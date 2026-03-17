@@ -76,6 +76,10 @@
     }
     .nav-pill:hover { border-color: var(--amber); }
     .section-header {
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    .section-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -385,7 +389,9 @@
         header.classList.add('collapsed');
         cards.classList.add('collapsed');
       }
-      header.addEventListener('click', () => {
+      header.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
         const isCollapsed = cards.classList.toggle('collapsed');
         header.classList.toggle('collapsed', isCollapsed);
         const list = getCollapsed();
@@ -399,4 +405,5 @@
 </script>
 </body>
 </html>
+
 
