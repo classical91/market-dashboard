@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -24,11 +24,6 @@
       --blue-bg: rgba(55,138,221,0.12);
       --coral: #D85A30;
       --coral-bg: rgba(216,90,48,0.12);
-      --purple: #7F77DD;
-      --purple-bg: rgba(127,119,221,0.12);
-      --green: #639922;
-      --green-bg: rgba(99,153,34,0.12);
-      --red: #E24B4A;
     }
 
     body {
@@ -72,47 +67,6 @@
       margin-bottom: 10px;
     }
 
-    /* ── Tickers ── */
-    .tickers {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-bottom: 2rem;
-    }
-    .tick {
-      background: var(--surface);
-      border: 0.5px solid var(--border);
-      border-radius: 8px;
-      padding: 9px 14px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      min-width: 130px;
-    }
-    .tick-sym {
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      font-size: 11px;
-      color: var(--muted);
-    }
-    .tick-price {
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      font-size: 14px;
-      color: var(--text);
-    }
-    .tick-chg {
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      font-size: 11px;
-      padding: 2px 6px;
-      border-radius: 4px;
-      margin-left: auto;
-    }
-    .up   { background: rgba(99,153,34,0.15); color: #97C459; }
-    .dn   { background: rgba(216,90,48,0.15); color: #F0997B; }
-    .flat { background: var(--surface2); color: var(--muted); }
-    .pulse { animation: pulse 1.4s ease-in-out infinite; color: var(--dim); }
-    @keyframes pulse { 0%,100%{opacity:.3} 50%{opacity:1} }
-
-    /* ── Cards grid ── */
     .cards {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
@@ -142,41 +96,6 @@
     .card-title { font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 4px; }
     .card-src { font-size: 11px; font-family: 'SF Mono', 'Fira Code', monospace; color: var(--dim); }
 
-    /* ── Calendar ── */
-    .calendar {
-      background: var(--surface);
-      border: 0.5px solid var(--border);
-      border-radius: 12px;
-      overflow: hidden;
-      margin-bottom: 2rem;
-    }
-    .cal-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 10px 16px;
-      border-bottom: 0.5px solid var(--border);
-      font-size: 13px;
-    }
-    .cal-row:last-child { border-bottom: none; }
-    .cal-name { display: flex; align-items: center; gap: 8px; }
-    .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-    .dot-hi { background: var(--red); }
-    .dot-md { background: var(--amber); }
-    .dot-lo { background: var(--dim); }
-    .cal-date { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; color: var(--dim); }
-
-    .legend {
-      display: flex;
-      gap: 16px;
-      padding: 10px 16px;
-      border-top: 0.5px solid var(--border);
-      font-size: 11px;
-      color: var(--dim);
-      font-family: 'SF Mono', 'Fira Code', monospace;
-    }
-    .legend span { display: flex; align-items: center; gap: 5px; }
-
     footer {
       font-size: 11px;
       color: var(--dim);
@@ -191,17 +110,8 @@
 
 <header>
   <span class="logo">Market Intel</span>
-  <span class="ts" id="ts">—</span>
+  <span class="ts" id="ts"></span>
 </header>
-
-<div class="section-label">Live Prices</div>
-<div class="tickers" id="tickers">
-  <div class="tick"><span class="tick-sym">BTC</span><span class="tick-price pulse">loading…</span></div>
-  <div class="tick"><span class="tick-sym">XRP</span><span class="tick-price pulse">loading…</span></div>
-  <div class="tick"><span class="tick-sym">ETH</span><span class="tick-price pulse">loading…</span></div>
-  <div class="tick"><span class="tick-sym">SOL</span><span class="tick-price pulse">loading…</span></div>
-  <div class="tick"><span class="tick-sym">F&amp;G</span><span class="tick-price pulse">loading…</span></div>
-</div>
 
 <div class="section-label">Quick Launch</div>
 <div class="cards">
@@ -221,7 +131,7 @@
     <div class="card-title">U.S. Economic Calendar</div>
     <div class="card-src">marketwatch.com</div>
   </a>
-  <a class="card" href="https://www.marketwatch.com/optionscenter/expirations" target="_blank">
+  <a class="card" href="https://www.marketwatch.com/tools/options-expiration-calendar" target="_blank">
     <div class="card-top">
       <span class="badge" style="background:var(--coral-bg);color:var(--coral)">OPTIONS EXP</span>
       <span class="arrow">↗</span>
@@ -229,62 +139,17 @@
     <div class="card-title">Options Expiration Calendar</div>
     <div class="card-src">marketwatch.com</div>
   </a>
-  <a class="card" href="https://www.marketwatch.com/bond-markets" target="_blank">
+  <a class="card" href="https://www.marketwatch.com/economy-politics" target="_blank">
     <div class="card-top">
-      <span class="badge" style="background:var(--blue-bg);color:var(--blue)">BONDS & RATES</span>
+      <span class="badge" style="background:var(--blue-bg);color:var(--blue)">BONDS &amp; RATES</span>
       <span class="arrow">↗</span>
     </div>
     <div class="card-title">Bonds &amp; Rates</div>
     <div class="card-src">marketwatch.com</div>
   </a>
-  <a class="card" href="https://www.marketwatch.com/economy-politics" target="_blank">
-    <div class="card-top">
-      <span class="badge" style="background:var(--purple-bg);color:var(--purple)">ECONOMICS</span>
-      <span class="arrow">↗</span>
-    </div>
-    <div class="card-title">Economics &amp; Politics</div>
-    <div class="card-src">marketwatch.com</div>
-  </a>
-  <a class="card" href="https://github.com/BigBodyCobain/Shadowbroker" target="_blank">
-    <div class="card-top">
-      <span class="badge" style="background:var(--green-bg);color:var(--green)">OSINT</span>
-      <span class="arrow">↗</span>
-    </div>
-    <div class="card-title">Shadowbroker Intel Tool</div>
-    <div class="card-src">github.com/BigBodyCobain</div>
-  </a>
 </div>
 
-<div class="section-label">Key Events This Week</div>
-<div class="calendar">
-  <div class="cal-row">
-    <span class="cal-name"><span class="dot dot-hi"></span>FOMC Rate Decision</span>
-    <span class="cal-date">Mar 19</span>
-  </div>
-  <div class="cal-row">
-    <span class="cal-name"><span class="dot dot-hi"></span>Fed Press Conference</span>
-    <span class="cal-date">Mar 19</span>
-  </div>
-  <div class="cal-row">
-    <span class="cal-name"><span class="dot dot-md"></span>Initial Jobless Claims</span>
-    <span class="cal-date">Mar 20</span>
-  </div>
-  <div class="cal-row">
-    <span class="cal-name"><span class="dot dot-md"></span>Philly Fed Manufacturing</span>
-    <span class="cal-date">Mar 20</span>
-  </div>
-  <div class="cal-row">
-    <span class="cal-name"><span class="dot dot-lo"></span>Existing Home Sales</span>
-    <span class="cal-date">Mar 20</span>
-  </div>
-  <div class="legend">
-    <span><span class="dot dot-hi"></span>High impact</span>
-    <span><span class="dot dot-md"></span>Medium</span>
-    <span><span class="dot dot-lo"></span>Low</span>
-  </div>
-</div>
-
-<footer>auto-refreshes every 60s · prices via coingecko &amp; alternative.me</footer>
+<footer>Market Intel</footer>
 
 <script>
   function setTimestamp() {
@@ -293,55 +158,8 @@
       now.toLocaleDateString('en-CA', { weekday:'short', month:'short', day:'numeric' }) +
       ' · ' + now.toLocaleTimeString('en-CA', { hour:'2-digit', minute:'2-digit' });
   }
-
-  async function loadPrices() {
-    const el = document.getElementById('tickers');
-    try {
-      const [cgRes, fgRes] = await Promise.all([
-        fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ripple,ethereum,solana&vs_currencies=usd&include_24hr_change=true'),
-        fetch('https://api.alternative.me/fng/')
-      ]);
-      const cg = await cgRes.json();
-      const fg = await fgRes.json();
-
-      const fgVal = parseInt(fg.data[0].value);
-      const fgName = fg.data[0].value_classification;
-      const fgCls = fgVal > 60 ? 'up' : fgVal < 40 ? 'dn' : 'flat';
-
-      const coins = [
-        { id:'bitcoin',  sym:'BTC', fmt: v => '$' + (v/1000).toFixed(1)+'k' },
-        { id:'ripple',   sym:'XRP', fmt: v => '$' + v.toFixed(3) },
-        { id:'ethereum', sym:'ETH', fmt: v => '$' + (v/1000).toFixed(2)+'k' },
-        { id:'solana',   sym:'SOL', fmt: v => '$' + v.toFixed(2) },
-      ];
-
-      let html = '';
-      for (const c of coins) {
-        const p = cg[c.id];
-        if (!p) continue;
-        const chg = p.usd_24h_change;
-        const cls = chg > 0.2 ? 'up' : chg < -0.2 ? 'dn' : 'flat';
-        const sign = chg > 0 ? '+' : '';
-        html += `<div class="tick">
-          <span class="tick-sym">${c.sym}</span>
-          <span class="tick-price">${c.fmt(p.usd)}</span>
-          <span class="tick-chg ${cls}">${sign}${chg.toFixed(2)}%</span>
-        </div>`;
-      }
-      html += `<div class="tick">
-        <span class="tick-sym">F&amp;G</span>
-        <span class="tick-price">${fgVal}</span>
-        <span class="tick-chg ${fgCls}">${fgName}</span>
-      </div>`;
-      el.innerHTML = html;
-    } catch(e) {
-      el.innerHTML = '<div class="tick"><span class="tick-price" style="color:var(--dim)">price fetch failed</span></div>';
-    }
-  }
-
   setTimestamp();
-  loadPrices();
-  setInterval(() => { setTimestamp(); loadPrices(); }, 60000);
+  setInterval(setTimestamp, 60000);
 </script>
 </body>
 </html>
