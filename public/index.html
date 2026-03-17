@@ -390,7 +390,9 @@
   }
 
   function initSections() {
-    const collapsed = getCollapsed();
+    const stored = localStorage.getItem(STORE_KEY);
+    const allIds = Array.from(document.querySelectorAll('.section-header')).map(h => h.dataset.section);
+    const collapsed = stored ? JSON.parse(stored) : allIds;
     document.querySelectorAll('.section-header').forEach(header => {
       const id = header.dataset.section;
       const cards = document.getElementById(id);
@@ -413,3 +415,4 @@
 </script>
 </body>
 </html>
+
