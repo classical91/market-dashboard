@@ -1,0 +1,261 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Traditional Markets</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0f0f0f; --surface: #1a1a1a; --surface2: #222;
+      --border: rgba(255,255,255,0.08); --border-hover: rgba(255,255,255,0.18);
+      --text: #f0ede8; --muted: #888; --dim: #555;
+      --amber: #EF9F27; --amber-bg: rgba(239,159,39,0.12);
+      --teal: #1D9E75; --teal-bg: rgba(29,158,117,0.12);
+      --blue: #378ADD; --blue-bg: rgba(55,138,221,0.12);
+      --coral: #D85A30; --coral-bg: rgba(216,90,48,0.12);
+      --purple: #7F77DD; --purple-bg: rgba(127,119,221,0.12);
+      --green: #639922; --green-bg: rgba(99,153,34,0.12);
+      --accent: #378ADD;
+    }
+    body { font-family:-apple-system,'SF Pro Text','Segoe UI',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; padding:2rem 1.5rem; max-width:900px; margin:0 auto; }
+    header { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:1.5rem; padding-bottom:14px; border-bottom:0.5px solid var(--border); }
+    .logo { font-family:'SF Mono','Fira Code',monospace; font-size:13px; font-weight:500; letter-spacing:0.12em; text-transform:uppercase; color:var(--blue); }
+    .back { font-family:'SF Mono','Fira Code',monospace; font-size:11px; color:var(--dim); text-decoration:none; transition:color 0.15s; }
+    .back:hover { color:var(--muted); }
+    .nav-pills { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:2rem; }
+    .nav-pill { font-family:'SF Mono','Fira Code',monospace; font-size:10px; letter-spacing:0.08em; text-transform:uppercase; text-decoration:none; padding:4px 10px; border-radius:20px; border:0.5px solid rgba(55,138,221,0.3); color:var(--blue); background:var(--blue-bg); transition:border-color 0.15s; }
+    .nav-pill:hover { border-color:var(--blue); }
+    .section-header { display:flex; align-items:center; justify-content:space-between; cursor:pointer; user-select:none; -webkit-tap-highlight-color:transparent; touch-action:manipulation; margin-bottom:10px; padding:4px 0; }
+    .section-header:hover .section-label { color:var(--muted); }
+    .section-label { font-family:'SF Mono','Fira Code',monospace; font-size:10px; letter-spacing:0.12em; text-transform:uppercase; color:var(--blue); transition:color 0.15s; }
+    .section-chevron { font-size:10px; color:var(--blue); opacity:0.6; transition:transform 0.2s ease; }
+    .section-header.collapsed .section-chevron { transform:rotate(-90deg); }
+    .cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:10px; margin-bottom:2rem; overflow:hidden; transition:max-height 0.25s ease,opacity 0.2s ease,margin-bottom 0.25s ease; max-height:2000px; opacity:1; }
+    .cards.collapsed { max-height:0; opacity:0; margin-bottom:0.5rem; pointer-events:none; }
+    .card { background:var(--surface); border:0.5px solid var(--border); border-radius:12px; padding:14px 16px; text-decoration:none; display:block; transition:border-color 0.15s,background 0.15s; }
+    .card:hover { border-color:var(--blue); background:var(--surface2); }
+    .card-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px; }
+    .badge { font-family:'SF Mono','Fira Code',monospace; font-size:10px; font-weight:500; padding:3px 8px; border-radius:5px; letter-spacing:0.06em; }
+    .arrow { color:var(--dim); font-size:14px; }
+    .card-title { font-size:13px; font-weight:500; color:var(--text); margin-bottom:4px; }
+    .card-src { font-size:11px; font-family:'SF Mono','Fira Code',monospace; color:var(--dim); }
+    footer { font-size:11px; color:var(--dim); font-family:'SF Mono','Fira Code',monospace; text-align:center; padding-top:1rem; border-top:0.5px solid var(--border); }
+  </style>
+</head>
+<body>
+
+<header>
+  <span class="logo">&#9670; Traditional Markets</span>
+  <a href="/" class="back">&#8592; Market Intel</a>
+</header>
+
+<div class="nav-pills">
+  <a href="#cnbc" class="nav-pill">CNBC</a>
+  <a href="#news-analysis" class="nav-pill">News &amp; Analysis</a>
+  <a href="#market-data" class="nav-pill">Market Data</a>
+  <a href="#macro" class="nav-pill">Macro</a>
+  <a href="#global" class="nav-pill">Global</a>
+  <a href="#commodities" class="nav-pill">Commodities</a>
+</div>
+
+<div class="section-header" data-section="cnbc">
+  <span class="section-label">CNBC</span>
+  <span class="section-chevron">&#9660;</span>
+</div>
+<div class="cards" id="cnbc">
+  <a class="card" href="https://www.cnbc.com/pre-markets/" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">PRE-MARKETS</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Pre-Markets</div><div class="card-src">cnbc.com</div>
+  </a>
+  <a class="card" href="https://www.cnbc.com/us-markets/" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">US MARKETS</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">US Markets</div><div class="card-src">cnbc.com</div>
+  </a>
+  <a class="card" href="https://www.cnbc.com/currencies/" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">CURRENCIES</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Currencies</div><div class="card-src">cnbc.com</div>
+  </a>
+  <a class="card" href="https://www.cnbc.com/futures-and-commodities/" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">FUTURES &amp; COMM.</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Futures &amp; Commodities</div><div class="card-src">cnbc.com</div>
+  </a>
+  <a class="card" href="https://www.cnbc.com/bonds/" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">BONDS</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Bonds &amp; Rates</div><div class="card-src">cnbc.com</div>
+  </a>
+  <a class="card" href="https://www.cnbc.com/funds-and-etfs/" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">FUNDS &amp; ETFS</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Funds &amp; ETFs</div><div class="card-src">cnbc.com</div>
+  </a>
+</div>
+
+<div class="section-header" data-section="news-analysis">
+  <span class="section-label">News &amp; Analysis</span>
+  <span class="section-chevron">&#9660;</span>
+</div>
+<div class="cards" id="news-analysis">
+  <a class="card" href="https://www.bloomberg.com/markets" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">BLOOMBERG</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Bloomberg Markets</div><div class="card-src">bloomberg.com</div>
+  </a>
+  <a class="card" href="https://finance.yahoo.com/" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">YAHOO FINANCE</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Yahoo Finance</div><div class="card-src">finance.yahoo.com</div>
+  </a>
+  <a class="card" href="https://www.reuters.com/business/finance/" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">REUTERS</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Reuters Finance</div><div class="card-src">reuters.com</div>
+  </a>
+  <a class="card" href="https://www.wsj.com/finance" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">WSJ</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Wall Street Journal Finance</div><div class="card-src">wsj.com</div>
+  </a>
+  <a class="card" href="https://seekingalpha.com/" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">SEEKING ALPHA</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Seeking Alpha</div><div class="card-src">seekingalpha.com</div>
+  </a>
+  <a class="card" href="https://www.fool.com/" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">MOTLEY FOOL</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">The Motley Fool</div><div class="card-src">fool.com</div>
+  </a>
+  <a class="card" href="https://www.investopedia.com/" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--surface2);color:var(--muted)">INVESTOPEDIA</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Investopedia</div><div class="card-src">investopedia.com</div>
+  </a>
+</div>
+
+<div class="section-header" data-section="market-data">
+  <span class="section-label">Market Data</span>
+  <span class="section-chevron">&#9660;</span>
+</div>
+<div class="cards" id="market-data">
+  <a class="card" href="https://finviz.com/" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--green-bg);color:var(--green)">FINVIZ</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Equity Heatmap &amp; Screener</div><div class="card-src">finviz.com</div>
+  </a>
+  <a class="card" href="https://www.koyfin.com/" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--green-bg);color:var(--green)">KOYFIN</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Koyfin Market Dashboard</div><div class="card-src">koyfin.com</div>
+  </a>
+  <a class="card" href="https://www.morningstar.com/" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--green-bg);color:var(--green)">MORNINGSTAR</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Morningstar</div><div class="card-src">morningstar.com</div>
+  </a>
+  <a class="card" href="https://www.tradingview.com/heatmap/stock/#%7B%22dataSource%22%3A%22SPX500%22%2C%22blockColor%22%3A%22change%22%2C%22blockSize%22%3A%22market_cap_basic%22%2C%22grouping%22%3A%22sector%22%7D" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">SPX HEATMAP</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">S&amp;P 500 Sector Heatmap</div><div class="card-src">tradingview.com</div>
+  </a>
+  <a class="card" href="https://www.tradingview.com/watchlists/100857422/" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">TV WATCHLIST</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">TradingView Watchlist</div><div class="card-src">tradingview.com</div>
+  </a>
+  <a class="card" href="https://www.marketwatch.com/tools/options-expiration-calendar" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">OPTIONS EXP</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Options Expiration Calendar</div><div class="card-src">marketwatch.com</div>
+  </a>
+  <a class="card" href="https://www.marketwatch.com/economy-politics/calendar" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">ECON CALENDAR</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Economic Calendar</div><div class="card-src">marketwatch.com</div>
+  </a>
+  <a class="card" href="https://companiesmarketcap.com/assets-by-market-cap/" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">MARKET CAP</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Assets by Market Cap</div><div class="card-src">companiesmarketcap.com</div>
+  </a>
+  <a class="card" href="https://www.forexfactory.com/" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">FOREX FACTORY</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Forex Factory Calendar</div><div class="card-src">forexfactory.com</div>
+  </a>
+</div>
+
+<div class="section-header" data-section="macro">
+  <span class="section-label">Macro</span>
+  <span class="section-chevron">&#9660;</span>
+</div>
+<div class="cards" id="macro">
+  <a class="card" href="https://fred.stlouisfed.org/series/GFDEBTN" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">FRED</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">US Federal Debt (FRED)</div><div class="card-src">fred.stlouisfed.org</div>
+  </a>
+  <a class="card" href="https://usdebtclock.org/" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">DEBT CLOCK</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">US Debt Clock</div><div class="card-src">usdebtclock.org</div>
+  </a>
+  <a class="card" href="https://tradingeconomics.com/canada/forecast" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">CANADA FORECAST</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Canada Economic Forecast</div><div class="card-src">tradingeconomics.com</div>
+  </a>
+  <a class="card" href="https://en.macromicro.me/spotlights" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">MACRO SPOTLIGHTS</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">MacroMicro Spotlights</div><div class="card-src">macromicro.me</div>
+  </a>
+  <a class="card" href="https://en.macromicro.me/charts/62344/philly-fed-anxious-index" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">PHILLY FED</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Philly Fed Anxious Index</div><div class="card-src">macromicro.me</div>
+  </a>
+  <a class="card" href="https://en.macromicro.me/collections/2/us-gdp-relative/66653/us-nber-recession-indicators-drawdown" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">RECESSION IND.</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">NBER Recession Indicators</div><div class="card-src">macromicro.me</div>
+  </a>
+  <a class="card" href="https://tradingeconomics.com/" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">TRADING ECON.</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Trading Economics</div><div class="card-src">tradingeconomics.com</div>
+  </a>
+</div>
+
+<div class="section-header" data-section="global">
+  <span class="section-label">Global</span>
+  <span class="section-chevron">&#9660;</span>
+</div>
+<div class="cards" id="global">
+  <a class="card" href="https://companiesmarketcap.com/china/largest-companies-in-china-by-market-cap/" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">CHINA</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Largest Chinese Companies</div><div class="card-src">companiesmarketcap.com</div>
+  </a>
+  <a class="card" href="https://companiesmarketcap.com/assets-by-market-cap/" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">ALL ASSETS</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Global Assets by Market Cap</div><div class="card-src">companiesmarketcap.com</div>
+  </a>
+</div>
+
+<div class="section-header" data-section="commodities">
+  <span class="section-label">Commodities</span>
+  <span class="section-chevron">&#9660;</span>
+</div>
+<div class="cards" id="commodities">
+  <a class="card" href="https://www.goldpriceforecast.com/explanations/gold-commercial-traders/" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">GOLD COT</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Gold Commercial Traders (COT)</div><div class="card-src">goldpriceforecast.com</div>
+  </a>
+</div>
+
+<footer>Traditional Markets &mdash; <a href="/" style="color:var(--dim);text-decoration:none;">Market Intel</a></footer>
+
+<script>
+  const STORE_KEY = 'trad_collapsed';
+  function getCollapsed() { try { return JSON.parse(localStorage.getItem(STORE_KEY)||'[]'); } catch { return []; } }
+  function saveCollapsed(list) { localStorage.setItem(STORE_KEY, JSON.stringify(list)); }
+  function initSections() {
+    const stored = localStorage.getItem(STORE_KEY);
+    const allIds = Array.from(document.querySelectorAll('.section-header[data-section]')).map(h=>h.dataset.section);
+    const collapsed = stored ? JSON.parse(stored) : allIds;
+    document.querySelectorAll('.section-header[data-section]').forEach(header => {
+      const id = header.dataset.section;
+      const cards = document.getElementById(id);
+      if (!cards) return;
+      if (collapsed.includes(id)) { header.classList.add('collapsed'); cards.classList.add('collapsed'); }
+      header.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        const isCollapsed = cards.classList.toggle('collapsed');
+        header.classList.toggle('collapsed', isCollapsed);
+        const list = getCollapsed();
+        if (isCollapsed) { if (!list.includes(id)) list.push(id); }
+        else { const i = list.indexOf(id); if (i > -1) list.splice(i, 1); }
+        saveCollapsed(list);
+      });
+    });
+  }
+  initSections();
+</script>
+</body>
+</html>
