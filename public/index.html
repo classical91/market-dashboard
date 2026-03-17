@@ -6,157 +6,44 @@
   <title>Market Intel</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     :root {
-      --bg: #0f0f0f;
-      --surface: #1a1a1a;
-      --surface2: #222;
-      --border: rgba(255,255,255,0.08);
-      --border-hover: rgba(255,255,255,0.18);
-      --text: #f0ede8;
-      --muted: #888;
-      --dim: #555;
-      --amber: #EF9F27;
-      --amber-bg: rgba(239,159,39,0.12);
-      --teal: #1D9E75;
-      --teal-bg: rgba(29,158,117,0.12);
-      --blue: #378ADD;
-      --blue-bg: rgba(55,138,221,0.12);
-      --coral: #D85A30;
-      --coral-bg: rgba(216,90,48,0.12);
-      --purple: #7F77DD;
-      --purple-bg: rgba(127,119,221,0.12);
-      --green: #639922;
-      --green-bg: rgba(99,153,34,0.12);
+      --bg: #0f0f0f; --surface: #1a1a1a; --surface2: #222;
+      --border: rgba(255,255,255,0.08); --border-hover: rgba(255,255,255,0.18);
+      --text: #f0ede8; --muted: #888; --dim: #555;
+      --amber: #EF9F27; --amber-bg: rgba(239,159,39,0.12);
+      --teal: #1D9E75; --teal-bg: rgba(29,158,117,0.12);
+      --blue: #378ADD; --blue-bg: rgba(55,138,221,0.12);
+      --coral: #D85A30; --coral-bg: rgba(216,90,48,0.12);
+      --purple: #7F77DD; --purple-bg: rgba(127,119,221,0.12);
+      --green: #639922; --green-bg: rgba(99,153,34,0.12);
     }
-
-    body {
-      font-family: -apple-system, 'SF Pro Text', 'Segoe UI', sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      padding: 2rem 1.5rem;
-      max-width: 900px;
-      margin: 0 auto;
-    }
-
-    header {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      margin-bottom: 2rem;
-      padding-bottom: 14px;
-      border-bottom: 0.5px solid var(--border);
-    }
-    .logo {
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      font-size: 13px;
-      font-weight: 500;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--text);
-    }
-    .ts {
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      font-size: 11px;
-      color: var(--dim);
-    }
-
-    .section-header {
-      -webkit-tap-highlight-color: transparent;
-      touch-action: manipulation;
-    }
-    .section-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      cursor: pointer;
-      user-select: none;
-      margin-bottom: 10px;
-      padding: 4px 0;
-    }
-    .section-header:hover .section-label { color: var(--muted); }
-    .section-label {
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      font-size: 10px;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--dim);
-      transition: color 0.15s;
-    }
-    .section-chevron {
-      font-size: 10px;
-      color: var(--dim);
-      transition: transform 0.2s ease, color 0.15s;
-    }
-    .section-header:hover .section-chevron { color: var(--muted); }
-    .section-header.collapsed .section-chevron { transform: rotate(-90deg); }
-
-    .cards {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-      gap: 10px;
-      margin-bottom: 2rem;
-      overflow: hidden;
-      transition: max-height 0.25s ease, opacity 0.2s ease, margin-bottom 0.25s ease;
-      max-height: 2000px;
-      opacity: 1;
-    }
-    .cards.collapsed {
-      max-height: 0;
-      opacity: 0;
-      margin-bottom: 0.5rem;
-      pointer-events: none;
-    }
-
-    .card {
-      background: var(--surface);
-      border: 0.5px solid var(--border);
-      border-radius: 12px;
-      padding: 14px 16px;
-      text-decoration: none;
-      display: block;
-      transition: border-color 0.15s, background 0.15s;
-    }
-    .card:hover { border-color: var(--border-hover); background: var(--surface2); }
-    .card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
-    .badge {
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      font-size: 10px;
-      font-weight: 500;
-      padding: 3px 8px;
-      border-radius: 5px;
-      letter-spacing: 0.06em;
-    }
-    .arrow { color: var(--dim); font-size: 14px; }
-    .card-title { font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 4px; }
-    .card-src { font-size: 11px; font-family: 'SF Mono', 'Fira Code', monospace; color: var(--dim); }
-
-    .nav-pill {
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      font-size: 10px;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      text-decoration: none;
-      padding: 4px 10px;
-      border-radius: 20px;
-      border: 0.5px solid var(--border);
-      color: var(--dim);
-      background: var(--surface);
-      transition: border-color 0.15s, color 0.15s;
-    }
-    .nav-pill:hover { border-color: var(--border-hover); color: var(--muted); }
-    .nav-pill-crypto { border-color: rgba(239,159,39,0.3); color: var(--amber); background: var(--amber-bg); }
-    .nav-pill-crypto:hover { border-color: var(--amber); }
-
-    footer {
-      font-size: 11px;
-      color: var(--dim);
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      text-align: center;
-      padding-top: 1rem;
-      border-top: 0.5px solid var(--border);
-    }
+    body { font-family: -apple-system,'SF Pro Text','Segoe UI',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; padding:2rem 1.5rem; max-width:900px; margin:0 auto; }
+    header { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:1.5rem; padding-bottom:14px; border-bottom:0.5px solid var(--border); }
+    .logo { font-family:'SF Mono','Fira Code',monospace; font-size:13px; font-weight:500; letter-spacing:0.12em; text-transform:uppercase; color:var(--text); }
+    .ts { font-family:'SF Mono','Fira Code',monospace; font-size:11px; color:var(--dim); }
+    .nav-pills { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:2rem; }
+    .nav-pill { font-family:'SF Mono','Fira Code',monospace; font-size:10px; letter-spacing:0.08em; text-transform:uppercase; text-decoration:none; padding:4px 10px; border-radius:20px; border:0.5px solid var(--border); color:var(--dim); background:var(--surface); transition:border-color 0.15s,color 0.15s; }
+    .nav-pill:hover { border-color:var(--border-hover); color:var(--muted); }
+    .nav-pill-crypto { border-color:rgba(239,159,39,0.3); color:var(--amber); background:var(--amber-bg); }
+    .nav-pill-crypto:hover { border-color:var(--amber); }
+    .section-header { display:flex; align-items:center; justify-content:space-between; cursor:pointer; user-select:none; -webkit-tap-highlight-color:transparent; touch-action:manipulation; margin-bottom:10px; padding:4px 0; }
+    .section-header:hover .section-label { color:var(--muted); }
+    .section-label { font-family:'SF Mono','Fira Code',monospace; font-size:10px; letter-spacing:0.12em; text-transform:uppercase; color:var(--dim); transition:color 0.15s; }
+    .section-chevron { font-size:10px; color:var(--dim); transition:transform 0.2s ease,color 0.15s; }
+    .section-header:hover .section-chevron { color:var(--muted); }
+    .section-header.collapsed .section-chevron { transform:rotate(-90deg); }
+    .cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:10px; margin-bottom:2rem; overflow:hidden; transition:max-height 0.25s ease,opacity 0.2s ease,margin-bottom 0.25s ease; max-height:2000px; opacity:1; }
+    .cards.collapsed { max-height:0; opacity:0; margin-bottom:0.5rem; pointer-events:none; }
+    .card { background:var(--surface); border:0.5px solid var(--border); border-radius:12px; padding:14px 16px; text-decoration:none; display:block; transition:border-color 0.15s,background 0.15s; }
+    .card:hover { border-color:var(--border-hover); background:var(--surface2); }
+    .card-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px; }
+    .badge { font-family:'SF Mono','Fira Code',monospace; font-size:10px; font-weight:500; padding:3px 8px; border-radius:5px; letter-spacing:0.06em; }
+    .arrow { color:var(--dim); font-size:14px; }
+    .card-title { font-size:13px; font-weight:500; color:var(--text); margin-bottom:4px; }
+    .card-src { font-size:11px; font-family:'SF Mono','Fira Code',monospace; color:var(--dim); }
+    .section-link { text-decoration:none; display:block; margin-bottom:2rem; }
+    .section-link .section-header { margin-bottom:0; }
+    footer { font-size:11px; color:var(--dim); font-family:'SF Mono','Fira Code',monospace; text-align:center; padding-top:1rem; border-top:0.5px solid var(--border); }
   </style>
 </head>
 <body>
@@ -166,407 +53,119 @@
   <span class="ts" id="ts"></span>
 </header>
 
-<nav style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:2rem;">
+<div class="nav-pills">
   <a href="#market-overview" class="nav-pill">Market Overview</a>
   <a href="#macro-indicators" class="nav-pill">Macro Indicators</a>
   <a href="#news" class="nav-pill">News</a>
   <a href="#trends" class="nav-pill">Trends</a>
   <a href="#screeners" class="nav-pill">Screeners</a>
   <a href="#commodities" class="nav-pill">Commodities</a>
-  <a href="#on-chain" class="nav-pill nav-pill-crypto">On-Chain</a>
-  <a href="#sentiment" class="nav-pill nav-pill-crypto">Sentiment</a>
   <a href="#key-charts" class="nav-pill">Key Charts</a>
-  <a href="#btc-research" class="nav-pill nav-pill-crypto">BTC Research</a>
-  <a href="#alt-research" class="nav-pill nav-pill-crypto">Alt Research</a>
   <a href="#research" class="nav-pill">Research</a>
-</nav>
+  <a href="/crypto.html" class="nav-pill nav-pill-crypto">Crypto</a>
+</div>
 
-
-<div class="section-header" data-section="market-overview">
+<div class="section-header" id="market-overview" data-section="market-overview">
   <span class="section-label">Market Overview</span>
   <span class="section-chevron">&#9660;</span>
 </div>
-<div class="cards" id="market-overview">
-  <a class="card" href="https://companiesmarketcap.com/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">MARKET CAP</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Assets Ranked by Market Cap</div>
-    <div class="card-src">companiesmarketcap.com</div>
-  </a>
-  <a class="card" href="https://www.marketwatch.com/economy-politics/calendar" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">ECON CALENDAR</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">U.S. Economic Calendar</div>
-    <div class="card-src">marketwatch.com</div>
-  </a>
-  <a class="card" href="https://www.marketwatch.com/tools/options-expiration-calendar" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">OPTIONS EXP</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Options Expiration Calendar</div>
-    <div class="card-src">marketwatch.com</div>
-  </a>
-  <a class="card" href="https://www.cnbc.com/bonds/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">BONDS &amp; RATES</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Bonds &amp; Rates</div>
-    <div class="card-src">cnbc.com</div>
-  </a>
-  <a class="card" href="https://tradingeconomics.com/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">MACRO DATA</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Trading Economics</div>
-    <div class="card-src">tradingeconomics.com</div>
-  </a>
-  <a class="card" href="https://www.timeanddate.com/moon/phases/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">MOON PHASES</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Moon Phase Calendar</div>
-    <div class="card-src">timeanddate.com</div>
-  </a>
-  <a class="card" href="https://www.tradingview.com/markets/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">TV MARKETS</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">TradingView Markets</div>
-    <div class="card-src">tradingview.com</div>
-  </a>
-  <a class="card" href="https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">FOMC</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">FOMC Meeting Calendar</div>
-    <div class="card-src">federalreserve.gov</div>
-  </a>
-  <a class="card" href="https://www.cnn.com/markets#market-movers" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">CNN MARKETS</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Market Movers</div>
-    <div class="card-src">cnn.com/markets</div>
-  </a>
-  <a class="card" href="https://tradingeconomics.com/stocks" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">STOCKS</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Global Stock Markets</div>
-    <div class="card-src">tradingeconomics.com</div>
-  </a>
-  <a class="card" href="https://www.barchart.com/futures" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">FUTURES</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Futures Overview</div>
-    <div class="card-src">barchart.com</div>
-  </a>
-  <a class="card" href="https://www.cnbc.com/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--surface2);color:var(--muted)">CNBC</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">CNBC Markets</div>
-    <div class="card-src">cnbc.com</div>
-  </a>
-  <a class="card" href="https://coinmarketcap.com/best-cryptos/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">BEST CRYPTOS</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Best Performing Cryptos</div>
-    <div class="card-src">coinmarketcap.com</div>
-  </a>
-  <a class="card" href="https://coinmarketcap.com/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">CMC</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">CoinMarketCap</div>
-    <div class="card-src">coinmarketcap.com</div>
-  </a>
-  <a class="card" href="https://www.tradingview.com/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">TRADINGVIEW</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">TradingView</div>
-    <div class="card-src">tradingview.com</div>
-  </a>
-  <a class="card" href="https://www.tradingview.com/chart/UBsUirLO/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">TV CHART 1</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">TradingView Chart</div>
-    <div class="card-src">tradingview.com</div>
-  </a>
-  <a class="card" href="https://www.tradingview.com/chart/uwHQFIja/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">TV CHART 2</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">TradingView Chart</div>
-    <div class="card-src">tradingview.com</div>
-  </a>
-  <a class="card" href="https://www.tradingview.com/chart/tDSfdLfo/?symbol=SP%3ASPX" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">SPX CHART</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">S&amp;P 500 Chart</div>
-    <div class="card-src">tradingview.com</div>
-  </a></div>
+<div class="cards" id="cards-market-overview">
+  <a class="card" href="https://companiesmarketcap.com/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">MARKET CAP</span><span class="arrow">&#8599;</span></div><div class="card-title">Assets Ranked by Market Cap</div><div class="card-src">companiesmarketcap.com</div></a>
+  <a class="card" href="https://www.marketwatch.com/economy-politics/calendar" target="_blank"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">ECON CALENDAR</span><span class="arrow">&#8599;</span></div><div class="card-title">U.S. Economic Calendar</div><div class="card-src">marketwatch.com</div></a>
+  <a class="card" href="https://www.marketwatch.com/tools/options-expiration-calendar" target="_blank"><div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">OPTIONS EXP</span><span class="arrow">&#8599;</span></div><div class="card-title">Options Expiration Calendar</div><div class="card-src">marketwatch.com</div></a>
+  <a class="card" href="https://www.cnbc.com/bonds/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">BONDS &amp; RATES</span><span class="arrow">&#8599;</span></div><div class="card-title">Bonds &amp; Rates</div><div class="card-src">cnbc.com</div></a>
+  <a class="card" href="https://tradingeconomics.com/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">MACRO DATA</span><span class="arrow">&#8599;</span></div><div class="card-title">Trading Economics</div><div class="card-src">tradingeconomics.com</div></a>
+  <a class="card" href="https://www.timeanddate.com/moon/phases/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">MOON PHASES</span><span class="arrow">&#8599;</span></div><div class="card-title">Moon Phase Calendar</div><div class="card-src">timeanddate.com</div></a>
+  <a class="card" href="https://www.tradingview.com/markets/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">TV MARKETS</span><span class="arrow">&#8599;</span></div><div class="card-title">TradingView Markets</div><div class="card-src">tradingview.com</div></a>
+  <a class="card" href="https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm" target="_blank"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">FOMC</span><span class="arrow">&#8599;</span></div><div class="card-title">FOMC Meeting Calendar</div><div class="card-src">federalreserve.gov</div></a>
+  <a class="card" href="https://www.cnn.com/markets#market-movers" target="_blank"><div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">CNN MARKETS</span><span class="arrow">&#8599;</span></div><div class="card-title">Market Movers</div><div class="card-src">cnn.com/markets</div></a>
+  <a class="card" href="https://tradingeconomics.com/stocks" target="_blank"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">STOCKS</span><span class="arrow">&#8599;</span></div><div class="card-title">Global Stock Markets</div><div class="card-src">tradingeconomics.com</div></a>
+  <a class="card" href="https://www.barchart.com/futures" target="_blank"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">FUTURES</span><span class="arrow">&#8599;</span></div><div class="card-title">Futures Overview</div><div class="card-src">barchart.com</div></a>
+  <a class="card" href="https://www.cnbc.com/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--surface2);color:var(--muted)">CNBC</span><span class="arrow">&#8599;</span></div><div class="card-title">CNBC Markets</div><div class="card-src">cnbc.com</div></a>
+  <a class="card" href="https://coinmarketcap.com/best-cryptos/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">BEST CRYPTOS</span><span class="arrow">&#8599;</span></div><div class="card-title">Best Performing Cryptos</div><div class="card-src">coinmarketcap.com</div></a>
+  <a class="card" href="https://coinmarketcap.com/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">CMC</span><span class="arrow">&#8599;</span></div><div class="card-title">CoinMarketCap</div><div class="card-src">coinmarketcap.com</div></a>
+  <a class="card" href="https://www.tradingview.com/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">TRADINGVIEW</span><span class="arrow">&#8599;</span></div><div class="card-title">TradingView</div><div class="card-src">tradingview.com</div></a>
+  <a class="card" href="https://www.tradingview.com/chart/UBsUirLO/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">TV CHART 1</span><span class="arrow">&#8599;</span></div><div class="card-title">TradingView Chart</div><div class="card-src">tradingview.com</div></a>
+  <a class="card" href="https://www.tradingview.com/chart/uwHQFIja/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">TV CHART 2</span><span class="arrow">&#8599;</span></div><div class="card-title">TradingView Chart</div><div class="card-src">tradingview.com</div></a>
+  <a class="card" href="https://www.tradingview.com/chart/tDSfdLfo/?symbol=SP%3ASPX" target="_blank"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">SPX CHART</span><span class="arrow">&#8599;</span></div><div class="card-title">S&amp;P 500 Chart</div><div class="card-src">tradingview.com</div></a>
+</div>
 
-<a href="/crypto.html" style="text-decoration:none;">
-  <div class="section-header" style="margin-bottom:2rem;">
+<a href="/crypto.html" class="section-link" id="crypto">
+  <div class="section-header" style="margin-bottom:0;">
     <span class="section-label" style="color:var(--amber);">Crypto &#8599;</span>
     <span class="section-chevron" style="color:var(--amber);opacity:0.7;">&#9654;</span>
   </div>
 </a>
-<div class="section-header" data-section="macro-indicators">
+
+<div class="section-header" id="macro-indicators" data-section="macro-indicators">
   <span class="section-label">Macro Indicators</span>
   <span class="section-chevron">&#9660;</span>
 </div>
-<div class="cards" id="macro-indicators">
-  <a class="card" href="https://tradingeconomics.com/country-list/interest-rate" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">INTEREST RATES</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Interest Rates by Country</div>
-    <div class="card-src">tradingeconomics.com</div>
-  </a>
-  <a class="card" href="https://tradingeconomics.com/country-list/inflation-rate" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">INFLATION</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Inflation Rate by Country</div>
-    <div class="card-src">tradingeconomics.com</div>
-  </a>
-  <a class="card" href="https://tradingeconomics.com/country-list/gdp-growth-rate" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">GDP GROWTH</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">GDP Growth Rate by Country</div>
-    <div class="card-src">tradingeconomics.com</div>
-  </a>
-  <a class="card" href="https://tradingeconomics.com/country-list/unemployment-rate" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">UNEMPLOYMENT</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Unemployment Rate by Country</div>
-    <div class="card-src">tradingeconomics.com</div>
-  </a>
+<div class="cards" id="cards-macro-indicators">
+  <a class="card" href="https://tradingeconomics.com/country-list/interest-rate" target="_blank"><div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">INTEREST RATES</span><span class="arrow">&#8599;</span></div><div class="card-title">Interest Rates by Country</div><div class="card-src">tradingeconomics.com</div></a>
+  <a class="card" href="https://tradingeconomics.com/country-list/inflation-rate" target="_blank"><div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">INFLATION</span><span class="arrow">&#8599;</span></div><div class="card-title">Inflation Rate by Country</div><div class="card-src">tradingeconomics.com</div></a>
+  <a class="card" href="https://tradingeconomics.com/country-list/gdp-growth-rate" target="_blank"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">GDP GROWTH</span><span class="arrow">&#8599;</span></div><div class="card-title">GDP Growth Rate by Country</div><div class="card-src">tradingeconomics.com</div></a>
+  <a class="card" href="https://tradingeconomics.com/country-list/unemployment-rate" target="_blank"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">UNEMPLOYMENT</span><span class="arrow">&#8599;</span></div><div class="card-title">Unemployment Rate by Country</div><div class="card-src">tradingeconomics.com</div></a>
 </div>
-<div class="section-header" data-section="news">
+
+<div class="section-header" id="news" data-section="news">
   <span class="section-label">News</span>
   <span class="section-chevron">&#9660;</span>
 </div>
-<div class="cards" id="news">
-  <a class="card" href="https://www.tradingview.com/news/markets/crypto/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">CRYPTO NEWS</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Crypto Market News</div>
-    <div class="card-src">tradingview.com</div>
-  </a>
-  <a class="card" href="https://www.tradingview.com/symbols/BTCUSDT.P/news/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">BTC NEWS</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">BTCUSDT News Feed</div>
-    <div class="card-src">tradingview.com</div>
-  </a>
-  <a class="card" href="https://coinmarketcap.com/community/articles/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">CMC ARTICLES</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">CoinMarketCap Articles</div>
-    <div class="card-src">coinmarketcap.com</div>
-  </a>
+<div class="cards" id="cards-news">
+  <a class="card" href="https://www.tradingview.com/news/markets/crypto/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">CRYPTO NEWS</span><span class="arrow">&#8599;</span></div><div class="card-title">Crypto Market News</div><div class="card-src">tradingview.com</div></a>
+  <a class="card" href="https://www.tradingview.com/symbols/BTCUSDT.P/news/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">BTC NEWS</span><span class="arrow">&#8599;</span></div><div class="card-title">BTCUSDT News Feed</div><div class="card-src">tradingview.com</div></a>
+  <a class="card" href="https://coinmarketcap.com/community/articles/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">CMC ARTICLES</span><span class="arrow">&#8599;</span></div><div class="card-title">CoinMarketCap Articles</div><div class="card-src">coinmarketcap.com</div></a>
 </div>
 
-<div class="section-header" data-section="trends">
+<div class="section-header" id="trends" data-section="trends">
   <span class="section-label">Trends</span>
   <span class="section-chevron">&#9660;</span>
 </div>
-<div class="cards" id="trends">
-  <a class="card" href="https://x.com/i/trends" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--surface2);color:var(--muted)">X TRENDS</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Trending on X</div>
-    <div class="card-src">x.com</div>
-  </a>
-  <a class="card" href="https://trends.google.com/trending?geo=CA&hl=en-US" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">GOOGLE TRENDS</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Google Trends &mdash; Canada</div>
-    <div class="card-src">trends.google.com</div>
-  </a>
-  <a class="card" href="https://www.youtube.com/@WhatsTrending" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">YT TRENDS</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">What&apos;s Trending on YouTube</div>
-    <div class="card-src">youtube.com/@WhatsTrending</div>
-  </a>
+<div class="cards" id="cards-trends">
+  <a class="card" href="https://x.com/i/trends" target="_blank"><div class="card-top"><span class="badge" style="background:var(--surface2);color:var(--muted)">X TRENDS</span><span class="arrow">&#8599;</span></div><div class="card-title">Trending on X</div><div class="card-src">x.com</div></a>
+  <a class="card" href="https://trends.google.com/trending?geo=CA&hl=en-US" target="_blank"><div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">GOOGLE TRENDS</span><span class="arrow">&#8599;</span></div><div class="card-title">Google Trends &mdash; Canada</div><div class="card-src">trends.google.com</div></a>
+  <a class="card" href="https://www.youtube.com/@WhatsTrending" target="_blank"><div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">YT TRENDS</span><span class="arrow">&#8599;</span></div><div class="card-title">What&apos;s Trending on YouTube</div><div class="card-src">youtube.com/@WhatsTrending</div></a>
 </div>
 
-<div class="section-header" data-section="screeners">
+<div class="section-header" id="screeners" data-section="screeners">
   <span class="section-label">Screeners</span>
   <span class="section-chevron">&#9660;</span>
 </div>
-<div class="cards" id="screeners">
-  <a class="card" href="https://www.tradingview.com/screener/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">STOCK SCREENER</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Stock Screener</div>
-    <div class="card-src">tradingview.com</div>
-  </a>
-  <a class="card" href="https://www.tradingview.com/forex-screener/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">FOREX SCREENER</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Forex Screener</div>
-    <div class="card-src">tradingview.com</div>
-  </a>
+<div class="cards" id="cards-screeners">
+  <a class="card" href="https://www.tradingview.com/screener/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">STOCK SCREENER</span><span class="arrow">&#8599;</span></div><div class="card-title">Stock Screener</div><div class="card-src">tradingview.com</div></a>
+  <a class="card" href="https://www.tradingview.com/forex-screener/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">FOREX SCREENER</span><span class="arrow">&#8599;</span></div><div class="card-title">Forex Screener</div><div class="card-src">tradingview.com</div></a>
 </div>
 
-<div class="section-header" data-section="commodities">
+<div class="section-header" id="commodities" data-section="commodities">
   <span class="section-label">Commodities</span>
   <span class="section-chevron">&#9660;</span>
 </div>
-<div class="cards" id="commodities">
-  <a class="card" href="https://tradingeconomics.com/commodity/gold" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">GOLD</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Gold</div>
-    <div class="card-src">tradingeconomics.com</div>
-  </a>
-  <a class="card" href="https://tradingeconomics.com/commodity/silver" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--surface2);color:var(--muted)">SILVER</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Silver</div>
-    <div class="card-src">tradingeconomics.com</div>
-  </a>
-  <a class="card" href="https://tradingeconomics.com/commodity/copper" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">COPPER</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Copper</div>
-    <div class="card-src">tradingeconomics.com</div>
-  </a>
+<div class="cards" id="cards-commodities">
+  <a class="card" href="https://tradingeconomics.com/commodity/gold" target="_blank"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">GOLD</span><span class="arrow">&#8599;</span></div><div class="card-title">Gold</div><div class="card-src">tradingeconomics.com</div></a>
+  <a class="card" href="https://tradingeconomics.com/commodity/silver" target="_blank"><div class="card-top"><span class="badge" style="background:var(--surface2);color:var(--muted)">SILVER</span><span class="arrow">&#8599;</span></div><div class="card-title">Silver</div><div class="card-src">tradingeconomics.com</div></a>
+  <a class="card" href="https://tradingeconomics.com/commodity/copper" target="_blank"><div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">COPPER</span><span class="arrow">&#8599;</span></div><div class="card-title">Copper</div><div class="card-src">tradingeconomics.com</div></a>
 </div>
 
-
-    <div class="card-title">On-Chain BTC Metrics</div>
-    <div class="card-src">studio.glassnode.com</div>
-  </a>
-  <a class="card" href="https://cryptoquant.com" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">CRYPTOQUANT</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Exchange Flows &amp; Whale Activity</div>
-    <div class="card-src">cryptoquant.com</div>
-  </a>
-  <a class="card" href="https://coinglass.com" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">COINGLASS</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Liquidations, Funding &amp; OI</div>
-    <div class="card-src">coinglass.com</div>
-  </a>
-  <a class="card" href="https://www.lookintobitcoin.com" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">LOOK INTO BTC</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Cycle Indicators (MVRV, NUPL)</div>
-    <div class="card-src">lookintobitcoin.com</div>
-  </a>
-</div>
-
-
-    <div class="card-title">Crypto Fear &amp; Greed Index</div>
-    <div class="card-src">alternative.me</div>
-  </a>
-  <a class="card" href="https://app.santiment.net" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">SANTIMENT</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Social Volume &amp; Dev Activity</div>
-    <div class="card-src">app.santiment.net</div>
-  </a>
-</div>
-
-<div class="section-header" data-section="key-charts">
+<div class="section-header" id="key-charts" data-section="key-charts">
   <span class="section-label">Key Charts</span>
   <span class="section-chevron">&#9660;</span>
 </div>
-<div class="cards" id="key-charts">
-  <a class="card" href="https://www.tradingview.com/symbols/TVC-DXY/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--green-bg);color:var(--green)">DXY</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">US Dollar Index</div>
-    <div class="card-src">tradingview.com</div>
-  </a>
-  <a class="card" href="https://www.tradingview.com/symbols/TVC-US10Y/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--green-bg);color:var(--green)">US10Y</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">10-Year Treasury Yield</div>
-    <div class="card-src">tradingview.com</div>
-  </a>
-  <a class="card" href="https://www.tradingview.com/symbols/CRYPTOCAP-BTC.D/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--green-bg);color:var(--green)">BTC.D</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">BTC Dominance</div>
-    <div class="card-src">tradingview.com</div>
-  </a>
-  <a class="card" href="https://finviz.com" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--green-bg);color:var(--green)">FINVIZ</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Equity Heatmap &amp; Macro Visual</div>
-    <div class="card-src">finviz.com</div>
-  </a>
+<div class="cards" id="cards-key-charts">
+  <a class="card" href="https://www.tradingview.com/symbols/TVC-DXY/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--green-bg);color:var(--green)">DXY</span><span class="arrow">&#8599;</span></div><div class="card-title">US Dollar Index</div><div class="card-src">tradingview.com</div></a>
+  <a class="card" href="https://www.tradingview.com/symbols/TVC-US10Y/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--green-bg);color:var(--green)">US10Y</span><span class="arrow">&#8599;</span></div><div class="card-title">10-Year Treasury Yield</div><div class="card-src">tradingview.com</div></a>
+  <a class="card" href="https://www.tradingview.com/symbols/CRYPTOCAP-BTC.D/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--green-bg);color:var(--green)">BTC.D</span><span class="arrow">&#8599;</span></div><div class="card-title">BTC Dominance</div><div class="card-src">tradingview.com</div></a>
+  <a class="card" href="https://finviz.com" target="_blank"><div class="card-top"><span class="badge" style="background:var(--green-bg);color:var(--green)">FINVIZ</span><span class="arrow">&#8599;</span></div><div class="card-title">Equity Heatmap &amp; Macro Visual</div><div class="card-src">finviz.com</div></a>
 </div>
 
-
-    <div class="card-title">BTC Perp Chart</div>
-    <div class="card-src">tradingview.com</div>
-  </a>
-  <a class="card" href="https://coinmarketcap.com/currencies/bitcoin/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">BTC / CMC</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Bitcoin on CoinMarketCap</div>
-    <div class="card-src">coinmarketcap.com</div>
-  </a>
-  <a class="card" href="https://www.tradingview.com/symbols/BTCUSD/technicals/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">TV TECHNICALS</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">BTC Technical Analysis</div>
-    <div class="card-src">tradingview.com</div>
-  </a>
-  <a class="card" href="https://coinalyze.net/bitcoin/technical-analysis/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">COINALYZE TA</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">BTC Technical Analysis</div>
-    <div class="card-src">coinalyze.net</div>
-  </a>
-  <a class="card" href="https://coinalyze.net/bitcoin/usd/binance/btcusd_perp/price-chart-live/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">LIVE CHART</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">BTC Live Price Chart</div>
-    <div class="card-src">coinalyze.net</div>
-  </a>
-  <a class="card" href="https://www.coinglass.com/mergev2/BTC-USDT" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">MERGE VIEW</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">BTC Merge View</div>
-    <div class="card-src">coinglass.com</div>
-  </a>
-  <a class="card" href="https://www.coinglass.com/LongShortRatio" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">LONG/SHORT</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Long/Short Ratio</div>
-    <div class="card-src">coinglass.com</div>
-  </a>
-  <a class="card" href="https://www.coinglass.com/tv/Binance_BTCUSDT" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">CG TV CHART</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">BTC Chart (Coinglass TV)</div>
-    <div class="card-src">coinglass.com</div>
-  </a>
-  <a class="card" href="https://cryptoquant.com/asset/btc/summary" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">CQ SUMMARY</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">BTC On-Chain Summary</div>
-    <div class="card-src">cryptoquant.com</div>
-  </a>
-  <a class="card" href="https://studio.glassnode.com/charts/addresses.ActiveCount?a=BTC&chartStyle=column&resolution=1month" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">ACTIVE ADDRS</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">BTC Active Addresses</div>
-    <div class="card-src">glassnode.com</div>
-  </a>
-  <a class="card" href="https://www.theblock.co/data/crypto-markets/spot/total-exchange-volume-daily/embed" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">EXCHANGE VOL</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Daily Exchange Volume</div>
-    <div class="card-src">theblock.co</div>
-  </a>
-  <a class="card" href="https://coinmarketcap.com/rankings/exchanges/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">EXCHANGES</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Exchange Rankings</div>
-    <div class="card-src">coinmarketcap.com</div>
-  </a>
-  <a class="card" href="https://trends.google.com/trends/explore?date=today%203-m&geo=CA&q=bitcoin&hl=en" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">BTC TRENDS</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Bitcoin Search Trends — CA</div>
-    <div class="card-src">trends.google.com</div>
-  </a>
-  <a class="card" href="https://www.barchart.com/crypto/quotes/%5EBTCUSD/price-history/historical" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">PRICE HISTORY</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">BTC Historical Price Data</div>
-    <div class="card-src">barchart.com</div>
-  </a>
-</div>
-
-    <div class="card-title">Crypto Bubbles Visualizer</div>
-    <div class="card-src">cryptobubbles.net</div>
-  </a>
-  <a class="card" href="https://coinmarketcap.com/cryptocurrency-category/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">CATEGORIES</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Crypto Categories</div>
-    <div class="card-src">coinmarketcap.com</div>
-  </a>
-  <a class="card" href="https://www.coinglass.com/position" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">POSITIONS</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Open Positions Overview</div>
-    <div class="card-src">coinglass.com</div>
-  </a>
-  <a class="card" href="https://coinank.com/etf/EthEtf" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">ETH ETF</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Ethereum ETF Flows</div>
-    <div class="card-src">coinank.com</div>
-  </a>
-  <a class="card" href="https://bettertrader.io/cryptoscanner?exchange=KuCoin&quote_coin=&spread_cat=%3E20%25&sort_by=Spread+%28hi-low%29&limit=50" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">ALT SCANNER</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">KuCoin Alt Scanner &gt;20% Spread</div>
-    <div class="card-src">bettertrader.io</div>
-  </a>
-</div>
-<div class="section-header" data-section="research">
+<div class="section-header" id="research" data-section="research">
   <span class="section-label">Research</span>
   <span class="section-chevron">&#9660;</span>
 </div>
-<div class="cards" id="research">
-  <a class="card" href="https://messari.io" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">MESSARI</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Crypto Research &amp; Profiles</div>
-    <div class="card-src">messari.io</div>
-  </a>
-  <a class="card" href="https://tokenomist.ai" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">TOKENOMIST</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Token Unlock Calendar</div>
-    <div class="card-src">tokenomist.ai</div>
-  </a>
-  <a class="card" href="https://macromon.wordpress.com" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">MACRO MONITOR</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Global Macro Monitor</div>
-    <div class="card-src">macromon.wordpress.com</div>
-  </a>
+<div class="cards" id="cards-research">
+  <a class="card" href="https://messari.io" target="_blank"><div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">MESSARI</span><span class="arrow">&#8599;</span></div><div class="card-title">Crypto Research &amp; Profiles</div><div class="card-src">messari.io</div></a>
+  <a class="card" href="https://tokenomist.ai" target="_blank"><div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">TOKENOMIST</span><span class="arrow">&#8599;</span></div><div class="card-title">Token Unlock Calendar</div><div class="card-src">tokenomist.ai</div></a>
+  <a class="card" href="https://macromon.wordpress.com" target="_blank"><div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">MACRO MONITOR</span><span class="arrow">&#8599;</span></div><div class="card-title">Global Macro Monitor</div><div class="card-src">macromon.wordpress.com</div></a>
 </div>
 
 <footer>Market Intel</footer>
@@ -575,35 +174,27 @@
   function setTimestamp() {
     const now = new Date();
     document.getElementById('ts').textContent =
-      now.toLocaleDateString('en-CA', { weekday:'short', month:'short', day:'numeric' }) +
-      ' · ' + now.toLocaleTimeString('en-CA', { hour:'2-digit', minute:'2-digit' });
+      now.toLocaleDateString('en-CA',{weekday:'short',month:'short',day:'numeric'}) +
+      ' · ' + now.toLocaleTimeString('en-CA',{hour:'2-digit',minute:'2-digit'});
   }
   setTimestamp();
   setInterval(setTimestamp, 60000);
 
-  // Collapsible sections with localStorage persistence
   const STORE_KEY = 'mi_collapsed';
-  function getCollapsed() {
-    try { return JSON.parse(localStorage.getItem(STORE_KEY) || '[]'); } catch { return []; }
-  }
-  function saveCollapsed(list) {
-    localStorage.setItem(STORE_KEY, JSON.stringify(list));
-  }
+  function getCollapsed() { try { return JSON.parse(localStorage.getItem(STORE_KEY)||'[]'); } catch { return []; } }
+  function saveCollapsed(list) { localStorage.setItem(STORE_KEY, JSON.stringify(list)); }
 
   function initSections() {
     const stored = localStorage.getItem(STORE_KEY);
-    const allIds = Array.from(document.querySelectorAll('.section-header')).map(h => h.dataset.section);
+    const allIds = Array.from(document.querySelectorAll('.section-header[data-section]')).map(h=>h.dataset.section);
     const collapsed = stored ? JSON.parse(stored) : allIds;
-    document.querySelectorAll('.section-header').forEach(header => {
+    document.querySelectorAll('.section-header[data-section]').forEach(header => {
       const id = header.dataset.section;
-      const cards = document.getElementById(id);
-      if (collapsed.includes(id)) {
-        header.classList.add('collapsed');
-        cards.classList.add('collapsed');
-      }
+      const cards = document.getElementById('cards-' + id);
+      if (!cards) return;
+      if (collapsed.includes(id)) { header.classList.add('collapsed'); cards.classList.add('collapsed'); }
       header.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
+        e.preventDefault(); e.stopPropagation();
         const isCollapsed = cards.classList.toggle('collapsed');
         header.classList.toggle('collapsed', isCollapsed);
         const list = getCollapsed();
@@ -613,19 +204,7 @@
       });
     });
   }
-
   initSections();
 </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
