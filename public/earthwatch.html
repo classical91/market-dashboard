@@ -1,0 +1,171 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Earth Watch</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0f0f0f; --surface: #1a1a1a; --surface2: #222;
+      --border: rgba(255,255,255,0.08); --border-hover: rgba(255,255,255,0.18);
+      --text: #f0ede8; --muted: #888; --dim: #555;
+      --green: #2ECC71; --green-bg: rgba(46,204,113,0.12);
+      --teal: #1D9E75; --teal-bg: rgba(29,158,117,0.12);
+      --amber: #EF9F27; --amber-bg: rgba(239,159,39,0.12);
+      --coral: #D85A30; --coral-bg: rgba(216,90,48,0.12);
+      --blue: #378ADD; --blue-bg: rgba(55,138,221,0.12);
+      --purple: #7F77DD; --purple-bg: rgba(127,119,221,0.12);
+      --red: #E74C3C; --red-bg: rgba(231,76,60,0.12);
+      --accent: #2ECC71;
+    }
+    body { font-family:-apple-system,'SF Pro Text','Segoe UI',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; padding:2rem 1.5rem; max-width:900px; margin:0 auto; }
+    header { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:1.5rem; padding-bottom:14px; border-bottom:0.5px solid var(--border); }
+    .logo { font-family:'SF Mono','Fira Code',monospace; font-size:13px; font-weight:500; letter-spacing:0.12em; text-transform:uppercase; color:var(--green); }
+    .back { font-family:'SF Mono','Fira Code',monospace; font-size:11px; color:var(--dim); text-decoration:none; transition:color 0.15s; }
+    .back:hover { color:var(--muted); }
+    .nav-pills { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:2rem; }
+    .nav-pill { font-family:'SF Mono','Fira Code',monospace; font-size:10px; letter-spacing:0.08em; text-transform:uppercase; text-decoration:none; padding:4px 10px; border-radius:20px; border:0.5px solid rgba(46,204,113,0.3); color:var(--green); background:var(--green-bg); transition:border-color 0.15s; }
+    .nav-pill:hover { border-color:var(--green); }
+    .section-header { display:flex; align-items:center; justify-content:space-between; cursor:pointer; user-select:none; -webkit-tap-highlight-color:transparent; touch-action:manipulation; margin-bottom:10px; padding:4px 0; }
+    .section-header:hover .section-label { color:var(--muted); }
+    .section-label { font-family:'SF Mono','Fira Code',monospace; font-size:10px; letter-spacing:0.12em; text-transform:uppercase; color:var(--green); transition:color 0.15s; }
+    .section-chevron { font-size:10px; color:var(--green); opacity:0.6; transition:transform 0.2s ease; }
+    .section-header.collapsed .section-chevron { transform:rotate(-90deg); }
+    .cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:10px; margin-bottom:2rem; overflow:hidden; transition:max-height 0.25s ease,opacity 0.2s ease,margin-bottom 0.25s ease; max-height:2000px; opacity:1; }
+    .cards.collapsed { max-height:0; opacity:0; margin-bottom:0.5rem; pointer-events:none; }
+    .card { background:var(--surface); border:0.5px solid var(--border); border-radius:12px; padding:14px 16px; text-decoration:none; display:block; transition:border-color 0.15s,background 0.15s; }
+    .card:hover { border-color:var(--green); background:var(--surface2); }
+    .card-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px; }
+    .badge { font-family:'SF Mono','Fira Code',monospace; font-size:10px; font-weight:500; padding:3px 8px; border-radius:5px; letter-spacing:0.06em; }
+    .arrow { color:var(--dim); font-size:14px; }
+    .card-title { font-size:13px; font-weight:500; color:var(--text); margin-bottom:4px; }
+    .card-src { font-size:11px; font-family:'SF Mono','Fira Code',monospace; color:var(--dim); }
+    footer { font-size:11px; color:var(--dim); font-family:'SF Mono','Fira Code',monospace; text-align:center; padding-top:1rem; border-top:0.5px solid var(--border); }
+  </style>
+</head>
+<body>
+
+<header>
+  <span class="logo">&#127758; Earth Watch</span>
+  <a href="/" class="back">&#8592; Market Intel</a>
+</header>
+
+<div class="nav-pills">
+  <a href="#space-weather" class="nav-pill">Space Weather</a>
+  <a href="#weather" class="nav-pill">Weather</a>
+  <a href="#disasters" class="nav-pill">Disasters &amp; Alerts</a>
+  <a href="#seismic" class="nav-pill">Seismic &amp; Volcanic</a>
+  <a href="#live-cams" class="nav-pill">Live Cams</a>
+</div>
+
+<div class="section-header" data-section="space-weather">
+  <span class="section-label">Space Weather</span>
+  <span class="section-chevron">&#9660;</span>
+</div>
+<div class="cards" id="space-weather">
+  <a class="card" href="https://www.spaceweatherlive.com/en/solar-activity/solar-flares.html" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">SOLAR FLARES</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Solar Flare Activity</div>
+    <div class="card-src">spaceweatherlive.com</div>
+  </a>
+</div>
+
+<div class="section-header" data-section="weather">
+  <span class="section-label">Weather</span>
+  <span class="section-chevron">&#9660;</span>
+</div>
+<div class="cards" id="weather">
+  <a class="card" href="https://www.ventusky.com/?p=15;-27;1&l=temperature-2m" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">VENTUSKY</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Global Weather Visualization</div>
+    <div class="card-src">ventusky.com</div>
+  </a>
+  <a class="card" href="https://www.weather.gov/" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">NWS</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">National Weather Service</div>
+    <div class="card-src">weather.gov</div>
+  </a>
+  <a class="card" href="https://weather.gc.ca/?layers=alert&zoom=1&center=51.61666797,-62.82684741" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--red-bg);color:var(--red)">CA ALERTS</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Canada Weather Alerts</div>
+    <div class="card-src">weather.gc.ca</div>
+  </a>
+</div>
+
+<div class="section-header" data-section="disasters">
+  <span class="section-label">Disasters &amp; Alerts</span>
+  <span class="section-chevron">&#9660;</span>
+</div>
+<div class="cards" id="disasters">
+  <a class="card" href="https://www.gdacs.org/" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--red-bg);color:var(--red)">GDACS</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Global Disaster Alert &amp; Coordination</div>
+    <div class="card-src">gdacs.org</div>
+  </a>
+  <a class="card" href="https://www.nhc.noaa.gov/refresh/graphics_at2+shtml/204227.shtml?gm_track#contents" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">NHC</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">National Hurricane Center</div>
+    <div class="card-src">nhc.noaa.gov</div>
+  </a>
+</div>
+
+<div class="section-header" data-section="seismic">
+  <span class="section-label">Seismic &amp; Volcanic</span>
+  <span class="section-chevron">&#9660;</span>
+</div>
+<div class="cards" id="seismic">
+  <a class="card" href="https://www.volcanodiscovery.com/earthquakes/today.html" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">EARTHQUAKES</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Earthquakes Today</div>
+    <div class="card-src">volcanodiscovery.com</div>
+  </a>
+  <a class="card" href="https://www.volcanodiscovery.com/volcano-map.html" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--red-bg);color:var(--red)">VOLCANO MAP</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Live Volcano Activity Map</div>
+    <div class="card-src">volcanodiscovery.com</div>
+  </a>
+</div>
+
+<div class="section-header" data-section="live-cams">
+  <span class="section-label">Live Cams</span>
+  <span class="section-chevron">&#9660;</span>
+</div>
+<div class="cards" id="live-cams">
+  <a class="card" href="https://www.youtube.com/@WorldCamLIVE/streams" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--red-bg);color:var(--red)">LIVE</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">WorldCam Live Streams</div>
+    <div class="card-src">youtube.com/@WorldCamLIVE</div>
+  </a>
+</div>
+
+<footer>Earth Watch &mdash; <a href="/" style="color:var(--dim);text-decoration:none;">Market Intel</a></footer>
+
+<script>
+  const STORE_KEY = 'ew_collapsed';
+  function getCollapsed() { try { return JSON.parse(localStorage.getItem(STORE_KEY)||'[]'); } catch { return []; } }
+  function saveCollapsed(list) { localStorage.setItem(STORE_KEY, JSON.stringify(list)); }
+  function initSections() {
+    const stored = localStorage.getItem(STORE_KEY);
+    const allIds = Array.from(document.querySelectorAll('.section-header[data-section]')).map(h=>h.dataset.section);
+    const collapsed = stored ? JSON.parse(stored) : allIds;
+    document.querySelectorAll('.section-header[data-section]').forEach(header => {
+      const id = header.dataset.section;
+      const cards = document.getElementById(id);
+      if (!cards) return;
+      if (collapsed.includes(id)) { header.classList.add('collapsed'); cards.classList.add('collapsed'); }
+      header.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        const isCollapsed = cards.classList.toggle('collapsed');
+        header.classList.toggle('collapsed', isCollapsed);
+        const list = getCollapsed();
+        if (isCollapsed) { if (!list.includes(id)) list.push(id); }
+        else { const i = list.indexOf(id); if (i > -1) list.splice(i, 1); }
+        saveCollapsed(list);
+      });
+    });
+  }
+  initSections();
+</script>
+</body>
+</html>
