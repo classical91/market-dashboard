@@ -15,7 +15,8 @@
       --blue: #378ADD; --blue-bg: rgba(55,138,221,0.12);
       --coral: #D85A30; --coral-bg: rgba(216,90,48,0.12);
       --purple: #7F77DD; --purple-bg: rgba(127,119,221,0.12);
-      --green: #639922; --green-bg: rgba(99,153,34,0.12);
+      --green: #2ECC71; --green-bg: rgba(46,204,113,0.12);
+      --red: #E74C3C; --red-bg: rgba(231,76,60,0.12);
     }
     body { font-family: -apple-system,'SF Pro Text','Segoe UI',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; padding:2rem 1.5rem; max-width:900px; margin:0 auto; }
     header { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:1.5rem; padding-bottom:14px; border-bottom:0.5px solid var(--border); }
@@ -24,8 +25,6 @@
     .nav-pills { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:2rem; }
     .nav-pill { font-family:'SF Mono','Fira Code',monospace; font-size:10px; letter-spacing:0.08em; text-transform:uppercase; text-decoration:none; padding:4px 10px; border-radius:20px; border:0.5px solid var(--border); color:var(--dim); background:var(--surface); transition:border-color 0.15s,color 0.15s; }
     .nav-pill:hover { border-color:var(--border-hover); color:var(--muted); }
-    .nav-pill-crypto { border-color:rgba(239,159,39,0.3); color:var(--amber); background:var(--amber-bg); }
-    .nav-pill-crypto:hover { border-color:var(--amber); }
     .section-header { display:flex; align-items:center; justify-content:space-between; cursor:pointer; user-select:none; -webkit-tap-highlight-color:transparent; touch-action:manipulation; margin-bottom:10px; padding:4px 0; }
     .section-header:hover .section-label { color:var(--muted); }
     .section-label { font-family:'SF Mono','Fira Code',monospace; font-size:10px; letter-spacing:0.12em; text-transform:uppercase; color:var(--dim); transition:color 0.15s; }
@@ -62,11 +61,12 @@
   <a href="#commodities" class="nav-pill">Commodities</a>
   <a href="#key-charts" class="nav-pill">Key Charts</a>
   <a href="#research" class="nav-pill">Research</a>
-  <a href="/crypto.html" class="nav-pill nav-pill-crypto">Crypto</a>
+  <a href="/crypto.html" class="nav-pill" style="border-color:rgba(239,159,39,0.3);color:var(--amber);background:var(--amber-bg);">Crypto</a>
   <a href="/traditional.html" class="nav-pill" style="border-color:rgba(55,138,221,0.3);color:var(--blue);background:var(--blue-bg);">Traditional</a>
-  <a href="/earthwatch.html" class="nav-pill" style="border-color:rgba(46,204,113,0.3);color:#2ECC71;background:rgba(46,204,113,0.12);">Earth Watch</a>
+  <a href="/earthwatch.html" class="nav-pill" style="border-color:rgba(46,204,113,0.3);color:var(--green);background:var(--green-bg);">Earth Watch</a>
 </div>
 
+<!-- MARKET OVERVIEW -->
 <div class="section-header" id="market-overview" data-section="market-overview">
   <span class="section-label">Market Overview</span>
   <span class="section-chevron">&#9660;</span>
@@ -90,8 +90,12 @@
   <a class="card" href="https://www.tradingview.com/chart/UBsUirLO/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">TV CHART 1</span><span class="arrow">&#8599;</span></div><div class="card-title">TradingView Chart</div><div class="card-src">tradingview.com</div></a>
   <a class="card" href="https://www.tradingview.com/chart/uwHQFIja/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">TV CHART 2</span><span class="arrow">&#8599;</span></div><div class="card-title">TradingView Chart</div><div class="card-src">tradingview.com</div></a>
   <a class="card" href="https://www.tradingview.com/chart/tDSfdLfo/?symbol=SP%3ASPX" target="_blank"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">SPX CHART</span><span class="arrow">&#8599;</span></div><div class="card-title">S&amp;P 500 Chart</div><div class="card-src">tradingview.com</div></a>
+  <a class="card" href="https://money.cnn.com/data/fear-and-greed/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">FEAR &amp; GREED</span><span class="arrow">&#8599;</span></div><div class="card-title">CNN Fear &amp; Greed Index</div><div class="card-src">money.cnn.com</div></a>
+  <a class="card" href="https://www.barchart.com/stocks/performance/pre-market-trading" target="_blank"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">PRE-MARKET</span><span class="arrow">&#8599;</span></div><div class="card-title">Pre-Market Movers</div><div class="card-src">barchart.com</div></a>
+  <a class="card" href="https://unusualwhales.com/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">UNUSUAL WHALES</span><span class="arrow">&#8599;</span></div><div class="card-title">Options Flow &amp; Dark Pool</div><div class="card-src">unusualwhales.com</div></a>
 </div>
 
+<!-- HUB LINKS -->
 <a href="/crypto.html" class="section-link" id="crypto">
   <div class="section-header" style="margin-bottom:0;">
     <span class="section-label" style="color:var(--amber);">Crypto &#8599;</span>
@@ -105,12 +109,15 @@
     <span class="section-chevron" style="color:var(--blue);opacity:0.7;">&#9654;</span>
   </div>
 </a>
+
 <a href="/earthwatch.html" class="section-link" id="earthwatch">
   <div class="section-header" style="margin-bottom:0;">
-    <span class="section-label" style="color:#2ECC71;">Earth Watch &#8599;</span>
-    <span class="section-chevron" style="color:#2ECC71;opacity:0.7;">&#9654;</span>
+    <span class="section-label" style="color:var(--green);">Earth Watch &#8599;</span>
+    <span class="section-chevron" style="color:var(--green);opacity:0.7;">&#9654;</span>
   </div>
 </a>
+
+<!-- MACRO INDICATORS -->
 <div class="section-header" id="macro-indicators" data-section="macro-indicators">
   <span class="section-label">Macro Indicators</span>
   <span class="section-chevron">&#9660;</span>
@@ -122,6 +129,7 @@
   <a class="card" href="https://tradingeconomics.com/country-list/unemployment-rate" target="_blank"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">UNEMPLOYMENT</span><span class="arrow">&#8599;</span></div><div class="card-title">Unemployment Rate by Country</div><div class="card-src">tradingeconomics.com</div></a>
 </div>
 
+<!-- NEWS -->
 <div class="section-header" id="news" data-section="news">
   <span class="section-label">News</span>
   <span class="section-chevron">&#9660;</span>
@@ -132,6 +140,7 @@
   <a class="card" href="https://coinmarketcap.com/community/articles/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">CMC ARTICLES</span><span class="arrow">&#8599;</span></div><div class="card-title">CoinMarketCap Articles</div><div class="card-src">coinmarketcap.com</div></a>
 </div>
 
+<!-- TRENDS -->
 <div class="section-header" id="trends" data-section="trends">
   <span class="section-label">Trends</span>
   <span class="section-chevron">&#9660;</span>
@@ -142,6 +151,7 @@
   <a class="card" href="https://www.youtube.com/@WhatsTrending" target="_blank"><div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">YT TRENDS</span><span class="arrow">&#8599;</span></div><div class="card-title">What&apos;s Trending on YouTube</div><div class="card-src">youtube.com/@WhatsTrending</div></a>
 </div>
 
+<!-- SCREENERS -->
 <div class="section-header" id="screeners" data-section="screeners">
   <span class="section-label">Screeners</span>
   <span class="section-chevron">&#9660;</span>
@@ -149,8 +159,11 @@
 <div class="cards" id="cards-screeners">
   <a class="card" href="https://www.tradingview.com/screener/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">STOCK SCREENER</span><span class="arrow">&#8599;</span></div><div class="card-title">Stock Screener</div><div class="card-src">tradingview.com</div></a>
   <a class="card" href="https://www.tradingview.com/forex-screener/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">FOREX SCREENER</span><span class="arrow">&#8599;</span></div><div class="card-title">Forex Screener</div><div class="card-src">tradingview.com</div></a>
+  <a class="card" href="https://www.earningswhispers.com/calendar" target="_blank"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">EARNINGS</span><span class="arrow">&#8599;</span></div><div class="card-title">Earnings Whispers Calendar</div><div class="card-src">earningswhispers.com</div></a>
+  <a class="card" href="https://www.barchart.com/options/unusual-activity/stocks" target="_blank"><div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">UNUSUAL OPTIONS</span><span class="arrow">&#8599;</span></div><div class="card-title">Unusual Options Activity</div><div class="card-src">barchart.com</div></a>
 </div>
 
+<!-- COMMODITIES -->
 <div class="section-header" id="commodities" data-section="commodities">
   <span class="section-label">Commodities</span>
   <span class="section-chevron">&#9660;</span>
@@ -161,6 +174,7 @@
   <a class="card" href="https://tradingeconomics.com/commodity/copper" target="_blank"><div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">COPPER</span><span class="arrow">&#8599;</span></div><div class="card-title">Copper</div><div class="card-src">tradingeconomics.com</div></a>
 </div>
 
+<!-- KEY CHARTS -->
 <div class="section-header" id="key-charts" data-section="key-charts">
   <span class="section-label">Key Charts</span>
   <span class="section-chevron">&#9660;</span>
@@ -170,8 +184,10 @@
   <a class="card" href="https://www.tradingview.com/symbols/TVC-US10Y/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--green-bg);color:var(--green)">US10Y</span><span class="arrow">&#8599;</span></div><div class="card-title">10-Year Treasury Yield</div><div class="card-src">tradingview.com</div></a>
   <a class="card" href="https://www.tradingview.com/symbols/CRYPTOCAP-BTC.D/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--green-bg);color:var(--green)">BTC.D</span><span class="arrow">&#8599;</span></div><div class="card-title">BTC Dominance</div><div class="card-src">tradingview.com</div></a>
   <a class="card" href="https://finviz.com" target="_blank"><div class="card-top"><span class="badge" style="background:var(--green-bg);color:var(--green)">FINVIZ</span><span class="arrow">&#8599;</span></div><div class="card-title">Equity Heatmap &amp; Macro Visual</div><div class="card-src">finviz.com</div></a>
+  <a class="card" href="https://www.tradingview.com/symbols/CBOE-VIX/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--red-bg);color:var(--red)">VIX</span><span class="arrow">&#8599;</span></div><div class="card-title">Volatility Index (VIX)</div><div class="card-src">tradingview.com</div></a>
 </div>
 
+<!-- RESEARCH -->
 <div class="section-header" id="research" data-section="research">
   <span class="section-label">Research</span>
   <span class="section-chevron">&#9660;</span>
@@ -180,6 +196,7 @@
   <a class="card" href="https://messari.io" target="_blank"><div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">MESSARI</span><span class="arrow">&#8599;</span></div><div class="card-title">Crypto Research &amp; Profiles</div><div class="card-src">messari.io</div></a>
   <a class="card" href="https://tokenomist.ai" target="_blank"><div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">TOKENOMIST</span><span class="arrow">&#8599;</span></div><div class="card-title">Token Unlock Calendar</div><div class="card-src">tokenomist.ai</div></a>
   <a class="card" href="https://macromon.wordpress.com" target="_blank"><div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">MACRO MONITOR</span><span class="arrow">&#8599;</span></div><div class="card-title">Global Macro Monitor</div><div class="card-src">macromon.wordpress.com</div></a>
+  <a class="card" href="https://openinsider.com/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">INSIDER BUYS</span><span class="arrow">&#8599;</span></div><div class="card-title">Insider Buying &amp; Selling</div><div class="card-src">openinsider.com</div></a>
 </div>
 
 <footer>Market Intel</footer>
@@ -222,5 +239,3 @@
 </script>
 </body>
 </html>
-
-
