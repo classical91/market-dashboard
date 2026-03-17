@@ -1,0 +1,4 @@
+[deploy]
+startCommand = "node server.js"
+healthcheckPath = "/"
+restartPolicyType = "on-failure"
