@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>On-Chain Analytics</title>
+  <style>
+    :root {
+      --bg: #0b0e11;
+      --surface: #141921;
+      --surface-alt: #1a2030;
+      --border: #1e2a3a;
+      --border-hover: #2a3a50;
+      --text: #e1e8f0;
+      --text-muted: #7a8a9e;
+      --text-dim: #4a5a6e;
+      --accent: #00c9a7;
+      --accent-dim: rgba(0,201,167,0.12);
+      --red: #f5475d;
+      --red-dim: rgba(245,71,93,0.12);
+      --amber: #f0b90b;
+      --amber-dim: rgba(240,185,11,0.12);
+      --blue: #3a8bfd;
+      --radius: 10px;
+      --font: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+      --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-body);
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    /* ── Header ─────────────────────────────────────────── */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header h1 {
+      font-size: 18px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      letter-spacing: -0.3px;
+    }
+
+    .header h1 span.icon { font-size: 22px; }
+
+    .header-links {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .header-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 13px;
+      padding: 6px 12px;
+      border-radius: 6px;
+      transition: all 0.2s;
+    }
+
+    .header-links a:hover {
+      color: var(--text);
+      background: var(--surface-alt);
+    }
+
+    /* ── Main Layout ────────────────────────────────────── */
+    .container {
+      max-width: 1360px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    /* ── Status Bar ─────────────────────────────────────── */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 20px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .status-dot {
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      margin-right: 6px;
+      background: var(--text-dim);
+    }
+
+    .status-dot.live { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+    .status-dot.error { background: var(--red); }
+
+    .refresh-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 4px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .refresh-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .refresh-btn.loading { opacity: 0.5; pointer-events: none; }
+
+    /* ── Metric Cards ───────────────────────────────────── */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .metric-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      transition: border-color 0.2s;
+    }
+
+    .metric-card:hover { border-color: var(--border-hover); }
+
+    .metric-card .label {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .metric-card .value {
+      font-family: var(--font);
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    .metric-card .sub {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 4px;
+    }
+
+    .val-positive { color: var(--accent); }
+    .val-negative { color: var(--red); }
+    .val-neutral  { color: var(--text); }
+
+    /* ── Search Bar ─────────────────────────────────────── */
+    .search-section {
+      margin-bottom: 24px;
+    }
+
+    .search-bar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .search-bar input {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 13px;
+      padding: 12px 16px;
+      border-radius: var(--radius);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .search-bar input::placeholder { color: var(--text-dim); }
+    .search-bar input:focus { border-color: var(--accent); }
+
+    .search-bar button {
+      background: var(--accent);
+      color: #0b0e11;
+      border: none;
+      padding: 12px 24px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: opacity 0.2s;
+    }
+
+    .search-bar button:hover { opacity: 0.85; }
+
+    .search-bar button.secondary {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    .search-bar button.secondary:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      opacity: 1;
+    }
+
+    /* ── Collapsible Section ────────────────────────────── */
+    .section {
+      margin-bottom: 20px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: var(--surface);
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.15s;
+    }
+
+    .section-header:hover { background: var(--surface-alt); }
+
+    .section-header h2 {
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .section-header .toggle {
+      font-size: 12px;
+      color: var(--text-dim);
+      transition: transform 0.2s;
+    }
+
+    .section.collapsed .section-header .toggle {
+      transform: rotate(-90deg);
+    }
+
+    .section.collapsed .section-body { display: none; }
+
+    .section-body { padding: 0 20px 16px; }
+
+    .badge {
+      font-size: 10px;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+
+    .badge-green { background: var(--accent-dim); color: var(--accent); }
+    .badge-red   { background: var(--red-dim); color: var(--red); }
+    .badge-amber { background: var(--amber-dim); color: var(--amber); }
+    .badge-blue  { background: rgba(58,139,253,0.12); color: var(--blue); }
+
+    /* ── Tables ──────────────────────────────────────────── */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .data-table thead th {
+      text-align: left;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--text-dim);
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      font-weight: 500;
+    }
+
+    .data-table tbody tr {
+      border-bottom: 1px solid rgba(30,42,58,0.5);
+      transition: background 0.15s;
+    }
+
+    .data-table tbody tr:hover { background: var(--surface-alt); }
+    .data-table tbody tr:last-child { border-bottom: none; }
+
+    .data-table td {
+      padding: 10px 12px;
+      vertical-align: middle;
+    }
+
+    .mono {
+      font-family: var(--font);
+      font-size: 12px;
+    }
+
+    .addr {
+      color: var(--blue);
+      cursor: pointer;
+      text-decoration: none;
+    }
+
+    .addr:hover { text-decoration: underline; }
+
+    .label-tag {
+      display: inline-block;
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 3px;
+      background: var(--surface-alt);
+      color: var(--text-muted);
+      margin-left: 6px;
+    }
+
+    /* ── Detail Panel (slides in from right) ─────────────── */
+    .detail-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(4px);
+    }
+
+    .detail-overlay.open { display: flex; justify-content: flex-end; }
+
+    .detail-panel {
+      width: min(560px, 90vw);
+      height: 100vh;
+      background: var(--bg);
+      border-left: 1px solid var(--border);
+      overflow-y: auto;
+      padding: 24px;
+      animation: slideIn 0.25s ease-out;
+    }
+
+    @keyframes slideIn {
+      from { transform: translateX(40px); opacity: 0; }
+      to   { transform: translateX(0); opacity: 1; }
+    }
+
+    .detail-panel .close-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      margin-bottom: 20px;
+    }
+
+    .detail-panel .close-btn:hover { color: var(--text); border-color: var(--text-muted); }
+
+    .detail-panel h3 {
+      font-size: 16px;
+      margin-bottom: 16px;
+      word-break: break-all;
+    }
+
+    .detail-panel .stat-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+
+    .detail-panel .stat-row .stat-label { color: var(--text-muted); }
+
+    /* ── Loading / Empty / Error states ──────────────────── */
+    .loading-skeleton {
+      height: 20px;
+      background: linear-gradient(90deg, var(--surface-alt) 25%, var(--border) 50%, var(--surface-alt) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: 4px;
+      margin: 6px 0;
+    }
+
+    @keyframes shimmer {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--text-dim);
+      font-size: 13px;
+    }
+
+    .empty-state .icon { font-size: 28px; margin-bottom: 8px; }
+
+    .error-banner {
+      background: var(--red-dim);
+      border: 1px solid rgba(245,71,93,0.25);
+      color: var(--red);
+      padding: 12px 16px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      margin-bottom: 16px;
+      display: none;
+    }
+
+    .error-banner.show { display: block; }
+
+    /* ── Responsive ──────────────────────────────────────── */
+    @media (max-width: 768px) {
+      .container { padding: 12px; }
+      .header { padding: 12px 16px; }
+      .metric-card .value { font-size: 22px; }
+      .search-bar { flex-direction: column; }
+      .search-bar button { width: 100%; }
+      .data-table { font-size: 12px; }
+      .data-table td, .data-table th { padding: 8px 6px; }
+      .col-hide-mobile { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1><span class="icon">⛓</span> On-Chain Analytics</h1>
+  <div class="header-links">
+    <a href="/">← Market Intel</a>
+    <a href="/crypto.html">Crypto Hub</a>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- Status Bar -->
+  <div class="status-bar">
+    <div>
+      <span class="status-dot" id="statusDot"></span>
+      <span id="statusText">Connecting...</span>
+      <span id="statusTime" style="margin-left:12px; color:var(--text-dim);"></span>
+    </div>
+    <button class="refresh-btn" id="refreshBtn" onclick="loadOverview()">Refresh</button>
+  </div>
+
+  <!-- Error Banner -->
+  <div class="error-banner" id="errorBanner"></div>
+
+  <!-- Metric Cards -->
+  <div class="metrics-grid" id="metricsGrid">
+    <div class="metric-card">
+      <div class="label">Stablecoin Net Flow 24h</div>
+      <div class="value" id="metricNetflow">—</div>
+      <div class="sub">USDT + USDC exchange netflow</div>
+    </div>
+    <div class="metric-card">
+      <div class="label">Tracked Wallet Inflows 24h</div>
+      <div class="value" id="metricInflows">—</div>
+      <div class="sub">Aggregate buy-side volume</div>
+    </div>
+    <div class="metric-card">
+      <div class="label">Tracked Wallet Outflows 24h</div>
+      <div class="value" id="metricOutflows">—</div>
+      <div class="sub">Aggregate sell-side volume</div>
+    </div>
+  </div>
+
+  <!-- Search -->
+  <div class="search-section">
+    <div class="search-bar">
+      <input type="text" id="searchInput" placeholder="Enter wallet or token contract address (0x...)" spellcheck="false"/>
+      <button onclick="handleSearch('wallet')">Wallet</button>
+      <button class="secondary" onclick="handleSearch('token')">Token</button>
+    </div>
+  </div>
+
+  <!-- Top Inflows -->
+  <div class="section" id="sectionInflows">
+    <div class="section-header" onclick="toggleSection('sectionInflows')">
+      <h2>Top Wallet Inflows <span class="badge badge-green">24h</span></h2>
+      <span class="toggle">▼</span>
+    </div>
+    <div class="section-body">
+      <div class="table-wrap" id="inflowsTable"></div>
+    </div>
+  </div>
+
+  <!-- Top Outflows -->
+  <div class="section" id="sectionOutflows">
+    <div class="section-header" onclick="toggleSection('sectionOutflows')">
+      <h2>Top Wallet Outflows <span class="badge badge-red">24h</span></h2>
+      <span class="toggle">▼</span>
+    </div>
+    <div class="section-body">
+      <div class="table-wrap" id="outflowsTable"></div>
+    </div>
+  </div>
+
+  <!-- Most Accumulated Tokens -->
+  <div class="section" id="sectionAccum">
+    <div class="section-header" onclick="toggleSection('sectionAccum')">
+      <h2>Most Accumulated Tokens <span class="badge badge-green">24h</span></h2>
+      <span class="toggle">▼</span>
+    </div>
+    <div class="section-body">
+      <div class="table-wrap" id="accumTable"></div>
+    </div>
+  </div>
+
+  <!-- Most Distributed Tokens -->
+  <div class="section" id="sectionDist">
+    <div class="section-header" onclick="toggleSection('sectionDist')">
+      <h2>Most Distributed Tokens <span class="badge badge-red">24h</span></h2>
+      <span class="toggle">▼</span>
+    </div>
+    <div class="section-body">
+      <div class="table-wrap" id="distTable"></div>
+    </div>
+  </div>
+
+  <!-- Large Transfers -->
+  <div class="section" id="sectionTransfers">
+    <div class="section-header" onclick="toggleSection('sectionTransfers')">
+      <h2>Recent Large Transfers <span class="badge badge-amber">Live</span></h2>
+      <span class="toggle">▼</span>
+    </div>
+    <div class="section-body">
+      <div class="table-wrap" id="transfersTable"></div>
+    </div>
+  </div>
+
+  <!-- Quick Links (matching your Crypto Hub's On-Chain section) -->
+  <div class="section" id="sectionLinks">
+    <div class="section-header" onclick="toggleSection('sectionLinks')">
+      <h2>On-Chain Tools <span class="badge badge-blue">External</span></h2>
+      <span class="toggle">▼</span>
+    </div>
+    <div class="section-body" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(200px,1fr)); gap:8px; padding-top:12px;">
+      <a href="https://studio.glassnode.com" target="_blank" class="addr" style="padding:10px; background:var(--surface-alt); border-radius:6px; text-decoration:none; font-size:12px;">Glassnode Studio ↗</a>
+      <a href="https://cryptoquant.com" target="_blank" class="addr" style="padding:10px; background:var(--surface-alt); border-radius:6px; text-decoration:none; font-size:12px;">CryptoQuant ↗</a>
+      <a href="https://coinglass.com" target="_blank" class="addr" style="padding:10px; background:var(--surface-alt); border-radius:6px; text-decoration:none; font-size:12px;">Coinglass ↗</a>
+      <a href="https://www.lookintobitcoin.com" target="_blank" class="addr" style="padding:10px; background:var(--surface-alt); border-radius:6px; text-decoration:none; font-size:12px;">Look Into Bitcoin ↗</a>
+      <a href="https://dune.com" target="_blank" class="addr" style="padding:10px; background:var(--surface-alt); border-radius:6px; text-decoration:none; font-size:12px;">Dune Analytics ↗</a>
+      <a href="https://debank.com" target="_blank" class="addr" style="padding:10px; background:var(--surface-alt); border-radius:6px; text-decoration:none; font-size:12px;">DeBank ↗</a>
+      <a href="https://etherscan.io" target="_blank" class="addr" style="padding:10px; background:var(--surface-alt); border-radius:6px; text-decoration:none; font-size:12px;">Etherscan ↗</a>
+      <a href="https://app.santiment.net" target="_blank" class="addr" style="padding:10px; background:var(--surface-alt); border-radius:6px; text-decoration:none; font-size:12px;">Santiment ↗</a>
+    </div>
+  </div>
+
+</div>
+
+<!-- Detail Panel -->
+<div class="detail-overlay" id="detailOverlay" onclick="closeDetail(event)">
+  <div class="detail-panel" onclick="event.stopPropagation()">
+    <button class="close-btn" onclick="closeDetail()">✕ Close</button>
+    <div id="detailContent">
+      <div class="empty-state"><div class="icon">🔍</div>Loading...</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── Config ────────────────────────────────────────────────────
+// Point this at wherever you deploy the Express server.
+// If this HTML is served BY the Express server, use "" (same origin).
+const API_BASE = "";
+
+// ─── Helpers ───────────────────────────────────────────────────
+function $(id) { return document.getElementById(id); }
+
+function fmtUsd(v) {
+  if (v == null || isNaN(v)) return "—";
+  const abs = Math.abs(v);
+  const sign = v < 0 ? "-" : v > 0 ? "+" : "";
+  if (abs >= 1e9) return sign + "$" + (abs / 1e9).toFixed(2) + "B";
+  if (abs >= 1e6) return sign + "$" + (abs / 1e6).toFixed(2) + "M";
+  if (abs >= 1e3) return sign + "$" + (abs / 1e3).toFixed(1) + "K";
+  return sign + "$" + abs.toFixed(0);
+}
+
+function fmtAddr(addr) {
+  if (!addr || addr.length < 10) return addr || "—";
+  return addr.slice(0, 6) + "..." + addr.slice(-4);
+}
+
+function fmtTime(ts) {
+  if (!ts) return "—";
+  try {
+    const d = new Date(ts);
+    return d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  } catch { return ts; }
+}
+
+function valClass(v) {
+  if (v > 0) return "val-positive";
+  if (v < 0) return "val-negative";
+  return "val-neutral";
+}
+
+function etherscanUrl(addr) {
+  return `https://etherscan.io/address/${addr}`;
+}
+
+function etherscanTx(hash) {
+  return `https://etherscan.io/tx/${hash}`;
+}
+
+function skeleton(rows = 5) {
+  let html = "";
+  for (let i = 0; i < rows; i++) {
+    html += `<div class="loading-skeleton" style="width:${70 + Math.random()*30}%"></div>`;
+  }
+  return html;
+}
+
+function emptyState(msg) {
+  return `<div class="empty-state"><div class="icon">📭</div>${msg}</div>`;
+}
+
+// ─── Section Toggle ────────────────────────────────────────────
+function toggleSection(id) {
+  $(id).classList.toggle("collapsed");
+}
+
+// ─── Render Tables ─────────────────────────────────────────────
+function renderWalletTable(rows) {
+  if (!rows || rows.length === 0) return emptyState("No data yet. Configure Dune query IDs in your .env");
+  let html = `<table class="data-table"><thead><tr>
+    <th>Wallet</th><th class="col-hide-mobile">Label</th>
+    <th class="col-hide-mobile">Token</th><th>USD Value</th>
+    <th class="col-hide-mobile">Txns</th></tr></thead><tbody>`;
+  for (const r of rows) {
+    html += `<tr>
+      <td class="mono"><a class="addr" href="${etherscanUrl(r.address)}" target="_blank" title="${r.address}">${fmtAddr(r.address)}</a></td>
+      <td class="col-hide-mobile">${r.label ? `<span class="label-tag">${r.label}</span>` : "—"}</td>
+      <td class="col-hide-mobile">${r.token || "—"}</td>
+      <td class="mono ${valClass(r.usd)}">${fmtUsd(r.usd)}</td>
+      <td class="col-hide-mobile">${r.txCount ?? "—"}</td></tr>`;
+  }
+  html += "</tbody></table>";
+  return html;
+}
+
+function renderTokenTable(rows) {
+  if (!rows || rows.length === 0) return emptyState("No data yet. Configure Dune query IDs in your .env");
+  let html = `<table class="data-table"><thead><tr>
+    <th>Token</th><th>Contract</th>
+    <th>USD Value</th><th class="col-hide-mobile">Wallets</th></tr></thead><tbody>`;
+  for (const r of rows) {
+    html += `<tr>
+      <td><strong>${r.symbol}</strong></td>
+      <td class="mono"><a class="addr" href="${etherscanUrl(r.address)}" target="_blank" title="${r.address}">${fmtAddr(r.address)}</a></td>
+      <td class="mono ${valClass(r.usd)}">${fmtUsd(r.usd)}</td>
+      <td class="col-hide-mobile">${r.walletCount ?? "—"}</td></tr>`;
+  }
+  html += "</tbody></table>";
+  return html;
+}
+
+function renderTransferTable(rows) {
+  if (!rows || rows.length === 0) return emptyState("No data yet. Configure Dune query IDs in your .env");
+  let html = `<table class="data-table"><thead><tr>
+    <th>Time</th><th>Wallet</th>
+    <th>Token</th><th>USD Value</th>
+    <th class="col-hide-mobile">Tx</th></tr></thead><tbody>`;
+  for (const r of rows) {
+    html += `<tr>
+      <td style="white-space:nowrap; font-size:11px; color:var(--text-muted);">${fmtTime(r.time)}</td>
+      <td class="mono"><a class="addr" href="${etherscanUrl(r.address)}" target="_blank" title="${r.address}">${fmtAddr(r.address)}</a></td>
+      <td>${r.token}</td>
+      <td class="mono ${valClass(r.usd)}">${fmtUsd(r.usd)}</td>
+      <td class="col-hide-mobile mono"><a class="addr" href="${etherscanTx(r.txHash)}" target="_blank">${fmtAddr(r.txHash)}</a></td></tr>`;
+  }
+  html += "</tbody></table>";
+  return html;
+}
+
+// ─── Load Overview ─────────────────────────────────────────────
+let overviewData = null;
+
+async function loadOverview() {
+  const btn = $("refreshBtn");
+  btn.classList.add("loading");
+  btn.textContent = "Loading...";
+
+  $("inflowsTable").innerHTML = skeleton(8);
+  $("outflowsTable").innerHTML = skeleton(8);
+  $("accumTable").innerHTML = skeleton(6);
+  $("distTable").innerHTML = skeleton(6);
+  $("transfersTable").innerHTML = skeleton(10);
+
+  $("statusDot").className = "status-dot";
+  $("statusText").textContent = "Fetching...";
+  $("errorBanner").classList.remove("show");
+
+  try {
+    const res = await fetch(API_BASE + "/api/onchain/overview");
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    overviewData = data;
+
+    // Metrics
+    const m = data.metrics || {};
+    const nf = m.stablecoinNetflow ?? 0;
+    $("metricNetflow").textContent = fmtUsd(nf);
+    $("metricNetflow").className = "value " + valClass(nf);
+
+    $("metricInflows").textContent = fmtUsd(m.totalInflows ?? 0);
+    $("metricInflows").className = "value val-positive";
+
+    $("metricOutflows").textContent = fmtUsd(m.totalOutflows ?? 0);
+    $("metricOutflows").className = "value val-negative";
+
+    // Tables
+    $("inflowsTable").innerHTML = renderWalletTable(data.topInflows);
+    $("outflowsTable").innerHTML = renderWalletTable(data.topOutflows);
+    $("accumTable").innerHTML = renderTokenTable(data.accumulatedTokens);
+    $("distTable").innerHTML = renderTokenTable(data.distributedTokens);
+    $("transfersTable").innerHTML = renderTransferTable(data.largeTransfers);
+
+    $("statusDot").className = "status-dot live";
+    $("statusText").textContent = "Live";
+    $("statusTime").textContent = "Updated " + new Date(data.ts).toLocaleTimeString();
+
+  } catch (err) {
+    console.error("Overview load failed:", err);
+    $("statusDot").className = "status-dot error";
+    $("statusText").textContent = "Error";
+
+    $("errorBanner").textContent = "⚠ " + err.message + " — Check /api/health to diagnose.";
+    $("errorBanner").classList.add("show");
+
+    const msg = emptyState("Failed to load. Is the API server running?");
+    $("inflowsTable").innerHTML = msg;
+    $("outflowsTable").innerHTML = msg;
+    $("accumTable").innerHTML = msg;
+    $("distTable").innerHTML = msg;
+    $("transfersTable").innerHTML = msg;
+  }
+
+  btn.classList.remove("loading");
+  btn.textContent = "Refresh";
+}
+
+// ─── Search / Detail ───────────────────────────────────────────
+async function handleSearch(mode = "wallet") {
+  const input = $("searchInput").value.trim();
+  if (!input) return;
+
+  if (!input.startsWith("0x")) {
+    $("errorBanner").textContent = "Enter a valid 0x address.";
+    $("errorBanner").classList.add("show");
+    setTimeout(() => $("errorBanner").classList.remove("show"), 4000);
+    return;
+  }
+
+  if (input.length > 42) {
+    window.open(etherscanTx(input), "_blank");
+    return;
+  }
+
+  if (input.length !== 42) {
+    $("errorBanner").textContent = "Wallets and token contracts should be 42 characters long.";
+    $("errorBanner").classList.add("show");
+    setTimeout(() => $("errorBanner").classList.remove("show"), 4000);
+    return;
+  }
+
+  if (mode === "token") {
+    await openTokenDetail(input);
+    return;
+  }
+
+  await openWalletDetail(input);
+}
+
+$("searchInput").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") handleSearch("wallet");
+});
+
+function openDetailPanel(html) {
+  $("detailContent").innerHTML = html;
+  $("detailOverlay").classList.add("open");
+  document.body.style.overflow = "hidden";
+}
+
+function closeDetail(e) {
+  if (e && e.target !== $("detailOverlay")) return;
+  $("detailOverlay").classList.remove("open");
+  document.body.style.overflow = "";
+}
+
+async function openWalletDetail(address) {
+  openDetailPanel(`<div class="empty-state"><div class="icon">⛓</div>Loading wallet data...<br><small>This may take 10-30s (Dune execution queue)</small></div>`);
+
+  try {
+    const res = await fetch(`${API_BASE}/api/onchain/wallet/${address}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    let html = `<h3>🏦 Wallet: ${fmtAddr(address)}</h3>
+      <div style="margin-bottom:4px;"><a class="addr" href="${etherscanUrl(address)}" target="_blank">${address}</a></div>`;
+
+    if (data.label) html += `<span class="label-tag">${data.label}</span>`;
+
+    html += `<div style="margin-top:16px;">
+      <div class="stat-row"><span class="stat-label">Net Flow 24h</span><span class="mono ${valClass(data.netflow24h)}">${fmtUsd(data.netflow24h)}</span></div>
+      <div class="stat-row"><span class="stat-label">Net Flow 7d</span><span class="mono ${valClass(data.netflow7d)}">${fmtUsd(data.netflow7d)}</span></div>
+    </div>`;
+
+    if (data.transfers?.length) {
+      html += `<h3 style="margin-top:24px;">Recent Transfers</h3>` + renderTransferTable(data.transfers);
+    }
+
+    openDetailPanel(html);
+  } catch (err) {
+    openDetailPanel(`<div class="empty-state"><div class="icon">⚠️</div>${err.message}</div>`);
+  }
+}
+
+async function openTokenDetail(address) {
+  openDetailPanel(`<div class="empty-state"><div class="icon">⛓</div>Loading token data...<br><small>This may take 10-30s (Dune execution queue)</small></div>`);
+
+  try {
+    const res = await fetch(`${API_BASE}/api/onchain/token/${address}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    let html = `<h3>🪙 ${data.symbol} ${data.name ? `(${data.name})` : ""}</h3>
+      <div style="margin-bottom:12px;"><a class="addr" href="${etherscanUrl(address)}" target="_blank">${address}</a></div>`;
+
+    html += `<div>
+      <div class="stat-row"><span class="stat-label">Whale Buys 24h</span><span class="mono val-positive">${fmtUsd(data.whaleBuys24h)}</span></div>
+      <div class="stat-row"><span class="stat-label">Whale Sells 24h</span><span class="mono val-negative">${fmtUsd(data.whaleSells24h)}</span></div>
+    </div>`;
+
+    if (data.whaleActivity?.length) {
+      html += `<h3 style="margin-top:24px;">Whale Activity</h3>` + renderWalletTable(data.whaleActivity);
+    }
+
+    openDetailPanel(html);
+  } catch (err) {
+    openDetailPanel(`<div class="empty-state"><div class="icon">⚠️</div>${err.message}</div>`);
+  }
+}
+
+// ─── Keyboard shortcut ────────────────────────────────────────
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeDetail();
+  if (e.key === "/" && document.activeElement !== $("searchInput")) {
+    e.preventDefault();
+    $("searchInput").focus();
+  }
+});
+
+// ─── Init ──────────────────────────────────────────────────────
+loadOverview();
+
+// Auto-refresh every 3 minutes
+setInterval(loadOverview, 3 * 60 * 1000);
+</script>
+
+</body>
+</html>
