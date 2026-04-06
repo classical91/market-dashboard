@@ -1,0 +1,6 @@
+Failed to fetch stablecoinNetflow: Dune query QUERY_STATE_FAILED
+Failed to fetch topInflows: Dune query QUERY_STATE_FAILED
+Failed to fetch topOutflows: Dune query QUERY_STATE_FAILED
+Failed to fetch accumulatedTokens: Dune query QUERY_STATE_FAILED
+Failed to fetch distributedTokens: Dune query QUERY_STATE_FAILED
+Failed to fetch largeTransfers: Dune query QUERY_STATE_FAILED

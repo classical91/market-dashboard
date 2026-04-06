@@ -1,0 +1,5 @@
+overview error: Error: Dune query QUERY_STATE_FAILED: This query has too many stages and is too complex to execute at once. Please consider splitting out several subqueries into a materialized view so parts of this query can be pre-computed separately. https://dune.com/docs/query/materialized-views [Execution ID: 01KNCS1VM52080F0RDHJ6JD69Z]
+    at dunePoll (C:\Users\JAson\Documents\codex\market-dashboard\server.js:159:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async duneSqlRows (C:\Users\JAson\Documents\codex\market-dashboard\server.js:235:19)
+    at async C:\Users\JAson\Documents\codex\market-dashboard\server.js:874:26

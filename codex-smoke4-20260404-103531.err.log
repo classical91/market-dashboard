@@ -1,0 +1,5 @@
+overview error: Error: Dune query QUERY_STATE_FAILED: line 127:50: IN value and list items must be the same type or coercible to a common type. Cannot find common type between varchar and varbinary, all types (without duplicates): [varchar, varbinary] at line 127, position 50 [Execution ID: 01KNCS0Z6RJAVQJFTA87SEX2AA]
+    at dunePoll (C:\Users\JAson\Documents\codex\market-dashboard\server.js:159:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async duneSqlRows (C:\Users\JAson\Documents\codex\market-dashboard\server.js:231:19)
+    at async C:\Users\JAson\Documents\codex\market-dashboard\server.js:870:26

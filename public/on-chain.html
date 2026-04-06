@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>On-Chain Analytics</title>
+  <link rel="stylesheet" href="/assets/styles/base.css" />
+  <link rel="stylesheet" href="/assets/styles/on-chain.css" />
+</head>
+<body>
+
+<header>
+  <span class="logo">On-Chain Analytics</span>
+  <div class="back-group">
+    <a href="/crypto.html" class="back back--crypto">&#8592; Crypto</a>
+    <a href="/" class="back">&#8592; Market Intel</a>
+  </div>
+</header>
+
+<nav class="nav-pills">
+  <a href="#platforms" class="nav-pill nav-pill--accent">Platforms</a>
+  <a href="#exchange-flows" class="nav-pill nav-pill--accent">Exchange Flows</a>
+  <a href="#network-activity" class="nav-pill nav-pill--accent">Network Activity</a>
+  <a href="#derivatives" class="nav-pill nav-pill--accent">Derivatives</a>
+  <a href="#cycle-indicators" class="nav-pill nav-pill--accent">Cycle Indicators</a>
+  <a href="#whale-tracking" class="nav-pill nav-pill--accent">Whale Tracking</a>
+  <a href="#stablecoin-flows" class="nav-pill nav-pill--accent">Stablecoins</a>
+  <a href="#defi" class="nav-pill nav-pill--accent">DeFi</a>
+</nav>
+
+<!-- PLATFORMS -->
+<div class="section-header" data-section="platforms">
+  <span class="section-label">Platforms</span>
+  <span class="section-chevron">&#9660;</span>
+</div>
+<div class="cards" id="platforms">
+  <a class="card" href="https://studio.glassnode.com" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">GLASSNODE</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Glassnode Studio</div>
+    <div class="card-src">studio.glassnode.com</div>
+  </a>
+  <a class="card" href="https://cryptoquant.com" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">CRYPTOQUANT</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">CryptoQuant Analytics</div>
+    <div class="card-src">cryptoquant.com</div>
+  </a>
+  <a class="card" href="https://app.santiment.net" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">SANTIMENT</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Social &amp; On-Chain Analytics</div>
+    <div class="card-src">app.santiment.net</div>
+  </a>
+  <a class="card" href="https://www.lookintobitcoin.com" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">LOOK INTO BTC</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Bitcoin On-Chain Charts</div>
+    <div class="card-src">lookintobitcoin.com</div>
+  </a>
+  <a class="card" href="https://www.blockchain.com/explorer" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">EXPLORER</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Blockchain Explorer</div>
+    <div class="card-src">blockchain.com</div>
+  </a>
+  <a class="card" href="https://mempool.space" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">MEMPOOL</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Bitcoin Mempool Visualizer</div>
+    <div class="card-src">mempool.space</div>
+  </a>
+</div>
+
+<!-- EXCHANGE FLOWS -->
+<div class="section-header" data-section="exchange-flows">
+  <span class="section-label">Exchange Flows</span>
+  <span class="section-chevron">&#9660;</span>
+</div>
+<div class="cards" id="exchange-flows">
+  <a class="card" href="https://cryptoquant.com/asset/btc/chart/exchange-flows/exchange-reserve" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">BTC RESERVE</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">BTC Exchange Reserve</div>
+    <div class="card-src">cryptoquant.com</div>
+  </a>
+  <a class="card" href="https://cryptoquant.com/asset/btc/chart/exchange-flows/exchange-netflow-total" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">NETFLOW</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">BTC Exchange Netflow</div>
+    <div class="card-src">cryptoquant.com</div>
+  </a>
+  <a class="card" href="https://www.coinglass.com/balance" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">BALANCE</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Exchange Balance Tracker</div>
+    <div class="card-src">coinglass.com</div>
+  </a>
+  <a class="card" href="https://www.theblock.co/data/crypto-markets/spot/total-exchange-volume-daily/embed" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">EXCHANGE VOL</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Daily Exchange Volume</div>
+    <div class="card-src">theblock.co</div>
+  </a>
+</div>
+
+<!-- NETWORK ACTIVITY -->
+<div class="section-header" data-section="network-activity">
+  <span class="section-label">Network Activity</span>
+  <span class="section-chevron">&#9660;</span>
+</div>
+<div class="cards" id="network-activity">
+  <a class="card" href="https://studio.glassnode.com/charts/addresses.ActiveCount?a=BTC&chartStyle=column&resolution=1month" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">ACTIVE ADDRS</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">BTC Active Addresses</div>
+    <div class="card-src">glassnode.com</div>
+  </a>
+  <a class="card" href="https://studio.glassnode.com/charts/addresses.NewNonZeroCount?a=BTC" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">NEW ADDRS</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">New BTC Addresses</div>
+    <div class="card-src">glassnode.com</div>
+  </a>
+  <a class="card" href="https://studio.glassnode.com/charts/transactions.Count?a=BTC" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">TX COUNT</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">BTC Transaction Count</div>
+    <div class="card-src">glassnode.com</div>
+  </a>
+  <a class="card" href="https://www.blockchain.com/explorer/charts/hash-rate" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">HASH RATE</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">BTC Hash Rate</div>
+    <div class="card-src">blockchain.com</div>
+  </a>
+  <a class="card" href="https://mempool.space/graphs/mining/hashrate-difficulty" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">DIFFICULTY</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Hashrate &amp; Difficulty</div>
+    <div class="card-src">mempool.space</div>
+  </a>
+  <a class="card" href="https://mempool.space/graphs#1y" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">MEMPOOL STATS</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Mempool Size &amp; Fees</div>
+    <div class="card-src">mempool.space</div>
+  </a>
+</div>
+
+<!-- DERIVATIVES ON-CHAIN -->
+<div class="section-header" data-section="derivatives">
+  <span class="section-label">Derivatives</span>
+  <span class="section-chevron">&#9660;</span>
+</div>
+<div class="cards" id="derivatives">
+  <a class="card" href="https://coinglass.com" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">COINGLASS</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Liquidations, Funding &amp; OI</div>
+    <div class="card-src">coinglass.com</div>
+  </a>
+  <a class="card" href="https://www.coinglass.com/FundingRate" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">FUNDING RATE</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Funding Rate Heatmap</div>
+    <div class="card-src">coinglass.com</div>
+  </a>
+  <a class="card" href="https://www.coinglass.com/LiquidationData" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">LIQUIDATIONS</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Liquidation Data</div>
+    <div class="card-src">coinglass.com</div>
+  </a>
+  <a class="card" href="https://www.coinglass.com/pro/futures/OpenInterest" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">OPEN INTEREST</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Open Interest Overview</div>
+    <div class="card-src">coinglass.com</div>
+  </a>
+  <a class="card" href="https://www.coinglass.com/LongShortRatio" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">LONG/SHORT</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Long/Short Ratio</div>
+    <div class="card-src">coinglass.com</div>
+  </a>
+  <a class="card" href="https://coinalyze.net/bitcoin/open-interest/" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">BTC OI</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">BTC Open Interest Chart</div>
+    <div class="card-src">coinalyze.net</div>
+  </a>
+</div>
+
+<!-- CYCLE INDICATORS -->
+<div class="section-header" data-section="cycle-indicators">
+  <span class="section-label">Cycle Indicators</span>
+  <span class="section-chevron">&#9660;</span>
+</div>
+<div class="cards" id="cycle-indicators">
+  <a class="card" href="https://www.lookintobitcoin.com/charts/mvrv-zscore/" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--green-bg);color:var(--green)">MVRV Z-SCORE</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">MVRV Z-Score</div>
+    <div class="card-src">lookintobitcoin.com</div>
+  </a>
+  <a class="card" href="https://www.lookintobitcoin.com/charts/relative-unrealized-profit--loss/" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--green-bg);color:var(--green)">NUPL</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Net Unrealized Profit/Loss</div>
+    <div class="card-src">lookintobitcoin.com</div>
+  </a>
+  <a class="card" href="https://www.lookintobitcoin.com/charts/stock-to-flow-model/" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">S2F MODEL</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Stock-to-Flow Model</div>
+    <div class="card-src">lookintobitcoin.com</div>
+  </a>
+  <a class="card" href="https://www.lookintobitcoin.com/charts/pi-cycle-top-indicator/" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">PI CYCLE TOP</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Pi Cycle Top Indicator</div>
+    <div class="card-src">lookintobitcoin.com</div>
+  </a>
+  <a class="card" href="https://www.lookintobitcoin.com/charts/puell-multiple/" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">PUELL MULTIPLE</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Puell Multiple</div>
+    <div class="card-src">lookintobitcoin.com</div>
+  </a>
+  <a class="card" href="https://coinmarketcap.com/charts/market-cycle-indicators/" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">CMC CYCLE</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Market Cycle Indicators</div>
+    <div class="card-src">coinmarketcap.com</div>
+  </a>
+  <a class="card" href="https://cryptoquant.com/asset/btc/summary" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">CQ SUMMARY</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">BTC On-Chain Summary</div>
+    <div class="card-src">cryptoquant.com</div>
+  </a>
+</div>
+
+<!-- WHALE TRACKING -->
+<div class="section-header" data-section="whale-tracking">
+  <span class="section-label">Whale Tracking</span>
+  <span class="section-chevron">&#9660;</span>
+</div>
+<div class="cards" id="whale-tracking">
+  <a class="card" href="https://whale-alert.io" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">WHALE ALERT</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Large Transaction Tracker</div>
+    <div class="card-src">whale-alert.io</div>
+  </a>
+  <a class="card" href="https://bitinfocharts.com/top-100-richest-bitcoin-addresses.html" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">RICH LIST</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Top 100 BTC Addresses</div>
+    <div class="card-src">bitinfocharts.com</div>
+  </a>
+  <a class="card" href="https://www.coinglass.com/whale" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">CG WHALES</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Whale Positions</div>
+    <div class="card-src">coinglass.com</div>
+  </a>
+</div>
+
+<!-- STABLECOIN FLOWS -->
+<div class="section-header" data-section="stablecoin-flows">
+  <span class="section-label">Stablecoin Flows</span>
+  <span class="section-chevron">&#9660;</span>
+</div>
+<div class="cards" id="stablecoin-flows">
+  <a class="card" href="https://www.coinglass.com/stablecoin" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">STABLECOIN</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Stablecoin Market Cap</div>
+    <div class="card-src">coinglass.com</div>
+  </a>
+  <a class="card" href="https://defillama.com/stablecoins" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">STABLES LLAMA</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Stablecoin Dashboard</div>
+    <div class="card-src">defillama.com</div>
+  </a>
+  <a class="card" href="https://coinmarketcap.com/view/stablecoin/" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">CMC STABLES</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Stablecoin Rankings</div>
+    <div class="card-src">coinmarketcap.com</div>
+  </a>
+</div>
+
+<!-- DEFI -->
+<div class="section-header" data-section="defi">
+  <span class="section-label">DeFi</span>
+  <span class="section-chevron">&#9660;</span>
+</div>
+<div class="cards" id="defi">
+  <a class="card" href="https://defillama.com" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">DEFI LLAMA</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">DeFi TVL &amp; Analytics</div>
+    <div class="card-src">defillama.com</div>
+  </a>
+  <a class="card" href="https://defillama.com/chains" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">CHAINS TVL</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">TVL by Chain</div>
+    <div class="card-src">defillama.com</div>
+  </a>
+  <a class="card" href="https://defillama.com/dexs" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">DEX VOLUME</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">DEX Trading Volume</div>
+    <div class="card-src">defillama.com</div>
+  </a>
+  <a class="card" href="https://dune.com/browse/dashboards" target="_blank">
+    <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">DUNE</span><span class="arrow">&#8599;</span></div>
+    <div class="card-title">Dune Analytics Dashboards</div>
+    <div class="card-src">dune.com</div>
+  </a>
+</div>
+
+<footer>On-Chain Analytics &mdash; <a href="/crypto.html" style="color:var(--amber);text-decoration:none;">Crypto Hub</a> &mdash; <a href="/" style="color:var(--dim);text-decoration:none;">Market Intel</a></footer>
+
+<script src="/assets/js/sections.js" defer></script>
+<script src="/assets/js/on-chain.js" defer></script>
+</body>
+</html>

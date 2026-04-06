@@ -1,0 +1,30 @@
+:root {
+  --green: #639922;
+  --green-bg: rgba(99, 153, 34, 0.12);
+  --accent: var(--amber);
+  --accent-bg: var(--amber-bg);
+}
+
+.logo {
+  color: var(--amber);
+}
+
+.nav-pill--accent {
+  border-color: rgba(239, 159, 39, 0.3);
+}
+
+.section-label {
+  color: var(--accent);
+}
+
+.section-chevron {
+  color: var(--accent);
+}
+
+.section-chevron--accent {
+  opacity: 0.5;
+}
+
+.card:hover {
+  border-color: var(--amber);
+}

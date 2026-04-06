@@ -1,0 +1,5 @@
+Failed to fetch stablecoinNetflow: Dune 429: {"error":"Too many requests. Please upgrade your plan https://dune.com/pricing"}
+Failed to fetch topInflows: Dune query QUERY_STATE_FAILED
+Failed to fetch topOutflows: Dune 429: {"error":"Too many requests. Please upgrade your plan https://dune.com/pricing"}
+Failed to fetch accumulatedTokens: Dune 429: {"error":"Too many requests. Please upgrade your plan https://dune.com/pricing"}
+Failed to fetch distributedTokens: Dune query QUERY_STATE_FAILED

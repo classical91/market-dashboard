@@ -1,0 +1,3 @@
+Market Intel running on port 3000
+On-chain queries configured: 0/10
+Raw Dune SQL fallback is available for any unset DUNE_Q_* values.

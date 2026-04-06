@@ -1,14 +1,10 @@
-const express = require('express');
-const path = require('path');
-const app = express();
-const PORT = process.env.PORT || 3000;
+require("dotenv").config();
 
-app.use(express.static(path.join(__dirname, 'public')));
+const { createApp } = require("./src/app");
+const { config } = require("./src/config/env");
 
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+const app = createApp();
 
-app.listen(PORT, () => {
-  console.log(`Market Intel running on port ${PORT}`);
+app.listen(config.port, () => {
+  console.log(`Market Intel running on port ${config.port}`);
 });

@@ -1,0 +1,40 @@
+:root {
+  --green: #639922;
+  --green-bg: rgba(99, 153, 34, 0.12);
+  --accent: var(--purple);
+  --accent-bg: var(--purple-bg);
+}
+
+.logo {
+  color: var(--purple);
+}
+
+.back-group {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.back--crypto {
+  color: var(--amber);
+}
+
+.nav-pill--accent {
+  border-color: rgba(127, 119, 221, 0.3);
+}
+
+.section-label {
+  color: var(--accent);
+}
+
+.section-chevron {
+  color: var(--accent);
+}
+
+.section-chevron--accent {
+  opacity: 0.5;
+}
+
+.card:hover {
+  border-color: var(--purple);
+}

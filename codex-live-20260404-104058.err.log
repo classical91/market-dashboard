@@ -1,0 +1,48 @@
+overview error: Error: Dune 429: {"error":"Too many requests. Please upgrade your plan https://dune.com/pricing"}
+    at duneRequest (C:\Users\JAson\Documents\codex\market-dashboard\server.js:111:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async dunePoll (C:\Users\JAson\Documents\codex\market-dashboard\server.js:145:20)
+    at async duneSqlRows (C:\Users\JAson\Documents\codex\market-dashboard\server.js:235:19)
+    at async C:\Users\JAson\Documents\codex\market-dashboard\server.js:1004:28
+overview error: Error: Dune 429: {"error":"Too many requests. Please upgrade your plan https://dune.com/pricing"}
+    at duneRequest (C:\Users\JAson\Documents\codex\market-dashboard\server.js:111:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async dunePoll (C:\Users\JAson\Documents\codex\market-dashboard\server.js:145:20)
+    at async duneSqlRows (C:\Users\JAson\Documents\codex\market-dashboard\server.js:235:19)
+    at async C:\Users\JAson\Documents\codex\market-dashboard\server.js:1002:26
+overview error: Error: Dune 429: {"error":"Too many requests. Please upgrade your plan https://dune.com/pricing"}
+    at duneRequest (C:\Users\JAson\Documents\codex\market-dashboard\server.js:111:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async dunePoll (C:\Users\JAson\Documents\codex\market-dashboard\server.js:145:20)
+    at async duneSqlRows (C:\Users\JAson\Documents\codex\market-dashboard\server.js:235:19)
+    at async C:\Users\JAson\Documents\codex\market-dashboard\server.js:1004:28
+overview error: Error: Dune 429: {"error":"Too many requests. Please upgrade your plan https://dune.com/pricing"}
+    at duneRequest (C:\Users\JAson\Documents\codex\market-dashboard\server.js:111:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async dunePoll (C:\Users\JAson\Documents\codex\market-dashboard\server.js:145:20)
+    at async duneSqlRows (C:\Users\JAson\Documents\codex\market-dashboard\server.js:235:19)
+    at async C:\Users\JAson\Documents\codex\market-dashboard\server.js:1002:26
+overview error: Error: Dune 429: {"error":"Too many requests. Please upgrade your plan https://dune.com/pricing"}
+    at duneRequest (C:\Users\JAson\Documents\codex\market-dashboard\server.js:111:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async dunePoll (C:\Users\JAson\Documents\codex\market-dashboard\server.js:145:20)
+    at async duneSqlRows (C:\Users\JAson\Documents\codex\market-dashboard\server.js:235:19)
+    at async C:\Users\JAson\Documents\codex\market-dashboard\server.js:1002:26
+overview error: Error: Dune 429: {"error":"Too many requests. Please upgrade your plan https://dune.com/pricing"}
+    at duneRequest (C:\Users\JAson\Documents\codex\market-dashboard\server.js:111:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async dunePoll (C:\Users\JAson\Documents\codex\market-dashboard\server.js:145:20)
+    at async duneSqlRows (C:\Users\JAson\Documents\codex\market-dashboard\server.js:235:19)
+    at async C:\Users\JAson\Documents\codex\market-dashboard\server.js:1004:28
+overview error: Error: Dune 429: {"error":"Too many requests. Please upgrade your plan https://dune.com/pricing"}
+    at duneRequest (C:\Users\JAson\Documents\codex\market-dashboard\server.js:111:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async dunePoll (C:\Users\JAson\Documents\codex\market-dashboard\server.js:145:20)
+    at async duneSqlRows (C:\Users\JAson\Documents\codex\market-dashboard\server.js:235:19)
+    at async C:\Users\JAson\Documents\codex\market-dashboard\server.js:1002:26
+overview error: Error: Dune 429: {"error":"Too many requests. Please upgrade your plan https://dune.com/pricing"}
+    at duneRequest (C:\Users\JAson\Documents\codex\market-dashboard\server.js:111:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async dunePoll (C:\Users\JAson\Documents\codex\market-dashboard\server.js:145:20)
+    at async duneSqlRows (C:\Users\JAson\Documents\codex\market-dashboard\server.js:235:19)
+    at async C:\Users\JAson\Documents\codex\market-dashboard\server.js:1004:28

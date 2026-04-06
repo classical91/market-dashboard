@@ -4,148 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Crypto Hub</title>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    :root {
-      --bg: #0f0f0f;
-      --surface: #1a1a1a;
-      --surface2: #222;
-      --border: rgba(255,255,255,0.08);
-      --border-hover: rgba(255,255,255,0.18);
-      --text: #f0ede8;
-      --muted: #888;
-      --dim: #555;
-      --amber: #EF9F27;
-      --amber-bg: rgba(239,159,39,0.12);
-      --teal: #1D9E75;
-      --teal-bg: rgba(29,158,117,0.12);
-      --blue: #378ADD;
-      --blue-bg: rgba(55,138,221,0.12);
-      --coral: #D85A30;
-      --coral-bg: rgba(216,90,48,0.12);
-      --purple: #7F77DD;
-      --purple-bg: rgba(127,119,221,0.12);
-      --green: #639922;
-      --green-bg: rgba(99,153,34,0.12);
-    }
-    body {
-      font-family: -apple-system, 'SF Pro Text', 'Segoe UI', sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      padding: 2rem 1.5rem;
-      max-width: 900px;
-      margin: 0 auto;
-    }
-    header {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      margin-bottom: 1.5rem;
-      padding-bottom: 14px;
-      border-bottom: 0.5px solid var(--border);
-    }
-    .logo {
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      font-size: 13px;
-      font-weight: 500;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--amber);
-    }
-    .back {
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      font-size: 11px;
-      color: var(--dim);
-      text-decoration: none;
-      transition: color 0.15s;
-    }
-    .back:hover { color: var(--muted); }
-    .nav-pill {
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      font-size: 10px;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      text-decoration: none;
-      padding: 4px 10px;
-      border-radius: 20px;
-      border: 0.5px solid rgba(239,159,39,0.3);
-      color: var(--amber);
-      background: var(--amber-bg);
-      transition: border-color 0.15s, color 0.15s;
-    }
-    .nav-pill:hover { border-color: var(--amber); }
-    .section-header {
-      -webkit-tap-highlight-color: transparent;
-      touch-action: manipulation;
-    }
-    .section-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      cursor: pointer;
-      user-select: none;
-      margin-bottom: 10px;
-      padding: 4px 0;
-    }
-    .section-header:hover .section-label { color: var(--muted); }
-    .section-label {
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      font-size: 10px;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--amber);
-      transition: color 0.15s;
-    }
-    .section-chevron {
-      font-size: 10px;
-      color: var(--amber);
-      opacity: 0.5;
-      transition: transform 0.2s ease;
-    }
-    .section-header.collapsed .section-chevron { transform: rotate(-90deg); }
-    .cards {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-      gap: 10px;
-      margin-bottom: 2rem;
-      overflow: hidden;
-      transition: max-height 0.25s ease, opacity 0.2s ease, margin-bottom 0.25s ease;
-      max-height: 2000px;
-      opacity: 1;
-    }
-    .cards.collapsed { max-height: 0; opacity: 0; margin-bottom: 0.5rem; pointer-events: none; }
-    .card {
-      background: var(--surface);
-      border: 0.5px solid var(--border);
-      border-radius: 12px;
-      padding: 14px 16px;
-      text-decoration: none;
-      display: block;
-      transition: border-color 0.15s, background 0.15s;
-    }
-    .card:hover { border-color: var(--amber); background: var(--surface2); }
-    .card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
-    .badge {
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      font-size: 10px;
-      font-weight: 500;
-      padding: 3px 8px;
-      border-radius: 5px;
-      letter-spacing: 0.06em;
-    }
-    .arrow { color: var(--dim); font-size: 14px; }
-    .card-title { font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 4px; }
-    .card-src { font-size: 11px; font-family: 'SF Mono', 'Fira Code', monospace; color: var(--dim); }
-    footer {
-      font-size: 11px;
-      color: var(--dim);
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      text-align: center;
-      padding-top: 1rem;
-      border-top: 0.5px solid var(--border);
-    }
-  </style>
+  <link rel="stylesheet" href="/assets/styles/base.css" />
+  <link rel="stylesheet" href="/assets/styles/crypto.css" />
 </head>
 <body>
 
@@ -154,17 +14,17 @@
   <a href="/" class="back">&#8592; Market Intel</a>
 </header>
 
-<nav style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:2rem;">
-  <a href="#btc-research" class="nav-pill">BTC Research</a>
-  <a href="#alt-research" class="nav-pill">Alt Research</a>
-  <a href="#on-chain" class="nav-pill">On-Chain</a>
-  <a href="#sentiment" class="nav-pill">Sentiment</a>
-  <a href="#news" class="nav-pill">Crypto News</a>
-  <a href="#cmc-markets" class="nav-pill">CMC Markets</a>
-  <a href="#cmc-indicators" class="nav-pill">CMC Indicators</a>
-  <a href="#etf-flows" class="nav-pill">ETF Flows</a>
-  <a href="#derivatives" class="nav-pill">Derivatives</a>
-  <a href="#qualitative" class="nav-pill">Qual. Analysis</a>
+<nav class="nav-pills">
+  <a href="#btc-research" class="nav-pill nav-pill--accent">BTC Research</a>
+  <a href="#alt-research" class="nav-pill nav-pill--accent">Alt Research</a>
+  <a href="/on-chain.html" class="nav-pill nav-pill--accent">On-Chain</a>
+  <a href="#sentiment" class="nav-pill nav-pill--accent">Sentiment</a>
+  <a href="#news" class="nav-pill nav-pill--accent">Crypto News</a>
+  <a href="#cmc-markets" class="nav-pill nav-pill--accent">CMC Markets</a>
+  <a href="#cmc-indicators" class="nav-pill nav-pill--accent">CMC Indicators</a>
+  <a href="#etf-flows" class="nav-pill nav-pill--accent">ETF Flows</a>
+  <a href="#derivatives" class="nav-pill nav-pill--accent">Derivatives</a>
+  <a href="#qualitative" class="nav-pill nav-pill--accent">Qual. Analysis</a>
 </nav>
 
 <div class="section-header" data-section="btc-research">
@@ -488,40 +348,9 @@
 </div>
 <footer>Crypto Hub &mdash; <a href="/" style="color:var(--dim);text-decoration:none;">Market Intel</a></footer>
 
-<script>
-  const STORE_KEY = 'crypto_collapsed';
-  function getCollapsed() {
-    try { return JSON.parse(localStorage.getItem(STORE_KEY) || '[]'); } catch { return []; }
-  }
-  function saveCollapsed(list) { localStorage.setItem(STORE_KEY, JSON.stringify(list)); }
-
-  function initSections() {
-    const stored = localStorage.getItem(STORE_KEY);
-    const allIds = Array.from(document.querySelectorAll('.section-header')).map(h => h.dataset.section);
-    const collapsed = stored ? JSON.parse(stored) : allIds;
-    document.querySelectorAll('.section-header').forEach(header => {
-      const id = header.dataset.section;
-      const cards = document.getElementById(id);
-      if (collapsed.includes(id)) {
-        header.classList.add('collapsed');
-        cards.classList.add('collapsed');
-      }
-      header.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const isCollapsed = cards.classList.toggle('collapsed');
-        header.classList.toggle('collapsed', isCollapsed);
-        const list = getCollapsed();
-        if (isCollapsed) { if (!list.includes(id)) list.push(id); }
-        else { const i = list.indexOf(id); if (i > -1) list.splice(i, 1); }
-        saveCollapsed(list);
-      });
-    });
-  }
-  initSections();
-</script>
+<script src="/assets/js/sections.js" defer></script>
+<script src="/assets/js/crypto.js" defer></script>
 </body>
 </html>
-
 
 
