@@ -1,13 +1,13 @@
-﻿// â”€â”€â”€ Config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Config ----------------------------------------------------
 // Point this at wherever you deploy the Express server.
 // If this HTML is served BY the Express server, use "" (same origin).
 const API_BASE = "";
 
-// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Helpers ---------------------------------------------------
 function $(id) { return document.getElementById(id); }
 
 function fmtUsd(v) {
-  if (v == null || isNaN(v)) return "â€”";
+  if (v == null || isNaN(v)) return "—";
   const abs = Math.abs(v);
   const sign = v < 0 ? "-" : v > 0 ? "+" : "";
   if (abs >= 1e9) return sign + "$" + (abs / 1e9).toFixed(2) + "B";
@@ -17,12 +17,12 @@ function fmtUsd(v) {
 }
 
 function fmtAddr(addr) {
-  if (!addr || addr.length < 10) return addr || "â€”";
+  if (!addr || addr.length < 10) return addr || "—";
   return addr.slice(0, 6) + "..." + addr.slice(-4);
 }
 
 function fmtTime(ts) {
-  if (!ts) return "â€”";
+  if (!ts) return "—";
   try {
     const d = new Date(ts);
     return d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
@@ -52,15 +52,15 @@ function skeleton(rows = 5) {
 }
 
 function emptyState(msg) {
-  return `<div class="empty-state"><div class="icon">ðŸ“­</div>${msg}</div>`;
+  return `<div class="empty-state"><div class="icon">📭</div>${msg}</div>`;
 }
 
-// â”€â”€â”€ Section Toggle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Section Toggle --------------------------------------------
 function toggleSection(id) {
   $(id).classList.toggle("collapsed");
 }
 
-// â”€â”€â”€ Render Tables â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Render Tables ---------------------------------------------
 function renderWalletTable(rows) {
   if (!rows || rows.length === 0) return emptyState("No data yet. Configure Dune query IDs in your .env");
   let html = `<table class="data-table"><thead><tr>
@@ -70,10 +70,10 @@ function renderWalletTable(rows) {
   for (const r of rows) {
     html += `<tr>
       <td class="mono"><a class="addr" href="${etherscanUrl(r.address)}" target="_blank" title="${r.address}">${fmtAddr(r.address)}</a></td>
-      <td class="col-hide-mobile">${r.label ? `<span class="label-tag">${r.label}</span>` : "â€”"}</td>
-      <td class="col-hide-mobile">${r.token || "â€”"}</td>
+      <td class="col-hide-mobile">${r.label ? `<span class="label-tag">${r.label}</span>` : "—"}</td>
+      <td class="col-hide-mobile">${r.token || "—"}</td>
       <td class="mono ${valClass(r.usd)}">${fmtUsd(r.usd)}</td>
-      <td class="col-hide-mobile">${r.txCount ?? "â€”"}</td></tr>`;
+      <td class="col-hide-mobile">${r.txCount ?? "—"}</td></tr>`;
   }
   html += "</tbody></table>";
   return html;
@@ -89,7 +89,7 @@ function renderTokenTable(rows) {
       <td><strong>${r.symbol}</strong></td>
       <td class="mono"><a class="addr" href="${etherscanUrl(r.address)}" target="_blank" title="${r.address}">${fmtAddr(r.address)}</a></td>
       <td class="mono ${valClass(r.usd)}">${fmtUsd(r.usd)}</td>
-      <td class="col-hide-mobile">${r.walletCount ?? "â€”"}</td></tr>`;
+      <td class="col-hide-mobile">${r.walletCount ?? "—"}</td></tr>`;
   }
   html += "</tbody></table>";
   return html;
@@ -113,7 +113,7 @@ function renderTransferTable(rows) {
   return html;
 }
 
-// â”€â”€â”€ Load Overview â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Load Overview ---------------------------------------------
 let overviewData = null;
 
 async function loadOverview() {
@@ -170,7 +170,7 @@ async function loadOverview() {
     $("statusDot").className = "status-dot error";
     $("statusText").textContent = "Error";
 
-    $("errorBanner").textContent = "âš  " + err.message + " â€” Check /api/health to diagnose.";
+    $("errorBanner").textContent = "⚠ " + err.message + " — Check /api/health to diagnose.";
     $("errorBanner").classList.add("show");
 
     const msg = emptyState("Failed to load. Is the API server running?");
@@ -185,7 +185,7 @@ async function loadOverview() {
   btn.textContent = "Refresh";
 }
 
-// â”€â”€â”€ Search / Detail â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Search / Detail -------------------------------------------
 async function handleSearch(mode = "wallet") {
   const input = $("searchInput").value.trim();
   if (!input) return;
@@ -234,14 +234,14 @@ function closeDetail(e) {
 }
 
 async function openWalletDetail(address) {
-  openDetailPanel(`<div class="empty-state"><div class="icon">â›“</div>Loading wallet data...<br><small>This may take 10-30s (Dune execution queue)</small></div>`);
+  openDetailPanel(`<div class="empty-state"><div class="icon">⛓</div>Loading wallet data...<br><small>This may take 10-30s (Dune execution queue)</small></div>`);
 
   try {
     const res = await fetch(`${API_BASE}/api/onchain/wallet/${address}`);
     const data = await res.json();
     if (data.error) throw new Error(data.error);
 
-    let html = `<h3>ðŸ¦ Wallet: ${fmtAddr(address)}</h3>
+    let html = `<h3>🏦 Wallet: ${fmtAddr(address)}</h3>
       <div style="margin-bottom:4px;"><a class="addr" href="${etherscanUrl(address)}" target="_blank">${address}</a></div>`;
 
     if (data.label) html += `<span class="label-tag">${data.label}</span>`;
@@ -257,19 +257,19 @@ async function openWalletDetail(address) {
 
     openDetailPanel(html);
   } catch (err) {
-    openDetailPanel(`<div class="empty-state"><div class="icon">âš ï¸</div>${err.message}</div>`);
+    openDetailPanel(`<div class="empty-state"><div class="icon">⚠️</div>${err.message}</div>`);
   }
 }
 
 async function openTokenDetail(address) {
-  openDetailPanel(`<div class="empty-state"><div class="icon">â›“</div>Loading token data...<br><small>This may take 10-30s (Dune execution queue)</small></div>`);
+  openDetailPanel(`<div class="empty-state"><div class="icon">⛓</div>Loading token data...<br><small>This may take 10-30s (Dune execution queue)</small></div>`);
 
   try {
     const res = await fetch(`${API_BASE}/api/onchain/token/${address}`);
     const data = await res.json();
     if (data.error) throw new Error(data.error);
 
-    let html = `<h3>ðŸª™ ${data.symbol} ${data.name ? `(${data.name})` : ""}</h3>
+    let html = `<h3>🪙 ${data.symbol} ${data.name ? `(${data.name})` : ""}</h3>
       <div style="margin-bottom:12px;"><a class="addr" href="${etherscanUrl(address)}" target="_blank">${address}</a></div>`;
 
     html += `<div>
@@ -283,11 +283,11 @@ async function openTokenDetail(address) {
 
     openDetailPanel(html);
   } catch (err) {
-    openDetailPanel(`<div class="empty-state"><div class="icon">âš ï¸</div>${err.message}</div>`);
+    openDetailPanel(`<div class="empty-state"><div class="icon">⚠️</div>${err.message}</div>`);
   }
 }
 
-// â”€â”€â”€ Keyboard shortcut â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Keyboard shortcut ----------------------------------------
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") closeDetail();
   if (e.key === "/" && document.activeElement !== $("searchInput")) {
@@ -296,7 +296,7 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
-// â”€â”€â”€ Init â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Init ------------------------------------------------------
 loadOverview();
 
 // Auto-refresh every 3 minutes
