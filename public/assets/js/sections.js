@@ -17,7 +17,7 @@ function initSections(storeKey) {
 
   headers.forEach(header => {
     const id = header.dataset.section;
-    const cards = document.getElementById('cards-' + id) || document.getElementById(id);
+    const cards = document.getElementById('cards-' + id) || document.getElementById(id + '-cards') || document.getElementById(id);
     if (!cards) return;
 
     if (collapsed.includes(id)) {

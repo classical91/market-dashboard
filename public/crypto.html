@@ -1,361 +1,185 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Crypto Hub</title>
-  <link rel="stylesheet" href="/assets/styles/base.css" />
-  <link rel="stylesheet" href="/assets/styles/crypto.css" />
+  <title>Crypto Hub · Market Command</title>
+  <link rel="stylesheet" href="/assets/styles/command.css" />
 </head>
 <body>
+<div class="app">
+  <aside class="cmd-sidebar"></aside>
+  <main class="cmd-main">
 
-<header>
-  <span class="logo">&#9733; Crypto Hub</span>
-  <a href="/" class="back">&#8592; Market Intel</a>
-</header>
+    <div class="cmd-page-header">
+      <div>
+        <div class="cmd-page-title">₿ Crypto Hub</div>
+        <div class="cmd-page-subtitle">BTC research, alts, on-chain, sentiment &amp; derivatives</div>
+      </div>
+      <div class="cmd-clock" id="cmd-clock"></div>
+    </div>
 
-<nav class="nav-pills">
-  <a href="#btc-research" class="nav-pill nav-pill--accent">BTC Research</a>
-  <a href="#alt-research" class="nav-pill nav-pill--accent">Alt Research</a>
-  <a href="/on-chain.html" class="nav-pill nav-pill--accent">On-Chain</a>
-  <a href="#sentiment" class="nav-pill nav-pill--accent">Sentiment</a>
-  <a href="#news" class="nav-pill nav-pill--accent">Crypto News</a>
-  <a href="#cmc-markets" class="nav-pill nav-pill--accent">CMC Markets</a>
-  <a href="#cmc-indicators" class="nav-pill nav-pill--accent">CMC Indicators</a>
-  <a href="#etf-flows" class="nav-pill nav-pill--accent">ETF Flows</a>
-  <a href="#derivatives" class="nav-pill nav-pill--accent">Derivatives</a>
-  <a href="#qualitative" class="nav-pill nav-pill--accent">Qual. Analysis</a>
-</nav>
+    <nav class="nav-pills">
+      <a href="#btc-research"   class="nav-pill nav-pill--accent">BTC Research</a>
+      <a href="#alt-research"   class="nav-pill nav-pill--accent">Alt Research</a>
+      <a href="/on-chain.html"  class="nav-pill nav-pill--accent">On-Chain</a>
+      <a href="#sentiment"      class="nav-pill nav-pill--accent">Sentiment</a>
+      <a href="#news"           class="nav-pill nav-pill--accent">Crypto News</a>
+      <a href="#cmc-markets"    class="nav-pill nav-pill--accent">CMC Markets</a>
+      <a href="#cmc-indicators" class="nav-pill nav-pill--accent">CMC Indicators</a>
+      <a href="#etf-flows"      class="nav-pill nav-pill--accent">ETF Flows</a>
+      <a href="#derivatives"    class="nav-pill nav-pill--accent">Derivatives</a>
+      <a href="#qualitative"    class="nav-pill nav-pill--accent">Qual. Analysis</a>
+    </nav>
 
-<div class="section-header" data-section="btc-research">
-  <span class="section-label">BTC Research</span>
-  <span class="section-chevron">&#9660;</span>
-</div>
-<div class="cards" id="btc-research">
-  <a class="card" href="https://www.tradingview.com/symbols/BTCUSDT.P/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">BTCUSDT.P</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">BTC Perp Chart</div>
-    <div class="card-src">tradingview.com</div>
-  </a>
-  <a class="card" href="https://coinmarketcap.com/currencies/bitcoin/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">BTC / CMC</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Bitcoin on CoinMarketCap</div>
-    <div class="card-src">coinmarketcap.com</div>
-  </a>
-  <a class="card" href="https://www.tradingview.com/symbols/BTCUSD/technicals/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">TV TECHNICALS</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">BTC Technical Analysis</div>
-    <div class="card-src">tradingview.com</div>
-  </a>
-  <a class="card" href="https://coinalyze.net/bitcoin/technical-analysis/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">COINALYZE TA</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">BTC Technical Analysis</div>
-    <div class="card-src">coinalyze.net</div>
-  </a>
-  <a class="card" href="https://coinalyze.net/bitcoin/usd/binance/btcusd_perp/price-chart-live/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">LIVE CHART</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">BTC Live Price Chart</div>
-    <div class="card-src">coinalyze.net</div>
-  </a>
-  <a class="card" href="https://www.coinglass.com/mergev2/BTC-USDT" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">MERGE VIEW</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">BTC Merge View</div>
-    <div class="card-src">coinglass.com</div>
-  </a>
-  <a class="card" href="https://www.coinglass.com/LongShortRatio" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">LONG/SHORT</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Long/Short Ratio</div>
-    <div class="card-src">coinglass.com</div>
-  </a>
-  <a class="card" href="https://www.coinglass.com/tv/Binance_BTCUSDT" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">CG TV CHART</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">BTC Chart (Coinglass TV)</div>
-    <div class="card-src">coinglass.com</div>
-  </a>
-  <a class="card" href="https://cryptoquant.com/asset/btc/summary" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">CQ SUMMARY</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">BTC On-Chain Summary</div>
-    <div class="card-src">cryptoquant.com</div>
-  </a>
-  <a class="card" href="https://studio.glassnode.com/charts/addresses.ActiveCount?a=BTC&chartStyle=column&resolution=1month" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">ACTIVE ADDRS</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">BTC Active Addresses</div>
-    <div class="card-src">glassnode.com</div>
-  </a>
-  <a class="card" href="https://www.theblock.co/data/crypto-markets/spot/total-exchange-volume-daily/embed" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">EXCHANGE VOL</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Daily Exchange Volume</div>
-    <div class="card-src">theblock.co</div>
-  </a>
-  <a class="card" href="https://coinmarketcap.com/rankings/exchanges/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">EXCHANGES</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Exchange Rankings</div>
-    <div class="card-src">coinmarketcap.com</div>
-  </a>
-  <a class="card" href="https://trends.google.com/trends/explore?date=today%203-m&geo=CA&q=bitcoin&hl=en" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">BTC TRENDS</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Bitcoin Search Trends — CA</div>
-    <div class="card-src">trends.google.com</div>
-  </a>
-  <a class="card" href="https://www.barchart.com/crypto/quotes/%5EBTCUSD/price-history/historical" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">PRICE HISTORY</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">BTC Historical Price Data</div>
-    <div class="card-src">barchart.com</div>
-  </a>
-</div>
+    <!-- BTC RESEARCH -->
+    <div class="section-header" data-section="btc-research">
+      <span class="section-label">BTC Research</span>
+      <span class="section-chevron">&#9660;</span>
+    </div>
+    <div class="cards" id="btc-research">
+      <a class="card" href="https://www.tradingview.com/symbols/BTCUSDT.P/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">BTCUSDT.P</span><span class="arrow">&#8599;</span></div><div class="card-title">BTC Perp Chart</div><div class="card-src">tradingview.com</div></a>
+      <a class="card" href="https://coinmarketcap.com/currencies/bitcoin/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">BTC / CMC</span><span class="arrow">&#8599;</span></div><div class="card-title">Bitcoin on CoinMarketCap</div><div class="card-src">coinmarketcap.com</div></a>
+      <a class="card" href="https://www.tradingview.com/symbols/BTCUSD/technicals/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">TV TECHNICALS</span><span class="arrow">&#8599;</span></div><div class="card-title">BTC Technical Analysis</div><div class="card-src">tradingview.com</div></a>
+      <a class="card" href="https://coinalyze.net/bitcoin/technical-analysis/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">COINALYZE TA</span><span class="arrow">&#8599;</span></div><div class="card-title">BTC Technical Analysis</div><div class="card-src">coinalyze.net</div></a>
+      <a class="card" href="https://coinalyze.net/bitcoin/usd/binance/btcusd_perp/price-chart-live/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">LIVE CHART</span><span class="arrow">&#8599;</span></div><div class="card-title">BTC Live Price Chart</div><div class="card-src">coinalyze.net</div></a>
+      <a class="card" href="https://www.coinglass.com/mergev2/BTC-USDT" target="_blank"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">MERGE VIEW</span><span class="arrow">&#8599;</span></div><div class="card-title">BTC Merge View</div><div class="card-src">coinglass.com</div></a>
+      <a class="card" href="https://www.coinglass.com/LongShortRatio" target="_blank"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">LONG/SHORT</span><span class="arrow">&#8599;</span></div><div class="card-title">Long/Short Ratio</div><div class="card-src">coinglass.com</div></a>
+      <a class="card" href="https://www.coinglass.com/tv/Binance_BTCUSDT" target="_blank"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">CG TV CHART</span><span class="arrow">&#8599;</span></div><div class="card-title">BTC Chart (Coinglass TV)</div><div class="card-src">coinglass.com</div></a>
+      <a class="card" href="https://cryptoquant.com/asset/btc/summary" target="_blank"><div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">CQ SUMMARY</span><span class="arrow">&#8599;</span></div><div class="card-title">BTC On-Chain Summary</div><div class="card-src">cryptoquant.com</div></a>
+      <a class="card" href="https://studio.glassnode.com/charts/addresses.ActiveCount?a=BTC&chartStyle=column&resolution=1month" target="_blank"><div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">ACTIVE ADDRS</span><span class="arrow">&#8599;</span></div><div class="card-title">BTC Active Addresses</div><div class="card-src">glassnode.com</div></a>
+      <a class="card" href="https://www.theblock.co/data/crypto-markets/spot/total-exchange-volume-daily/embed" target="_blank"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">EXCHANGE VOL</span><span class="arrow">&#8599;</span></div><div class="card-title">Daily Exchange Volume</div><div class="card-src">theblock.co</div></a>
+      <a class="card" href="https://coinmarketcap.com/rankings/exchanges/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">EXCHANGES</span><span class="arrow">&#8599;</span></div><div class="card-title">Exchange Rankings</div><div class="card-src">coinmarketcap.com</div></a>
+      <a class="card" href="https://trends.google.com/trends/explore?date=today%203-m&geo=CA&q=bitcoin&hl=en" target="_blank"><div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">BTC TRENDS</span><span class="arrow">&#8599;</span></div><div class="card-title">Bitcoin Search Trends &mdash; CA</div><div class="card-src">trends.google.com</div></a>
+      <a class="card" href="https://www.barchart.com/crypto/quotes/%5EBTCUSD/price-history/historical" target="_blank"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">PRICE HISTORY</span><span class="arrow">&#8599;</span></div><div class="card-title">BTC Historical Price Data</div><div class="card-src">barchart.com</div></a>
+    </div>
 
-<div class="section-header" data-section="alt-research">
-  <span class="section-label">Alt Research</span>
-  <span class="section-chevron">&#9660;</span>
-</div>
-<div class="cards" id="alt-research">
-  <a class="card" href="https://cryptobubbles.net/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">CRYPTO BUBBLES</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Crypto Bubbles Visualizer</div>
-    <div class="card-src">cryptobubbles.net</div>
-  </a>
-  <a class="card" href="https://coinmarketcap.com/cryptocurrency-category/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">CATEGORIES</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Crypto Categories</div>
-    <div class="card-src">coinmarketcap.com</div>
-  </a>
-  <a class="card" href="https://www.coinglass.com/position" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">POSITIONS</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Open Positions Overview</div>
-    <div class="card-src">coinglass.com</div>
-  </a>
-  <a class="card" href="https://coinank.com/etf/EthEtf" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">ETH ETF</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Ethereum ETF Flows</div>
-    <div class="card-src">coinank.com</div>
-  </a>
-  <a class="card" href="https://bettertrader.io/cryptoscanner?exchange=KuCoin&quote_coin=&spread_cat=%3E20%25&sort_by=Spread+%28hi-low%29&limit=50" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">ALT SCANNER</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">KuCoin Alt Scanner &gt;20% Spread</div>
-    <div class="card-src">bettertrader.io</div>
-  </a>
-</div>
+    <!-- ALT RESEARCH -->
+    <div class="section-header" data-section="alt-research">
+      <span class="section-label">Alt Research</span>
+      <span class="section-chevron">&#9660;</span>
+    </div>
+    <div class="cards" id="alt-research">
+      <a class="card" href="https://cryptobubbles.net/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">CRYPTO BUBBLES</span><span class="arrow">&#8599;</span></div><div class="card-title">Crypto Bubbles Visualizer</div><div class="card-src">cryptobubbles.net</div></a>
+      <a class="card" href="https://coinmarketcap.com/cryptocurrency-category/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">CATEGORIES</span><span class="arrow">&#8599;</span></div><div class="card-title">Crypto Categories</div><div class="card-src">coinmarketcap.com</div></a>
+      <a class="card" href="https://www.coinglass.com/position" target="_blank"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">POSITIONS</span><span class="arrow">&#8599;</span></div><div class="card-title">Open Positions Overview</div><div class="card-src">coinglass.com</div></a>
+      <a class="card" href="https://coinank.com/etf/EthEtf" target="_blank"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">ETH ETF</span><span class="arrow">&#8599;</span></div><div class="card-title">Ethereum ETF Flows</div><div class="card-src">coinank.com</div></a>
+      <a class="card" href="https://bettertrader.io/cryptoscanner?exchange=KuCoin&quote_coin=&spread_cat=%3E20%25&sort_by=Spread+%28hi-low%29&limit=50" target="_blank"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">ALT SCANNER</span><span class="arrow">&#8599;</span></div><div class="card-title">KuCoin Alt Scanner &gt;20% Spread</div><div class="card-src">bettertrader.io</div></a>
+    </div>
 
-<div class="section-header" data-section="on-chain">
-  <span class="section-label">On-Chain</span>
-  <span class="section-chevron">&#9660;</span>
-</div>
-<div class="cards" id="on-chain">
-  <a class="card" href="/on-chain.html">
-    <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">LOCAL HUB</span><span class="arrow">&#8594;</span></div>
-    <div class="card-title">On-Chain Analytics Dashboard</div>
-    <div class="card-src">market intel</div>
-  </a>
-  <a class="card" href="https://studio.glassnode.com" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">GLASSNODE</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">On-Chain BTC Metrics</div>
-    <div class="card-src">studio.glassnode.com</div>
-  </a>
-  <a class="card" href="https://cryptoquant.com" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">CRYPTOQUANT</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Exchange Flows &amp; Whale Activity</div>
-    <div class="card-src">cryptoquant.com</div>
-  </a>
-  <a class="card" href="https://coinglass.com" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">COINGLASS</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Liquidations, Funding &amp; OI</div>
-    <div class="card-src">coinglass.com</div>
-  </a>
-  <a class="card" href="https://www.lookintobitcoin.com" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">LOOK INTO BTC</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Cycle Indicators (MVRV, NUPL)</div>
-    <div class="card-src">lookintobitcoin.com</div>
-  </a>
-</div>
+    <!-- ON-CHAIN -->
+    <div class="section-header" data-section="on-chain">
+      <span class="section-label">On-Chain</span>
+      <span class="section-chevron">&#9660;</span>
+    </div>
+    <div class="cards" id="on-chain">
+      <a class="card" href="/on-chain.html"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">LOCAL HUB</span><span class="arrow">&#8594;</span></div><div class="card-title">On-Chain Analytics Dashboard</div><div class="card-src">market intel</div></a>
+      <a class="card" href="https://studio.glassnode.com" target="_blank"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">GLASSNODE</span><span class="arrow">&#8599;</span></div><div class="card-title">On-Chain BTC Metrics</div><div class="card-src">studio.glassnode.com</div></a>
+      <a class="card" href="https://cryptoquant.com" target="_blank"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">CRYPTOQUANT</span><span class="arrow">&#8599;</span></div><div class="card-title">Exchange Flows &amp; Whale Activity</div><div class="card-src">cryptoquant.com</div></a>
+      <a class="card" href="https://coinglass.com" target="_blank"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">COINGLASS</span><span class="arrow">&#8599;</span></div><div class="card-title">Liquidations, Funding &amp; OI</div><div class="card-src">coinglass.com</div></a>
+      <a class="card" href="https://www.lookintobitcoin.com" target="_blank"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">LOOK INTO BTC</span><span class="arrow">&#8599;</span></div><div class="card-title">Cycle Indicators (MVRV, NUPL)</div><div class="card-src">lookintobitcoin.com</div></a>
+    </div>
 
-<div class="section-header" data-section="sentiment">
-  <span class="section-label">Sentiment</span>
-  <span class="section-chevron">&#9660;</span>
-</div>
-<div class="cards" id="sentiment">
-  <a class="card" href="https://alternative.me/crypto/fear-and-greed-index/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">FEAR &amp; GREED</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Crypto Fear &amp; Greed Index</div>
-    <div class="card-src">alternative.me</div>
-  </a>
-  <a class="card" href="https://app.santiment.net" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">SANTIMENT</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Social Volume &amp; Dev Activity</div>
-    <div class="card-src">app.santiment.net</div>
-  </a>
-</div>
+    <!-- SENTIMENT -->
+    <div class="section-header" data-section="sentiment" id="sentiment">
+      <span class="section-label">Sentiment</span>
+      <span class="section-chevron">&#9660;</span>
+    </div>
+    <div class="cards" id="sentiment-cards">
+      <a class="card" href="https://alternative.me/crypto/fear-and-greed-index/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">FEAR &amp; GREED</span><span class="arrow">&#8599;</span></div><div class="card-title">Crypto Fear &amp; Greed Index</div><div class="card-src">alternative.me</div></a>
+      <a class="card" href="https://app.santiment.net" target="_blank"><div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">SANTIMENT</span><span class="arrow">&#8599;</span></div><div class="card-title">Social Volume &amp; Dev Activity</div><div class="card-src">app.santiment.net</div></a>
+    </div>
 
-<div class="section-header" data-section="news">
-  <span class="section-label">Crypto News</span>
-  <span class="section-chevron">&#9660;</span>
-</div>
-<div class="cards" id="news">
-  <a class="card" href="https://www.tradingview.com/news/markets/crypto/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">CRYPTO NEWS</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Crypto Market News</div>
-    <div class="card-src">tradingview.com</div>
-  </a>
-  <a class="card" href="https://www.tradingview.com/symbols/BTCUSDT.P/news/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">BTC NEWS</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">BTCUSDT News Feed</div>
-    <div class="card-src">tradingview.com</div>
-  </a>
-  <a class="card" href="https://coinmarketcap.com/community/articles/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">CMC ARTICLES</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">CoinMarketCap Articles</div>
-    <div class="card-src">coinmarketcap.com</div>
-  </a>
-</div>
+    <!-- CRYPTO NEWS -->
+    <div class="section-header" data-section="news">
+      <span class="section-label">Crypto News</span>
+      <span class="section-chevron">&#9660;</span>
+    </div>
+    <div class="cards" id="news">
+      <a class="card" href="https://www.tradingview.com/news/markets/crypto/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">CRYPTO NEWS</span><span class="arrow">&#8599;</span></div><div class="card-title">Crypto Market News</div><div class="card-src">tradingview.com</div></a>
+      <a class="card" href="https://www.tradingview.com/symbols/BTCUSDT.P/news/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">BTC NEWS</span><span class="arrow">&#8599;</span></div><div class="card-title">BTCUSDT News Feed</div><div class="card-src">tradingview.com</div></a>
+      <a class="card" href="https://coinmarketcap.com/community/articles/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">CMC ARTICLES</span><span class="arrow">&#8599;</span></div><div class="card-title">CoinMarketCap Articles</div><div class="card-src">coinmarketcap.com</div></a>
+    </div>
 
-<div class="section-header" data-section="qualitative">
-  <span class="section-label">Qualitative Analysis</span>
-  <span class="section-chevron">&#9660;</span>
-</div>
-<div class="cards" id="qualitative">
-  <a class="card" href="https://www.tradingview.com/markets/cryptocurrencies/ideas/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">CRYPTO IDEAS</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Crypto Market Ideas</div>
-    <div class="card-src">tradingview.com</div>
-  </a>
-  <a class="card" href="https://www.tradingview.com/ideas/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">ALL IDEAS</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">All TradingView Ideas</div>
-    <div class="card-src">tradingview.com</div>
-  </a>
-  <a class="card" href="https://www.tradingview.com/symbols/BTCUSD/ideas/?exchange=BITSTAMP" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">BTC IDEAS</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">BTCUSD Ideas</div>
-    <div class="card-src">tradingview.com</div>
-  </a>
-  <a class="card" href="https://www.tradingview.com/ideas/followed-authors/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">FOLLOWED</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Ideas from Followed Authors</div>
-    <div class="card-src">tradingview.com</div>
-  </a>
-  <a class="card" href="https://www.tradingview.com/ideas/editors-picks/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">EDITOR&apos;S PICKS</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Editor&apos;s Pick Ideas</div>
-    <div class="card-src">tradingview.com</div>
-  </a>
-</div>
+    <!-- QUALITATIVE ANALYSIS -->
+    <div class="section-header" data-section="qualitative">
+      <span class="section-label">Qualitative Analysis</span>
+      <span class="section-chevron">&#9660;</span>
+    </div>
+    <div class="cards" id="qualitative">
+      <a class="card" href="https://www.tradingview.com/markets/cryptocurrencies/ideas/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">CRYPTO IDEAS</span><span class="arrow">&#8599;</span></div><div class="card-title">Crypto Market Ideas</div><div class="card-src">tradingview.com</div></a>
+      <a class="card" href="https://www.tradingview.com/ideas/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">ALL IDEAS</span><span class="arrow">&#8599;</span></div><div class="card-title">All TradingView Ideas</div><div class="card-src">tradingview.com</div></a>
+      <a class="card" href="https://www.tradingview.com/symbols/BTCUSD/ideas/?exchange=BITSTAMP" target="_blank"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">BTC IDEAS</span><span class="arrow">&#8599;</span></div><div class="card-title">BTCUSD Ideas</div><div class="card-src">tradingview.com</div></a>
+      <a class="card" href="https://www.tradingview.com/ideas/followed-authors/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">FOLLOWED</span><span class="arrow">&#8599;</span></div><div class="card-title">Ideas from Followed Authors</div><div class="card-src">tradingview.com</div></a>
+      <a class="card" href="https://www.tradingview.com/ideas/editors-picks/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">EDITOR&apos;S PICKS</span><span class="arrow">&#8599;</span></div><div class="card-title">Editor&apos;s Pick Ideas</div><div class="card-src">tradingview.com</div></a>
+    </div>
 
-<div class="section-header" data-section="cmc-markets">
-  <span class="section-label">CMC Markets</span>
-  <span class="section-chevron">&#9660;</span>
-</div>
-<div class="cards" id="cmc-markets">
-  <a class="card" href="https://coinmarketcap.com/charts/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">MARKET OVERVIEW</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Global Crypto Market Overview</div>
-    <div class="card-src">coinmarketcap.com</div>
-  </a>
-  <a class="card" href="https://coinmarketcap.com/rankings/exchanges/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">SPOT MARKET</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Spot Exchange Rankings</div>
-    <div class="card-src">coinmarketcap.com</div>
-  </a>
-  <a class="card" href="https://coinmarketcap.com/rankings/exchanges/derivatives/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">DERIVATIVES MKT</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Derivatives Market</div>
-    <div class="card-src">coinmarketcap.com</div>
-  </a>
-  <a class="card" href="https://coinmarketcap.com/charts/#total-cryptocurrencies" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)"># OF CRYPTOS</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">No. of Cryptocurrencies</div>
-    <div class="card-src">coinmarketcap.com</div>
-  </a>
-  <a class="card" href="https://coinmarketcap.com/bitcoin-treasuries/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">BTC TREASURIES</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Bitcoin Treasuries</div>
-    <div class="card-src">coinmarketcap.com</div>
-  </a>
-  <a class="card" href="https://coinmarketcap.com/bnb-treasuries/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">BNB TREASURIES</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">BNB Treasuries</div>
-    <div class="card-src">coinmarketcap.com</div>
-  </a>
-</div>
+    <!-- CMC MARKETS -->
+    <div class="section-header" data-section="cmc-markets">
+      <span class="section-label">CMC Markets</span>
+      <span class="section-chevron">&#9660;</span>
+    </div>
+    <div class="cards" id="cmc-markets">
+      <a class="card" href="https://coinmarketcap.com/charts/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">MARKET OVERVIEW</span><span class="arrow">&#8599;</span></div><div class="card-title">Global Crypto Market Overview</div><div class="card-src">coinmarketcap.com</div></a>
+      <a class="card" href="https://coinmarketcap.com/rankings/exchanges/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">SPOT MARKET</span><span class="arrow">&#8599;</span></div><div class="card-title">Spot Exchange Rankings</div><div class="card-src">coinmarketcap.com</div></a>
+      <a class="card" href="https://coinmarketcap.com/rankings/exchanges/derivatives/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">DERIVATIVES MKT</span><span class="arrow">&#8599;</span></div><div class="card-title">Derivatives Market</div><div class="card-src">coinmarketcap.com</div></a>
+      <a class="card" href="https://coinmarketcap.com/charts/#total-cryptocurrencies" target="_blank"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)"># OF CRYPTOS</span><span class="arrow">&#8599;</span></div><div class="card-title">No. of Cryptocurrencies</div><div class="card-src">coinmarketcap.com</div></a>
+      <a class="card" href="https://coinmarketcap.com/bitcoin-treasuries/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">BTC TREASURIES</span><span class="arrow">&#8599;</span></div><div class="card-title">Bitcoin Treasuries</div><div class="card-src">coinmarketcap.com</div></a>
+      <a class="card" href="https://coinmarketcap.com/bnb-treasuries/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">BNB TREASURIES</span><span class="arrow">&#8599;</span></div><div class="card-title">BNB Treasuries</div><div class="card-src">coinmarketcap.com</div></a>
+    </div>
 
-<div class="section-header" data-section="cmc-indicators">
-  <span class="section-label">CMC Indicators</span>
-  <span class="section-chevron">&#9660;</span>
-</div>
-<div class="cards" id="cmc-indicators">
-  <a class="card" href="https://coinmarketcap.com/charts/fear-and-greed-index/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">FEAR &amp; GREED</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Fear &amp; Greed Index</div>
-    <div class="card-src">coinmarketcap.com</div>
-  </a>
-  <a class="card" href="https://coinmarketcap.com/charts/altcoin-season-index/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">ALTCOIN SEASON</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Altcoin Season Index</div>
-    <div class="card-src">coinmarketcap.com</div>
-  </a>
-  <a class="card" href="https://coinmarketcap.com/charts/#bitcoin-dominance" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">BTC DOMINANCE</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Bitcoin Dominance</div>
-    <div class="card-src">coinmarketcap.com</div>
-  </a>
-  <a class="card" href="https://coinmarketcap.com/charts/market-cycle-indicators/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">CYCLE</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Market Cycle Indicators</div>
-    <div class="card-src">coinmarketcap.com</div>
-  </a>
-  <a class="card" href="https://coinmarketcap.com/indices/cmc20/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">CMC20 INDEX</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">CoinMarketCap 20 Index</div>
-    <div class="card-src">coinmarketcap.com</div>
-  </a>
-  <a class="card" href="https://coinmarketcap.com/indices/cmc100/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">CMC100 INDEX</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">CoinMarketCap 100 Index</div>
-    <div class="card-src">coinmarketcap.com</div>
-  </a>
-</div>
+    <!-- CMC INDICATORS -->
+    <div class="section-header" data-section="cmc-indicators">
+      <span class="section-label">CMC Indicators</span>
+      <span class="section-chevron">&#9660;</span>
+    </div>
+    <div class="cards" id="cmc-indicators">
+      <a class="card" href="https://coinmarketcap.com/charts/fear-and-greed-index/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">FEAR &amp; GREED</span><span class="arrow">&#8599;</span></div><div class="card-title">Fear &amp; Greed Index</div><div class="card-src">coinmarketcap.com</div></a>
+      <a class="card" href="https://coinmarketcap.com/charts/altcoin-season-index/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">ALTCOIN SEASON</span><span class="arrow">&#8599;</span></div><div class="card-title">Altcoin Season Index</div><div class="card-src">coinmarketcap.com</div></a>
+      <a class="card" href="https://coinmarketcap.com/charts/#bitcoin-dominance" target="_blank"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">BTC DOMINANCE</span><span class="arrow">&#8599;</span></div><div class="card-title">Bitcoin Dominance</div><div class="card-src">coinmarketcap.com</div></a>
+      <a class="card" href="https://coinmarketcap.com/charts/market-cycle-indicators/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">CYCLE</span><span class="arrow">&#8599;</span></div><div class="card-title">Market Cycle Indicators</div><div class="card-src">coinmarketcap.com</div></a>
+      <a class="card" href="https://coinmarketcap.com/indices/cmc20/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">CMC20 INDEX</span><span class="arrow">&#8599;</span></div><div class="card-title">CoinMarketCap 20 Index</div><div class="card-src">coinmarketcap.com</div></a>
+      <a class="card" href="https://coinmarketcap.com/indices/cmc100/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">CMC100 INDEX</span><span class="arrow">&#8599;</span></div><div class="card-title">CoinMarketCap 100 Index</div><div class="card-src">coinmarketcap.com</div></a>
+    </div>
 
-<div class="section-header" data-section="etf-flows">
-  <span class="section-label">ETF Flows</span>
-  <span class="section-chevron">&#9660;</span>
-</div>
-<div class="cards" id="etf-flows">
-  <a class="card" href="https://coinmarketcap.com/crypto-etf/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">CRYPTO ETFS</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">All Crypto ETFs</div>
-    <div class="card-src">coinmarketcap.com</div>
-  </a>
-  <a class="card" href="https://coinmarketcap.com/crypto-etf/bitcoin-etf/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">BTC ETFS</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Bitcoin ETF Flows</div>
-    <div class="card-src">coinmarketcap.com</div>
-  </a>
-  <a class="card" href="https://coinmarketcap.com/crypto-etf/ethereum-etf/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">ETH ETFS</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Ethereum ETF Flows</div>
-    <div class="card-src">coinmarketcap.com</div>
-  </a>
-</div>
+    <!-- ETF FLOWS -->
+    <div class="section-header" data-section="etf-flows">
+      <span class="section-label">ETF Flows</span>
+      <span class="section-chevron">&#9660;</span>
+    </div>
+    <div class="cards" id="etf-flows">
+      <a class="card" href="https://coinmarketcap.com/crypto-etf/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">CRYPTO ETFS</span><span class="arrow">&#8599;</span></div><div class="card-title">All Crypto ETFs</div><div class="card-src">coinmarketcap.com</div></a>
+      <a class="card" href="https://coinmarketcap.com/crypto-etf/bitcoin-etf/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">BTC ETFS</span><span class="arrow">&#8599;</span></div><div class="card-title">Bitcoin ETF Flows</div><div class="card-src">coinmarketcap.com</div></a>
+      <a class="card" href="https://coinmarketcap.com/crypto-etf/ethereum-etf/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">ETH ETFS</span><span class="arrow">&#8599;</span></div><div class="card-title">Ethereum ETF Flows</div><div class="card-src">coinmarketcap.com</div></a>
+    </div>
 
-<div class="section-header" data-section="derivatives">
-  <span class="section-label">Derivatives</span>
-  <span class="section-chevron">&#9660;</span>
-</div>
-<div class="cards" id="derivatives">
-  <a class="card" href="https://coinmarketcap.com/derivatives/futures/funding-rates/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">FUNDING RATES</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Funding Rates</div>
-    <div class="card-src">coinmarketcap.com</div>
-  </a>
-  <a class="card" href="https://coinmarketcap.com/derivatives/futures/liquidations/" target="_blank">
-    <div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">LIQUIDATIONS</span><span class="arrow">&#8599;</span></div>
-    <div class="card-title">Liquidations</div>
-    <div class="card-src">coinmarketcap.com</div>
-  </a>
-</div>
-<footer>Crypto Hub &mdash; <a href="/" style="color:var(--dim);text-decoration:none;">Market Intel</a></footer>
+    <!-- DERIVATIVES -->
+    <div class="section-header" data-section="derivatives">
+      <span class="section-label">Derivatives</span>
+      <span class="section-chevron">&#9660;</span>
+    </div>
+    <div class="cards" id="derivatives">
+      <a class="card" href="https://coinmarketcap.com/derivatives/futures/funding-rates/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">FUNDING RATES</span><span class="arrow">&#8599;</span></div><div class="card-title">Funding Rates</div><div class="card-src">coinmarketcap.com</div></a>
+      <a class="card" href="https://coinmarketcap.com/derivatives/futures/liquidations/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">LIQUIDATIONS</span><span class="arrow">&#8599;</span></div><div class="card-title">Liquidations</div><div class="card-src">coinmarketcap.com</div></a>
+    </div>
 
-<script src="/assets/js/sections.js" defer></script>
-<script src="/assets/js/crypto.js" defer></script>
+    <footer>Crypto Hub &mdash; <a href="/">Market Command</a></footer>
+
+  </main>
+</div>
+<script src="/assets/js/sidebar.js"></script>
+<script src="/assets/js/sections.js"></script>
+<script>
+  (function () {
+    function tick() {
+      var el = document.getElementById('cmd-clock');
+      if (el) el.textContent = new Date().toLocaleString(undefined, {
+        weekday: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit'
+      });
+    }
+    tick(); setInterval(tick, 1000);
+    initSections('crypto_collapsed');
+  })();
+</script>
 </body>
 </html>
-
-
