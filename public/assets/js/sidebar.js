@@ -6,6 +6,7 @@
     { href: '/market-intel.html#macro-indicators', icon: '🧭', label: 'Macro'       },
     { href: '/market-intel.html#news',             icon: '📰', label: 'News'        },
     { href: '/on-chain.html',                      icon: '🔗', label: 'On-Chain'    },
+    { href: '/onchain-v2.html',                    icon: '⛓',  label: 'On-Chain V2' },
   ];
   var tools = [
     { href: '/market-intel.html#screeners', icon: '📊', label: 'Screener'    },

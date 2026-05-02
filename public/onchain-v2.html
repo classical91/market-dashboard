@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>On-Chain V2 · Market Command</title>
+  <link rel="stylesheet" href="/assets/styles/command.css" />
+  <link rel="stylesheet" href="/assets/styles/onchain-v2.css" />
+</head>
+<body>
+<div class="app">
+  <aside class="cmd-sidebar"></aside>
+  <main class="cmd-main">
+
+    <div class="cmd-page-header">
+      <div>
+        <div class="cmd-page-title">⛓ On-Chain V2</div>
+        <div class="cmd-page-subtitle">Decentralized dev infrastructure — GOSH · Radicle · Gitcoin · DAO tooling</div>
+      </div>
+      <div class="cmd-clock" id="cmd-clock"></div>
+    </div>
+
+    <nav class="nav-pills">
+      <a href="#protocols"       class="nav-pill nav-pill--accent">Protocols</a>
+      <a href="#gosh"            class="nav-pill nav-pill--accent">GOSH</a>
+      <a href="#radicle"         class="nav-pill nav-pill--accent">Radicle</a>
+      <a href="#public-goods"    class="nav-pill nav-pill--accent">Public Goods</a>
+      <a href="#storage"         class="nav-pill nav-pill--accent">Storage</a>
+      <a href="#identity"        class="nav-pill nav-pill--accent">Identity</a>
+      <a href="#dao-tools"       class="nav-pill nav-pill--accent">DAO Tools</a>
+      <a href="#dev-tooling"     class="nav-pill nav-pill--accent">Dev Tooling</a>
+      <a href="#compare"         class="nav-pill nav-pill--accent">Compare</a>
+    </nav>
+
+    <!-- ── PROTOCOLS OVERVIEW ─────────────────────────────── -->
+    <div class="section-header" data-section="protocols" id="protocols">
+      <span class="section-label section-label--accent">Protocols Overview</span>
+      <span class="section-chevron section-chevron--accent">&#9660;</span>
+    </div>
+    <div id="protocols-cards">
+
+      <p class="section-intro">
+        Three open protocols define the frontier of on-chain developer infrastructure — combining censorship-resistant code hosting, peer-to-peer collaboration, and on-chain public goods funding into a fully decentralized software supply chain.
+      </p>
+
+      <div class="protocol-grid">
+
+        <!-- GOSH -->
+        <a class="proto-card proto-card--gosh" href="https://gosh.sh" target="_blank" rel="noopener">
+          <div class="proto-head">
+            <div class="proto-icon proto-icon--gosh">🔵</div>
+            <div>
+              <div class="proto-name">GOSH</div>
+              <div class="proto-tagline">Git On-Chain Secured Hosting</div>
+            </div>
+          </div>
+          <div class="proto-desc">
+            Every Git object — repository, branch, commit, tree, blob, diff — is deployed as a smart contract on the Everscale blockchain. DAOs govern merge approvals and access control entirely on-chain.
+          </div>
+          <div class="proto-pills">
+            <span class="proto-pill proto-pill--blue">Everscale / TVM</span>
+            <span class="proto-pill proto-pill--blue">Smart Contracts</span>
+            <span class="proto-pill proto-pill--blue">DAO Governance</span>
+            <span class="proto-pill proto-pill--blue">Supply-Chain Security</span>
+          </div>
+          <div class="proto-stat-row">
+            <div class="proto-stat">
+              <div class="proto-stat-val" style="color:var(--blue)">100%</div>
+              <div class="proto-stat-lbl">On-chain history</div>
+            </div>
+            <div class="proto-stat">
+              <div class="proto-stat-val" style="color:var(--blue)">Async</div>
+              <div class="proto-stat-lbl">Parallel contracts</div>
+            </div>
+            <div class="proto-stat">
+              <div class="proto-stat-val" style="color:var(--blue)">DAO</div>
+              <div class="proto-stat-lbl">Merge governance</div>
+            </div>
+          </div>
+          <span class="proto-link">docs.gosh.sh &#8599;</span>
+        </a>
+
+        <!-- Radicle -->
+        <a class="proto-card proto-card--radicle" href="https://radicle.dev" target="_blank" rel="noopener">
+          <div class="proto-head">
+            <div class="proto-icon proto-icon--radicle">🌱</div>
+            <div>
+              <div class="proto-name">Radicle</div>
+              <div class="proto-tagline">Sovereign Peer-to-Peer Code Collaboration</div>
+            </div>
+          </div>
+          <div class="proto-desc">
+            A decentralized Git hosting stack using the Heartwood gossip protocol. Repositories are addressed by cryptographic Radicle IDs (RIDs), not by a domain. No central server, no accounts — just keys and peers.
+          </div>
+          <div class="proto-pills">
+            <span class="proto-pill proto-pill--purple">P2P / Heartwood</span>
+            <span class="proto-pill proto-pill--purple">Ed25519 Identity</span>
+            <span class="proto-pill proto-pill--purple">Git-native</span>
+            <span class="proto-pill proto-pill--purple">Offline-first</span>
+          </div>
+          <div class="proto-stat-row">
+            <div class="proto-stat">
+              <div class="proto-stat-val" style="color:var(--purple)">v1.0</div>
+              <div class="proto-stat-lbl">Heartwood (2023)</div>
+            </div>
+            <div class="proto-stat">
+              <div class="proto-stat-val" style="color:var(--purple)">COBs</div>
+              <div class="proto-stat-lbl">Issues &amp; patches</div>
+            </div>
+            <div class="proto-stat">
+              <div class="proto-stat-val" style="color:var(--purple)">RAD</div>
+              <div class="proto-stat-lbl">Governance token</div>
+            </div>
+          </div>
+          <span class="proto-link">radicle.dev &#8599;</span>
+        </a>
+
+        <!-- Gitcoin -->
+        <a class="proto-card proto-card--gitcoin" href="https://gitcoin.co" target="_blank" rel="noopener">
+          <div class="proto-head">
+            <div class="proto-icon proto-icon--gitcoin">🌳</div>
+            <div>
+              <div class="proto-name">Gitcoin</div>
+              <div class="proto-tagline">On-Chain Public Goods Funding</div>
+            </div>
+          </div>
+          <div class="proto-desc">
+            Grants Stack and Allo Protocol provide permissionless on-chain infrastructure for running quadratic funding rounds. Gitcoin Passport enforces Sybil resistance through verifiable credentials aggregated into a humanness score.
+          </div>
+          <div class="proto-pills">
+            <span class="proto-pill proto-pill--green">Allo Protocol</span>
+            <span class="proto-pill proto-pill--green">Quadratic Funding</span>
+            <span class="proto-pill proto-pill--green">Grants Stack</span>
+            <span class="proto-pill proto-pill--green">Passport</span>
+          </div>
+          <div class="proto-stat-row">
+            <div class="proto-stat">
+              <div class="proto-stat-val" style="color:var(--green)">$60M+</div>
+              <div class="proto-stat-lbl">Distributed to OSS</div>
+            </div>
+            <div class="proto-stat">
+              <div class="proto-stat-val" style="color:var(--green)">900K+</div>
+              <div class="proto-stat-lbl">Passport holders</div>
+            </div>
+            <div class="proto-stat">
+              <div class="proto-stat-val" style="color:var(--green)">Multi-L2</div>
+              <div class="proto-stat-lbl">EVM chains</div>
+            </div>
+          </div>
+          <span class="proto-link">gitcoin.co &#8599;</span>
+        </a>
+
+      </div>
+    </div>
+
+    <!-- ── GOSH SMART CONTRACTS ───────────────────────────── -->
+    <div class="section-header" data-section="gosh" id="gosh">
+      <span class="section-label">GOSH Smart Contracts</span>
+      <span class="section-chevron">&#9660;</span>
+    </div>
+    <div id="gosh-cards">
+
+      <p class="section-intro">
+        GOSH represents a Git repository as a graph of smart contracts on the Everscale (TVM) blockchain. A single <code style="font-family:monospace;color:var(--blue);font-size:12px">git push</code> fans out into hundreds of parallel async contract deployments — each carrying a cryptographically verifiable piece of the commit history.
+      </p>
+
+      <!-- Architecture tree -->
+      <div class="arch-tree">
+        <div class="arch-row" style="grid-template-columns: 1fr;">
+          <div class="arch-node arch-node--root">
+            <span class="arch-node-name arch-node-name--blue">GoshRoot</span>
+            <span class="arch-node-desc">Top-level registry — maps usernames to wallets and DAOs. Entry point for all protocol interactions.</span>
+          </div>
+        </div>
+        <div class="arch-connector">&#9660; deploys</div>
+        <div class="arch-row">
+          <div class="arch-node arch-node--dao">
+            <span class="arch-node-name arch-node-name--purple">GoshDao</span>
+            <span class="arch-node-desc">DAO contract governing a collection of repositories. Holds governance parameters, token supply, and voting logic.</span>
+          </div>
+          <div class="arch-node arch-node--wallet">
+            <span class="arch-node-name arch-node-name--amber">GoshWallet</span>
+            <span class="arch-node-desc">Per-user identity contract. Signs Git operations with the user's key pair. Authorizes pushes and votes.</span>
+          </div>
+        </div>
+        <div class="arch-connector">&#9660; contains</div>
+        <div class="arch-row">
+          <div class="arch-node arch-node--repo">
+            <span class="arch-node-name arch-node-name--green">Repository</span>
+            <span class="arch-node-desc">One contract per repo. Stores branch heads and repository metadata.</span>
+          </div>
+          <div class="arch-node arch-node--leaf">
+            <span class="arch-node-name arch-node-name--dim">Branch</span>
+            <span class="arch-node-desc">Stores the commit hash for a named branch tip (e.g. <code style="font-size:10px;font-family:monospace">main</code>).</span>
+          </div>
+          <div class="arch-node arch-node--leaf">
+            <span class="arch-node-name arch-node-name--dim">Tag</span>
+            <span class="arch-node-desc">Lightweight and annotated Git tag objects stored on-chain.</span>
+          </div>
+        </div>
+        <div class="arch-connector">&#9660; references</div>
+        <div class="arch-row">
+          <div class="arch-node arch-node--leaf">
+            <span class="arch-node-name arch-node-name--dim">Commit</span>
+            <span class="arch-node-desc">Stores author, message, parent hash, and tree hash for each commit.</span>
+          </div>
+          <div class="arch-node arch-node--leaf">
+            <span class="arch-node-name arch-node-name--dim">Tree</span>
+            <span class="arch-node-desc">Directory listing mapping filenames to blob/snapshot hashes.</span>
+          </div>
+          <div class="arch-node arch-node--leaf">
+            <span class="arch-node-name arch-node-name--dim">Snapshot / Diff</span>
+            <span class="arch-node-desc">File content and deltas between commits. Large files chunked across multiple contracts.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="cards">
+        <a class="card" href="https://docs.gosh.sh" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">GOSH DOCS</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">GOSH Documentation</div>
+          <div class="card-src">docs.gosh.sh</div>
+        </a>
+        <a class="card" href="https://gosh.sh" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">GOSH APP</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">GOSH Platform</div>
+          <div class="card-src">gosh.sh</div>
+        </a>
+        <a class="card" href="https://github.com/gosh-sh/gosh" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">OPEN SOURCE</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">GOSH Smart Contract Source</div>
+          <div class="card-src">github.com/gosh-sh/gosh</div>
+        </a>
+        <a class="card" href="https://docs.gosh.sh/on-chain-architecture/gosh-smart-contracts/" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">ARCHITECTURE</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">Smart Contract Architecture</div>
+          <div class="card-src">docs.gosh.sh</div>
+        </a>
+        <a class="card" href="https://ever.live" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">EXPLORER</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">Everscale Blockchain Explorer</div>
+          <div class="card-src">ever.live</div>
+        </a>
+        <a class="card" href="https://ever.surf" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">WALLET</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">Ever Surf — TVM Wallet</div>
+          <div class="card-src">ever.surf</div>
+        </a>
+      </div>
+    </div>
+
+    <!-- ── RADICLE NETWORK ────────────────────────────────── -->
+    <div class="section-header" data-section="radicle" id="radicle">
+      <span class="section-label">Radicle Network</span>
+      <span class="section-chevron">&#9660;</span>
+    </div>
+    <div id="radicle-cards">
+
+      <p class="section-intro">
+        Radicle's Heartwood protocol stores all collaboration data — issues, patches, comments — as signed Git objects within the repository itself, replicated across a gossip network of peer nodes. Your repo's identity is a <code style="font-family:monospace;color:var(--purple);font-size:12px">rad:z…</code> cryptographic ID that survives any server going offline.
+      </p>
+
+      <div class="cards" style="grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); margin-bottom:14px">
+        <div class="feature-card">
+          <div class="feature-card-icon">🪪</div>
+          <div class="feature-card-title">Radicle ID (RID)</div>
+          <div class="feature-card-desc">Each repository gets a permanent <code style="font-family:monospace;font-size:10.5px">rad:z&lt;base58&gt;</code> identifier derived from the delegate's public key. Stable and DNS-independent.</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card-icon">📡</div>
+          <div class="feature-card-title">Heartwood Protocol</div>
+          <div class="feature-card-desc">TCP gossip protocol for repository replication. Seed nodes replicate repos they're interested in; protocol is fully open and self-hostable.</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card-icon">📝</div>
+          <div class="feature-card-title">COBs — Collaborative Objects</div>
+          <div class="feature-card-desc">Issues, patches, and comments stored as signed Git refs inside the repo. Portable, offline-capable, and verifiable without a server.</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card-icon">🔑</div>
+          <div class="feature-card-title">Delegates &amp; Patches</div>
+          <div class="feature-card-desc">Delegates are the authorized keys for canonical refs. Patches are Radicle's pull-request equivalent — signed, stored as Git refs, and replicated across all peers.</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card-icon">🌐</div>
+          <div class="feature-card-title">Radicle Orgs (On-chain)</div>
+          <div class="feature-card-desc">Optional Ethereum multisig/treasury contracts linking an on-chain org to a set of Radicle repos. Used for contributor rewards and DAO treasury management.</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card-icon">🛠</div>
+          <div class="feature-card-title">rad CLI</div>
+          <div class="feature-card-desc">All peer operations — init, clone, push, patch, issue — are handled through the <code style="font-family:monospace;font-size:10.5px">rad</code> CLI. Standard Git remote <code style="font-family:monospace;font-size:10.5px">rad://</code> protocol for compatibility.</div>
+        </div>
+      </div>
+
+      <div class="cards">
+        <a class="card" href="https://radicle.dev" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">RADICLE</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">Radicle Home</div>
+          <div class="card-src">radicle.dev</div>
+        </a>
+        <a class="card" href="https://app.radicle.xyz" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">WEB APP</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">Radicle Web Explorer</div>
+          <div class="card-src">app.radicle.xyz</div>
+        </a>
+        <a class="card" href="https://radicle.dev/guides" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">GUIDES</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">Getting Started Guide</div>
+          <div class="card-src">radicle.dev/guides</div>
+        </a>
+        <a class="card" href="https://github.com/radicle-dev" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">OPEN SOURCE</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">Radicle GitHub Org</div>
+          <div class="card-src">github.com/radicle-dev</div>
+        </a>
+        <a class="card" href="https://app.uniswap.org/explore/tokens/ethereum/0x31c8eacbffdd875c74b94b077895bd78cf1e64a3" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">RAD TOKEN</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">RAD Governance Token</div>
+          <div class="card-src">Uniswap · Ethereum</div>
+        </a>
+        <a class="card" href="https://community.radworks.org" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">COMMUNITY</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">Radworks Community Forum</div>
+          <div class="card-src">community.radworks.org</div>
+        </a>
+      </div>
+    </div>
+
+    <!-- ── PUBLIC GOODS FUNDING ───────────────────────────── -->
+    <div class="section-header" data-section="public-goods" id="public-goods">
+      <span class="section-label">Public Goods Funding</span>
+      <span class="section-chevron">&#9660;</span>
+    </div>
+    <div id="public-goods-cards">
+
+      <p class="section-intro">
+        Gitcoin Grants Stack and Allo Protocol provide open-source, multi-chain infrastructure for running on-chain grant programs. Quadratic Funding amplifies community support; Gitcoin Passport guards against Sybil attacks via verifiable credentials.
+      </p>
+
+      <div class="stat-banner">
+        <div class="stat-tile stat-tile--green">
+          <div class="stat-tile-val">$60M+</div>
+          <div class="stat-tile-lbl">Distributed to OSS</div>
+          <div class="stat-tile-sub">Across all Gitcoin rounds</div>
+        </div>
+        <div class="stat-tile stat-tile--blue">
+          <div class="stat-tile-val">900K+</div>
+          <div class="stat-tile-lbl">Passport Holders</div>
+          <div class="stat-tile-sub">Unique verified humans</div>
+        </div>
+        <div class="stat-tile stat-tile--purple">
+          <div class="stat-tile-val">GR19+</div>
+          <div class="stat-tile-lbl">Grants Round</div>
+          <div class="stat-tile-sub">Running on Allo v2</div>
+        </div>
+        <div class="stat-tile stat-tile--amber">
+          <div class="stat-tile-val">Multi-L2</div>
+          <div class="stat-tile-lbl">EVM Chains</div>
+          <div class="stat-tile-sub">Optimism · Arbitrum · Base · Polygon</div>
+        </div>
+      </div>
+
+      <div class="cards" style="grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); margin-bottom:14px">
+        <div class="feature-card">
+          <div class="feature-card-icon">🏗</div>
+          <div class="feature-card-title">Allo Protocol v2</div>
+          <div class="feature-card-desc">Permissionless EVM smart contracts for grant allocation. Separates Pool creation, Strategy (funding logic), and token distribution. Strategies are pluggable modules.</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card-icon">📐</div>
+          <div class="feature-card-title">Quadratic Funding</div>
+          <div class="feature-card-desc">Matching funds distributed proportional to the square root of contributor count — not dollar amount. Amplifies broad community support over whale donations.</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card-icon">🛡</div>
+          <div class="feature-card-title">Gitcoin Passport</div>
+          <div class="feature-card-desc">Aggregates ENS, GitHub, Twitter, POAPs, and on-chain credentials into a humanness score. Gates Sybil-resistant participation in QF rounds via Verifiable Credentials.</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card-icon">🎯</div>
+          <div class="feature-card-title">Direct Grants</div>
+          <div class="feature-card-desc">Fixed-allocation grants with milestone tracking, managed via Allo Protocol. Used by DAOs and foundations for structured grant programs without quadratic mechanics.</div>
+        </div>
+      </div>
+
+      <div class="cards">
+        <a class="card" href="https://gitcoin.co" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--green-bg);color:var(--green)">GITCOIN</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">Gitcoin Home</div>
+          <div class="card-src">gitcoin.co</div>
+        </a>
+        <a class="card" href="https://explorer.gitcoin.co" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--green-bg);color:var(--green)">ROUNDS</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">Grants Round Explorer</div>
+          <div class="card-src">explorer.gitcoin.co</div>
+        </a>
+        <a class="card" href="https://manager.gitcoin.co" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--green-bg);color:var(--green)">ROUND MGR</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">Round Manager</div>
+          <div class="card-src">manager.gitcoin.co</div>
+        </a>
+        <a class="card" href="https://passport.gitcoin.co" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">PASSPORT</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">Gitcoin Passport</div>
+          <div class="card-src">passport.gitcoin.co</div>
+        </a>
+        <a class="card" href="https://allo.gitcoin.co" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">ALLO</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">Allo Protocol</div>
+          <div class="card-src">allo.gitcoin.co</div>
+        </a>
+        <a class="card" href="https://github.com/gitcoinco/grants-stack" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">OPEN SOURCE</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">Grants Stack Source</div>
+          <div class="card-src">github.com/gitcoinco</div>
+        </a>
+        <a class="card" href="https://gov.gitcoin.co" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">GOVERNANCE</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">Gitcoin DAO Forum</div>
+          <div class="card-src">gov.gitcoin.co</div>
+        </a>
+      </div>
+    </div>
+
+    <!-- ── DECENTRALIZED STORAGE ──────────────────────────── -->
+    <div class="section-header" data-section="storage" id="storage">
+      <span class="section-label">Decentralized Storage</span>
+      <span class="section-chevron">&#9660;</span>
+    </div>
+    <div id="storage-cards">
+      <p class="section-intro">
+        On-chain code infrastructure requires immutable, censorship-resistant storage layers for artifacts, assets, and data that are too large or too static for blockchain state.
+      </p>
+      <div class="cards">
+        <a class="card" href="https://ipfs.tech" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">IPFS</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">InterPlanetary File System</div>
+          <div class="card-src">ipfs.tech</div>
+        </a>
+        <a class="card" href="https://web3.storage" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">WEB3 STORAGE</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">IPFS + Filecoin Pinning</div>
+          <div class="card-src">web3.storage</div>
+        </a>
+        <a class="card" href="https://www.arweave.org" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">ARWEAVE</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">Permanent On-Chain Storage</div>
+          <div class="card-src">arweave.org</div>
+        </a>
+        <a class="card" href="https://ardrive.io" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">ARDRIVE</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">ArDrive — Arweave File Manager</div>
+          <div class="card-src">ardrive.io</div>
+        </a>
+        <a class="card" href="https://filecoin.io" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">FILECOIN</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">Filecoin Decentralized Storage</div>
+          <div class="card-src">filecoin.io</div>
+        </a>
+        <a class="card" href="https://ceramic.network" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">CERAMIC</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">Ceramic — Mutable Data Protocol</div>
+          <div class="card-src">ceramic.network</div>
+        </a>
+      </div>
+    </div>
+
+    <!-- ── ON-CHAIN IDENTITY ───────────────────────────────── -->
+    <div class="section-header" data-section="identity" id="identity">
+      <span class="section-label">On-Chain Identity</span>
+      <span class="section-chevron">&#9660;</span>
+    </div>
+    <div id="identity-cards">
+      <p class="section-intro">
+        Decentralized identity primitives let developers and contributors establish verifiable on-chain credentials without centralized account systems.
+      </p>
+      <div class="cards">
+        <a class="card" href="https://ens.domains" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">ENS</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">Ethereum Name Service</div>
+          <div class="card-src">ens.domains</div>
+        </a>
+        <a class="card" href="https://app.ens.domains" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">ENS APP</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">Register &amp; Manage .eth Names</div>
+          <div class="card-src">app.ens.domains</div>
+        </a>
+        <a class="card" href="https://www.lens.xyz" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--green-bg);color:var(--green)">LENS</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">Lens Protocol — Social Graph</div>
+          <div class="card-src">lens.xyz</div>
+        </a>
+        <a class="card" href="https://passport.gitcoin.co" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">PASSPORT</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">Gitcoin Passport — Humanness Score</div>
+          <div class="card-src">passport.gitcoin.co</div>
+        </a>
+        <a class="card" href="https://proofofhumanity.id" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">POH</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">Proof of Humanity Registry</div>
+          <div class="card-src">proofofhumanity.id</div>
+        </a>
+        <a class="card" href="https://www.worldcoin.org/world-id" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">WORLD ID</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">Worldcoin — World ID</div>
+          <div class="card-src">worldcoin.org</div>
+        </a>
+        <a class="card" href="https://www.spruceid.com" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">SPRUCE</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">Sign-In With Ethereum</div>
+          <div class="card-src">spruceid.com</div>
+        </a>
+        <a class="card" href="https://disco.xyz" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">DISCO</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">Disco — Verifiable Credentials</div>
+          <div class="card-src">disco.xyz</div>
+        </a>
+      </div>
+    </div>
+
+    <!-- ── DAO TOOLS ───────────────────────────────────────── -->
+    <div class="section-header" data-section="dao-tools" id="dao-tools">
+      <span class="section-label">DAO Governance Tools</span>
+      <span class="section-chevron">&#9660;</span>
+    </div>
+    <div id="dao-tools-cards">
+      <p class="section-intro">
+        On-chain governance infrastructure for developer DAOs and open-source foundations — from off-chain signalling to fully on-chain proposal execution and treasury management.
+      </p>
+      <div class="cards">
+        <a class="card" href="https://snapshot.org" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">SNAPSHOT</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">Off-Chain Signalling Votes</div>
+          <div class="card-src">snapshot.org</div>
+        </a>
+        <a class="card" href="https://www.tally.xyz" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">TALLY</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">On-Chain Governor Proposals</div>
+          <div class="card-src">tally.xyz</div>
+        </a>
+        <a class="card" href="https://aragon.org" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">ARAGON</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">DAO Framework &amp; Plugin System</div>
+          <div class="card-src">aragon.org</div>
+        </a>
+        <a class="card" href="https://safe.global" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">SAFE</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">Safe Multisig Treasury</div>
+          <div class="card-src">safe.global</div>
+        </a>
+        <a class="card" href="https://colony.io" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">COLONY</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">Colony — Contributor DAOs</div>
+          <div class="card-src">colony.io</div>
+        </a>
+        <a class="card" href="https://www.llama.xyz" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">LLAMA</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">Llama DAO Treasury Management</div>
+          <div class="card-src">llama.xyz</div>
+        </a>
+        <a class="card" href="https://boardroom.io" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">BOARDROOM</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">DAO Governance Aggregator</div>
+          <div class="card-src">boardroom.io</div>
+        </a>
+        <a class="card" href="https://www.withtally.com/gov/gitcoindao" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--green-bg);color:var(--green)">GITCOIN DAO</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">Gitcoin DAO Governor</div>
+          <div class="card-src">tally.xyz · Gitcoin DAO</div>
+        </a>
+      </div>
+    </div>
+
+    <!-- ── DEV TOOLING ────────────────────────────────────── -->
+    <div class="section-header" data-section="dev-tooling" id="dev-tooling">
+      <span class="section-label">Smart Contract Dev Tooling</span>
+      <span class="section-chevron">&#9660;</span>
+    </div>
+    <div id="dev-tooling-cards">
+      <p class="section-intro">
+        The canonical toolchain for writing, testing, auditing, and deploying smart contracts across EVM chains — from local development environments to on-chain monitoring and formal verification.
+      </p>
+      <div class="cards">
+        <a class="card" href="https://hardhat.org" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">HARDHAT</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">Hardhat — EVM Dev Environment</div>
+          <div class="card-src">hardhat.org</div>
+        </a>
+        <a class="card" href="https://book.getfoundry.sh" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">FOUNDRY</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">Foundry — Rust-Speed Testing</div>
+          <div class="card-src">book.getfoundry.sh</div>
+        </a>
+        <a class="card" href="https://www.openzeppelin.com/contracts" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">OPENZEPPELIN</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">Audited Contract Libraries</div>
+          <div class="card-src">openzeppelin.com</div>
+        </a>
+        <a class="card" href="https://dashboard.tenderly.co" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">TENDERLY</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">Contract Simulation &amp; Monitoring</div>
+          <div class="card-src">tenderly.co</div>
+        </a>
+        <a class="card" href="https://dune.com" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">DUNE</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">Dune Analytics — SQL for Chains</div>
+          <div class="card-src">dune.com</div>
+        </a>
+        <a class="card" href="https://thegraph.com" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">THE GRAPH</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">The Graph — Indexing Protocol</div>
+          <div class="card-src">thegraph.com</div>
+        </a>
+        <a class="card" href="https://etherscan.io/solcdecompiler" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">ETHERSCAN</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">Contract Verification &amp; ABI</div>
+          <div class="card-src">etherscan.io</div>
+        </a>
+        <a class="card" href="https://github.com/crytic/echidna" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">ECHIDNA</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">Echidna — Fuzzing for Solidity</div>
+          <div class="card-src">github.com/crytic/echidna</div>
+        </a>
+        <a class="card" href="https://mythx.io" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">MYTHX</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">MythX — Security Analysis</div>
+          <div class="card-src">mythx.io</div>
+        </a>
+        <a class="card" href="https://remix.ethereum.org" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">REMIX IDE</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">Browser-Based Solidity IDE</div>
+          <div class="card-src">remix.ethereum.org</div>
+        </a>
+        <a class="card" href="https://www.alchemy.com" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">ALCHEMY</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">Alchemy — Web3 Dev Platform</div>
+          <div class="card-src">alchemy.com</div>
+        </a>
+        <a class="card" href="https://infura.io" target="_blank" rel="noopener">
+          <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">INFURA</span><span class="arrow">&#8599;</span></div>
+          <div class="card-title">Infura — Node &amp; IPFS API</div>
+          <div class="card-src">infura.io</div>
+        </a>
+      </div>
+    </div>
+
+    <!-- ── PROTOCOL COMPARISON ────────────────────────────── -->
+    <div class="section-header" data-section="compare" id="compare">
+      <span class="section-label">Protocol Comparison</span>
+      <span class="section-chevron">&#9660;</span>
+    </div>
+    <div id="compare-cards">
+      <p class="section-intro">
+        GOSH, Radicle, and GitHub represent three distinct points on the decentralization spectrum. This table compares key architectural properties relevant to on-chain developer infrastructure.
+      </p>
+      <div class="compare-wrap">
+        <table class="compare-table">
+          <thead>
+            <tr>
+              <th>Property</th>
+              <th>GOSH <span class="tag tag--chain">Blockchain</span></th>
+              <th>Radicle <span class="tag tag--p2p">P2P</span></th>
+              <th>GitHub <span style="font-size:10px;color:var(--dim)">Centralized</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Code storage</td>
+              <td>On-chain smart contracts (Everscale)</td>
+              <td>Git objects in gossip network</td>
+              <td>Centralized servers (Microsoft)</td>
+            </tr>
+            <tr>
+              <td>Repository identity</td>
+              <td>On-chain contract address</td>
+              <td>Cryptographic RID (<code style="font-family:monospace;font-size:11px">rad:z…</code>)</td>
+              <td>URL tied to domain/org</td>
+            </tr>
+            <tr>
+              <td>Commit history tamper-proof</td>
+              <td><span class="check">✓</span> Blockchain-enforced</td>
+              <td><span class="check">✓</span> Signed Git refs</td>
+              <td><span class="cross">✗</span> Mutable by admin</td>
+            </tr>
+            <tr>
+              <td>Censorship resistance</td>
+              <td><span class="check">✓</span> Immutable contracts</td>
+              <td><span class="check">✓</span> Multi-seed replication</td>
+              <td><span class="cross">✗</span> Platform can remove</td>
+            </tr>
+            <tr>
+              <td>Offline operation</td>
+              <td><span class="cross">✗</span> Requires blockchain node</td>
+              <td><span class="check">✓</span> Full offline Git workflow</td>
+              <td><span class="cross">✗</span> Requires internet</td>
+            </tr>
+            <tr>
+              <td>Merge governance</td>
+              <td><span class="check">✓</span> On-chain DAO votes</td>
+              <td><span class="optl">~</span> Delegate-signed patches</td>
+              <td><span class="cross">✗</span> Centralized maintainer</td>
+            </tr>
+            <tr>
+              <td>Issues &amp; PRs</td>
+              <td><span class="check">✓</span> DAO proposals / on-chain</td>
+              <td><span class="check">✓</span> COBs (Git-native)</td>
+              <td><span class="check">✓</span> Centralized platform</td>
+            </tr>
+            <tr>
+              <td>Token governance</td>
+              <td><span class="check">✓</span> GOSH token</td>
+              <td><span class="check">✓</span> RAD token (Ethereum)</td>
+              <td><span class="cross">✗</span> None</td>
+            </tr>
+            <tr>
+              <td>Blockchain dependency</td>
+              <td>Everscale (required)</td>
+              <td>Ethereum (optional, Orgs only)</td>
+              <td>None</td>
+            </tr>
+            <tr>
+              <td>Standard Git client compat.</td>
+              <td><span class="optl">~</span> Via remote helper</td>
+              <td><span class="check">✓</span> Via <code style="font-family:monospace;font-size:11px">rad://</code> remote</td>
+              <td><span class="check">✓</span> Native HTTPS / SSH</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <footer>On-Chain V2 &mdash; <a href="/on-chain.html">On-Chain V1</a> &mdash; <a href="/crypto.html">Crypto Hub</a> &mdash; <a href="/">Market Command</a></footer>
+
+  </main>
+</div>
+<script src="/assets/js/sidebar.js"></script>
+<script src="/assets/js/sections.js"></script>
+<script>
+  (function () {
+    function tick() {
+      var el = document.getElementById('cmd-clock');
+      if (el) el.textContent = new Date().toLocaleString(undefined, {
+        weekday: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit'
+      });
+    }
+    tick(); setInterval(tick, 1000);
+    initSections('onchain_v2_collapsed');
+  })();
+</script>
+</body>
+</html>
