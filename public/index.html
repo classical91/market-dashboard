@@ -440,10 +440,78 @@
     /* ── Footer ──────────────────────────────────────────── */
     .footer-note { color: var(--muted); font-size: 12px; text-align: center; padding: 20px 0 4px; }
 
+    /* ── Mobile top bar ──────────────────────────────────── */
+    .mob-bar {
+      display: none;
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(7,10,18,0.96);
+      backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 16px; height: 56px;
+      align-items: center; justify-content: space-between;
+    }
+    .mob-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; }
+    .mob-brand-mark {
+      width: 32px; height: 32px; flex-shrink: 0; border-radius: 10px;
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+      display: grid; place-items: center; font-weight: 900; font-size: 14px;
+    }
+    .mob-brand-name { font-size: 14px; font-weight: 700; }
+    .mob-ham {
+      background: transparent; border: 1px solid var(--border);
+      color: var(--soft); padding: 8px 11px; border-radius: 10px;
+      cursor: pointer; font-size: 18px; line-height: 1; font-family: inherit;
+    }
+    /* Mobile overlay */
+    .mob-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.55); z-index: 200;
+      backdrop-filter: blur(2px);
+    }
+    .mob-overlay.open { display: block; }
+    /* Mobile drawer */
+    .mob-drawer {
+      position: fixed; top: 0; left: 0; bottom: 0;
+      width: min(290px, 88vw);
+      background: rgba(7,10,18,0.98); border-right: 1px solid var(--border);
+      backdrop-filter: blur(20px); z-index: 201;
+      padding: 22px 16px; display: flex; flex-direction: column; gap: 2px;
+      overflow-y: auto; scrollbar-width: none;
+      transform: translateX(-110%);
+      transition: transform 0.26s cubic-bezier(0.4,0,0.2,1);
+    }
+    .mob-drawer::-webkit-scrollbar { display: none; }
+    .mob-drawer.open { transform: translateX(0); }
+    /* Reuse sidebar inner styles inside drawer */
+    .mob-drawer .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; text-decoration: none; color: inherit; }
+    .mob-drawer .brand-mark {
+      width: 38px; height: 38px; border-radius: 12px;
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+      display: grid; place-items: center; font-weight: 900; font-size: 16px;
+    }
+    .mob-drawer .brand-text h1 { font-size: 15px; font-weight: 700; }
+    .mob-drawer .brand-text span { font-size: 11px; color: var(--muted); }
+    .mob-drawer .nav-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.16em; padding: 14px 11px 6px; }
+    .mob-drawer .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px; border-radius: 13px; color: var(--soft);
+      text-decoration: none; font-size: 13.5px; transition: 0.18s;
+    }
+    .mob-drawer .nav-item:hover, .mob-drawer .nav-item.active { background: rgba(77,163,255,0.12); color: var(--text); }
+    .mob-drawer .nav-dot { width: 8px; height: 8px; border-radius: 99px; background: var(--blue); box-shadow: 0 0 12px rgba(77,163,255,0.75); flex-shrink: 0; }
+    .mob-drawer .sidebar-card {
+      margin-top: auto; padding: 14px; border-radius: 15px;
+      background: linear-gradient(145deg, rgba(77,163,255,0.1), rgba(155,123,255,0.08));
+      border: 1px solid var(--border); text-decoration: none; color: inherit; display: block;
+    }
+    .mob-drawer .sidebar-card strong { font-size: 13px; }
+    .mob-drawer .sidebar-card p { color: var(--muted); font-size: 12px; margin-top: 5px; line-height: 1.4; }
+
     /* ── Responsive ──────────────────────────────────────── */
     @media (max-width: 1180px) {
       .app { grid-template-columns: 1fr; }
       .sidebar { display: none; }
+      .mob-bar { display: flex; }
       .grid { grid-template-columns: 1fr; }
       .kpi-grid { grid-template-columns: repeat(2, 1fr); }
       .heatmap { grid-template-columns: repeat(3, 1fr); }
@@ -955,6 +1023,77 @@
     drawChart();
     updateClock();
     setInterval(updateClock, 1000);
+
+    /* ── Mobile nav ───────────────────────────────────────── */
+    (function () {
+      var drawerHtml =
+        '<a class="brand" href="/">'
+        + '<div class="brand-mark">M</div>'
+        + '<div class="brand-text"><h1>Market Command</h1><span>Live dashboard system</span></div>'
+        + '</a>'
+        + '<div class="nav-label">Workspace</div>'
+        + '<a class="nav-item active" href="/"><span class="nav-dot"></span> Overview</a>'
+        + '<a class="nav-item" href="/market-intel.html">📈 Markets</a>'
+        + '<a class="nav-item" href="/crypto.html">₿ Crypto</a>'
+        + '<a class="nav-item" href="/market-intel.html#macro-indicators">🧭 Macro</a>'
+        + '<a class="nav-item" href="/market-intel.html#news">📰 News</a>'
+        + '<a class="nav-item" href="#alerts">🚨 Alerts</a>'
+        + '<a class="nav-item" href="/on-chain.html">🔗 On-Chain</a>'
+        + '<div class="nav-label">Tools</div>'
+        + '<a class="nav-item" href="/market-intel.html#screeners">📊 Screener</a>'
+        + '<a class="nav-item" href="/crypto.html#sentiment">🧠 Sentiment</a>'
+        + '<a class="nav-item" href="/traditional.html">🏦 Traditional</a>'
+        + '<a class="nav-item" href="/earthwatch.html">🌍 Earth Watch</a>'
+        + '<a class="sidebar-card" href="https://trading-strategy-production-1b41.up.railway.app/" target="_blank" rel="noopener">'
+        + '<strong>🧠 Decision Engine ↗</strong>'
+        + '<p>Trading decision framework, strategy rules, entry &amp; exit conditions.</p>'
+        + '</a>';
+
+      function openDrawer() {
+        document.getElementById('mob-drawer').classList.add('open');
+        document.getElementById('mob-overlay').classList.add('open');
+        document.body.style.overflow = 'hidden';
+      }
+      function closeDrawer() {
+        document.getElementById('mob-drawer').classList.remove('open');
+        document.getElementById('mob-overlay').classList.remove('open');
+        document.body.style.overflow = '';
+      }
+
+      var mainEl = document.querySelector('.main');
+      if (mainEl && !document.getElementById('mob-bar')) {
+        var bar = document.createElement('div');
+        bar.className = 'mob-bar'; bar.id = 'mob-bar';
+        bar.innerHTML =
+          '<a class="mob-brand" href="/">'
+          + '<div class="mob-brand-mark">M</div>'
+          + '<span class="mob-brand-name">Market Command</span>'
+          + '</a>'
+          + '<button class="mob-ham" id="mob-ham" aria-label="Open navigation">&#9776;</button>';
+        mainEl.insertBefore(bar, mainEl.firstChild);
+      }
+
+      if (!document.getElementById('mob-overlay')) {
+        var overlay = document.createElement('div');
+        overlay.className = 'mob-overlay'; overlay.id = 'mob-overlay';
+        document.body.appendChild(overlay);
+        overlay.addEventListener('click', closeDrawer);
+      }
+
+      if (!document.getElementById('mob-drawer')) {
+        var drawer = document.createElement('div');
+        drawer.className = 'mob-drawer'; drawer.id = 'mob-drawer';
+        drawer.innerHTML = drawerHtml;
+        document.body.appendChild(drawer);
+      }
+
+      var ham = document.getElementById('mob-ham');
+      if (ham) ham.addEventListener('click', openDrawer);
+
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeDrawer();
+      });
+    })();
   </script>
 </body>
 </html>
