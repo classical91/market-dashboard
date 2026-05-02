@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>On-Chain V2 · Market Command</title>
   <link rel="stylesheet" href="/assets/styles/command.css" />
-  <link rel="stylesheet" href="/assets/styles/onchain-v2.css" />
 </head>
 <body>
 <div class="app">
@@ -15,719 +14,217 @@
     <div class="cmd-page-header">
       <div>
         <div class="cmd-page-title">⛓ On-Chain V2</div>
-        <div class="cmd-page-subtitle">Decentralized dev infrastructure — GOSH · Radicle · Gitcoin · DAO tooling</div>
+        <div class="cmd-page-subtitle">Analytics platforms, network health, developer activity, DeFi flows &amp; L2 data</div>
       </div>
       <div class="cmd-clock" id="cmd-clock"></div>
     </div>
 
     <nav class="nav-pills">
-      <a href="#protocols"       class="nav-pill nav-pill--accent">Protocols</a>
-      <a href="#gosh"            class="nav-pill nav-pill--accent">GOSH</a>
-      <a href="#radicle"         class="nav-pill nav-pill--accent">Radicle</a>
-      <a href="#public-goods"    class="nav-pill nav-pill--accent">Public Goods</a>
-      <a href="#storage"         class="nav-pill nav-pill--accent">Storage</a>
-      <a href="#identity"        class="nav-pill nav-pill--accent">Identity</a>
-      <a href="#dao-tools"       class="nav-pill nav-pill--accent">DAO Tools</a>
-      <a href="#dev-tooling"     class="nav-pill nav-pill--accent">Dev Tooling</a>
-      <a href="#compare"         class="nav-pill nav-pill--accent">Compare</a>
+      <a href="#platforms"      class="nav-pill nav-pill--accent">Platforms</a>
+      <a href="#exchange-flows" class="nav-pill nav-pill--accent">Exchange Flows</a>
+      <a href="#network-health" class="nav-pill nav-pill--accent">Network Health</a>
+      <a href="#developer"      class="nav-pill nav-pill--accent">Developer Activity</a>
+      <a href="#defi"           class="nav-pill nav-pill--accent">DeFi &amp; TVL</a>
+      <a href="#funding-flows"  class="nav-pill nav-pill--accent">Funding Flows</a>
+      <a href="#smart-contracts" class="nav-pill nav-pill--accent">Smart Contracts</a>
+      <a href="#stablecoins"    class="nav-pill nav-pill--accent">Stablecoins</a>
+      <a href="#whale-tracking" class="nav-pill nav-pill--accent">Whale Tracking</a>
+      <a href="#layer2"         class="nav-pill nav-pill--accent">Layer 2</a>
+      <a href="#cycle-indicators" class="nav-pill nav-pill--accent">Cycle Indicators</a>
+      <a href="#derivatives"    class="nav-pill nav-pill--accent">Derivatives</a>
     </nav>
 
-    <!-- ── PROTOCOLS OVERVIEW ─────────────────────────────── -->
-    <div class="section-header" data-section="protocols" id="protocols">
-      <span class="section-label section-label--accent">Protocols Overview</span>
-      <span class="section-chevron section-chevron--accent">&#9660;</span>
-    </div>
-    <div id="protocols-cards">
-
-      <p class="section-intro">
-        Three open protocols define the frontier of on-chain developer infrastructure — combining censorship-resistant code hosting, peer-to-peer collaboration, and on-chain public goods funding into a fully decentralized software supply chain.
-      </p>
-
-      <div class="protocol-grid">
-
-        <!-- GOSH -->
-        <a class="proto-card proto-card--gosh" href="https://gosh.sh" target="_blank" rel="noopener">
-          <div class="proto-head">
-            <div class="proto-icon proto-icon--gosh">🔵</div>
-            <div>
-              <div class="proto-name">GOSH</div>
-              <div class="proto-tagline">Git On-Chain Secured Hosting</div>
-            </div>
-          </div>
-          <div class="proto-desc">
-            Every Git object — repository, branch, commit, tree, blob, diff — is deployed as a smart contract on the Everscale blockchain. DAOs govern merge approvals and access control entirely on-chain.
-          </div>
-          <div class="proto-pills">
-            <span class="proto-pill proto-pill--blue">Everscale / TVM</span>
-            <span class="proto-pill proto-pill--blue">Smart Contracts</span>
-            <span class="proto-pill proto-pill--blue">DAO Governance</span>
-            <span class="proto-pill proto-pill--blue">Supply-Chain Security</span>
-          </div>
-          <div class="proto-stat-row">
-            <div class="proto-stat">
-              <div class="proto-stat-val" style="color:var(--blue)">100%</div>
-              <div class="proto-stat-lbl">On-chain history</div>
-            </div>
-            <div class="proto-stat">
-              <div class="proto-stat-val" style="color:var(--blue)">Async</div>
-              <div class="proto-stat-lbl">Parallel contracts</div>
-            </div>
-            <div class="proto-stat">
-              <div class="proto-stat-val" style="color:var(--blue)">DAO</div>
-              <div class="proto-stat-lbl">Merge governance</div>
-            </div>
-          </div>
-          <span class="proto-link">docs.gosh.sh &#8599;</span>
-        </a>
-
-        <!-- Radicle -->
-        <a class="proto-card proto-card--radicle" href="https://radicle.dev" target="_blank" rel="noopener">
-          <div class="proto-head">
-            <div class="proto-icon proto-icon--radicle">🌱</div>
-            <div>
-              <div class="proto-name">Radicle</div>
-              <div class="proto-tagline">Sovereign Peer-to-Peer Code Collaboration</div>
-            </div>
-          </div>
-          <div class="proto-desc">
-            A decentralized Git hosting stack using the Heartwood gossip protocol. Repositories are addressed by cryptographic Radicle IDs (RIDs), not by a domain. No central server, no accounts — just keys and peers.
-          </div>
-          <div class="proto-pills">
-            <span class="proto-pill proto-pill--purple">P2P / Heartwood</span>
-            <span class="proto-pill proto-pill--purple">Ed25519 Identity</span>
-            <span class="proto-pill proto-pill--purple">Git-native</span>
-            <span class="proto-pill proto-pill--purple">Offline-first</span>
-          </div>
-          <div class="proto-stat-row">
-            <div class="proto-stat">
-              <div class="proto-stat-val" style="color:var(--purple)">v1.0</div>
-              <div class="proto-stat-lbl">Heartwood (2023)</div>
-            </div>
-            <div class="proto-stat">
-              <div class="proto-stat-val" style="color:var(--purple)">COBs</div>
-              <div class="proto-stat-lbl">Issues &amp; patches</div>
-            </div>
-            <div class="proto-stat">
-              <div class="proto-stat-val" style="color:var(--purple)">RAD</div>
-              <div class="proto-stat-lbl">Governance token</div>
-            </div>
-          </div>
-          <span class="proto-link">radicle.dev &#8599;</span>
-        </a>
-
-        <!-- Gitcoin -->
-        <a class="proto-card proto-card--gitcoin" href="https://gitcoin.co" target="_blank" rel="noopener">
-          <div class="proto-head">
-            <div class="proto-icon proto-icon--gitcoin">🌳</div>
-            <div>
-              <div class="proto-name">Gitcoin</div>
-              <div class="proto-tagline">On-Chain Public Goods Funding</div>
-            </div>
-          </div>
-          <div class="proto-desc">
-            Grants Stack and Allo Protocol provide permissionless on-chain infrastructure for running quadratic funding rounds. Gitcoin Passport enforces Sybil resistance through verifiable credentials aggregated into a humanness score.
-          </div>
-          <div class="proto-pills">
-            <span class="proto-pill proto-pill--green">Allo Protocol</span>
-            <span class="proto-pill proto-pill--green">Quadratic Funding</span>
-            <span class="proto-pill proto-pill--green">Grants Stack</span>
-            <span class="proto-pill proto-pill--green">Passport</span>
-          </div>
-          <div class="proto-stat-row">
-            <div class="proto-stat">
-              <div class="proto-stat-val" style="color:var(--green)">$60M+</div>
-              <div class="proto-stat-lbl">Distributed to OSS</div>
-            </div>
-            <div class="proto-stat">
-              <div class="proto-stat-val" style="color:var(--green)">900K+</div>
-              <div class="proto-stat-lbl">Passport holders</div>
-            </div>
-            <div class="proto-stat">
-              <div class="proto-stat-val" style="color:var(--green)">Multi-L2</div>
-              <div class="proto-stat-lbl">EVM chains</div>
-            </div>
-          </div>
-          <span class="proto-link">gitcoin.co &#8599;</span>
-        </a>
-
-      </div>
-    </div>
-
-    <!-- ── GOSH SMART CONTRACTS ───────────────────────────── -->
-    <div class="section-header" data-section="gosh" id="gosh">
-      <span class="section-label">GOSH Smart Contracts</span>
+    <!-- PLATFORMS -->
+    <div class="section-header" data-section="platforms" id="platforms">
+      <span class="section-label">Analytics Platforms</span>
       <span class="section-chevron">&#9660;</span>
     </div>
-    <div id="gosh-cards">
-
-      <p class="section-intro">
-        GOSH represents a Git repository as a graph of smart contracts on the Everscale (TVM) blockchain. A single <code style="font-family:monospace;color:var(--blue);font-size:12px">git push</code> fans out into hundreds of parallel async contract deployments — each carrying a cryptographically verifiable piece of the commit history.
-      </p>
-
-      <!-- Architecture tree -->
-      <div class="arch-tree">
-        <div class="arch-row" style="grid-template-columns: 1fr;">
-          <div class="arch-node arch-node--root">
-            <span class="arch-node-name arch-node-name--blue">GoshRoot</span>
-            <span class="arch-node-desc">Top-level registry — maps usernames to wallets and DAOs. Entry point for all protocol interactions.</span>
-          </div>
-        </div>
-        <div class="arch-connector">&#9660; deploys</div>
-        <div class="arch-row">
-          <div class="arch-node arch-node--dao">
-            <span class="arch-node-name arch-node-name--purple">GoshDao</span>
-            <span class="arch-node-desc">DAO contract governing a collection of repositories. Holds governance parameters, token supply, and voting logic.</span>
-          </div>
-          <div class="arch-node arch-node--wallet">
-            <span class="arch-node-name arch-node-name--amber">GoshWallet</span>
-            <span class="arch-node-desc">Per-user identity contract. Signs Git operations with the user's key pair. Authorizes pushes and votes.</span>
-          </div>
-        </div>
-        <div class="arch-connector">&#9660; contains</div>
-        <div class="arch-row">
-          <div class="arch-node arch-node--repo">
-            <span class="arch-node-name arch-node-name--green">Repository</span>
-            <span class="arch-node-desc">One contract per repo. Stores branch heads and repository metadata.</span>
-          </div>
-          <div class="arch-node arch-node--leaf">
-            <span class="arch-node-name arch-node-name--dim">Branch</span>
-            <span class="arch-node-desc">Stores the commit hash for a named branch tip (e.g. <code style="font-size:10px;font-family:monospace">main</code>).</span>
-          </div>
-          <div class="arch-node arch-node--leaf">
-            <span class="arch-node-name arch-node-name--dim">Tag</span>
-            <span class="arch-node-desc">Lightweight and annotated Git tag objects stored on-chain.</span>
-          </div>
-        </div>
-        <div class="arch-connector">&#9660; references</div>
-        <div class="arch-row">
-          <div class="arch-node arch-node--leaf">
-            <span class="arch-node-name arch-node-name--dim">Commit</span>
-            <span class="arch-node-desc">Stores author, message, parent hash, and tree hash for each commit.</span>
-          </div>
-          <div class="arch-node arch-node--leaf">
-            <span class="arch-node-name arch-node-name--dim">Tree</span>
-            <span class="arch-node-desc">Directory listing mapping filenames to blob/snapshot hashes.</span>
-          </div>
-          <div class="arch-node arch-node--leaf">
-            <span class="arch-node-name arch-node-name--dim">Snapshot / Diff</span>
-            <span class="arch-node-desc">File content and deltas between commits. Large files chunked across multiple contracts.</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="cards">
-        <a class="card" href="https://docs.gosh.sh" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">GOSH DOCS</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">GOSH Documentation</div>
-          <div class="card-src">docs.gosh.sh</div>
-        </a>
-        <a class="card" href="https://gosh.sh" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">GOSH APP</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">GOSH Platform</div>
-          <div class="card-src">gosh.sh</div>
-        </a>
-        <a class="card" href="https://github.com/gosh-sh/gosh" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">OPEN SOURCE</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">GOSH Smart Contract Source</div>
-          <div class="card-src">github.com/gosh-sh/gosh</div>
-        </a>
-        <a class="card" href="https://docs.gosh.sh/on-chain-architecture/gosh-smart-contracts/" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">ARCHITECTURE</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">Smart Contract Architecture</div>
-          <div class="card-src">docs.gosh.sh</div>
-        </a>
-        <a class="card" href="https://ever.live" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">EXPLORER</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">Everscale Blockchain Explorer</div>
-          <div class="card-src">ever.live</div>
-        </a>
-        <a class="card" href="https://ever.surf" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">WALLET</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">Ever Surf — TVM Wallet</div>
-          <div class="card-src">ever.surf</div>
-        </a>
-      </div>
+    <div class="cards" id="platforms-cards">
+      <a class="card" href="https://studio.glassnode.com" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">GLASSNODE</span><span class="arrow">&#8599;</span></div><div class="card-title">Glassnode Studio</div><div class="card-src">studio.glassnode.com</div></a>
+      <a class="card" href="https://cryptoquant.com" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">CRYPTOQUANT</span><span class="arrow">&#8599;</span></div><div class="card-title">CryptoQuant Analytics</div><div class="card-src">cryptoquant.com</div></a>
+      <a class="card" href="https://nansen.ai" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">NANSEN</span><span class="arrow">&#8599;</span></div><div class="card-title">Nansen — Wallet Intelligence</div><div class="card-src">nansen.ai</div></a>
+      <a class="card" href="https://app.santiment.net" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">SANTIMENT</span><span class="arrow">&#8599;</span></div><div class="card-title">Social &amp; On-Chain Analytics</div><div class="card-src">app.santiment.net</div></a>
+      <a class="card" href="https://dune.com" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">DUNE</span><span class="arrow">&#8599;</span></div><div class="card-title">Dune Analytics — SQL for Chains</div><div class="card-src">dune.com</div></a>
+      <a class="card" href="https://www.lookintobitcoin.com" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">LOOK INTO BTC</span><span class="arrow">&#8599;</span></div><div class="card-title">Bitcoin On-Chain Charts</div><div class="card-src">lookintobitcoin.com</div></a>
+      <a class="card" href="https://tokenterminal.com" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">TOKEN TERMINAL</span><span class="arrow">&#8599;</span></div><div class="card-title">Protocol Revenue &amp; Fundamentals</div><div class="card-src">tokenterminal.com</div></a>
+      <a class="card" href="https://www.theblock.co/data" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">THE BLOCK</span><span class="arrow">&#8599;</span></div><div class="card-title">The Block Research Data</div><div class="card-src">theblock.co/data</div></a>
+      <a class="card" href="https://messari.io" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">MESSARI</span><span class="arrow">&#8599;</span></div><div class="card-title">Messari — Asset Intelligence</div><div class="card-src">messari.io</div></a>
+      <a class="card" href="https://www.blockchain.com/explorer" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">EXPLORER</span><span class="arrow">&#8599;</span></div><div class="card-title">Blockchain Explorer</div><div class="card-src">blockchain.com</div></a>
+      <a class="card" href="https://mempool.space" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">MEMPOOL</span><span class="arrow">&#8599;</span></div><div class="card-title">Bitcoin Mempool Visualizer</div><div class="card-src">mempool.space</div></a>
+      <a class="card" href="https://etherscan.io" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">ETHERSCAN</span><span class="arrow">&#8599;</span></div><div class="card-title">Ethereum Block Explorer</div><div class="card-src">etherscan.io</div></a>
     </div>
 
-    <!-- ── RADICLE NETWORK ────────────────────────────────── -->
-    <div class="section-header" data-section="radicle" id="radicle">
-      <span class="section-label">Radicle Network</span>
+    <!-- EXCHANGE FLOWS -->
+    <div class="section-header" data-section="exchange-flows" id="exchange-flows">
+      <span class="section-label">Exchange Flows</span>
       <span class="section-chevron">&#9660;</span>
     </div>
-    <div id="radicle-cards">
-
-      <p class="section-intro">
-        Radicle's Heartwood protocol stores all collaboration data — issues, patches, comments — as signed Git objects within the repository itself, replicated across a gossip network of peer nodes. Your repo's identity is a <code style="font-family:monospace;color:var(--purple);font-size:12px">rad:z…</code> cryptographic ID that survives any server going offline.
-      </p>
-
-      <div class="cards" style="grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); margin-bottom:14px">
-        <div class="feature-card">
-          <div class="feature-card-icon">🪪</div>
-          <div class="feature-card-title">Radicle ID (RID)</div>
-          <div class="feature-card-desc">Each repository gets a permanent <code style="font-family:monospace;font-size:10.5px">rad:z&lt;base58&gt;</code> identifier derived from the delegate's public key. Stable and DNS-independent.</div>
-        </div>
-        <div class="feature-card">
-          <div class="feature-card-icon">📡</div>
-          <div class="feature-card-title">Heartwood Protocol</div>
-          <div class="feature-card-desc">TCP gossip protocol for repository replication. Seed nodes replicate repos they're interested in; protocol is fully open and self-hostable.</div>
-        </div>
-        <div class="feature-card">
-          <div class="feature-card-icon">📝</div>
-          <div class="feature-card-title">COBs — Collaborative Objects</div>
-          <div class="feature-card-desc">Issues, patches, and comments stored as signed Git refs inside the repo. Portable, offline-capable, and verifiable without a server.</div>
-        </div>
-        <div class="feature-card">
-          <div class="feature-card-icon">🔑</div>
-          <div class="feature-card-title">Delegates &amp; Patches</div>
-          <div class="feature-card-desc">Delegates are the authorized keys for canonical refs. Patches are Radicle's pull-request equivalent — signed, stored as Git refs, and replicated across all peers.</div>
-        </div>
-        <div class="feature-card">
-          <div class="feature-card-icon">🌐</div>
-          <div class="feature-card-title">Radicle Orgs (On-chain)</div>
-          <div class="feature-card-desc">Optional Ethereum multisig/treasury contracts linking an on-chain org to a set of Radicle repos. Used for contributor rewards and DAO treasury management.</div>
-        </div>
-        <div class="feature-card">
-          <div class="feature-card-icon">🛠</div>
-          <div class="feature-card-title">rad CLI</div>
-          <div class="feature-card-desc">All peer operations — init, clone, push, patch, issue — are handled through the <code style="font-family:monospace;font-size:10.5px">rad</code> CLI. Standard Git remote <code style="font-family:monospace;font-size:10.5px">rad://</code> protocol for compatibility.</div>
-        </div>
-      </div>
-
-      <div class="cards">
-        <a class="card" href="https://radicle.dev" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">RADICLE</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">Radicle Home</div>
-          <div class="card-src">radicle.dev</div>
-        </a>
-        <a class="card" href="https://app.radicle.xyz" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">WEB APP</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">Radicle Web Explorer</div>
-          <div class="card-src">app.radicle.xyz</div>
-        </a>
-        <a class="card" href="https://radicle.dev/guides" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">GUIDES</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">Getting Started Guide</div>
-          <div class="card-src">radicle.dev/guides</div>
-        </a>
-        <a class="card" href="https://github.com/radicle-dev" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">OPEN SOURCE</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">Radicle GitHub Org</div>
-          <div class="card-src">github.com/radicle-dev</div>
-        </a>
-        <a class="card" href="https://app.uniswap.org/explore/tokens/ethereum/0x31c8eacbffdd875c74b94b077895bd78cf1e64a3" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">RAD TOKEN</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">RAD Governance Token</div>
-          <div class="card-src">Uniswap · Ethereum</div>
-        </a>
-        <a class="card" href="https://community.radworks.org" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">COMMUNITY</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">Radworks Community Forum</div>
-          <div class="card-src">community.radworks.org</div>
-        </a>
-      </div>
+    <div class="cards" id="exchange-flows-cards">
+      <a class="card" href="https://cryptoquant.com/asset/btc/chart/exchange-flows/exchange-reserve" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">BTC RESERVE</span><span class="arrow">&#8599;</span></div><div class="card-title">BTC Exchange Reserve</div><div class="card-src">cryptoquant.com</div></a>
+      <a class="card" href="https://cryptoquant.com/asset/btc/chart/exchange-flows/exchange-netflow-total" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">NETFLOW</span><span class="arrow">&#8599;</span></div><div class="card-title">BTC Exchange Netflow</div><div class="card-src">cryptoquant.com</div></a>
+      <a class="card" href="https://cryptoquant.com/asset/eth/chart/exchange-flows/exchange-reserve" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">ETH RESERVE</span><span class="arrow">&#8599;</span></div><div class="card-title">ETH Exchange Reserve</div><div class="card-src">cryptoquant.com</div></a>
+      <a class="card" href="https://www.coinglass.com/balance" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">BALANCE</span><span class="arrow">&#8599;</span></div><div class="card-title">Exchange Balance Tracker</div><div class="card-src">coinglass.com</div></a>
+      <a class="card" href="https://www.theblock.co/data/crypto-markets/spot/total-exchange-volume-daily" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">EXCHANGE VOL</span><span class="arrow">&#8599;</span></div><div class="card-title">Daily Exchange Volume</div><div class="card-src">theblock.co</div></a>
+      <a class="card" href="https://studio.glassnode.com/metrics?a=BTC&m=distribution.BalanceExchanges" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">SUPPLY ON EXCH</span><span class="arrow">&#8599;</span></div><div class="card-title">BTC Supply on Exchanges</div><div class="card-src">glassnode.com</div></a>
+      <a class="card" href="https://nansen.ai/nansen-101/exchange-flows" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">NANSEN FLOWS</span><span class="arrow">&#8599;</span></div><div class="card-title">Nansen Smart Money Flows</div><div class="card-src">nansen.ai</div></a>
+      <a class="card" href="https://dune.com/hagaetc/exchange-metrics" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">DUNE EXCHANGE</span><span class="arrow">&#8599;</span></div><div class="card-title">Exchange Metrics Dashboard</div><div class="card-src">dune.com</div></a>
     </div>
 
-    <!-- ── PUBLIC GOODS FUNDING ───────────────────────────── -->
-    <div class="section-header" data-section="public-goods" id="public-goods">
-      <span class="section-label">Public Goods Funding</span>
+    <!-- NETWORK HEALTH -->
+    <div class="section-header" data-section="network-health" id="network-health">
+      <span class="section-label">Network Health</span>
       <span class="section-chevron">&#9660;</span>
     </div>
-    <div id="public-goods-cards">
-
-      <p class="section-intro">
-        Gitcoin Grants Stack and Allo Protocol provide open-source, multi-chain infrastructure for running on-chain grant programs. Quadratic Funding amplifies community support; Gitcoin Passport guards against Sybil attacks via verifiable credentials.
-      </p>
-
-      <div class="stat-banner">
-        <div class="stat-tile stat-tile--green">
-          <div class="stat-tile-val">$60M+</div>
-          <div class="stat-tile-lbl">Distributed to OSS</div>
-          <div class="stat-tile-sub">Across all Gitcoin rounds</div>
-        </div>
-        <div class="stat-tile stat-tile--blue">
-          <div class="stat-tile-val">900K+</div>
-          <div class="stat-tile-lbl">Passport Holders</div>
-          <div class="stat-tile-sub">Unique verified humans</div>
-        </div>
-        <div class="stat-tile stat-tile--purple">
-          <div class="stat-tile-val">GR19+</div>
-          <div class="stat-tile-lbl">Grants Round</div>
-          <div class="stat-tile-sub">Running on Allo v2</div>
-        </div>
-        <div class="stat-tile stat-tile--amber">
-          <div class="stat-tile-val">Multi-L2</div>
-          <div class="stat-tile-lbl">EVM Chains</div>
-          <div class="stat-tile-sub">Optimism · Arbitrum · Base · Polygon</div>
-        </div>
-      </div>
-
-      <div class="cards" style="grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); margin-bottom:14px">
-        <div class="feature-card">
-          <div class="feature-card-icon">🏗</div>
-          <div class="feature-card-title">Allo Protocol v2</div>
-          <div class="feature-card-desc">Permissionless EVM smart contracts for grant allocation. Separates Pool creation, Strategy (funding logic), and token distribution. Strategies are pluggable modules.</div>
-        </div>
-        <div class="feature-card">
-          <div class="feature-card-icon">📐</div>
-          <div class="feature-card-title">Quadratic Funding</div>
-          <div class="feature-card-desc">Matching funds distributed proportional to the square root of contributor count — not dollar amount. Amplifies broad community support over whale donations.</div>
-        </div>
-        <div class="feature-card">
-          <div class="feature-card-icon">🛡</div>
-          <div class="feature-card-title">Gitcoin Passport</div>
-          <div class="feature-card-desc">Aggregates ENS, GitHub, Twitter, POAPs, and on-chain credentials into a humanness score. Gates Sybil-resistant participation in QF rounds via Verifiable Credentials.</div>
-        </div>
-        <div class="feature-card">
-          <div class="feature-card-icon">🎯</div>
-          <div class="feature-card-title">Direct Grants</div>
-          <div class="feature-card-desc">Fixed-allocation grants with milestone tracking, managed via Allo Protocol. Used by DAOs and foundations for structured grant programs without quadratic mechanics.</div>
-        </div>
-      </div>
-
-      <div class="cards">
-        <a class="card" href="https://gitcoin.co" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--green-bg);color:var(--green)">GITCOIN</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">Gitcoin Home</div>
-          <div class="card-src">gitcoin.co</div>
-        </a>
-        <a class="card" href="https://explorer.gitcoin.co" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--green-bg);color:var(--green)">ROUNDS</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">Grants Round Explorer</div>
-          <div class="card-src">explorer.gitcoin.co</div>
-        </a>
-        <a class="card" href="https://manager.gitcoin.co" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--green-bg);color:var(--green)">ROUND MGR</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">Round Manager</div>
-          <div class="card-src">manager.gitcoin.co</div>
-        </a>
-        <a class="card" href="https://passport.gitcoin.co" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">PASSPORT</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">Gitcoin Passport</div>
-          <div class="card-src">passport.gitcoin.co</div>
-        </a>
-        <a class="card" href="https://allo.gitcoin.co" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">ALLO</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">Allo Protocol</div>
-          <div class="card-src">allo.gitcoin.co</div>
-        </a>
-        <a class="card" href="https://github.com/gitcoinco/grants-stack" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">OPEN SOURCE</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">Grants Stack Source</div>
-          <div class="card-src">github.com/gitcoinco</div>
-        </a>
-        <a class="card" href="https://gov.gitcoin.co" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">GOVERNANCE</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">Gitcoin DAO Forum</div>
-          <div class="card-src">gov.gitcoin.co</div>
-        </a>
-      </div>
+    <div class="cards" id="network-health-cards">
+      <a class="card" href="https://studio.glassnode.com/charts/addresses.ActiveCount?a=BTC" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">ACTIVE ADDRS</span><span class="arrow">&#8599;</span></div><div class="card-title">BTC Active Addresses</div><div class="card-src">glassnode.com</div></a>
+      <a class="card" href="https://studio.glassnode.com/charts/addresses.NewNonZeroCount?a=BTC" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">NEW ADDRS</span><span class="arrow">&#8599;</span></div><div class="card-title">New BTC Addresses</div><div class="card-src">glassnode.com</div></a>
+      <a class="card" href="https://studio.glassnode.com/charts/transactions.Count?a=BTC" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">TX COUNT</span><span class="arrow">&#8599;</span></div><div class="card-title">BTC Transaction Count</div><div class="card-src">glassnode.com</div></a>
+      <a class="card" href="https://www.blockchain.com/explorer/charts/hash-rate" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">HASH RATE</span><span class="arrow">&#8599;</span></div><div class="card-title">BTC Hash Rate</div><div class="card-src">blockchain.com</div></a>
+      <a class="card" href="https://mempool.space/graphs/mining/hashrate-difficulty" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">DIFFICULTY</span><span class="arrow">&#8599;</span></div><div class="card-title">Hashrate &amp; Difficulty</div><div class="card-src">mempool.space</div></a>
+      <a class="card" href="https://mempool.space/graphs#1y" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">MEMPOOL STATS</span><span class="arrow">&#8599;</span></div><div class="card-title">Mempool Size &amp; Fees</div><div class="card-src">mempool.space</div></a>
+      <a class="card" href="https://etherscan.io/charts/tx" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">ETH TXS</span><span class="arrow">&#8599;</span></div><div class="card-title">Ethereum Daily Transactions</div><div class="card-src">etherscan.io</div></a>
+      <a class="card" href="https://etherscan.io/gastracker" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">GAS TRACKER</span><span class="arrow">&#8599;</span></div><div class="card-title">Ethereum Gas Tracker</div><div class="card-src">etherscan.io</div></a>
+      <a class="card" href="https://ultrasound.money" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">ETH BURN</span><span class="arrow">&#8599;</span></div><div class="card-title">ETH Burn Rate (EIP-1559)</div><div class="card-src">ultrasound.money</div></a>
+      <a class="card" href="https://beaconcha.in" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">BEACON CHAIN</span><span class="arrow">&#8599;</span></div><div class="card-title">Ethereum Beacon Chain Explorer</div><div class="card-src">beaconcha.in</div></a>
     </div>
 
-    <!-- ── DECENTRALIZED STORAGE ──────────────────────────── -->
-    <div class="section-header" data-section="storage" id="storage">
-      <span class="section-label">Decentralized Storage</span>
+    <!-- DEVELOPER ACTIVITY -->
+    <div class="section-header" data-section="developer" id="developer">
+      <span class="section-label">Developer Activity</span>
       <span class="section-chevron">&#9660;</span>
     </div>
-    <div id="storage-cards">
-      <p class="section-intro">
-        On-chain code infrastructure requires immutable, censorship-resistant storage layers for artifacts, assets, and data that are too large or too static for blockchain state.
-      </p>
-      <div class="cards">
-        <a class="card" href="https://ipfs.tech" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">IPFS</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">InterPlanetary File System</div>
-          <div class="card-src">ipfs.tech</div>
-        </a>
-        <a class="card" href="https://web3.storage" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">WEB3 STORAGE</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">IPFS + Filecoin Pinning</div>
-          <div class="card-src">web3.storage</div>
-        </a>
-        <a class="card" href="https://www.arweave.org" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">ARWEAVE</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">Permanent On-Chain Storage</div>
-          <div class="card-src">arweave.org</div>
-        </a>
-        <a class="card" href="https://ardrive.io" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">ARDRIVE</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">ArDrive — Arweave File Manager</div>
-          <div class="card-src">ardrive.io</div>
-        </a>
-        <a class="card" href="https://filecoin.io" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">FILECOIN</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">Filecoin Decentralized Storage</div>
-          <div class="card-src">filecoin.io</div>
-        </a>
-        <a class="card" href="https://ceramic.network" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">CERAMIC</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">Ceramic — Mutable Data Protocol</div>
-          <div class="card-src">ceramic.network</div>
-        </a>
-      </div>
+    <div class="cards" id="developer-cards">
+      <a class="card" href="https://developerreport.com" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">DEV REPORT</span><span class="arrow">&#8599;</span></div><div class="card-title">Electric Capital Dev Report</div><div class="card-src">developerreport.com</div></a>
+      <a class="card" href="https://artemis.xyz" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">ARTEMIS</span><span class="arrow">&#8599;</span></div><div class="card-title">Artemis — Developer Metrics</div><div class="card-src">artemis.xyz</div></a>
+      <a class="card" href="https://www.theblock.co/data/on-chain-metrics/github-activity" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">GITHUB ACTIVITY</span><span class="arrow">&#8599;</span></div><div class="card-title">Protocol GitHub Commits</div><div class="card-src">theblock.co</div></a>
+      <a class="card" href="https://tokenterminal.com/terminal/metrics/developer-activity" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">DEV ACTIVITY</span><span class="arrow">&#8599;</span></div><div class="card-title">Protocol Developer Activity</div><div class="card-src">tokenterminal.com</div></a>
+      <a class="card" href="https://etherscan.io/charts/verified-contracts" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">VERIFIED CONTRACTS</span><span class="arrow">&#8599;</span></div><div class="card-title">Verified Contracts Chart</div><div class="card-src">etherscan.io</div></a>
+      <a class="card" href="https://dune.com/queries/1259205" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">CONTRACT DEPLOYS</span><span class="arrow">&#8599;</span></div><div class="card-title">Contract Deployments Over Time</div><div class="card-src">dune.com</div></a>
+      <a class="card" href="https://app.santiment.net/charts?settings=%7B%22slug%22%3A%22ethereum%22%2C%22ticker%22%3A%22ETH%22%7D&widgets=%5B%7B%22widget%22%3A%22ChartWidget%22%2C%22metrics%22%3A%5B%22dev_activity%22%5D%7D%5D" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">SANTIMENT DEV</span><span class="arrow">&#8599;</span></div><div class="card-title">Santiment Dev Activity</div><div class="card-src">santiment.net</div></a>
+      <a class="card" href="https://oss.fyi" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--green-bg);color:var(--green)">OSS.FYI</span><span class="arrow">&#8599;</span></div><div class="card-title">Open Source Funding Analytics</div><div class="card-src">oss.fyi</div></a>
     </div>
 
-    <!-- ── ON-CHAIN IDENTITY ───────────────────────────────── -->
-    <div class="section-header" data-section="identity" id="identity">
-      <span class="section-label">On-Chain Identity</span>
+    <!-- DEFI & TVL -->
+    <div class="section-header" data-section="defi" id="defi">
+      <span class="section-label">DeFi &amp; TVL</span>
       <span class="section-chevron">&#9660;</span>
     </div>
-    <div id="identity-cards">
-      <p class="section-intro">
-        Decentralized identity primitives let developers and contributors establish verifiable on-chain credentials without centralized account systems.
-      </p>
-      <div class="cards">
-        <a class="card" href="https://ens.domains" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">ENS</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">Ethereum Name Service</div>
-          <div class="card-src">ens.domains</div>
-        </a>
-        <a class="card" href="https://app.ens.domains" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">ENS APP</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">Register &amp; Manage .eth Names</div>
-          <div class="card-src">app.ens.domains</div>
-        </a>
-        <a class="card" href="https://www.lens.xyz" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--green-bg);color:var(--green)">LENS</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">Lens Protocol — Social Graph</div>
-          <div class="card-src">lens.xyz</div>
-        </a>
-        <a class="card" href="https://passport.gitcoin.co" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">PASSPORT</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">Gitcoin Passport — Humanness Score</div>
-          <div class="card-src">passport.gitcoin.co</div>
-        </a>
-        <a class="card" href="https://proofofhumanity.id" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">POH</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">Proof of Humanity Registry</div>
-          <div class="card-src">proofofhumanity.id</div>
-        </a>
-        <a class="card" href="https://www.worldcoin.org/world-id" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">WORLD ID</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">Worldcoin — World ID</div>
-          <div class="card-src">worldcoin.org</div>
-        </a>
-        <a class="card" href="https://www.spruceid.com" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">SPRUCE</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">Sign-In With Ethereum</div>
-          <div class="card-src">spruceid.com</div>
-        </a>
-        <a class="card" href="https://disco.xyz" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">DISCO</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">Disco — Verifiable Credentials</div>
-          <div class="card-src">disco.xyz</div>
-        </a>
-      </div>
+    <div class="cards" id="defi-cards">
+      <a class="card" href="https://defillama.com" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">DEFI LLAMA</span><span class="arrow">&#8599;</span></div><div class="card-title">DeFi TVL &amp; Analytics</div><div class="card-src">defillama.com</div></a>
+      <a class="card" href="https://defillama.com/chains" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">CHAINS TVL</span><span class="arrow">&#8599;</span></div><div class="card-title">TVL by Chain</div><div class="card-src">defillama.com</div></a>
+      <a class="card" href="https://defillama.com/dexs" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">DEX VOLUME</span><span class="arrow">&#8599;</span></div><div class="card-title">DEX Trading Volume</div><div class="card-src">defillama.com</div></a>
+      <a class="card" href="https://defillama.com/yields" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">YIELDS</span><span class="arrow">&#8599;</span></div><div class="card-title">DeFi Yield Rates</div><div class="card-src">defillama.com</div></a>
+      <a class="card" href="https://defillama.com/fees" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">PROTOCOL FEES</span><span class="arrow">&#8599;</span></div><div class="card-title">Protocol Fee Revenue</div><div class="card-src">defillama.com</div></a>
+      <a class="card" href="https://tokenterminal.com/terminal/metrics/revenue" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">REVENUE</span><span class="arrow">&#8599;</span></div><div class="card-title">Protocol Revenue Rankings</div><div class="card-src">tokenterminal.com</div></a>
+      <a class="card" href="https://dune.com/browse/dashboards?q=defi+tvl" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">DUNE DEFI</span><span class="arrow">&#8599;</span></div><div class="card-title">DeFi Dune Dashboards</div><div class="card-src">dune.com</div></a>
+      <a class="card" href="https://app.aave.com" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">AAVE</span><span class="arrow">&#8599;</span></div><div class="card-title">Aave Lending Markets</div><div class="card-src">app.aave.com</div></a>
     </div>
 
-    <!-- ── DAO TOOLS ───────────────────────────────────────── -->
-    <div class="section-header" data-section="dao-tools" id="dao-tools">
-      <span class="section-label">DAO Governance Tools</span>
+    <!-- FUNDING FLOWS -->
+    <div class="section-header" data-section="funding-flows" id="funding-flows">
+      <span class="section-label">Funding Flows &amp; Grants</span>
       <span class="section-chevron">&#9660;</span>
     </div>
-    <div id="dao-tools-cards">
-      <p class="section-intro">
-        On-chain governance infrastructure for developer DAOs and open-source foundations — from off-chain signalling to fully on-chain proposal execution and treasury management.
-      </p>
-      <div class="cards">
-        <a class="card" href="https://snapshot.org" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">SNAPSHOT</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">Off-Chain Signalling Votes</div>
-          <div class="card-src">snapshot.org</div>
-        </a>
-        <a class="card" href="https://www.tally.xyz" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">TALLY</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">On-Chain Governor Proposals</div>
-          <div class="card-src">tally.xyz</div>
-        </a>
-        <a class="card" href="https://aragon.org" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">ARAGON</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">DAO Framework &amp; Plugin System</div>
-          <div class="card-src">aragon.org</div>
-        </a>
-        <a class="card" href="https://safe.global" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">SAFE</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">Safe Multisig Treasury</div>
-          <div class="card-src">safe.global</div>
-        </a>
-        <a class="card" href="https://colony.io" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">COLONY</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">Colony — Contributor DAOs</div>
-          <div class="card-src">colony.io</div>
-        </a>
-        <a class="card" href="https://www.llama.xyz" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">LLAMA</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">Llama DAO Treasury Management</div>
-          <div class="card-src">llama.xyz</div>
-        </a>
-        <a class="card" href="https://boardroom.io" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">BOARDROOM</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">DAO Governance Aggregator</div>
-          <div class="card-src">boardroom.io</div>
-        </a>
-        <a class="card" href="https://www.withtally.com/gov/gitcoindao" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--green-bg);color:var(--green)">GITCOIN DAO</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">Gitcoin DAO Governor</div>
-          <div class="card-src">tally.xyz · Gitcoin DAO</div>
-        </a>
-      </div>
+    <div class="cards" id="funding-flows-cards">
+      <a class="card" href="https://explorer.gitcoin.co" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--green-bg);color:var(--green)">GITCOIN ROUNDS</span><span class="arrow">&#8599;</span></div><div class="card-title">Gitcoin Grants Explorer</div><div class="card-src">explorer.gitcoin.co</div></a>
+      <a class="card" href="https://dune.com/gitcoin/gitcoin-grants" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--green-bg);color:var(--green)">GITCOIN DUNE</span><span class="arrow">&#8599;</span></div><div class="card-title">Gitcoin Grants Analytics</div><div class="card-src">dune.com/gitcoin</div></a>
+      <a class="card" href="https://defillama.com/raises" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">VC RAISES</span><span class="arrow">&#8599;</span></div><div class="card-title">Crypto VC Raises Tracker</div><div class="card-src">defillama.com/raises</div></a>
+      <a class="card" href="https://www.theblock.co/data/fundraising/venture-capital" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">VC FUNDING</span><span class="arrow">&#8599;</span></div><div class="card-title">Crypto VC Funding Data</div><div class="card-src">theblock.co</div></a>
+      <a class="card" href="https://open.fission.codes/fundraising" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">OSS FUNDING</span><span class="arrow">&#8599;</span></div><div class="card-title">Open Source Fundraising</div><div class="card-src">open.fission.codes</div></a>
+      <a class="card" href="https://protocol.ai/blog" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">PROTOCOL LABS</span><span class="arrow">&#8599;</span></div><div class="card-title">Protocol Labs Grants</div><div class="card-src">protocol.ai</div></a>
     </div>
 
-    <!-- ── DEV TOOLING ────────────────────────────────────── -->
-    <div class="section-header" data-section="dev-tooling" id="dev-tooling">
-      <span class="section-label">Smart Contract Dev Tooling</span>
+    <!-- SMART CONTRACT ACTIVITY -->
+    <div class="section-header" data-section="smart-contracts" id="smart-contracts">
+      <span class="section-label">Smart Contract Activity</span>
       <span class="section-chevron">&#9660;</span>
     </div>
-    <div id="dev-tooling-cards">
-      <p class="section-intro">
-        The canonical toolchain for writing, testing, auditing, and deploying smart contracts across EVM chains — from local development environments to on-chain monitoring and formal verification.
-      </p>
-      <div class="cards">
-        <a class="card" href="https://hardhat.org" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">HARDHAT</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">Hardhat — EVM Dev Environment</div>
-          <div class="card-src">hardhat.org</div>
-        </a>
-        <a class="card" href="https://book.getfoundry.sh" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">FOUNDRY</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">Foundry — Rust-Speed Testing</div>
-          <div class="card-src">book.getfoundry.sh</div>
-        </a>
-        <a class="card" href="https://www.openzeppelin.com/contracts" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">OPENZEPPELIN</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">Audited Contract Libraries</div>
-          <div class="card-src">openzeppelin.com</div>
-        </a>
-        <a class="card" href="https://dashboard.tenderly.co" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">TENDERLY</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">Contract Simulation &amp; Monitoring</div>
-          <div class="card-src">tenderly.co</div>
-        </a>
-        <a class="card" href="https://dune.com" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">DUNE</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">Dune Analytics — SQL for Chains</div>
-          <div class="card-src">dune.com</div>
-        </a>
-        <a class="card" href="https://thegraph.com" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">THE GRAPH</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">The Graph — Indexing Protocol</div>
-          <div class="card-src">thegraph.com</div>
-        </a>
-        <a class="card" href="https://etherscan.io/solcdecompiler" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">ETHERSCAN</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">Contract Verification &amp; ABI</div>
-          <div class="card-src">etherscan.io</div>
-        </a>
-        <a class="card" href="https://github.com/crytic/echidna" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">ECHIDNA</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">Echidna — Fuzzing for Solidity</div>
-          <div class="card-src">github.com/crytic/echidna</div>
-        </a>
-        <a class="card" href="https://mythx.io" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">MYTHX</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">MythX — Security Analysis</div>
-          <div class="card-src">mythx.io</div>
-        </a>
-        <a class="card" href="https://remix.ethereum.org" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">REMIX IDE</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">Browser-Based Solidity IDE</div>
-          <div class="card-src">remix.ethereum.org</div>
-        </a>
-        <a class="card" href="https://www.alchemy.com" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">ALCHEMY</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">Alchemy — Web3 Dev Platform</div>
-          <div class="card-src">alchemy.com</div>
-        </a>
-        <a class="card" href="https://infura.io" target="_blank" rel="noopener">
-          <div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">INFURA</span><span class="arrow">&#8599;</span></div>
-          <div class="card-title">Infura — Node &amp; IPFS API</div>
-          <div class="card-src">infura.io</div>
-        </a>
-      </div>
+    <div class="cards" id="smart-contracts-cards">
+      <a class="card" href="https://etherscan.io/charts/verified-contracts" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">CONTRACT COUNT</span><span class="arrow">&#8599;</span></div><div class="card-title">Verified Contracts Deployed</div><div class="card-src">etherscan.io</div></a>
+      <a class="card" href="https://etherscan.io/charts/contractsinternal" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">INTERNAL TXS</span><span class="arrow">&#8599;</span></div><div class="card-title">Internal Contract Transactions</div><div class="card-src">etherscan.io</div></a>
+      <a class="card" href="https://dune.com/hildobby/ethereum-contract-deployments" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">DEPLOYMENTS</span><span class="arrow">&#8599;</span></div><div class="card-title">Contract Deployments Dashboard</div><div class="card-src">dune.com</div></a>
+      <a class="card" href="https://dashboard.tenderly.co" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">TENDERLY</span><span class="arrow">&#8599;</span></div><div class="card-title">Contract Simulation &amp; Monitoring</div><div class="card-src">tenderly.co</div></a>
+      <a class="card" href="https://thegraph.com/explorer" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">THE GRAPH</span><span class="arrow">&#8599;</span></div><div class="card-title">The Graph — Subgraph Explorer</div><div class="card-src">thegraph.com</div></a>
+      <a class="card" href="https://blocksec.com" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">BLOCKSEC</span><span class="arrow">&#8599;</span></div><div class="card-title">BlockSec Transaction Tracer</div><div class="card-src">blocksec.com</div></a>
+      <a class="card" href="https://openchain.xyz/trace" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">OPENCHAIN</span><span class="arrow">&#8599;</span></div><div class="card-title">Transaction Decoder &amp; Tracer</div><div class="card-src">openchain.xyz</div></a>
+      <a class="card" href="https://dedaub.com/decompiler" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">DECOMPILER</span><span class="arrow">&#8599;</span></div><div class="card-title">Dedaub Contract Decompiler</div><div class="card-src">dedaub.com</div></a>
     </div>
 
-    <!-- ── PROTOCOL COMPARISON ────────────────────────────── -->
-    <div class="section-header" data-section="compare" id="compare">
-      <span class="section-label">Protocol Comparison</span>
+    <!-- STABLECOINS -->
+    <div class="section-header" data-section="stablecoins" id="stablecoins">
+      <span class="section-label">Stablecoin Flows</span>
       <span class="section-chevron">&#9660;</span>
     </div>
-    <div id="compare-cards">
-      <p class="section-intro">
-        GOSH, Radicle, and GitHub represent three distinct points on the decentralization spectrum. This table compares key architectural properties relevant to on-chain developer infrastructure.
-      </p>
-      <div class="compare-wrap">
-        <table class="compare-table">
-          <thead>
-            <tr>
-              <th>Property</th>
-              <th>GOSH <span class="tag tag--chain">Blockchain</span></th>
-              <th>Radicle <span class="tag tag--p2p">P2P</span></th>
-              <th>GitHub <span style="font-size:10px;color:var(--dim)">Centralized</span></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>Code storage</td>
-              <td>On-chain smart contracts (Everscale)</td>
-              <td>Git objects in gossip network</td>
-              <td>Centralized servers (Microsoft)</td>
-            </tr>
-            <tr>
-              <td>Repository identity</td>
-              <td>On-chain contract address</td>
-              <td>Cryptographic RID (<code style="font-family:monospace;font-size:11px">rad:z…</code>)</td>
-              <td>URL tied to domain/org</td>
-            </tr>
-            <tr>
-              <td>Commit history tamper-proof</td>
-              <td><span class="check">✓</span> Blockchain-enforced</td>
-              <td><span class="check">✓</span> Signed Git refs</td>
-              <td><span class="cross">✗</span> Mutable by admin</td>
-            </tr>
-            <tr>
-              <td>Censorship resistance</td>
-              <td><span class="check">✓</span> Immutable contracts</td>
-              <td><span class="check">✓</span> Multi-seed replication</td>
-              <td><span class="cross">✗</span> Platform can remove</td>
-            </tr>
-            <tr>
-              <td>Offline operation</td>
-              <td><span class="cross">✗</span> Requires blockchain node</td>
-              <td><span class="check">✓</span> Full offline Git workflow</td>
-              <td><span class="cross">✗</span> Requires internet</td>
-            </tr>
-            <tr>
-              <td>Merge governance</td>
-              <td><span class="check">✓</span> On-chain DAO votes</td>
-              <td><span class="optl">~</span> Delegate-signed patches</td>
-              <td><span class="cross">✗</span> Centralized maintainer</td>
-            </tr>
-            <tr>
-              <td>Issues &amp; PRs</td>
-              <td><span class="check">✓</span> DAO proposals / on-chain</td>
-              <td><span class="check">✓</span> COBs (Git-native)</td>
-              <td><span class="check">✓</span> Centralized platform</td>
-            </tr>
-            <tr>
-              <td>Token governance</td>
-              <td><span class="check">✓</span> GOSH token</td>
-              <td><span class="check">✓</span> RAD token (Ethereum)</td>
-              <td><span class="cross">✗</span> None</td>
-            </tr>
-            <tr>
-              <td>Blockchain dependency</td>
-              <td>Everscale (required)</td>
-              <td>Ethereum (optional, Orgs only)</td>
-              <td>None</td>
-            </tr>
-            <tr>
-              <td>Standard Git client compat.</td>
-              <td><span class="optl">~</span> Via remote helper</td>
-              <td><span class="check">✓</span> Via <code style="font-family:monospace;font-size:11px">rad://</code> remote</td>
-              <td><span class="check">✓</span> Native HTTPS / SSH</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+    <div class="cards" id="stablecoins-cards">
+      <a class="card" href="https://defillama.com/stablecoins" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">STABLES LLAMA</span><span class="arrow">&#8599;</span></div><div class="card-title">Stablecoin Dashboard</div><div class="card-src">defillama.com</div></a>
+      <a class="card" href="https://www.coinglass.com/stablecoin" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">STABLECOIN</span><span class="arrow">&#8599;</span></div><div class="card-title">Stablecoin Market Cap</div><div class="card-src">coinglass.com</div></a>
+      <a class="card" href="https://coinmarketcap.com/view/stablecoin/" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">CMC STABLES</span><span class="arrow">&#8599;</span></div><div class="card-title">Stablecoin Rankings</div><div class="card-src">coinmarketcap.com</div></a>
+      <a class="card" href="https://studio.glassnode.com/metrics?a=USDT&m=supply.Current" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">USDT SUPPLY</span><span class="arrow">&#8599;</span></div><div class="card-title">Tether Supply On-Chain</div><div class="card-src">glassnode.com</div></a>
+      <a class="card" href="https://dune.com/hagaetc/stablecoins" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">DUNE STABLES</span><span class="arrow">&#8599;</span></div><div class="card-title">Stablecoin Dune Dashboard</div><div class="card-src">dune.com</div></a>
+      <a class="card" href="https://cryptoquant.com/asset/usdt/summary" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">USDT ON-CHAIN</span><span class="arrow">&#8599;</span></div><div class="card-title">USDT On-Chain Summary</div><div class="card-src">cryptoquant.com</div></a>
+    </div>
+
+    <!-- WHALE TRACKING -->
+    <div class="section-header" data-section="whale-tracking" id="whale-tracking">
+      <span class="section-label">Whale Tracking</span>
+      <span class="section-chevron">&#9660;</span>
+    </div>
+    <div class="cards" id="whale-tracking-cards">
+      <a class="card" href="https://whale-alert.io" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">WHALE ALERT</span><span class="arrow">&#8599;</span></div><div class="card-title">Large Transaction Tracker</div><div class="card-src">whale-alert.io</div></a>
+      <a class="card" href="https://nansen.ai/query" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">NANSEN QUERY</span><span class="arrow">&#8599;</span></div><div class="card-title">Smart Money Wallet Tracker</div><div class="card-src">nansen.ai</div></a>
+      <a class="card" href="https://bitinfocharts.com/top-100-richest-bitcoin-addresses.html" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">RICH LIST</span><span class="arrow">&#8599;</span></div><div class="card-title">Top 100 BTC Addresses</div><div class="card-src">bitinfocharts.com</div></a>
+      <a class="card" href="https://www.coinglass.com/whale" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">CG WHALES</span><span class="arrow">&#8599;</span></div><div class="card-title">Whale Positions</div><div class="card-src">coinglass.com</div></a>
+      <a class="card" href="https://etherscan.io/accounts" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">ETH RICH LIST</span><span class="arrow">&#8599;</span></div><div class="card-title">Top ETH Holder Accounts</div><div class="card-src">etherscan.io</div></a>
+      <a class="card" href="https://app.santiment.net/labs/trends" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">SANTIMENT WHALE</span><span class="arrow">&#8599;</span></div><div class="card-title">Whale Accumulation Signals</div><div class="card-src">santiment.net</div></a>
+      <a class="card" href="https://dune.com/browse/dashboards?q=whale" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">DUNE WHALES</span><span class="arrow">&#8599;</span></div><div class="card-title">Whale Tracking Dashboards</div><div class="card-src">dune.com</div></a>
+    </div>
+
+    <!-- LAYER 2 -->
+    <div class="section-header" data-section="layer2" id="layer2">
+      <span class="section-label">Layer 2 Analytics</span>
+      <span class="section-chevron">&#9660;</span>
+    </div>
+    <div class="cards" id="layer2-cards">
+      <a class="card" href="https://l2beat.com" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">L2BEAT</span><span class="arrow">&#8599;</span></div><div class="card-title">L2Beat — TVL &amp; Risk Ratings</div><div class="card-src">l2beat.com</div></a>
+      <a class="card" href="https://growthepie.xyz" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">GROWTHEPIE</span><span class="arrow">&#8599;</span></div><div class="card-title">L2 Usage &amp; Activity Metrics</div><div class="card-src">growthepie.xyz</div></a>
+      <a class="card" href="https://dune.com/nansen/layer-2-ecosystem" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">L2 ECOSYSTEM</span><span class="arrow">&#8599;</span></div><div class="card-title">Layer 2 Ecosystem Dashboard</div><div class="card-src">dune.com</div></a>
+      <a class="card" href="https://defillama.com/chains" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">L2 TVL</span><span class="arrow">&#8599;</span></div><div class="card-title">L2 TVL Rankings</div><div class="card-src">defillama.com</div></a>
+      <a class="card" href="https://optimistic.etherscan.io" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">OPTIMISM</span><span class="arrow">&#8599;</span></div><div class="card-title">Optimism Explorer</div><div class="card-src">optimistic.etherscan.io</div></a>
+      <a class="card" href="https://arbiscan.io" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">ARBITRUM</span><span class="arrow">&#8599;</span></div><div class="card-title">Arbitrum Explorer</div><div class="card-src">arbiscan.io</div></a>
+      <a class="card" href="https://basescan.org" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">BASE</span><span class="arrow">&#8599;</span></div><div class="card-title">Base Chain Explorer</div><div class="card-src">basescan.org</div></a>
+      <a class="card" href="https://explorer.zksync.io" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">ZKSYNC</span><span class="arrow">&#8599;</span></div><div class="card-title">zkSync Era Explorer</div><div class="card-src">explorer.zksync.io</div></a>
+    </div>
+
+    <!-- CYCLE INDICATORS -->
+    <div class="section-header" data-section="cycle-indicators" id="cycle-indicators">
+      <span class="section-label">Cycle Indicators</span>
+      <span class="section-chevron">&#9660;</span>
+    </div>
+    <div class="cards" id="cycle-indicators-cards">
+      <a class="card" href="https://www.lookintobitcoin.com/charts/mvrv-zscore/" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--green-bg);color:var(--green)">MVRV Z-SCORE</span><span class="arrow">&#8599;</span></div><div class="card-title">MVRV Z-Score</div><div class="card-src">lookintobitcoin.com</div></a>
+      <a class="card" href="https://www.lookintobitcoin.com/charts/relative-unrealized-profit--loss/" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--green-bg);color:var(--green)">NUPL</span><span class="arrow">&#8599;</span></div><div class="card-title">Net Unrealized Profit/Loss</div><div class="card-src">lookintobitcoin.com</div></a>
+      <a class="card" href="https://www.lookintobitcoin.com/charts/stock-to-flow-model/" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">S2F MODEL</span><span class="arrow">&#8599;</span></div><div class="card-title">Stock-to-Flow Model</div><div class="card-src">lookintobitcoin.com</div></a>
+      <a class="card" href="https://www.lookintobitcoin.com/charts/pi-cycle-top-indicator/" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">PI CYCLE TOP</span><span class="arrow">&#8599;</span></div><div class="card-title">Pi Cycle Top Indicator</div><div class="card-src">lookintobitcoin.com</div></a>
+      <a class="card" href="https://www.lookintobitcoin.com/charts/puell-multiple/" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">PUELL MULTIPLE</span><span class="arrow">&#8599;</span></div><div class="card-title">Puell Multiple</div><div class="card-src">lookintobitcoin.com</div></a>
+      <a class="card" href="https://www.lookintobitcoin.com/charts/rhodl-ratio/" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">RHODL RATIO</span><span class="arrow">&#8599;</span></div><div class="card-title">RHODL Ratio</div><div class="card-src">lookintobitcoin.com</div></a>
+      <a class="card" href="https://cryptoquant.com/asset/btc/summary" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">CQ SUMMARY</span><span class="arrow">&#8599;</span></div><div class="card-title">BTC On-Chain Summary</div><div class="card-src">cryptoquant.com</div></a>
+      <a class="card" href="https://coinmarketcap.com/charts/market-cycle-indicators/" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">CMC CYCLE</span><span class="arrow">&#8599;</span></div><div class="card-title">Market Cycle Indicators</div><div class="card-src">coinmarketcap.com</div></a>
+    </div>
+
+    <!-- DERIVATIVES -->
+    <div class="section-header" data-section="derivatives" id="derivatives">
+      <span class="section-label">Derivatives</span>
+      <span class="section-chevron">&#9660;</span>
+    </div>
+    <div class="cards" id="derivatives-cards">
+      <a class="card" href="https://coinglass.com" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">COINGLASS</span><span class="arrow">&#8599;</span></div><div class="card-title">Liquidations, Funding &amp; OI</div><div class="card-src">coinglass.com</div></a>
+      <a class="card" href="https://www.coinglass.com/FundingRate" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">FUNDING RATE</span><span class="arrow">&#8599;</span></div><div class="card-title">Funding Rate Heatmap</div><div class="card-src">coinglass.com</div></a>
+      <a class="card" href="https://www.coinglass.com/LiquidationData" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">LIQUIDATIONS</span><span class="arrow">&#8599;</span></div><div class="card-title">Liquidation Data</div><div class="card-src">coinglass.com</div></a>
+      <a class="card" href="https://www.coinglass.com/pro/futures/OpenInterest" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">OPEN INTEREST</span><span class="arrow">&#8599;</span></div><div class="card-title">Open Interest Overview</div><div class="card-src">coinglass.com</div></a>
+      <a class="card" href="https://www.coinglass.com/LongShortRatio" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">LONG/SHORT</span><span class="arrow">&#8599;</span></div><div class="card-title">Long/Short Ratio</div><div class="card-src">coinglass.com</div></a>
+      <a class="card" href="https://coinalyze.net/bitcoin/open-interest/" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">BTC OI</span><span class="arrow">&#8599;</span></div><div class="card-title">BTC Open Interest Chart</div><div class="card-src">coinalyze.net</div></a>
+      <a class="card" href="https://www.laevitas.ch" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">LAEVITAS</span><span class="arrow">&#8599;</span></div><div class="card-title">Options Analytics &amp; Greeks</div><div class="card-src">laevitas.ch</div></a>
+      <a class="card" href="https://deribit.com" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">DERIBIT</span><span class="arrow">&#8599;</span></div><div class="card-title">Deribit Options &amp; Futures</div><div class="card-src">deribit.com</div></a>
     </div>
 
     <footer>On-Chain V2 &mdash; <a href="/on-chain.html">On-Chain V1</a> &mdash; <a href="/crypto.html">Crypto Hub</a> &mdash; <a href="/">Market Command</a></footer>
