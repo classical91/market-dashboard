@@ -69,6 +69,10 @@ const config = {
   reporter: {
     apiKey: process.env.OPENAI_API_KEY || "",
   },
+  telegram: {
+    botToken: process.env.TELEGRAM_BOT_TOKEN || "",
+    chatIds: parseList(process.env.TELEGRAM_CHAT_IDS),
+  },
   defillama: {
     baseUrl: process.env.DEFILLAMA_API_BASE_URL || "https://stablecoins.llama.fi/",
     coinsBaseUrl: process.env.DEFILLAMA_COINS_API_BASE_URL || "https://coins.llama.fi/",

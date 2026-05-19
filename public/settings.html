@@ -74,6 +74,36 @@
     }
     .freq-btn:hover:not(.active) { background: rgba(255,255,255,0.08); color: var(--soft); }
 
+    /* ── Telegram section ──────────────────────────────── */
+    .tg-status-row {
+      display: flex; align-items: center; gap: 12px; margin-top: 16px; flex-wrap: wrap;
+    }
+    .status-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 14px; border-radius: 20px;
+      font-size: 12px; font-weight: 700; letter-spacing: 0.04em;
+    }
+    .status-pill.ok  { background: rgba(0,227,150,0.14); color: var(--teal); border: 1px solid rgba(0,227,150,0.3); }
+    .status-pill.off { background: rgba(245,197,66,0.12); color: var(--amber); border: 1px solid rgba(245,197,66,0.28); }
+    .tg-test-btn {
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.04);
+      color: var(--soft); padding: 8px 18px;
+      border-radius: 14px; font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: 0.18s; font-family: inherit;
+    }
+    .tg-test-btn:hover:not(:disabled) { background: rgba(255,255,255,0.08); color: var(--text); }
+    .tg-test-btn:disabled { opacity: 0.4; cursor: default; }
+    .tg-instructions {
+      margin-top: 14px; padding: 14px 16px;
+      background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+      border-radius: 12px; font-size: 12px; color: var(--muted); line-height: 1.6;
+    }
+    .tg-instructions code {
+      background: rgba(255,255,255,0.08); padding: 1px 5px;
+      border-radius: 5px; font-size: 11px; color: var(--soft);
+    }
+
     /* ── Saved toast ────────────────────────────────────── */
     .toast {
       position: fixed; bottom: 28px; right: 28px;
@@ -124,6 +154,30 @@
         <div class="freq-options" id="freqOptions">
           <button class="freq-btn" data-hours="24">Daily (24h)</button>
           <button class="freq-btn" data-hours="48">Every 2 Days (48h)</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Telegram -->
+    <div class="settings-section">
+      <div class="settings-label">Telegram</div>
+      <div class="settings-card">
+        <div class="settings-row">
+          <div>
+            <div class="settings-row-label">Auto-Post to Channels</div>
+            <div class="settings-row-sub">Sends each report section to your configured Telegram channels when a fresh briefing is generated</div>
+          </div>
+        </div>
+        <div class="tg-status-row">
+          <span class="status-pill off" id="tgStatusPill">⏳ Checking…</span>
+          <button class="tg-test-btn" id="tgTestBtn" disabled>Send Test Message</button>
+        </div>
+        <div class="tg-instructions" id="tgInstructions" style="display:none">
+          <strong>Setup:</strong><br>
+          1. Create a bot via <a href="https://t.me/BotFather" target="_blank" rel="noopener" style="color:var(--blue)">@BotFather</a> and copy the token.<br>
+          2. Add the bot to each channel as an <strong>admin</strong>.<br>
+          3. Set <code>TELEGRAM_BOT_TOKEN</code> and <code>TELEGRAM_CHAT_IDS</code> (comma-separated channel IDs) in your Railway environment variables.<br>
+          4. Redeploy — the next fresh report will auto-post to all channels.
         </div>
       </div>
     </div>
@@ -199,6 +253,48 @@
     /* Set initial active state */
     document.querySelectorAll('.freq-btn').forEach(function (b) {
       if (parseInt(b.dataset.hours, 10) === current) b.classList.add('active');
+    });
+  })();
+
+  /* ── Telegram status ────────────────────────────────── */
+  (function () {
+    var pill = document.getElementById('tgStatusPill');
+    var btn  = document.getElementById('tgTestBtn');
+    var inst = document.getElementById('tgInstructions');
+
+    fetch('/api/telegram/status')
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.configured) {
+          pill.className = 'status-pill ok';
+          pill.textContent = '✅ Connected (' + data.channelCount + ' channel' + (data.channelCount !== 1 ? 's' : '') + ')';
+          btn.disabled = false;
+        } else {
+          pill.className = 'status-pill off';
+          pill.textContent = '⚠️ Not configured';
+          inst.style.display = '';
+        }
+      })
+      .catch(function () {
+        pill.className = 'status-pill off';
+        pill.textContent = '⚠️ Not configured';
+        inst.style.display = '';
+      });
+
+    btn.addEventListener('click', function () {
+      btn.disabled = true;
+      btn.textContent = 'Sending…';
+      fetch('/api/telegram/test', { method: 'POST' })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          btn.textContent = data.ok ? '✓ Sent!' : '✗ Failed';
+          setTimeout(function () { btn.textContent = 'Send Test Message'; btn.disabled = false; }, 2500);
+          if (data.ok) showToast();
+        })
+        .catch(function () {
+          btn.textContent = '✗ Error';
+          setTimeout(function () { btn.textContent = 'Send Test Message'; btn.disabled = false; }, 2500);
+        });
     });
   })();
 </script>

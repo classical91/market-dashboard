@@ -95,10 +95,11 @@ Rules:
 }
 
 class ReporterService {
-  constructor({ cache, apiKey }) {
+  constructor({ cache, apiKey, telegramService }) {
     this._cache = cache;
     this._apiKey = apiKey;
     this._client = apiKey ? new OpenAI({ apiKey }) : null;
+    this._telegram = telegramService || null;
   }
 
   _cacheKey(ttlMs) {
@@ -132,7 +133,7 @@ class ReporterService {
         this._generate(economicsPrompt(dateStr)),
         this._generate(marketsPrompt(dateStr)),
       ]);
-      return {
+      const report = {
         configured: true,
         generatedAt: new Date().toISOString(),
         dateStr,
@@ -140,6 +141,12 @@ class ReporterService {
         economics,
         markets,
       };
+      if (this._telegram) {
+        this._telegram.postReport(report).catch((err) => {
+          console.error("[Telegram] Failed to post report:", err.message);
+        });
+      }
+      return report;
     });
   }
 }
