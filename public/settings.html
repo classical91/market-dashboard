@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Settings · Market Command</title>
+  <script src="/assets/js/settings.js"></script>
+  <link rel="stylesheet" href="/assets/styles/command.css" />
+  <style>
+    .settings-section {
+      margin-bottom: 28px;
+    }
+    .settings-label {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.14em;
+      text-transform: uppercase; color: var(--muted);
+      margin-bottom: 12px;
+    }
+    .settings-card {
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015)),
+        var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px; padding: 20px 22px;
+    }
+    .settings-row {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 16px; flex-wrap: wrap;
+    }
+    .settings-row-label { font-size: 14px; font-weight: 600; color: var(--text); }
+    .settings-row-sub   { font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+    /* ── Theme swatches ─────────────────────────────────── */
+    .theme-grid {
+      display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px;
+    }
+    .theme-swatch {
+      display: flex; flex-direction: column; align-items: center; gap: 8px;
+      cursor: pointer; border: none; background: transparent;
+      font-family: inherit;
+    }
+    .theme-swatch-preview {
+      width: 64px; height: 48px; border-radius: 12px;
+      border: 2px solid var(--border);
+      position: relative; overflow: hidden;
+      transition: border-color 0.18s, transform 0.15s;
+    }
+    .theme-swatch.active .theme-swatch-preview {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px var(--blue-bg);
+    }
+    .theme-swatch:hover .theme-swatch-preview { transform: translateY(-2px); }
+    .theme-swatch-bg   { position: absolute; inset: 0; }
+    .theme-swatch-dot  {
+      position: absolute; bottom: 8px; right: 8px;
+      width: 14px; height: 14px; border-radius: 50%;
+    }
+    .theme-swatch-name {
+      font-size: 12px; color: var(--muted); font-weight: 500;
+    }
+    .theme-swatch.active .theme-swatch-name { color: var(--text); }
+
+    /* ── Frequency toggle ───────────────────────────────── */
+    .freq-options { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+    .freq-btn {
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.04);
+      color: var(--muted); padding: 10px 20px;
+      border-radius: 14px; font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: 0.18s; font-family: inherit;
+    }
+    .freq-btn.active {
+      background: rgba(77,163,255,0.16);
+      color: var(--text); border-color: rgba(77,163,255,0.36);
+    }
+    .freq-btn:hover:not(.active) { background: rgba(255,255,255,0.08); color: var(--soft); }
+
+    /* ── Saved toast ────────────────────────────────────── */
+    .toast {
+      position: fixed; bottom: 28px; right: 28px;
+      background: var(--panel-2); border: 1px solid var(--border);
+      border-radius: 14px; padding: 12px 18px;
+      font-size: 13px; color: var(--text);
+      box-shadow: var(--shadow);
+      opacity: 0; transform: translateY(8px);
+      transition: opacity 0.2s, transform 0.2s;
+      pointer-events: none; z-index: 999;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside class="cmd-sidebar"></aside>
+  <main class="cmd-main">
+
+    <div class="cmd-page-header">
+      <div>
+        <div class="cmd-page-title">⚙️ Settings</div>
+        <div class="cmd-page-subtitle">Appearance and reporter preferences</div>
+      </div>
+      <div class="cmd-clock" id="cmd-clock"></div>
+    </div>
+
+    <!-- Appearance -->
+    <div class="settings-section">
+      <div class="settings-label">Appearance</div>
+      <div class="settings-card">
+        <div class="settings-row-label">Theme</div>
+        <div class="settings-row-sub">Applies instantly across all pages</div>
+        <div class="theme-grid" id="themeGrid"></div>
+      </div>
+    </div>
+
+    <!-- Reporter -->
+    <div class="settings-section">
+      <div class="settings-label">Reporter</div>
+      <div class="settings-card">
+        <div class="settings-row">
+          <div>
+            <div class="settings-row-label">Refresh Frequency</div>
+            <div class="settings-row-sub">How often the Daily News Reporter generates a new briefing</div>
+          </div>
+        </div>
+        <div class="freq-options" id="freqOptions">
+          <button class="freq-btn" data-hours="24">Daily (24h)</button>
+          <button class="freq-btn" data-hours="48">Every 2 Days (48h)</button>
+        </div>
+      </div>
+    </div>
+
+    <footer>Market Command — settings are saved locally in your browser</footer>
+  </main>
+</div>
+
+<div class="toast" id="toast">✓ Saved</div>
+
+<script src="/assets/js/sidebar.js"></script>
+<script>
+  /* ── Clock ─────────────────────────────────────────────── */
+  (function () {
+    function tick() {
+      var el = document.getElementById('cmd-clock');
+      if (el) el.textContent = new Date().toLocaleString(undefined, {
+        weekday: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit'
+      });
+    }
+    tick(); setInterval(tick, 1000);
+  })();
+
+  /* ── Toast ─────────────────────────────────────────────── */
+  function showToast() {
+    var t = document.getElementById('toast');
+    t.classList.add('show');
+    setTimeout(function () { t.classList.remove('show'); }, 1600);
+  }
+
+  /* ── Themes ─────────────────────────────────────────────── */
+  (function () {
+    var s = window.AppSettings;
+    var grid = document.getElementById('themeGrid');
+    var current = s.getTheme();
+
+    Object.keys(s.THEMES).forEach(function (name) {
+      var theme = s.THEMES[name];
+      var btn = document.createElement('button');
+      btn.className = 'theme-swatch' + (name === current ? ' active' : '');
+      btn.innerHTML =
+        '<div class="theme-swatch-preview">' +
+          '<div class="theme-swatch-bg" style="background:' + theme.swatch[0] + '"></div>' +
+          '<div class="theme-swatch-dot" style="background:' + theme.swatch[1] + '"></div>' +
+        '</div>' +
+        '<span class="theme-swatch-name">' + theme.label + '</span>';
+      btn.addEventListener('click', function () {
+        document.querySelectorAll('.theme-swatch').forEach(function (el) {
+          el.classList.remove('active');
+        });
+        btn.classList.add('active');
+        s.applyTheme(name);
+        showToast();
+      });
+      grid.appendChild(btn);
+    });
+  })();
+
+  /* ── Frequency ──────────────────────────────────────────── */
+  (function () {
+    var s = window.AppSettings;
+    var current = s.getFrequency();
+    document.getElementById('freqOptions').addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-hours]');
+      if (!btn) return;
+      document.querySelectorAll('.freq-btn').forEach(function (b) {
+        b.classList.remove('active');
+      });
+      btn.classList.add('active');
+      s.setFrequency(parseInt(btn.dataset.hours, 10));
+      showToast();
+    });
+    /* Set initial active state */
+    document.querySelectorAll('.freq-btn').forEach(function (b) {
+      if (parseInt(b.dataset.hours, 10) === current) b.classList.add('active');
+    });
+  })();
+</script>
+</body>
+</html>

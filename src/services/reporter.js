@@ -1,6 +1,6 @@
 const OpenAI = require("openai");
 
-const CACHE_TTL_MS = 48 * 60 * 60 * 1000;
+const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000;
 
 const SYSTEM_PROMPT =
   "You are a professional financial journalist producing concise, structured daily market briefings. " +
@@ -101,9 +101,9 @@ class ReporterService {
     this._client = apiKey ? new OpenAI({ apiKey }) : null;
   }
 
-  _cacheKey() {
-    const period = Math.floor(Date.now() / CACHE_TTL_MS);
-    return `reporter:v1:${period}`;
+  _cacheKey(ttlMs) {
+    const period = Math.floor(Date.now() / ttlMs);
+    return `reporter:v1:${ttlMs}:${period}`;
   }
 
   async _generate(prompt) {
@@ -118,13 +118,14 @@ class ReporterService {
     return res.choices[0].message.content;
   }
 
-  async getReport() {
+  async getReport(ttlMs) {
     if (!this._client) {
       return { configured: false };
     }
 
-    const key = this._cacheKey();
-    return this._cache.getOrLoad(key, CACHE_TTL_MS, async () => {
+    const resolvedTtl = ttlMs || DEFAULT_TTL_MS;
+    const key = this._cacheKey(resolvedTtl);
+    return this._cache.getOrLoad(key, resolvedTtl, async () => {
       const dateStr = formatDate();
       const [crypto, economics, markets] = await Promise.all([
         this._generate(cryptoPrompt(dateStr)),
