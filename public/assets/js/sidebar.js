@@ -1,4 +1,7 @@
 (function () {
+  /* Apply saved theme as early as possible */
+  if (window.AppSettings) window.AppSettings.applyTheme(window.AppSettings.getTheme());
+
   var workspace = [
     { href: '/',                                   dot: true,  label: 'Overview'    },
     { href: '/market-intel.html',                  icon: '📈', label: 'Markets'     },
@@ -14,6 +17,7 @@
     { href: '/crypto.html#sentiment',       icon: '🧠', label: 'Sentiment'   },
     { href: '/traditional.html',            icon: '🏦', label: 'Traditional' },
     { href: '/earthwatch.html',             icon: '🌍', label: 'Earth Watch' },
+    { href: '/settings.html',              icon: '⚙️', label: 'Settings'    },
   ];
 
   function isActive(href) {

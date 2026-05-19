@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Daily Reporter · Market Command</title>
+  <script src="/assets/js/settings.js"></script>
   <link rel="stylesheet" href="/assets/styles/command.css" />
   <style>
     /* ── Reporter-specific styles ─────────────────────────── */
@@ -232,8 +233,9 @@
 
     function loadReport() {
       var content = document.getElementById('reporterContent');
+      var ttl = window.AppSettings ? window.AppSettings.getFrequency() : 24;
 
-      fetch('/api/daily-report')
+      fetch('/api/daily-report?ttlHours=' + ttl)
         .then(function (res) {
           if (!res.ok) throw new Error('HTTP ' + res.status);
           return res.json();
