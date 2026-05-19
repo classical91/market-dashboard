@@ -1,4 +1,4 @@
-const Anthropic = require("@anthropic-ai/sdk");
+const OpenAI = require("openai");
 
 const CACHE_TTL_MS = 48 * 60 * 60 * 1000;
 
@@ -98,7 +98,7 @@ class ReporterService {
   constructor({ cache, apiKey }) {
     this._cache = cache;
     this._apiKey = apiKey;
-    this._client = apiKey ? new Anthropic({ apiKey }) : null;
+    this._client = apiKey ? new OpenAI({ apiKey }) : null;
   }
 
   _cacheKey() {
@@ -107,19 +107,15 @@ class ReporterService {
   }
 
   async _generate(prompt) {
-    const msg = await this._client.messages.create({
-      model: "claude-sonnet-4-6",
+    const res = await this._client.chat.completions.create({
+      model: "gpt-4o",
       max_tokens: 2048,
-      system: [
-        {
-          type: "text",
-          text: SYSTEM_PROMPT,
-          cache_control: { type: "ephemeral" },
-        },
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: prompt },
       ],
-      messages: [{ role: "user", content: prompt }],
     });
-    return msg.content[0].text;
+    return res.choices[0].message.content;
   }
 
   async getReport() {

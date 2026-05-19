@@ -67,7 +67,7 @@ const ignoredAddresses = Array.from(
 const config = {
   port: parseNumber(process.env.PORT, 3000),
   reporter: {
-    apiKey: process.env.ANTHROPIC_API_KEY || "",
+    apiKey: process.env.OPENAI_API_KEY || "",
   },
   defillama: {
     baseUrl: process.env.DEFILLAMA_API_BASE_URL || "https://stablecoins.llama.fi/",
