@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Daily Reporter · Market Command</title>
+  <link rel="stylesheet" href="/assets/styles/command.css" />
+  <style>
+    /* ── Reporter-specific styles ─────────────────────────── */
+    .reporter-header-row {
+      display: flex; align-items: center; gap: 16px;
+      margin-bottom: 18px; flex-wrap: wrap;
+    }
+    .reporter-date-badge {
+      font-size: 12px; font-weight: 700; letter-spacing: 0.07em;
+      color: var(--blue);
+      background: var(--blue-bg);
+      border: 1px solid rgba(77,163,255,0.22);
+      padding: 6px 14px; border-radius: 10px;
+    }
+    .reporter-gen-badge {
+      font-size: 11px; color: var(--muted);
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      padding: 5px 12px; border-radius: 10px;
+    }
+
+    /* ── Tabs ─────────────────────────────────────────────── */
+    .reporter-tabs {
+      display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;
+    }
+    .reporter-tab {
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.04);
+      color: var(--muted);
+      padding: 10px 20px; border-radius: 14px;
+      font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: 0.18s;
+      font-family: inherit; white-space: nowrap;
+    }
+    .reporter-tab.active {
+      background: rgba(77,163,255,0.16);
+      color: var(--text);
+      border-color: rgba(77,163,255,0.36);
+    }
+    .reporter-tab:hover:not(.active) {
+      background: rgba(255,255,255,0.08);
+      color: var(--soft);
+      border-color: var(--border-hover);
+    }
+
+    /* ── Loading / Error ──────────────────────────────────── */
+    .reporter-loading {
+      text-align: center; padding: 56px 20px;
+      color: var(--muted); font-size: 14px;
+    }
+    .spinner {
+      display: block; width: 28px; height: 28px;
+      margin: 0 auto 16px;
+      border: 3px solid rgba(77,163,255,0.18);
+      border-top-color: var(--blue);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .reporter-error {
+      background: rgba(255,77,109,0.07);
+      border: 1px solid rgba(255,77,109,0.2);
+      border-radius: 14px; padding: 18px 20px;
+      color: #ff8fa0; font-size: 13.5px; line-height: 1.6;
+    }
+    .reporter-error code {
+      background: rgba(255,255,255,0.08);
+      padding: 2px 6px; border-radius: 5px;
+      font-size: 12px;
+    }
+    .reporter-unconfigured {
+      background: rgba(77,163,255,0.06);
+      border: 1px solid rgba(77,163,255,0.2);
+      border-radius: 14px; padding: 24px 22px;
+      font-size: 14px; line-height: 1.65; color: var(--soft);
+    }
+    .reporter-unconfigured strong { color: var(--text); }
+    .reporter-unconfigured code {
+      background: rgba(255,255,255,0.08);
+      padding: 2px 7px; border-radius: 5px;
+      font-size: 12.5px; color: var(--blue);
+    }
+
+    /* ── Story cards ──────────────────────────────────────── */
+    .stories { display: grid; gap: 10px; }
+
+    .story {
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015)),
+        var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 15px; padding: 15px 18px;
+      transition: border-color 0.15s;
+    }
+    .story:hover { border-color: rgba(77,163,255,0.28); }
+
+    .story p {
+      color: var(--text); font-size: 14px;
+      line-height: 1.5; margin-bottom: 6px;
+    }
+    .story p:last-child { margin-bottom: 0; }
+
+    .story ul {
+      list-style: none; padding: 0; margin: 4px 0 0;
+    }
+    .story li {
+      color: var(--soft); font-size: 13px; line-height: 1.55;
+      padding-left: 16px; position: relative; margin-bottom: 3px;
+    }
+    .story li:last-child { margin-bottom: 0; }
+    .story li::before {
+      content: "–"; position: absolute; left: 0; color: var(--muted);
+    }
+    .story strong { color: var(--text); }
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside class="cmd-sidebar"></aside>
+  <main class="cmd-main">
+
+    <div class="cmd-page-header">
+      <div>
+        <div class="cmd-page-title">📰 Daily News Reporter</div>
+        <div class="cmd-page-subtitle">AI-generated briefing &middot; refreshes every 48 hours</div>
+      </div>
+      <div class="cmd-clock" id="cmd-clock"></div>
+    </div>
+
+    <!-- Date + generated-at badges -->
+    <div class="reporter-header-row" id="reporterHeaderRow" style="display:none">
+      <div class="reporter-date-badge" id="reporterDate"></div>
+      <div class="reporter-gen-badge" id="reporterGen"></div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="reporter-tabs" id="reporterTabs">
+      <button class="reporter-tab active" data-tab="crypto">₿ Crypto Top 10</button>
+      <button class="reporter-tab" data-tab="economics">🌍 Economics Top 10</button>
+      <button class="reporter-tab" data-tab="markets">📊 Markets Top 10</button>
+    </div>
+
+    <!-- Content area -->
+    <div id="reporterContent">
+      <div class="reporter-loading">
+        <span class="spinner"></span>
+        Loading daily briefing&hellip;
+      </div>
+    </div>
+
+    <footer>Market Command &mdash; AI-generated content based on model knowledge</footer>
+
+  </main>
+</div>
+
+<script src="/assets/js/sidebar.js"></script>
+<script>
+  /* ── Clock ──────────────────────────────────────────────── */
+  (function () {
+    function tick() {
+      var el = document.getElementById('cmd-clock');
+      if (el) el.textContent = new Date().toLocaleString(undefined, {
+        weekday: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit'
+      });
+    }
+    tick();
+    setInterval(tick, 1000);
+  })();
+
+  /* ── Reporter ───────────────────────────────────────────── */
+  (function () {
+    var activeTab = 'crypto';
+    var reportData = null;
+
+    function esc(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    function applyBold(text) {
+      return esc(text).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    }
+
+    function parseToStories(text) {
+      /* Split on blank lines → individual story cards */
+      var blocks = text.split(/\n{2,}/);
+      return blocks
+        .map(function (b) { return b.trim(); })
+        .filter(Boolean)
+        .map(function (block) {
+          var lines = block.split('\n');
+          var html = '';
+          var inList = false;
+
+          lines.forEach(function (line) {
+            var t = line.trim();
+            if (!t) return;
+            if (t.startsWith('- ')) {
+              if (!inList) { html += '<ul>'; inList = true; }
+              html += '<li>' + applyBold(t.slice(2)) + '</li>';
+            } else {
+              if (inList) { html += '</ul>'; inList = false; }
+              html += '<p>' + applyBold(t) + '</p>';
+            }
+          });
+
+          if (inList) html += '</ul>';
+          return '<div class="story">' + html + '</div>';
+        })
+        .join('');
+    }
+
+    function renderTab(tab) {
+      var content = document.getElementById('reporterContent');
+      if (!reportData) return;
+      var text = reportData[tab];
+      if (!text) {
+        content.innerHTML = '<div class="reporter-loading" style="padding:32px"><span style="color:var(--muted)">No data for this section.</span></div>';
+        return;
+      }
+      content.innerHTML = '<div class="stories">' + parseToStories(text) + '</div>';
+    }
+
+    function loadReport() {
+      var content = document.getElementById('reporterContent');
+
+      fetch('/api/daily-report')
+        .then(function (res) {
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          return res.json();
+        })
+        .then(function (data) {
+          if (!data.configured) {
+            content.innerHTML =
+              '<div class="reporter-unconfigured">' +
+              '<strong>Setup required</strong><br>' +
+              'Set the <code>ANTHROPIC_API_KEY</code> environment variable and restart the server ' +
+              'to enable the Daily News Reporter. The reporter uses Claude to generate ' +
+              'structured briefings on crypto, economics, and global markets every 48 hours.' +
+              '</div>';
+            return;
+          }
+
+          reportData = data;
+
+          /* Show badges */
+          var headerRow = document.getElementById('reporterHeaderRow');
+          if (headerRow) headerRow.style.display = 'flex';
+
+          var dateEl = document.getElementById('reporterDate');
+          if (dateEl && data.dateStr) dateEl.textContent = '🗓️ ' + data.dateStr;
+
+          var genEl = document.getElementById('reporterGen');
+          if (genEl && data.generatedAt) {
+            var ts = new Date(data.generatedAt);
+            genEl.textContent = 'Generated ' + ts.toLocaleString(undefined, {
+              month: 'short', day: 'numeric',
+              hour: '2-digit', minute: '2-digit'
+            });
+          }
+
+          renderTab(activeTab);
+        })
+        .catch(function (err) {
+          content.innerHTML =
+            '<div class="reporter-error">Failed to load daily report: ' + esc(err.message) + '</div>';
+        });
+    }
+
+    /* Tab clicks */
+    document.getElementById('reporterTabs').addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-tab]');
+      if (!btn) return;
+      document.querySelectorAll('.reporter-tab').forEach(function (t) {
+        t.classList.remove('active');
+      });
+      btn.classList.add('active');
+      activeTab = btn.dataset.tab;
+      if (reportData) renderTab(activeTab);
+    });
+
+    loadReport();
+  })();
+</script>
+</body>
+</html>
