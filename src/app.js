@@ -4,11 +4,13 @@ const path = require("path");
 const { config } = require("./config/env");
 const { createHealthRouter } = require("./routes/health");
 const { createOnchainRouter } = require("./routes/onchain");
+const { createReporterRouter } = require("./routes/reporter");
 const { MemoryCache } = require("./services/cache");
 const { CovalentService } = require("./services/covalent");
 const { DefiLlamaService } = require("./services/defillama");
 const { EtherscanService } = require("./services/etherscan");
 const { OnchainService } = require("./services/onchain");
+const { ReporterService } = require("./services/reporter");
 
 function createApp() {
   const app = express();
@@ -22,6 +24,10 @@ function createApp() {
     defillamaService,
     etherscanService,
     covalentService,
+  });
+  const reporterService = new ReporterService({
+    cache,
+    apiKey: config.reporter.apiKey,
   });
 
   app.disable("x-powered-by");
@@ -38,6 +44,7 @@ function createApp() {
     }),
   );
   app.use("/api/onchain", createOnchainRouter({ onchainService }));
+  app.use("/api/daily-report", createReporterRouter({ reporterService }));
 
   app.get("/", (req, res) => {
     res.sendFile(path.join(__dirname, "..", "public", "index.html"));
