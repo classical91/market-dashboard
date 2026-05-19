@@ -437,6 +437,70 @@
     .legend-left  { display: flex; align-items: center; gap: 8px; }
     .legend-dot   { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 
+    /* ── Daily News Reporter ─────────────────────────────── */
+    .reporter-card { margin-top: 18px; }
+    .reporter-tabs {
+      display: flex; gap: 8px;
+      padding: 0 18px 16px; flex-wrap: wrap;
+    }
+    .reporter-tab {
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.04);
+      color: var(--muted);
+      padding: 9px 16px; border-radius: 14px;
+      font-size: 13px; cursor: pointer;
+      transition: 0.18s; font-family: inherit; white-space: nowrap;
+    }
+    .reporter-tab.active {
+      background: rgba(77,163,255,0.16);
+      color: var(--text); border-color: rgba(77,163,255,0.3);
+    }
+    .reporter-tab:hover:not(.active) { background: rgba(255,255,255,0.08); color: var(--soft); }
+
+    .reporter-loading {
+      text-align: center; padding: 40px 20px;
+      color: var(--muted); font-size: 14px;
+    }
+    .spinner {
+      display: block; width: 24px; height: 24px; margin: 0 auto 14px;
+      border: 3px solid rgba(77,163,255,0.18);
+      border-top-color: var(--blue);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .reporter-error {
+      background: rgba(255,77,109,0.08);
+      border: 1px solid rgba(255,77,109,0.22);
+      border-radius: 14px; padding: 16px 18px;
+      color: #ff8fa0; font-size: 13px; margin: 0 18px 18px;
+      line-height: 1.55;
+    }
+    .reporter-date {
+      font-size: 12px; color: var(--blue); font-weight: 700;
+      padding: 0 18px 12px; letter-spacing: 0.06em;
+    }
+    .reporter-panel { padding: 0 18px 20px; }
+
+    .story-block {
+      background: rgba(255,255,255,0.035);
+      border: 1px solid var(--border);
+      border-radius: 16px; padding: 14px 16px; margin-bottom: 10px;
+    }
+    .story-block p {
+      color: var(--text); font-size: 13.5px;
+      line-height: 1.5; margin-bottom: 5px;
+    }
+    .story-block p:last-child { margin-bottom: 0; }
+    .story-block ul { list-style: none; padding: 0; margin: 4px 0 0; }
+    .story-block li {
+      color: var(--soft); font-size: 13px; line-height: 1.5;
+      padding-left: 14px; position: relative; margin-bottom: 2px;
+    }
+    .story-block li::before { content: "–"; position: absolute; left: 0; color: var(--muted); }
+    .story-block strong { color: var(--text); }
+
     /* ── Footer ──────────────────────────────────────────── */
     .footer-note { color: var(--muted); font-size: 12px; text-align: center; padding: 20px 0 4px; }
 
@@ -768,6 +832,29 @@
         </div><!-- /right column -->
       </section><!-- /grid -->
 
+      <!-- Daily News Reporter -->
+      <article class="card reporter-card" id="dailyReporter">
+        <div class="card-header">
+          <div>
+            <div class="card-title">📰 Daily News Reporter</div>
+            <div class="card-subtitle">AI-generated briefing &middot; refreshes every 48 hours</div>
+          </div>
+          <div id="reporterMeta" style="color:var(--muted);font-size:12px;text-align:right;line-height:1.4"></div>
+        </div>
+        <div id="reporterDateLine" class="reporter-date"></div>
+        <div class="reporter-tabs" id="reporterTabs">
+          <button class="reporter-tab active" data-tab="crypto">₿ Crypto Top 10</button>
+          <button class="reporter-tab" data-tab="economics">🌍 Economics Top 10</button>
+          <button class="reporter-tab" data-tab="markets">📊 Markets Top 10</button>
+        </div>
+        <div id="reporterContent">
+          <div class="reporter-loading">
+            <span class="spinner"></span>
+            Loading daily briefing&hellip;
+          </div>
+        </div>
+      </article>
+
       <p class="footer-note">
         Market Command &mdash; replace sample data with your market API, database, or backend route.
       </p>
@@ -1023,6 +1110,104 @@
     drawChart();
     updateClock();
     setInterval(updateClock, 1000);
+
+    /* ── Daily News Reporter ─────────────────────────────── */
+    (function () {
+      var activeTab = 'crypto';
+      var reportData = null;
+
+      function esc(s) {
+        return String(s)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+      }
+
+      function applyBold(text) {
+        return esc(text).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      }
+
+      function parseToBlocks(text) {
+        var blocks = text.split(/\n{2,}/);
+        return blocks
+          .map(function (block) { return block.trim(); })
+          .filter(Boolean)
+          .map(function (block) {
+            var lines = block.split('\n');
+            var html = '';
+            var inList = false;
+            lines.forEach(function (line) {
+              var t = line.trim();
+              if (!t) return;
+              if (t.startsWith('- ')) {
+                if (!inList) { html += '<ul>'; inList = true; }
+                html += '<li>' + applyBold(t.slice(2)) + '</li>';
+              } else {
+                if (inList) { html += '</ul>'; inList = false; }
+                html += '<p>' + applyBold(t) + '</p>';
+              }
+            });
+            if (inList) html += '</ul>';
+            return '<div class="story-block">' + html + '</div>';
+          })
+          .join('');
+      }
+
+      function renderTab(tab) {
+        var content = document.getElementById('reporterContent');
+        if (!reportData) return;
+        var text = reportData[tab];
+        if (!text) {
+          content.innerHTML = '<div class="reporter-loading" style="padding:24px"><span style="color:var(--muted)">No data for this section.</span></div>';
+          return;
+        }
+        content.innerHTML = '<div class="reporter-panel">' + parseToBlocks(text) + '</div>';
+      }
+
+      function loadReport() {
+        var content = document.getElementById('reporterContent');
+        fetch('/api/daily-report')
+          .then(function (res) {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.json();
+          })
+          .then(function (data) {
+            if (!data.configured) {
+              content.innerHTML =
+                '<div class="reporter-error">' +
+                'ℹ️ Set the <code>ANTHROPIC_API_KEY</code> environment variable to enable the Daily News Reporter.' +
+                '</div>';
+              return;
+            }
+            reportData = data;
+            var dateEl = document.getElementById('reporterDateLine');
+            if (dateEl && data.dateStr) dateEl.textContent = '🗓️ ' + data.dateStr;
+            var metaEl = document.getElementById('reporterMeta');
+            if (metaEl && data.generatedAt) {
+              var ts = new Date(data.generatedAt);
+              metaEl.textContent = 'Generated\n' + ts.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            }
+            renderTab(activeTab);
+          })
+          .catch(function (err) {
+            content.innerHTML = '<div class="reporter-error">Failed to load daily report: ' + esc(err.message) + '</div>';
+          });
+      }
+
+      var tabs = document.getElementById('reporterTabs');
+      if (tabs) {
+        tabs.addEventListener('click', function (e) {
+          var btn = e.target.closest('[data-tab]');
+          if (!btn) return;
+          document.querySelectorAll('.reporter-tab').forEach(function (t) { t.classList.remove('active'); });
+          btn.classList.add('active');
+          activeTab = btn.dataset.tab;
+          if (reportData) renderTab(activeTab);
+        });
+      }
+
+      loadReport();
+    })();
 
     /* ── Mobile nav ───────────────────────────────────────── */
     (function () {
