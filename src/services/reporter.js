@@ -108,15 +108,18 @@ class ReporterService {
   }
 
   async _generate(prompt) {
-    const res = await this._client.chat.completions.create({
-      model: "gpt-4o",
-      max_tokens: 2048,
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: prompt },
-      ],
+    const res = await this._client.responses.create({
+      model: "gpt-4.5-preview",
+      instructions: SYSTEM_PROMPT,
+      tools: [{ type: "web_search_preview" }],
+      input: prompt,
     });
-    return res.choices[0].message.content;
+    return res.output
+      .filter((block) => block.type === "message")
+      .flatMap((block) => block.content)
+      .filter((c) => c.type === "output_text")
+      .map((c) => c.text)
+      .join("");
   }
 
   async getReport(ttlMs) {
