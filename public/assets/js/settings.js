@@ -60,6 +60,44 @@
       },
       body: 'radial-gradient(circle at top left, rgba(169,139,255,0.2), transparent 35%), radial-gradient(circle at bottom right, rgba(201,123,255,0.12), transparent 35%), linear-gradient(135deg, #07050e, #0c0918 50%, #07050e)',
     },
+    terminal: {
+      label: 'Terminal',
+      swatch: ['#000000', '#00ff41'],
+      vars: {
+        '--bg': '#000000', '--panel': '#0a0a0a', '--panel-2': '#0f0f0f', '--panel-3': '#141414',
+        '--surface': '#0a0a0a', '--surface2': '#0f0f0f',
+        '--border': 'rgba(0,255,65,0.15)', '--border-hover': 'rgba(0,255,65,0.35)',
+        '--shadow': '0 12px 40px rgba(0,0,0,0.8)',
+        '--text': '#00ff41', '--soft': '#00cc33', '--muted': '#009922', '--dim': '#006614',
+        '--blue': '#00ff41', '--blue-bg': 'rgba(0,255,65,0.1)',
+        '--purple': '#00ff41', '--purple-bg': 'rgba(0,255,65,0.1)',
+        '--green': '#00ff41', '--teal': '#00ff41', '--teal-bg': 'rgba(0,255,65,0.12)',
+        '--amber': '#ffcc00', '--amber-bg': 'rgba(255,204,0,0.1)', '--yellow': '#ffcc00',
+        '--coral': '#ff3333', '--coral-bg': 'rgba(255,51,51,0.1)',
+        '--red': '#ff3333', '--red-bg': 'rgba(255,51,51,0.1)',
+        '--accent': '#00ff41', '--accent-bg': 'rgba(0,255,65,0.12)',
+      },
+      body: 'linear-gradient(180deg, #000000, #000000)',
+    },
+    minimal: {
+      label: 'Minimal',
+      swatch: ['#1c1c1e', '#d4a843'],
+      vars: {
+        '--bg': '#1c1c1e', '--panel': '#242426', '--panel-2': '#2c2c2e', '--panel-3': '#323234',
+        '--surface': '#242426', '--surface2': '#2c2c2e',
+        '--border': 'rgba(255,255,255,0.1)', '--border-hover': 'rgba(212,168,67,0.4)',
+        '--shadow': '0 12px 40px rgba(0,0,0,0.5)',
+        '--text': '#ffffff', '--soft': '#ebebf5', '--muted': '#aeaeb2', '--dim': '#636366',
+        '--blue': '#d4a843', '--blue-bg': 'rgba(212,168,67,0.12)',
+        '--purple': '#d4a843', '--purple-bg': 'rgba(212,168,67,0.12)',
+        '--green': '#30d158', '--teal': '#30d158', '--teal-bg': 'rgba(48,209,88,0.12)',
+        '--amber': '#d4a843', '--amber-bg': 'rgba(212,168,67,0.12)', '--yellow': '#d4a843',
+        '--coral': '#ff453a', '--coral-bg': 'rgba(255,69,58,0.12)',
+        '--red': '#ff453a', '--red-bg': 'rgba(255,69,58,0.12)',
+        '--accent': '#d4a843', '--accent-bg': 'rgba(212,168,67,0.12)',
+      },
+      body: 'linear-gradient(160deg, #1c1c1e 0%, #18181a 100%)',
+    },
     light: {
       label: 'Light',
       swatch: ['#eef2f9', '#1a7aff'],
@@ -90,6 +128,7 @@
         root.style.setProperty(k, vars[k]);
       }
     }
+    root.setAttribute('data-theme', name);
     var bg = theme.body;
     if (bg) {
       if (document.body) {

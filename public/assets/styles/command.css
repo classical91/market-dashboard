@@ -336,3 +336,226 @@ header, .back, .back-group { display: none !important; }
   .nav-pills { gap: 4px; }
   .cmd-page-title { font-size: 17px; }
 }
+
+/* ------------------------------------------------------
+   TERMINAL THEME (v2)
+   ------------------------------------------------------ */
+[data-theme="terminal"] body,
+[data-theme="terminal"] .app {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Courier New', monospace !important;
+}
+
+[data-theme="terminal"] .cmd-sidebar {
+  border-right-color: rgba(0, 255, 65, 0.2);
+  background: #000 !important;
+}
+
+[data-theme="terminal"] .cmd-nav-item {
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+}
+
+[data-theme="terminal"] .cmd-nav-item.active {
+  background: rgba(0, 255, 65, 0.12);
+  color: #00ff41;
+  border-left: 2px solid #00ff41;
+  border-radius: 0 4px 4px 0;
+}
+
+[data-theme="terminal"] .cmd-nav-item:hover:not(.active) {
+  background: rgba(0, 255, 65, 0.06);
+  color: #00cc33;
+}
+
+[data-theme="terminal"] .cmd-topbar {
+  background: #000 !important;
+  border-bottom-color: rgba(0, 255, 65, 0.2);
+}
+
+[data-theme="terminal"] .ticker-bar {
+  background: #000 !important;
+  border-bottom-color: rgba(0, 255, 65, 0.15);
+}
+
+[data-theme="terminal"] .panel,
+[data-theme="terminal"] .cmd-card,
+[data-theme="terminal"] .kpi-card,
+[data-theme="terminal"] .chart-panel {
+  border-color: rgba(0, 255, 65, 0.18) !important;
+  border-radius: 4px !important;
+}
+
+[data-theme="terminal"] .panel:hover,
+[data-theme="terminal"] .cmd-card:hover {
+  border-color: rgba(0, 255, 65, 0.4) !important;
+  box-shadow: 0 0 12px rgba(0, 255, 65, 0.08);
+}
+
+/* Scanline overlay */
+[data-theme="terminal"] body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.08) 2px,
+    rgba(0, 0, 0, 0.08) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* Ticker green tint */
+[data-theme="terminal"] .ticker-item { color: #00ff41; }
+[data-theme="terminal"] .ticker-pos  { color: #00ff41; }
+[data-theme="terminal"] .ticker-neg  { color: #ff3333; }
+
+/* KPI value glow */
+[data-theme="terminal"] .kpi-value,
+[data-theme="terminal"] .cmd-page-title {
+  text-shadow: 0 0 10px rgba(0, 255, 65, 0.35);
+}
+
+/* Logo */
+[data-theme="terminal"] .cmd-logo,
+[data-theme="terminal"] .cmd-logo-text {
+  color: #00ff41 !important;
+  text-shadow: 0 0 8px rgba(0, 255, 65, 0.5);
+}
+
+[data-theme="terminal"] .cmd-logo-icon {
+  background: #00ff41 !important;
+  color: #000 !important;
+  box-shadow: 0 0 12px rgba(0, 255, 65, 0.4);
+}
+
+/* Search bar */
+[data-theme="terminal"] .cmd-search {
+  border-color: rgba(0, 255, 65, 0.25);
+  background: #000;
+  caret-color: #00ff41;
+}
+[data-theme="terminal"] .cmd-search:focus-within {
+  border-color: #00ff41;
+  box-shadow: 0 0 0 2px rgba(0, 255, 65, 0.15);
+}
+
+/* Buttons */
+[data-theme="terminal"] .cmd-btn,
+[data-theme="terminal"] .cmd-refresh {
+  border-color: rgba(0, 255, 65, 0.3);
+  color: #00ff41;
+}
+[data-theme="terminal"] .cmd-btn:hover,
+[data-theme="terminal"] .cmd-refresh:hover {
+  background: rgba(0, 255, 65, 0.1);
+  box-shadow: 0 0 8px rgba(0, 255, 65, 0.2);
+}
+
+/* Heatmap cells */
+[data-theme="terminal"] .heatmap-cell {
+  border-radius: 2px !important;
+  font-family: 'SF Mono', monospace;
+}
+
+/* Section labels */
+[data-theme="terminal"] .section-label,
+[data-theme="terminal"] .cmd-section-label {
+  letter-spacing: 0.18em;
+}
+
+
+/* ------------------------------------------------------
+   MINIMAL THEME (v3)
+   ------------------------------------------------------ */
+
+[data-theme="minimal"] .cmd-sidebar {
+  background: #1c1c1e !important;
+  border-right-color: rgba(255,255,255,0.08);
+}
+
+[data-theme="minimal"] .cmd-nav-item.active {
+  background: rgba(212, 168, 67, 0.14);
+  color: #d4a843;
+  font-weight: 700;
+}
+
+[data-theme="minimal"] .cmd-nav-item:hover:not(.active) {
+  background: rgba(255,255,255,0.05);
+}
+
+[data-theme="minimal"] .cmd-topbar {
+  background: #1c1c1e !important;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+[data-theme="minimal"] .ticker-bar {
+  background: #1c1c1e !important;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+
+[data-theme="minimal"] .panel,
+[data-theme="minimal"] .cmd-card,
+[data-theme="minimal"] .kpi-card,
+[data-theme="minimal"] .chart-panel {
+  border-color: rgba(255,255,255,0.1) !important;
+  border-radius: 14px !important;
+}
+
+[data-theme="minimal"] .panel:hover,
+[data-theme="minimal"] .cmd-card:hover {
+  border-color: rgba(212, 168, 67, 0.35) !important;
+}
+
+/* Gold accent on active/positive elements */
+[data-theme="minimal"] .kpi-change.pos,
+[data-theme="minimal"] .ticker-pos {
+  color: #d4a843 !important;
+}
+
+/* Logo gold */
+[data-theme="minimal"] .cmd-logo-icon {
+  background: #d4a843 !important;
+  color: #000 !important;
+}
+
+[data-theme="minimal"] .cmd-logo-text {
+  color: #ffffff !important;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+/* Search bar */
+[data-theme="minimal"] .cmd-search {
+  background: #2c2c2e;
+  border-color: rgba(255,255,255,0.1);
+}
+[data-theme="minimal"] .cmd-search:focus-within {
+  border-color: #d4a843;
+  box-shadow: 0 0 0 2px rgba(212, 168, 67, 0.15);
+}
+
+/* Buttons */
+[data-theme="minimal"] .cmd-btn,
+[data-theme="minimal"] .cmd-refresh {
+  border-color: rgba(255,255,255,0.15);
+}
+[data-theme="minimal"] .cmd-btn:hover,
+[data-theme="minimal"] .cmd-refresh:hover {
+  border-color: #d4a843;
+  color: #d4a843;
+}
+
+/* Heatmap cells */
+[data-theme="minimal"] .heatmap-cell {
+  border-radius: 10px !important;
+}
+
+/* Section labels */
+[data-theme="minimal"] .cmd-section-label,
+[data-theme="minimal"] .section-label {
+  letter-spacing: 0.1em;
+  font-weight: 700;
+}
