@@ -7,6 +7,7 @@ const { createOnchainRouter } = require("./routes/onchain");
 const { createReporterRouter } = require("./routes/reporter");
 const { createTelegramRouter } = require("./routes/telegram");
 const { MemoryCache } = require("./services/cache");
+const { PersistentReporterCache } = require("./services/persistent-cache");
 const { CovalentService } = require("./services/covalent");
 const { DefiLlamaService } = require("./services/defillama");
 const { EtherscanService } = require("./services/etherscan");
@@ -17,6 +18,7 @@ const { TelegramService } = require("./services/telegram");
 function createApp() {
   const app = express();
   const cache = new MemoryCache();
+  const reporterCache = new PersistentReporterCache();
   const defillamaService = new DefiLlamaService(config.defillama);
   const etherscanService = new EtherscanService(config.etherscan);
   const covalentService = new CovalentService(config.covalent);
@@ -29,7 +31,7 @@ function createApp() {
   });
   const telegramService = new TelegramService(config.telegram);
   const reporterService = new ReporterService({
-    cache,
+    cache: reporterCache,
     apiKey: config.reporter.apiKey,
     telegramService,
   });
