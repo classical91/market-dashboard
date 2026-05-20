@@ -245,10 +245,9 @@
             content.innerHTML =
               '<div class="reporter-unconfigured">' +
               '<strong>Setup required</strong><br>' +
-              'Set the <code>ANTHROPIC_API_KEY</code> environment variable and restart the server ' +
-              'to enable the Daily News Reporter. The reporter uses Claude to generate ' +
-              'structured briefings on crypto, economics, and global markets every 48 hours.' +
-              '</div>';
+              'Set the <code>OPENAI_API_KEY</code> environment variable on Railway ' +
+              'to enable the Daily News Reporter. The reporter uses GPT-4.5 to generate ' +
+              'structured briefings on crypto, economics, and global markets.</div>';
             return;
           }
 
