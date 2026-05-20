@@ -108,15 +108,13 @@ class ReporterService {
   }
 
   async _generate(prompt) {
-    const res = await this._client.chat.completions.create({
+    const res = await this._client.responses.create({
       model: "gpt-5.5",
-      max_completion_tokens: 2048,
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: prompt },
-      ],
+      instructions: SYSTEM_PROMPT,
+      tools: [{ type: "web_search" }],
+      input: prompt,
     });
-    return res.choices[0].message.content;
+    return res.output_text;
   }
 
   async getReport(ttlMs) {
