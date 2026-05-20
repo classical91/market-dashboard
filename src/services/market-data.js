@@ -57,12 +57,20 @@ const RANGE_TO_DAYS = { "1D": 1, "1W": 7, "1M": 30, "3M": 90 };
 
 class MarketDataService {
   constructor(config = {}) {
+    const coingeckoKey =
+      config.coingeckoApiKey || process.env.COINGECKO_API_KEY || process.env.COINGECKO_DEMO_API_KEY || "";
     this.config = {
       provider: config.provider || process.env.MARKET_DATA_PROVIDER || "coingecko",
       apiKey: config.apiKey || process.env.MARKET_DATA_API_KEY || "",
+      coingeckoApiKey: coingeckoKey,
+      coingeckoKeyHeader:
+        config.coingeckoKeyHeader ||
+        process.env.COINGECKO_KEY_HEADER ||
+        (process.env.COINGECKO_API_KEY ? "x-cg-pro-api-key" : "x-cg-demo-api-key"),
       baseUrl:
         config.baseUrl || process.env.MARKET_DATA_BASE_URL || "https://api.coingecko.com/api/v3",
       requestTimeoutMs: Number(config.requestTimeoutMs || process.env.MARKET_DATA_TIMEOUT_MS || 8000),
+      retryCount: Number(config.retryCount || process.env.MARKET_DATA_RETRIES || 1),
       newsUrl: config.newsUrl || process.env.MARKET_NEWS_URL || "",
     };
   }
@@ -201,26 +209,64 @@ class MarketDataService {
   }
 
   async fetchJson(url) {
+    const headers = { Accept: "application/json" };
+    if (this.config.coingeckoApiKey && url.startsWith(this.config.baseUrl)) {
+      headers[this.config.coingeckoKeyHeader] = this.config.coingeckoApiKey;
+    }
+    const maxAttempts = Math.max(1, this.config.retryCount + 1);
+    let lastError = null;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await this.singleFetch(url, headers);
+      } catch (error) {
+        lastError = error;
+        const status = error.statusCode || error.status || 0;
+        const transient = status === 429 || status >= 500 || error.name === "AbortError";
+        if (!transient || attempt === maxAttempts) break;
+        await sleep(400 * attempt);
+      }
+    }
+    throw lastError;
+  }
+
+  async singleFetch(url, headers) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.config.requestTimeoutMs);
     try {
-      const response = await fetch(url, {
-        headers: { Accept: "application/json" },
-        signal: controller.signal,
-      });
+      const response = await fetch(url, { headers, signal: controller.signal });
       const text = await response.text();
-      const payload = text ? JSON.parse(text) : null;
+      let payload = null;
+      if (text) {
+        try {
+          payload = JSON.parse(text);
+        } catch {
+          payload = null;
+        }
+      }
       if (!response.ok) {
+        const detail = payload?.error || payload?.status?.error_message || text.slice(0, 120) || response.statusText;
         throw createServiceError(
-          `Market data ${response.status}: ${payload?.error || response.statusText}`,
+          `CoinGecko HTTP ${response.status} ${detail}`,
           response.status,
         );
       }
       return payload;
+    } catch (error) {
+      if (error.name === "AbortError") {
+        throw createServiceError(
+          `CoinGecko request timed out after ${this.config.requestTimeoutMs}ms`,
+          408,
+        );
+      }
+      throw error;
     } finally {
       clearTimeout(timer);
     }
   }
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function fallbackCrypto(symbols) {

@@ -38,13 +38,16 @@ class OverviewService {
     const sources = [];
     const warnings = [];
     if (crypto.live) sources.push("coingecko:crypto");
-    else warnings.push("Crypto prices using fallback data.");
+    else warnings.push(withReason("Crypto prices using fallback data", crypto.error));
     if (chart.live) sources.push("coingecko:chart");
+    else if (chart.error) warnings.push(withReason("Market Pulse chart using fallback", chart.error));
     if (globalData.live) sources.push("coingecko:global");
+    else if (globalData.error) warnings.push(withReason("Crypto allocation using fallback", globalData.error));
     if (!equities.live) warnings.push("Equities using fallback (set MARKET_DATA_PROVIDER + MARKET_DATA_API_KEY for live).");
     if (!macro.live) warnings.push("Macro/FX using fallback (no provider configured).");
     if (!news.live) warnings.push("News feed using fallback (no MARKET_NEWS_URL configured).");
     if (!calendar.live) warnings.push("Macro calendar using fallback (no provider configured).");
+    if (onchainResult.error) warnings.push(withReason("On-chain service unavailable", onchainResult.error.message));
     if (onchain) sources.push("internal:onchain");
 
     const ticker = [...crypto.items, ...equities.items, ...macro.items].map((item) => ({
@@ -347,6 +350,12 @@ function formatPercent(value) {
 
 function round2(value) {
   return Number((Number(value) || 0).toFixed(2));
+}
+
+function withReason(label, reason) {
+  if (!reason) return `${label}.`;
+  const text = typeof reason === "string" ? reason : reason.message || String(reason);
+  return `${label}: ${text}`;
 }
 
 module.exports = { OverviewService };
