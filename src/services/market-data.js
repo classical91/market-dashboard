@@ -72,6 +72,8 @@ class MarketDataService {
       requestTimeoutMs: Number(config.requestTimeoutMs || process.env.MARKET_DATA_TIMEOUT_MS || 8000),
       retryCount: Number(config.retryCount || process.env.MARKET_DATA_RETRIES || 1),
       newsUrl: config.newsUrl || process.env.MARKET_NEWS_URL || "",
+      finnhubApiKey: config.finnhubApiKey || process.env.FINNHUB_API_KEY || "",
+      finnhubBaseUrl: config.finnhubBaseUrl || process.env.FINNHUB_BASE_URL || "https://finnhub.io/api/v1",
     };
   }
 
@@ -80,7 +82,7 @@ class MarketDataService {
   }
 
   hasLiveEquitySource() {
-    return Boolean(this.config.apiKey) && this.config.provider !== "coingecko";
+    return Boolean(this.config.finnhubApiKey);
   }
 
   async getCryptoPrices(symbols = DEFAULT_CRYPTOS) {
@@ -177,10 +179,46 @@ class MarketDataService {
   }
 
   async getEquities() {
+    if (!this.config.finnhubApiKey) {
+      return {
+        live: false,
+        source: "fallback",
+        items: FALLBACK_EQUITIES.map((entry) => ({ ...entry, type: "equity" })),
+      };
+    }
+    let firstError = null;
+    let liveCount = 0;
+    const items = await Promise.all(
+      FALLBACK_EQUITIES.map(async (entry) => {
+        try {
+          const url = `${this.config.finnhubBaseUrl}/quote?symbol=${encodeURIComponent(
+            entry.symbol,
+          )}&token=${encodeURIComponent(this.config.finnhubApiKey)}`;
+          const data = await this.singleFetch(url, { Accept: "application/json" });
+          const price = Number(data?.c ?? 0);
+          if (!price) {
+            return { ...entry, type: "equity" };
+          }
+          liveCount += 1;
+          return {
+            symbol: entry.symbol,
+            name: entry.name,
+            price,
+            changePercent: Number(data?.dp ?? 0),
+            volume: "-",
+            type: "equity",
+          };
+        } catch (error) {
+          if (!firstError) firstError = error;
+          return { ...entry, type: "equity" };
+        }
+      }),
+    );
     return {
-      live: false,
-      source: "fallback",
-      items: FALLBACK_EQUITIES.map((entry) => ({ ...entry, type: "equity" })),
+      live: liveCount > 0,
+      source: liveCount > 0 ? "finnhub" : "fallback",
+      items,
+      error: liveCount === 0 && firstError ? firstError.message : undefined,
     };
   }
 
