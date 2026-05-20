@@ -43,7 +43,8 @@ class OverviewService {
     else if (chart.error) warnings.push(withReason("Market Pulse chart using fallback", chart.error));
     if (globalData.live) sources.push("coingecko:global");
     else if (globalData.error) warnings.push(withReason("Crypto allocation using fallback", globalData.error));
-    if (!equities.live) warnings.push("Equities using fallback (set MARKET_DATA_PROVIDER + MARKET_DATA_API_KEY for live).");
+    if (equities.live) sources.push("finnhub:equities");
+    else warnings.push(withReason("Equities using fallback (set FINNHUB_API_KEY for live)", equities.error));
     if (!macro.live) warnings.push("Macro/FX using fallback (no provider configured).");
     if (!news.live) warnings.push("News feed using fallback (no MARKET_NEWS_URL configured).");
     if (!calendar.live) warnings.push("Macro calendar using fallback (no provider configured).");
