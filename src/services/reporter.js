@@ -109,7 +109,7 @@ class ReporterService {
 
   async _generate(prompt) {
     const res = await this._client.chat.completions.create({
-      model: "gpt-5.5-preview",
+      model: "gpt-5.5",
       max_tokens: 2048,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
