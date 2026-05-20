@@ -1,0 +1,303 @@
+const { createServiceError } = require("../utils/errors");
+
+const DEFAULT_CRYPTOS = [
+  { symbol: "BTC", id: "bitcoin", name: "Bitcoin" },
+  { symbol: "ETH", id: "ethereum", name: "Ethereum" },
+  { symbol: "SOL", id: "solana", name: "Solana" },
+  { symbol: "BNB", id: "binancecoin", name: "BNB" },
+  { symbol: "XRP", id: "ripple", name: "XRP" },
+  { symbol: "ADA", id: "cardano", name: "Cardano" },
+  { symbol: "DOGE", id: "dogecoin", name: "Dogecoin" },
+  { symbol: "AVAX", id: "avalanche-2", name: "Avalanche" },
+];
+
+const FALLBACK_EQUITIES = [
+  { symbol: "SPY", name: "S&P 500 ETF", price: 522.18, changePercent: 0.38, volume: "74.1M" },
+  { symbol: "QQQ", name: "Nasdaq 100 ETF", price: 448.72, changePercent: 0.61, volume: "51.8M" },
+  { symbol: "NVDA", name: "Nvidia", price: 884.55, changePercent: 3.12, volume: "49.7M" },
+  { symbol: "TSLA", name: "Tesla", price: 173.42, changePercent: -1.26, volume: "92.4M" },
+];
+
+const FALLBACK_MACRO = [
+  { symbol: "XAU", name: "Gold", price: 2342.9, changePercent: -0.24, volume: "High" },
+  { symbol: "DXY", name: "Dollar Index", price: 104.12, changePercent: -0.31, volume: "High" },
+  { symbol: "WTI", name: "Crude Oil", price: 78.44, changePercent: 0.88, volume: "Med" },
+  { symbol: "VIX", name: "Volatility Index", price: 14.72, changePercent: -2.08, volume: "Med" },
+];
+
+const FALLBACK_NEWS = [
+  {
+    title: "Bitcoin trades in tight range as traders await Fed signal",
+    source: "Fallback Feed",
+    url: null,
+    publishedAt: null,
+  },
+  {
+    title: "Stablecoin supply expansion remains a key risk barometer",
+    source: "Fallback Feed",
+    url: null,
+    publishedAt: null,
+  },
+  {
+    title: "Semiconductor basket continues to lead broad equity advance",
+    source: "Fallback Feed",
+    url: null,
+    publishedAt: null,
+  },
+];
+
+const FALLBACK_CALENDAR = [
+  { time: "08:30", title: "US CPI Inflation", impact: "High" },
+  { time: "10:00", title: "Consumer Sentiment", impact: "Medium" },
+  { time: "14:00", title: "Fed Speaker", impact: "High" },
+  { time: "16:30", title: "Oil Inventories", impact: "Medium" },
+];
+
+const RANGE_TO_DAYS = { "1D": 1, "1W": 7, "1M": 30, "3M": 90 };
+
+class MarketDataService {
+  constructor(config = {}) {
+    this.config = {
+      provider: config.provider || process.env.MARKET_DATA_PROVIDER || "coingecko",
+      apiKey: config.apiKey || process.env.MARKET_DATA_API_KEY || "",
+      baseUrl:
+        config.baseUrl || process.env.MARKET_DATA_BASE_URL || "https://api.coingecko.com/api/v3",
+      requestTimeoutMs: Number(config.requestTimeoutMs || process.env.MARKET_DATA_TIMEOUT_MS || 8000),
+      newsUrl: config.newsUrl || process.env.MARKET_NEWS_URL || "",
+    };
+  }
+
+  hasLiveCryptoSource() {
+    return this.config.provider === "coingecko";
+  }
+
+  hasLiveEquitySource() {
+    return Boolean(this.config.apiKey) && this.config.provider !== "coingecko";
+  }
+
+  async getCryptoPrices(symbols = DEFAULT_CRYPTOS) {
+    if (this.config.provider !== "coingecko") {
+      return { live: false, source: "fallback", items: fallbackCrypto(symbols) };
+    }
+
+    const ids = symbols.map((entry) => entry.id).join(",");
+    const url = `${this.config.baseUrl}/coins/markets?vs_currency=usd&ids=${encodeURIComponent(
+      ids,
+    )}&price_change_percentage=24h&per_page=${symbols.length}&page=1`;
+
+    try {
+      const data = await this.fetchJson(url);
+      if (!Array.isArray(data)) {
+        return { live: false, source: "fallback", items: fallbackCrypto(symbols) };
+      }
+      const byId = new Map(data.map((row) => [row.id, row]));
+      const items = symbols.map((entry) => {
+        const row = byId.get(entry.id);
+        if (!row) {
+          return fallbackCryptoOne(entry);
+        }
+        return {
+          symbol: entry.symbol,
+          name: entry.name,
+          price: Number(row.current_price ?? 0),
+          changePercent: Number(row.price_change_percentage_24h ?? 0),
+          volume: formatVolume(row.total_volume),
+          marketCap: Number(row.market_cap ?? 0),
+        };
+      });
+      return { live: true, source: "coingecko", items };
+    } catch (error) {
+      return {
+        live: false,
+        source: "fallback",
+        items: fallbackCrypto(symbols),
+        error: error.message,
+      };
+    }
+  }
+
+  async getGlobalDominance() {
+    if (this.config.provider !== "coingecko") {
+      return { live: false, source: "fallback", dominance: defaultDominance() };
+    }
+    try {
+      const data = await this.fetchJson(`${this.config.baseUrl}/global`);
+      const pct = data?.data?.market_cap_percentage || {};
+      const totalMcap = Number(data?.data?.total_market_cap?.usd || 0);
+      const totalVolume = Number(data?.data?.total_volume?.usd || 0);
+      const dominance = Object.entries(pct)
+        .map(([symbol, value]) => ({ symbol: symbol.toUpperCase(), percent: Number(value) }))
+        .sort((a, b) => b.percent - a.percent);
+      return { live: true, source: "coingecko", dominance, totalMcap, totalVolume };
+    } catch (error) {
+      return {
+        live: false,
+        source: "fallback",
+        dominance: defaultDominance(),
+        error: error.message,
+      };
+    }
+  }
+
+  async getMarketChart(range = "1D", coinId = "bitcoin") {
+    const days = RANGE_TO_DAYS[range] || 1;
+    if (this.config.provider !== "coingecko") {
+      return { live: false, source: "fallback", points: fallbackChartPoints(range) };
+    }
+    try {
+      const url = `${this.config.baseUrl}/coins/${coinId}/market_chart?vs_currency=usd&days=${days}`;
+      const data = await this.fetchJson(url);
+      const prices = Array.isArray(data?.prices) ? data.prices : [];
+      if (!prices.length) {
+        return { live: false, source: "fallback", points: fallbackChartPoints(range) };
+      }
+      const sampled = sampleSeries(prices, 30);
+      const first = sampled[0][1];
+      const points = sampled.map(([ts, value]) => ({
+        time: new Date(ts).toISOString(),
+        value: Number(((value / first) * 100).toFixed(3)),
+      }));
+      return { live: true, source: "coingecko", points };
+    } catch (error) {
+      return {
+        live: false,
+        source: "fallback",
+        points: fallbackChartPoints(range),
+        error: error.message,
+      };
+    }
+  }
+
+  async getEquities() {
+    return {
+      live: false,
+      source: "fallback",
+      items: FALLBACK_EQUITIES.map((entry) => ({ ...entry, type: "equity" })),
+    };
+  }
+
+  async getMacro() {
+    return {
+      live: false,
+      source: "fallback",
+      items: FALLBACK_MACRO.map((entry) => ({ ...entry, type: "macro" })),
+    };
+  }
+
+  async getNews() {
+    return {
+      live: false,
+      source: "fallback",
+      items: FALLBACK_NEWS.map((item) => ({ ...item })),
+    };
+  }
+
+  async getCalendar() {
+    return {
+      live: false,
+      source: "fallback",
+      items: FALLBACK_CALENDAR.map((item) => ({ ...item })),
+    };
+  }
+
+  async fetchJson(url) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.config.requestTimeoutMs);
+    try {
+      const response = await fetch(url, {
+        headers: { Accept: "application/json" },
+        signal: controller.signal,
+      });
+      const text = await response.text();
+      const payload = text ? JSON.parse(text) : null;
+      if (!response.ok) {
+        throw createServiceError(
+          `Market data ${response.status}: ${payload?.error || response.statusText}`,
+          response.status,
+        );
+      }
+      return payload;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+}
+
+function fallbackCrypto(symbols) {
+  return symbols.map(fallbackCryptoOne);
+}
+
+function fallbackCryptoOne(entry) {
+  const seeds = {
+    BTC: { price: 64280, changePercent: 2.84, volume: "38.2B" },
+    ETH: { price: 3188, changePercent: 1.42, volume: "18.6B" },
+    SOL: { price: 152.4, changePercent: 2.1, volume: "2.6B" },
+    BNB: { price: 588.3, changePercent: 0.4, volume: "1.4B" },
+    XRP: { price: 0.52, changePercent: -0.6, volume: "1.1B" },
+    ADA: { price: 0.45, changePercent: -1.1, volume: "420M" },
+    DOGE: { price: 0.16, changePercent: 0.9, volume: "780M" },
+    AVAX: { price: 35.7, changePercent: 1.8, volume: "320M" },
+  };
+  const seed = seeds[entry.symbol] || { price: 0, changePercent: 0, volume: "-" };
+  return {
+    symbol: entry.symbol,
+    name: entry.name,
+    price: seed.price,
+    changePercent: seed.changePercent,
+    volume: seed.volume,
+    marketCap: 0,
+  };
+}
+
+function defaultDominance() {
+  return [
+    { symbol: "BTC", percent: 52 },
+    { symbol: "ETH", percent: 17 },
+    { symbol: "USDT", percent: 6 },
+    { symbol: "BNB", percent: 3 },
+    { symbol: "SOL", percent: 3 },
+  ];
+}
+
+function fallbackChartPoints(range) {
+  const sets = {
+    "1D": [100, 100.4, 100.7, 101.1, 101.0, 101.5, 102.0, 101.7, 102.3, 102.8],
+    "1W": [100, 98.6, 99.3, 101.1, 100.8, 103, 102.4, 104.7, 105.2, 106.5],
+    "1M": [100, 102, 101.3, 104, 103.8, 105.9, 108.2, 107.3, 110.4, 112.8],
+    "3M": [100, 96, 98, 101, 99, 106, 108, 111, 109, 116],
+  };
+  const values = sets[range] || sets["1D"];
+  const now = Date.now();
+  const step = (RANGE_TO_DAYS[range] || 1) * 86400 * 1000 / values.length;
+  return values.map((value, index) => ({
+    time: new Date(now - (values.length - 1 - index) * step).toISOString(),
+    value,
+  }));
+}
+
+function sampleSeries(rows, maxPoints) {
+  if (rows.length <= maxPoints) {
+    return rows;
+  }
+  const step = Math.max(1, Math.floor(rows.length / maxPoints));
+  const sampled = [];
+  for (let i = 0; i < rows.length; i += step) {
+    sampled.push(rows[i]);
+  }
+  if (sampled[sampled.length - 1] !== rows[rows.length - 1]) {
+    sampled.push(rows[rows.length - 1]);
+  }
+  return sampled;
+}
+
+function formatVolume(value) {
+  const n = Number(value || 0);
+  if (!Number.isFinite(n) || n <= 0) return "-";
+  if (n >= 1e12) return `${(n / 1e12).toFixed(2)}T`;
+  if (n >= 1e9) return `${(n / 1e9).toFixed(2)}B`;
+  if (n >= 1e6) return `${(n / 1e6).toFixed(2)}M`;
+  if (n >= 1e3) return `${(n / 1e3).toFixed(2)}K`;
+  return String(Math.round(n));
+}
+
+module.exports = { MarketDataService, DEFAULT_CRYPTOS, RANGE_TO_DAYS };

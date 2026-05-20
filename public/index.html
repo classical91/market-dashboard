@@ -1,1104 +1,192 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Market Command Dashboard</title>
-  <script src="/assets/js/settings.js"></script>
-  <style>
-    :root {
-      --bg: #070a12;
-      --panel: #0f1524;
-      --panel-2: #121b2e;
-      --panel-3: #17223a;
-      --border: rgba(255,255,255,0.08);
-      --text: #edf3ff;
-      --muted: #8492aa;
-      --soft: #aab7cf;
-      --green: #00e396;
-      --red: #ff4d6d;
-      --yellow: #f5c542;
-      --blue: #4da3ff;
-      --purple: #9b7bff;
-      --shadow: 0 24px 70px rgba(0,0,0,0.45);
-      --radius: 22px;
-    }
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      min-height: 100vh;
-      background:
-        radial-gradient(circle at top left, rgba(77,163,255,0.16), transparent 32%),
-        radial-gradient(circle at top right, rgba(155,123,255,0.13), transparent 34%),
-        linear-gradient(135deg, #050711, #08101e 45%, #050711);
-      color: var(--text);
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      overflow-x: hidden;
-    }
-    .app {
-      display: grid;
-      grid-template-columns: 260px 1fr;
-      min-height: 100vh;
-    }
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Market Command Dashboard</title>
+    <link rel="stylesheet" href="/assets/styles/overview.css" />
+    <script src="/assets/js/settings.js"></script>
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar">
+        <a class="brand" href="/">
+          <div class="brand-mark">M</div>
+          <div class="brand-text">
+            <h1>Market Command</h1>
+            <span>Live dashboard system</span>
+          </div>
+        </a>
 
-    /* ── Sidebar ─────────────────────────────────────────── */
-    .sidebar {
-      border-right: 1px solid var(--border);
-      background: rgba(8,12,22,0.86);
-      backdrop-filter: blur(20px);
-      padding: 24px 18px;
-      position: sticky;
-      top: 0;
-      height: 100vh;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-    }
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 28px;
-      text-decoration: none;
-      color: inherit;
-    }
-    .brand-mark {
-      width: 42px;
-      height: 42px;
-      flex-shrink: 0;
-      border-radius: 14px;
-      background: linear-gradient(135deg, var(--blue), var(--purple));
-      display: grid;
-      place-items: center;
-      box-shadow: 0 14px 34px rgba(77,163,255,0.22);
-      font-weight: 900;
-      font-size: 18px;
-    }
-    .brand-text h1 { font-size: 17px; line-height: 1.1; }
-    .brand-text span { font-size: 12px; color: var(--muted); }
+        <div class="nav-label">Workspace</div>
+        <a class="nav-item active" href="/"><span class="nav-dot"></span> Overview</a>
+        <a class="nav-item" href="/market-intel.html">📈 Markets</a>
+        <a class="nav-item" href="/crypto.html">₿ Crypto</a>
+        <a class="nav-item" href="/market-intel.html#macro-indicators">🧭 Macro</a>
+        <a class="nav-item" href="/market-intel.html#news">📰 News</a>
+        <a class="nav-item" href="#alerts">🚨 Alerts</a>
+        <a class="nav-item" href="/on-chain.html">🔗 On-Chain</a>
+        <a class="nav-item" href="/reporter.html">📰 Reporter</a>
 
-    .nav-label {
-      font-size: 11px;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.16em;
-      margin: 22px 12px 10px;
-    }
-    .nav-item {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 11px 14px;
-      border-radius: 15px;
-      color: var(--soft);
-      cursor: pointer;
-      transition: 0.2s ease;
-      font-size: 14px;
-      text-decoration: none;
-    }
-    .nav-item:hover, .nav-item.active {
-      background: rgba(77,163,255,0.12);
-      color: var(--text);
-    }
-    .nav-dot {
-      width: 9px;
-      height: 9px;
-      flex-shrink: 0;
-      border-radius: 99px;
-      background: var(--blue);
-      box-shadow: 0 0 18px rgba(77,163,255,0.8);
-    }
+        <div class="nav-label">Tools</div>
+        <a class="nav-item" href="/market-intel.html#screeners">📊 Screener</a>
+        <a class="nav-item" href="/crypto.html#sentiment">🧠 Sentiment</a>
+        <a class="nav-item" href="/market-intel.html#market-overview">🗓 Calendar</a>
+        <a class="nav-item" href="/traditional.html">🏦 Traditional</a>
+        <a class="nav-item" href="/earthwatch.html">🌍 Earth Watch</a>
+        <a class="nav-item" href="/settings.html">⚙️ Settings</a>
 
-    .sidebar-card {
-      margin-top: auto;
-      padding: 16px;
-      border-radius: 18px;
-      background: linear-gradient(145deg, rgba(77,163,255,0.12), rgba(155,123,255,0.1));
-      border: 1px solid var(--border);
-      text-decoration: none;
-      color: inherit;
-      display: block;
-      transition: background 0.2s;
-    }
-    .sidebar-card:hover { background: linear-gradient(145deg, rgba(77,163,255,0.2), rgba(155,123,255,0.17)); }
-    .sidebar-card strong { font-size: 14px; }
-    .sidebar-card p { color: var(--muted); font-size: 13px; margin-top: 6px; line-height: 1.45; }
+        <a
+          class="sidebar-card"
+          href="https://trading-strategy-production-1b41.up.railway.app/"
+          target="_blank"
+          rel="noopener"
+        >
+          <strong>🧠 Decision Engine ↗</strong>
+          <p>
+            Trading decision framework, strategy rules, entry &amp; exit conditions, and trade
+            management.
+          </p>
+        </a>
+      </aside>
 
-    /* ── Main ────────────────────────────────────────────── */
-    .main { padding: 22px; min-width: 0; }
+      <main class="main">
+        <section class="topbar">
+          <input
+            id="searchInput"
+            class="search"
+            placeholder="Search symbol, asset, sector, news…"
+          />
+          <span id="sourceBadge" class="chip fallback" title="Data source status">● Loading…</span>
+          <span id="lastUpdated" class="chip" title="Last refresh time"></span>
+          <div class="chip" id="clock">Loading…</div>
+          <button class="button" id="refreshBtn">↺ Refresh</button>
+        </section>
 
-    .topbar {
-      display: grid;
-      grid-template-columns: 1fr auto auto;
-      gap: 14px;
-      align-items: center;
-      margin-bottom: 16px;
-    }
-    .search {
-      background: rgba(255,255,255,0.05);
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      padding: 14px 16px;
-      color: var(--text);
-      outline: none;
-      width: 100%;
-      font-size: 14px;
-      font-family: inherit;
-    }
-    .search::placeholder { color: var(--muted); }
-    .chip {
-      border: 1px solid var(--border);
-      background: rgba(255,255,255,0.05);
-      color: var(--text);
-      padding: 12px 14px;
-      border-radius: 16px;
-      font-size: 13px;
-      white-space: nowrap;
-    }
-    .button {
-      border: 1px solid var(--border);
-      background: rgba(255,255,255,0.05);
-      color: var(--text);
-      padding: 12px 16px;
-      border-radius: 16px;
-      font-size: 13px;
-      white-space: nowrap;
-      cursor: pointer;
-      transition: 0.2s ease;
-      font-family: inherit;
-    }
-    .button:hover { background: rgba(77,163,255,0.15); transform: translateY(-1px); }
+        <div id="statusBanner" class="banner" role="status" aria-live="polite"></div>
 
-    /* ── Ticker Tape ─────────────────────────────────────── */
-    .ticker {
-      overflow: hidden;
-      border: 1px solid var(--border);
-      background: rgba(255,255,255,0.04);
-      border-radius: 18px;
-      margin-bottom: 18px;
-    }
-    .ticker-track {
-      display: flex;
-      gap: 24px;
-      padding: 12px 0;
-      width: max-content;
-      animation: scroll 34s linear infinite;
-    }
-    .ticker-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 13px;
-      color: var(--soft);
-      white-space: nowrap;
-    }
-    .ticker-item strong { color: var(--text); }
-    .up   { color: var(--green); }
-    .down { color: var(--red); }
-    .flat { color: var(--yellow); }
-    @keyframes scroll {
-      from { transform: translateX(20px); }
-      to   { transform: translateX(-50%); }
-    }
+        <section class="ticker" aria-label="Live ticker">
+          <div class="ticker-track" id="tickerTrack"></div>
+        </section>
 
-    /* ── KPI Grid ────────────────────────────────────────── */
-    .kpi-grid {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 16px;
-      margin-bottom: 18px;
-    }
-    .card {
-      background:
-        linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0.025)),
-        var(--panel);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      min-width: 0;
-    }
-    .kpi {
-      padding: 18px;
-      position: relative;
-      overflow: hidden;
-    }
-    .kpi::after {
-      content: "";
-      position: absolute;
-      right: -32px; top: -32px;
-      width: 100px; height: 100px;
-      border-radius: 50%;
-      background: rgba(77,163,255,0.08);
-      pointer-events: none;
-    }
-    .kpi-top {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      color: var(--muted);
-      font-size: 13px;
-      margin-bottom: 14px;
-    }
-    .kpi-value { font-size: 28px; font-weight: 800; letter-spacing: -0.04em; }
-    .kpi-bottom {
-      display: flex;
-      justify-content: space-between;
-      margin-top: 12px;
-      font-size: 13px;
-      color: var(--muted);
-    }
+        <section class="kpi-grid" id="kpiGrid" aria-label="Key market indicators"></section>
 
-    /* ── Two-column layout ───────────────────────────────── */
-    .grid {
-      display: grid;
-      grid-template-columns: 1.65fr 1fr;
-      gap: 18px;
-      align-items: start;
-    }
-    .stack { display: grid; gap: 18px; }
-
-    /* ── Card internals ──────────────────────────────────── */
-    .card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 18px 18px 0;
-      gap: 12px;
-    }
-    .card-title  { font-size: 16px; font-weight: 800; }
-    .card-subtitle { color: var(--muted); font-size: 12px; margin-top: 3px; }
-
-    .timeframe {
-      display: flex;
-      gap: 6px;
-      background: rgba(255,255,255,0.04);
-      padding: 5px;
-      border-radius: 14px;
-      border: 1px solid var(--border);
-    }
-    .tf {
-      border: 0;
-      background: transparent;
-      color: var(--muted);
-      padding: 8px 10px;
-      border-radius: 10px;
-      cursor: pointer;
-      font-size: 12px;
-      font-family: inherit;
-      transition: 0.15s;
-    }
-    .tf.active { background: rgba(77,163,255,0.18); color: var(--text); }
-
-    .chart-wrap { padding: 14px 18px 18px; }
-    canvas { width: 100%; height: 320px; display: block; }
-
-    .market-row {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 12px;
-      padding: 0 18px 18px;
-    }
-    .mini-card {
-      background: rgba(255,255,255,0.04);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 14px;
-    }
-    .mini-card span  { color: var(--muted); font-size: 12px; }
-    .mini-card strong { display: block; margin-top: 7px; font-size: 18px; }
-
-    /* ── Watchlist Table ─────────────────────────────────── */
-    table { width: 100%; border-collapse: collapse; }
-    th, td { padding: 13px 16px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.055); font-size: 13px; }
-    th { color: var(--muted); font-weight: 600; font-size: 12px; }
-    td { color: var(--soft); }
-    td strong { color: var(--text); }
-    .symbol-pill { display: inline-flex; align-items: center; gap: 8px; }
-    .asset-dot { width: 9px; height: 9px; border-radius: 99px; background: var(--blue); flex-shrink: 0; }
-
-    /* ── Heatmap ─────────────────────────────────────────── */
-    .heatmap {
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 10px;
-      padding: 18px;
-    }
-    .heat-tile {
-      min-height: 92px;
-      padding: 14px;
-      border-radius: 17px;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      border: 1px solid rgba(255,255,255,0.1);
-      overflow: hidden;
-      position: relative;
-    }
-    .heat-tile::after {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: radial-gradient(circle at top right, rgba(255,255,255,0.17), transparent 40%);
-      pointer-events: none;
-    }
-    .heat-tile strong { font-size: 14px; z-index: 1; }
-    .heat-tile span   { font-size: 22px; font-weight: 850; letter-spacing: -0.04em; z-index: 1; }
-
-    /* ── Risk Meter ──────────────────────────────────────── */
-    .risk-box {
-      padding: 18px;
-      display: grid;
-      grid-template-columns: 140px 1fr;
-      gap: 18px;
-      align-items: center;
-    }
-    .gauge {
-      width: 132px;
-      height: 132px;
-      border-radius: 50%;
-      background: conic-gradient(var(--green) 0 34%, var(--yellow) 34% 68%, var(--red) 68% 100%);
-      display: grid;
-      place-items: center;
-      position: relative;
-    }
-    .gauge::before {
-      content: "";
-      width: 92px; height: 92px;
-      border-radius: 50%;
-      background: var(--panel);
-      position: absolute;
-    }
-    .gauge-value { position: relative; z-index: 1; text-align: center; font-weight: 900; font-size: 26px; }
-    .gauge-value small { display: block; font-size: 11px; color: var(--muted); font-weight: 600; }
-    .risk-list { display: grid; gap: 10px; }
-    .risk-item { display: flex; justify-content: space-between; gap: 12px; color: var(--soft); font-size: 13px; }
-    .progress { height: 8px; border-radius: 99px; background: rgba(255,255,255,0.07); overflow: hidden; margin-top: 6px; }
-    .progress span { display: block; height: 100%; background: linear-gradient(90deg, var(--blue), var(--purple)); border-radius: inherit; }
-
-    /* ── Feed / Alerts / News ────────────────────────────── */
-    .feed { padding: 8px 18px 18px; display: grid; gap: 12px; }
-    .feed-item {
-      background: rgba(255,255,255,0.04);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 14px;
-    }
-    .feed-item h4 { font-size: 14px; line-height: 1.35; margin-bottom: 8px; }
-    .feed-meta { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; gap: 10px; }
-
-    /* ── Macro Calendar ──────────────────────────────────── */
-    .calendar-list { padding: 8px 18px 18px; display: grid; gap: 10px; }
-    .event {
-      display: grid;
-      grid-template-columns: 68px 1fr auto;
-      gap: 12px;
-      align-items: center;
-      padding: 12px;
-      border-radius: 15px;
-      background: rgba(255,255,255,0.04);
-      border: 1px solid var(--border);
-      font-size: 13px;
-    }
-    .event-time { color: var(--blue); font-weight: 800; }
-    .impact { padding: 5px 8px; border-radius: 10px; font-size: 11px; font-weight: 800; }
-    .impact.high { background: rgba(255,77,109,0.16); color: var(--red); }
-    .impact.med  { background: rgba(245,197,66,0.16);  color: var(--yellow); }
-
-    /* ── Portfolio Allocation ────────────────────────────── */
-    .allocation {
-      padding: 18px;
-      display: grid;
-      grid-template-columns: 150px 1fr;
-      gap: 18px;
-      align-items: center;
-    }
-    .donut {
-      width: 140px;
-      height: 140px;
-      border-radius: 50%;
-      background: conic-gradient(
-        var(--blue)   0 34%,
-        var(--green)  34% 58%,
-        var(--purple) 58% 78%,
-        var(--yellow) 78% 90%,
-        var(--red)    90% 100%
-      );
-      position: relative;
-      flex-shrink: 0;
-    }
-    .donut::after {
-      content: "";
-      width: 92px; height: 92px;
-      background: var(--panel);
-      border-radius: 50%;
-      position: absolute;
-      inset: 24px;
-    }
-    .legend { display: grid; gap: 11px; font-size: 13px; color: var(--soft); }
-    .legend-item { display: flex; justify-content: space-between; gap: 12px; }
-    .legend-left  { display: flex; align-items: center; gap: 8px; }
-    .legend-dot   { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-
-    /* ── Footer ──────────────────────────────────────────── */
-    .footer-note { color: var(--muted); font-size: 12px; text-align: center; padding: 20px 0 4px; }
-
-    /* ── Mobile top bar ──────────────────────────────────── */
-    .mob-bar {
-      display: none;
-      position: sticky; top: 0; z-index: 100;
-      background: rgba(7,10,18,0.96);
-      backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
-      border-bottom: 1px solid var(--border);
-      padding: 0 16px; height: 56px;
-      align-items: center; justify-content: space-between;
-    }
-    .mob-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; }
-    .mob-brand-mark {
-      width: 32px; height: 32px; flex-shrink: 0; border-radius: 10px;
-      background: linear-gradient(135deg, var(--blue), var(--purple));
-      display: grid; place-items: center; font-weight: 900; font-size: 14px;
-    }
-    .mob-brand-name { font-size: 14px; font-weight: 700; }
-    .mob-ham {
-      background: transparent; border: 1px solid var(--border);
-      color: var(--soft); padding: 8px 11px; border-radius: 10px;
-      cursor: pointer; font-size: 18px; line-height: 1; font-family: inherit;
-    }
-    /* Mobile overlay */
-    .mob-overlay {
-      display: none; position: fixed; inset: 0;
-      background: rgba(0,0,0,0.55); z-index: 200;
-      backdrop-filter: blur(2px);
-    }
-    .mob-overlay.open { display: block; }
-    /* Mobile drawer */
-    .mob-drawer {
-      position: fixed; top: 0; left: 0; bottom: 0;
-      width: min(290px, 88vw);
-      background: rgba(7,10,18,0.98); border-right: 1px solid var(--border);
-      backdrop-filter: blur(20px); z-index: 201;
-      padding: 22px 16px; display: flex; flex-direction: column; gap: 2px;
-      overflow-y: auto; scrollbar-width: none;
-      transform: translateX(-110%);
-      transition: transform 0.26s cubic-bezier(0.4,0,0.2,1);
-    }
-    .mob-drawer::-webkit-scrollbar { display: none; }
-    .mob-drawer.open { transform: translateX(0); }
-    /* Reuse sidebar inner styles inside drawer */
-    .mob-drawer .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; text-decoration: none; color: inherit; }
-    .mob-drawer .brand-mark {
-      width: 38px; height: 38px; border-radius: 12px;
-      background: linear-gradient(135deg, var(--blue), var(--purple));
-      display: grid; place-items: center; font-weight: 900; font-size: 16px;
-    }
-    .mob-drawer .brand-text h1 { font-size: 15px; font-weight: 700; }
-    .mob-drawer .brand-text span { font-size: 11px; color: var(--muted); }
-    .mob-drawer .nav-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.16em; padding: 14px 11px 6px; }
-    .mob-drawer .nav-item {
-      display: flex; align-items: center; gap: 10px;
-      padding: 10px 12px; border-radius: 13px; color: var(--soft);
-      text-decoration: none; font-size: 13.5px; transition: 0.18s;
-    }
-    .mob-drawer .nav-item:hover, .mob-drawer .nav-item.active { background: rgba(77,163,255,0.12); color: var(--text); }
-    .mob-drawer .nav-dot { width: 8px; height: 8px; border-radius: 99px; background: var(--blue); box-shadow: 0 0 12px rgba(77,163,255,0.75); flex-shrink: 0; }
-    .mob-drawer .sidebar-card {
-      margin-top: auto; padding: 14px; border-radius: 15px;
-      background: linear-gradient(145deg, rgba(77,163,255,0.1), rgba(155,123,255,0.08));
-      border: 1px solid var(--border); text-decoration: none; color: inherit; display: block;
-    }
-    .mob-drawer .sidebar-card strong { font-size: 13px; }
-    .mob-drawer .sidebar-card p { color: var(--muted); font-size: 12px; margin-top: 5px; line-height: 1.4; }
-
-    /* ── Responsive ──────────────────────────────────────── */
-    @media (max-width: 1180px) {
-      .app { grid-template-columns: 1fr; }
-      .sidebar { display: none; }
-      .mob-bar { display: flex; }
-      .grid { grid-template-columns: 1fr; }
-      .kpi-grid { grid-template-columns: repeat(2, 1fr); }
-      .heatmap { grid-template-columns: repeat(3, 1fr); }
-    }
-    @media (max-width: 720px) {
-      .main { padding: 14px; }
-      .topbar { grid-template-columns: 1fr; }
-      .kpi-grid { grid-template-columns: 1fr; }
-      .market-row { grid-template-columns: 1fr; }
-      .heatmap { grid-template-columns: repeat(2, 1fr); }
-      .risk-box, .allocation { grid-template-columns: 1fr; }
-      th:nth-child(4), td:nth-child(4) { display: none; }
-    }
-  </style>
-</head>
-<body>
-  <div class="app">
-
-    <!-- ── Sidebar ──────────────────────────────────────── -->
-    <aside class="sidebar">
-      <a class="brand" href="/">
-        <div class="brand-mark">M</div>
-        <div class="brand-text">
-          <h1>Market Command</h1>
-          <span>Live dashboard system</span>
-        </div>
-      </a>
-
-      <div class="nav-label">Workspace</div>
-      <a class="nav-item active" href="/"><span class="nav-dot"></span> Overview</a>
-      <a class="nav-item" href="/market-intel.html">📈 Markets</a>
-      <a class="nav-item" href="/crypto.html">₿ Crypto</a>
-      <a class="nav-item" href="/market-intel.html#macro-indicators">🧭 Macro</a>
-      <a class="nav-item" href="/market-intel.html#news">📰 News</a>
-      <a class="nav-item" href="#alerts">🚨 Alerts</a>
-      <a class="nav-item" href="/on-chain.html">🔗 On-Chain</a>
-      <a class="nav-item" href="/reporter.html">📰 Reporter</a>
-
-      <div class="nav-label">Tools</div>
-      <a class="nav-item" href="/market-intel.html#screeners">📊 Screener</a>
-      <a class="nav-item" href="/crypto.html#sentiment">🧠 Sentiment</a>
-      <a class="nav-item" href="/market-intel.html#market-overview">🗓 Calendar</a>
-      <a class="nav-item" href="/traditional.html">🏦 Traditional</a>
-      <a class="nav-item" href="/earthwatch.html">🌍 Earth Watch</a>
-      <a class="nav-item" href="/settings.html">⚙️ Settings</a>
-
-      <a class="sidebar-card" href="https://trading-strategy-production-1b41.up.railway.app/" target="_blank" rel="noopener">
-        <strong>🧠 Decision Engine ↗</strong>
-        <p>Trading decision framework, strategy rules, entry &amp; exit conditions, and trade management.</p>
-      </a>
-    </aside>
-
-    <!-- ── Main ─────────────────────────────────────────── -->
-    <main class="main">
-
-      <!-- Top bar -->
-      <section class="topbar">
-        <input id="searchInput" class="search" placeholder="Search symbol, asset, sector, news…" />
-        <div class="chip" id="clock">Loading…</div>
-        <button class="button" id="refreshBtn">↺ Refresh</button>
-      </section>
-
-      <!-- Ticker tape -->
-      <section class="ticker" aria-label="Live ticker">
-        <div class="ticker-track" id="tickerTrack"></div>
-      </section>
-
-      <!-- KPI cards -->
-      <section class="kpi-grid" id="kpiGrid" aria-label="Key market indicators"></section>
-
-      <!-- Main grid -->
-      <section class="grid">
-
-        <!-- Left column -->
-        <div class="stack">
-
-          <!-- Chart panel -->
-          <article class="card">
-            <div class="card-header">
-              <div>
-                <div class="card-title">Market Pulse</div>
-                <div class="card-subtitle">Composite move across equities, crypto, commodities &amp; FX</div>
-              </div>
-              <div class="timeframe" role="group" aria-label="Timeframe">
-                <button class="tf active" data-range="1D">1D</button>
-                <button class="tf" data-range="1W">1W</button>
-                <button class="tf" data-range="1M">1M</button>
-                <button class="tf" data-range="3M">3M</button>
-              </div>
-            </div>
-            <div class="chart-wrap">
-              <canvas id="marketChart" width="1000" height="360"></canvas>
-            </div>
-            <div class="market-row">
-              <div class="mini-card">
-                <span>Market Status</span>
-                <strong class="up">Risk-On Bias</strong>
-              </div>
-              <div class="mini-card">
-                <span>Volatility</span>
-                <strong class="flat">Moderate</strong>
-              </div>
-              <div class="mini-card">
-                <span>Strongest Theme</span>
-                <strong>AI / Semis</strong>
-              </div>
-            </div>
-          </article>
-
-          <!-- Heatmap -->
-          <article class="card">
-            <div class="card-header">
-              <div>
-                <div class="card-title">Market Heatmap</div>
-                <div class="card-subtitle">Fast visual scan by asset or sector</div>
-              </div>
-            </div>
-            <div class="heatmap" id="heatmap"></div>
-          </article>
-
-          <!-- Portfolio allocation -->
-          <article class="card">
-            <div class="card-header">
-              <div>
-                <div class="card-title">Portfolio Allocation</div>
-                <div class="card-subtitle">Example exposure view</div>
-              </div>
-            </div>
-            <div class="allocation">
-              <div class="donut" role="img" aria-label="Portfolio allocation donut chart"></div>
-              <div class="legend">
-                <div class="legend-item">
-                  <div class="legend-left"><span class="legend-dot" style="background:var(--blue)"></span> Equities</div>
-                  <strong>34%</strong>
-                </div>
-                <div class="legend-item">
-                  <div class="legend-left"><span class="legend-dot" style="background:var(--green)"></span> Crypto</div>
-                  <strong>24%</strong>
-                </div>
-                <div class="legend-item">
-                  <div class="legend-left"><span class="legend-dot" style="background:var(--purple)"></span> Cash</div>
-                  <strong>20%</strong>
-                </div>
-                <div class="legend-item">
-                  <div class="legend-left"><span class="legend-dot" style="background:var(--yellow)"></span> Commodities</div>
-                  <strong>12%</strong>
-                </div>
-                <div class="legend-item">
-                  <div class="legend-left"><span class="legend-dot" style="background:var(--red)"></span> Bonds</div>
-                  <strong>10%</strong>
-                </div>
-              </div>
-            </div>
-          </article>
-        </div><!-- /left column -->
-
-        <!-- Right column -->
-        <div class="stack">
-
-          <!-- Watchlist -->
-          <article class="card">
-            <div class="card-header">
-              <div>
-                <div class="card-title">Watchlist</div>
-                <div class="card-subtitle">Filtered by your search</div>
-              </div>
-            </div>
-            <table>
-              <thead>
-                <tr>
-                  <th>Asset</th>
-                  <th>Price</th>
-                  <th>Change</th>
-                  <th>Volume</th>
-                </tr>
-              </thead>
-              <tbody id="watchlistBody"></tbody>
-            </table>
-          </article>
-
-          <!-- Risk meter -->
-          <article class="card">
-            <div class="card-header">
-              <div>
-                <div class="card-title">Risk Meter</div>
-                <div class="card-subtitle">Simple multi-factor risk model</div>
-              </div>
-            </div>
-            <div class="risk-box">
-              <div class="gauge" role="img" aria-label="Risk score: 62">
-                <div class="gauge-value">62<small>Risk Score</small></div>
-              </div>
-              <div class="risk-list">
+        <section class="grid">
+          <div class="stack">
+            <article class="card">
+              <div class="card-header">
                 <div>
-                  <div class="risk-item"><span>Volatility</span><strong>58%</strong></div>
-                  <div class="progress"><span style="width:58%"></span></div>
+                  <div class="card-title">Market Pulse</div>
+                  <div class="card-subtitle">
+                    BTC-anchored composite — equities &amp; macro shown when configured
+                  </div>
                 </div>
+                <div class="timeframe" role="group" aria-label="Timeframe">
+                  <button class="tf active" data-range="1D">1D</button>
+                  <button class="tf" data-range="1W">1W</button>
+                  <button class="tf" data-range="1M">1M</button>
+                  <button class="tf" data-range="3M">3M</button>
+                </div>
+              </div>
+              <div class="chart-wrap">
+                <canvas id="marketChart" width="1000" height="360"></canvas>
+              </div>
+              <div class="market-row">
+                <div class="mini-card">
+                  <span>Market Status</span>
+                  <strong id="pulseStatus" class="flat">—</strong>
+                </div>
+                <div class="mini-card">
+                  <span>Volatility</span>
+                  <strong id="pulseVolatility" class="flat">—</strong>
+                </div>
+                <div class="mini-card">
+                  <span>Range Change</span>
+                  <strong id="pulseChange" class="flat">—</strong>
+                </div>
+              </div>
+            </article>
+
+            <article class="card">
+              <div class="card-header">
                 <div>
-                  <div class="risk-item"><span>Dollar Strength</span><strong>41%</strong></div>
-                  <div class="progress"><span style="width:41%"></span></div>
+                  <div class="card-title">Market Heatmap</div>
+                  <div class="card-subtitle">Fast visual scan by asset</div>
                 </div>
+              </div>
+              <div class="heatmap" id="heatmap"></div>
+            </article>
+
+            <article class="card" id="allocationCard"></article>
+          </div>
+
+          <div class="stack">
+            <article class="card">
+              <div class="card-header">
                 <div>
-                  <div class="risk-item"><span>Crypto Momentum</span><strong>73%</strong></div>
-                  <div class="progress"><span style="width:73%"></span></div>
+                  <div class="card-title">Watchlist</div>
+                  <div class="card-subtitle">Filtered by your search</div>
                 </div>
               </div>
-            </div>
-          </article>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Asset</th>
+                    <th>Price</th>
+                    <th>Change</th>
+                    <th>Volume</th>
+                  </tr>
+                </thead>
+                <tbody id="watchlistBody"></tbody>
+              </table>
+            </article>
 
-          <!-- Alerts -->
-          <article class="card" id="alerts">
-            <div class="card-header">
-              <div>
-                <div class="card-title">Alerts</div>
-                <div class="card-subtitle">Priority triggers</div>
+            <article class="card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">Risk Meter</div>
+                  <div class="card-subtitle">Multi-factor risk model</div>
+                </div>
               </div>
-            </div>
-            <div class="feed">
-              <div class="feed-item">
-                <h4>BTC approaching breakout zone near resistance</h4>
-                <div class="feed-meta"><span>Crypto</span><span class="up">Active</span></div>
+              <div class="risk-box" id="riskBox"></div>
+            </article>
+
+            <article class="card" id="alerts">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">Alerts</div>
+                  <div class="card-subtitle">Generated from live conditions</div>
+                </div>
               </div>
-              <div class="feed-item">
-                <h4>DXY weakness may support risk assets</h4>
-                <div class="feed-meta"><span>FX / Macro</span><span class="flat">Watching</span></div>
+              <div class="feed" id="alertsFeed"></div>
+            </article>
+
+            <article class="card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">Macro Calendar</div>
+                  <div class="card-subtitle">Events that can move markets</div>
+                </div>
               </div>
-              <div class="feed-item">
-                <h4>NVDA volume above 20-day average</h4>
-                <div class="feed-meta"><span>Equities</span><span class="up">Triggered</span></div>
+              <div class="calendar-list" id="calendarList"></div>
+            </article>
+
+            <article class="card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">News Pulse</div>
+                  <div class="card-subtitle">Catalysts and market narratives</div>
+                </div>
               </div>
-            </div>
-          </article>
+              <div class="feed" id="newsFeed"></div>
+            </article>
+          </div>
+        </section>
 
-          <!-- Macro calendar -->
-          <article class="card">
-            <div class="card-header">
-              <div>
-                <div class="card-title">Macro Calendar</div>
-                <div class="card-subtitle">Events that can move markets</div>
-              </div>
-            </div>
-            <div class="calendar-list" id="calendarList"></div>
-          </article>
+        <p class="footer-note">Market Command — data via /api/overview</p>
+      </main>
+    </div>
 
-          <!-- News pulse -->
-          <article class="card">
-            <div class="card-header">
-              <div>
-                <div class="card-title">News Pulse</div>
-                <div class="card-subtitle">Catalysts and market narratives</div>
-              </div>
-            </div>
-            <div class="feed" id="newsFeed"></div>
-          </article>
-
-        </div><!-- /right column -->
-      </section><!-- /grid -->
-
-      <p class="footer-note">
-        Market Command &mdash; replace sample data with your market API, database, or backend route.
-      </p>
-    </main>
-  </div><!-- /app -->
-
-  <script>
-    /* ── Data ─────────────────────────────────────────────── */
-    const symbols = [
-      { name: "Bitcoin",     symbol: "BTC",  price: 64280,   change:  2.84, volume: "38.2B",  type: "crypto"     },
-      { name: "Ethereum",    symbol: "ETH",  price: 3188,    change:  1.42, volume: "18.6B",  type: "crypto"     },
-      { name: "S&P 500",     symbol: "SPY",  price: 522.18,  change:  0.38, volume: "74.1M",  type: "equity"     },
-      { name: "Nasdaq 100",  symbol: "QQQ",  price: 448.72,  change:  0.61, volume: "51.8M",  type: "equity"     },
-      { name: "Nvidia",      symbol: "NVDA", price: 884.55,  change:  3.12, volume: "49.7M",  type: "equity"     },
-      { name: "Tesla",       symbol: "TSLA", price: 173.42,  change: -1.26, volume: "92.4M",  type: "equity"     },
-      { name: "Gold",        symbol: "XAU",  price: 2342.9,  change: -0.24, volume: "High",   type: "commodity"  },
-      { name: "Dollar Index",symbol: "DXY",  price: 104.12,  change: -0.31, volume: "High",   type: "fx"         },
-      { name: "Crude Oil",   symbol: "WTI",  price: 78.44,   change:  0.88, volume: "Med",    type: "commodity"  },
-      { name: "VIX",         symbol: "VIX",  price: 14.72,   change: -2.08, volume: "Med",    type: "volatility" },
-    ];
-
-    const heatmapData = [
-      { label: "AI",     value:  3.8 }, { label: "Semis",  value:  2.9 },
-      { label: "Crypto", value:  2.3 }, { label: "Energy", value:  0.9 },
-      { label: "Gold",   value: -0.3 }, { label: "Banks",  value: -0.7 },
-      { label: "Retail", value:  0.4 }, { label: "Cloud",  value:  1.6 },
-      { label: "DXY",    value: -0.5 }, { label: "VIX",    value: -2.1 },
-    ];
-
-    const news = [
-      { title: "Risk assets firm as traders rotate back into growth names", source: "Market Desk", time: "12m ago" },
-      { title: "Crypto momentum improves while dollar index softens",       source: "Macro Wire",  time: "28m ago" },
-      { title: "Semiconductor basket leads broad tech advance",             source: "Equity Watch",time: "44m ago" },
-    ];
-
-    const calendarEvents = [
-      { time: "08:30", title: "US CPI Inflation",   impact: "High" },
-      { time: "10:00", title: "Consumer Sentiment", impact: "Med"  },
-      { time: "14:00", title: "Fed Speaker",         impact: "High" },
-      { time: "16:30", title: "Oil Inventories",     impact: "Med"  },
-    ];
-
-    const chartSets = {
-      "1D": [100, 101,  100.7, 102,  101.4, 103.2, 104.1, 103.4, 104.8, 106  ],
-      "1W": [100,  98.6, 99.3, 101.1, 100.8, 103,  102.4, 104.7, 105.2, 106.5],
-      "1M": [100, 102,  101.3, 104,  103.8, 105.9, 108.2, 107.3, 110.4, 112.8],
-      "3M": [100,  96,   98,   101,   99,   106,   108,   111,   109,   116  ],
-    };
-
-    let currentRange = "1D";
-
-    /* ── Helpers ──────────────────────────────────────────── */
-    function money(v) {
-      return v >= 1000
-        ? "$" + v.toLocaleString(undefined, { maximumFractionDigits: 0 })
-        : "$" + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    }
-
-    function pct(v) {
-      const cls  = v > 0 ? "up" : v < 0 ? "down" : "flat";
-      const sign = v > 0 ? "+" : "";
-      return `<span class="${cls}">${sign}${v.toFixed(2)}%</span>`;
-    }
-
-    function heatColor(v) {
-      const intensity = Math.min(Math.abs(v) / 4, 1);
-      return v >= 0
-        ? `rgba(0,227,150,${0.18 + intensity * 0.58})`
-        : `rgba(255,77,109,${0.18 + intensity * 0.58})`;
-    }
-
-    /* ── Render functions ─────────────────────────────────── */
-    function renderTicker() {
-      const doubled = [...symbols, ...symbols];
-      document.getElementById("tickerTrack").innerHTML = doubled.map(s =>
-        `<div class="ticker-item"><strong>${s.symbol}</strong><span>${money(s.price)}</span>${pct(s.change)}</div>`
-      ).join("");
-    }
-
-    function renderKpis() {
-      const kpis = [
-        { label: "Market Cap Pulse", value: "$3.18T",   change: "+1.8%",  note: "Crypto + equities"   },
-        { label: "Risk Appetite",    value: "Bullish",   change: "+12 pts",note: "Momentum improving"  },
-        { label: "Volatility Index", value: "14.72",     change: "-2.1%",  note: "VIX cooling"         },
-        { label: "Dollar Index",     value: "104.12",    change: "-0.31%", note: "Supports risk"       },
-      ];
-      document.getElementById("kpiGrid").innerHTML = kpis.map(k => {
-        const n   = parseFloat(k.change);
-        const cls = n >= 0 ? "up" : "down";
-        return `<article class="card kpi">
-          <div class="kpi-top"><span>${k.label}</span><span class="${cls}">${k.change}</span></div>
-          <div class="kpi-value">${k.value}</div>
-          <div class="kpi-bottom"><span>${k.note}</span><span>Live</span></div>
-        </article>`;
-      }).join("");
-    }
-
-    function renderWatchlist() {
-      const q        = document.getElementById("searchInput").value.trim().toLowerCase();
-      const filtered = symbols.filter(s =>
-        s.name.toLowerCase().includes(q) ||
-        s.symbol.toLowerCase().includes(q) ||
-        s.type.toLowerCase().includes(q)
-      );
-      document.getElementById("watchlistBody").innerHTML = filtered.map(s => `
-        <tr>
-          <td><span class="symbol-pill"><span class="asset-dot"></span>
-            <span><strong>${s.symbol}</strong><br>${s.name}</span></span></td>
-          <td>${money(s.price)}</td>
-          <td>${pct(s.change)}</td>
-          <td>${s.volume}</td>
-        </tr>`
-      ).join("");
-    }
-
-    function renderHeatmap() {
-      document.getElementById("heatmap").innerHTML = heatmapData.map(d =>
-        `<div class="heat-tile" style="background:${heatColor(d.value)}">
-          <strong>${d.label}</strong>
-          <span>${d.value > 0 ? "+" : ""}${d.value.toFixed(1)}%</span>
-        </div>`
-      ).join("");
-    }
-
-    function renderNews() {
-      document.getElementById("newsFeed").innerHTML = news.map(n =>
-        `<div class="feed-item">
-          <h4>${n.title}</h4>
-          <div class="feed-meta"><span>${n.source}</span><span>${n.time}</span></div>
-        </div>`
-      ).join("");
-    }
-
-    function renderCalendar() {
-      document.getElementById("calendarList").innerHTML = calendarEvents.map(e => {
-        const cls = e.impact.toLowerCase() === "high" ? "high" : "med";
-        return `<div class="event">
-          <div class="event-time">${e.time}</div>
-          <div>${e.title}</div>
-          <div class="impact ${cls}">${e.impact}</div>
-        </div>`;
-      }).join("");
-    }
-
-    /* ── Canvas chart ─────────────────────────────────────── */
-    function drawChart() {
-      const canvas  = document.getElementById("marketChart");
-      const ctx     = canvas.getContext("2d");
-      const data    = chartSets[currentRange];
-      const W       = canvas.width;
-      const H       = canvas.height;
-      const pad     = 34;
-
-      ctx.clearRect(0, 0, W, H);
-
-      const min = Math.min(...data) - 2;
-      const max = Math.max(...data) + 2;
-
-      const pts = data.map((v, i) => ({
-        x: pad + (i / (data.length - 1)) * (W - pad * 2),
-        y: H - pad - ((v - min) / (max - min)) * (H - pad * 2),
-        v,
-      }));
-
-      /* Grid lines */
-      ctx.strokeStyle = "rgba(255,255,255,0.07)";
-      ctx.lineWidth   = 1;
-      for (let i = 0; i < 5; i++) {
-        const y = pad + i * ((H - pad * 2) / 4);
-        ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(W - pad, y); ctx.stroke();
-      }
-
-      /* Fill gradient */
-      const grad = ctx.createLinearGradient(0, pad, 0, H - pad);
-      grad.addColorStop(0, "rgba(77,163,255,0.34)");
-      grad.addColorStop(1, "rgba(77,163,255,0)");
-      ctx.beginPath();
-      pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
-      ctx.lineTo(pts[pts.length - 1].x, H - pad);
-      ctx.lineTo(pts[0].x, H - pad);
-      ctx.closePath();
-      ctx.fillStyle = grad;
-      ctx.fill();
-
-      /* Line */
-      ctx.beginPath();
-      pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
-      ctx.strokeStyle = "#4da3ff";
-      ctx.lineWidth   = 4;
-      ctx.lineCap     = "round";
-      ctx.lineJoin    = "round";
-      ctx.stroke();
-
-      /* Dots */
-      pts.forEach(p => {
-        ctx.beginPath(); ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
-        ctx.fillStyle = "#edf3ff"; ctx.fill();
-        ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
-        ctx.fillStyle = "#4da3ff"; ctx.fill();
-      });
-
-      /* Labels */
-      ctx.fillStyle = "rgba(237,243,255,0.72)";
-      ctx.font      = "13px system-ui";
-      ctx.fillText(`${currentRange} Composite Index`, pad, 24);
-
-      const change = ((data[data.length - 1] - data[0]) / data[0]) * 100;
-      ctx.fillStyle = change >= 0 ? "#00e396" : "#ff4d6d";
-      ctx.font      = "bold 26px system-ui";
-      ctx.fillText(`${change >= 0 ? "+" : ""}${change.toFixed(2)}%`, W - 150, 32);
-    }
-
-    /* ── Clock ────────────────────────────────────────────── */
-    function updateClock() {
-      document.getElementById("clock").textContent = new Date().toLocaleString(undefined, {
-        weekday: "short", hour: "2-digit", minute: "2-digit", second: "2-digit",
-      });
-    }
-
-    /* ── Refresh simulation ───────────────────────────────── */
-    function simulateRefresh() {
-      symbols.forEach(s => {
-        const drift = (Math.random() - 0.45) * 0.8;
-        s.change = +(s.change + drift).toFixed(2);
-        s.price  = +(s.price  * (1 + drift / 100)).toFixed(2);
-      });
-      renderTicker();
-      renderWatchlist();
-      renderKpis();
-      drawChart();
-    }
-
-    /* ── Events ───────────────────────────────────────────── */
-    document.querySelectorAll(".tf").forEach(btn =>
-      btn.addEventListener("click", () => {
-        document.querySelectorAll(".tf").forEach(b => b.classList.remove("active"));
-        btn.classList.add("active");
-        currentRange = btn.dataset.range;
-        drawChart();
-      })
-    );
-
-    document.getElementById("searchInput").addEventListener("input", renderWatchlist);
-    document.getElementById("refreshBtn").addEventListener("click", simulateRefresh);
-
-    /* ── Init ─────────────────────────────────────────────── */
-    renderTicker();
-    renderKpis();
-    renderWatchlist();
-    renderHeatmap();
-    renderNews();
-    renderCalendar();
-    drawChart();
-    updateClock();
-    setInterval(updateClock, 1000);
-
-    /* ── Mobile nav ───────────────────────────────────────── */
-    (function () {
-      var drawerHtml =
-        '<a class="brand" href="/">'
-        + '<div class="brand-mark">M</div>'
-        + '<div class="brand-text"><h1>Market Command</h1><span>Live dashboard system</span></div>'
-        + '</a>'
-        + '<div class="nav-label">Workspace</div>'
-        + '<a class="nav-item active" href="/"><span class="nav-dot"></span> Overview</a>'
-        + '<a class="nav-item" href="/market-intel.html">📈 Markets</a>'
-        + '<a class="nav-item" href="/crypto.html">₿ Crypto</a>'
-        + '<a class="nav-item" href="/market-intel.html#macro-indicators">🧭 Macro</a>'
-        + '<a class="nav-item" href="/market-intel.html#news">📰 News</a>'
-        + '<a class="nav-item" href="#alerts">🚨 Alerts</a>'
-        + '<a class="nav-item" href="/on-chain.html">🔗 On-Chain</a>'
-        + '<a class="nav-item" href="/reporter.html">📰 Reporter</a>'
-        + '<div class="nav-label">Tools</div>'
-        + '<a class="nav-item" href="/market-intel.html#screeners">📊 Screener</a>'
-        + '<a class="nav-item" href="/crypto.html#sentiment">🧠 Sentiment</a>'
-        + '<a class="nav-item" href="/traditional.html">🏦 Traditional</a>'
-        + '<a class="nav-item" href="/earthwatch.html">🌍 Earth Watch</a>'
-        + '<a class="nav-item" href="/settings.html">⚙️ Settings</a>'
-        + '<a class="sidebar-card" href="https://trading-strategy-production-1b41.up.railway.app/" target="_blank" rel="noopener">'
-        + '<strong>🧠 Decision Engine ↗</strong>'
-        + '<p>Trading decision framework, strategy rules, entry &amp; exit conditions.</p>'
-        + '</a>';
-
-      function openDrawer() {
-        document.getElementById('mob-drawer').classList.add('open');
-        document.getElementById('mob-overlay').classList.add('open');
-        document.body.style.overflow = 'hidden';
-      }
-      function closeDrawer() {
-        document.getElementById('mob-drawer').classList.remove('open');
-        document.getElementById('mob-overlay').classList.remove('open');
-        document.body.style.overflow = '';
-      }
-
-      var mainEl = document.querySelector('.main');
-      if (mainEl && !document.getElementById('mob-bar')) {
-        var bar = document.createElement('div');
-        bar.className = 'mob-bar'; bar.id = 'mob-bar';
-        bar.innerHTML =
-          '<a class="mob-brand" href="/">'
-          + '<div class="mob-brand-mark">M</div>'
-          + '<span class="mob-brand-name">Market Command</span>'
-          + '</a>'
-          + '<button class="mob-ham" id="mob-ham" aria-label="Open navigation">&#9776;</button>';
-        mainEl.insertBefore(bar, mainEl.firstChild);
-      }
-
-      if (!document.getElementById('mob-overlay')) {
-        var overlay = document.createElement('div');
-        overlay.className = 'mob-overlay'; overlay.id = 'mob-overlay';
-        document.body.appendChild(overlay);
-        overlay.addEventListener('click', closeDrawer);
-      }
-
-      if (!document.getElementById('mob-drawer')) {
-        var drawer = document.createElement('div');
-        drawer.className = 'mob-drawer'; drawer.id = 'mob-drawer';
-        drawer.innerHTML = drawerHtml;
-        document.body.appendChild(drawer);
-      }
-
-      var ham = document.getElementById('mob-ham');
-      if (ham) ham.addEventListener('click', openDrawer);
-
-      document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') closeDrawer();
-      });
-    })();
-  </script>
-</body>
+    <script src="/assets/js/overview.js"></script>
+  </body>
 </html>
