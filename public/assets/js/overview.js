@@ -1,0 +1,603 @@
+(function () {
+  "use strict";
+
+  const REFRESH_INTERVAL_MS = 90_000;
+  const DONUT_COLORS = ["#4da3ff", "#00e396", "#9b7bff", "#f5c542", "#ff4d6d", "#8492aa"];
+
+  const state = {
+    range: "1D",
+    overview: null,
+    loading: false,
+    error: null,
+    search: "",
+  };
+
+  const els = {};
+
+  function $(id) {
+    return document.getElementById(id);
+  }
+
+  function init() {
+    Object.assign(els, {
+      banner: $("statusBanner"),
+      sourceBadge: $("sourceBadge"),
+      lastUpdated: $("lastUpdated"),
+      clock: $("clock"),
+      refresh: $("refreshBtn"),
+      search: $("searchInput"),
+      ticker: $("tickerTrack"),
+      kpiGrid: $("kpiGrid"),
+      pulseStatus: $("pulseStatus"),
+      pulseVolatility: $("pulseVolatility"),
+      pulseChange: $("pulseChange"),
+      heatmap: $("heatmap"),
+      allocation: $("allocationCard"),
+      watchlistBody: $("watchlistBody"),
+      riskBox: $("riskBox"),
+      alerts: $("alertsFeed"),
+      calendar: $("calendarList"),
+      news: $("newsFeed"),
+      chart: $("marketChart"),
+    });
+
+    document.querySelectorAll(".tf").forEach((btn) =>
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".tf").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        state.range = btn.dataset.range;
+        loadOverview();
+      }),
+    );
+
+    els.search.addEventListener("input", (event) => {
+      state.search = event.target.value.trim().toLowerCase();
+      renderWatchlist();
+    });
+
+    els.refresh.addEventListener("click", () => loadOverview());
+
+    renderSkeletons();
+    loadOverview();
+    setInterval(loadOverview, REFRESH_INTERVAL_MS);
+    setInterval(updateClock, 1000);
+    updateClock();
+    setupMobileNav();
+  }
+
+  async function loadOverview() {
+    if (state.loading) return;
+    state.loading = true;
+    els.refresh.disabled = true;
+    try {
+      const response = await fetch(`/api/overview?range=${encodeURIComponent(state.range)}`, {
+        headers: { Accept: "application/json" },
+      });
+      if (!response.ok) {
+        throw new Error(`API ${response.status}`);
+      }
+      const payload = await response.json();
+      state.overview = payload;
+      state.error = null;
+      renderAll();
+    } catch (error) {
+      state.error = error;
+      renderError(error.message);
+    } finally {
+      state.loading = false;
+      els.refresh.disabled = false;
+    }
+  }
+
+  function renderAll() {
+    const data = state.overview;
+    if (!data) return;
+    renderBanner(data);
+    renderSourceBadge(data);
+    renderLastUpdated(data);
+    renderTicker(data);
+    renderKpis(data);
+    renderPulse(data);
+    renderHeatmap(data);
+    renderAllocation(data);
+    renderWatchlist();
+    renderRiskBox(data);
+    renderAlerts(data);
+    renderCalendar(data);
+    renderNews(data);
+    drawChart(data);
+  }
+
+  function renderBanner(data) {
+    const dq = data.dataQuality || {};
+    const warnings = Array.isArray(dq.warnings) ? dq.warnings : [];
+    if (!warnings.length && dq.live) {
+      els.banner.classList.remove("show", "warning", "error");
+      els.banner.innerHTML = "";
+      return;
+    }
+    const cls = dq.live ? "warning" : "error";
+    els.banner.className = `banner show ${cls}`;
+    const headline = dq.live
+      ? "Some sections are using fallback data."
+      : "Live market data unavailable — showing fallback values.";
+    els.banner.innerHTML = `<strong>${headline}</strong>${
+      warnings.length ? `<ul>${warnings.map((w) => `<li>${escapeHtml(w)}</li>`).join("")}</ul>` : ""
+    }`;
+  }
+
+  function renderSourceBadge(data) {
+    const dq = data.dataQuality || {};
+    if (dq.live && !dq.partial) {
+      els.sourceBadge.className = "chip live";
+      els.sourceBadge.textContent = "● Live";
+    } else if (dq.live) {
+      els.sourceBadge.className = "chip fallback";
+      els.sourceBadge.textContent = "● Partial";
+    } else {
+      els.sourceBadge.className = "chip fallback";
+      els.sourceBadge.textContent = "● Fallback";
+    }
+    els.sourceBadge.title = (dq.sources || []).join(", ") || "no live sources";
+  }
+
+  function renderLastUpdated(data) {
+    if (!data.updatedAt) {
+      els.lastUpdated.textContent = "";
+      return;
+    }
+    const updated = new Date(data.updatedAt);
+    els.lastUpdated.textContent = `Updated ${updated.toLocaleTimeString(undefined, {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    })}`;
+  }
+
+  function renderTicker(data) {
+    const items = data.ticker || [];
+    if (!items.length) {
+      els.ticker.innerHTML = `<div class="ticker-item">No ticker data available.</div>`;
+      return;
+    }
+    const doubled = [...items, ...items];
+    els.ticker.innerHTML = doubled
+      .map(
+        (s) =>
+          `<div class="ticker-item"><strong>${escapeHtml(s.symbol)}</strong><span>${money(s.price)}</span>${pct(s.changePercent)}</div>`,
+      )
+      .join("");
+  }
+
+  function renderKpis(data) {
+    const kpis = data.kpis || [];
+    if (!kpis.length) {
+      els.kpiGrid.innerHTML = `<div class="card kpi"><div class="empty-state">No KPI data.</div></div>`;
+      return;
+    }
+    els.kpiGrid.innerHTML = kpis
+      .map((k) => {
+        const change = Number(k.changePercent);
+        const cls = Number.isFinite(change) && change !== 0 ? (change > 0 ? "up" : "down") : "flat";
+        const changeText = Number.isFinite(change) && change !== 0 ? `${change > 0 ? "+" : ""}${change.toFixed(2)}%` : "—";
+        return `<article class="card kpi">
+          <div class="kpi-top"><span>${escapeHtml(k.label)}</span><span class="${cls}">${changeText}</span></div>
+          <div class="kpi-value">${escapeHtml(String(k.value))}</div>
+          <div class="kpi-bottom"><span>${escapeHtml(k.note || "")}</span><span>${data.dataQuality?.live ? "Live" : "Fallback"}</span></div>
+        </article>`;
+      })
+      .join("");
+  }
+
+  function renderPulse(data) {
+    const status = data.marketStatus || {};
+    els.pulseStatus.textContent = status.label || "—";
+    els.pulseStatus.className = status.label === "Risk-On" ? "up" : status.label === "Risk-Off" ? "down" : "flat";
+    els.pulseVolatility.textContent = status.volatilityLabel || "—";
+    els.pulseVolatility.className = status.volatilityLabel === "High" ? "down" : "flat";
+    const change = Number(data.marketPulse?.changePercent || 0);
+    els.pulseChange.textContent = `${change > 0 ? "+" : ""}${change.toFixed(2)}%`;
+    els.pulseChange.className = change > 0 ? "up" : change < 0 ? "down" : "flat";
+  }
+
+  function renderHeatmap(data) {
+    const tiles = data.heatmap || [];
+    if (!tiles.length) {
+      els.heatmap.innerHTML = `<div class="empty-state">No heatmap data.</div>`;
+      return;
+    }
+    els.heatmap.innerHTML = tiles
+      .map((d) => {
+        const change = Number(d.value) || 0;
+        return `<div class="heat-tile" style="background:${heatColor(change)}">
+          <strong>${escapeHtml(d.label)}</strong>
+          <span>${change > 0 ? "+" : ""}${change.toFixed(2)}%</span>
+          <small>${escapeHtml(d.category || "")}</small>
+        </div>`;
+      })
+      .join("");
+  }
+
+  function renderAllocation(data) {
+    const allocation = data.allocation;
+    if (!allocation || !Array.isArray(allocation.segments) || !allocation.segments.length) {
+      els.allocation.innerHTML = `
+        <div class="card-header">
+          <div>
+            <div class="card-title">Market Cap Allocation</div>
+            <div class="card-subtitle">Asset class snapshot</div>
+          </div>
+        </div>
+        <div class="empty-state">No allocation data available.</div>`;
+      return;
+    }
+    const segments = allocation.segments;
+    let cumulative = 0;
+    const stops = segments
+      .map((seg, i) => {
+        const start = cumulative;
+        cumulative += seg.percent;
+        return `${DONUT_COLORS[i % DONUT_COLORS.length]} ${start}% ${cumulative}%`;
+      })
+      .join(", ");
+    els.allocation.innerHTML = `
+      <div class="card-header">
+        <div>
+          <div class="card-title">${escapeHtml(allocation.title || "Market Allocation")}</div>
+          <div class="card-subtitle">${escapeHtml(allocation.subtitle || "")}${allocation.live ? "" : " · fallback"}</div>
+        </div>
+      </div>
+      <div class="allocation">
+        <div class="donut" style="background:conic-gradient(${stops})" role="img"
+          aria-label="Allocation by symbol"></div>
+        <div class="legend">
+          ${segments
+            .map(
+              (seg, i) => `
+            <div class="legend-item">
+              <div class="legend-left"><span class="legend-dot" style="background:${DONUT_COLORS[i % DONUT_COLORS.length]}"></span> ${escapeHtml(seg.label)}</div>
+              <strong>${seg.percent.toFixed(2)}%</strong>
+            </div>`,
+            )
+            .join("")}
+        </div>
+      </div>`;
+  }
+
+  function renderWatchlist() {
+    const data = state.overview;
+    if (!data) return;
+    const q = state.search;
+    const rows = (data.watchlist || []).filter((s) => {
+      if (!q) return true;
+      return (
+        (s.symbol || "").toLowerCase().includes(q) ||
+        (s.name || "").toLowerCase().includes(q) ||
+        (s.type || "").toLowerCase().includes(q)
+      );
+    });
+    if (!rows.length) {
+      els.watchlistBody.innerHTML = `<tr><td colspan="4"><div class="empty-state">No matches.</div></td></tr>`;
+      return;
+    }
+    els.watchlistBody.innerHTML = rows
+      .map(
+        (s) => `
+        <tr>
+          <td><span class="symbol-pill"><span class="asset-dot ${escapeHtml(s.type || "")}"></span>
+            <span><strong>${escapeHtml(s.symbol)}</strong><br>${escapeHtml(s.name || "")}</span></span></td>
+          <td>${money(s.price)}</td>
+          <td>${pct(s.changePercent)}</td>
+          <td>${escapeHtml(String(s.volume || "-"))}</td>
+        </tr>`,
+      )
+      .join("");
+  }
+
+  function renderRiskBox(data) {
+    const factors = data.riskFactors || [];
+    const score = data.marketStatus?.riskScore ?? 50;
+    els.riskBox.innerHTML = `
+      <div class="gauge" role="img" aria-label="Risk score ${score}">
+        <div class="gauge-value">${score}<small>Risk Score</small></div>
+      </div>
+      <div class="risk-list">
+        ${factors
+          .map(
+            (f) => `
+          <div>
+            <div class="risk-item"><span>${escapeHtml(f.label)}</span><strong>${Math.round(f.value)}%</strong></div>
+            <div class="progress"><span style="width:${Math.max(0, Math.min(100, f.value))}%"></span></div>
+          </div>`,
+          )
+          .join("")}
+      </div>`;
+  }
+
+  function renderAlerts(data) {
+    const alerts = data.alerts || [];
+    if (!alerts.length) {
+      els.alerts.innerHTML = `<div class="empty-state">No active alerts.</div>`;
+      return;
+    }
+    els.alerts.innerHTML = alerts
+      .map(
+        (a) => `
+        <div class="feed-item severity-${escapeHtml(a.severity || "low")}">
+          <h4>${escapeHtml(a.title)}</h4>
+          <div class="feed-meta">
+            <span>${escapeHtml(a.category || "")}</span>
+            <span class="${a.status === "Triggered" ? "up" : a.status === "Watching" ? "flat" : ""}">${escapeHtml(a.status || "")}</span>
+          </div>
+        </div>`,
+      )
+      .join("");
+  }
+
+  function renderCalendar(data) {
+    const events = data.calendar || [];
+    if (!events.length) {
+      els.calendar.innerHTML = `<div class="empty-state">No scheduled events.</div>`;
+      return;
+    }
+    els.calendar.innerHTML = events
+      .map((e) => {
+        const impactCls = e.impact?.toLowerCase().startsWith("h")
+          ? "high"
+          : e.impact?.toLowerCase().startsWith("m")
+            ? "med"
+            : "low";
+        return `<div class="event">
+          <div class="event-time">${escapeHtml(e.time || "")}</div>
+          <div>${escapeHtml(e.title || "")}</div>
+          <div class="impact ${impactCls}">${escapeHtml(e.impact || "")}</div>
+        </div>`;
+      })
+      .join("");
+  }
+
+  function renderNews(data) {
+    const news = data.news || [];
+    if (!news.length) {
+      els.news.innerHTML = `<div class="empty-state">No news available.</div>`;
+      return;
+    }
+    els.news.innerHTML = news
+      .map((n) => {
+        const time = n.publishedAt ? timeAgo(n.publishedAt) : "";
+        const inner = `
+          <h4>${escapeHtml(n.title || "")}</h4>
+          <div class="feed-meta"><span>${escapeHtml(n.source || "")}</span><span>${escapeHtml(time)}</span></div>`;
+        return n.url
+          ? `<a class="feed-item" href="${escapeAttr(n.url)}" target="_blank" rel="noopener">${inner}</a>`
+          : `<div class="feed-item">${inner}</div>`;
+      })
+      .join("");
+  }
+
+  function drawChart(data) {
+    const points = data.marketPulse?.points || [];
+    const canvas = els.chart;
+    const ctx = canvas.getContext("2d");
+    const W = canvas.width;
+    const H = canvas.height;
+    const pad = 34;
+    ctx.clearRect(0, 0, W, H);
+
+    if (!points.length) {
+      ctx.fillStyle = "rgba(237,243,255,0.5)";
+      ctx.font = "14px system-ui";
+      ctx.fillText("No chart data available.", pad, H / 2);
+      return;
+    }
+
+    const values = points.map((p) => p.value);
+    const min = Math.min(...values) - 0.5;
+    const max = Math.max(...values) + 0.5;
+    const pts = values.map((v, i) => ({
+      x: pad + (i / Math.max(1, values.length - 1)) * (W - pad * 2),
+      y: H - pad - ((v - min) / Math.max(0.0001, max - min)) * (H - pad * 2),
+    }));
+
+    ctx.strokeStyle = "rgba(255,255,255,0.07)";
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 5; i++) {
+      const y = pad + i * ((H - pad * 2) / 4);
+      ctx.beginPath();
+      ctx.moveTo(pad, y);
+      ctx.lineTo(W - pad, y);
+      ctx.stroke();
+    }
+
+    const grad = ctx.createLinearGradient(0, pad, 0, H - pad);
+    grad.addColorStop(0, "rgba(77,163,255,0.34)");
+    grad.addColorStop(1, "rgba(77,163,255,0)");
+    ctx.beginPath();
+    pts.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+    ctx.lineTo(pts[pts.length - 1].x, H - pad);
+    ctx.lineTo(pts[0].x, H - pad);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    ctx.beginPath();
+    pts.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+    ctx.strokeStyle = "#4da3ff";
+    ctx.lineWidth = 4;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.stroke();
+
+    ctx.fillStyle = "rgba(237,243,255,0.72)";
+    ctx.font = "13px system-ui";
+    ctx.fillText(`${data.range || state.range} BTC Composite`, pad, 24);
+
+    const change = data.marketPulse?.changePercent || 0;
+    ctx.fillStyle = change >= 0 ? "#00e396" : "#ff4d6d";
+    ctx.font = "bold 26px system-ui";
+    ctx.fillText(`${change >= 0 ? "+" : ""}${Number(change).toFixed(2)}%`, W - 150, 32);
+  }
+
+  function renderSkeletons() {
+    els.kpiGrid.innerHTML = Array.from({ length: 4 })
+      .map(
+        () => `
+        <article class="card kpi">
+          <div class="kpi-top"><span class="skeleton">loading</span></div>
+          <div class="kpi-value skeleton">$0,000</div>
+          <div class="kpi-bottom"><span class="skeleton">loading</span></div>
+        </article>`,
+      )
+      .join("");
+    els.ticker.innerHTML = `<div class="ticker-item"><span class="skeleton">Loading market data…</span></div>`;
+    els.watchlistBody.innerHTML = `<tr><td colspan="4"><div class="empty-state">Loading…</div></td></tr>`;
+    els.heatmap.innerHTML = `<div class="empty-state">Loading heatmap…</div>`;
+    els.alerts.innerHTML = `<div class="empty-state">Loading alerts…</div>`;
+    els.calendar.innerHTML = `<div class="empty-state">Loading calendar…</div>`;
+    els.news.innerHTML = `<div class="empty-state">Loading news…</div>`;
+  }
+
+  function renderError(message) {
+    els.banner.className = "banner show error";
+    els.banner.innerHTML = `<strong>Overview API failed:</strong> ${escapeHtml(message)}. Showing last cached data if available.`;
+    els.sourceBadge.className = "chip error";
+    els.sourceBadge.textContent = "● Error";
+  }
+
+  function updateClock() {
+    els.clock.textContent = new Date().toLocaleString(undefined, {
+      weekday: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  }
+
+  function money(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return "—";
+    if (Math.abs(n) >= 1000) return `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+    return `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`;
+  }
+
+  function pct(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return `<span class="flat">—</span>`;
+    const cls = n > 0 ? "up" : n < 0 ? "down" : "flat";
+    const sign = n > 0 ? "+" : "";
+    return `<span class="${cls}">${sign}${n.toFixed(2)}%</span>`;
+  }
+
+  function heatColor(v) {
+    const intensity = Math.min(Math.abs(v) / 4, 1);
+    return v >= 0
+      ? `rgba(0,227,150,${0.18 + intensity * 0.58})`
+      : `rgba(255,77,109,${0.18 + intensity * 0.58})`;
+  }
+
+  function timeAgo(iso) {
+    const then = new Date(iso).getTime();
+    if (!Number.isFinite(then)) return "";
+    const diff = Date.now() - then;
+    const minutes = Math.floor(diff / 60_000);
+    if (minutes < 1) return "just now";
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return `${Math.floor(hours / 24)}d ago`;
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "").replace(/[&<>"']/g, (c) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    })[c]);
+  }
+
+  function escapeAttr(value) {
+    return escapeHtml(value);
+  }
+
+  function setupMobileNav() {
+    const drawerHtml =
+      '<a class="brand" href="/">' +
+      '<div class="brand-mark">M</div>' +
+      '<div class="brand-text"><h1>Market Command</h1><span>Live dashboard system</span></div>' +
+      "</a>" +
+      '<div class="nav-label">Workspace</div>' +
+      '<a class="nav-item active" href="/"><span class="nav-dot"></span> Overview</a>' +
+      '<a class="nav-item" href="/market-intel.html">📈 Markets</a>' +
+      '<a class="nav-item" href="/crypto.html">₿ Crypto</a>' +
+      '<a class="nav-item" href="/market-intel.html#macro-indicators">🧭 Macro</a>' +
+      '<a class="nav-item" href="/market-intel.html#news">📰 News</a>' +
+      '<a class="nav-item" href="#alerts">🚨 Alerts</a>' +
+      '<a class="nav-item" href="/on-chain.html">🔗 On-Chain</a>' +
+      '<a class="nav-item" href="/reporter.html">📰 Reporter</a>' +
+      '<div class="nav-label">Tools</div>' +
+      '<a class="nav-item" href="/market-intel.html#screeners">📊 Screener</a>' +
+      '<a class="nav-item" href="/crypto.html#sentiment">🧠 Sentiment</a>' +
+      '<a class="nav-item" href="/traditional.html">🏦 Traditional</a>' +
+      '<a class="nav-item" href="/earthwatch.html">🌍 Earth Watch</a>' +
+      '<a class="nav-item" href="/settings.html">⚙️ Settings</a>' +
+      '<a class="sidebar-card" href="https://trading-strategy-production-1b41.up.railway.app/" target="_blank" rel="noopener">' +
+      "<strong>🧠 Decision Engine ↗</strong>" +
+      "<p>Trading decision framework, strategy rules, entry &amp; exit conditions.</p>" +
+      "</a>";
+
+    function openDrawer() {
+      document.getElementById("mob-drawer").classList.add("open");
+      document.getElementById("mob-overlay").classList.add("open");
+      document.body.style.overflow = "hidden";
+    }
+    function closeDrawer() {
+      document.getElementById("mob-drawer").classList.remove("open");
+      document.getElementById("mob-overlay").classList.remove("open");
+      document.body.style.overflow = "";
+    }
+
+    const mainEl = document.querySelector(".main");
+    if (mainEl && !document.getElementById("mob-bar")) {
+      const bar = document.createElement("div");
+      bar.className = "mob-bar";
+      bar.id = "mob-bar";
+      bar.innerHTML =
+        '<a class="mob-brand" href="/">' +
+        '<div class="mob-brand-mark">M</div>' +
+        '<span class="mob-brand-name">Market Command</span>' +
+        "</a>" +
+        '<button class="mob-ham" id="mob-ham" aria-label="Open navigation">&#9776;</button>';
+      mainEl.insertBefore(bar, mainEl.firstChild);
+    }
+
+    if (!document.getElementById("mob-overlay")) {
+      const overlay = document.createElement("div");
+      overlay.className = "mob-overlay";
+      overlay.id = "mob-overlay";
+      document.body.appendChild(overlay);
+      overlay.addEventListener("click", closeDrawer);
+    }
+
+    if (!document.getElementById("mob-drawer")) {
+      const drawer = document.createElement("div");
+      drawer.className = "mob-drawer";
+      drawer.id = "mob-drawer";
+      drawer.innerHTML = drawerHtml;
+      document.body.appendChild(drawer);
+    }
+
+    const ham = document.getElementById("mob-ham");
+    if (ham) ham.addEventListener("click", openDrawer);
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeDrawer();
+    });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+})();

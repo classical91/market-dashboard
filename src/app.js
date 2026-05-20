@@ -4,6 +4,7 @@ const path = require("path");
 const { config } = require("./config/env");
 const { createHealthRouter } = require("./routes/health");
 const { createOnchainRouter } = require("./routes/onchain");
+const { createOverviewRouter } = require("./routes/overview");
 const { createReporterRouter } = require("./routes/reporter");
 const { createTelegramRouter } = require("./routes/telegram");
 const { MemoryCache } = require("./services/cache");
@@ -11,7 +12,9 @@ const { PersistentReporterCache } = require("./services/persistent-cache");
 const { CovalentService } = require("./services/covalent");
 const { DefiLlamaService } = require("./services/defillama");
 const { EtherscanService } = require("./services/etherscan");
+const { MarketDataService } = require("./services/market-data");
 const { OnchainService } = require("./services/onchain");
+const { OverviewService } = require("./services/overview");
 const { ReporterService } = require("./services/reporter");
 const { TelegramService } = require("./services/telegram");
 
@@ -35,6 +38,13 @@ function createApp() {
     apiKey: config.reporter.apiKey,
     telegramService,
   });
+  const marketDataService = new MarketDataService();
+  const overviewService = new OverviewService({
+    marketDataService,
+    onchainService,
+    cache,
+    cacheTtlMs: Number(process.env.OVERVIEW_CACHE_MS) || 60_000,
+  });
 
   app.disable("x-powered-by");
   app.use(express.json());
@@ -50,6 +60,7 @@ function createApp() {
     }),
   );
   app.use("/api/onchain", createOnchainRouter({ onchainService }));
+  app.use("/api/overview", createOverviewRouter({ overviewService }));
   app.use("/api/daily-report", createReporterRouter({ reporterService }));
   app.use("/api/telegram", createTelegramRouter({ telegramService }));
 
