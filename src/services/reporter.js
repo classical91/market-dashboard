@@ -109,7 +109,7 @@ class ReporterService {
 
   async _generate(prompt) {
     const res = await this._client.responses.create({
-      model: "gpt-4.5-preview",
+      model: "gpt-4.5",
       instructions: SYSTEM_PROMPT,
       tools: [{ type: "web_search_preview" }],
       input: prompt,
