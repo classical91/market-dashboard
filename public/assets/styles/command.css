@@ -582,3 +582,16 @@ header, .back, .back-group { display: none !important; }
   letter-spacing: 0.1em;
   font-weight: 700;
 }
+
+/* "Open All" popup-blocked hint */
+.open-all-hint {
+  display: none;
+  margin: -6px 2px 14px;
+  padding: 9px 13px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text);
+  background: rgba(245,197,66,0.10);
+  border: 1px solid rgba(245,197,66,0.35);
+  border-radius: 10px;
+}
