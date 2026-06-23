@@ -21,13 +21,21 @@
           icon: "&#128444;",
           label: "Image Converter",
         },
+        {
+          href: "https://www.youtube.com/",
+          icon: "&#9654;&#65039;",
+          label: "YouTube",
+        },
+        {
+          href: "https://x.com/",
+          icon: "&#120143;",
+          label: "X",
+        },
       ],
     },
     { href: "/market-intel.html", icon: "&#128200;", label: "Markets" },
     { href: "/crypto.html", icon: "&#8383;", label: "Crypto" },
     { href: "/market-intel.html#macro-indicators", icon: "&#129517;", label: "Macro" },
-    { href: "/market-intel.html#news", icon: "&#128240;", label: "News" },
-    { href: "/#alerts", icon: "&#128680;", label: "Alerts" },
     { href: "/on-chain.html", icon: "&#128279;", label: "On-Chain" },
     { href: "/reporter.html", icon: "&#128240;", label: "Reporter" },
   ];
@@ -58,8 +66,7 @@
     if (current !== path) return false;
     if (hash) return currentHash === hash;
 
-    if (path === "/" && currentHash === "#alerts") return false;
-    if (path === "/market-intel.html" && ["#macro-indicators", "#news", "#screeners", "#market-overview"].indexOf(currentHash) !== -1) {
+    if (path === "/market-intel.html" && ["#macro-indicators", "#screeners", "#market-overview"].indexOf(currentHash) !== -1) {
       return false;
     }
     if (path === "/crypto.html" && currentHash === "#sentiment") return false;
