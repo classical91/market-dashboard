@@ -117,7 +117,28 @@ class ReporterService {
     return res.output_text;
   }
 
-  async getReport(ttlMs) {
+  /**
+   * Read-only: return the cached report if one exists. Never triggers
+   * generation, so simply viewing the page can't spend API calls.
+   */
+  peekReport(ttlMs) {
+    if (!this._client) {
+      return { configured: false };
+    }
+    const resolvedTtl = ttlMs || DEFAULT_TTL_MS;
+    const cached = this._cache.get(this._cacheKey(resolvedTtl));
+    if (cached) {
+      return cached;
+    }
+    return { configured: true, generated: false };
+  }
+
+  /**
+   * Generate (or return today's already-generated) report. Triggered only by
+   * an explicit user action. getOrLoad dedupes concurrent clicks and reuses a
+   * report that already exists for the current period.
+   */
+  async generateReport(ttlMs) {
     if (!this._client) {
       return { configured: false };
     }
@@ -133,6 +154,7 @@ class ReporterService {
       ]);
       const report = {
         configured: true,
+        generated: true,
         generatedAt: new Date().toISOString(),
         dateStr,
         crypto,
