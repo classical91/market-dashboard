@@ -62,7 +62,6 @@
     setInterval(loadOverview, REFRESH_INTERVAL_MS);
     setInterval(updateClock, 1000);
     updateClock();
-    setupMobileNav();
   }
 
   async function loadOverview() {
@@ -519,80 +518,6 @@
 
   function escapeAttr(value) {
     return escapeHtml(value);
-  }
-
-  function setupMobileNav() {
-    const drawerHtml =
-      '<a class="brand" href="/">' +
-      '<div class="brand-mark">M</div>' +
-      '<div class="brand-text"><h1>Market Command</h1><span>Live dashboard system</span></div>' +
-      "</a>" +
-      '<div class="nav-label">Workspace</div>' +
-      '<a class="nav-item active" href="/"><span class="nav-dot"></span> Overview</a>' +
-      '<a class="nav-item" href="/market-intel.html">📈 Markets</a>' +
-      '<a class="nav-item" href="/crypto.html">₿ Crypto</a>' +
-      '<a class="nav-item" href="/market-intel.html#macro-indicators">🧭 Macro</a>' +
-      '<a class="nav-item" href="/market-intel.html#news">📰 News</a>' +
-      '<a class="nav-item" href="#alerts">🚨 Alerts</a>' +
-      '<a class="nav-item" href="/on-chain.html">🔗 On-Chain</a>' +
-      '<a class="nav-item" href="/reporter.html">📰 Reporter</a>' +
-      '<div class="nav-label">Tools</div>' +
-      '<a class="nav-item" href="/market-intel.html#screeners">📊 Screener</a>' +
-      '<a class="nav-item" href="/crypto.html#sentiment">🧠 Sentiment</a>' +
-      '<a class="nav-item" href="/traditional.html">🏦 Traditional</a>' +
-      '<a class="nav-item" href="/earthwatch.html">🌍 Earth Watch</a>' +
-      '<a class="nav-item" href="/settings.html">⚙️ Settings</a>' +
-      '<a class="sidebar-card" href="https://trading-strategy-production-1b41.up.railway.app/" target="_blank" rel="noopener">' +
-      "<strong>🧠 Decision Engine ↗</strong>" +
-      "<p>Trading decision framework, strategy rules, entry &amp; exit conditions.</p>" +
-      "</a>";
-
-    function openDrawer() {
-      document.getElementById("mob-drawer").classList.add("open");
-      document.getElementById("mob-overlay").classList.add("open");
-      document.body.style.overflow = "hidden";
-    }
-    function closeDrawer() {
-      document.getElementById("mob-drawer").classList.remove("open");
-      document.getElementById("mob-overlay").classList.remove("open");
-      document.body.style.overflow = "";
-    }
-
-    const mainEl = document.querySelector(".main");
-    if (mainEl && !document.getElementById("mob-bar")) {
-      const bar = document.createElement("div");
-      bar.className = "mob-bar";
-      bar.id = "mob-bar";
-      bar.innerHTML =
-        '<a class="mob-brand" href="/">' +
-        '<div class="mob-brand-mark">M</div>' +
-        '<span class="mob-brand-name">Market Command</span>' +
-        "</a>" +
-        '<button class="mob-ham" id="mob-ham" aria-label="Open navigation">&#9776;</button>';
-      mainEl.insertBefore(bar, mainEl.firstChild);
-    }
-
-    if (!document.getElementById("mob-overlay")) {
-      const overlay = document.createElement("div");
-      overlay.className = "mob-overlay";
-      overlay.id = "mob-overlay";
-      document.body.appendChild(overlay);
-      overlay.addEventListener("click", closeDrawer);
-    }
-
-    if (!document.getElementById("mob-drawer")) {
-      const drawer = document.createElement("div");
-      drawer.className = "mob-drawer";
-      drawer.id = "mob-drawer";
-      drawer.innerHTML = drawerHtml;
-      document.body.appendChild(drawer);
-    }
-
-    const ham = document.getElementById("mob-ham");
-    if (ham) ham.addEventListener("click", openDrawer);
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") closeDrawer();
-    });
   }
 
   if (document.readyState === "loading") {

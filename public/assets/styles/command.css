@@ -62,7 +62,7 @@ body {
   background: rgba(8,12,22,0.86);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  padding: 22px 16px;
+  padding: 24px 18px;
   position: sticky;
   top: 0;
   height: 100vh;
@@ -75,37 +75,58 @@ body {
 .cmd-sidebar::-webkit-scrollbar { display: none; }
 
 .cmd-brand {
-  display: flex; align-items: center; gap: 11px;
-  margin-bottom: 22px;
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 28px;
   text-decoration: none; color: inherit;
 }
 .cmd-brand-mark {
-  width: 38px; height: 38px; flex-shrink: 0;
-  border-radius: 12px;
+  width: 42px; height: 42px; flex-shrink: 0;
+  border-radius: 14px;
   background: linear-gradient(135deg, var(--blue), var(--purple));
   display: grid; place-items: center;
   box-shadow: 0 10px 24px rgba(77,163,255,0.24);
-  font-weight: 900; font-size: 16px;
+  font-weight: 900; font-size: 18px;
 }
-.cmd-brand-text h1 { font-size: 15px; font-weight: 700; line-height: 1.1; }
-.cmd-brand-text span { font-size: 11px; color: var(--muted); }
+.cmd-brand-text h1 { font-size: 17px; font-weight: 700; line-height: 1.1; }
+.cmd-brand-text span { font-size: 12px; color: var(--muted); }
 
 .cmd-nav-label {
-  font-size: 10px; color: var(--muted);
+  font-size: 11px; color: var(--muted);
   text-transform: uppercase; letter-spacing: 0.16em;
-  padding: 14px 11px 6px;
+  margin: 22px 12px 10px;
 }
 .cmd-nav-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px 12px; border-radius: 13px;
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 14px; border-radius: 15px;
   color: var(--soft); cursor: pointer;
-  transition: 0.18s ease; font-size: 13.5px;
+  transition: 0.2s ease; font-size: 14px;
   text-decoration: none; line-height: 1;
 }
 .cmd-nav-item:hover, .cmd-nav-item.active {
   background: rgba(77,163,255,0.12);
   color: var(--text);
 }
+.cmd-nav-icon {
+  width: 18px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.cmd-nav-text { flex: 1; }
+.cmd-nav-dropdown-toggle {
+  width: 100%; border: 0; background: none; font: inherit;
+  text-align: left;
+}
+.cmd-nav-caret {
+  margin-left: auto; color: var(--muted); font-size: 11px;
+  transition: transform 0.18s ease;
+}
+.cmd-nav-dropdown.open .cmd-nav-caret { transform: rotate(90deg); }
+.cmd-nav-dropdown-menu {
+  display: none; margin: 2px 0 2px 17px; padding-left: 8px;
+  border-left: 1px solid var(--border);
+}
+.cmd-nav-dropdown.open .cmd-nav-dropdown-menu { display: block; }
+.cmd-nav-subitem { padding: 9px 10px; font-size: 12.5px; }
+.cmd-nav-external { color: var(--muted); font-size: 11px; }
 .cmd-nav-dot {
   width: 8px; height: 8px; flex-shrink: 0;
   border-radius: 99px; background: var(--blue);
