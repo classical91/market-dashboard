@@ -25,6 +25,24 @@ function initSections(storeKey) {
       cards.classList.add('collapsed');
     }
 
+    // "Open All" button — opens every link in this section in new tabs.
+    const links = Array.from(cards.querySelectorAll('a[href]'));
+    if (links.length) {
+      const chevron = header.querySelector('.section-chevron');
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'open-all-btn';
+      btn.textContent = '⧉ Open All (' + links.length + ')';
+      btn.setAttribute('aria-label', 'Open all ' + links.length + ' links in this section');
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        links.forEach((a) => window.open(a.href, '_blank', 'noopener'));
+      });
+      if (chevron) header.insertBefore(btn, chevron);
+      else header.appendChild(btn);
+    }
+
     header.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
