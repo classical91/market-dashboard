@@ -37,7 +37,18 @@ function initSections(storeKey) {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        links.forEach((a) => window.open(a.href, '_blank', 'noopener'));
+        // Open each link via a synthetic anchor click. Browsers reliably
+        // allow multiple of these within one user gesture, whereas repeated
+        // window.open() calls get suppressed by popup blockers after the first.
+        links.forEach((a) => {
+          const opener = document.createElement('a');
+          opener.href = a.href;
+          opener.target = '_blank';
+          opener.rel = 'noopener';
+          document.body.appendChild(opener);
+          opener.click();
+          opener.remove();
+        });
       });
       if (chevron) header.insertBefore(btn, chevron);
       else header.appendChild(btn);
