@@ -200,6 +200,29 @@ body {
 .section-header:hover .section-chevron { color: var(--soft); }
 .section-header.collapsed .section-chevron { transform: rotate(-90deg); }
 
+/* "Open All" button in section headers */
+.open-all-btn {
+  margin-left: auto;
+  margin-right: 12px;
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--muted);
+  background: rgba(77,163,255,0.10);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 9px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.open-all-btn:hover {
+  background: rgba(77,163,255,0.20);
+  color: var(--text);
+  border-color: rgba(77,163,255,0.45);
+}
+
 /* themed accent labels */
 .section-label--accent  { color: var(--blue); }
 .section-chevron--accent { color: var(--blue); opacity: 0.6; }
