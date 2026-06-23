@@ -130,9 +130,12 @@
     <div class="cmd-page-header">
       <div>
         <div class="cmd-page-title">📰 Daily News Reporter</div>
-        <div class="cmd-page-subtitle">AI-generated briefing &middot; refreshes every 48 hours</div>
+        <div class="cmd-page-subtitle">AI-generated briefing &middot; generated on demand</div>
       </div>
-      <div class="cmd-clock" id="cmd-clock"></div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <button class="open-all-btn" id="generateBtn" type="button" style="margin:0">⚡ Generate</button>
+        <div class="cmd-clock" id="cmd-clock"></div>
+      </div>
     </div>
 
     <!-- Date + generated-at badges -->
@@ -231,49 +234,103 @@
       content.innerHTML = '<div class="stories">' + parseToStories(text) + '</div>';
     }
 
+    function currentTtl() {
+      return window.AppSettings ? window.AppSettings.getFrequency() : 24;
+    }
+
+    function showUnconfigured() {
+      document.getElementById('reporterContent').innerHTML =
+        '<div class="reporter-unconfigured">' +
+        '<strong>Setup required</strong><br>' +
+        'Set the <code>OPENAI_API_KEY</code> environment variable on Railway ' +
+        'to enable the Daily News Reporter. The reporter uses GPT-5.5 to generate ' +
+        'structured briefings on crypto, economics, and global markets.</div>';
+    }
+
+    function showEmptyState() {
+      var headerRow = document.getElementById('reporterHeaderRow');
+      if (headerRow) headerRow.style.display = 'none';
+      document.getElementById('reporterContent').innerHTML =
+        '<div class="reporter-unconfigured">' +
+        '<strong>No briefing generated yet</strong><br>' +
+        'Click <strong>⚡ Generate</strong> above to create today\'s crypto, economics, ' +
+        'and markets briefings. Reports are only generated when you ask &mdash; ' +
+        'opening this page no longer triggers a generation.</div>';
+    }
+
+    function hasContent(data) {
+      return !!(data && (data.crypto || data.economics || data.markets));
+    }
+
+    function applyReport(data) {
+      reportData = data;
+
+      var headerRow = document.getElementById('reporterHeaderRow');
+      if (headerRow) headerRow.style.display = 'flex';
+
+      var dateEl = document.getElementById('reporterDate');
+      if (dateEl && data.dateStr) dateEl.textContent = '🗓️ ' + data.dateStr;
+
+      var genEl = document.getElementById('reporterGen');
+      if (genEl && data.generatedAt) {
+        var ts = new Date(data.generatedAt);
+        genEl.textContent = 'Generated ' + ts.toLocaleString(undefined, {
+          month: 'short', day: 'numeric',
+          hour: '2-digit', minute: '2-digit'
+        });
+      }
+
+      renderTab(activeTab);
+    }
+
+    /* Read-only on page load — never triggers a generation. */
     function loadReport() {
       var content = document.getElementById('reporterContent');
-      var ttl = window.AppSettings ? window.AppSettings.getFrequency() : 24;
-
-      fetch('/api/daily-report?ttlHours=' + ttl)
+      fetch('/api/daily-report?ttlHours=' + currentTtl())
         .then(function (res) {
           if (!res.ok) throw new Error('HTTP ' + res.status);
           return res.json();
         })
         .then(function (data) {
-          if (!data.configured) {
-            content.innerHTML =
-              '<div class="reporter-unconfigured">' +
-              '<strong>Setup required</strong><br>' +
-              'Set the <code>OPENAI_API_KEY</code> environment variable on Railway ' +
-              'to enable the Daily News Reporter. The reporter uses GPT-4.5 to generate ' +
-              'structured briefings on crypto, economics, and global markets.</div>';
-            return;
-          }
-
-          reportData = data;
-
-          /* Show badges */
-          var headerRow = document.getElementById('reporterHeaderRow');
-          if (headerRow) headerRow.style.display = 'flex';
-
-          var dateEl = document.getElementById('reporterDate');
-          if (dateEl && data.dateStr) dateEl.textContent = '🗓️ ' + data.dateStr;
-
-          var genEl = document.getElementById('reporterGen');
-          if (genEl && data.generatedAt) {
-            var ts = new Date(data.generatedAt);
-            genEl.textContent = 'Generated ' + ts.toLocaleString(undefined, {
-              month: 'short', day: 'numeric',
-              hour: '2-digit', minute: '2-digit'
-            });
-          }
-
-          renderTab(activeTab);
+          if (!data.configured) return showUnconfigured();
+          if (data.generated === false || !hasContent(data)) return showEmptyState();
+          applyReport(data);
         })
         .catch(function (err) {
           content.innerHTML =
             '<div class="reporter-error">Failed to load daily report: ' + esc(err.message) + '</div>';
+        });
+    }
+
+    /* Explicit generation — only on button click. */
+    var generating = false;
+    function generateReport() {
+      if (generating) return;
+      generating = true;
+      var btn = document.getElementById('generateBtn');
+      var content = document.getElementById('reporterContent');
+      if (btn) { btn.disabled = true; btn.textContent = '⏳ Generating…'; }
+      content.innerHTML =
+        '<div class="reporter-loading"><span class="spinner"></span>' +
+        'Generating briefing — this can take up to a minute&hellip;</div>';
+
+      fetch('/api/daily-report/generate?ttlHours=' + currentTtl(), { method: 'POST' })
+        .then(function (res) {
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          return res.json();
+        })
+        .then(function (data) {
+          if (!data.configured) return showUnconfigured();
+          if (!hasContent(data)) return showEmptyState();
+          applyReport(data);
+        })
+        .catch(function (err) {
+          content.innerHTML =
+            '<div class="reporter-error">Failed to generate report: ' + esc(err.message) + '</div>';
+        })
+        .finally(function () {
+          generating = false;
+          if (btn) { btn.disabled = false; btn.textContent = '⚡ Generate'; }
         });
     }
 
@@ -288,6 +345,9 @@
       activeTab = btn.dataset.tab;
       if (reportData) renderTab(activeTab);
     });
+
+    var generateBtn = document.getElementById('generateBtn');
+    if (generateBtn) generateBtn.addEventListener('click', generateReport);
 
     loadReport();
   })();

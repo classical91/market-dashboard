@@ -3,10 +3,24 @@ const { Router } = require("express");
 function createReporterRouter({ reporterService }) {
   const router = Router();
 
-  router.get("/", async (req, res, next) => {
+  function resolveTtlMs(req) {
+    const hours = Math.min(Math.max(parseInt(req.query.ttlHours, 10) || 24, 1), 168);
+    return hours * 60 * 60 * 1000;
+  }
+
+  // Read-only: returns the cached report if present, never generates.
+  router.get("/", (req, res, next) => {
     try {
-      const hours = Math.min(Math.max(parseInt(req.query.ttlHours, 10) || 24, 1), 168);
-      const report = await reporterService.getReport(hours * 60 * 60 * 1000);
+      res.json(reporterService.peekReport(resolveTtlMs(req)));
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // Explicit generation — triggered only by a user action.
+  router.post("/generate", async (req, res, next) => {
+    try {
+      const report = await reporterService.generateReport(resolveTtlMs(req));
       res.json(report);
     } catch (err) {
       next(err);
