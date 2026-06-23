@@ -50,7 +50,9 @@ body {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  scrollbar-width: none;
 }
+.sidebar::-webkit-scrollbar { display: none; }
 .brand {
   display: flex;
   align-items: center;
@@ -104,6 +106,15 @@ body {
   background: rgba(77, 163, 255, 0.12);
   color: var(--text);
 }
+.nav-icon {
+  width: 18px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.nav-text { flex: 1; }
+.nav-external { color: var(--muted); font-size: 11px; }
 .nav-dot {
   width: 9px;
   height: 9px;
