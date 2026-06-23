@@ -20,7 +20,16 @@
 
         <div class="nav-label">Workspace</div>
         <a class="nav-item active" href="/"><span class="nav-dot"></span> Overview</a>
-        <a class="nav-item" href="https://chatgpt.com/share/6a3ad954-cdf4-83e8-81bb-77966ffefab6" target="_blank" rel="noopener">🤖 AI Market Trader ↗</a>
+        <div class="nav-dropdown" id="appsDropdown">
+          <button class="nav-item nav-dropdown-toggle" type="button" aria-expanded="false" aria-controls="appsDropdownMenu">
+            <span>🤖 AI Apps</span>
+            <span class="nav-caret" aria-hidden="true">▸</span>
+          </button>
+          <div class="nav-dropdown-menu" id="appsDropdownMenu">
+            <a class="nav-item nav-subitem" href="https://chatgpt.com/share/6a3ad954-cdf4-83e8-81bb-77966ffefab6" target="_blank" rel="noopener">🤖 AI Market Trader ↗</a>
+            <a class="nav-item nav-subitem" href="https://commentfarm-production-fc8b.up.railway.app/image-converter" target="_blank" rel="noopener">🖼 Image Converter ↗</a>
+          </div>
+        </div>
         <a class="nav-item" href="/market-intel.html">📈 Markets</a>
         <a class="nav-item" href="/crypto.html">₿ Crypto</a>
         <a class="nav-item" href="/market-intel.html#macro-indicators">🧭 Macro</a>
@@ -223,5 +232,16 @@
     </div>
 
     <script src="/assets/js/overview.js"></script>
+    <script>
+      (function () {
+        var dd = document.getElementById("appsDropdown");
+        if (!dd) return;
+        var toggle = dd.querySelector(".nav-dropdown-toggle");
+        toggle.addEventListener("click", function () {
+          var open = dd.classList.toggle("open");
+          toggle.setAttribute("aria-expanded", open ? "true" : "false");
+        });
+      })();
+    </script>
   </body>
 </html>
