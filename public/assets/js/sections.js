@@ -2,6 +2,19 @@
  * Collapsible sections with localStorage persistence.
  * Usage: initSections('mi_collapsed')
  */
+function showOpenAllHint(header, blocked, total) {
+  let note = header.nextElementSibling;
+  if (!note || !note.classList.contains('open-all-hint')) {
+    note = document.createElement('div');
+    note.className = 'open-all-hint';
+    header.parentNode.insertBefore(note, header.nextSibling);
+  }
+  note.textContent =
+    '⚠️ Your browser blocked ' + blocked + ' of ' + total +
+    ' tabs. Allow pop-ups for this site (pop-up icon in the address bar), then click “Open All” again.';
+  note.style.display = 'block';
+}
+
 function initSections(storeKey) {
   function getCollapsed() {
     try { return JSON.parse(localStorage.getItem(storeKey) || '[]'); } catch { return []; }
@@ -37,18 +50,18 @@ function initSections(storeKey) {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        // Open each link via a synthetic anchor click. Browsers reliably
-        // allow multiple of these within one user gesture, whereas repeated
-        // window.open() calls get suppressed by popup blockers after the first.
+        // Best-effort: open every link in its own tab. Browsers' popup
+        // blockers typically allow only the first per click gesture, so we
+        // detect blocked tabs (window.open returns null) and prompt the user
+        // to allow pop-ups for the site, after which all links open.
+        let blocked = 0;
         links.forEach((a) => {
-          const opener = document.createElement('a');
-          opener.href = a.href;
-          opener.target = '_blank';
-          opener.rel = 'noopener';
-          document.body.appendChild(opener);
-          opener.click();
-          opener.remove();
+          const w = window.open(a.href, '_blank', 'noopener');
+          if (!w) blocked += 1;
         });
+        if (blocked > 0) {
+          showOpenAllHint(header, blocked, links.length);
+        }
       });
       if (chevron) header.insertBefore(btn, chevron);
       else header.appendChild(btn);
