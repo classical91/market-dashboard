@@ -29,22 +29,21 @@
       href: "https://trading-strategy-production-1b41.up.railway.app/",
       icon: "&#129504;",
       label: "Decision Engine",
-      featured: true,
+      featured: "decision",
+    },
+    {
+      href: "https://traderclaw-production.up.railway.app/",
+      icon: "&#129408;",
+      label: "TraderClaw",
+      featured: "traderclaw",
     },
     {
       href: "https://www.worldmonitor.app/dashboard?lat=168.3787&lon=-46.4780&zoom=2.50&view=america&timeRange=48h&layers=conflicts%2Chotspots%2Csanctions%2Cweather%2Coutages%2Cnatural%2CiranAttacks",
       icon: "&#127758;",
       label: "World Monitor",
     },
-    { href: "/market-intel.html", icon: "&#128200;", label: "Markets" },
-    { href: "/crypto.html", icon: "&#8383;", label: "Crypto" },
-    { href: "/on-chain.html", icon: "&#128279;", label: "On-Chain" },
+    { href: "/market-intel.html", icon: "&#128200;", label: "Market Intel Links" },
     { href: "/reporter.html", icon: "&#128240;", label: "Reporter" },
-  ];
-
-  var tools = [
-    { href: "/crypto.html#sentiment", icon: "&#129504;", label: "Sentiment" },
-    { href: "/#calendars-tools", icon: "&#128467;", label: "Calendar" },
     { href: "https://earth-watch-production-e3c6.up.railway.app/", icon: "&#127757;", label: "Earth Watch" },
     { href: "/settings.html", icon: "&#9881;&#65039;", label: "Settings" },
   ];
@@ -66,8 +65,6 @@
     if (current !== path) return false;
     if (hash) return currentHash === hash;
 
-    if (path === "/" && currentHash === "#calendars-tools") return false;
-    if (path === "/crypto.html" && currentHash === "#sentiment") return false;
     return true;
   }
 
@@ -75,7 +72,9 @@
     var prefix = mode === "command" ? "cmd-" : "";
     var active = isActive(item.href);
     var external = /^https?:\/\//.test(item.href);
-    var featuredClass = item.featured ? " " + prefix + "nav-item--featured" : "";
+    var featuredClass = item.featured
+      ? " " + prefix + "nav-item--featured " + prefix + "nav-item--" + item.featured
+      : "";
     var icon = item.dot
       ? '<span class="' + prefix + 'nav-dot"></span>'
       : '<span class="' + prefix + 'nav-icon" aria-hidden="true">' + item.icon + "</span>";
@@ -114,13 +113,11 @@
     var workspaceHtml = workspace.map(function (item) {
       return item.children ? dropdown(item, mode, instance) : navItem(item, mode);
     }).join("");
-    var toolsHtml = tools.map(function (item) { return navItem(item, mode); }).join("");
     return (
       '<a class="' + prefix + 'brand" href="/">' +
       '<div class="' + prefix + 'brand-mark">M</div>' +
       '<div class="' + prefix + 'brand-text"><h1>Market Command</h1><span>Live dashboard system</span></div></a>' +
-      '<div class="' + prefix + 'nav-label">Workspace</div>' + workspaceHtml +
-      '<div class="' + prefix + 'nav-label">Tools</div>' + toolsHtml
+      '<div class="' + prefix + 'nav-label">Workspace</div>' + workspaceHtml
     );
   }
 
