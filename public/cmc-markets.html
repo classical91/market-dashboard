@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CMC Markets · Market Command</title>
+  <script src="/assets/js/settings.js"></script>
+  <link rel="stylesheet" href="/assets/styles/command.css" />
+</head>
+<body>
+<div class="app">
+  <aside class="cmd-sidebar"></aside>
+  <main class="cmd-main">
+
+    <div class="cmd-page-header">
+      <div>
+        <div class="cmd-page-title">📈 CMC Markets</div>
+        <div class="cmd-page-subtitle">Global market overview, exchanges &amp; treasuries</div>
+      </div>
+      <div class="cmd-clock" id="cmd-clock"></div>
+    </div>
+
+    <nav class="nav-pills">
+      <a href="/btc-research.html" class="nav-pill nav-pill--accent">BTC Research</a>
+      <a href="/alt-research.html" class="nav-pill nav-pill--accent">Alt Research</a>
+      <a href="/on-chain.html" class="nav-pill nav-pill--accent">On-Chain</a>
+      <a href="/interactive-dashboards.html" class="nav-pill nav-pill--accent">Interactive Dashboards</a>
+      <a href="/sentiment.html" class="nav-pill nav-pill--accent">Sentiment</a>
+      <a href="/crypto-news.html" class="nav-pill nav-pill--accent">Crypto News</a>
+      <a href="/cmc-markets.html" class="nav-pill nav-pill--accent nav-pill--current">CMC Markets</a>
+      <a href="/cmc-indicators.html" class="nav-pill nav-pill--accent">CMC Indicators</a>
+      <a href="/etf-flows.html" class="nav-pill nav-pill--accent">ETF Flows</a>
+      <a href="/derivatives.html" class="nav-pill nav-pill--accent">Derivatives</a>
+      <a href="/qualitative-analysis.html" class="nav-pill nav-pill--accent">Qual. Analysis</a>
+    </nav>
+
+    <div class="section-header" data-section="cmc-markets" id="cmc-markets">
+      <span class="section-label">CMC Markets</span>
+      <span class="section-chevron">&#9660;</span>
+    </div>
+    <div class="cards" id="cmc-markets-cards">
+      <a class="card" href="https://coinmarketcap.com/charts/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">MARKET OVERVIEW</span><span class="arrow">&#8599;</span></div><div class="card-title">Global Crypto Market Overview</div><div class="card-src">coinmarketcap.com</div></a>
+      <a class="card" href="https://coinmarketcap.com/rankings/exchanges/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">SPOT MARKET</span><span class="arrow">&#8599;</span></div><div class="card-title">Spot Exchange Rankings</div><div class="card-src">coinmarketcap.com</div></a>
+      <a class="card" href="https://coinmarketcap.com/rankings/exchanges/derivatives/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">DERIVATIVES MKT</span><span class="arrow">&#8599;</span></div><div class="card-title">Derivatives Market</div><div class="card-src">coinmarketcap.com</div></a>
+      <a class="card" href="https://coinmarketcap.com/charts/#total-cryptocurrencies" target="_blank"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)"># OF CRYPTOS</span><span class="arrow">&#8599;</span></div><div class="card-title">No. of Cryptocurrencies</div><div class="card-src">coinmarketcap.com</div></a>
+      <a class="card" href="https://coinmarketcap.com/bitcoin-treasuries/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">BTC TREASURIES</span><span class="arrow">&#8599;</span></div><div class="card-title">Bitcoin Treasuries</div><div class="card-src">coinmarketcap.com</div></a>
+      <a class="card" href="https://coinmarketcap.com/bnb-treasuries/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">BNB TREASURIES</span><span class="arrow">&#8599;</span></div><div class="card-title">BNB Treasuries</div><div class="card-src">coinmarketcap.com</div></a>
+    </div>
+
+    <footer>CMC Markets &mdash; <a href="/crypto.html">Crypto Hub</a> &mdash; <a href="/">Market Command</a></footer>
+
+  </main>
+</div>
+<script src="/assets/js/sidebar.js"></script>
+<script src="/assets/js/sections.js"></script>
+<script>
+  (function () {
+    function tick() {
+      var el = document.getElementById('cmd-clock');
+      if (el) el.textContent = new Date().toLocaleString(undefined, {
+        weekday: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit'
+      });
+    }
+    tick(); setInterval(tick, 1000);
+    initSections('cmc-markets_collapsed');
+  })();
+</script>
+</body>
+</html>
