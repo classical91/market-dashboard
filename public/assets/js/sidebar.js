@@ -34,8 +34,14 @@
     {
       href: "https://traderclaw-production.up.railway.app/",
       icon: "&#129408;",
-      label: "TraderClaw",
+      label: "Traderclaw Backtest",
       featured: "traderclaw",
+    },
+    {
+      href: "https://t.me/tesr56788",
+      icon: "&#9992;&#65039;",
+      label: "Trader Lab",
+      featured: "traderlab",
     },
     {
       href: "https://www.worldmonitor.app/dashboard?lat=168.3787&lon=-46.4780&zoom=2.50&view=america&timeRange=48h&layers=conflicts%2Chotspots%2Csanctions%2Cweather%2Coutages%2Cnatural%2CiranAttacks",
