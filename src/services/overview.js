@@ -154,6 +154,7 @@ function buildKpis({ crypto, onchain }) {
   const avgChange = crypto.length
     ? crypto.reduce((sum, row) => sum + (Number(row.changePercent) || 0), 0) / crypto.length
     : 0;
+  const stablecoinNetflow = getOnchainStablecoinNetflow(onchain);
 
   const kpis = [];
   if (btc) {
@@ -179,8 +180,8 @@ function buildKpis({ crypto, onchain }) {
     note: "Avg 24h move across majors",
   });
 
-  if (onchain && onchain.stablecoinNetflow != null) {
-    const netflow = Number(onchain.stablecoinNetflow) || 0;
+  if (stablecoinNetflow != null) {
+    const netflow = Number(stablecoinNetflow) || 0;
     kpis.push({
       label: "Stablecoin Netflow",
       value: formatSignedMoney(netflow),
@@ -191,7 +192,7 @@ function buildKpis({ crypto, onchain }) {
     kpis.push({
       label: "Volatility",
       value: crypto.length
-        ? `${(crypto.reduce((max, row) => Math.max(max, Math.abs(row.changePercent || 0)), 0)).toFixed(2)}%`
+        ? `${crypto.reduce((max, row) => Math.max(max, Math.abs(row.changePercent || 0)), 0).toFixed(2)}%`
         : "-",
       changePercent: 0,
       note: "Largest 24h crypto move",
@@ -241,6 +242,7 @@ function buildAlerts({ crypto, macro, onchain }) {
   const alerts = [];
   const btc = crypto.find((row) => row.symbol === "BTC");
   const eth = crypto.find((row) => row.symbol === "ETH");
+  const stablecoinNetflow = getOnchainStablecoinNetflow(onchain);
 
   if (btc && Math.abs(btc.changePercent) >= 3) {
     alerts.push({
@@ -279,9 +281,9 @@ function buildAlerts({ crypto, macro, onchain }) {
     });
   }
 
-  if (onchain && Number(onchain.stablecoinNetflow) && Math.abs(onchain.stablecoinNetflow) > 50_000_000) {
+  if (Number(stablecoinNetflow) && Math.abs(stablecoinNetflow) > 50_000_000) {
     alerts.push({
-      title: `Stablecoin netflow ${formatSignedMoney(onchain.stablecoinNetflow)} (24h)`,
+      title: `Stablecoin netflow ${formatSignedMoney(stablecoinNetflow)} (24h)`,
       category: "On-Chain",
       status: "Active",
       severity: "medium",
@@ -325,6 +327,16 @@ function safe(fn) {
 function unwrap(result, fallback) {
   if (result.error || !result.value) return fallback;
   return result.value;
+}
+
+function getOnchainStablecoinNetflow(onchain) {
+  if (!onchain) return null;
+
+  const value = onchain.metrics?.stablecoinNetflow ?? onchain.stablecoinNetflow;
+  if (value === null || value === undefined) return null;
+
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? numericValue : null;
 }
 
 function formatMoney(value) {
