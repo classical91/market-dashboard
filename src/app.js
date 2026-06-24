@@ -48,6 +48,9 @@ function createApp() {
 
   app.disable("x-powered-by");
   app.use(express.json());
+  app.get(["/earthwatch", "/earthwatch.html"], (req, res) => {
+    res.redirect(302, "https://earth-watch-production-e3c6.up.railway.app/");
+  });
   app.use(express.static(path.join(__dirname, "..", "public")));
 
   app.use(
