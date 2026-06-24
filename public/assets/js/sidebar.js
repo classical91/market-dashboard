@@ -21,18 +21,10 @@
           icon: "&#128444;",
           label: "Image Converter",
         },
-        {
-          href: "https://www.youtube.com/",
-          icon: "&#9654;&#65039;",
-          label: "YouTube",
-        },
-        {
-          href: "https://x.com/",
-          icon: "&#120143;",
-          label: "X",
-        },
       ],
     },
+    { href: "https://www.youtube.com/", icon: "&#9654;&#65039;", label: "YouTube" },
+    { href: "https://x.com/", icon: "&#120143;", label: "X" },
     { href: "/market-intel.html", icon: "&#128200;", label: "Markets" },
     { href: "/crypto.html", icon: "&#8383;", label: "Crypto" },
     { href: "/market-intel.html#macro-indicators", icon: "&#129517;", label: "Macro" },
@@ -43,9 +35,9 @@
   var tools = [
     { href: "/market-intel.html#screeners", icon: "&#128202;", label: "Screener" },
     { href: "/crypto.html#sentiment", icon: "&#129504;", label: "Sentiment" },
-    { href: "/market-intel.html#market-overview", icon: "&#128467;", label: "Calendar" },
+    { href: "/#calendars-tools", icon: "&#128467;", label: "Calendar" },
     { href: "/traditional.html", icon: "&#127974;", label: "Traditional" },
-    { href: "/earthwatch.html", icon: "&#127757;", label: "Earth Watch" },
+    { href: "https://earth-watch-production-e3c6.up.railway.app/", icon: "&#127757;", label: "Earth Watch" },
     { href: "/settings.html", icon: "&#9881;&#65039;", label: "Settings" },
   ];
 
@@ -66,7 +58,8 @@
     if (current !== path) return false;
     if (hash) return currentHash === hash;
 
-    if (path === "/market-intel.html" && ["#macro-indicators", "#screeners", "#market-overview"].indexOf(currentHash) !== -1) {
+    if (path === "/" && currentHash === "#calendars-tools") return false;
+    if (path === "/market-intel.html" && ["#macro-indicators", "#screeners"].indexOf(currentHash) !== -1) {
       return false;
     }
     if (path === "/crypto.html" && currentHash === "#sentiment") return false;
@@ -76,12 +69,14 @@
   function navItem(item, mode) {
     var prefix = mode === "command" ? "cmd-" : "";
     var active = isActive(item.href);
+    var external = /^https?:\/\//.test(item.href);
     var icon = item.dot
       ? '<span class="' + prefix + 'nav-dot"></span>'
       : '<span class="' + prefix + 'nav-icon" aria-hidden="true">' + item.icon + "</span>";
     return (
       '<a class="' + prefix + "nav-item" + (active ? " active" : "") + '" href="' + item.href +
-      '" data-nav-href="' + item.href + '"' + (active ? ' aria-current="page"' : "") + ">" +
+      '" data-nav-href="' + item.href + '"' + (external ? ' target="_blank" rel="noopener"' : "") +
+      (active ? ' aria-current="page"' : "") + ">" +
       icon + '<span class="' + prefix + 'nav-text">' + item.label + "</span></a>"
     );
   }

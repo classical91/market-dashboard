@@ -28,9 +28,34 @@ function initSections(storeKey) {
   const allIds = Array.from(headers).map(h => h.dataset.section);
   const collapsed = stored ? JSON.parse(stored) : allIds;
 
+  function cardsFor(id) {
+    return document.getElementById('cards-' + id) ||
+      document.getElementById(id + '-cards') ||
+      document.getElementById(id);
+  }
+
+  function openHashTarget() {
+    const id = decodeURIComponent(window.location.hash.slice(1));
+    if (!id) return;
+
+    const header = Array.from(headers).find(h => h.dataset.section === id);
+    if (!header) return;
+
+    const cards = cardsFor(id);
+    if (!cards) return;
+
+    header.classList.remove('collapsed');
+    cards.classList.remove('collapsed');
+    saveCollapsed(
+      Array.from(headers)
+        .filter(sectionHeader => sectionHeader.classList.contains('collapsed'))
+        .map(sectionHeader => sectionHeader.dataset.section)
+    );
+  }
+
   headers.forEach(header => {
     const id = header.dataset.section;
-    const cards = document.getElementById('cards-' + id) || document.getElementById(id + '-cards') || document.getElementById(id);
+    const cards = cardsFor(id);
     if (!cards) return;
 
     if (collapsed.includes(id)) {
@@ -78,4 +103,7 @@ function initSections(storeKey) {
       saveCollapsed(list);
     });
   });
+
+  openHashTarget();
+  window.addEventListener('hashchange', openHashTarget);
 }
