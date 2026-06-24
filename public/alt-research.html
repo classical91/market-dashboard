@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Alt Research · Market Command</title>
+  <script src="/assets/js/settings.js"></script>
+  <link rel="stylesheet" href="/assets/styles/command.css" />
+</head>
+<body>
+<div class="app">
+  <aside class="cmd-sidebar"></aside>
+  <main class="cmd-main">
+
+    <div class="cmd-page-header">
+      <div>
+        <div class="cmd-page-title">🪙 Alt Research</div>
+        <div class="cmd-page-subtitle">Altcoin sector analysis, categories &amp; scanners</div>
+      </div>
+      <div class="cmd-clock" id="cmd-clock"></div>
+    </div>
+
+    <nav class="nav-pills">
+      <a href="/btc-research.html" class="nav-pill nav-pill--accent">BTC Research</a>
+      <a href="/alt-research.html" class="nav-pill nav-pill--accent nav-pill--current">Alt Research</a>
+      <a href="/on-chain.html" class="nav-pill nav-pill--accent">On-Chain</a>
+      <a href="/interactive-dashboards.html" class="nav-pill nav-pill--accent">Interactive Dashboards</a>
+      <a href="/sentiment.html" class="nav-pill nav-pill--accent">Sentiment</a>
+      <a href="/crypto-news.html" class="nav-pill nav-pill--accent">Crypto News</a>
+      <a href="/cmc-markets.html" class="nav-pill nav-pill--accent">CMC Markets</a>
+      <a href="/cmc-indicators.html" class="nav-pill nav-pill--accent">CMC Indicators</a>
+      <a href="/etf-flows.html" class="nav-pill nav-pill--accent">ETF Flows</a>
+      <a href="/derivatives.html" class="nav-pill nav-pill--accent">Derivatives</a>
+      <a href="/qualitative-analysis.html" class="nav-pill nav-pill--accent">Qual. Analysis</a>
+    </nav>
+
+    <div class="section-header" data-section="alt-research" id="alt-research">
+      <span class="section-label">Alt Research</span>
+      <span class="section-chevron">&#9660;</span>
+    </div>
+    <div class="cards" id="alt-research-cards">
+      <a class="card" href="https://cryptobubbles.net/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">CRYPTO BUBBLES</span><span class="arrow">&#8599;</span></div><div class="card-title">Crypto Bubbles Visualizer</div><div class="card-src">cryptobubbles.net</div></a>
+      <a class="card" href="https://coinmarketcap.com/cryptocurrency-category/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">CATEGORIES</span><span class="arrow">&#8599;</span></div><div class="card-title">Crypto Categories</div><div class="card-src">coinmarketcap.com</div></a>
+      <a class="card" href="https://coinmarketcap.com/charts/altcoin-season-index/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">ALTCOIN SEASON</span><span class="arrow">&#8599;</span></div><div class="card-title">Altcoin Season Index</div><div class="card-src">coinmarketcap.com</div></a>
+      <a class="card" href="https://www.coinglass.com/position" target="_blank"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">POSITIONS</span><span class="arrow">&#8599;</span></div><div class="card-title">Open Positions Overview</div><div class="card-src">coinglass.com</div></a>
+      <a class="card" href="https://coinank.com/etf/EthEtf" target="_blank"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">ETH ETF</span><span class="arrow">&#8599;</span></div><div class="card-title">Ethereum ETF Flows</div><div class="card-src">coinank.com</div></a>
+      <a class="card" href="https://bettertrader.io/cryptoscanner?exchange=KuCoin&quote_coin=&spread_cat=%3E20%25&sort_by=Spread+%28hi-low%29&limit=50" target="_blank"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">ALT SCANNER</span><span class="arrow">&#8599;</span></div><div class="card-title">KuCoin Alt Scanner &gt;20% Spread</div><div class="card-src">bettertrader.io</div></a>
+    </div>
+
+    <footer>Alt Research &mdash; <a href="/crypto.html">Crypto Hub</a> &mdash; <a href="/">Market Command</a></footer>
+
+  </main>
+</div>
+<script src="/assets/js/sidebar.js"></script>
+<script src="/assets/js/sections.js"></script>
+<script>
+  (function () {
+    function tick() {
+      var el = document.getElementById('cmd-clock');
+      if (el) el.textContent = new Date().toLocaleString(undefined, {
+        weekday: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit'
+      });
+    }
+    tick(); setInterval(tick, 1000);
+    initSections('alt-research_collapsed');
+  })();
+</script>
+</body>
+</html>

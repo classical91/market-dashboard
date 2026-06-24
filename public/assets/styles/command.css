@@ -221,6 +221,7 @@ body {
 .nav-pill--crypto:hover,
 .nav-pill--traditional:hover,
 .nav-pill--earthwatch:hover { border-color: var(--blue); }
+.nav-pill--current { border-color: var(--text); color: var(--text); background: rgba(255,255,255,0.10); }
 
 /* ── Section headers ──────────────────────────────────── */
 .section-header {
