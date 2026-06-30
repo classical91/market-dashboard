@@ -24,19 +24,19 @@
       id: "ema", term: "EMA (Exponential Moving Average)", category: "Technical Indicators",
       def: "A moving average that weights recent prices more heavily than older ones, so it reacts faster to new price action than a simple average.",
       read: "Price holding above a rising EMA (commonly 20/50/200-period) is read as trend support; a cross below is often an early trend-change signal. A shorter EMA crossing a longer one (e.g. the 50/200 “golden cross”) is a classic trend-following trigger.",
-      pages: [{ label: "Crypto Hub → Crypto Research", href: "/crypto.html#crypto-research" }],
+      pages: [{ label: "Crypto Hub → Bitcoin Research", href: "/crypto.html#crypto-research" }],
     },
     {
       id: "sma", term: "SMA (Simple Moving Average)", category: "Technical Indicators",
       def: "The unweighted average closing price over a fixed window (e.g. 50-day, 200-day) — every period counts equally, so it's smoother and slower to react than an EMA.",
       read: "The 200-day SMA is the most widely watched long-term trend line in both crypto and equities; sustained price below it is broadly treated as a bear-market signal.",
-      pages: [{ label: "Crypto Hub → Crypto Research", href: "/crypto.html#crypto-research" }],
+      pages: [{ label: "Crypto Hub → Bitcoin Research", href: "/crypto.html#crypto-research" }],
     },
     {
       id: "bollinger", term: "Bollinger Bands", category: "Technical Indicators",
       def: "A volatility envelope — a moving average (typically 20-period) plus and minus two standard deviations of price, forming an upper and lower band.",
       read: "Bands squeezing tight signal low volatility and often precede a sharp move; price tagging a band means volatility is expanding in that direction, not necessarily “time to reverse.”",
-      pages: [{ label: "Crypto Hub → Crypto Research", href: "/crypto.html#crypto-research" }],
+      pages: [{ label: "Crypto Hub → Bitcoin Research", href: "/crypto.html#crypto-research" }],
     },
 
     // ── Futures & Derivatives ─────────────────────────────────────────
@@ -53,7 +53,7 @@
       id: "futures-volume", term: "Futures Volume", category: "Futures & Derivatives",
       def: "The dollar or contract volume of futures trades over a period — how much derivatives activity is happening, independent of how many positions are still open.",
       read: "Rising volume alongside rising OI confirms genuine new positioning rather than existing positions just churning. Volume spikes without an OI change usually mean traders are flipping sides, not adding net exposure.",
-      pages: [{ label: "Crypto Hub → Volume & Market Overview", href: "/crypto.html#market-overview-dashboard" }],
+      pages: [{ label: "Crypto Hub → Market Volumes", href: "/crypto.html#market-overview-dashboard" }],
     },
     {
       id: "funding-rate", term: "Funding Rate", category: "Futures & Derivatives",
@@ -98,7 +98,7 @@
       def: "The count of unique wallet addresses that sent or received a transaction on-chain over a given window — a rough proxy for network usage.",
       read: "Rising active addresses alongside rising price supports a “real demand” narrative. Price rising while active addresses stagnate or fall is a divergence worth noting — the rally may be thinner than it looks.",
       pages: [
-        { label: "Crypto Hub → Crypto Research", href: "/crypto.html#crypto-research" },
+        { label: "Crypto Hub → Bitcoin Research", href: "/crypto.html#crypto-research" },
         { label: "On-Chain → Network Activity", href: "/on-chain.html#network-activity" },
       ],
     },
@@ -197,7 +197,7 @@
       def: "A composite sentiment score (0–100) blending volatility, momentum, social activity, and survey data into a single “how emotional is the market right now” reading. Crypto (alternative.me) and traditional markets (CNN) each publish their own version.",
       read: "Extreme Fear readings have historically been decent contrarian buy zones; Extreme Greed readings have historically preceded pullbacks. It's a sentiment gauge, not a standalone timing signal.",
       pages: [
-        { label: "Crypto Hub → Crypto Research", href: "/crypto.html#crypto-research" },
+        { label: "Crypto Hub → Bitcoin Research", href: "/crypto.html#crypto-research" },
         { label: "Overview → Calendars & Tools", href: "/#calendars-tools" },
       ],
     },

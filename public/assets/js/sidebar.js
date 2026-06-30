@@ -24,10 +24,10 @@
           label: "Crypto",
           icon: "&#8383;",
           children: [
-            { href: "/crypto.html#market-overview-dashboard", icon: "&#128202;", label: "Volume & Market Overview" },
             { href: "/crypto.html#interactive-dashboards", icon: "&#128225;", label: "Interactive Dashboards" },
-            { href: "/crypto.html#crypto-research", icon: "&#8383;", label: "Crypto Research" },
+            { href: "/crypto.html#crypto-research", icon: "&#8383;", label: "Bitcoin Research" },
             { href: "/crypto.html#alt-research", icon: "&#9672;", label: "Alt Research" },
+            { href: "/crypto.html#market-overview-dashboard", icon: "&#128202;", label: "Market Volumes" },
             { href: "/crypto.html#news", icon: "&#128240;", label: "Crypto News" },
             { href: "/crypto.html#market-cap", icon: "&#128200;", label: "Market Cap" },
             { href: "/crypto.html#liquidations", icon: "&#9889;", label: "Liquidations" },
