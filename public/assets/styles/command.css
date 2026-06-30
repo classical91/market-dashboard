@@ -308,6 +308,10 @@ body {
 /* themed accent labels */
 .section-label--accent  { color: var(--blue); }
 .section-chevron--accent { color: var(--blue); opacity: 0.6; }
+.section-label--btc  { color: var(--amber); }
+.section-chevron--btc { color: var(--amber); opacity: 0.6; }
+.section-label--alt  { color: var(--purple); }
+.section-chevron--alt { color: var(--purple); opacity: 0.6; }
 
 /* hub section links */
 .section-link { text-decoration: none; display: block; margin-bottom: 1.5rem; }
