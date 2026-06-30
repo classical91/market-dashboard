@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Indicators Glossary · Market Command</title>
+  <script src="/assets/js/settings.js"></script>
+  <link rel="stylesheet" href="/assets/styles/command.css" />
+  <style>
+    .glossary-search {
+      width: 100%;
+      padding: 12px 16px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      color: var(--text);
+      font-size: 14px;
+      font-family: inherit;
+      margin-bottom: 16px;
+    }
+    .glossary-search:focus {
+      outline: none;
+      border-color: var(--border-hover);
+    }
+    .glossary-category {
+      margin-top: 28px;
+      margin-bottom: 14px;
+      scroll-margin-top: 16px;
+    }
+    .glossary-category-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .glossary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 14px;
+    }
+    .glossary-card {
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015)),
+        var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px 20px;
+    }
+    .glossary-term {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+    .glossary-def {
+      font-size: 13px;
+      color: var(--soft);
+      line-height: 1.55;
+      margin-bottom: 10px;
+    }
+    .glossary-read {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.55;
+      padding: 10px 12px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 10px;
+    }
+    .glossary-read strong { color: var(--soft); }
+    .glossary-used-in {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .glossary-used-chip {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--blue);
+      background: var(--blue-bg);
+      border-radius: 8px;
+      padding: 4px 9px;
+      text-decoration: none;
+    }
+    .glossary-used-chip:hover { background: rgba(77, 163, 255, 0.22); }
+    .glossary-empty {
+      color: var(--muted);
+      font-size: 13px;
+      padding: 24px 0;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside class="cmd-sidebar"></aside>
+  <main class="cmd-main">
+
+    <div class="cmd-page-header">
+      <div>
+        <div class="cmd-page-title">&#128218; Indicators Glossary</div>
+        <div class="cmd-page-subtitle">What each metric means, how to read it, and where it shows up in this dashboard</div>
+      </div>
+      <div class="cmd-clock" id="cmd-clock"></div>
+    </div>
+
+    <input class="glossary-search" id="glossarySearch" type="search" placeholder="Search indicators — e.g. MACD, funding rate, MVRV..." />
+
+    <nav class="nav-pills" id="glossaryPills"></nav>
+
+    <div id="glossaryContent"></div>
+    <div class="glossary-empty" id="glossaryEmpty" hidden>No indicators match your search.</div>
+
+    <footer>Indicators Glossary &mdash; <a href="/">Market Command</a></footer>
+
+  </main>
+</div>
+
+<script src="/assets/js/sidebar.js"></script>
+<script src="/assets/js/indicators.js"></script>
+<script>
+  (function () {
+    function tick() {
+      var el = document.getElementById('cmd-clock');
+      if (el) el.textContent = new Date().toLocaleString(undefined, {
+        weekday: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit'
+      });
+    }
+    tick(); setInterval(tick, 1000);
+  })();
+</script>
+</body>
+</html>

@@ -108,6 +108,7 @@
     },
     { href: "/reporter.html", icon: "&#128240;", label: "Reporter" },
     { href: "https://earth-watch-production-e3c6.up.railway.app/", icon: "&#127757;", label: "Earth Watch" },
+    { href: "/indicators.html", icon: "&#128218;", label: "Indicators Glossary" },
     { href: "/settings.html", icon: "&#9881;&#65039;", label: "Settings" },
   ];
 
