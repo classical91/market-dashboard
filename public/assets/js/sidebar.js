@@ -16,13 +16,8 @@
           label: "Market Intel",
           icon: "&#128202;",
           children: [
-            { href: "/market-intel.html#market-overview", icon: "&#128200;", label: "Market Overview" },
+            { href: "/market-intel.html#cross-asset-overview", icon: "&#128200;", label: "Cross-Asset Overview" },
             { href: "/market-intel.html#macro-indicators", icon: "&#128202;", label: "Macro Indicators" },
-            { href: "/market-intel.html#news", icon: "&#128240;", label: "News" },
-            { href: "/market-intel.html#screeners", icon: "&#128269;", label: "Screeners" },
-            { href: "/market-intel.html#commodities", icon: "&#9981;", label: "Commodities" },
-            { href: "/market-intel.html#key-charts", icon: "&#128201;", label: "Key Charts" },
-            { href: "/market-intel.html#research", icon: "&#128214;", label: "Research" },
           ],
         },
         {
