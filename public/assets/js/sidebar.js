@@ -7,6 +7,7 @@
 
   var workspace = [
     { href: "/", dot: true, label: "Overview" },
+    { href: "/overview-v2.html", icon: "&#128202;", label: "Overview V2" },
     {
       label: "Market Intel Links",
       icon: "&#128200;",

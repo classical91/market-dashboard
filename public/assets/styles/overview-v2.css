@@ -1,0 +1,49 @@
+/* ─────────────────────────────────────────────────────────
+   Overview V2 — TradingView Market Overview widget +
+   Market Command quick-link rail, layered on top of command.css
+───────────────────────────────────────────────────────── */
+
+.ov2-split {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 16px;
+  align-items: start;
+}
+
+.ov2-chart-pane {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  height: calc(100vh - 150px);
+  min-height: 520px;
+  position: sticky;
+  top: 16px;
+}
+
+.ov2-chart-pane iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
+.ov2-side-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.ov2-side-pane .cards {
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.ov2-side-pane .card {
+  padding: 11px 13px;
+}
+
+@media (max-width: 980px) {
+  .ov2-split { grid-template-columns: 1fr; }
+  .ov2-chart-pane { position: static; height: 70vh; min-height: 420px; }
+}
