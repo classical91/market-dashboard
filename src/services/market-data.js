@@ -75,6 +75,19 @@ class MarketDataService {
       finnhubApiKey: config.finnhubApiKey || process.env.FINNHUB_API_KEY || "",
       finnhubBaseUrl: config.finnhubBaseUrl || process.env.FINNHUB_BASE_URL || "https://finnhub.io/api/v1",
     };
+    // Last-known-good live responses, keyed per data type, so a transient
+    // CoinGecko rate-limit (429) serves slightly stale real data instead of
+    // overwriting the dashboard with static seed values.
+    this.lastGood = new Map();
+  }
+
+  rememberGood(key, value) {
+    this.lastGood.set(key, { value, storedAt: Date.now() });
+  }
+
+  recallGood(key) {
+    const entry = this.lastGood.get(key);
+    return entry ? entry.value : null;
   }
 
   hasLiveCryptoSource() {
@@ -91,6 +104,7 @@ class MarketDataService {
     }
 
     const ids = symbols.map((entry) => entry.id).join(",");
+    const cacheKey = `crypto:${ids}`;
     const url = `${this.config.baseUrl}/coins/markets?vs_currency=usd&ids=${encodeURIComponent(
       ids,
     )}&price_change_percentage=24h&per_page=${symbols.length}&page=1`;
@@ -98,7 +112,7 @@ class MarketDataService {
     try {
       const data = await this.fetchJson(url);
       if (!Array.isArray(data)) {
-        return { live: false, source: "fallback", items: fallbackCrypto(symbols) };
+        return this.staleOr(cacheKey, { live: false, source: "fallback", items: fallbackCrypto(symbols) });
       }
       const byId = new Map(data.map((row) => [row.id, row]));
       const items = symbols.map((entry) => {
@@ -115,15 +129,26 @@ class MarketDataService {
           marketCap: Number(row.market_cap ?? 0),
         };
       });
-      return { live: true, source: "coingecko", items };
+      const result = { live: true, source: "coingecko", items };
+      this.rememberGood(cacheKey, result);
+      return result;
     } catch (error) {
-      return {
-        live: false,
-        source: "fallback",
-        items: fallbackCrypto(symbols),
-        error: error.message,
-      };
+      return this.staleOr(
+        cacheKey,
+        { live: false, source: "fallback", items: fallbackCrypto(symbols) },
+        error,
+      );
     }
+  }
+
+  // Serve the last live response (marked stale) when a fresh fetch fails;
+  // otherwise fall back to the static seed payload.
+  staleOr(cacheKey, fallback, error) {
+    const good = this.recallGood(cacheKey);
+    if (good) {
+      return { ...good, live: false, stale: true, source: "coingecko-stale", error: error?.message };
+    }
+    return error ? { ...fallback, error: error.message } : fallback;
   }
 
   async getGlobalDominance() {
@@ -138,14 +163,15 @@ class MarketDataService {
       const dominance = Object.entries(pct)
         .map(([symbol, value]) => ({ symbol: symbol.toUpperCase(), percent: Number(value) }))
         .sort((a, b) => b.percent - a.percent);
-      return { live: true, source: "coingecko", dominance, totalMcap, totalVolume };
+      const result = { live: true, source: "coingecko", dominance, totalMcap, totalVolume };
+      this.rememberGood("global", result);
+      return result;
     } catch (error) {
-      return {
-        live: false,
-        source: "fallback",
-        dominance: defaultDominance(),
-        error: error.message,
-      };
+      return this.staleOr(
+        "global",
+        { live: false, source: "fallback", dominance: defaultDominance() },
+        error,
+      );
     }
   }
 
@@ -154,12 +180,13 @@ class MarketDataService {
     if (this.config.provider !== "coingecko") {
       return { live: false, source: "fallback", points: fallbackChartPoints(range) };
     }
+    const cacheKey = `chart:${coinId}:${days}`;
     try {
       const url = `${this.config.baseUrl}/coins/${coinId}/market_chart?vs_currency=usd&days=${days}`;
       const data = await this.fetchJson(url);
       const prices = Array.isArray(data?.prices) ? data.prices : [];
       if (!prices.length) {
-        return { live: false, source: "fallback", points: fallbackChartPoints(range) };
+        return this.staleOr(cacheKey, { live: false, source: "fallback", points: fallbackChartPoints(range) });
       }
       const sampled = sampleSeries(prices, 30);
       const first = sampled[0][1];
@@ -167,14 +194,15 @@ class MarketDataService {
         time: new Date(ts).toISOString(),
         value: Number(((value / first) * 100).toFixed(3)),
       }));
-      return { live: true, source: "coingecko", points };
+      const result = { live: true, source: "coingecko", points };
+      this.rememberGood(cacheKey, result);
+      return result;
     } catch (error) {
-      return {
-        live: false,
-        source: "fallback",
-        points: fallbackChartPoints(range),
-        error: error.message,
-      };
+      return this.staleOr(
+        cacheKey,
+        { live: false, source: "fallback", points: fallbackChartPoints(range) },
+        error,
+      );
     }
   }
 
@@ -231,11 +259,25 @@ class MarketDataService {
   }
 
   async getNews() {
-    return {
-      live: false,
-      source: "fallback",
-      items: FALLBACK_NEWS.map((item) => ({ ...item })),
-    };
+    const url = this.config.newsUrl;
+    if (!url) {
+      return { live: false, source: "fallback", items: FALLBACK_NEWS.map((item) => ({ ...item })) };
+    }
+    try {
+      const data = await this.singleFetch(url, { Accept: "application/json" }, "News feed");
+      const items = normalizeNews(data);
+      if (!items.length) {
+        return { live: false, source: "fallback", items: FALLBACK_NEWS.map((item) => ({ ...item })) };
+      }
+      return { live: true, source: "market_news_url", items };
+    } catch (error) {
+      return {
+        live: false,
+        source: "fallback",
+        items: FALLBACK_NEWS.map((item) => ({ ...item })),
+        error: error.message,
+      };
+    }
   }
 
   async getCalendar() {
@@ -261,13 +303,16 @@ class MarketDataService {
         const status = error.statusCode || error.status || 0;
         const transient = status === 429 || status >= 500 || error.name === "AbortError";
         if (!transient || attempt === maxAttempts) break;
-        await sleep(400 * attempt);
+        // Honor the server's Retry-After on 429 when present, but cap it so a
+        // long header value can't stall the request past a sensible budget.
+        const wait = Math.min(error.retryAfterMs ?? 400 * attempt, 2000);
+        await sleep(wait);
       }
     }
     throw lastError;
   }
 
-  async singleFetch(url, headers) {
+  async singleFetch(url, headers, label = "CoinGecko") {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.config.requestTimeoutMs);
     try {
@@ -283,16 +328,21 @@ class MarketDataService {
       }
       if (!response.ok) {
         const detail = payload?.error || payload?.status?.error_message || text.slice(0, 120) || response.statusText;
-        throw createServiceError(
-          `CoinGecko HTTP ${response.status} ${detail}`,
+        const error = createServiceError(
+          `${label} HTTP ${response.status} ${detail}`,
           response.status,
         );
+        const retryAfterMs = parseRetryAfter(response.headers.get("retry-after"));
+        if (retryAfterMs != null) {
+          error.retryAfterMs = retryAfterMs;
+        }
+        throw error;
       }
       return payload;
     } catch (error) {
       if (error.name === "AbortError") {
         throw createServiceError(
-          `CoinGecko request timed out after ${this.config.requestTimeoutMs}ms`,
+          `${label} request timed out after ${this.config.requestTimeoutMs}ms`,
           408,
         );
       }
@@ -305,6 +355,63 @@ class MarketDataService {
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function parseRetryAfter(value) {
+  if (!value) return null;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds)) {
+    return Math.max(0, seconds * 1000);
+  }
+  const dateMs = Date.parse(value);
+  if (Number.isFinite(dateMs)) {
+    return Math.max(0, dateMs - Date.now());
+  }
+  return null;
+}
+
+// Normalize a variety of news-feed JSON shapes (NewsAPI, Finnhub, generic
+// arrays, {items|results|data:[...]}) into the dashboard's news item shape.
+function normalizeNews(data) {
+  const rows = Array.isArray(data)
+    ? data
+    : data?.articles || data?.items || data?.results || data?.data || [];
+  if (!Array.isArray(rows)) {
+    return [];
+  }
+  return rows
+    .map((row) => {
+      if (!row || typeof row !== "object") return null;
+      const title = String(row.title || row.headline || row.name || "").trim();
+      if (!title) return null;
+      const sourceRaw =
+        (row.source && (row.source.name || row.source.title || row.source)) ||
+        row.author ||
+        row.provider ||
+        "News";
+      const urlRaw = row.url || row.link || row.guid || null;
+      const publishedAt =
+        row.publishedAt || row.published_at || row.pubDate || row.datetime || row.date || null;
+      return {
+        title,
+        source: String(sourceRaw).slice(0, 80),
+        url: typeof urlRaw === "string" ? urlRaw : null,
+        publishedAt: normalizePublishedAt(publishedAt),
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 8);
+}
+
+function normalizePublishedAt(value) {
+  if (value == null) return null;
+  if (typeof value === "number") {
+    const ms = value < 1e12 ? value * 1000 : value;
+    const date = new Date(ms);
+    return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
 function fallbackCrypto(symbols) {

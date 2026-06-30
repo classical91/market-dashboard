@@ -97,6 +97,10 @@ const config = {
     dataSourceLabel: "DefiLlama + Etherscan + Covalent (Dune-free)",
     overviewCacheMs: parseNumber(process.env.ONCHAIN_OVERVIEW_CACHE_MS, 180000),
     detailCacheMs: parseNumber(process.env.ONCHAIN_DETAIL_CACHE_MS, 60000),
+    // How long to pause Covalent calls after a credit (402) or rate-limit (429)
+    // error, so an exhausted account isn't re-hit on every overview refresh.
+    covalentCreditCooldownMs: parseNumber(process.env.COVALENT_CREDIT_COOLDOWN_MS, 1800000),
+    covalentRateCooldownMs: parseNumber(process.env.COVALENT_RATELIMIT_COOLDOWN_MS, 120000),
     overviewLookbackHours: parseNumber(process.env.ONCHAIN_OVERVIEW_LOOKBACK_HOURS, 24),
     detailLookbackDays: parseNumber(process.env.ONCHAIN_DETAIL_LOOKBACK_DAYS, 7),
     pageSize: parseNumber(process.env.ONCHAIN_OVERVIEW_PAGE_SIZE, 100),
