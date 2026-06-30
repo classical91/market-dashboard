@@ -47,7 +47,6 @@
                 { href: "/on-chain.html#defi",                   icon: "&#127963;", label: "DeFi" },
               ],
             },
-            { href: "/crypto.html#cmc-markets", icon: "&#128200;", label: "CMC Markets" },
             { href: "/crypto.html#cmc-indicators", icon: "&#128204;", label: "CMC Indicators" },
             { href: "/crypto.html#etf-flows", icon: "&#127974;", label: "ETF Flows" },
             { href: "/crypto.html#qualitative", icon: "&#9998;", label: "Qual. Analysis" },
