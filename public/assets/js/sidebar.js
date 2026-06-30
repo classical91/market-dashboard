@@ -29,6 +29,7 @@
             { href: "/crypto.html#alt-research", icon: "&#9672;", label: "Alt Research" },
             { href: "/crypto.html#liquidations", icon: "&#9889;", label: "Liquidations" },
             { href: "/crypto.html#open-interest", icon: "&#128200;", label: "Open-Interest Overview" },
+            { href: "/crypto.html#heatmaps", icon: "&#127777;", label: "Heatmaps & Momentum" },
             {
               label: "On-Chain Analytics",
               icon: "&#128279;",
