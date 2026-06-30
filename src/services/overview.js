@@ -92,6 +92,22 @@ class OverviewService {
     const live = crypto.live;
     const partial = live && warnings.length > 0;
 
+    const cryptoTicker = crypto.items.map((item) => ({
+      symbol: item.symbol,
+      name: item.name,
+      price: item.price,
+      changePercent: item.changePercent,
+      volume: item.volume,
+      type: "crypto",
+    }));
+
+    const traditionalTicker = [
+      ...equities.items.map((item) => ({ ...item, type: "equity" })),
+      ...macro.items.map((item) => ({ ...item, type: "macro" })),
+    ].map(({ symbol, name, price, changePercent, volume, type }) => ({
+      symbol, name, price, changePercent, volume, type,
+    }));
+
     return {
       status: "ok",
       updatedAt: new Date().toISOString(),
@@ -112,6 +128,43 @@ class OverviewService {
         partial,
         sources,
         warnings,
+      },
+      scopes: {
+        crypto: {
+          marketStatus: buildMarketStatus(crypto.items),
+          kpis: buildKpis({ crypto: crypto.items, onchain }),
+          ticker: cryptoTicker,
+          watchlist: cryptoTicker,
+          marketPulse,
+          heatmap: crypto.items.slice(0, 6).map((r) => ({
+            label: r.symbol,
+            value: round2(r.changePercent),
+            category: "crypto",
+          })),
+          allocation,
+          alerts: buildAlerts({ crypto: crypto.items, macro: [], onchain }),
+          news: news.items,
+        },
+        traditional: {
+          ticker: traditionalTicker,
+          watchlist: traditionalTicker,
+          heatmap: [
+            ...equities.items.map((r) => ({ label: r.symbol, value: round2(r.changePercent), category: "equity" })),
+            ...macro.items.map((r) => ({ label: r.symbol, value: round2(r.changePercent), category: "macro" })),
+          ],
+          riskFactors: buildRiskFactors({ crypto: [], macro: macro.items }),
+          alerts: buildAlerts({ crypto: [], macro: macro.items, onchain: null }),
+          calendar: calendar.items,
+        },
+        crossAsset: {
+          marketStatus,
+          ticker,
+          watchlist,
+          heatmap,
+          riskFactors,
+          alerts,
+          onchain,
+        },
       },
     };
   }
