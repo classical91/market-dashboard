@@ -37,11 +37,22 @@ class OverviewService {
 
     const sources = [];
     const warnings = [];
-    if (crypto.live) sources.push("coingecko:crypto");
-    else warnings.push(withReason("Crypto prices using fallback data", crypto.error));
+    // Stale = a transient rate-limit served the last live values; treat it as
+    // "delayed" (soft warning) rather than full fallback.
+    const cryptoUsable = crypto.live || Boolean(crypto.stale);
+    if (crypto.live) {
+      sources.push("coingecko:crypto");
+    } else if (crypto.stale) {
+      sources.push("coingecko:crypto (delayed)");
+      warnings.push(withReason("Crypto prices delayed (rate-limited) — showing last live values", crypto.error));
+    } else {
+      warnings.push(withReason("Crypto prices using fallback data", crypto.error));
+    }
     if (chart.live) sources.push("coingecko:chart");
+    else if (chart.stale) warnings.push(withReason("Market Pulse chart delayed — showing last live values", chart.error));
     else if (chart.error) warnings.push(withReason("Market Pulse chart using fallback", chart.error));
     if (globalData.live) sources.push("coingecko:global");
+    else if (globalData.stale) warnings.push(withReason("Crypto allocation delayed — showing last live values", globalData.error));
     else if (globalData.error) warnings.push(withReason("Crypto allocation using fallback", globalData.error));
     if (equities.live) sources.push("finnhub:equities");
     else warnings.push(withReason("Equities using fallback (set FINNHUB_API_KEY for live)", equities.error));
@@ -49,6 +60,7 @@ class OverviewService {
     if (!news.live) warnings.push("News feed using fallback (no MARKET_NEWS_URL configured).");
     if (!calendar.live) warnings.push("Macro calendar using fallback (no provider configured).");
     if (onchainResult.error) warnings.push(withReason("On-chain service unavailable", onchainResult.error.message));
+    if (onchain?.meta?.note) warnings.push(onchain.meta.note);
     if (onchain) sources.push("internal:onchain");
 
     const ticker = [...crypto.items, ...equities.items, ...macro.items].map((item) => ({
@@ -89,7 +101,7 @@ class OverviewService {
           : 0,
     };
 
-    const live = crypto.live;
+    const live = cryptoUsable;
     const partial = live && warnings.length > 0;
 
     const cryptoTicker = crypto.items.map((item) => ({
