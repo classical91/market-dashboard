@@ -24,7 +24,7 @@
           label: "Crypto",
           icon: "&#8383;",
           children: [
-            { href: "/crypto.html#market-overview-dashboard", icon: "&#128202;", label: "Market Overview Dashboard" },
+            { href: "/crypto.html#market-overview-dashboard", icon: "&#128202;", label: "Volume & Market Overview" },
             { href: "/crypto.html#crypto-research", icon: "&#8383;", label: "Crypto Research" },
             { href: "/crypto.html#alt-research", icon: "&#9672;", label: "Alt Research" },
             { href: "/crypto.html#news", icon: "&#128240;", label: "Crypto News" },
