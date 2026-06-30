@@ -995,14 +995,42 @@ td strong {
 /* Calendars & Tools */
 .tools-section {
   margin-top: 18px;
+  margin-bottom: 22px;
 }
 .tools-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
   margin-bottom: 14px;
 }
 .tool-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 14px;
+}
+.open-all-btn {
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 13px;
+  border-radius: 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.open-all-btn:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.07);
+}
+.open-all-hint {
+  margin-top: 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--yellow);
 }
 .tool-card {
   display: flex;
@@ -1047,4 +1075,18 @@ td strong {
 .tool-src {
   font-size: 11px;
   color: var(--muted);
+}
+/* Responsive tool-grid overrides. Defined after the base .tool-grid rule
+   above so they win on source order (the shared media queries earlier in
+   the file precede this component, so overrides placed there would be
+   overridden by the base rule). */
+@media (max-width: 1180px) {
+  .tool-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 720px) {
+  .tool-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
