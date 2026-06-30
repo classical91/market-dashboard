@@ -32,6 +32,7 @@
             { href: "/crypto.html#news", icon: "&#128240;", label: "Crypto News" },
             { href: "/crypto.html#market-cap", icon: "&#128200;", label: "Market Cap" },
             { href: "/crypto.html#market-trends", icon: "&#128293;", label: "Market Trends" },
+            { href: "/crypto.html#rankings", icon: "&#127942;", label: "Rankings" },
             { href: "/crypto.html#liquidations", icon: "&#9889;", label: "Liquidations" },
             { href: "/crypto.html#open-interest", icon: "&#128200;", label: "Open-Interest Overview" },
             { href: "/crypto.html#heatmaps", icon: "&#127777;", label: "Heatmaps & Momentum" },
