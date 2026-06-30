@@ -28,6 +28,7 @@
             { href: "/crypto.html#crypto-research", icon: "&#8383;", label: "Crypto Research" },
             { href: "/crypto.html#alt-research", icon: "&#9672;", label: "Alt Research" },
             { href: "/crypto.html#liquidations", icon: "&#9889;", label: "Liquidations" },
+            { href: "/crypto.html#open-interest", icon: "&#128200;", label: "Open-Interest Overview" },
             { href: "/on-chain.html", icon: "&#128279;", label: "On-Chain" },
             { href: "/crypto.html#news", icon: "&#128240;", label: "Crypto News" },
             { href: "/crypto.html#cmc-markets", icon: "&#128200;", label: "CMC Markets" },
