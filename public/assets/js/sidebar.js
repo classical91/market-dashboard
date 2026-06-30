@@ -51,7 +51,7 @@
                 { href: "/on-chain.html#defi",                   icon: "&#127963;", label: "DeFi" },
               ],
             },
-            { href: "/crypto.html#cmc-indicators", icon: "&#128204;", label: "CMC Indicators" },
+            { href: "/crypto.html#cmc-indicators", icon: "&#128204;", label: "Indicators" },
             { href: "/crypto.html#qualitative", icon: "&#9998;", label: "Qual. Analysis" },
           ],
         },

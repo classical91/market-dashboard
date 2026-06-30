@@ -176,7 +176,7 @@
       id: "btc-dominance", term: "Bitcoin Dominance", category: "Market Cap & Dominance",
       def: "Bitcoin's market cap as a percentage of the total crypto market cap.",
       read: "Rising dominance with a flat/falling total market cap usually means capital rotating out of altcoins into BTC (risk-off within crypto). Falling dominance with a rising total market cap usually signals “alt season,” where altcoins outperform BTC.",
-      pages: [{ label: "Crypto Hub → CMC Indicators", href: "/crypto.html#cmc-indicators" }],
+      pages: [{ label: "Crypto Hub → Indicators", href: "/crypto.html#cmc-indicators" }],
     },
     {
       id: "altcoin-season-index", term: "Altcoin Season Index", category: "Market Cap & Dominance",
@@ -188,7 +188,7 @@
       id: "cmc-indices", term: "CMC20 / CMC100 Index", category: "Market Cap & Dominance",
       def: "Market-cap-weighted indices tracking CoinMarketCap's top 20 / top 100 cryptocurrencies — similar in concept to the S&P 500, but for crypto.",
       read: "Useful as a single number for “how is the broad crypto market doing” without checking each asset individually — compare against BTC alone to see if a move is BTC-led or broad-based.",
-      pages: [{ label: "Crypto Hub → CMC Indicators", href: "/crypto.html#cmc-indicators" }],
+      pages: [{ label: "Crypto Hub → Indicators", href: "/crypto.html#cmc-indicators" }],
     },
 
     // ── Volatility & Sentiment ────────────────────────────────────────
