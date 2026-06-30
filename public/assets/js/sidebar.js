@@ -93,6 +93,7 @@
       label: "Open WorldMonitor.com",
       featured: "worldmonitor",
     },
+    { href: "https://www.tradingview.com/", icon: "&#128200;", label: "Open TradingView.com", featured: "tradingview" },
     {
       href: "https://trading-strategy-production-1b41.up.railway.app/",
       icon: "&#129504;",

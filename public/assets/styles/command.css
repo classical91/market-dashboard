@@ -143,6 +143,15 @@ body {
   border-color: rgba(77, 163, 255, 0.9);
   background: rgba(77, 163, 255, 0.15);
 }
+.cmd-nav-item--tradingview {
+  border-color: rgba(41, 98, 255, 0.58);
+  background: rgba(41, 98, 255, 0.08);
+  box-shadow: inset 3px 0 0 rgba(41, 98, 255, 0.82);
+}
+.cmd-nav-item--tradingview:hover {
+  border-color: rgba(41, 98, 255, 0.9);
+  background: rgba(41, 98, 255, 0.15);
+}
 .cmd-nav-item--traderclaw {
   border-color: rgba(0,227,150,0.58);
   background: rgba(0,227,150,0.07);
