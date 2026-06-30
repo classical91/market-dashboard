@@ -8,6 +8,49 @@
   var workspace = [
     { href: "/", dot: true, label: "Overview" },
     {
+      label: "Market Intel Links",
+      icon: "&#128200;",
+      children: [
+        { href: "/market-intel.html", icon: "&#128200;", label: "Market Intel Home" },
+        {
+          label: "Market Intel",
+          icon: "&#128202;",
+          children: [
+            { href: "/market-intel.html#cross-asset-overview", icon: "&#128200;", label: "Cross-Asset Overview" },
+            { href: "/market-intel.html#macro-indicators", icon: "&#128202;", label: "Macro Indicators" },
+          ],
+        },
+        {
+          label: "Crypto",
+          icon: "&#8383;",
+          children: [
+            { href: "/crypto.html#market-overview-dashboard", icon: "&#128202;", label: "Market Overview Dashboard" },
+            { href: "/crypto.html#crypto-research", icon: "&#8383;", label: "Crypto Research" },
+            { href: "/crypto.html#alt-research", icon: "&#9672;", label: "Alt Research" },
+            { href: "/crypto.html#liquidations", icon: "&#9889;", label: "Liquidations" },
+            { href: "/on-chain.html", icon: "&#128279;", label: "On-Chain" },
+            { href: "/crypto.html#news", icon: "&#128240;", label: "Crypto News" },
+            { href: "/crypto.html#cmc-markets", icon: "&#128200;", label: "CMC Markets" },
+            { href: "/crypto.html#cmc-indicators", icon: "&#128204;", label: "CMC Indicators" },
+            { href: "/crypto.html#etf-flows", icon: "&#127974;", label: "ETF Flows" },
+            { href: "/crypto.html#qualitative", icon: "&#9998;", label: "Qual. Analysis" },
+          ],
+        },
+        {
+          label: "Traditional",
+          icon: "&#127974;",
+          children: [
+            { href: "/traditional.html#cnbc", icon: "&#128250;", label: "CNBC" },
+            { href: "/traditional.html#news-analysis", icon: "&#128240;", label: "News & Analysis" },
+            { href: "/traditional.html#market-data", icon: "&#128200;", label: "Market Data" },
+            { href: "/traditional.html#macro", icon: "&#127757;", label: "Macro" },
+            { href: "/traditional.html#global", icon: "&#127760;", label: "Global" },
+            { href: "/traditional.html#commodities", icon: "&#9981;", label: "Commodities" },
+          ],
+        },
+      ],
+    },
+    {
       label: "AI Apps",
       icon: "&#129302;",
       children: [
@@ -23,32 +66,29 @@
         },
       ],
     },
-    { href: "https://www.youtube.com/", icon: "&#9654;&#65039;", label: "YouTube" },
-    { href: "https://x.com/", icon: "&#120143;", label: "X" },
+    { href: "https://www.youtube.com/", icon: "&#9654;&#65039;", label: "Open YouTube.com", featured: "youtube" },
+    { href: "https://x.com/", icon: "&#120143;", label: "Open X.com", featured: "x" },
+    {
+      href: "https://www.worldmonitor.app/dashboard?lat=168.3787&lon=-46.4780&zoom=2.50&view=america&timeRange=48h&layers=conflicts%2Chotspots%2Csanctions%2Cweather%2Coutages%2Cnatural%2CiranAttacks",
+      icon: "&#127758;",
+      label: "Open WorldMonitor.com",
+      featured: "worldmonitor",
+    },
     {
       href: "https://trading-strategy-production-1b41.up.railway.app/",
       icon: "&#129504;",
       label: "Decision Engine",
-      featured: "decision",
     },
     {
       href: "https://traderclaw-production.up.railway.app/",
       icon: "&#129408;",
       label: "Traderclaw Backtest",
-      featured: "traderclaw",
     },
     {
       href: "https://t.me/tesr56788",
       icon: "&#9992;&#65039;",
       label: "Trader Lab",
-      featured: "traderlab",
     },
-    {
-      href: "https://www.worldmonitor.app/dashboard?lat=168.3787&lon=-46.4780&zoom=2.50&view=america&timeRange=48h&layers=conflicts%2Chotspots%2Csanctions%2Cweather%2Coutages%2Cnatural%2CiranAttacks",
-      icon: "&#127758;",
-      label: "World Monitor",
-    },
-    { href: "/market-intel.html", icon: "&#128200;", label: "Market Intel Links" },
     { href: "/reporter.html", icon: "&#128240;", label: "Reporter" },
     { href: "https://earth-watch-production-e3c6.up.railway.app/", icon: "&#127757;", label: "Earth Watch" },
     { href: "/settings.html", icon: "&#9881;&#65039;", label: "Settings" },
@@ -74,6 +114,26 @@
     return true;
   }
 
+  function dropdownKey(item, mode) {
+    return "sidebar_dropdown_" + mode + "_" + String(item.label || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "");
+  }
+
+  function getStoredDropdownState(key) {
+    try { return localStorage.getItem(key); } catch { return null; }
+  }
+
+  function setStoredDropdownState(key, open) {
+    try { localStorage.setItem(key, open ? "open" : "closed"); } catch {}
+  }
+
+  function hasActiveDescendant(item) {
+    if (isActive(item.href)) return true;
+    return !!(item.children && item.children.some(hasActiveDescendant));
+  }
+
   function navItem(item, mode) {
     var prefix = mode === "command" ? "cmd-" : "";
     var active = isActive(item.href);
@@ -92,21 +152,39 @@
     );
   }
 
-  function dropdown(item, mode, instance) {
+  function subNavItem(item, mode) {
+    var prefix = mode === "command" ? "cmd-" : "";
+    var active = isActive(item.href);
+    var external = /^https?:\/\//.test(item.href);
+    return (
+      '<a class="' + prefix + 'nav-item ' + prefix + 'nav-subitem' + (active ? " active" : "") +
+      '" href="' + item.href + '" data-nav-href="' + item.href + '"' +
+      (external ? ' target="_blank" rel="noopener"' : "") +
+      (active ? ' aria-current="page"' : "") +
+      '><span class="' + prefix + 'nav-icon" aria-hidden="true">' +
+      item.icon + '</span><span class="' + prefix + 'nav-text">' + item.label +
+      '</span>' + (external ? '<span class="' + prefix + 'nav-external" aria-hidden="true">&#8599;</span>' : "") +
+      "</a>"
+    );
+  }
+
+  function dropdown(item, mode, instance, nested) {
     var prefix = mode === "command" ? "cmd-" : "";
     var id = prefix + "apps-menu-" + instance;
-    var children = item.children.map(function (child) {
-      return (
-        '<a class="' + prefix + 'nav-item ' + prefix + 'nav-subitem" href="' + child.href +
-        '" target="_blank" rel="noopener"><span class="' + prefix + 'nav-icon" aria-hidden="true">' +
-        child.icon + '</span><span class="' + prefix + 'nav-text">' + child.label +
-        '</span><span class="' + prefix + 'nav-external" aria-hidden="true">&#8599;</span></a>'
-      );
+    var storageKey = dropdownKey(item, mode);
+    var active = item.children.some(hasActiveDescendant);
+    var storedState = getStoredDropdownState(storageKey);
+    var open = storedState ? storedState === "open" : active;
+    var children = item.children.map(function (child, index) {
+      return child.children
+        ? dropdown(child, mode, instance + "-" + index, true)
+        : subNavItem(child, mode);
     }).join("");
 
     return (
-      '<div class="' + prefix + 'nav-dropdown">' +
-      '<button class="' + prefix + 'nav-item ' + prefix + 'nav-dropdown-toggle" type="button" aria-expanded="false" aria-controls="' + id + '">' +
+      '<div class="' + prefix + 'nav-dropdown' + (nested ? " " + prefix + "nav-subdropdown" : "") + (open ? " open" : "") + '" data-dropdown-key="' + storageKey + '">' +
+      '<button class="' + prefix + 'nav-item ' + (nested ? prefix + "nav-subitem " : "") + prefix + 'nav-dropdown-toggle' + (active ? " active" : "") +
+      '" type="button" aria-expanded="' + (open ? "true" : "false") + '" aria-controls="' + id + '">' +
       '<span class="' + prefix + 'nav-icon" aria-hidden="true">' + item.icon + '</span>' +
       '<span class="' + prefix + 'nav-text">' + item.label + '</span>' +
       '<span class="' + prefix + 'nav-caret" aria-hidden="true">&#9656;</span></button>' +
@@ -116,8 +194,8 @@
 
   function navigationHtml(mode, instance) {
     var prefix = mode === "command" ? "cmd-" : "";
-    var workspaceHtml = workspace.map(function (item) {
-      return item.children ? dropdown(item, mode, instance) : navItem(item, mode);
+    var workspaceHtml = workspace.map(function (item, index) {
+      return item.children ? dropdown(item, mode, instance + "-" + index) : navItem(item, mode);
     }).join("");
     return (
       '<a class="' + prefix + 'brand" href="/">' +
@@ -133,6 +211,7 @@
         var dropdownRoot = toggle.parentElement;
         var open = dropdownRoot.classList.toggle("open");
         toggle.setAttribute("aria-expanded", open ? "true" : "false");
+        setStoredDropdownState(dropdownRoot.getAttribute("data-dropdown-key"), open);
       });
     });
   }
@@ -148,6 +227,18 @@
       link.classList.toggle("active", active);
       if (active) link.setAttribute("aria-current", "page");
       else link.removeAttribute("aria-current");
+    });
+
+    document.querySelectorAll(".nav-dropdown, .cmd-nav-dropdown").forEach(function (dropdownRoot) {
+      var active = !!dropdownRoot.querySelector("[data-nav-href].active");
+      var storedState = getStoredDropdownState(dropdownRoot.getAttribute("data-dropdown-key"));
+      var open = storedState ? storedState === "open" : active;
+      var toggle = dropdownRoot.querySelector(".nav-dropdown-toggle, .cmd-nav-dropdown-toggle");
+      dropdownRoot.classList.toggle("open", open);
+      if (toggle) {
+        toggle.classList.toggle("active", active);
+        toggle.setAttribute("aria-expanded", open ? "true" : "false");
+      }
     });
   }
 
