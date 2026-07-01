@@ -1,0 +1,133 @@
+/* ─────────────────────────────────────────────────────────
+   X Intelligence — curated trader/analyst feeds, layered on
+   top of command.css
+───────────────────────────────────────────────────────── */
+
+.x-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0 16px;
+}
+
+.x-filter {
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--muted);
+  background: rgba(255,255,255,0.035);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 13px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.x-filter:hover { color: var(--text); border-color: var(--border-hover); }
+.x-filter.active {
+  color: var(--blue);
+  border-color: rgba(77,163,255,0.45);
+  background: var(--blue-bg);
+}
+
+.x-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 16px;
+  align-items: start;
+}
+
+.x-timeline-pane {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.x-timeline-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+.x-timeline-head a {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  text-decoration: none;
+}
+.x-timeline-head a:hover { color: var(--text); }
+
+.x-timeline-frame {
+  min-height: 620px;
+  max-height: calc(100vh - 220px);
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.x-account-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: calc(100vh - 150px);
+  overflow-y: auto;
+}
+
+.x-account-group-title {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 12px 4px 2px;
+}
+.x-account-group-title:first-child { margin-top: 2px; }
+
+.x-account-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  font-family: inherit;
+  text-align: left;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015)),
+    var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 9px 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.x-account-card:hover { border-color: rgba(77,163,255,0.35); }
+.x-account-card.active {
+  border-color: var(--blue);
+  background:
+    linear-gradient(180deg, rgba(77,163,255,0.08), rgba(77,163,255,0.01)),
+    var(--surface2);
+}
+
+.x-account-handle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.x-account-open {
+  font-size: 11px;
+  color: var(--muted);
+  text-decoration: none;
+  flex-shrink: 0;
+}
+.x-account-open:hover { color: var(--blue); }
+
+@media (max-width: 980px) {
+  .x-split { grid-template-columns: 1fr; }
+  .x-account-list { max-height: none; }
+}

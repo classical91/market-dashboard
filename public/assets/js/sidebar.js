@@ -118,6 +118,7 @@
       label: "Open ImageQueue",
     },
     { href: "https://x.com/", icon: "&#120143;", label: "Open X.com", featured: "x" },
+    { href: "/x-intelligence.html", icon: "&#120143;", label: "X Intelligence" },
     {
       href: "https://www.worldmonitor.app/dashboard?lat=168.3787&lon=-46.4780&zoom=2.50&view=america&timeRange=48h&layers=conflicts%2Chotspots%2Csanctions%2Cweather%2Coutages%2Cnatural%2CiranAttacks",
       icon: "&#127758;",

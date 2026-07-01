@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>X Intelligence · Market Command</title>
+  <script src="/assets/js/settings.js"></script>
+  <link rel="stylesheet" href="/assets/styles/command.css" />
+  <link rel="stylesheet" href="/assets/styles/components.css" />
+  <link rel="stylesheet" href="/assets/styles/x-intelligence.css" />
+</head>
+<body>
+<div class="app">
+  <aside class="cmd-sidebar"></aside>
+  <main class="cmd-main">
+
+    <div class="cmd-page-header">
+      <div>
+        <div class="cmd-page-title">&#120143; X Intelligence</div>
+        <div class="cmd-page-subtitle">Curated trader &amp; analyst feeds, embedded live from X</div>
+      </div>
+      <div class="cmd-clock" id="cmd-clock"></div>
+    </div>
+
+    <div class="x-filters">
+      <button class="x-filter active" type="button" data-filter="all">All</button>
+      <button class="x-filter" type="button" data-filter="market-data">Market Data</button>
+      <button class="x-filter" type="button" data-filter="crypto-traders">Crypto Traders</button>
+      <button class="x-filter" type="button" data-filter="ta-signals">TA &amp; Signals</button>
+    </div>
+
+    <div class="x-split">
+      <div class="x-timeline-pane">
+        <div class="x-timeline-head">
+          <span id="xTimelineLabel">&mdash;</span>
+          <a id="xTimelineLink" href="https://x.com/" target="_blank" rel="noopener">Open on X &#8599;</a>
+        </div>
+        <div class="x-timeline-frame" id="xTimelinePane"></div>
+      </div>
+      <div class="x-account-list" id="xAccountList"></div>
+    </div>
+
+    <footer>X Intelligence &mdash; <a href="/">Overview</a> &mdash; <a href="/overview-v2.html">Overview V2</a></footer>
+
+  </main>
+</div>
+<script src="/assets/js/sidebar.js"></script>
+<script src="/assets/js/x-intelligence.js"></script>
+<script>
+  (function () {
+    function tick() {
+      var el = document.getElementById('cmd-clock');
+      if (el) el.textContent = new Date().toLocaleString(undefined, {
+        weekday: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit'
+      });
+    }
+    tick(); setInterval(tick, 1000);
+  })();
+</script>
+</body>
+</html>
