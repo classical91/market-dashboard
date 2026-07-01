@@ -11,8 +11,9 @@ const { createServiceError } = require("../utils/errors");
 const SYNDICATION_URL = (handle) =>
   `https://syndication.twitter.com/srv/timeline-profile/screen-name/${encodeURIComponent(handle)}?showReplies=false`;
 
-const REQUEST_TIMEOUT_MS = 8000;
-const FEED_TTL_MS = 10 * 60 * 1000;
+const REQUEST_TIMEOUT_MS = 5000;
+const FEED_TTL_MS = 15 * 60 * 1000;
+const LATEST_GOOD_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_POSTS_PER_ACCOUNT = 8;
 
 const BROWSER_USER_AGENT =
@@ -67,37 +68,56 @@ class XFeedService {
     this.cache = cache;
   }
 
+  async _fetchFeed(handle) {
+    const response = await fetchWithTimeout(SYNDICATION_URL(handle), REQUEST_TIMEOUT_MS);
+    if (!response.ok) {
+      throw createServiceError(`Syndication endpoint returned ${response.status} for @${handle}`, 502);
+    }
+
+    const html = await response.text();
+    const data = extractNextData(html);
+    if (!data) {
+      throw createServiceError(`Could not parse timeline data for @${handle}`, 502);
+    }
+
+    const tweets = [];
+    collectTweets(data, tweets, new Set());
+    if (!tweets.length) {
+      throw createServiceError(`No posts found for @${handle}`, 502);
+    }
+
+    const posts = tweets
+      .map((tweet) => ({
+        id: tweet.idStr,
+        text: tweet.text,
+        url: `https://x.com/${handle}/status/${tweet.idStr}`,
+        publishedAt: new Date(tweet.createdAt).toISOString(),
+      }))
+      .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
+      .slice(0, MAX_POSTS_PER_ACCOUNT);
+
+    return { handle, posts };
+  }
+
+  /**
+   * Keeps posts on screen across refreshes/restarts instead of them
+   * disappearing: successful fetches are also written to a long-lived
+   * "last known good" entry, which is served as a fallback whenever a fresh
+   * fetch fails (X's syndication endpoint is unofficial and can be flaky).
+   */
   async getAccountFeed(handle) {
-    return this.cache.getOrLoad(`x:feed:${handle}`, FEED_TTL_MS, async () => {
-      const response = await fetchWithTimeout(SYNDICATION_URL(handle), REQUEST_TIMEOUT_MS);
-      if (!response.ok) {
-        throw createServiceError(`Syndication endpoint returned ${response.status} for @${handle}`, 502);
-      }
-
-      const html = await response.text();
-      const data = extractNextData(html);
-      if (!data) {
-        throw createServiceError(`Could not parse timeline data for @${handle}`, 502);
-      }
-
-      const tweets = [];
-      collectTweets(data, tweets, new Set());
-      if (!tweets.length) {
-        throw createServiceError(`No posts found for @${handle}`, 502);
-      }
-
-      const posts = tweets
-        .map((tweet) => ({
-          id: tweet.idStr,
-          text: tweet.text,
-          url: `https://x.com/${handle}/status/${tweet.idStr}`,
-          publishedAt: new Date(tweet.createdAt).toISOString(),
-        }))
-        .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
-        .slice(0, MAX_POSTS_PER_ACCOUNT);
-
-      return { handle, posts };
-    });
+    const latestGoodKey = `x:feed:latest:${handle}`;
+    try {
+      return await this.cache.getOrLoad(`x:feed:${handle}`, FEED_TTL_MS, async () => {
+        const feed = await this._fetchFeed(handle);
+        this.cache.set(latestGoodKey, feed, LATEST_GOOD_TTL_MS);
+        return feed;
+      });
+    } catch (err) {
+      const lastKnownGood = this.cache.get(latestGoodKey);
+      if (lastKnownGood) return lastKnownGood;
+      throw err;
+    }
   }
 }
 

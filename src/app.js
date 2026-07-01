@@ -28,6 +28,7 @@ function createApp() {
   const app = express();
   const cache = new MemoryCache();
   const reporterCache = new PersistentReporterCache();
+  const xFeedCache = new PersistentReporterCache(path.join(process.cwd(), "data", "x-feed-cache.json"));
   const defillamaService = new DefiLlamaService(config.defillama);
   const etherscanService = new EtherscanService(config.etherscan);
   const covalentService = new CovalentService(config.covalent);
@@ -53,7 +54,7 @@ function createApp() {
     cacheTtlMs: Number(process.env.OVERVIEW_CACHE_MS) || 60_000,
   });
   const youtubeService = new YouTubeFeedService({ cache });
-  const xFeedService = new XFeedService({ cache });
+  const xFeedService = new XFeedService({ cache: xFeedCache });
 
   app.disable("x-powered-by");
   app.use(express.json());
