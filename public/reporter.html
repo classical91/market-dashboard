@@ -284,7 +284,6 @@
         <div class="cmd-page-subtitle" id="reporterPageSubtitle">AI-generated briefing &middot; generated on demand</div>
       </div>
       <div style="display:flex;align-items:center;gap:10px">
-        <button class="open-all-btn" id="generateBtn" type="button" style="margin:0">⚡ Generate</button>
         <div class="cmd-clock" id="cmd-clock"></div>
       </div>
     </div>
@@ -414,19 +413,25 @@
       return dateKey(ts) === dateKey();
     }
 
+    function generateCta(label) {
+      return '<div style="margin-top:14px">' +
+        '<button class="open-all-btn reporter-generate-cta" type="button" style="margin:0">⚡ ' +
+        esc(label || 'Generate Current Page') + '</button></div>';
+    }
+
     function renderTab(tab) {
       var content = document.getElementById('reporterContent');
       if (!reportData) {
         content.innerHTML = '<div class="reporter-unconfigured">' +
           '<strong>' + esc(tabLabels[tab] || 'Reporter') + ' is selected</strong><br>' +
-          'No saved report is loaded for this page yet. Use <strong>Generate Current Page</strong> when the OpenAI rate limit clears.</div>';
+          'No saved report is loaded for this page yet.' + generateCta() + '</div>';
         return;
       }
       var text = reportData[tab];
       if (!text) {
         content.innerHTML = '<div class="reporter-unconfigured">' +
           '<strong>' + esc(tabLabels[tab] || 'Reporter') + ' is selected</strong><br>' +
-          'No saved report exists for this page yet. Use <strong>Generate Current Page</strong> when the OpenAI rate limit clears.</div>';
+          'No saved report exists for this page yet.' + generateCta() + '</div>';
         return;
       }
       var generatedAt = reportData.generatedAtBySection && reportData.generatedAtBySection[tab];
@@ -497,9 +502,9 @@
       document.getElementById('reporterContent').innerHTML =
         '<div class="reporter-unconfigured">' +
         '<strong>No briefing generated yet</strong><br>' +
-        'Click <strong>⚡ Generate</strong> above to create today\'s crypto, economics, ' +
-        'and markets briefings. Reports are only generated when you ask &mdash; ' +
-        'opening this page no longer triggers a generation.</div>';
+        'Generate today\'s crypto, economics, and markets briefings. Reports are only ' +
+        'generated when you ask &mdash; opening this page no longer triggers a generation.' +
+        generateCta() + '</div>';
     }
 
     function showRateLimited(data) {
@@ -789,9 +794,7 @@
       generating = true;
       var section = sectionOverride || activeTab;
       if (sectionOverride) setActiveTab(sectionOverride);
-      var btn = document.getElementById('generateBtn');
       var content = document.getElementById('reporterContent');
-      if (btn) { btn.disabled = true; btn.textContent = '⏳ Generating…'; }
       content.innerHTML =
         '<div class="reporter-loading"><span class="spinner"></span>' +
         'Generating briefing — this can take up to a minute&hellip;</div>';
@@ -821,10 +824,6 @@
         })
         .finally(function () {
           generating = false;
-          setTimeout(function () {
-            if (btn && !generating) btn.textContent = 'Generate Current Page';
-          }, 0);
-          if (btn) { btn.disabled = false; btn.textContent = '⚡ Generate'; }
         });
     }
 
@@ -857,10 +856,8 @@
       openLogEntry(Number(btn.getAttribute('data-log-index')));
     });
 
-    var generateBtn = document.getElementById('generateBtn');
-    if (generateBtn) generateBtn.textContent = 'Generate Current Page';
-    if (generateBtn) generateBtn.addEventListener('click', function () {
-      generateReport();
+    document.getElementById('reporterContent').addEventListener('click', function (e) {
+      if (e.target.closest('.reporter-generate-cta')) generateReport();
     });
     configurePageShell();
     setActiveTab(activeTab);
