@@ -107,6 +107,9 @@
     .reporter-log-item[aria-disabled="true"] {
       cursor: default;
     }
+    .reporter-log-item.crypto .reporter-log-label { color: var(--purple); }
+    .reporter-log-item.economics .reporter-log-label { color: var(--blue); }
+    .reporter-log-item.markets .reporter-log-label { color: var(--teal); }
     .reporter-log-name {
       display: grid;
       gap: 2px;
@@ -236,17 +239,18 @@
     }
     .story:hover { border-color: rgba(77,163,255,0.28); }
 
-    .story--bullish {
-      background:
-        linear-gradient(180deg, rgba(0,227,150,0.14), rgba(0,227,150,0.04)),
-        var(--surface);
-      border-color: rgba(0,227,150,0.3);
+    /* One accent color per report category, applied only to reports saved today. */
+    .story--crypto {
+      background: linear-gradient(180deg, var(--purple-bg), rgba(155,123,255,0.03)), var(--surface);
+      border-color: rgba(155,123,255,0.3);
     }
-    .story--bearish {
-      background:
-        linear-gradient(180deg, rgba(255,77,109,0.14), rgba(255,77,109,0.04)),
-        var(--surface);
-      border-color: rgba(255,77,109,0.3);
+    .story--economics {
+      background: linear-gradient(180deg, var(--blue-bg), rgba(77,163,255,0.03)), var(--surface);
+      border-color: rgba(77,163,255,0.3);
+    }
+    .story--markets {
+      background: linear-gradient(180deg, var(--teal-bg), rgba(0,227,150,0.03)), var(--surface);
+      border-color: rgba(0,227,150,0.3);
     }
 
     .story p {
@@ -373,9 +377,10 @@
       return esc(text).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     }
 
-    function parseToStories(text) {
+    function parseToStories(text, sectionClass) {
       /* Split on blank lines → individual story cards */
       var blocks = text.split(/\n{2,}/);
+      var cardClass = 'story' + (sectionClass ? ' story--' + sectionClass : '');
       return blocks
         .map(function (b) { return b.trim(); })
         .filter(Boolean)
@@ -383,17 +388,10 @@
           var lines = block.split('\n');
           var html = '';
           var inList = false;
-          var sentimentClass = '';
 
           lines.forEach(function (line) {
             var t = line.trim();
             if (!t) return;
-            var sentimentMatch = t.match(/sentiment[:\s]*\**\s*(bullish|bearish|neutral)/i);
-            if (sentimentMatch) {
-              var sentiment = sentimentMatch[1].toLowerCase();
-              if (sentiment === 'bullish') sentimentClass = ' story--bullish';
-              else if (sentiment === 'bearish') sentimentClass = ' story--bearish';
-            }
             if (t.startsWith('- ')) {
               if (!inList) { html += '<ul>'; inList = true; }
               html += '<li>' + applyBold(t.slice(2)) + '</li>';
@@ -404,9 +402,16 @@
           });
 
           if (inList) html += '</ul>';
-          return '<div class="story' + sentimentClass + '">' + html + '</div>';
+          return '<div class="' + cardClass + '">' + html + '</div>';
         })
         .join('');
+    }
+
+    function isDateToday(value) {
+      if (!value) return false;
+      var ts = new Date(value);
+      if (Number.isNaN(ts.getTime())) return false;
+      return dateKey(ts) === dateKey();
     }
 
     function renderTab(tab) {
@@ -424,7 +429,9 @@
           'No saved report exists for this page yet. Use <strong>Generate Current Page</strong> when the OpenAI rate limit clears.</div>';
         return;
       }
-      content.innerHTML = '<div class="stories">' + parseToStories(text) + '</div>';
+      var generatedAt = reportData.generatedAtBySection && reportData.generatedAtBySection[tab];
+      var sectionClass = isDateToday(generatedAt) ? tab : '';
+      content.innerHTML = '<div class="stories">' + parseToStories(text, sectionClass) + '</div>';
     }
 
     function currentTtl() {
@@ -648,7 +655,8 @@
           month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit'
         }) : 'timestamp unavailable';
         var readable = !!entry.content;
-        return '<button class="reporter-log-item' + (isPast ? ' past' : '') + '" type="button" data-log-index="' + index + '"' +
+        var sectionClass = !isPast && entry.section ? ' ' + entry.section : '';
+        return '<button class="reporter-log-item' + (isPast ? ' past' : '') + sectionClass + '" type="button" data-log-index="' + index + '"' +
           (readable ? '' : ' aria-disabled="true"') + '>' +
           '<span class="reporter-log-name">' +
           '<span class="reporter-log-label">' + esc(entry.label || entry.section || 'Reporter') + '</span>' +
@@ -692,10 +700,11 @@
         return;
       }
 
+      var sectionClass = isDateToday(entry.generatedAt) ? entry.section : '';
       content.innerHTML = '<div class="reporter-unconfigured" style="margin-bottom:12px">' +
         '<strong>Saved ' + esc(label) + '</strong><br>' +
         esc(when) + (entry.model ? ' &middot; ' + esc(entry.model) : '') +
-        '</div><div class="stories">' + parseToStories(entry.content) + '</div>';
+        '</div><div class="stories">' + parseToStories(entry.content, sectionClass) + '</div>';
     }
 
     function applyReport(data) {

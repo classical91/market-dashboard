@@ -283,9 +283,15 @@ class ReporterService {
     const key = this._cacheKey(resolvedTtl, section, promptCacheKey(promptOverride));
     const existingReport = this._buildReport(resolvedTtl);
     const existingGeneratedAt = existingReport.generatedAtBySection && existingReport.generatedAtBySection[section];
-    if (existingReport[section] && isGeneratedToday({ generatedAt: existingGeneratedAt })) {
+    const loggedToday = this._readLog().find(
+      (entry) => entry && entry.section === section && isGeneratedToday(entry)
+    );
+    if ((existingReport[section] && isGeneratedToday({ generatedAt: existingGeneratedAt })) || loggedToday) {
+      const fallback = loggedToday
+        ? { ...existingReport, [section]: existingReport[section] || loggedToday.content }
+        : existingReport;
       return {
-        ...existingReport,
+        ...fallback,
         generatedSection: section,
         generationSkipped: true,
         generationSkippedReason: "already-generated-today",
