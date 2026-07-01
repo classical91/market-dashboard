@@ -608,6 +608,38 @@
       return keys;
     }
 
+    function logEntryDayKey(entry) {
+      if (entry.generatedDateKey) return entry.generatedDateKey;
+      if (entry.generatedAt) {
+        var ts = new Date(entry.generatedAt);
+        if (!Number.isNaN(ts.getTime())) return dateKey(ts);
+      }
+      return null;
+    }
+
+    /* Collapse entries for the same section on the same day down to the most
+       recently generated one, so stale duplicates cached in localStorage
+       before the same-day gate existed don't keep resurfacing on merge. */
+    function dedupeSameDayEntries(rows) {
+      var bestByKey = {};
+      var undated = [];
+      rows.forEach(function (entry) {
+        if (!entry || !entry.section) return;
+        var day = logEntryDayKey(entry);
+        if (!day) { undated.push(entry); return; }
+        var key = entry.section + ':' + day;
+        var existing = bestByKey[key];
+        if (!existing || new Date(entry.generatedAt || 0) > new Date(existing.generatedAt || 0)) {
+          bestByKey[key] = entry;
+        }
+      });
+      return Object.keys(bestByKey).map(function (key) {
+        return bestByKey[key];
+      }).concat(undated).sort(function (a, b) {
+        return new Date(b.generatedAt || 0) - new Date(a.generatedAt || 0);
+      });
+    }
+
     function mergeLogEntries(serverLog) {
       var map = {};
       readLocalLog().concat(serverLog || []).forEach(function (entry) {
@@ -618,9 +650,9 @@
           map[key] = entry;
         }
       });
-      var rows = Object.keys(map).map(function (key) {
+      var rows = dedupeSameDayEntries(Object.keys(map).map(function (key) {
         return map[key];
-      }).sort(function (a, b) {
+      })).sort(function (a, b) {
         return new Date(b.generatedAt || 0) - new Date(a.generatedAt || 0);
       });
       writeLocalLog(rows);
