@@ -1,4 +1,4 @@
-const fs = require("fs");
+﻿const fs = require("fs");
 const path = require("path");
 const OpenAI = require("openai");
 
@@ -31,43 +31,30 @@ function normalizeSection(section) {
 }
 
 function cryptoPrompt(dateStr) {
-  return `🗓️ ${dateStr}
-🚨 TOP 10 EMERGING CRYPTO TOKENS REPORTER 🚨
-Search the web for crypto tokens showing early momentum in the last 24-72 hours. Focus on tokens that are beginning to gain traction before they become obvious mainstream trends.
-PRIORITIZE TOKENS WITH:
-- Rising trading volume
-- Fresh Dexscreener / DEXTools / CoinGecko / CoinMarketCap activity
-- New CEX or DEX listings
-- Whale or smart-money accumulation
-- Fast holder growth
-- Liquidity additions
-- Strong social momentum on X, Telegram, Discord, Reddit, or crypto news
-- Strong current narratives such as AI, RWA, DePIN, gaming, memecoins, Solana, Base, ETH L2s, Bitcoin ecosystem, or new chain launches
-FILTER OUT:
-- Obvious old large caps unless there is a fresh catalyst
-- Tokens with no reliable source trail
-- Pure hype with no volume, liquidity, or catalyst
-- Suspicious contracts, fake volume, extreme insider concentration, or rug-risk patterns
-FORMAT RULES:
-- Output EXACTLY 10 tokens.
-- Each item must begin with a bold numbered heading:
-  **#[N] [TOKEN NAME] ([TICKER]) — [CHAIN / NARRATIVE]**
-- Use only simple hyphen bullets.
-- Keep each item max 6 lines total including heading.
-- No long paragraphs.
+  return `${dateStr}
+TOP 10 EMERGING / TRENDING CRYPTO TOKENS
+
+Find 10 crypto tokens that are trending or starting to emerge right now. Keep this lightweight: use recent web results and market/news mentions, but do not perform a deep risk audit.
+
+Rules:
+- Output exactly 10 tokens.
+- Prefer tokens with recent momentum, fresh listings, rising volume, social buzz, or a clear narrative.
+- Avoid obvious mega-caps unless there is a fresh reason they are trending.
+- Use simple hyphen bullets only.
+- Keep each item short: heading plus 2-3 bullets.
 - Do not give financial advice or buy/sell instructions.
-FOR EACH TOKEN INCLUDE:
-- Why it is emerging now
-- Key traction signal: volume, listing, holders, social momentum, whale activity, or catalyst
-- Risk check: liquidity, contract risk, insider supply, fake volume, unlocks, or hype-only risk
-- Watch status: Watchlist Only / High Risk / Medium Conviction / Strong Emerging Candidate
-STYLE:
-Make it dashboard-ready, concise, useful for traders, and focused on early signals rather than tokens that are already everywhere.`;
+
+Format each item:
+**#[N] [TOKEN NAME] ([TICKER]) - [CHAIN / CATEGORY]**
+- Why it is trending
+- Main catalyst or signal
+- Quick caution if relevant`;
+
 }
 
 function economicsPrompt(dateStr) {
-  return `🗓️🌏 ${dateStr}
-💹 TOP 10 GLOBAL ECONOMIC DEVELOPMENTS BRIEF (LAST 24-48 HOURS) 💹
+  return `ðŸ—“ï¸ðŸŒ ${dateStr}
+ðŸ’¹ TOP 10 GLOBAL ECONOMIC DEVELOPMENTS BRIEF (LAST 24-48 HOURS) ðŸ’¹
 
 Search for current and verified economic events, indicators, policy moves, market data, or macro developments from the last 24-48 hours and produce a TOP 10 report.
 
@@ -92,7 +79,7 @@ PRIORITY ORDER (when more than 10 items compete):
 FORMAT RULES (STRICT):
 - Output EXACTLY 10 items (no more, no less)
 - Each item must begin with a bold numbered heading on its own line, structured as:
-  **#[N] [COUNTRY/REGION] — [HEADLINE TITLE]**
+  **#[N] [COUNTRY/REGION] â€” [HEADLINE TITLE]**
 - Use only simple hyphen bullets (-) for sub-details beneath each heading
 - Keep each item short and structured (max 6 lines total including heading)
 - For data releases, include: DATA + actual vs. expected where relevant
@@ -102,7 +89,7 @@ GOAL: concise, globally balanced daily economics snapshot.`;
 }
 
 function marketsPrompt(dateStr) {
-  return `🗓️ ${dateStr}
+  return `ðŸ—“ï¸ ${dateStr}
 
 Create a TOP 10 global markets news brief from the past 24-48 hours.
 
