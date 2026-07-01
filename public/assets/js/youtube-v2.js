@@ -108,7 +108,30 @@
   }
 
   function normalizeUploads(data) {
-    return (data.videos || []).map(function (video) {
+    var uploads = data.videos || [];
+
+    if (!uploads.length && data.channels) {
+      uploads = [];
+      data.channels.forEach(function (channel) {
+        (channel.videos || []).forEach(function (video) {
+          uploads.push({
+            video: video,
+            channelLabel: channel.label,
+            channelCategory: channel.category,
+          });
+        });
+      });
+
+      uploads.sort(function (a, b) {
+        var aTime = a.video.publishedAt ? new Date(a.video.publishedAt).getTime() : 0;
+        var bTime = b.video.publishedAt ? new Date(b.video.publishedAt).getTime() : 0;
+        return bTime - aTime;
+      });
+
+      return uploads;
+    }
+
+    return uploads.map(function (video) {
       return {
         video: video,
         channelLabel: video.channelLabel || video.channelHandle || "YouTube",
