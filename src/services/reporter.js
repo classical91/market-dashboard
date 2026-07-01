@@ -138,6 +138,7 @@ class ReporterService {
     this._client = apiKey ? new OpenAI({ apiKey }) : null;
     this._telegram = telegramService || null;
     this._logFile = path.join(process.cwd(), "data", "reporter-generation-log.json");
+    this._rateLimitedUntil = new Map();
   }
 
   _cacheKey(ttlMs, section) {
@@ -168,6 +169,21 @@ class ReporterService {
     const log = this._readLog();
     log.unshift(entry);
     this._writeLog(log);
+  }
+
+  _isRateLimitError(err) {
+    const status = err?.status || err?.statusCode || err?.response?.status;
+    return status === 429 || /rate limit|429/i.test(err?.message || "");
+  }
+
+  _withRateLimit(report, section, untilMs) {
+    return {
+      ...report,
+      rateLimited: true,
+      rateLimitedSection: section,
+      rateLimitedUntil: new Date(untilMs).toISOString(),
+      error: "OpenAI is rate-limited. Showing any saved report instead of retrying immediately.",
+    };
   }
 
   _buildReport(ttlMs) {
@@ -228,21 +244,33 @@ class ReporterService {
     const resolvedTtl = ttlMs || DEFAULT_TTL_MS;
     const section = normalizeSection(requestedSection);
     const key = this._cacheKey(resolvedTtl, section);
+    const existingCooldown = this._rateLimitedUntil.get(section) || 0;
+    if (existingCooldown > Date.now()) {
+      return this._withRateLimit(this._buildReport(resolvedTtl), section, existingCooldown);
+    }
+
     let created = false;
 
-    await this._cache.getOrLoad(key, resolvedTtl, async () => {
-      created = true;
-      const dateStr = formatDate();
-      const generatedAt = new Date().toISOString();
-      const content = await this._generate(promptForSection(section, dateStr));
-      return {
-        section,
-        label: SECTION_LABELS[section],
-        generatedAt,
-        dateStr,
-        content,
-      };
-    });
+    try {
+      await this._cache.getOrLoad(key, resolvedTtl, async () => {
+        created = true;
+        const dateStr = formatDate();
+        const generatedAt = new Date().toISOString();
+        const content = await this._generate(promptForSection(section, dateStr));
+        return {
+          section,
+          label: SECTION_LABELS[section],
+          generatedAt,
+          dateStr,
+          content,
+        };
+      });
+    } catch (err) {
+      if (!this._isRateLimitError(err)) throw err;
+      const untilMs = Date.now() + 5 * 60 * 1000;
+      this._rateLimitedUntil.set(section, untilMs);
+      return this._withRateLimit(this._buildReport(resolvedTtl), section, untilMs);
+    }
 
     const report = this._buildReport(resolvedTtl);
     report.generatedSection = section;

@@ -310,6 +310,27 @@
         'opening this page no longer triggers a generation.</div>';
     }
 
+    function showRateLimited(data) {
+      var until = data && data.rateLimitedUntil ? new Date(data.rateLimitedUntil) : null;
+      var untilText = until ? until.toLocaleTimeString(undefined, {
+        hour: '2-digit', minute: '2-digit'
+      }) : 'a few minutes';
+      if (data && hasContent(data)) {
+        applyReport(data);
+        document.getElementById('reporterContent').insertAdjacentHTML(
+          'afterbegin',
+          '<div class="reporter-error" style="margin-bottom:12px">OpenAI is rate-limited. Showing the saved report. Try generating again after ' +
+          esc(untilText) + '.</div>'
+        );
+        return;
+      }
+      document.getElementById('reporterContent').innerHTML =
+        '<div class="reporter-unconfigured">' +
+        '<strong>OpenAI is rate-limited</strong><br>' +
+        'No new report was generated. Try <strong>Generate Current Page</strong> again after ' +
+        esc(untilText) + '.</div>';
+    }
+
     function hasContent(data) {
       return !!(data && (data.crypto || data.economics || data.markets));
     }
@@ -402,10 +423,17 @@
         .then(readApiJson)
         .then(function (data) {
           if (!data.configured) return showUnconfigured();
+          if (data.rateLimited) return showRateLimited(data);
           if (!hasContent(data)) return showEmptyState();
           applyReport(data);
         })
         .catch(function (err) {
+          if (err.status === 429) {
+            content.innerHTML =
+              '<div class="reporter-unconfigured"><strong>OpenAI is rate-limited</strong><br>' +
+              'No new report was generated. Wait a few minutes before trying again.</div>';
+            return;
+          }
           content.innerHTML =
             '<div class="reporter-error">Failed to generate report: ' + esc(err.message) + '</div>';
         })
