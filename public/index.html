@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Market Command Dashboard</title>
+    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/assets/styles/overview.css" />
     <link rel="stylesheet" href="/assets/styles/components.css" />
     <script src="/assets/js/settings.js"></script>
@@ -13,6 +14,48 @@
       <aside class="sidebar"></aside>
 
       <main class="main">
+        <section class="terminal-suite" aria-label="Market terminal status">
+          <div class="terminal-brand">
+            <span class="terminal-mark">MC</span>
+            <span>
+              <strong>Market Command</strong>
+              <small>Terminal Suite</small>
+            </span>
+          </div>
+          <div class="terminal-tape" aria-label="Key market tape">
+            <span>BTC <strong>LIVE</strong></span>
+            <span>VIX <strong>WATCH</strong></span>
+            <span>DXY <strong>MACRO</strong></span>
+            <span>CL-F <strong>ENERGY</strong></span>
+          </div>
+          <div class="terminal-status">
+            <span>Server live</span>
+            <span>Fallback safe</span>
+          </div>
+        </section>
+
+        <nav class="terminal-tabs" aria-label="Terminal workspaces">
+          <a href="/" class="active">Overview</a>
+          <a href="/market-intel.html">Macro</a>
+          <a href="/crypto.html">Crypto</a>
+          <a href="/on-chain.html">On-Chain</a>
+          <a href="/youtube-v2.html">YouTube</a>
+          <a href="/indicators.html">Glossary</a>
+        </nav>
+
+        <section class="dashboard-header" aria-label="Dashboard overview">
+          <div>
+            <div class="eyebrow">Market Command</div>
+            <h2>Cross-asset operations dashboard</h2>
+            <p>Live crypto, macro, equities, alerts, and research links in one workspace.</p>
+          </div>
+          <div class="dashboard-header-actions" aria-label="Dashboard status">
+            <span class="status-pill status-pill--live">Live-ready</span>
+            <span class="status-pill">90s refresh</span>
+            <span class="status-pill">Fallback safe</span>
+          </div>
+        </section>
+
         <section class="topbar">
           <input
             id="searchInput"
