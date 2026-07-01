@@ -119,6 +119,57 @@
     },
   };
 
+  var DEFAULT_REPORTER_PROMPTS = {
+    crypto:
+`{date}
+TOP 10 EMERGING / TRENDING CRYPTO TOKENS
+
+Find 10 crypto tokens that are trending or starting to emerge right now. Keep this lightweight: use recent web results and market/news mentions, but do not perform a deep risk audit.
+
+Rules:
+- Output exactly 10 tokens.
+- Prefer tokens with recent momentum, fresh listings, rising volume, social buzz, or a clear narrative.
+- Avoid obvious mega-caps unless there is a fresh reason they are trending.
+- Use simple hyphen bullets only.
+- Keep each item short: heading plus 2-3 bullets.
+- Do not give financial advice or buy/sell instructions.
+
+Format each item:
+**#[N] [TOKEN NAME] ([TICKER]) - [CHAIN / CATEGORY]**
+- Why it is trending
+- Main catalyst or signal
+- Quick caution if relevant`,
+    economics:
+`{date}
+TOP 10 GLOBAL ECONOMIC DEVELOPMENTS BRIEF
+
+Search for current and verified economic events, indicators, policy moves, market data, or macro developments from the last 24-48 hours and produce a TOP 10 report.
+
+Rules:
+- Output exactly 10 items.
+- Cover a globally balanced mix across major economies.
+- Use simple hyphen bullets only.
+- Keep each item short and structured.
+- Include data plus actual vs. expected where relevant.
+- If uncertain of a specific data point, omit it rather than approximate.`,
+    markets:
+`{date}
+Create a TOP 10 global markets news brief from the past 24-48 hours.
+
+Coverage should include a mix of stocks, indices, forex, commodities, bonds, rates, macro, and central banks.
+
+Rules:
+- Output exactly 10 stories.
+- Include title, why it matters, assets affected, and sentiment.
+- Keep each story short.
+- No long paragraphs.
+- Use hyphen bullets only.`,
+  };
+
+  function reporterPromptKey(section) {
+    return 'reporterPrompt:' + (DEFAULT_REPORTER_PROMPTS[section] ? section : 'crypto');
+  }
+
   function applyTheme(name) {
     var theme = THEMES[name] || THEMES.dark;
     var root = document.documentElement;
@@ -151,6 +202,7 @@
 
   window.AppSettings = {
     THEMES: THEMES,
+    DEFAULT_REPORTER_PROMPTS: DEFAULT_REPORTER_PROMPTS,
     applyTheme: applyTheme,
     getTheme: getTheme,
     getFrequency: function () {
@@ -158,6 +210,19 @@
     },
     setFrequency: function (h) {
       localStorage.setItem('reporterFreqHours', String(h));
+    },
+    getReporterPrompt: function (section) {
+      var key = reporterPromptKey(section);
+      return localStorage.getItem(key) || DEFAULT_REPORTER_PROMPTS[section] || DEFAULT_REPORTER_PROMPTS.crypto;
+    },
+    getReporterPromptOverride: function (section) {
+      return localStorage.getItem(reporterPromptKey(section)) || '';
+    },
+    setReporterPrompt: function (section, prompt) {
+      localStorage.setItem(reporterPromptKey(section), String(prompt || '').trim());
+    },
+    resetReporterPrompt: function (section) {
+      localStorage.removeItem(reporterPromptKey(section));
     },
   };
 })();

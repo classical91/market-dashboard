@@ -54,24 +54,55 @@
       gap: 8px;
     }
     .reporter-log-item {
+      appearance: none;
+      width: 100%;
+      background: transparent;
+      border: 0;
+      color: inherit;
+      cursor: pointer;
       display: flex;
       justify-content: space-between;
+      align-items: center;
       gap: 12px;
-      padding-top: 8px;
+      padding: 8px 0 0;
+      text-align: left;
+      font: inherit;
       border-top: 1px solid var(--border);
+      transition: color 0.15s, background 0.15s;
     }
     .reporter-log-item:first-child {
       border-top: 0;
       padding-top: 0;
     }
+    .reporter-log-item:hover {
+      color: var(--soft);
+    }
+    .reporter-log-item[aria-disabled="true"] {
+      cursor: default;
+    }
+    .reporter-log-name {
+      display: grid;
+      gap: 2px;
+      min-width: 0;
+    }
     .reporter-log-label {
       color: var(--text);
       font-weight: 700;
+    }
+    .reporter-log-status {
+      color: var(--muted);
+      font-size: 11px;
     }
     .reporter-log-time {
       color: var(--muted);
       flex: 0 0 auto;
       text-align: right;
+    }
+    .reporter-log-read {
+      color: var(--blue);
+      display: block;
+      font-size: 11px;
+      margin-top: 2px;
     }
 
     /* ── Tabs ─────────────────────────────────────────────── */
@@ -231,6 +262,7 @@
   (function () {
     var activeTab = 'crypto';
     var reportData = null;
+    var generationLogEntries = [];
     var tabLabels = {
       crypto: 'Emerging Markets',
       economics: 'Economics',
@@ -299,6 +331,11 @@
       return window.AppSettings ? window.AppSettings.getFrequency() : 24;
     }
 
+    function currentPromptOverride(section) {
+      if (!window.AppSettings || !window.AppSettings.getReporterPromptOverride) return '';
+      return window.AppSettings.getReporterPromptOverride(section);
+    }
+
     function isRateLimitMessage(message) {
       return /rate limit|rate-limited|429/i.test(String(message || ''));
     }
@@ -360,6 +397,19 @@
         esc(untilText) + '.' + modelText + '</div>';
     }
 
+    function showAlreadyGenerated(data) {
+      applyReport(data);
+      var label = tabLabels[data && data.generatedSection] || tabLabels[activeTab] || 'Reporter';
+      var next = data && data.nextGenerationDate ? ' New generation unlocks on ' + esc(data.nextGenerationDate) + '.' : '';
+      document.getElementById('reporterContent').insertAdjacentHTML(
+        'afterbegin',
+        '<div class="reporter-unconfigured" style="margin-bottom:12px">' +
+        '<strong>' + esc(label) + ' already generated today</strong><br>' +
+        'Showing the saved report. No new OpenAI API call was made.' + next +
+        '</div>'
+      );
+    }
+
     function hasContent(data) {
       return !!(data && (data.crypto || data.economics || data.markets));
     }
@@ -370,6 +420,7 @@
       var rows = (log || []).slice().sort(function (a, b) {
         return new Date(b.generatedAt || 0) - new Date(a.generatedAt || 0);
       }).slice(0, 10);
+      generationLogEntries = rows;
       if (!rows.length) {
         el.style.display = 'none';
         el.innerHTML = '';
@@ -377,16 +428,51 @@
       }
       el.style.display = 'block';
       el.innerHTML = '<div class="reporter-log-title">Saved generation log</div>' +
-        '<div class="reporter-log-list">' + rows.map(function (entry) {
+        '<div class="reporter-log-list">' + rows.map(function (entry, index) {
         var ts = entry.generatedAt ? new Date(entry.generatedAt) : null;
         var when = ts ? ts.toLocaleString(undefined, {
           month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit'
         }) : 'timestamp unavailable';
-        return '<div class="reporter-log-item">' +
+        var readable = !!entry.content;
+        return '<button class="reporter-log-item" type="button" data-log-index="' + index + '"' +
+          (readable ? '' : ' aria-disabled="true"') + '>' +
+          '<span class="reporter-log-name">' +
           '<span class="reporter-log-label">' + esc(entry.label || entry.section || 'Reporter') + '</span>' +
-          '<span class="reporter-log-time">' + esc(when) + '</span>' +
-          '</div>';
+          '<span class="reporter-log-status">' + (readable ? 'Saved report available' : 'Timestamp only') + '</span>' +
+          '</span>' +
+          '<span class="reporter-log-time">' + esc(when) +
+          '<span class="reporter-log-read">' + (readable ? 'Read' : 'Unavailable') + '</span>' +
+          '</span>' +
+          '</button>';
       }).join('') + '</div>';
+    }
+
+    function openLogEntry(index) {
+      var entry = generationLogEntries[index];
+      var content = document.getElementById('reporterContent');
+      if (!entry || !content) return;
+      activeTab = entry.section || activeTab;
+      document.querySelectorAll('.reporter-tab').forEach(function (t) {
+        t.classList.toggle('active', t.dataset.tab === activeTab);
+      });
+
+      var ts = entry.generatedAt ? new Date(entry.generatedAt) : null;
+      var when = ts ? ts.toLocaleString(undefined, {
+        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit'
+      }) : 'timestamp unavailable';
+      var label = entry.label || tabLabels[entry.section] || 'Reporter';
+
+      if (!entry.content) {
+        content.innerHTML = '<div class="reporter-unconfigured">' +
+          '<strong>' + esc(label) + ' log is timestamp only</strong><br>' +
+          'This row was saved before report text was stored. Generate this page again to create a readable saved log.</div>';
+        return;
+      }
+
+      content.innerHTML = '<div class="reporter-unconfigured" style="margin-bottom:12px">' +
+        '<strong>Saved ' + esc(label) + '</strong><br>' +
+        esc(when) + (entry.model ? ' &middot; ' + esc(entry.model) : '') +
+        '</div><div class="stories">' + parseToStories(entry.content) + '</div>';
     }
 
     function applyReport(data) {
@@ -446,11 +532,16 @@
         '<div class="reporter-loading"><span class="spinner"></span>' +
         'Generating briefing — this can take up to a minute&hellip;</div>';
 
-      fetch('/api/daily-report/generate?ttlHours=' + currentTtl() + '&section=' + encodeURIComponent(section), { method: 'POST' })
+      fetch('/api/daily-report/generate?ttlHours=' + currentTtl() + '&section=' + encodeURIComponent(section), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: currentPromptOverride(section) })
+      })
         .then(readApiJson)
         .then(function (data) {
           if (!data.configured) return showUnconfigured();
           if (data.rateLimited) return showRateLimited(data);
+          if (data.generationSkipped) return showAlreadyGenerated(data);
           if (!hasContent(data)) return showEmptyState();
           applyReport(data);
         })
@@ -487,6 +578,13 @@
       var btn = e.target.closest('[data-tab]');
       if (!btn) return;
       setActiveTab(btn.dataset.tab);
+    });
+
+    var reporterLog = document.getElementById('reporterLog');
+    if (reporterLog) reporterLog.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-log-index]');
+      if (!btn) return;
+      openLogEntry(Number(btn.getAttribute('data-log-index')));
     });
 
     var generateBtn = document.getElementById('generateBtn');

@@ -1,5 +1,6 @@
 ﻿const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 const OpenAI = require("openai");
 
 const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000;
@@ -24,6 +25,27 @@ function formatDate() {
       year: "numeric",
     })
     .toUpperCase();
+}
+
+function formatDateKey(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function msUntilNextDay(date = new Date()) {
+  const nextDay = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
+  return Math.max(nextDay.getTime() - date.getTime(), 60 * 1000);
+}
+
+function isGeneratedToday(entry) {
+  if (!entry) return false;
+  if (entry.generatedDateKey) return entry.generatedDateKey === formatDateKey();
+  if (!entry.generatedAt) return false;
+  const generatedAt = new Date(entry.generatedAt);
+  if (Number.isNaN(generatedAt.getTime())) return false;
+  return formatDateKey(generatedAt) === formatDateKey();
 }
 
 function normalizeSection(section) {
@@ -118,6 +140,26 @@ function promptForSection(section, dateStr) {
   return cryptoPrompt(dateStr);
 }
 
+function normalizeCustomPrompt(prompt) {
+  if (typeof prompt !== "string") return "";
+  return prompt.trim().slice(0, 12000);
+}
+
+function customPromptForDate(prompt, dateStr) {
+  const normalized = normalizeCustomPrompt(prompt);
+  if (!normalized) return "";
+  if (/\{date\}/i.test(normalized)) {
+    return normalized.replace(/\{date\}/gi, dateStr);
+  }
+  return `${dateStr}\n${normalized}`;
+}
+
+function promptCacheKey(prompt) {
+  const normalized = normalizeCustomPrompt(prompt);
+  if (!normalized) return "default";
+  return crypto.createHash("sha256").update(normalized).digest("hex").slice(0, 16);
+}
+
 class ReporterService {
   constructor({ cache, apiKey, model, telegramService }) {
     this._cache = cache;
@@ -129,9 +171,13 @@ class ReporterService {
     this._rateLimitedUntil = new Map();
   }
 
-  _cacheKey(ttlMs, section) {
+  _cacheKey(ttlMs, section, promptKey = "default") {
     const period = Math.floor(Date.now() / ttlMs);
-    return `reporter:v2:${section}:${ttlMs}:${period}`;
+    return `reporter:v3:${section}:${promptKey}:${ttlMs}:${period}`;
+  }
+
+  _latestCacheKey(section) {
+    return `reporter:latest:${section}`;
   }
 
   _readLog() {
@@ -185,7 +231,7 @@ class ReporterService {
     };
 
     REPORT_SECTIONS.forEach((section) => {
-      const cached = this._cache.get(this._cacheKey(ttlMs, section));
+      const cached = this._cache.get(this._latestCacheKey(section)) || this._cache.get(this._cacheKey(ttlMs, section));
       if (!cached) return;
       report.generated = true;
       report.dateStr = report.dateStr || cached.dateStr;
@@ -226,40 +272,63 @@ class ReporterService {
    * Generate only the requested reporter section, then return the current
    * aggregate cached report so the UI can keep already-generated tabs visible.
    */
-  async generateReport(ttlMs, requestedSection) {
+  async generateReport(ttlMs, requestedSection, customPrompt) {
     if (!this._client) {
       return { configured: false };
     }
 
     const resolvedTtl = ttlMs || DEFAULT_TTL_MS;
     const section = normalizeSection(requestedSection);
-    const key = this._cacheKey(resolvedTtl, section);
+    const promptOverride = normalizeCustomPrompt(customPrompt);
+    const key = this._cacheKey(resolvedTtl, section, promptCacheKey(promptOverride));
+    const existingReport = this._buildReport(resolvedTtl);
+    const existingGeneratedAt = existingReport.generatedAtBySection && existingReport.generatedAtBySection[section];
+    if (existingReport[section] && isGeneratedToday({ generatedAt: existingGeneratedAt })) {
+      return {
+        ...existingReport,
+        generatedSection: section,
+        generationSkipped: true,
+        generationSkippedReason: "already-generated-today",
+        nextGenerationDate: formatDateKey(new Date(Date.now() + msUntilNextDay())),
+      };
+    }
+
     const existingCooldown = this._rateLimitedUntil.get(section) || 0;
     if (existingCooldown > Date.now()) {
       return this._withRateLimit(this._buildReport(resolvedTtl), section, existingCooldown);
     }
 
     let created = false;
+    let generatedEntry = null;
+    let loadedEntry = null;
 
     try {
-      await this._cache.getOrLoad(key, resolvedTtl, async () => {
+      loadedEntry = await this._cache.getOrLoad(key, resolvedTtl, async () => {
         created = true;
         const dateStr = formatDate();
         const generatedAt = new Date().toISOString();
-        const content = await this._generate(promptForSection(section, dateStr));
-        return {
+        const prompt = customPromptForDate(promptOverride, dateStr) || promptForSection(section, dateStr);
+        const content = await this._generate(prompt);
+        generatedEntry = {
           section,
           label: SECTION_LABELS[section],
           generatedAt,
+          generatedDateKey: formatDateKey(),
           dateStr,
           content,
+          prompt: promptOverride || null,
         };
+        return generatedEntry;
       });
     } catch (err) {
       if (!this._isRateLimitError(err)) throw err;
       const untilMs = Date.now() + 5 * 60 * 1000;
       this._rateLimitedUntil.set(section, untilMs);
       return this._withRateLimit(this._buildReport(resolvedTtl), section, untilMs);
+    }
+
+    if (loadedEntry) {
+      this._cache.set(this._latestCacheKey(section), loadedEntry, Math.max(resolvedTtl, msUntilNextDay()));
     }
 
     const report = this._buildReport(resolvedTtl);
@@ -270,7 +339,11 @@ class ReporterService {
         section,
         label: SECTION_LABELS[section],
         generatedAt: report.generatedAtBySection && report.generatedAtBySection[section],
+        generatedDateKey: formatDateKey(),
         dateStr: report.dateStr,
+        model: this._model,
+        content: generatedEntry ? generatedEntry.content : report[section],
+        prompt: generatedEntry ? generatedEntry.prompt : null,
       });
       report.generationLog = this._readLog();
     }

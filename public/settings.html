@@ -73,6 +73,63 @@
       color: var(--text); border-color: rgba(77,163,255,0.36);
     }
     .freq-btn:hover:not(.active) { background: rgba(255,255,255,0.08); color: var(--soft); }
+    .prompt-editor {
+      display: grid;
+      gap: 10px;
+      margin-top: 18px;
+    }
+    .prompt-editor select,
+    .prompt-editor textarea {
+      width: 100%;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.04);
+      color: var(--text);
+      border-radius: 12px;
+      font: inherit;
+    }
+    .prompt-editor select {
+      max-width: 280px;
+      padding: 10px 12px;
+    }
+    .prompt-editor textarea {
+      min-height: 260px;
+      resize: vertical;
+      padding: 12px 14px;
+      line-height: 1.45;
+      font-size: 13px;
+    }
+    .prompt-editor select:focus,
+    .prompt-editor textarea:focus {
+      outline: none;
+      border-color: rgba(77,163,255,0.42);
+      box-shadow: 0 0 0 3px var(--blue-bg);
+    }
+    .prompt-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .settings-action-btn {
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.04);
+      color: var(--soft);
+      padding: 9px 16px;
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: 0.18s;
+      font-family: inherit;
+    }
+    .settings-action-btn.primary {
+      background: rgba(77,163,255,0.16);
+      color: var(--text);
+      border-color: rgba(77,163,255,0.36);
+    }
+    .settings-action-btn:hover {
+      background: rgba(255,255,255,0.08);
+      color: var(--text);
+    }
 
     /* ── Telegram section ──────────────────────────────── */
     .tg-status-row {
@@ -154,6 +211,22 @@
         <div class="freq-options" id="freqOptions">
           <button class="freq-btn" data-hours="24">Daily (24h)</button>
           <button class="freq-btn" data-hours="48">Every 2 Days (48h)</button>
+        </div>
+        <div class="prompt-editor">
+          <div>
+            <div class="settings-row-label">Report Prompt</div>
+            <div class="settings-row-sub">Choose a reporter tab and adjust the request sent when you generate that page. Use <code>{date}</code> where today&apos;s date should appear.</div>
+          </div>
+          <select id="reportPromptSection" aria-label="Reporter prompt section">
+            <option value="crypto">Emerging Markets</option>
+            <option value="economics">Economics Top 10</option>
+            <option value="markets">Markets Top 10</option>
+          </select>
+          <textarea id="reportPromptText" spellcheck="true" aria-label="Reporter prompt"></textarea>
+          <div class="prompt-actions">
+            <button class="settings-action-btn primary" id="saveReportPrompt" type="button">Save Prompt</button>
+            <button class="settings-action-btn" id="resetReportPrompt" type="button">Reset Default</button>
+          </div>
         </div>
       </div>
     </div>
@@ -254,6 +327,32 @@
     document.querySelectorAll('.freq-btn').forEach(function (b) {
       if (parseInt(b.dataset.hours, 10) === current) b.classList.add('active');
     });
+  })();
+
+  /* Reporter prompt */
+  (function () {
+    var s = window.AppSettings;
+    var section = document.getElementById('reportPromptSection');
+    var text = document.getElementById('reportPromptText');
+    var save = document.getElementById('saveReportPrompt');
+    var reset = document.getElementById('resetReportPrompt');
+
+    function loadPrompt() {
+      text.value = s.getReporterPrompt(section.value);
+    }
+
+    section.addEventListener('change', loadPrompt);
+    save.addEventListener('click', function () {
+      s.setReporterPrompt(section.value, text.value);
+      showToast();
+    });
+    reset.addEventListener('click', function () {
+      s.resetReporterPrompt(section.value);
+      loadPrompt();
+      showToast();
+    });
+
+    loadPrompt();
   })();
 
   /* ── Telegram status ────────────────────────────────── */
