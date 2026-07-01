@@ -29,6 +29,13 @@
 
   var localKey = "xIntelligence:lastHandle";
 
+  function esc(s) {
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
   function allAccounts() {
     var seen = {};
     var out = [];
@@ -40,11 +47,6 @@
       });
     });
     return out;
-  }
-
-  function groupLabel(key) {
-    var match = GROUPS.filter(function (g) { return g.key === key; })[0];
-    return match ? match.label : key;
   }
 
   function readLastHandle() {
@@ -115,12 +117,98 @@
     });
   }
 
+  function formatRelativeDate(iso) {
+    if (!iso) return "";
+    var date = new Date(iso);
+    if (isNaN(date.getTime())) return "";
+    var diffMs = Date.now() - date.getTime();
+    var hour = 60 * 60 * 1000;
+    var hours = Math.floor(diffMs / hour);
+    if (hours < 1) return "Just now";
+    if (hours < 24) return hours + (hours === 1 ? " hour ago" : " hours ago");
+    var days = Math.floor(hours / 24);
+    if (days < 30) return days + (days === 1 ? " day ago" : " days ago");
+    var months = Math.floor(days / 30);
+    return months + (months === 1 ? " month ago" : " months ago");
+  }
+
+  function renderPostFeed(root, data) {
+    root.innerHTML = "";
+    var posts = (data.posts || []).slice().sort(function (a, b) {
+      var aTime = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
+      var bTime = b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
+      return bTime - aTime;
+    });
+
+    var grid = document.createElement("div");
+    grid.className = "x-post-grid";
+
+    posts.forEach(function (post) {
+      var card = document.createElement("a");
+      card.className = "x-post-card";
+      card.href = post.url;
+      card.target = "_blank";
+      card.rel = "noopener";
+
+      var meta = document.createElement("div");
+      meta.className = "x-post-meta";
+      meta.innerHTML =
+        '<span class="x-tag">@' + post.handle + "</span> &middot; " +
+        (post.category ? esc(post.category) + " &middot; " : "") +
+        formatRelativeDate(post.publishedAt);
+
+      var text = document.createElement("div");
+      text.className = "x-post-text";
+      text.textContent = post.text;
+
+      card.appendChild(meta);
+      card.appendChild(text);
+      grid.appendChild(card);
+    });
+
+    if (!posts.length) {
+      var empty = document.createElement("div");
+      empty.className = "x-empty";
+      empty.textContent = "No posts found yet.";
+      grid.appendChild(empty);
+    }
+
+    root.appendChild(grid);
+
+    var failed = data.failedFeeds || [];
+    if (failed.length) {
+      var err = document.createElement("div");
+      err.className = "x-feed-error";
+      err.textContent =
+        "Couldn't load feed" + (failed.length > 1 ? "s" : "") + " for: " +
+        failed.map(function (a) { return "@" + a.handle; }).join(", ");
+      root.appendChild(err);
+    }
+  }
+
+  function loadPostFeed(root) {
+    if (!root) return;
+    fetch("/api/x/accounts")
+      .then(function (res) {
+        if (!res.ok) throw new Error("Request failed: " + res.status);
+        return res.json();
+      })
+      .then(function (data) {
+        renderPostFeed(root, data || {});
+      })
+      .catch(function () {
+        root.innerHTML = '<div class="x-empty">Latest posts are unavailable right now.</div>';
+      });
+  }
+
   function init() {
     var listRoot = document.getElementById("xAccountList");
     var pane = document.getElementById("xTimelinePane");
     var paneLabel = document.getElementById("xTimelineLabel");
     var paneLink = document.getElementById("xTimelineLink");
     var filters = document.querySelectorAll(".x-filter");
+    var postFeedRoot = document.getElementById("xPostFeed");
+    loadPostFeed(postFeedRoot);
     if (!listRoot || !pane) return;
 
     var accounts = allAccounts();
