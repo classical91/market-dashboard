@@ -27,7 +27,9 @@
     },
   ];
 
+  var localModeKey = "xIntelligence:lastMode";
   var localKey = "xIntelligence:lastHandle";
+  var ALL_MODE = "all";
 
   function esc(s) {
     return String(s)
@@ -57,8 +59,23 @@
     try { localStorage.setItem(localKey, handle); } catch (err) {}
   }
 
-  function renderList(root, activeHandle, onSelect) {
+  function readLastMode() {
+    try { return localStorage.getItem(localModeKey) || ""; } catch (err) { return ""; }
+  }
+
+  function writeLastMode(mode) {
+    try { localStorage.setItem(localModeKey, mode); } catch (err) {}
+  }
+
+  function renderList(root, activeMode, activeHandle, onSelectAll, onSelect) {
     root.innerHTML = "";
+
+    var allCard = document.createElement("button");
+    allCard.type = "button";
+    allCard.className = "x-account-card x-account-card--all" + (activeMode === ALL_MODE ? " active" : "");
+    allCard.innerHTML = '<span class="x-account-handle">&#127760; All Accounts</span>';
+    allCard.addEventListener("click", onSelectAll);
+    root.appendChild(allCard);
 
     GROUPS.forEach(function (group) {
       var heading = document.createElement("div");
@@ -69,7 +86,7 @@
       group.accounts.forEach(function (handle) {
         var card = document.createElement("button");
         card.type = "button";
-        card.className = "x-account-card" + (handle === activeHandle ? " active" : "");
+        card.className = "x-account-card" + (activeMode !== ALL_MODE && handle === activeHandle ? " active" : "");
         card.innerHTML =
           '<span class="x-account-handle">@' + handle + "</span>" +
           '<a class="x-account-open" href="https://x.com/' + handle + '" target="_blank" rel="noopener">Open &#8599;</a>';
@@ -169,18 +186,24 @@
     var pane = document.getElementById("xTimelinePane");
     var paneLabel = document.getElementById("xTimelineLabel");
     var paneLink = document.getElementById("xTimelineLink");
-    var postFeedRoot = document.getElementById("xPostFeed");
     if (!listRoot || !pane) return;
 
     var accounts = allAccounts();
     var lastHandle = readLastHandle();
     var validLast = accounts.some(function (a) { return a.handle === lastHandle; });
+    var lastMode = readLastMode();
     var state = {
+      mode: lastMode === ALL_MODE ? ALL_MODE : "account",
       handle: validLast ? lastHandle : accounts[0].handle,
       feedData: { posts: [], failedFeeds: [] },
     };
 
     function renderPane() {
+      if (state.mode === ALL_MODE) {
+        renderPostCards(pane, state.feedData.posts, "No posts found yet.");
+        renderFeedError(pane, state.feedData.failedFeeds);
+        return;
+      }
       var handlePosts = state.feedData.posts.filter(function (p) { return p.handle === state.handle; });
       var failed = (state.feedData.failedFeeds || []).some(function (a) { return a.handle === state.handle; });
       renderPostCards(
@@ -192,25 +215,36 @@
       );
     }
 
+    function refreshList() {
+      renderList(listRoot, state.mode, state.handle, selectAll, selectHandle);
+    }
+
+    function selectAll() {
+      state.mode = ALL_MODE;
+      writeLastMode(ALL_MODE);
+      if (paneLabel) paneLabel.textContent = "All Accounts";
+      if (paneLink) paneLink.href = "https://x.com/";
+      renderPane();
+      refreshList();
+    }
+
     function selectHandle(handle) {
+      state.mode = "account";
       state.handle = handle;
+      writeLastMode("account");
       writeLastHandle(handle);
       if (paneLabel) paneLabel.textContent = "@" + handle;
       if (paneLink) paneLink.href = "https://x.com/" + handle;
       renderPane();
-      renderList(listRoot, state.handle, selectHandle);
+      refreshList();
     }
 
-    renderList(listRoot, state.handle, selectHandle);
-    selectHandle(state.handle);
+    refreshList();
+    if (state.mode === ALL_MODE) selectAll(); else selectHandle(state.handle);
 
     loadAccountsFeed().then(function (data) {
       state.feedData = { posts: data.posts || [], failedFeeds: data.failedFeeds || [] };
       renderPane();
-      if (postFeedRoot) {
-        renderPostCards(postFeedRoot, state.feedData.posts, "No posts found yet.");
-        renderFeedError(postFeedRoot, state.feedData.failedFeeds);
-      }
     });
   }
 
