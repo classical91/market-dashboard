@@ -252,10 +252,17 @@
 
     function renderTab(tab) {
       var content = document.getElementById('reporterContent');
-      if (!reportData) return;
+      if (!reportData) {
+        content.innerHTML = '<div class="reporter-unconfigured">' +
+          '<strong>' + esc(tabLabels[tab] || 'Reporter') + ' is selected</strong><br>' +
+          'No saved report is loaded for this page yet. Use <strong>Generate Current Page</strong> when the OpenAI rate limit clears.</div>';
+        return;
+      }
       var text = reportData[tab];
       if (!text) {
-        content.innerHTML = '<div class="reporter-loading" style="padding:32px"><span style="color:var(--muted)">No data for this section.</span></div>';
+        content.innerHTML = '<div class="reporter-unconfigured">' +
+          '<strong>' + esc(tabLabels[tab] || 'Reporter') + ' is selected</strong><br>' +
+          'No saved report exists for this page yet. Use <strong>Generate Current Page</strong> when the OpenAI rate limit clears.</div>';
         return;
       }
       content.innerHTML = '<div class="stories">' + parseToStories(text) + '</div>';
@@ -273,6 +280,9 @@
         var message = body.error || ('HTTP ' + res.status);
         if (res.status === 429) {
           message = 'OpenAI rate limit hit. Wait a few minutes, then generate this page again.';
+          try {
+            localStorage.setItem('reporterRateLimitedUntil', String(Date.now() + 5 * 60 * 1000));
+          } catch {}
         }
         var err = new Error(message);
         err.status = res.status;
@@ -365,6 +375,17 @@
     var generating = false;
     function generateReport(sectionOverride) {
       if (generating) return;
+      var rateLimitedUntil = 0;
+      try {
+        rateLimitedUntil = parseInt(localStorage.getItem('reporterRateLimitedUntil') || '0', 10);
+      } catch {}
+      if (rateLimitedUntil > Date.now()) {
+        var waitSeconds = Math.ceil((rateLimitedUntil - Date.now()) / 1000);
+        document.getElementById('reporterContent').innerHTML =
+          '<div class="reporter-error">OpenAI rate limit is cooling down. Try again in about ' +
+          esc(waitSeconds) + ' seconds.</div>';
+        return;
+      }
       generating = true;
       var section = sectionOverride || activeTab;
       if (sectionOverride) setActiveTab(sectionOverride);
@@ -420,7 +441,9 @@
       generateReport();
     });
     var emergingBtn = document.getElementById('emergingBtn');
-    if (emergingBtn) emergingBtn.addEventListener('click', function () {
+    if (emergingBtn) emergingBtn.addEventListener('click', function (event) {
+      event.preventDefault();
+      event.stopPropagation();
       setActiveTab('crypto');
     });
     setActiveTab(activeTab);
