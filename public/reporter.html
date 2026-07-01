@@ -559,6 +559,28 @@
       return false;
     }
 
+    function reportEntryKey(entry) {
+      return [entry && entry.section || '', entry && entry.generatedAt || ''].join('|');
+    }
+
+    function currentReportKeys(rows) {
+      var keys = {};
+      if (reportData && reportData.generatedAtBySection) {
+        Object.keys(reportData.generatedAtBySection).forEach(function (section) {
+          keys[[section, reportData.generatedAtBySection[section]].join('|')] = true;
+        });
+      }
+      rows.forEach(function (entry) {
+        if (!entry || !entry.section || !entry.generatedAt) return;
+        var section = entry.section;
+        var existingKey = Object.keys(keys).find(function (key) {
+          return key.indexOf(section + '|') === 0;
+        });
+        if (!existingKey) keys[reportEntryKey(entry)] = true;
+      });
+      return keys;
+    }
+
     function mergeLogEntries(serverLog) {
       var map = {};
       readLocalLog().concat(serverLog || []).forEach(function (entry) {
@@ -589,8 +611,13 @@
         return;
       }
       el.style.display = 'block';
-      var currentRows = rows.filter(isCurrentLogEntry);
-      var pastRows = rows.filter(function (entry) { return !isCurrentLogEntry(entry); });
+      var currentKeys = currentReportKeys(rows);
+      var currentRows = rows.filter(function (entry) {
+        return currentKeys[reportEntryKey(entry)] || isCurrentLogEntry(entry);
+      });
+      var pastRows = rows.filter(function (entry) {
+        return !currentKeys[reportEntryKey(entry)] && !isCurrentLogEntry(entry);
+      });
 
       function renderRows(groupRows, isPast) {
         if (!groupRows.length) return '<div class="reporter-log-empty">No saved reports here yet.</div>';
