@@ -139,6 +139,7 @@
 
   function renderPostCards(root, posts, emptyText) {
     root.innerHTML = "";
+    root.classList.toggle("is-empty", !posts.length);
     var grid = document.createElement("div");
     grid.className = "x-post-grid";
 
