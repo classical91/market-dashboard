@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Terminal Suite · Market Command</title>
+    <link rel="stylesheet" href="/assets/styles/overview.css" />
+    <link rel="stylesheet" href="/assets/styles/components.css" />
+    <link rel="stylesheet" href="/assets/styles/terminal-suite.css" />
+    <script src="/assets/js/settings.js"></script>
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar"></aside>
+
+      <main class="main terminal-page">
+        <section class="terminal-chrome" aria-label="Terminal controls">
+          <div class="terminal-brand">
+            <div class="terminal-logo">MC</div>
+            <div>
+              <div class="terminal-kicker">Market Command</div>
+              <h1>Terminal Suite</h1>
+            </div>
+          </div>
+          <div class="terminal-status-row">
+            <span class="terminal-pill live-dot" id="terminalSource">Loading</span>
+            <span class="terminal-pill" id="terminalClock">UTC --:--:--</span>
+            <button class="terminal-button" id="terminalRefresh" type="button">↻ Refresh</button>
+          </div>
+        </section>
+
+        <section class="terminal-tabs" aria-label="Terminal tools">
+          <a class="terminal-tab active" href="#macro-regime">Macro Regime</a>
+          <a class="terminal-tab" href="#confluence">Confluence</a>
+          <a class="terminal-tab" href="#cross-asset">Cross-Asset</a>
+          <a class="terminal-tab" href="#calendar">Calendar</a>
+          <a class="terminal-tab" href="/crypto.html#interactive-dashboards">Dashboards</a>
+          <a class="terminal-tab" href="/traditional.html#macro">Traditional Macro</a>
+        </section>
+
+        <section class="terminal-filterbar" aria-label="Terminal filters">
+          <input id="terminalSearch" class="terminal-search" placeholder="filter cross-asset table · e.g. DXY, BTC, VIX, GOLD" />
+          <div class="terminal-range" role="group" aria-label="Timeframe">
+            <button class="terminal-range-btn" type="button" data-range="1D">1D</button>
+            <button class="terminal-range-btn active" type="button" data-range="1W">1W</button>
+            <button class="terminal-range-btn" type="button" data-range="1M">1M</button>
+            <button class="terminal-range-btn" type="button" data-range="3M">3M</button>
+          </div>
+        </section>
+
+        <div id="terminalBanner" class="terminal-banner" role="status" aria-live="polite"></div>
+
+        <section class="terminal-tape" aria-label="Cross asset ticker">
+          <div class="terminal-tape-track" id="terminalTape"></div>
+        </section>
+
+        <section class="terminal-layout">
+          <aside class="terminal-panel terminal-side" id="cross-asset">
+            <div class="terminal-panel-head">
+              <div>
+                <div class="terminal-section-label">Cross-Asset · I</div>
+                <h2>Asset Monitor</h2>
+              </div>
+              <span class="terminal-mini-tag" id="assetCount">-- assets</span>
+            </div>
+            <div class="terminal-asset-list" id="assetList"></div>
+          </aside>
+
+          <div class="terminal-center-stack">
+            <article class="terminal-panel terminal-regime-card" id="macro-regime">
+              <div class="terminal-panel-head terminal-regime-head">
+                <div>
+                  <div class="terminal-section-label">Macro Regime</div>
+                  <h2 id="regimeLabel">Loading…</h2>
+                </div>
+                <div class="terminal-score">
+                  <strong id="regimeScore">--</strong>
+                  <span>of 30</span>
+                </div>
+              </div>
+              <p class="terminal-regime-summary" id="regimeSummary">Building the macro confluence engine from /api/overview.</p>
+              <div class="terminal-micro-grid" id="regimeMiniCards"></div>
+            </article>
+
+            <article class="terminal-panel" id="confluence">
+              <div class="terminal-panel-head">
+                <div>
+                  <div class="terminal-section-label">TraderClaw Macro Confluence</div>
+                  <h2>6-Factor Read</h2>
+                </div>
+                <span class="terminal-mini-tag" id="factorCount">6 factors</span>
+              </div>
+              <div class="terminal-table-shell">
+                <table class="terminal-table">
+                  <thead>
+                    <tr>
+                      <th>Factor</th>
+                      <th>Reading</th>
+                      <th>Bias</th>
+                      <th>Pts</th>
+                    </tr>
+                  </thead>
+                  <tbody id="confluenceRows"></tbody>
+                </table>
+              </div>
+            </article>
+
+            <article class="terminal-panel terminal-thesis-card">
+              <div class="terminal-panel-head">
+                <div>
+                  <div class="terminal-section-label">Engine Note</div>
+                  <h2>What this means</h2>
+                </div>
+              </div>
+              <div id="terminalThesis" class="terminal-thesis-text">Waiting for market data…</div>
+            </article>
+          </div>
+
+          <aside class="terminal-right-stack">
+            <article class="terminal-panel" id="calendar">
+              <div class="terminal-panel-head">
+                <div>
+                  <div class="terminal-section-label">Indicators & Calendar · III</div>
+                  <h2>Macro Watch</h2>
+                </div>
+                <span class="terminal-mini-tag">Events</span>
+              </div>
+              <div class="terminal-indicator-list" id="indicatorList"></div>
+            </article>
+
+            <article class="terminal-panel">
+              <div class="terminal-panel-head">
+                <div>
+                  <div class="terminal-section-label">Crypto Pulse</div>
+                  <h2>BTC / ETH / Dominance</h2>
+                </div>
+                <span class="terminal-mini-tag" id="cryptoLiveTag">--</span>
+              </div>
+              <div class="terminal-crypto-grid" id="cryptoPulse"></div>
+            </article>
+
+            <article class="terminal-panel">
+              <div class="terminal-panel-head">
+                <div>
+                  <div class="terminal-section-label">Catalyst Feed</div>
+                  <h2>News Pulse</h2>
+                </div>
+              </div>
+              <div class="terminal-news-feed" id="terminalNews"></div>
+            </article>
+          </aside>
+        </section>
+
+        <p class="terminal-footer">Terminal Suite uses the existing Market Command overview feed: <code>/api/overview</code>.</p>
+      </main>
+    </div>
+
+    <script src="/assets/js/ui.js"></script>
+    <script src="/assets/js/sidebar.js"></script>
+    <script src="/assets/js/terminal-suite.js"></script>
+  </body>
+</html>
