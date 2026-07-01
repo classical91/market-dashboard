@@ -107,32 +107,21 @@
     return years + (years === 1 ? " year ago" : " years ago");
   }
 
-  function flattenSortedByDate(channels) {
-    var items = [];
-    channels.forEach(function (channel) {
-      (channel.videos || []).forEach(function (video) {
-        items.push({
-          video: video,
-          channelLabel: channel.label,
-          channelCategory: channel.category,
-        });
-      });
+  function normalizeUploads(data) {
+    return (data.videos || []).map(function (video) {
+      return {
+        video: video,
+        channelLabel: video.channelLabel || video.channelHandle || "YouTube",
+        channelCategory: video.channelCategory || "",
+      };
     });
-
-    items.sort(function (a, b) {
-      var aTime = a.video.publishedAt ? new Date(a.video.publishedAt).getTime() : 0;
-      var bTime = b.video.publishedAt ? new Date(b.video.publishedAt).getTime() : 0;
-      return bTime - aTime;
-    });
-
-    return items;
   }
 
-  function renderChannelFeeds(root, channels, onSelect) {
+  function renderChannelFeeds(root, data, onSelect) {
     root.innerHTML = "";
 
-    var failed = channels.filter(function (c) { return c.error; });
-    var items = flattenSortedByDate(channels);
+    var failed = data.failedFeeds || [];
+    var items = normalizeUploads(data);
 
     var grid = document.createElement("div");
     grid.className = "yt-channel-videos";
@@ -203,7 +192,7 @@
         return res.json();
       })
       .then(function (data) {
-        renderChannelFeeds(root, data.channels || [], onSelect);
+        renderChannelFeeds(root, data || {}, onSelect);
       })
       .catch(function () {
         root.innerHTML = '<div class="yt-empty">Channel feeds are unavailable right now.</div>';

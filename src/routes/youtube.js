@@ -6,6 +6,14 @@ function asyncRoute(handler) {
   };
 }
 
+function sortByPublishedDateDesc(items) {
+  return items.sort((a, b) => {
+    const aTime = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
+    const bTime = b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
+    return bTime - aTime;
+  });
+}
+
 function createYoutubeRouter({ youtubeService, channels }) {
   const router = express.Router();
 
@@ -25,7 +33,7 @@ function createYoutubeRouter({ youtubeService, channels }) {
             label: channel.label,
             category: channel.category,
             title: result.value.title,
-            videos: result.value.videos.slice(0, 6),
+            videos: result.value.videos,
           };
         }
 
@@ -37,7 +45,22 @@ function createYoutubeRouter({ youtubeService, channels }) {
         };
       });
 
-      res.json({ channels: payload });
+      const videos = sortByPublishedDateDesc(
+        payload.flatMap((channel) =>
+          (channel.videos || []).map((video) => ({
+            ...video,
+            channelHandle: channel.handle,
+            channelLabel: channel.label,
+            channelCategory: channel.category,
+          })),
+        ),
+      );
+
+      res.json({
+        videos,
+        failedFeeds: payload.filter((channel) => channel.error),
+        channels: payload,
+      });
     }),
   );
 
