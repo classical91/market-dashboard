@@ -236,6 +236,19 @@
     }
     .story:hover { border-color: rgba(77,163,255,0.28); }
 
+    .story--bullish {
+      background:
+        linear-gradient(180deg, rgba(0,227,150,0.14), rgba(0,227,150,0.04)),
+        var(--surface);
+      border-color: rgba(0,227,150,0.3);
+    }
+    .story--bearish {
+      background:
+        linear-gradient(180deg, rgba(255,77,109,0.14), rgba(255,77,109,0.04)),
+        var(--surface);
+      border-color: rgba(255,77,109,0.3);
+    }
+
     .story p {
       color: var(--text); font-size: 14px;
       line-height: 1.5; margin-bottom: 6px;
@@ -370,10 +383,17 @@
           var lines = block.split('\n');
           var html = '';
           var inList = false;
+          var sentimentClass = '';
 
           lines.forEach(function (line) {
             var t = line.trim();
             if (!t) return;
+            var sentimentMatch = t.match(/sentiment[:\s]*\**\s*(bullish|bearish|neutral)/i);
+            if (sentimentMatch) {
+              var sentiment = sentimentMatch[1].toLowerCase();
+              if (sentiment === 'bullish') sentimentClass = ' story--bullish';
+              else if (sentiment === 'bearish') sentimentClass = ' story--bearish';
+            }
             if (t.startsWith('- ')) {
               if (!inList) { html += '<ul>'; inList = true; }
               html += '<li>' + applyBold(t.slice(2)) + '</li>';
@@ -384,7 +404,7 @@
           });
 
           if (inList) html += '</ul>';
-          return '<div class="story">' + html + '</div>';
+          return '<div class="story' + sentimentClass + '">' + html + '</div>';
         })
         .join('');
     }
