@@ -29,6 +29,7 @@
             { href: "/crypto.html#crypto-research", icon: "&#8383;", label: "Bitcoin Research" },
             { href: "/crypto.html#alt-research", icon: "&#9672;", label: "Alt Research" },
             { href: "/crypto.html#etf-flows", icon: "&#127974;", label: "ETF Flows" },
+            { href: "/crypto.html#long-vs-shorts", icon: "&#9878;&#65039;", label: "Long vs Shorts" },
             { href: "/crypto.html#market-overview-dashboard", icon: "&#128202;", label: "Market Volumes" },
             { href: "/crypto.html#news", icon: "&#128240;", label: "Crypto News" },
             { href: "/crypto.html#market-cap", icon: "&#128200;", label: "Market Cap" },
@@ -95,6 +96,7 @@
       label: "Open WorldMonitor.com",
       featured: "worldmonitor",
     },
+    { href: "https://www.tradingview.com/", icon: "&#128200;", label: "Open TradingView.com", featured: "tradingview" },
     {
       href: "https://trading-strategy-production-1b41.up.railway.app/",
       icon: "&#129504;",
