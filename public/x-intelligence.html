@@ -29,22 +29,11 @@
           <a id="xTimelineLink" href="https://x.com/" target="_blank" rel="noopener">Open on X &#8599;</a>
         </div>
         <div class="x-timeline-frame" id="xTimelinePane"></div>
+        <p class="x-rss-placeholder">
+          Post text is pulled from the same feed X's own embed widget uses. It's unofficial and can change or rate-limit without notice &mdash; if an account's posts stop loading, that's X, not the dashboard.
+        </p>
       </div>
       <div class="x-account-list" id="xAccountList"></div>
-    </div>
-
-    <!-- LATEST POSTS -->
-    <div class="section-header" data-section="x-latest">
-      <span class="section-label">Latest Posts</span>
-      <span class="section-chevron">&#9660;</span>
-    </div>
-    <div id="x-latest">
-      <div class="x-post-feed" id="xPostFeed">
-        <div class="x-empty">Loading latest posts&hellip;</div>
-      </div>
-      <p class="x-rss-placeholder">
-        Post text is pulled from the same feed X's own embed widget uses. It's unofficial and can change or rate-limit without notice &mdash; if an account's posts stop loading, that's X, not the dashboard.
-      </p>
     </div>
 
     <footer>X Intelligence &mdash; <a href="/">Overview</a> &mdash; <a href="/overview-v2.html">Overview V2</a></footer>
@@ -52,7 +41,6 @@
   </main>
 </div>
 <script src="/assets/js/sidebar.js"></script>
-<script src="/assets/js/sections.js"></script>
 <script src="/assets/js/x-intelligence.js"></script>
 <script>
   (function () {
@@ -63,7 +51,6 @@
       });
     }
     tick(); setInterval(tick, 1000);
-    initSections('x_intelligence_collapsed');
   })();
 </script>
 </body>
