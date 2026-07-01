@@ -60,6 +60,15 @@
       color: var(--soft);
       border-color: var(--border-hover);
     }
+    .reporter-tab-action {
+      color: var(--blue);
+      border-color: rgba(77,163,255,0.28);
+      background: var(--blue-bg);
+    }
+    .reporter-tab-action:hover {
+      color: var(--text);
+      border-color: rgba(77,163,255,0.44);
+    }
 
     /* ── Loading / Error ──────────────────────────────────── */
     .reporter-loading {
@@ -145,7 +154,6 @@
       </div>
       <div style="display:flex;align-items:center;gap:10px">
         <button class="open-all-btn" id="generateBtn" type="button" style="margin:0">⚡ Generate</button>
-        <button class="open-all-btn" id="emergingBtn" type="button" style="margin:0">Emerging Small Cap</button>
         <div class="cmd-clock" id="cmd-clock"></div>
       </div>
     </div>
@@ -162,6 +170,7 @@
       <button class="reporter-tab active" data-tab="crypto">₿ Crypto Top 10</button>
       <button class="reporter-tab" data-tab="economics">🌍 Economics Top 10</button>
       <button class="reporter-tab" data-tab="markets">📊 Markets Top 10</button>
+      <button class="reporter-tab reporter-tab-action" id="emergingBtn" type="button">Emerging Small Cap</button>
     </div>
 
     <!-- Content area -->
@@ -256,6 +265,21 @@
       return window.AppSettings ? window.AppSettings.getFrequency() : 24;
     }
 
+    function readApiJson(res) {
+      if (res.ok) return res.json();
+      return res.json().catch(function () {
+        return {};
+      }).then(function (body) {
+        var message = body.error || ('HTTP ' + res.status);
+        if (res.status === 429) {
+          message = 'OpenAI rate limit hit. Wait a few minutes, then generate this page again.';
+        }
+        var err = new Error(message);
+        err.status = res.status;
+        throw err;
+      });
+    }
+
     function showUnconfigured() {
       document.getElementById('reporterContent').innerHTML =
         '<div class="reporter-unconfigured">' +
@@ -325,10 +349,7 @@
     function loadReport() {
       var content = document.getElementById('reporterContent');
       fetch('/api/daily-report?ttlHours=' + currentTtl())
-        .then(function (res) {
-          if (!res.ok) throw new Error('HTTP ' + res.status);
-          return res.json();
-        })
+        .then(readApiJson)
         .then(function (data) {
           if (!data.configured) return showUnconfigured();
           if (data.generated === false || !hasContent(data)) return showEmptyState();
@@ -357,10 +378,7 @@
         'Generating briefing — this can take up to a minute&hellip;</div>';
 
       fetch('/api/daily-report/generate?ttlHours=' + currentTtl() + '&section=' + encodeURIComponent(section), { method: 'POST' })
-        .then(function (res) {
-          if (!res.ok) throw new Error('HTTP ' + res.status);
-          return res.json();
-        })
+        .then(readApiJson)
         .then(function (data) {
           if (!data.configured) return showUnconfigured();
           if (!hasContent(data)) return showEmptyState();
@@ -398,7 +416,9 @@
 
     var generateBtn = document.getElementById('generateBtn');
     if (generateBtn) generateBtn.textContent = 'Generate Current Page';
-    if (generateBtn) generateBtn.addEventListener('click', generateReport);
+    if (generateBtn) generateBtn.addEventListener('click', function () {
+      generateReport();
+    });
     var emergingBtn = document.getElementById('emergingBtn');
     if (emergingBtn) emergingBtn.addEventListener('click', function () {
       generateReport('crypto');
