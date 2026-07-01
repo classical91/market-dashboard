@@ -30,6 +30,32 @@ function extractNextData(html) {
 }
 
 /**
+ * Finds the first photo attached to a tweet by walking its own subtree for
+ * media objects (entities.media / extended_entities.media both contain
+ * `media_url_https` + a `type` of "photo" on the syndication payload).
+ */
+function firstPhotoUrl(node, seen) {
+  if (!node || typeof node !== "object") return null;
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      const found = firstPhotoUrl(item, seen);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (seen.has(node)) return null;
+  seen.add(node);
+  if (typeof node.media_url_https === "string" && (!node.type || node.type === "photo")) {
+    return node.media_url_https;
+  }
+  for (const value of Object.values(node)) {
+    const found = firstPhotoUrl(value, seen);
+    if (found) return found;
+  }
+  return null;
+}
+
+/**
  * The exact JSON shape isn't documented and can shift, so rather than
  * hardcoding a path, walk the whole tree looking for tweet-shaped objects
  * (full_text/text + id_str + created_at).
@@ -45,7 +71,7 @@ function collectTweets(node, out, seen) {
   const createdAt = node.created_at;
   if (typeof text === "string" && typeof idStr === "string" && typeof createdAt === "string" && !seen.has(idStr)) {
     seen.add(idStr);
-    out.push({ idStr, text, createdAt });
+    out.push({ idStr, text, createdAt, image: firstPhotoUrl(node, new Set()) });
   }
   Object.values(node).forEach((value) => collectTweets(value, out, seen));
 }
@@ -90,6 +116,7 @@ class XFeedService {
       .map((tweet) => ({
         id: tweet.idStr,
         text: tweet.text,
+        image: tweet.image || null,
         url: `https://x.com/${handle}/status/${tweet.idStr}`,
         publishedAt: new Date(tweet.createdAt).toISOString(),
       }))

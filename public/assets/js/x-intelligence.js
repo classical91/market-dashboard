@@ -161,6 +161,14 @@
       text.textContent = post.text;
 
       card.appendChild(meta);
+      if (post.image) {
+        var img = document.createElement("img");
+        img.className = "x-post-image";
+        img.src = post.image;
+        img.loading = "lazy";
+        img.alt = "";
+        card.appendChild(img);
+      }
       card.appendChild(text);
       grid.appendChild(card);
     });
