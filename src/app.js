@@ -7,6 +7,8 @@ const { createOnchainRouter } = require("./routes/onchain");
 const { createOverviewRouter } = require("./routes/overview");
 const { createReporterRouter } = require("./routes/reporter");
 const { createTelegramRouter } = require("./routes/telegram");
+const { createYoutubeRouter } = require("./routes/youtube");
+const { YOUTUBE_CHANNELS } = require("./config/youtube-channels");
 const { MemoryCache } = require("./services/cache");
 const { PersistentReporterCache } = require("./services/persistent-cache");
 const { CovalentService } = require("./services/covalent");
@@ -17,6 +19,7 @@ const { OnchainService } = require("./services/onchain");
 const { OverviewService } = require("./services/overview");
 const { ReporterService } = require("./services/reporter");
 const { TelegramService } = require("./services/telegram");
+const { YouTubeFeedService } = require("./services/youtube");
 
 function createApp() {
   const app = express();
@@ -45,6 +48,7 @@ function createApp() {
     cache,
     cacheTtlMs: Number(process.env.OVERVIEW_CACHE_MS) || 60_000,
   });
+  const youtubeService = new YouTubeFeedService({ cache });
 
   app.disable("x-powered-by");
   app.use(express.json());
@@ -66,6 +70,7 @@ function createApp() {
   app.use("/api/overview", createOverviewRouter({ overviewService }));
   app.use("/api/daily-report", createReporterRouter({ reporterService }));
   app.use("/api/telegram", createTelegramRouter({ telegramService }));
+  app.use("/api/youtube", createYoutubeRouter({ youtubeService, channels: YOUTUBE_CHANNELS }));
 
   app.get("/", (req, res) => {
     res.sendFile(path.join(__dirname, "..", "public", "index.html"));
