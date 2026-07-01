@@ -47,3 +47,38 @@
   .ov2-split { grid-template-columns: 1fr; }
   .ov2-chart-pane { position: static; height: 70vh; min-height: 420px; }
 }
+
+/* ── Ticker tape strip ───────────────────────────────────── */
+.ov2-ticker-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  overflow: hidden;
+  margin-bottom: 20px;
+  min-height: 46px;
+}
+
+/* ── Extra widget panels (heatmap, calendar, top stories) ─ */
+.ov2-widget-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 20px;
+  transition: max-height 0.25s ease, opacity 0.2s ease, margin-bottom 0.25s ease;
+  max-height: 3000px; opacity: 1;
+}
+.ov2-widget-panel.collapsed { max-height: 0; opacity: 0; margin-bottom: 0.5rem; pointer-events: none; }
+
+.ov2-widget-body { height: 380px; }
+.ov2-widget-body--tall { height: 480px; }
+
+.ov2-widgets-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 780px) {
+  .ov2-widgets-row { grid-template-columns: 1fr; }
+}
