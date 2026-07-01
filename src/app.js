@@ -39,6 +39,7 @@ function createApp() {
   const reporterService = new ReporterService({
     cache: reporterCache,
     apiKey: config.reporter.apiKey,
+    model: config.reporter.model,
     telegramService,
   });
   const marketDataService = new MarketDataService();

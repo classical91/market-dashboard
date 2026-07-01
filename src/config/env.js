@@ -68,6 +68,7 @@ const config = {
   port: parseNumber(process.env.PORT, 3000),
   reporter: {
     apiKey: process.env.OPENAI_API_KEY || "",
+    model: process.env.REPORTER_MODEL || "gpt-5.4",
   },
   telegram: {
     botToken: process.env.TELEGRAM_BOT_TOKEN || "",

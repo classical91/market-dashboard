@@ -132,10 +132,11 @@ function promptForSection(section, dateStr) {
 }
 
 class ReporterService {
-  constructor({ cache, apiKey, telegramService }) {
+  constructor({ cache, apiKey, model, telegramService }) {
     this._cache = cache;
     this._apiKey = apiKey;
     this._client = apiKey ? new OpenAI({ apiKey }) : null;
+    this._model = model || "gpt-5.4";
     this._telegram = telegramService || null;
     this._logFile = path.join(process.cwd(), "data", "reporter-generation-log.json");
     this._rateLimitedUntil = new Map();
@@ -213,7 +214,7 @@ class ReporterService {
 
   async _generate(prompt) {
     const res = await this._client.responses.create({
-      model: "gpt-5.5",
+      model: this._model,
       instructions: SYSTEM_PROMPT,
       tools: [{ type: "web_search" }],
       input: prompt,
