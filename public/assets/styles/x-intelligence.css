@@ -144,7 +144,6 @@
   padding: 12px 14px;
   text-decoration: none;
   color: inherit;
-  cursor: pointer;
   transition: border-color 0.15s, transform 0.15s;
 }
 .x-post-card:hover {
@@ -185,6 +184,59 @@
   display: -webkit-box;
   -webkit-line-clamp: 5;
   -webkit-box-orient: vertical;
+}
+
+.x-post-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 2px;
+}
+
+.x-post-open,
+.x-post-copy {
+  min-height: 30px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.04);
+  color: var(--soft);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.x-post-open {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 10px;
+}
+
+.x-post-copy {
+  cursor: pointer;
+  padding: 8px 11px;
+}
+
+.x-post-open:hover,
+.x-post-copy:hover:not(:disabled) {
+  border-color: rgba(77,163,255,0.42);
+  color: var(--text);
+  background: rgba(77,163,255,0.10);
+}
+
+.x-post-copy:disabled {
+  cursor: wait;
+  color: var(--muted);
+  opacity: 0.82;
+}
+
+.x-post-copy:focus-visible,
+.x-post-open:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
 }
 
 .x-empty {
