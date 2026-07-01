@@ -18,6 +18,14 @@
     return document.getElementById(id);
   }
 
+  function ui() {
+    return window.MarketUI || {
+      emptyState: (title) => `<div class="empty-state">${escapeHtml(title)}</div>`,
+      errorState: (title, detail) => `<div class="empty-state">${escapeHtml(title)} ${escapeHtml(detail || "")}</div>`,
+      skeletonCard: () => '<article class="card kpi"><div class="empty-state">Loading...</div></article>',
+    };
+  }
+
   function init() {
     Object.assign(els, {
       banner: $("statusBanner"),
@@ -57,7 +65,7 @@
 
     els.refresh.addEventListener("click", () => loadOverview());
 
-    renderSkeletons();
+    renderDashboardLoading();
     loadOverview();
     setInterval(loadOverview, REFRESH_INTERVAL_MS);
     setInterval(updateClock, 1000);
@@ -171,7 +179,7 @@
   function renderKpis(data) {
     const kpis = data.kpis || [];
     if (!kpis.length) {
-      els.kpiGrid.innerHTML = `<div class="card kpi"><div class="empty-state">No KPI data.</div></div>`;
+      els.kpiGrid.innerHTML = `<div class="card kpi">${ui().emptyState("No KPI data", "The overview API returned no key metrics.")}</div>`;
       return;
     }
     els.kpiGrid.innerHTML = kpis
@@ -202,7 +210,7 @@
   function renderHeatmap(data) {
     const tiles = data.heatmap || [];
     if (!tiles.length) {
-      els.heatmap.innerHTML = `<div class="empty-state">No heatmap data.</div>`;
+      els.heatmap.innerHTML = ui().emptyState("No heatmap data", "Asset performance tiles will appear after data loads.");
       return;
     }
     els.heatmap.innerHTML = tiles
@@ -227,7 +235,7 @@
             <div class="card-subtitle">Asset class snapshot</div>
           </div>
         </div>
-        <div class="empty-state">No allocation data available.</div>`;
+        ${ui().emptyState("No allocation data", "Market-cap dominance is unavailable for this refresh.")}`;
       return;
     }
     const segments = allocation.segments;
@@ -276,7 +284,7 @@
       );
     });
     if (!rows.length) {
-      els.watchlistBody.innerHTML = `<tr><td colspan="4"><div class="empty-state">No matches.</div></td></tr>`;
+      els.watchlistBody.innerHTML = `<tr><td colspan="4">${ui().emptyState("No matches", "Try another symbol, asset name, or market type.")}</td></tr>`;
       return;
     }
     els.watchlistBody.innerHTML = rows
@@ -316,7 +324,7 @@
   function renderAlerts(data) {
     const alerts = data.alerts || [];
     if (!alerts.length) {
-      els.alerts.innerHTML = `<div class="empty-state">No active alerts.</div>`;
+      els.alerts.innerHTML = ui().emptyState("No active alerts", "Live alert conditions are quiet right now.");
       return;
     }
     els.alerts.innerHTML = alerts
@@ -336,7 +344,7 @@
   function renderCalendar(data) {
     const events = data.calendar || [];
     if (!events.length) {
-      els.calendar.innerHTML = `<div class="empty-state">No scheduled events.</div>`;
+      els.calendar.innerHTML = ui().emptyState("No scheduled events", "Macro events will appear here when configured.");
       return;
     }
     els.calendar.innerHTML = events
@@ -358,7 +366,7 @@
   function renderNews(data) {
     const news = data.news || [];
     if (!news.length) {
-      els.news.innerHTML = `<div class="empty-state">No news available.</div>`;
+      els.news.innerHTML = ui().emptyState("No news available", "Connect MARKET_NEWS_URL for live headlines.");
       return;
     }
     els.news.innerHTML = news
@@ -435,6 +443,18 @@
     ctx.fillStyle = change >= 0 ? "#00e396" : "#ff4d6d";
     ctx.font = "bold 26px system-ui";
     ctx.fillText(`${change >= 0 ? "+" : ""}${Number(change).toFixed(2)}%`, W - 150, 32);
+  }
+
+  function renderDashboardLoading() {
+    els.kpiGrid.innerHTML = Array.from({ length: 4 })
+      .map(() => ui().skeletonCard(3))
+      .join("");
+    els.ticker.innerHTML = `<div class="ticker-item"><span class="skeleton">Loading market data...</span></div>`;
+    els.watchlistBody.innerHTML = `<tr><td colspan="4">${ui().emptyState("Loading watchlist", "Fetching current market rows.")}</td></tr>`;
+    els.heatmap.innerHTML = ui().emptyState("Loading heatmap", "Preparing the asset performance scan.");
+    els.alerts.innerHTML = ui().emptyState("Loading alerts", "Checking live conditions.");
+    els.calendar.innerHTML = ui().emptyState("Loading calendar", "Preparing upcoming market events.");
+    els.news.innerHTML = ui().emptyState("Loading news", "Fetching market headlines.");
   }
 
   function renderSkeletons() {
