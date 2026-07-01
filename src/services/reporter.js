@@ -88,6 +88,25 @@ function dedupeLog(entries) {
   );
 }
 
+function normalizeImportedLogEntry(entry) {
+  if (!entry || typeof entry !== "object") return null;
+  const section = normalizeSection(entry.section);
+  const content = typeof entry.content === "string" ? entry.content.trim().slice(0, 50000) : "";
+  const generatedAt = typeof entry.generatedAt === "string" ? entry.generatedAt : "";
+  const generatedDate = generatedAt ? new Date(generatedAt) : null;
+  if (!content || !generatedAt || Number.isNaN(generatedDate.getTime())) return null;
+  return {
+    section,
+    label: SECTION_LABELS[section],
+    generatedAt: generatedDate.toISOString(),
+    generatedDateKey: entry.generatedDateKey || formatDateKey(generatedDate),
+    dateStr: typeof entry.dateStr === "string" ? entry.dateStr.slice(0, 120) : formatDate(),
+    model: typeof entry.model === "string" ? entry.model.slice(0, 80) : null,
+    content,
+    prompt: typeof entry.prompt === "string" ? entry.prompt.slice(0, 12000) : null,
+  };
+}
+
 function cryptoPrompt(dateStr) {
   return `${dateStr}
 TOP 10 EMERGING / TRENDING CRYPTO TOKENS
@@ -242,6 +261,32 @@ class ReporterService {
     const log = this._readLog();
     log.unshift(entry);
     this._writeLog(log);
+  }
+
+  importLogEntries(entries, ttlMs) {
+    const incoming = Array.isArray(entries) ? entries.map(normalizeImportedLogEntry).filter(Boolean) : [];
+    if (!incoming.length) return this._buildReport(ttlMs || DEFAULT_TTL_MS);
+
+    const merged = dedupeLog([...incoming, ...this._readLog()]);
+    this._writeLog(merged);
+
+    const resolvedTtl = ttlMs || DEFAULT_TTL_MS;
+    REPORT_SECTIONS.forEach((section) => {
+      const latest = merged.find((entry) => entry.section === section && entry.content);
+      if (!latest) return;
+      this._cache.set(
+        this._latestCacheKey(section),
+        {
+          dateStr: latest.dateStr,
+          content: latest.content,
+          generatedAt: latest.generatedAt,
+          generatedDateKey: latest.generatedDateKey,
+        },
+        Math.max(resolvedTtl, msUntilNextDay()),
+      );
+    });
+
+    return this._buildReport(resolvedTtl);
   }
 
   _isRateLimitError(err) {

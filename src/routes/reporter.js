@@ -35,6 +35,17 @@ function createReporterRouter({ reporterService }) {
     }
   });
 
+  // Import readable browser-backed logs into the server store so reports can
+  // be shared across devices after a persistent volume is attached.
+  router.post("/logs/import", (req, res, next) => {
+    try {
+      const report = reporterService.importLogEntries(req.body?.entries, resolveTtlMs(req));
+      res.json(report);
+    } catch (err) {
+      next(err);
+    }
+  });
+
   return router;
 }
 

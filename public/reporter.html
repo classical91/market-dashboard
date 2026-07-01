@@ -349,6 +349,7 @@
     var reportData = null;
     var generationLogEntries = [];
     var localLogKey = 'reporterGenerationLog:v1';
+    var localLogSynced = false;
     var tabLabels = {
       crypto: 'Emerging Markets',
       economics: 'Economics Top 10',
@@ -664,6 +665,26 @@
       return rows;
     }
 
+    function syncLocalLogToServer(serverLog) {
+      if (localLogSynced) return Promise.resolve(null);
+      localLogSynced = true;
+      var serverKeys = {};
+      (serverLog || []).forEach(function (entry) {
+        serverKeys[logEntryKey(entry)] = true;
+      });
+      var entries = readLocalLog().filter(function (entry) {
+        return entry && entry.content && entry.generatedAt && !serverKeys[logEntryKey(entry)];
+      }).slice(0, 25);
+      if (!entries.length) return Promise.resolve(null);
+      return fetch('/api/daily-report/logs/import?ttlHours=' + currentTtl(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entries: entries })
+      })
+        .then(readApiJson)
+        .catch(function () { return null; });
+    }
+
     function renderLog(log) {
       var el = document.getElementById('reporterLog');
       if (!el) return;
@@ -777,9 +798,12 @@
         .then(readApiJson)
         .then(function (data) {
           if (!data.configured) return showUnconfigured();
-          renderLog(data.generationLog);
-          if (data.generated === false || !hasContent(data)) return showEmptyState();
-          applyReport(data);
+          return syncLocalLogToServer(data.generationLog).then(function (syncedData) {
+            var resolved = syncedData || data;
+            renderLog(resolved.generationLog);
+            if (resolved.generated === false || !hasContent(resolved)) return showEmptyState();
+            applyReport(resolved);
+          });
         })
         .catch(function (err) {
           content.innerHTML =

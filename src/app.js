@@ -60,7 +60,7 @@ function createApp() {
   const xFeedService = new XFeedService({ cache: xFeedCache });
 
   app.disable("x-powered-by");
-  app.use(express.json());
+  app.use(express.json({ limit: "2mb" }));
   app.get(["/earthwatch", "/earthwatch.html"], (req, res) => {
     res.redirect(302, "https://earth-watch-production-e3c6.up.railway.app/");
   });
