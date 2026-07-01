@@ -542,11 +542,11 @@
 
     function isCurrentLogEntry(entry) {
       if (!entry) return false;
-      if (entry.generatedDateKey) return entry.generatedDateKey === dateKey();
-      if (!entry.generatedAt) return false;
-      var ts = new Date(entry.generatedAt);
-      if (Number.isNaN(ts.getTime())) return false;
-      return dateKey(ts) === dateKey();
+      if (entry.generatedAt) {
+        var ts = new Date(entry.generatedAt);
+        if (!Number.isNaN(ts.getTime())) return dateKey(ts) === dateKey();
+      }
+      return entry.generatedDateKey === dateKey();
     }
 
     function mergeLogEntries(serverLog) {
