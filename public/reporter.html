@@ -30,12 +30,49 @@
     }
     .reporter-log {
       display: none;
-      margin: -4px 0 18px;
+      margin: 18px 0 0;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.012)),
+        var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 15px;
+      padding: 14px 16px;
       color: var(--muted);
       font-size: 12px;
       line-height: 1.5;
     }
-    .reporter-log strong { color: var(--soft); }
+    .reporter-log-title {
+      color: var(--soft);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.07em;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+    }
+    .reporter-log-list {
+      display: grid;
+      gap: 8px;
+    }
+    .reporter-log-item {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding-top: 8px;
+      border-top: 1px solid var(--border);
+    }
+    .reporter-log-item:first-child {
+      border-top: 0;
+      padding-top: 0;
+    }
+    .reporter-log-label {
+      color: var(--text);
+      font-weight: 700;
+    }
+    .reporter-log-time {
+      color: var(--muted);
+      flex: 0 0 auto;
+      text-align: right;
+    }
 
     /* ── Tabs ─────────────────────────────────────────────── */
     .reporter-tabs {
@@ -163,7 +200,6 @@
       <div class="reporter-date-badge" id="reporterDate"></div>
       <div class="reporter-gen-badge" id="reporterGen"></div>
     </div>
-    <div class="reporter-log" id="reporterLog"></div>
 
     <!-- Tabs -->
     <div class="reporter-tabs" id="reporterTabs">
@@ -180,6 +216,8 @@
         Loading daily briefing&hellip;
       </div>
     </div>
+
+    <section class="reporter-log" id="reporterLog" aria-label="Saved generation log"></section>
 
     <footer>Market Command &mdash; AI-generated content based on model knowledge</footer>
 
@@ -340,20 +378,26 @@
     function renderLog(log) {
       var el = document.getElementById('reporterLog');
       if (!el) return;
-      var rows = (log || []).slice(0, 5);
+      var rows = (log || []).slice().sort(function (a, b) {
+        return new Date(b.generatedAt || 0) - new Date(a.generatedAt || 0);
+      }).slice(0, 10);
       if (!rows.length) {
         el.style.display = 'none';
         el.innerHTML = '';
         return;
       }
       el.style.display = 'block';
-      el.innerHTML = '<strong>Generation log:</strong> ' + rows.map(function (entry) {
+      el.innerHTML = '<div class="reporter-log-title">Saved generation log</div>' +
+        '<div class="reporter-log-list">' + rows.map(function (entry) {
         var ts = entry.generatedAt ? new Date(entry.generatedAt) : null;
         var when = ts ? ts.toLocaleString(undefined, {
-          month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+          month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit'
         }) : 'timestamp unavailable';
-        return esc(entry.label || entry.section || 'Reporter') + ' at ' + esc(when);
-      }).join(' | ');
+        return '<div class="reporter-log-item">' +
+          '<span class="reporter-log-label">' + esc(entry.label || entry.section || 'Reporter') + '</span>' +
+          '<span class="reporter-log-time">' + esc(when) + '</span>' +
+          '</div>';
+      }).join('') + '</div>';
     }
 
     function applyReport(data) {
