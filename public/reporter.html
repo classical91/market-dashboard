@@ -272,20 +272,24 @@
       return window.AppSettings ? window.AppSettings.getFrequency() : 24;
     }
 
+    function isRateLimitMessage(message) {
+      return /rate limit|rate-limited|429/i.test(String(message || ''));
+    }
+
     function readApiJson(res) {
       if (res.ok) return res.json();
       return res.json().catch(function () {
         return {};
       }).then(function (body) {
         var message = body.error || ('HTTP ' + res.status);
-        if (res.status === 429) {
+        if (res.status === 429 || isRateLimitMessage(message)) {
           message = 'OpenAI rate limit hit. Wait a few minutes, then generate this page again.';
           try {
             localStorage.setItem('reporterRateLimitedUntil', String(Date.now() + 5 * 60 * 1000));
           } catch {}
         }
         var err = new Error(message);
-        err.status = res.status;
+        err.status = isRateLimitMessage(message) ? 429 : res.status;
         throw err;
       });
     }
@@ -428,7 +432,7 @@
           applyReport(data);
         })
         .catch(function (err) {
-          if (err.status === 429) {
+          if (err.status === 429 || isRateLimitMessage(err.message)) {
             content.innerHTML =
               '<div class="reporter-unconfigured"><strong>OpenAI is rate-limited</strong><br>' +
               'No new report was generated. Wait a few minutes before trying again.</div>';
