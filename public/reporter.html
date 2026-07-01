@@ -97,16 +97,6 @@
       color: var(--soft);
       border-color: var(--border-hover);
     }
-    .reporter-tab-action {
-      color: var(--blue);
-      border-color: rgba(77,163,255,0.28);
-      background: var(--blue-bg);
-    }
-    .reporter-tab-action:hover {
-      color: var(--text);
-      border-color: rgba(77,163,255,0.44);
-    }
-
     /* ── Loading / Error ──────────────────────────────────── */
     .reporter-loading {
       text-align: center; padding: 56px 20px;
@@ -206,7 +196,6 @@
       <button class="reporter-tab active" data-tab="crypto">₿ Crypto Top 10</button>
       <button class="reporter-tab" data-tab="economics">🌍 Economics Top 10</button>
       <button class="reporter-tab" data-tab="markets">📊 Markets Top 10</button>
-      <button class="reporter-tab reporter-tab-action" id="emergingBtn" type="button">Emerging Markets</button>
     </div>
 
     <!-- Content area -->
@@ -419,6 +408,10 @@
       }
 
       renderLog(data.generationLog);
+      if (!data[activeTab] && data.latestSection) {
+        setActiveTab(data.latestSection);
+        return;
+      }
       renderTab(activeTab);
     }
 
@@ -429,6 +422,7 @@
         .then(readApiJson)
         .then(function (data) {
           if (!data.configured) return showUnconfigured();
+          renderLog(data.generationLog);
           if (data.generated === false || !hasContent(data)) return showEmptyState();
           applyReport(data);
         })
@@ -446,9 +440,7 @@
       var section = sectionOverride || activeTab;
       if (sectionOverride) setActiveTab(sectionOverride);
       var btn = document.getElementById('generateBtn');
-      var emergingBtn = document.getElementById('emergingBtn');
       var content = document.getElementById('reporterContent');
-      if (emergingBtn) emergingBtn.disabled = true;
       if (btn) { btn.disabled = true; btn.textContent = '⏳ Generating…'; }
       content.innerHTML =
         '<div class="reporter-loading"><span class="spinner"></span>' +
@@ -474,7 +466,6 @@
         })
         .finally(function () {
           generating = false;
-          if (emergingBtn) emergingBtn.disabled = false;
           setTimeout(function () {
             if (btn && !generating) btn.textContent = 'Generate Current Page';
           }, 0);
@@ -502,12 +493,6 @@
     if (generateBtn) generateBtn.textContent = 'Generate Current Page';
     if (generateBtn) generateBtn.addEventListener('click', function () {
       generateReport();
-    });
-    var emergingBtn = document.getElementById('emergingBtn');
-    if (emergingBtn) emergingBtn.addEventListener('click', function (event) {
-      event.preventDefault();
-      event.stopPropagation();
-      setActiveTab('crypto');
     });
     setActiveTab(activeTab);
 
