@@ -40,11 +40,26 @@
       <div class="x-account-list" id="xAccountList"></div>
     </div>
 
+    <!-- LATEST POSTS -->
+    <div class="section-header" data-section="x-latest">
+      <span class="section-label">Latest Posts</span>
+      <span class="section-chevron">&#9660;</span>
+    </div>
+    <div id="x-latest">
+      <div class="x-post-feed" id="xPostFeed">
+        <div class="x-empty">Loading latest posts&hellip;</div>
+      </div>
+      <p class="x-rss-placeholder">
+        Post text is pulled from public Nitter RSS mirrors, which can go down or rate-limit without notice &mdash; if an account's posts stop loading, that's the mirror, not the dashboard.
+      </p>
+    </div>
+
     <footer>X Intelligence &mdash; <a href="/">Overview</a> &mdash; <a href="/overview-v2.html">Overview V2</a></footer>
 
   </main>
 </div>
 <script src="/assets/js/sidebar.js"></script>
+<script src="/assets/js/sections.js"></script>
 <script src="/assets/js/x-intelligence.js"></script>
 <script>
   (function () {
@@ -55,6 +70,7 @@
       });
     }
     tick(); setInterval(tick, 1000);
+    initSections('x_intelligence_collapsed');
   })();
 </script>
 </body>

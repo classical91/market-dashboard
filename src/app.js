@@ -8,7 +8,9 @@ const { createOverviewRouter } = require("./routes/overview");
 const { createReporterRouter } = require("./routes/reporter");
 const { createTelegramRouter } = require("./routes/telegram");
 const { createYoutubeRouter } = require("./routes/youtube");
+const { createXFeedRouter } = require("./routes/x-feed");
 const { YOUTUBE_CHANNELS } = require("./config/youtube-channels");
+const { X_ACCOUNTS } = require("./config/x-accounts");
 const { MemoryCache } = require("./services/cache");
 const { PersistentReporterCache } = require("./services/persistent-cache");
 const { CovalentService } = require("./services/covalent");
@@ -20,6 +22,7 @@ const { OverviewService } = require("./services/overview");
 const { ReporterService } = require("./services/reporter");
 const { TelegramService } = require("./services/telegram");
 const { YouTubeFeedService } = require("./services/youtube");
+const { XFeedService } = require("./services/x-feed");
 
 function createApp() {
   const app = express();
@@ -50,6 +53,7 @@ function createApp() {
     cacheTtlMs: Number(process.env.OVERVIEW_CACHE_MS) || 60_000,
   });
   const youtubeService = new YouTubeFeedService({ cache });
+  const xFeedService = new XFeedService({ cache });
 
   app.disable("x-powered-by");
   app.use(express.json());
@@ -83,6 +87,7 @@ function createApp() {
   app.use("/api/daily-report", createReporterRouter({ reporterService }));
   app.use("/api/telegram", createTelegramRouter({ telegramService }));
   app.use("/api/youtube", createYoutubeRouter({ youtubeService, channels: YOUTUBE_CHANNELS }));
+  app.use("/api/x", createXFeedRouter({ xFeedService, accounts: X_ACCOUNTS }));
 
   app.get("/", (req, res) => {
     res.sendFile(path.join(__dirname, "..", "public", "index.html"));
