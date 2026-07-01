@@ -3,35 +3,8 @@
    top of command.css
 ───────────────────────────────────────────────────────── */
 
-.x-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 14px 0 16px;
-}
-
-.x-filter {
-  font-family: inherit;
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  font-weight: 600;
-  color: var(--muted);
-  background: rgba(255,255,255,0.035);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 6px 13px;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
-}
-.x-filter:hover { color: var(--text); border-color: var(--border-hover); }
-.x-filter.active {
-  color: var(--blue);
-  border-color: rgba(77,163,255,0.45);
-  background: var(--blue-bg);
-}
-
 .x-split {
+  margin-top: 14px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 300px;
   gap: 16px;
