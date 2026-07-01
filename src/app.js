@@ -23,12 +23,14 @@ const { ReporterService } = require("./services/reporter");
 const { TelegramService } = require("./services/telegram");
 const { YouTubeFeedService } = require("./services/youtube");
 const { XFeedService } = require("./services/x-feed");
+const { resolveDataDir } = require("./utils/data-dir");
 
 function createApp() {
   const app = express();
   const cache = new MemoryCache();
-  const reporterCache = new PersistentReporterCache();
-  const xFeedCache = new PersistentReporterCache(path.join(process.cwd(), "data", "x-feed-cache.json"));
+  const dataDir = resolveDataDir();
+  const reporterCache = new PersistentReporterCache(path.join(dataDir, "reporter-cache.json"));
+  const xFeedCache = new PersistentReporterCache(path.join(dataDir, "x-feed-cache.json"));
   const defillamaService = new DefiLlamaService(config.defillama);
   const etherscanService = new EtherscanService(config.etherscan);
   const covalentService = new CovalentService(config.covalent);
@@ -45,6 +47,7 @@ function createApp() {
     apiKey: config.reporter.apiKey,
     model: config.reporter.model,
     telegramService,
+    dataDir,
   });
   const marketDataService = new MarketDataService();
   const overviewService = new OverviewService({

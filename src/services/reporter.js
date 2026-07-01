@@ -2,6 +2,7 @@
 const path = require("path");
 const crypto = require("crypto");
 const OpenAI = require("openai");
+const { resolveDataDir } = require("../utils/data-dir");
 
 const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000;
 const REPORT_SECTIONS = ["crypto", "economics", "markets"];
@@ -196,13 +197,13 @@ function promptCacheKey(prompt) {
 }
 
 class ReporterService {
-  constructor({ cache, apiKey, model, telegramService }) {
+  constructor({ cache, apiKey, model, telegramService, dataDir }) {
     this._cache = cache;
     this._apiKey = apiKey;
     this._client = apiKey ? new OpenAI({ apiKey }) : null;
     this._model = model || "gpt-5.4-mini";
     this._telegram = telegramService || null;
-    this._logFile = path.join(process.cwd(), "data", "reporter-generation-log.json");
+    this._logFile = path.join(dataDir || resolveDataDir(), "reporter-generation-log.json");
     this._rateLimitedUntil = new Map();
   }
 

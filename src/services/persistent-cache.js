@@ -10,6 +10,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const { resolveDataDir } = require("../utils/data-dir");
 
 class PersistentReporterCache {
   /**
@@ -17,7 +18,7 @@ class PersistentReporterCache {
    *                           Defaults to <project-root>/data/reporter-cache.json
    */
   constructor(filePath) {
-    this._file = filePath || path.join(process.cwd(), "data", "reporter-cache.json");
+    this._file = filePath || path.join(resolveDataDir(), "reporter-cache.json");
     this._map = new Map();
     this._inflight = new Map();
     this._load();

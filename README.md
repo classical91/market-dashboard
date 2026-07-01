@@ -58,6 +58,7 @@ Most keys are optional. The app is designed to degrade to fallback data where po
 ### Core
 
 - `PORT` - local/server port, defaults to `3000`.
+- `DATA_DIR` - persistent file directory for reporter logs/caches and X feed cache. On Railway, set this to the mounted volume path, usually `/app/data`.
 - `OPENAI_API_KEY` - enables report generation.
 - `REPORTER_MODEL` - OpenAI model for reporter generation, defaults to `gpt-5.4-mini`.
 - `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_IDS` - enable Telegram delivery.
