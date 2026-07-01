@@ -59,7 +59,7 @@ Most keys are optional. The app is designed to degrade to fallback data where po
 
 - `PORT` - local/server port, defaults to `3000`.
 - `OPENAI_API_KEY` - enables report generation.
-- `REPORTER_MODEL` - OpenAI model for reporter generation, defaults to `gpt-5.4`.
+- `REPORTER_MODEL` - OpenAI model for reporter generation, defaults to `gpt-5.4-mini`.
 - `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_IDS` - enable Telegram delivery.
 
 ### Market Overview

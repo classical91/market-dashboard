@@ -136,7 +136,7 @@ class ReporterService {
     this._cache = cache;
     this._apiKey = apiKey;
     this._client = apiKey ? new OpenAI({ apiKey }) : null;
-    this._model = model || "gpt-5.4";
+    this._model = model || "gpt-5.4-mini";
     this._telegram = telegramService || null;
     this._logFile = path.join(process.cwd(), "data", "reporter-generation-log.json");
     this._rateLimitedUntil = new Map();
@@ -183,6 +183,7 @@ class ReporterService {
       rateLimited: true,
       rateLimitedSection: section,
       rateLimitedUntil: new Date(untilMs).toISOString(),
+      reporterModel: this._model,
       error: "OpenAI is rate-limited. Showing any saved report instead of retrying immediately.",
     };
   }
@@ -191,6 +192,7 @@ class ReporterService {
     const report = {
       configured: true,
       generated: false,
+      reporterModel: this._model,
       sections: REPORT_SECTIONS,
       generationLog: this._readLog(),
     };

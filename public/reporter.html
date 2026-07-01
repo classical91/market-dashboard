@@ -284,9 +284,6 @@
         var message = body.error || ('HTTP ' + res.status);
         if (res.status === 429 || isRateLimitMessage(message)) {
           message = 'OpenAI rate limit hit. Wait a few minutes, then generate this page again.';
-          try {
-            localStorage.setItem('reporterRateLimitedUntil', String(Date.now() + 5 * 60 * 1000));
-          } catch {}
         }
         var err = new Error(message);
         err.status = isRateLimitMessage(message) ? 429 : res.status;
@@ -319,12 +316,13 @@
       var untilText = until ? until.toLocaleTimeString(undefined, {
         hour: '2-digit', minute: '2-digit'
       }) : 'a few minutes';
+      var modelText = data && data.reporterModel ? ' Model: ' + esc(data.reporterModel) + '.' : '';
       if (data && hasContent(data)) {
         applyReport(data);
         document.getElementById('reporterContent').insertAdjacentHTML(
           'afterbegin',
           '<div class="reporter-error" style="margin-bottom:12px">OpenAI is rate-limited. Showing the saved report. Try generating again after ' +
-          esc(untilText) + '.</div>'
+          esc(untilText) + '.' + modelText + '</div>'
         );
         return;
       }
@@ -332,7 +330,7 @@
         '<div class="reporter-unconfigured">' +
         '<strong>OpenAI is rate-limited</strong><br>' +
         'No new report was generated. Try <strong>Generate Current Page</strong> again after ' +
-        esc(untilText) + '.</div>';
+        esc(untilText) + '.' + modelText + '</div>';
     }
 
     function hasContent(data) {
@@ -400,17 +398,6 @@
     var generating = false;
     function generateReport(sectionOverride) {
       if (generating) return;
-      var rateLimitedUntil = 0;
-      try {
-        rateLimitedUntil = parseInt(localStorage.getItem('reporterRateLimitedUntil') || '0', 10);
-      } catch {}
-      if (rateLimitedUntil > Date.now()) {
-        var waitSeconds = Math.ceil((rateLimitedUntil - Date.now()) / 1000);
-        document.getElementById('reporterContent').innerHTML =
-          '<div class="reporter-error">OpenAI rate limit is cooling down. Try again in about ' +
-          esc(waitSeconds) + ' seconds.</div>';
-        return;
-      }
       generating = true;
       var section = sectionOverride || activeTab;
       if (sectionOverride) setActiveTab(sectionOverride);
