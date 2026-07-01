@@ -73,6 +73,24 @@
       ],
     },
     {
+      label: "YouTube",
+      icon: "&#9654;&#65039;",
+      children: [
+        { href: "/youtube-v2.html", icon: "&#127916;", label: "YouTube Intelligence" },
+        { href: "https://www.youtube.com/", icon: "&#9654;&#65039;", label: "YouTube.com" },
+        {
+          href: "https://yt-summarizer-production-4521.up.railway.app/",
+          icon: "&#128221;",
+          label: "YouTube Summarizer",
+        },
+      ],
+    },
+    {
+      href: "https://commentfarm-production-fc8b.up.railway.app/queue",
+      icon: "&#128444;",
+      label: "imagequeues",
+    },
+    {
       label: "AI Apps",
       icon: "&#129302;",
       children: [
@@ -85,24 +103,6 @@
           href: "https://commentfarm-production-fc8b.up.railway.app/image-converter",
           icon: "&#128444;",
           label: "Image Converter",
-        },
-        {
-          href: "https://commentfarm-production-fc8b.up.railway.app/queue",
-          icon: "&#128444;",
-          label: "imagequeues",
-        },
-      ],
-    },
-    {
-      label: "YouTube",
-      icon: "&#9654;&#65039;",
-      children: [
-        { href: "/youtube-v2.html", icon: "&#127916;", label: "YouTube Intelligence" },
-        { href: "https://www.youtube.com/", icon: "&#9654;&#65039;", label: "YouTube.com" },
-        {
-          href: "https://yt-summarizer-production-4521.up.railway.app/",
-          icon: "&#128221;",
-          label: "YouTube Summarizer",
         },
       ],
     },
