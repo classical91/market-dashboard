@@ -263,6 +263,7 @@
     var activeTab = 'crypto';
     var reportData = null;
     var generationLogEntries = [];
+    var localLogKey = 'reporterGenerationLog:v1';
     var tabLabels = {
       crypto: 'Emerging Markets',
       economics: 'Economics',
@@ -414,12 +415,48 @@
       return !!(data && (data.crypto || data.economics || data.markets));
     }
 
+    function readLocalLog() {
+      try {
+        var parsed = JSON.parse(localStorage.getItem(localLogKey) || '[]');
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (err) {
+        return [];
+      }
+    }
+
+    function writeLocalLog(entries) {
+      try {
+        localStorage.setItem(localLogKey, JSON.stringify(entries.slice(0, 100)));
+      } catch (err) {}
+    }
+
+    function logEntryKey(entry) {
+      return [entry.section || '', entry.generatedAt || '', entry.label || ''].join('|');
+    }
+
+    function mergeLogEntries(serverLog) {
+      var map = {};
+      readLocalLog().concat(serverLog || []).forEach(function (entry) {
+        if (!entry || !entry.generatedAt) return;
+        var key = logEntryKey(entry);
+        var existing = map[key];
+        if (!existing || (!existing.content && entry.content)) {
+          map[key] = entry;
+        }
+      });
+      var rows = Object.keys(map).map(function (key) {
+        return map[key];
+      }).sort(function (a, b) {
+        return new Date(b.generatedAt || 0) - new Date(a.generatedAt || 0);
+      });
+      writeLocalLog(rows);
+      return rows;
+    }
+
     function renderLog(log) {
       var el = document.getElementById('reporterLog');
       if (!el) return;
-      var rows = (log || []).slice().sort(function (a, b) {
-        return new Date(b.generatedAt || 0) - new Date(a.generatedAt || 0);
-      }).slice(0, 10);
+      var rows = mergeLogEntries(log).slice(0, 25);
       generationLogEntries = rows;
       if (!rows.length) {
         el.style.display = 'none';
