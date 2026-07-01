@@ -52,6 +52,41 @@ function normalizeSection(section) {
   return REPORT_SECTIONS.includes(section) ? section : "crypto";
 }
 
+function logEntryDayKey(entry) {
+  if (entry.generatedDateKey) return entry.generatedDateKey;
+  if (entry.generatedAt) {
+    const d = new Date(entry.generatedAt);
+    if (!Number.isNaN(d.getTime())) return formatDateKey(d);
+  }
+  return null;
+}
+
+/**
+ * Collapse multiple log entries for the same section on the same day down to
+ * the most recently generated one, so pre-existing duplicates (e.g. saved
+ * before the same-day dedupe check existed) get cleaned up on next read.
+ */
+function dedupeLog(entries) {
+  const bestByKey = new Map();
+  const undated = [];
+  entries.forEach((entry) => {
+    if (!entry || !entry.section) return;
+    const day = logEntryDayKey(entry);
+    if (!day) {
+      undated.push(entry);
+      return;
+    }
+    const key = `${entry.section}:${day}`;
+    const existing = bestByKey.get(key);
+    if (!existing || new Date(entry.generatedAt || 0) > new Date(existing.generatedAt || 0)) {
+      bestByKey.set(key, entry);
+    }
+  });
+  return [...bestByKey.values(), ...undated].sort(
+    (a, b) => new Date(b.generatedAt || 0) - new Date(a.generatedAt || 0)
+  );
+}
+
 function cryptoPrompt(dateStr) {
   return `${dateStr}
 TOP 10 EMERGING / TRENDING CRYPTO TOKENS
@@ -183,7 +218,10 @@ class ReporterService {
   _readLog() {
     try {
       const parsed = JSON.parse(fs.readFileSync(this._logFile, "utf8"));
-      return Array.isArray(parsed) ? parsed : [];
+      const entries = Array.isArray(parsed) ? parsed : [];
+      const deduped = dedupeLog(entries);
+      if (deduped.length !== entries.length) this._writeLog(deduped);
+      return deduped;
     } catch {
       return [];
     }
