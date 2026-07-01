@@ -1,0 +1,175 @@
+.bot-shell {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.95fr) minmax(360px, 1.35fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.bot-form,
+.bot-library {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015)),
+    var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.bot-form {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  padding: 16px;
+  position: sticky;
+  top: 14px;
+}
+
+.bot-form label {
+  display: grid;
+  gap: 6px;
+}
+
+.bot-form span,
+.bot-section-title {
+  color: var(--soft);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.bot-form input,
+.bot-form textarea,
+.bot-library input {
+  width: 100%;
+  color: var(--text);
+  background: rgba(255,255,255,0.045);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font: inherit;
+  padding: 10px 12px;
+  outline: none;
+}
+
+.bot-form textarea {
+  resize: vertical;
+  min-height: 96px;
+}
+
+.bot-form input:focus,
+.bot-form textarea:focus,
+.bot-library input:focus {
+  border-color: rgba(77,163,255,0.45);
+  box-shadow: 0 0 0 3px rgba(77,163,255,0.14);
+}
+
+.bot-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.bot-btn,
+.bot-card-actions button {
+  color: var(--soft);
+  background: rgba(255,255,255,0.045);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 750;
+  padding: 8px 11px;
+}
+
+.bot-btn:hover,
+.bot-card-actions button:hover {
+  color: var(--text);
+  border-color: var(--border-hover);
+}
+
+.bot-btn-primary {
+  color: #06101f;
+  background: var(--blue);
+  border-color: var(--blue);
+}
+
+.bot-library {
+  min-height: 520px;
+  padding: 16px;
+}
+
+.bot-library-head {
+  display: grid;
+  grid-template-columns: 1fr minmax(190px, 260px);
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.bot-muted {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 3px;
+}
+
+.bot-list {
+  display: grid;
+  gap: 10px;
+}
+
+.bot-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.035);
+  padding: 14px;
+}
+
+.bot-card-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.bot-title {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 850;
+}
+
+.bot-purpose,
+.bot-date,
+.bot-notes {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.bot-command {
+  margin: 12px 0;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  color: var(--soft);
+  background: rgba(0,0,0,0.18);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  font: 12px/1.5 "Cascadia Code", "SF Mono", Consolas, monospace;
+}
+
+.bot-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+@media (max-width: 980px) {
+  .bot-shell,
+  .bot-library-head {
+    grid-template-columns: 1fr;
+  }
+
+  .bot-form {
+    position: static;
+  }
+}

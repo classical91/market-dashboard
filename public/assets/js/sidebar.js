@@ -86,11 +86,6 @@
       ],
     },
     {
-      href: "https://commentfarm-production-fc8b.up.railway.app/queue",
-      icon: "&#128444;",
-      label: "imagequeues",
-    },
-    {
       label: "AI Apps",
       icon: "&#129302;",
       children: [
@@ -104,7 +99,17 @@
           icon: "&#128444;",
           label: "Image Converter",
         },
+        {
+          href: "/bot-commands.html",
+          icon: "&#128172;",
+          label: "Bot Commands",
+        },
       ],
+    },
+    {
+      href: "https://commentfarm-production-fc8b.up.railway.app/queue",
+      icon: "&#128444;",
+      label: "Open ImageQueue",
     },
     { href: "https://x.com/", icon: "&#120143;", label: "Open X.com", featured: "x" },
     {

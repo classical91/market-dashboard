@@ -1,0 +1,81 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bot Commands - Market Command</title>
+  <script src="/assets/js/settings.js"></script>
+  <link rel="stylesheet" href="/assets/styles/command.css" />
+  <link rel="stylesheet" href="/assets/styles/components.css" />
+  <link rel="stylesheet" href="/assets/styles/bot-commands.css" />
+</head>
+<body>
+<div class="app">
+  <aside class="cmd-sidebar"></aside>
+  <main class="cmd-main">
+    <div class="cmd-page-header">
+      <div>
+        <div class="cmd-page-title">&#128172; Bot Commands</div>
+        <div class="cmd-page-subtitle">Telegram bot command library for reusable market workflows</div>
+      </div>
+      <div class="cmd-clock" id="cmd-clock"></div>
+    </div>
+
+    <section class="bot-shell" aria-label="Bot command workspace">
+      <form class="bot-form" id="botCommandForm">
+        <input type="hidden" id="botCommandId" />
+        <label>
+          <span>Bot title</span>
+          <input id="botTitle" type="text" placeholder="e.g. News Bot, Alert Bot, BotFather" required />
+        </label>
+        <label>
+          <span>What it does</span>
+          <input id="botPurpose" type="text" placeholder="e.g. Sends macro headlines to Telegram" required />
+        </label>
+        <label class="bot-form-wide">
+          <span>Command</span>
+          <textarea id="botCommand" rows="5" placeholder="/command argument example" required></textarea>
+        </label>
+        <label class="bot-form-wide">
+          <span>Notes</span>
+          <textarea id="botNotes" rows="3" placeholder="Optional setup notes, token scope, chat IDs, schedule, or caveats"></textarea>
+        </label>
+        <div class="bot-actions bot-form-wide">
+          <button class="bot-btn bot-btn-primary" type="submit" id="saveCommandBtn">Save Command</button>
+          <button class="bot-btn" type="button" id="resetCommandBtn">New Entry</button>
+          <button class="bot-btn" type="button" id="exportCommandsBtn">Export JSON</button>
+        </div>
+      </form>
+
+      <aside class="bot-library">
+        <div class="bot-library-head">
+          <div>
+            <div class="bot-section-title">Saved Commands</div>
+            <div class="bot-muted" id="botCount">0 entries</div>
+          </div>
+          <input id="botSearch" type="search" placeholder="Search bots or commands" />
+        </div>
+        <div class="bot-list" id="botCommandList"></div>
+      </aside>
+    </section>
+  </main>
+</div>
+
+<script src="/assets/js/sidebar.js"></script>
+<script src="/assets/js/ui.js"></script>
+<script src="/assets/js/bot-commands.js"></script>
+<script>
+  (function () {
+    function tick() {
+      var el = document.getElementById("cmd-clock");
+      if (el) el.textContent = new Date().toLocaleString(undefined, {
+        weekday: "short", hour: "2-digit", minute: "2-digit", second: "2-digit"
+      });
+    }
+    tick();
+    setInterval(tick, 1000);
+  })();
+</script>
+</body>
+</html>
+
