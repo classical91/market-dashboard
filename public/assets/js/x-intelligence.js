@@ -29,7 +29,22 @@
 
   var localModeKey = "xIntelligence:lastMode";
   var localKey = "xIntelligence:lastHandle";
+  var localFeedKey = "xIntelligence:feedCache:v1";
   var ALL_MODE = "all";
+
+  function readCachedFeed() {
+    try {
+      var parsed = JSON.parse(localStorage.getItem(localFeedKey) || "null");
+      if (!parsed || !Array.isArray(parsed.posts)) return null;
+      return parsed;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function writeCachedFeed(data) {
+    try { localStorage.setItem(localFeedKey, JSON.stringify(data)); } catch (err) {}
+  }
 
   function esc(s) {
     return String(s)
@@ -192,13 +207,19 @@
     var lastHandle = readLastHandle();
     var validLast = accounts.some(function (a) { return a.handle === lastHandle; });
     var lastMode = readLastMode();
+    var cached = readCachedFeed();
     var state = {
       mode: lastMode === ALL_MODE ? ALL_MODE : "account",
       handle: validLast ? lastHandle : accounts[0].handle,
-      feedData: { posts: [], failedFeeds: [] },
+      feedData: cached || { posts: [], failedFeeds: [] },
+      loaded: !!cached,
     };
 
     function renderPane() {
+      if (!state.loaded) {
+        renderPostCards(pane, [], "Loading latest posts…");
+        return;
+      }
       if (state.mode === ALL_MODE) {
         renderPostCards(pane, state.feedData.posts, "No posts found yet.");
         renderFeedError(pane, state.feedData.failedFeeds);
@@ -243,7 +264,15 @@
     if (state.mode === ALL_MODE) selectAll(); else selectHandle(state.handle);
 
     loadAccountsFeed().then(function (data) {
-      state.feedData = { posts: data.posts || [], failedFeeds: data.failedFeeds || [] };
+      var hasFreshPosts = Array.isArray(data.posts) && data.posts.length > 0;
+      // Keep whatever was cached/shown if this fetch came back empty (e.g. a
+      // transient failure), instead of wiping out posts that were already
+      // on screen.
+      if (hasFreshPosts || !state.loaded) {
+        state.feedData = { posts: data.posts || [], failedFeeds: data.failedFeeds || [] };
+      }
+      state.loaded = true;
+      if (hasFreshPosts) writeCachedFeed(state.feedData);
       renderPane();
     });
   }
