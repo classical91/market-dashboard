@@ -544,9 +544,19 @@
       if (!entry) return false;
       if (entry.generatedAt) {
         var ts = new Date(entry.generatedAt);
-        if (!Number.isNaN(ts.getTime())) return dateKey(ts) === dateKey();
+        if (!Number.isNaN(ts.getTime()) && dateKey(ts) === dateKey()) return true;
       }
-      return entry.generatedDateKey === dateKey();
+      if (entry.generatedDateKey === dateKey()) return true;
+      if (entry.dateStr) {
+        var todayLabel = new Date().toLocaleDateString('en-US', {
+          weekday: 'long',
+          month: 'long',
+          day: 'numeric',
+          year: 'numeric'
+        }).toUpperCase();
+        return String(entry.dateStr).toUpperCase() === todayLabel;
+      }
+      return false;
     }
 
     function mergeLogEntries(serverLog) {
