@@ -5,7 +5,7 @@ const OpenAI = require("openai");
 const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000;
 const REPORT_SECTIONS = ["crypto", "economics", "markets"];
 const SECTION_LABELS = {
-  crypto: "Emerging Small Cap",
+  crypto: "Emerging Markets",
   economics: "Economics Top 10",
   markets: "Markets Top 10",
 };
