@@ -5,7 +5,7 @@
 
 .yt-split {
   display: grid;
-  grid-template-columns: 1fr 340px;
+  grid-template-columns: 1fr;
   gap: 16px;
   align-items: start;
   margin-bottom: 20px;
