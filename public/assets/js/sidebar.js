@@ -140,7 +140,15 @@
       icon: "&#9992;&#65039;",
       label: "Trader Lab",
     },
-    { href: "/reporter.html", icon: "&#128240;", label: "Reporter" },
+    {
+      label: "Reporter",
+      icon: "&#128240;",
+      children: [
+        { href: "/emerging-markets.html", icon: "&#128640;", label: "Emerging Markets" },
+        { href: "/economics-top-10.html", icon: "&#127758;", label: "Economics Top 10" },
+        { href: "/markets-top-10.html", icon: "&#128202;", label: "Markets Top 10" },
+      ],
+    },
     { href: "https://earth-watch-production-e3c6.up.railway.app/", icon: "&#127757;", label: "Earth Watch" },
     { href: "/indicators.html", icon: "&#128218;", label: "Indicators Glossary" },
     { href: "/settings.html", icon: "&#9881;&#65039;", label: "Settings" },

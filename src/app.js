@@ -64,6 +64,11 @@ function createApp() {
     },
   }));
 
+  app.get(["/emerging-markets.html", "/economics-top-10.html", "/markets-top-10.html"], (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    res.sendFile(path.join(__dirname, "..", "public", "reporter.html"));
+  });
+
   app.use(
     "/api/health",
     createHealthRouter({

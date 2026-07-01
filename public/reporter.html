@@ -88,6 +88,22 @@
     .reporter-log-item:hover {
       color: var(--soft);
     }
+    .reporter-log-item.past {
+      opacity: 0.62;
+      filter: grayscale(0.4);
+    }
+    .reporter-log-item.past .reporter-log-label,
+    .reporter-log-item.past .reporter-log-time,
+    .reporter-log-item.past .reporter-log-read {
+      color: var(--muted);
+    }
+    .reporter-log-item.past .reporter-log-status {
+      color: var(--dim);
+    }
+    .reporter-log-item.past:hover {
+      opacity: 0.82;
+      filter: grayscale(0.2);
+    }
     .reporter-log-item[aria-disabled="true"] {
       cursor: default;
     }
@@ -142,6 +158,30 @@
     .reporter-tab:hover:not(.active) {
       background: rgba(255,255,255,0.08);
       color: var(--soft);
+      border-color: var(--border-hover);
+    }
+    .reporter-link-row {
+      display: none;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin: -6px 0 20px;
+    }
+    .reporter-link-row a {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.04);
+      color: var(--soft);
+      text-decoration: none;
+      padding: 9px 14px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .reporter-link-row a:hover {
+      background: rgba(255,255,255,0.08);
+      color: var(--text);
       border-color: var(--border-hover);
     }
     /* ── Loading / Error ──────────────────────────────────── */
@@ -223,8 +263,8 @@
 
     <div class="cmd-page-header">
       <div>
-        <div class="cmd-page-title">📰 Daily News Reporter</div>
-        <div class="cmd-page-subtitle">AI-generated briefing &middot; generated on demand</div>
+        <div class="cmd-page-title" id="reporterPageTitle">📰 Daily News Reporter</div>
+        <div class="cmd-page-subtitle" id="reporterPageSubtitle">AI-generated briefing &middot; generated on demand</div>
       </div>
       <div style="display:flex;align-items:center;gap:10px">
         <button class="open-all-btn" id="generateBtn" type="button" style="margin:0">⚡ Generate</button>
@@ -244,6 +284,8 @@
       <button class="reporter-tab" data-tab="economics">🌍 Economics Top 10</button>
       <button class="reporter-tab" data-tab="markets">📊 Markets Top 10</button>
     </div>
+
+    <div class="reporter-link-row" id="reporterExternalLinks"></div>
 
     <!-- Content area -->
     <div id="reporterContent">
@@ -276,14 +318,35 @@
 
   /* ── Reporter ───────────────────────────────────────────── */
   (function () {
-    var activeTab = 'crypto';
+    var pageSections = {
+      '/emerging-markets.html': 'crypto',
+      '/economics-top-10.html': 'economics',
+      '/markets-top-10.html': 'markets'
+    };
+    var sectionPages = {
+      crypto: '/emerging-markets.html',
+      economics: '/economics-top-10.html',
+      markets: '/markets-top-10.html'
+    };
+    var fixedSection = pageSections[window.location.pathname] || '';
+    var activeTab = fixedSection || 'crypto';
     var reportData = null;
     var generationLogEntries = [];
     var localLogKey = 'reporterGenerationLog:v1';
     var tabLabels = {
       crypto: 'Emerging Markets',
-      economics: 'Economics',
-      markets: 'Markets'
+      economics: 'Economics Top 10',
+      markets: 'Markets Top 10'
+    };
+    var pageTitles = {
+      crypto: '🚀 Emerging Markets',
+      economics: '🌍 Economics Top 10',
+      markets: '📊 Markets Top 10'
+    };
+    var pageSubtitles = {
+      crypto: 'Trending tokens briefing · generated on demand',
+      economics: 'Global economics briefing · generated on demand',
+      markets: 'Global markets briefing · generated on demand'
     };
 
     function esc(s) {
@@ -351,6 +414,26 @@
     function currentPromptOverride(section) {
       if (!window.AppSettings || !window.AppSettings.getReporterPromptOverride) return '';
       return window.AppSettings.getReporterPromptOverride(section);
+    }
+
+    function configurePageShell() {
+      if (!fixedSection) return;
+      document.title = tabLabels[fixedSection] + ' · Market Command';
+      var title = document.getElementById('reporterPageTitle');
+      var subtitle = document.getElementById('reporterPageSubtitle');
+      if (title) title.textContent = pageTitles[fixedSection] || 'Daily News Reporter';
+      if (subtitle) subtitle.textContent = pageSubtitles[fixedSection] || 'AI-generated briefing · generated on demand';
+      var links = document.getElementById('reporterExternalLinks');
+      if (!links) return;
+      if (fixedSection === 'crypto') {
+        links.style.display = 'flex';
+        links.innerHTML =
+          '<a href="https://coinmarketcap.com/trending-cryptocurrencies/" target="_blank" rel="noopener">CoinMarketCap Trending ↗</a>' +
+          '<a href="https://cryptobubbles.net/en" target="_blank" rel="noopener">CryptoBubbles ↗</a>';
+      } else {
+        links.style.display = 'none';
+        links.innerHTML = '';
+      }
     }
 
     function isRateLimitMessage(message) {
@@ -499,7 +582,7 @@
       var currentRows = rows.filter(isCurrentLogEntry);
       var pastRows = rows.filter(function (entry) { return !isCurrentLogEntry(entry); });
 
-      function renderRows(groupRows) {
+      function renderRows(groupRows, isPast) {
         if (!groupRows.length) return '<div class="reporter-log-empty">No saved reports here yet.</div>';
         return groupRows.map(function (entry) {
           var index = rows.indexOf(entry);
@@ -508,7 +591,7 @@
           month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit'
         }) : 'timestamp unavailable';
         var readable = !!entry.content;
-        return '<button class="reporter-log-item" type="button" data-log-index="' + index + '"' +
+        return '<button class="reporter-log-item' + (isPast ? ' past' : '') + '" type="button" data-log-index="' + index + '"' +
           (readable ? '' : ' aria-disabled="true"') + '>' +
           '<span class="reporter-log-name">' +
           '<span class="reporter-log-label">' + esc(entry.label || entry.section || 'Reporter') + '</span>' +
@@ -524,9 +607,9 @@
       el.innerHTML = '<div class="reporter-log-title">Saved reports</div>' +
         '<div class="reporter-log-list">' +
         '<div class="reporter-log-group"><div class="reporter-log-group-title">Current Reports</div>' +
-        renderRows(currentRows) + '</div>' +
+        renderRows(currentRows, false) + '</div>' +
         '<div class="reporter-log-group"><div class="reporter-log-group-title">Past Reports</div>' +
-        renderRows(pastRows) + '</div>' +
+        renderRows(pastRows, true) + '</div>' +
         '</div>';
     }
 
@@ -652,6 +735,8 @@
       document.querySelectorAll('.reporter-tab').forEach(function (t) {
         t.classList.toggle('active', t.dataset.tab === tab);
         if (t.dataset.tab === 'crypto') t.textContent = 'Emerging Markets';
+        if (t.dataset.tab === 'economics') t.textContent = 'Economics Top 10';
+        if (t.dataset.tab === 'markets') t.textContent = 'Markets Top 10';
       });
       if (reportData) renderTab(activeTab);
     }
@@ -660,6 +745,10 @@
     document.getElementById('reporterTabs').addEventListener('click', function (e) {
       var btn = e.target.closest('[data-tab]');
       if (!btn) return;
+      if (fixedSection && sectionPages[btn.dataset.tab]) {
+        window.location.href = sectionPages[btn.dataset.tab];
+        return;
+      }
       setActiveTab(btn.dataset.tab);
     });
 
@@ -675,6 +764,7 @@
     if (generateBtn) generateBtn.addEventListener('click', function () {
       generateReport();
     });
+    configurePageShell();
     setActiveTab(activeTab);
 
     loadReport();
