@@ -29,6 +29,7 @@
             { href: "/crypto.html#interactive-dashboards", icon: "&#128225;", label: "Interactive Dashboards" },
             { href: "/crypto.html#crypto-research", icon: "&#8383;", label: "Bitcoin Research" },
             { href: "/crypto.html#alt-research", icon: "&#9672;", label: "Alt Research" },
+            { href: "/crypto.html#tradingview-tickers", icon: "&#128200;", label: "TradingView Tickers" },
             { href: "/crypto.html#etf-flows", icon: "&#127974;", label: "ETF Flows" },
             { href: "/crypto.html#long-vs-shorts", icon: "&#9878;&#65039;", label: "Long vs Shorts" },
             { href: "/crypto.html#market-overview-dashboard", icon: "&#128202;", label: "Market Volumes" },
@@ -98,6 +99,11 @@
           href: "https://commentfarm-production-fc8b.up.railway.app/image-converter",
           icon: "&#128444;",
           label: "Image Converter",
+        },
+        {
+          href: "https://main-page-production-9927.up.railway.app/ai.html",
+          icon: "&#129504;",
+          label: "AI Portal",
         },
         {
           href: "/bot-commands.html",
