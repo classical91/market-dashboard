@@ -85,6 +85,11 @@
           icon: "&#128444;",
           label: "Image Converter",
         },
+        {
+          href: "https://commentfarm-production-fc8b.up.railway.app/queue",
+          icon: "&#128444;",
+          label: "imagequeues",
+        },
       ],
     },
     {
@@ -97,11 +102,6 @@
           href: "https://yt-summarizer-production-4521.up.railway.app/",
           icon: "&#128221;",
           label: "YouTube Summarizer",
-        },
-        {
-          href: "https://commentfarm-production-fc8b.up.railway.app/queue",
-          icon: "&#128444;",
-          label: "imagequeues",
         },
       ],
     },
