@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YouTube Intelligence · Market Command</title>
+  <script src="/assets/js/settings.js"></script>
+  <link rel="stylesheet" href="/assets/styles/command.css" />
+  <link rel="stylesheet" href="/assets/styles/youtube-v2.css" />
+</head>
+<body>
+<div class="app">
+  <aside class="cmd-sidebar"></aside>
+  <main class="cmd-main">
+
+    <div class="cmd-page-header">
+      <div>
+        <div class="cmd-page-title">&#127916; YouTube Intelligence</div>
+        <div class="cmd-page-subtitle">Saved market videos, categorized &amp; queued &mdash; channel feeds coming next</div>
+      </div>
+      <div class="cmd-clock" id="cmd-clock"></div>
+    </div>
+
+    <div class="yt-filters" id="ytFilters"></div>
+
+    <div class="yt-split" style="margin-top:14px">
+      <div class="yt-player-pane">
+        <div class="yt-player-frame">
+          <iframe
+            id="ytPlayer"
+            src=""
+            title="YouTube video player"
+            loading="lazy"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowfullscreen
+          ></iframe>
+        </div>
+        <div class="yt-player-foot">
+          <a id="ytPlayerLink" href="" target="_blank" rel="noopener">Watch on YouTube &#8599;</a>
+        </div>
+      </div>
+
+      <div class="yt-queue-pane" id="ytQueue"></div>
+    </div>
+
+    <!-- CHANNEL RSS FEEDS -->
+    <div class="section-header" data-section="yt-rss">
+      <span class="section-label">Channel RSS Feeds</span>
+      <span class="section-chevron">&#9660;</span>
+    </div>
+    <div class="cards" id="yt-rss">
+      <div class="card" style="cursor:default">
+        <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">SOON</span></div>
+        <div class="card-title">Crypto Channel Feeds</div>
+        <div class="card-src">Latest uploads &amp; live replays</div>
+      </div>
+      <div class="card" style="cursor:default">
+        <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">SOON</span></div>
+        <div class="card-title">Macro Channel Feeds</div>
+        <div class="card-src">Latest uploads &amp; live replays</div>
+      </div>
+      <div class="card" style="cursor:default">
+        <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">SOON</span></div>
+        <div class="card-title">Stocks Channel Feeds</div>
+        <div class="card-src">Latest uploads &amp; live replays</div>
+      </div>
+      <div class="card" style="cursor:default">
+        <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">SOON</span></div>
+        <div class="card-title">Geopolitics Channel Feeds</div>
+        <div class="card-src">Latest uploads &amp; live replays</div>
+      </div>
+    </div>
+    <p class="yt-rss-placeholder">
+      Next up: pull each trusted channel's <code style="font-family:monospace">https://www.youtube.com/feeds/videos.xml?channel_id=CHANNEL_ID</code> feed to auto-list thumbnails, titles &amp; publish dates here &mdash; then layer in live-now / upcoming-stream detection via the YouTube API.
+    </p>
+
+    <footer>YouTube Intelligence &mdash; <a href="/">Overview</a> &mdash; <a href="/overview-v2.html">Overview V2</a></footer>
+
+  </main>
+</div>
+<script src="/assets/js/sidebar.js"></script>
+<script src="/assets/js/sections.js"></script>
+<script src="/assets/js/youtube-v2.js"></script>
+<script>
+  (function () {
+    function tick() {
+      var el = document.getElementById('cmd-clock');
+      if (el) el.textContent = new Date().toLocaleString(undefined, {
+        weekday: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit'
+      });
+    }
+    tick(); setInterval(tick, 1000);
+    initSections('youtube_v2_collapsed');
+  })();
+</script>
+</body>
+</html>
