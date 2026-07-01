@@ -8,6 +8,10 @@ function createReporterRouter({ reporterService }) {
     return hours * 60 * 60 * 1000;
   }
 
+  function resolveSection(req) {
+    return String(req.query.section || "crypto").toLowerCase();
+  }
+
   // Read-only: returns the cached report if present, never generates.
   router.get("/", (req, res, next) => {
     try {
@@ -20,7 +24,7 @@ function createReporterRouter({ reporterService }) {
   // Explicit generation — triggered only by a user action.
   router.post("/generate", async (req, res, next) => {
     try {
-      const report = await reporterService.generateReport(resolveTtlMs(req));
+      const report = await reporterService.generateReport(resolveTtlMs(req), resolveSection(req));
       res.json(report);
     } catch (err) {
       next(err);

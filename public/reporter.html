@@ -25,6 +25,17 @@
       border: 1px solid var(--border);
       padding: 5px 12px; border-radius: 10px;
     }
+    .reporter-actions {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+    .reporter-log {
+      display: none;
+      margin: -4px 0 18px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .reporter-log strong { color: var(--soft); }
 
     /* ── Tabs ─────────────────────────────────────────────── */
     .reporter-tabs {
@@ -134,6 +145,7 @@
       </div>
       <div style="display:flex;align-items:center;gap:10px">
         <button class="open-all-btn" id="generateBtn" type="button" style="margin:0">⚡ Generate</button>
+        <button class="open-all-btn" id="emergingBtn" type="button" style="margin:0">Emerging Small Cap</button>
         <div class="cmd-clock" id="cmd-clock"></div>
       </div>
     </div>
@@ -143,6 +155,7 @@
       <div class="reporter-date-badge" id="reporterDate"></div>
       <div class="reporter-gen-badge" id="reporterGen"></div>
     </div>
+    <div class="reporter-log" id="reporterLog"></div>
 
     <!-- Tabs -->
     <div class="reporter-tabs" id="reporterTabs">
@@ -182,6 +195,11 @@
   (function () {
     var activeTab = 'crypto';
     var reportData = null;
+    var tabLabels = {
+      crypto: 'Emerging Small Cap',
+      economics: 'Economics',
+      markets: 'Markets'
+    };
 
     function esc(s) {
       return String(s)
@@ -262,6 +280,25 @@
       return !!(data && (data.crypto || data.economics || data.markets));
     }
 
+    function renderLog(log) {
+      var el = document.getElementById('reporterLog');
+      if (!el) return;
+      var rows = (log || []).slice(0, 5);
+      if (!rows.length) {
+        el.style.display = 'none';
+        el.innerHTML = '';
+        return;
+      }
+      el.style.display = 'block';
+      el.innerHTML = '<strong>Generation log:</strong> ' + rows.map(function (entry) {
+        var ts = entry.generatedAt ? new Date(entry.generatedAt) : null;
+        var when = ts ? ts.toLocaleString(undefined, {
+          month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+        }) : 'timestamp unavailable';
+        return esc(entry.label || entry.section || 'Reporter') + ' at ' + esc(when);
+      }).join(' | ');
+    }
+
     function applyReport(data) {
       reportData = data;
 
@@ -280,6 +317,7 @@
         });
       }
 
+      renderLog(data.generationLog);
       renderTab(activeTab);
     }
 
@@ -304,17 +342,21 @@
 
     /* Explicit generation — only on button click. */
     var generating = false;
-    function generateReport() {
+    function generateReport(sectionOverride) {
       if (generating) return;
       generating = true;
+      var section = sectionOverride || activeTab;
+      if (sectionOverride) setActiveTab(sectionOverride);
       var btn = document.getElementById('generateBtn');
+      var emergingBtn = document.getElementById('emergingBtn');
       var content = document.getElementById('reporterContent');
+      if (emergingBtn) emergingBtn.disabled = true;
       if (btn) { btn.disabled = true; btn.textContent = '⏳ Generating…'; }
       content.innerHTML =
         '<div class="reporter-loading"><span class="spinner"></span>' +
         'Generating briefing — this can take up to a minute&hellip;</div>';
 
-      fetch('/api/daily-report/generate?ttlHours=' + currentTtl(), { method: 'POST' })
+      fetch('/api/daily-report/generate?ttlHours=' + currentTtl() + '&section=' + encodeURIComponent(section), { method: 'POST' })
         .then(function (res) {
           if (!res.ok) throw new Error('HTTP ' + res.status);
           return res.json();
@@ -330,24 +372,38 @@
         })
         .finally(function () {
           generating = false;
+          if (emergingBtn) emergingBtn.disabled = false;
+          setTimeout(function () {
+            if (btn && !generating) btn.textContent = 'Generate Current Page';
+          }, 0);
           if (btn) { btn.disabled = false; btn.textContent = '⚡ Generate'; }
         });
+    }
+
+    function setActiveTab(tab) {
+      activeTab = tab;
+      document.querySelectorAll('.reporter-tab').forEach(function (t) {
+        t.classList.toggle('active', t.dataset.tab === tab);
+        if (t.dataset.tab === 'crypto') t.textContent = 'Emerging Tokens';
+      });
+      if (reportData) renderTab(activeTab);
     }
 
     /* Tab clicks */
     document.getElementById('reporterTabs').addEventListener('click', function (e) {
       var btn = e.target.closest('[data-tab]');
       if (!btn) return;
-      document.querySelectorAll('.reporter-tab').forEach(function (t) {
-        t.classList.remove('active');
-      });
-      btn.classList.add('active');
-      activeTab = btn.dataset.tab;
-      if (reportData) renderTab(activeTab);
+      setActiveTab(btn.dataset.tab);
     });
 
     var generateBtn = document.getElementById('generateBtn');
+    if (generateBtn) generateBtn.textContent = 'Generate Current Page';
     if (generateBtn) generateBtn.addEventListener('click', generateReport);
+    var emergingBtn = document.getElementById('emergingBtn');
+    if (emergingBtn) emergingBtn.addEventListener('click', function () {
+      generateReport('crypto');
+    });
+    setActiveTab(activeTab);
 
     loadReport();
   })();
