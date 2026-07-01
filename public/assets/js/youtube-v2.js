@@ -107,78 +107,92 @@
     return years + (years === 1 ? " year ago" : " years ago");
   }
 
+  function flattenSortedByDate(channels) {
+    var items = [];
+    channels.forEach(function (channel) {
+      (channel.videos || []).forEach(function (video) {
+        items.push({
+          video: video,
+          channelLabel: channel.label,
+          channelCategory: channel.category,
+        });
+      });
+    });
+
+    items.sort(function (a, b) {
+      var aTime = a.video.publishedAt ? new Date(a.video.publishedAt).getTime() : 0;
+      var bTime = b.video.publishedAt ? new Date(b.video.publishedAt).getTime() : 0;
+      return bTime - aTime;
+    });
+
+    return items;
+  }
+
   function renderChannelFeeds(root, channels, onSelect) {
     root.innerHTML = "";
 
-    channels.forEach(function (channel) {
-      var block = document.createElement("div");
-      block.className = "yt-channel-block";
+    var failed = channels.filter(function (c) { return c.error; });
+    var items = flattenSortedByDate(channels);
 
-      var head = document.createElement("div");
-      head.className = "yt-channel-head";
-      head.innerHTML =
-        '<span class="yt-channel-name">' + channel.label + "</span>" +
-        '<span class="yt-tag">' + channel.category + "</span>";
-      block.appendChild(head);
+    var grid = document.createElement("div");
+    grid.className = "yt-channel-videos";
 
-      if (channel.error) {
-        var err = document.createElement("div");
-        err.className = "yt-channel-error";
-        err.textContent = "Couldn't load this channel's feed right now.";
-        block.appendChild(err);
-        root.appendChild(block);
-        return;
-      }
+    items.forEach(function (item) {
+      var video = item.video;
+      var card = document.createElement("a");
+      card.className = "yt-feed-card";
+      card.href = video.url || ("https://www.youtube.com/watch?v=" + video.id);
+      card.target = "_blank";
+      card.rel = "noopener";
 
-      var grid = document.createElement("div");
-      grid.className = "yt-channel-videos";
+      var thumb = document.createElement("div");
+      thumb.className = "yt-feed-thumb";
+      thumb.style.backgroundImage = "url('" + (video.thumbnail || thumbUrl(video.id)) + "')";
 
-      (channel.videos || []).forEach(function (video) {
-        var card = document.createElement("a");
-        card.className = "yt-feed-card";
-        card.href = video.url || ("https://www.youtube.com/watch?v=" + video.id);
-        card.target = "_blank";
-        card.rel = "noopener";
+      var body = document.createElement("div");
+      body.className = "yt-feed-body";
 
-        var thumb = document.createElement("div");
-        thumb.className = "yt-feed-thumb";
-        thumb.style.backgroundImage = "url('" + (video.thumbnail || thumbUrl(video.id)) + "')";
+      var title = document.createElement("div");
+      title.className = "yt-feed-title";
+      title.textContent = video.title;
 
-        var body = document.createElement("div");
-        body.className = "yt-feed-body";
+      var meta = document.createElement("div");
+      meta.className = "yt-feed-meta";
+      meta.innerHTML =
+        '<span class="yt-tag">' + item.channelLabel + "</span> &middot; " +
+        formatRelativeDate(video.publishedAt);
 
-        var title = document.createElement("div");
-        title.className = "yt-feed-title";
-        title.textContent = video.title;
+      body.appendChild(title);
+      body.appendChild(meta);
+      card.appendChild(thumb);
+      card.appendChild(body);
 
-        var meta = document.createElement("div");
-        meta.className = "yt-feed-meta";
-        meta.textContent = formatRelativeDate(video.publishedAt);
-
-        body.appendChild(title);
-        body.appendChild(meta);
-        card.appendChild(thumb);
-        card.appendChild(body);
-
-        card.addEventListener("click", function (e) {
-          if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0 || !video.id) return;
-          e.preventDefault();
-          onSelect(video.id);
-        });
-
-        grid.appendChild(card);
+      card.addEventListener("click", function (e) {
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0 || !video.id) return;
+        e.preventDefault();
+        onSelect(video.id);
       });
 
-      if (!(channel.videos || []).length) {
-        var empty = document.createElement("div");
-        empty.className = "yt-empty";
-        empty.textContent = "No videos found yet.";
-        grid.appendChild(empty);
-      }
-
-      block.appendChild(grid);
-      root.appendChild(block);
+      grid.appendChild(card);
     });
+
+    if (!items.length) {
+      var empty = document.createElement("div");
+      empty.className = "yt-empty";
+      empty.textContent = "No videos found yet.";
+      grid.appendChild(empty);
+    }
+
+    root.appendChild(grid);
+
+    if (failed.length) {
+      var err = document.createElement("div");
+      err.className = "yt-channel-error";
+      err.textContent =
+        "Couldn't load feed" + (failed.length > 1 ? "s" : "") + " for: " +
+        failed.map(function (c) { return c.label; }).join(", ");
+      root.appendChild(err);
+    }
   }
 
   function loadChannelFeeds(root, onSelect) {

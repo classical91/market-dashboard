@@ -163,21 +163,8 @@
 .yt-channel-feeds {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 12px;
   margin-bottom: 8px;
-}
-
-.yt-channel-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-
-.yt-channel-name {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text);
 }
 
 .yt-channel-videos {
