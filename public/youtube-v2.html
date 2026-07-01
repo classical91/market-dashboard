@@ -16,7 +16,7 @@
     <div class="cmd-page-header">
       <div>
         <div class="cmd-page-title">&#127916; YouTube Intelligence</div>
-        <div class="cmd-page-subtitle">Saved market videos, categorized &amp; queued &mdash; channel feeds coming next</div>
+        <div class="cmd-page-subtitle">Saved market videos, categorized &amp; queued &mdash; plus latest uploads from trusted channels</div>
       </div>
       <div class="cmd-clock" id="cmd-clock"></div>
     </div>
@@ -48,31 +48,14 @@
       <span class="section-label">Channel RSS Feeds</span>
       <span class="section-chevron">&#9660;</span>
     </div>
-    <div class="cards" id="yt-rss">
-      <div class="card" style="cursor:default">
-        <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">SOON</span></div>
-        <div class="card-title">Crypto Channel Feeds</div>
-        <div class="card-src">Latest uploads &amp; live replays</div>
+    <div id="yt-rss">
+      <div class="yt-channel-feeds" id="ytChannelFeeds">
+        <div class="yt-empty">Loading channel feeds&hellip;</div>
       </div>
-      <div class="card" style="cursor:default">
-        <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">SOON</span></div>
-        <div class="card-title">Macro Channel Feeds</div>
-        <div class="card-src">Latest uploads &amp; live replays</div>
-      </div>
-      <div class="card" style="cursor:default">
-        <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">SOON</span></div>
-        <div class="card-title">Stocks Channel Feeds</div>
-        <div class="card-src">Latest uploads &amp; live replays</div>
-      </div>
-      <div class="card" style="cursor:default">
-        <div class="card-top"><span class="badge" style="background:var(--purple-bg);color:var(--purple)">SOON</span></div>
-        <div class="card-title">Geopolitics Channel Feeds</div>
-        <div class="card-src">Latest uploads &amp; live replays</div>
-      </div>
+      <p class="yt-rss-placeholder">
+        Live-now / upcoming-stream detection needs the YouTube Data API (RSS only covers uploads &amp; replays) &mdash; a good next step once you have an API key.
+      </p>
     </div>
-    <p class="yt-rss-placeholder">
-      Next up: pull each trusted channel's <code style="font-family:monospace">https://www.youtube.com/feeds/videos.xml?channel_id=CHANNEL_ID</code> feed to auto-list thumbnails, titles &amp; publish dates here &mdash; then layer in live-now / upcoming-stream detection via the YouTube API.
-    </p>
 
     <footer>YouTube Intelligence &mdash; <a href="/">Overview</a> &mdash; <a href="/overview-v2.html">Overview V2</a></footer>
 
