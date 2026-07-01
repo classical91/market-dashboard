@@ -260,24 +260,33 @@ class ReporterService {
   }
 
   _buildReport(ttlMs) {
+    const log = this._readLog();
     const report = {
       configured: true,
       generated: false,
       reporterModel: this._model,
       sections: REPORT_SECTIONS,
-      generationLog: this._readLog(),
+      generationLog: log,
     };
 
     REPORT_SECTIONS.forEach((section) => {
       const cached = this._cache.get(this._latestCacheKey(section)) || this._cache.get(this._cacheKey(ttlMs, section));
-      if (!cached) return;
+      // The log persists to disk separately from the cache, so if the cache
+      // ever loses an entry (e.g. a process restart), fall back to the most
+      // recent logged entry for the section instead of showing no report.
+      const loggedEntry = !cached && log.find((entry) => entry && entry.section === section && entry.content);
+      const resolved = cached || (loggedEntry
+        ? { dateStr: loggedEntry.dateStr, content: loggedEntry.content, generatedAt: loggedEntry.generatedAt }
+        : null);
+      if (!resolved) return;
+      if (!cached) this._cache.set(this._latestCacheKey(section), resolved, Math.max(ttlMs, msUntilNextDay()));
       report.generated = true;
-      report.dateStr = report.dateStr || cached.dateStr;
-      report[section] = cached.content;
+      report.dateStr = report.dateStr || resolved.dateStr;
+      report[section] = resolved.content;
       report.generatedAtBySection = report.generatedAtBySection || {};
-      report.generatedAtBySection[section] = cached.generatedAt;
-      if (!report.generatedAt || cached.generatedAt > report.generatedAt) {
-        report.generatedAt = cached.generatedAt;
+      report.generatedAtBySection[section] = resolved.generatedAt;
+      if (!report.generatedAt || resolved.generatedAt > report.generatedAt) {
+        report.generatedAt = resolved.generatedAt;
         report.latestSection = section;
       }
     });
