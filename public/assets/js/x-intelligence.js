@@ -72,13 +72,10 @@
     document.head.appendChild(script);
   }
 
-  function renderList(root, activeFilter, activeHandle, onSelect) {
+  function renderList(root, activeHandle, onSelect) {
     root.innerHTML = "";
-    var groups = activeFilter === "all"
-      ? GROUPS
-      : GROUPS.filter(function (g) { return g.key === activeFilter; });
 
-    groups.forEach(function (group) {
+    GROUPS.forEach(function (group) {
       var heading = document.createElement("div");
       heading.className = "x-account-group-title";
       heading.textContent = group.label;
@@ -206,7 +203,6 @@
     var pane = document.getElementById("xTimelinePane");
     var paneLabel = document.getElementById("xTimelineLabel");
     var paneLink = document.getElementById("xTimelineLink");
-    var filters = document.querySelectorAll(".x-filter");
     var postFeedRoot = document.getElementById("xPostFeed");
     loadPostFeed(postFeedRoot);
     if (!listRoot || !pane) return;
@@ -215,7 +211,6 @@
     var lastHandle = readLastHandle();
     var validLast = accounts.some(function (a) { return a.handle === lastHandle; });
     var state = {
-      filter: "all",
       handle: validLast ? lastHandle : accounts[0].handle,
     };
 
@@ -225,18 +220,10 @@
       renderTimeline(pane, handle);
       if (paneLabel) paneLabel.textContent = "@" + handle;
       if (paneLink) paneLink.href = "https://x.com/" + handle;
-      renderList(listRoot, state.filter, state.handle, selectHandle);
+      renderList(listRoot, state.handle, selectHandle);
     }
 
-    filters.forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        state.filter = btn.dataset.filter || "all";
-        filters.forEach(function (b) { b.classList.toggle("active", b === btn); });
-        renderList(listRoot, state.filter, state.handle, selectHandle);
-      });
-    });
-
-    renderList(listRoot, state.filter, state.handle, selectHandle);
+    renderList(listRoot, state.handle, selectHandle);
     selectHandle(state.handle);
   }
 

@@ -1,59 +1,52 @@
 const { createServiceError } = require("../utils/errors");
 
 /**
- * X (Twitter) has no free official RSS/API. These are public Nitter mirrors
- * that expose an RSS feed per profile (`/<handle>/rss`). Mirrors go up and
- * down unpredictably, so each fetch tries them in order and remembers which
- * one last worked for a given handle.
+ * X (Twitter) has no free official RSS/API. This pulls from the same
+ * undocumented syndication endpoint X's own `widgets.js` embed uses to
+ * render a profile timeline, since public Nitter-style mirrors have largely
+ * been shut down. It's unofficial and could change or stop working without
+ * notice — there is no supported alternative that doesn't require a paid
+ * X API plan.
  */
-const NITTER_INSTANCES = [
-  "https://nitter.net",
-  "https://nitter.poast.org",
-  "https://nitter.privacyredirect.com",
-  "https://xcancel.com",
-];
+const SYNDICATION_URL = (handle) =>
+  `https://syndication.twitter.com/srv/timeline-profile/screen-name/${encodeURIComponent(handle)}?showReplies=false`;
 
-const REQUEST_TIMEOUT_MS = 6000;
+const REQUEST_TIMEOUT_MS = 8000;
 const FEED_TTL_MS = 10 * 60 * 1000;
-const WORKING_INSTANCE_TTL_MS = 5 * 60 * 1000;
+const MAX_POSTS_PER_ACCOUNT = 8;
 
 const BROWSER_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
-function decodeXmlEntities(value) {
-  if (!value) return value;
-  return value
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'");
+function extractNextData(html) {
+  const match = html.match(/<script[^>]*id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+  if (!match) return null;
+  try {
+    return JSON.parse(match[1]);
+  } catch {
+    return null;
+  }
 }
 
-function stripHtml(value) {
-  return decodeXmlEntities(String(value || "").replace(/<[^>]*>/g, "")).trim();
-}
-
-function parseFeedXml(xml, handle) {
-  const items = xml.split("<item>").slice(1);
-  const posts = items
-    .map((chunk) => {
-      const link = (chunk.match(/<link>([^<]+)<\/link>/) || [])[1];
-      const title = (chunk.match(/<title>([\s\S]*?)<\/title>/) || [])[1];
-      const pubDate = (chunk.match(/<pubDate>([^<]+)<\/pubDate>/) || [])[1];
-      if (!link) return null;
-
-      const publishedAt = pubDate ? new Date(pubDate).toISOString() : null;
-      return {
-        id: link,
-        text: stripHtml(title) || "",
-        url: link.replace(/^https?:\/\/[^/]+/, "https://x.com"),
-        publishedAt,
-      };
-    })
-    .filter(Boolean);
-
-  return { handle, posts };
+/**
+ * The exact JSON shape isn't documented and can shift, so rather than
+ * hardcoding a path, walk the whole tree looking for tweet-shaped objects
+ * (full_text/text + id_str + created_at).
+ */
+function collectTweets(node, out, seen) {
+  if (!node || typeof node !== "object") return;
+  if (Array.isArray(node)) {
+    node.forEach((item) => collectTweets(item, out, seen));
+    return;
+  }
+  const text = typeof node.full_text === "string" ? node.full_text : node.text;
+  const idStr = node.id_str || (typeof node.id === "string" ? node.id : null);
+  const createdAt = node.created_at;
+  if (typeof text === "string" && typeof idStr === "string" && typeof createdAt === "string" && !seen.has(idStr)) {
+    seen.add(idStr);
+    out.push({ idStr, text, createdAt });
+  }
+  Object.values(node).forEach((value) => collectTweets(value, out, seen));
 }
 
 async function fetchWithTimeout(url, timeoutMs) {
@@ -61,7 +54,7 @@ async function fetchWithTimeout(url, timeoutMs) {
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     return await fetch(url, {
-      headers: { "User-Agent": BROWSER_USER_AGENT },
+      headers: { "User-Agent": BROWSER_USER_AGENT, Accept: "text/html" },
       signal: controller.signal,
     });
   } finally {
@@ -70,42 +63,40 @@ async function fetchWithTimeout(url, timeoutMs) {
 }
 
 class XFeedService {
-  constructor({ cache, instances } = {}) {
+  constructor({ cache } = {}) {
     this.cache = cache;
-    this.instances = instances && instances.length ? instances : NITTER_INSTANCES;
-  }
-
-  async _fetchFromInstance(instance, handle) {
-    const response = await fetchWithTimeout(`${instance}/${handle}/rss`, REQUEST_TIMEOUT_MS);
-    if (!response.ok) {
-      throw createServiceError(`${instance} returned ${response.status} for @${handle}`, 502);
-    }
-    const xml = await response.text();
-    if (!xml.includes("<item>")) {
-      throw createServiceError(`${instance} returned no feed items for @${handle}`, 502);
-    }
-    return parseFeedXml(xml, handle);
   }
 
   async getAccountFeed(handle) {
     return this.cache.getOrLoad(`x:feed:${handle}`, FEED_TTL_MS, async () => {
-      const preferredKey = `x:instance:${handle}`;
-      const preferred = this.cache.get(preferredKey);
-      const ordered = preferred
-        ? [preferred, ...this.instances.filter((i) => i !== preferred)]
-        : this.instances;
-
-      let lastErr = null;
-      for (const instance of ordered) {
-        try {
-          const feed = await this._fetchFromInstance(instance, handle);
-          this.cache.set(preferredKey, instance, WORKING_INSTANCE_TTL_MS);
-          return feed;
-        } catch (err) {
-          lastErr = err;
-        }
+      const response = await fetchWithTimeout(SYNDICATION_URL(handle), REQUEST_TIMEOUT_MS);
+      if (!response.ok) {
+        throw createServiceError(`Syndication endpoint returned ${response.status} for @${handle}`, 502);
       }
-      throw lastErr || createServiceError(`Could not load a feed for @${handle}`, 502);
+
+      const html = await response.text();
+      const data = extractNextData(html);
+      if (!data) {
+        throw createServiceError(`Could not parse timeline data for @${handle}`, 502);
+      }
+
+      const tweets = [];
+      collectTweets(data, tweets, new Set());
+      if (!tweets.length) {
+        throw createServiceError(`No posts found for @${handle}`, 502);
+      }
+
+      const posts = tweets
+        .map((tweet) => ({
+          id: tweet.idStr,
+          text: tweet.text,
+          url: `https://x.com/${handle}/status/${tweet.idStr}`,
+          publishedAt: new Date(tweet.createdAt).toISOString(),
+        }))
+        .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
+        .slice(0, MAX_POSTS_PER_ACCOUNT);
+
+      return { handle, posts };
     });
   }
 }
