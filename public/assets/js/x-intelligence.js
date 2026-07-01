@@ -57,21 +57,6 @@
     try { localStorage.setItem(localKey, handle); } catch (err) {}
   }
 
-  function loadWidgetsScript(cb) {
-    if (window.twttr && window.twttr.widgets) { cb(); return; }
-    var existing = document.getElementById("twitter-wjs");
-    if (existing) {
-      existing.addEventListener("load", cb);
-      return;
-    }
-    var script = document.createElement("script");
-    script.id = "twitter-wjs";
-    script.src = "https://platform.twitter.com/widgets.js";
-    script.async = true;
-    script.onload = cb;
-    document.head.appendChild(script);
-  }
-
   function renderList(root, activeHandle, onSelect) {
     root.innerHTML = "";
 
@@ -97,23 +82,6 @@
     });
   }
 
-  function renderTimeline(pane, handle) {
-    pane.innerHTML = "";
-    var anchor = document.createElement("a");
-    anchor.className = "twitter-timeline";
-    anchor.setAttribute("data-theme", "dark");
-    anchor.setAttribute("data-chrome", "noheader nofooter transparent");
-    anchor.href = "https://twitter.com/" + handle + "?ref_src=twsrc%5Etfw";
-    anchor.textContent = "Tweets by @" + handle;
-    pane.appendChild(anchor);
-
-    loadWidgetsScript(function () {
-      if (window.twttr && window.twttr.widgets) {
-        window.twttr.widgets.load(pane);
-      }
-    });
-  }
-
   function formatRelativeDate(iso) {
     if (!iso) return "";
     var date = new Date(iso);
@@ -129,18 +97,20 @@
     return months + (months === 1 ? " month ago" : " months ago");
   }
 
-  function renderPostFeed(root, data) {
-    root.innerHTML = "";
-    var posts = (data.posts || []).slice().sort(function (a, b) {
+  function sortByPublishedDesc(posts) {
+    return posts.slice().sort(function (a, b) {
       var aTime = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
       var bTime = b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
       return bTime - aTime;
     });
+  }
 
+  function renderPostCards(root, posts, emptyText) {
+    root.innerHTML = "";
     var grid = document.createElement("div");
     grid.className = "x-post-grid";
 
-    posts.forEach(function (post) {
+    sortByPublishedDesc(posts).forEach(function (post) {
       var card = document.createElement("a");
       card.className = "x-post-card";
       card.href = post.url;
@@ -150,7 +120,7 @@
       var meta = document.createElement("div");
       meta.className = "x-post-meta";
       meta.innerHTML =
-        '<span class="x-tag">@' + post.handle + "</span> &middot; " +
+        '<span class="x-tag">@' + esc(post.handle) + "</span> &middot; " +
         (post.category ? esc(post.category) + " &middot; " : "") +
         formatRelativeDate(post.publishedAt);
 
@@ -166,35 +136,31 @@
     if (!posts.length) {
       var empty = document.createElement("div");
       empty.className = "x-empty";
-      empty.textContent = "No posts found yet.";
+      empty.textContent = emptyText || "No posts found yet.";
       grid.appendChild(empty);
     }
 
     root.appendChild(grid);
-
-    var failed = data.failedFeeds || [];
-    if (failed.length) {
-      var err = document.createElement("div");
-      err.className = "x-feed-error";
-      err.textContent =
-        "Couldn't load feed" + (failed.length > 1 ? "s" : "") + " for: " +
-        failed.map(function (a) { return "@" + a.handle; }).join(", ");
-      root.appendChild(err);
-    }
   }
 
-  function loadPostFeed(root) {
-    if (!root) return;
-    fetch("/api/x/accounts")
+  function renderFeedError(root, failedFeeds) {
+    if (!failedFeeds || !failedFeeds.length) return;
+    var err = document.createElement("div");
+    err.className = "x-feed-error";
+    err.textContent =
+      "Couldn't load feed" + (failedFeeds.length > 1 ? "s" : "") + " for: " +
+      failedFeeds.map(function (a) { return "@" + a.handle; }).join(", ");
+    root.appendChild(err);
+  }
+
+  function loadAccountsFeed() {
+    return fetch("/api/x/accounts")
       .then(function (res) {
         if (!res.ok) throw new Error("Request failed: " + res.status);
         return res.json();
       })
-      .then(function (data) {
-        renderPostFeed(root, data || {});
-      })
       .catch(function () {
-        root.innerHTML = '<div class="x-empty">Latest posts are unavailable right now.</div>';
+        return { posts: [], failedFeeds: [] };
       });
   }
 
@@ -204,7 +170,6 @@
     var paneLabel = document.getElementById("xTimelineLabel");
     var paneLink = document.getElementById("xTimelineLink");
     var postFeedRoot = document.getElementById("xPostFeed");
-    loadPostFeed(postFeedRoot);
     if (!listRoot || !pane) return;
 
     var accounts = allAccounts();
@@ -212,19 +177,41 @@
     var validLast = accounts.some(function (a) { return a.handle === lastHandle; });
     var state = {
       handle: validLast ? lastHandle : accounts[0].handle,
+      feedData: { posts: [], failedFeeds: [] },
     };
+
+    function renderPane() {
+      var handlePosts = state.feedData.posts.filter(function (p) { return p.handle === state.handle; });
+      var failed = (state.feedData.failedFeeds || []).some(function (a) { return a.handle === state.handle; });
+      renderPostCards(
+        pane,
+        handlePosts,
+        failed
+          ? "Couldn't load @" + state.handle + "'s posts right now."
+          : "No recent posts found for @" + state.handle + "."
+      );
+    }
 
     function selectHandle(handle) {
       state.handle = handle;
       writeLastHandle(handle);
-      renderTimeline(pane, handle);
       if (paneLabel) paneLabel.textContent = "@" + handle;
       if (paneLink) paneLink.href = "https://x.com/" + handle;
+      renderPane();
       renderList(listRoot, state.handle, selectHandle);
     }
 
     renderList(listRoot, state.handle, selectHandle);
     selectHandle(state.handle);
+
+    loadAccountsFeed().then(function (data) {
+      state.feedData = { posts: data.posts || [], failedFeeds: data.failedFeeds || [] };
+      renderPane();
+      if (postFeedRoot) {
+        renderPostCards(postFeedRoot, state.feedData.posts, "No posts found yet.");
+        renderFeedError(postFeedRoot, state.feedData.failedFeeds);
+      }
+    });
   }
 
   if (document.readyState === "loading") {
