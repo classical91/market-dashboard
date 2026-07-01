@@ -98,6 +98,11 @@
           icon: "&#128221;",
           label: "YouTube Summarizer",
         },
+        {
+          href: "https://commentfarm-production-fc8b.up.railway.app/queue",
+          icon: "&#128444;",
+          label: "imagequeues",
+        },
       ],
     },
     { href: "https://x.com/", icon: "&#120143;", label: "Open X.com", featured: "x" },
