@@ -12,6 +12,13 @@ const DEFAULT_STUDIES = [
 const ANALYSIS_PROMPT =
   "Analyze this chart and end with BUY/SELL/HOLD. Also put a space between each list, and use emojis creatively.";
 
+// The last generated result for each symbol/interval is kept in the
+// persistent cache indefinitely (until a fresh generation overwrites it), so
+// it survives page refreshes and server restarts. `ttlMs` only controls how
+// long a generation is considered "fresh enough" to skip re-generating (see
+// the manual generatedAt check below) — it does not expire the display copy.
+const PERSIST_TTL_MS = 100 * 365 * 24 * 60 * 60 * 1000;
+
 const DEFAULT_PRESETS = [
   { symbol: "BINANCE:BTCUSDT", label: "BTCUSDT", interval: "4h" },
   { symbol: "BINANCE:ETHUSDT", label: "ETHUSDT", interval: "4h" },
@@ -217,7 +224,7 @@ class AIAnalysisService {
       const verdict = extractVerdict(analysis);
       const generatedAt = new Date().toISOString();
       const result = { chartUrl, analysis, verdict, model: this._model, generatedAt };
-      this._cache.set(key, result, Math.max(ttlMs, 5 * 60 * 1000));
+      this._cache.set(key, result, PERSIST_TTL_MS);
       this._logGeneration({ symbol, interval, label: preset.label, ...result });
       return { ...preset, ...result };
     } catch (err) {
