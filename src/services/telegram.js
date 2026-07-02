@@ -37,9 +37,21 @@ function normalizeTarget(entry) {
   return threadId ? { chatId, threadId } : { chatId };
 }
 
+// Repair the common paste mistakes that produce a 404 from Telegram: a
+// leading "bot" copied from the API URL path, surrounding quotes, and stray
+// whitespace/newlines. A real token always starts with the numeric bot id,
+// so stripping a "bot" prefix can never break a valid token.
+function sanitizeBotToken(raw) {
+  return String(raw || "")
+    .trim()
+    .replace(/^["']|["']$/g, "")
+    .replace(/^bot/i, "")
+    .trim();
+}
+
 class TelegramService {
   constructor({ botToken, chatIds }) {
-    this._botToken = botToken;
+    this._botToken = sanitizeBotToken(botToken);
     this._chatIds = (chatIds || []).map(normalizeTarget);
   }
 
@@ -140,6 +152,72 @@ class TelegramService {
     } else {
       await this._sendToAll(message);
     }
+  }
+
+  /**
+   * Read-only health report: verifies the token against getMe and each
+   * configured chat against getChat, so a misconfigured deploy can be
+   * debugged from /api/telegram/diagnose without reading server logs.
+   * Never sends a message and never reveals the token secret — only the
+   * public bot-id prefix and length, enough to spot a paste error.
+   */
+  async diagnose() {
+    const report = {
+      tokenPresent: Boolean(this._botToken),
+      // The part before ":" is the public bot id (visible in getMe anyway);
+      // exposing it plus the total length helps spot truncation or swaps.
+      tokenBotId: this._botToken.split(":")[0] || null,
+      tokenLength: this._botToken.length,
+      targets: [],
+    };
+
+    if (!this._botToken) {
+      report.tokenValid = false;
+      report.tokenError = "TELEGRAM_BOT_TOKEN is not set";
+      return report;
+    }
+
+    try {
+      const res = await fetch(`${TELEGRAM_API}/bot${this._botToken}/getMe`);
+      const data = await res.json().catch(() => null);
+      report.tokenValid = Boolean(res.ok && data?.ok);
+      if (report.tokenValid) {
+        report.bot = { id: data.result.id, username: data.result.username };
+      } else {
+        report.tokenError = data?.description || `getMe HTTP ${res.status}`;
+      }
+    } catch (err) {
+      report.tokenValid = false;
+      report.tokenError = err.message;
+    }
+
+    for (const target of this._chatIds) {
+      const info = { chatId: target.chatId, threadId: target.threadId || null };
+      if (report.tokenValid) {
+        try {
+          const res = await fetch(
+            `${TELEGRAM_API}/bot${this._botToken}/getChat?chat_id=${encodeURIComponent(target.chatId)}`,
+          );
+          const data = await res.json().catch(() => null);
+          info.ok = Boolean(res.ok && data?.ok);
+          if (info.ok) {
+            info.title = data.result?.title || null;
+            info.isForum = Boolean(data.result?.is_forum);
+          } else {
+            info.error = data?.description || `getChat HTTP ${res.status}`;
+          }
+        } catch (err) {
+          info.ok = false;
+          info.error = err.message;
+        }
+      } else {
+        info.ok = false;
+        info.error = "skipped: token invalid";
+      }
+      report.targets.push(info);
+    }
+
+    return report;
   }
 
   async sendTest(target) {

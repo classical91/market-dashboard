@@ -10,6 +10,16 @@ function createTelegramRouter({ telegramService }) {
     });
   });
 
+  // Read-only config check: validates the token (getMe) and each chat id
+  // (getChat) against the live Telegram API without sending any message.
+  router.get("/diagnose", async (req, res, next) => {
+    try {
+      res.json(await telegramService.diagnose());
+    } catch (err) {
+      next(err);
+    }
+  });
+
   router.post("/test", async (req, res, next) => {
     try {
       if (!telegramService.configured) {
