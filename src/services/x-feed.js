@@ -22,12 +22,31 @@ const BROWSER_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
 function xBearerToken() {
-  return (
+  const raw = (
     process.env.X_API_BEARER_TOKEN ||
     process.env.X_BEARER_TOKEN ||
     process.env.TWITTER_BEARER_TOKEN ||
     ""
   ).trim();
+  // Tolerate common paste mistakes: surrounding quotes and a "Bearer " prefix.
+  return raw.replace(/^["']|["']$/g, "").replace(/^Bearer\s+/i, "").trim();
+}
+
+/**
+ * A 401/403 from the X API is a configuration problem, not a transient
+ * failure — point at the likely cause so it is obvious from the logs.
+ */
+function apiStatusHint(status) {
+  if (status === 401) {
+    return " (bearer token rejected — check X_API_BEARER_TOKEN is the app's Bearer Token, freshly copied, with no quotes)";
+  }
+  if (status === 403) {
+    return " (token valid but access denied — recent search needs a paid X API plan and the app must be attached to a Project)";
+  }
+  if (status === 429) {
+    return " (rate limited — too many requests or monthly post cap reached)";
+  }
+  return "";
 }
 
 function extractNextData(html) {
@@ -209,7 +228,7 @@ class XFeedService {
     });
     if (!response.ok) {
       throw createServiceError(
-        `X API returned ${response.status} for batch of ${handles.length} handles`,
+        `X API returned ${response.status} for batch of ${handles.length} handles${apiStatusHint(response.status)}`,
         502,
       );
     }
