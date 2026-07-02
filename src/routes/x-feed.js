@@ -20,19 +20,19 @@ function createXFeedRouter({ xFeedService, accounts }) {
   router.get(
     "/accounts",
     asyncRoute(async (req, res) => {
-      const results = await Promise.allSettled(
-        accounts.map((account) => xFeedService.getAccountFeed(account.handle)),
-      );
+      const feeds = await xFeedService.getAccountFeeds(accounts.map((account) => account.handle));
 
-      const payload = accounts.map((account, index) => {
-        const result = results[index];
+      const payload = accounts.map((account) => {
+        const feed = feeds.get(account.handle);
 
-        if (result.status === "fulfilled") {
+        if (feed && !feed.error) {
           return {
             handle: account.handle,
             label: account.label,
             category: account.category,
-            posts: result.value.posts,
+            posts: feed.posts,
+            source: feed.source || "api",
+            stale: Boolean(feed.stale),
           };
         }
 
@@ -40,7 +40,7 @@ function createXFeedRouter({ xFeedService, accounts }) {
           handle: account.handle,
           label: account.label,
           category: account.category,
-          error: result.reason?.message || "Failed to load feed",
+          error: feed?.error || "Failed to load feed",
         };
       });
 
