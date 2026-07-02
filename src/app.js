@@ -98,7 +98,7 @@ function createApp() {
       dataSource: config.onchain.dataSourceLabel,
     }),
   );
-  app.use("/api/ai-analysis", createAIAnalysisRouter({ aiAnalysisService }));
+  app.use("/api/ai-analysis", createAIAnalysisRouter({ aiAnalysisService, telegramService }));
   app.use("/api/onchain", createOnchainRouter({ onchainService }));
   app.use("/api/overview", createOverviewRouter({ overviewService }));
   app.use("/api/daily-report", createReporterRouter({ reporterService }));

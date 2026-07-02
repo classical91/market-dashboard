@@ -1,6 +1,6 @@
 const { Router } = require("express");
 
-function createAIAnalysisRouter({ aiAnalysisService }) {
+function createAIAnalysisRouter({ aiAnalysisService, telegramService }) {
   const router = Router();
 
   function resolveTtlMs(req) {
@@ -27,6 +27,32 @@ function createAIAnalysisRouter({ aiAnalysisService }) {
       }
       const result = await aiAnalysisService.generate(symbol, interval, resolveTtlMs(req));
       res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // Manually broadcast the last generated analysis for one symbol/interval to
+  // Telegram. Never generates a fresh analysis itself — run /generate first.
+  router.post("/broadcast", async (req, res, next) => {
+    try {
+      const symbol = typeof req.body?.symbol === "string" ? req.body.symbol.trim() : "";
+      const interval = typeof req.body?.interval === "string" ? req.body.interval.trim() : "";
+      if (!symbol || !interval) {
+        res.status(400).json({ error: "symbol and interval are required" });
+        return;
+      }
+      if (!telegramService.configured) {
+        res.status(400).json({ error: "Telegram is not configured (set TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_IDS)" });
+        return;
+      }
+      const cached = aiAnalysisService.getCached(symbol, interval);
+      if (!cached || !cached.analysis) {
+        res.status(400).json({ error: "No analysis to broadcast yet — click Analyze first" });
+        return;
+      }
+      await telegramService.postAIAnalysis(cached);
+      res.json({ ok: true, channelCount: telegramService._chatIds.length });
     } catch (err) {
       next(err);
     }

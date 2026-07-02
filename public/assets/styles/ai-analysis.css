@@ -87,6 +87,28 @@
 .aia-run-btn:hover:not(:disabled) { background: rgba(77,163,255,0.22); border-color: var(--blue); }
 .aia-run-btn:disabled { opacity: 0.55; cursor: default; }
 
+.aia-broadcast-btn {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--text);
+  background: var(--green-bg);
+  border: 1px solid rgba(0,227,150,0.3);
+  border-radius: 9px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.aia-broadcast-btn:hover:not(:disabled) { background: rgba(0,227,150,0.22); border-color: var(--green); }
+.aia-broadcast-btn:disabled { opacity: 0.4; cursor: default; }
+
+.aia-broadcast-status {
+  font-size: 11px;
+  color: var(--green);
+  margin-top: 8px;
+}
+
 .aia-chart {
   width: 100%;
   aspect-ratio: 16 / 9;

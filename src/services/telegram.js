@@ -56,6 +56,31 @@ class TelegramService {
     }
   }
 
+  async _sendPhoto(chatId, photoUrl, caption) {
+    const url = `${TELEGRAM_API}/bot${this._botToken}/sendPhoto`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        photo: photoUrl,
+        caption,
+        parse_mode: "HTML",
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`Telegram ${res.status}: ${body}`);
+    }
+    return res.json();
+  }
+
+  async _sendPhotoToAll(photoUrl, caption) {
+    for (const chatId of this._chatIds) {
+      await this._sendPhoto(chatId, photoUrl, caption);
+    }
+  }
+
   async postReport(report) {
     if (!this.configured) return;
 
@@ -70,6 +95,24 @@ class TelegramService {
       const body = formatForTelegram(report[s.key] || "");
       const header = `<b>${s.emoji} ${s.title}</b>\n🗓️ ${escapeHtml(date)}\n\n`;
       await this._sendToAll(header + body);
+    }
+  }
+
+  async postAIAnalysis(result) {
+    if (!this.configured) return;
+
+    const verdictEmoji = { BUY: "🟢", SELL: "🔴", HOLD: "🟡" }[result.verdict] || "⚪";
+    const header = `${verdictEmoji} <b>${escapeHtml(result.label || result.symbol || "")}</b> · ${escapeHtml(
+      result.interval || "",
+    )} — <b>${escapeHtml(result.verdict || "NO CALL")}</b>\n\n`;
+    const body = formatForTelegram(result.analysis || "");
+    // Telegram photo captions are capped at 1024 chars (vs 4096 for text messages).
+    const caption = truncate(header + body, 1024);
+
+    if (result.chartUrl) {
+      await this._sendPhotoToAll(result.chartUrl, caption);
+    } else {
+      await this._sendToAll(truncate(header + body, MAX_MSG_LEN));
     }
   }
 

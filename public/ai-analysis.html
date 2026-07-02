@@ -81,6 +81,10 @@
       return 'aia-card-' + preset.symbol.replace(/[^a-z0-9]+/gi, '-') + '-' + preset.interval;
     }
 
+    function hasResult(preset) {
+      return Boolean(preset.chartUrl && preset.analysis);
+    }
+
     function renderCard(preset) {
       var id = cardId(preset);
       return (
@@ -90,6 +94,7 @@
             '<div class="aia-card-actions">' +
               '<span class="' + verdictClass(preset.verdict) + '" data-role="verdict">' + (preset.verdict || 'NO CALL') + '</span>' +
               '<button class="aia-run-btn" type="button" data-role="run">Analyze</button>' +
+              '<button class="aia-broadcast-btn" type="button" data-role="broadcast"' + (hasResult(preset) ? '' : ' disabled') + '>&#128226; Broadcast</button>' +
             '</div>' +
           '</div>' +
           '<div class="aia-chart" data-role="chart">' +
@@ -100,6 +105,7 @@
           '<div class="aia-body">' +
             '<div class="aia-analysis" data-role="analysis">' + renderAnalysis(preset.analysis) + '</div>' +
             '<div class="aia-error" data-role="error" style="display:none"></div>' +
+            '<div class="aia-broadcast-status" data-role="broadcast-status" style="display:none"></div>' +
           '</div>' +
           '<div class="aia-meta" data-role="meta">' + formatGeneratedAt(preset.generatedAt) + '</div>' +
         '</div>'
@@ -121,6 +127,11 @@
 
       card.querySelector('[data-role="analysis"]').innerHTML = renderAnalysis(preset.analysis);
       card.querySelector('[data-role="meta"]').textContent = formatGeneratedAt(preset.generatedAt);
+      card.querySelector('[data-role="broadcast"]').disabled = !hasResult(preset);
+
+      var statusEl = card.querySelector('[data-role="broadcast-status"]');
+      statusEl.style.display = 'none';
+      statusEl.textContent = '';
 
       var errorEl = card.querySelector('[data-role="error"]');
       if (preset.error) {
@@ -166,6 +177,48 @@
       });
     }
 
+    function wireBroadcastButton(preset) {
+      var card = document.getElementById(cardId(preset));
+      if (!card) return;
+      var btn = card.querySelector('[data-role="broadcast"]');
+      var statusEl = card.querySelector('[data-role="broadcast-status"]');
+      btn.addEventListener('click', function () {
+        btn.disabled = true;
+        btn.textContent = 'Sending…';
+        statusEl.style.display = 'none';
+        statusEl.textContent = '';
+        fetch('/api/ai-analysis/broadcast', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ symbol: preset.symbol, interval: preset.interval })
+        })
+          .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+          .then(function (result) {
+            var errorEl = card.querySelector('[data-role="error"]');
+            if (result.ok && result.data.ok) {
+              var groupCount = result.data.channelCount;
+              statusEl.style.display = 'block';
+              statusEl.textContent = '✅ Sent to Telegram (' + groupCount + ' group' + (groupCount === 1 ? '' : 's') + ')';
+            } else {
+              errorEl.style.display = 'block';
+              errorEl.textContent = result.data.error || 'Broadcast failed.';
+            }
+          })
+          .catch(function (err) {
+            var errorEl = card.querySelector('[data-role="error"]');
+            errorEl.style.display = 'block';
+            errorEl.textContent = 'Broadcast request failed: ' + err.message;
+          })
+          .finally(function () {
+            // Re-derive from the live DOM rather than the closed-over preset,
+            // since a prior Analyze click may have populated the chart since
+            // this button was first wired up.
+            btn.disabled = !card.querySelector('[data-role="chart"] img');
+            btn.textContent = '📢 Broadcast';
+          });
+      });
+    }
+
     fetch('/api/ai-analysis')
       .then(function (res) { return res.json(); })
       .then(function (data) {
@@ -176,6 +229,7 @@
         var presets = data.presets || [];
         grid.innerHTML = presets.map(renderCard).join('');
         presets.forEach(wireRunButton);
+        presets.forEach(wireBroadcastButton);
       })
       .catch(function (err) {
         grid.innerHTML = '<div class="aia-notice" style="display:block">Failed to load AI Analysis: ' + err.message + '</div>';
