@@ -165,6 +165,20 @@ class AIAnalysisService {
   }
 
   /**
+   * Read-only: return the preset info merged with its last generated result
+   * (if any), for broadcasting an already-generated analysis.
+   */
+  getCached(symbol, interval) {
+    const preset = this._presets.find((p) => p.symbol === symbol && p.interval === interval) || {
+      symbol,
+      interval,
+      label: symbol,
+    };
+    const cached = this._cache.get(this._latestCacheKey(symbol, interval));
+    return cached ? { ...preset, ...cached } : null;
+  }
+
+  /**
    * Generate (or reuse a cached) analysis for one symbol/interval preset.
    */
   async generate(symbol, interval, ttlMs) {
