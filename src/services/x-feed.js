@@ -178,9 +178,11 @@ class XFeedService {
   }
 
   /**
-   * One recent-search request covering every handle in the batch. Returns a
-   * Map of handle -> feed; handles with no posts in the search window map to
-   * an empty feed so the caller can decide how to fall back.
+   * One recent-search request covering every handle in the batch. Returns
+   * feeds as a Map of handle -> feed (handles with no posts in the search
+   * window map to an empty feed) plus a `truncated` flag: when the response
+   * filled a whole page, an empty feed may just mean the handle was crowded
+   * out by higher-volume accounts rather than genuinely quiet.
    */
   async _fetchApiBatch(handles) {
     const token = xBearerToken();
@@ -188,9 +190,10 @@ class XFeedService {
       throw createServiceError("X API bearer token is not configured", 503);
     }
 
+    const maxResults = handles.length === 1 ? 10 : MAX_RESULTS_PER_BATCH;
     const params = new URLSearchParams({
       query: batchQuery(handles),
-      max_results: String(MAX_RESULTS_PER_BATCH),
+      max_results: String(maxResults),
       sort_order: "recency",
       "tweet.fields": "author_id,created_at,attachments",
       expansions: "author_id,attachments.media_keys",
@@ -233,7 +236,8 @@ class XFeedService {
         .slice(0, MAX_POSTS_PER_ACCOUNT);
       feeds.set(handle, { handle, posts, source: "api" });
     }
-    return feeds;
+    const truncated = Boolean(data.meta?.next_token) || tweets.length >= maxResults;
+    return { feeds, truncated };
   }
 
   _fetchApiBatchDeduped(handles) {
@@ -333,12 +337,19 @@ class XFeedService {
       const settled = await Promise.allSettled(
         batches.map((batch) => this._fetchApiBatchDeduped(batch)),
       );
+      const crowdedOut = [];
       settled.forEach((result, index) => {
         if (result.status === "fulfilled") {
-          for (const [handle, feed] of result.value) {
-            if (!feed.posts.length) continue;
-            this._cacheFreshFeed(handle, feed);
-            feeds.set(handle, feed);
+          for (const [handle, feed] of result.value.feeds) {
+            if (feed.posts.length) {
+              this._cacheFreshFeed(handle, feed);
+              feeds.set(handle, feed);
+            } else if (result.value.truncated) {
+              // A full page sorted by recency can be dominated by one
+              // high-volume account (e.g. Barchart), leaving quieter handles
+              // with zero posts even though they tweeted recently.
+              crowdedOut.push(handle);
+            }
           }
           return;
         }
@@ -346,6 +357,29 @@ class XFeedService {
         console.warn(`[x-feed] X API batch failed (${batches[index].join(", ")}): ${message}`);
         batches[index].forEach((handle) => apiFailures.set(handle, message));
       });
+
+      if (crowdedOut.length) {
+        console.warn(
+          `[x-feed] batch page was full; re-fetching crowded-out handles individually: ${crowdedOut.join(", ")}`,
+        );
+        const topUps = await Promise.allSettled(
+          crowdedOut.map((handle) => this._fetchApiBatchDeduped([handle])),
+        );
+        topUps.forEach((result, index) => {
+          const handle = crowdedOut[index];
+          if (result.status === "fulfilled") {
+            const feed = result.value.feeds.get(handle);
+            if (feed.posts.length) {
+              this._cacheFreshFeed(handle, feed);
+              feeds.set(handle, feed);
+            }
+            return;
+          }
+          const message = result.reason?.message || "X API request failed";
+          console.warn(`[x-feed] X API top-up failed for @${handle}: ${message}`);
+          apiFailures.set(handle, message);
+        });
+      }
     }
 
     await Promise.all(
