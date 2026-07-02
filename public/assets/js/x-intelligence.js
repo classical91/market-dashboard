@@ -29,7 +29,7 @@
 
   var localModeKey = "xIntelligence:lastMode";
   var localKey = "xIntelligence:lastHandle";
-  var localFeedKey = "xIntelligence:feedCache:v2";
+  var localFeedKey = "xIntelligence:feedCache:v3";
   var ALL_MODE = "all";
 
   function readCachedFeed() {
@@ -339,7 +339,7 @@
         pane,
         handlePosts,
         failed
-          ? "Couldn't load @" + state.handle + "'s posts right now."
+          ? "Couldn't load current posts for @" + state.handle + " right now."
           : "No recent posts found for @" + state.handle + "."
       );
     }

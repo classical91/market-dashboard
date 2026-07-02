@@ -13,6 +13,7 @@ const REQUEST_TIMEOUT_MS = 10000;
 const FEED_TTL_MS = 15 * 60 * 1000;
 const LATEST_GOOD_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_POSTS_PER_ACCOUNT = 8;
+const MAX_FALLBACK_POST_AGE_MS = 45 * 24 * 60 * 60 * 1000;
 
 const BROWSER_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
@@ -128,6 +129,19 @@ function mapXApiPost(tweet, usersById, mediaByKey, handle) {
   };
 }
 
+function newestPostAgeMs(feed) {
+  const newest = (feed.posts || []).reduce((latest, post) => {
+    const time = post.publishedAt ? new Date(post.publishedAt).getTime() : 0;
+    return Math.max(latest, Number.isFinite(time) ? time : 0);
+  }, 0);
+  return newest ? Date.now() - newest : Infinity;
+}
+
+function ensureFallbackIsRecent(feed, handle) {
+  if (newestPostAgeMs(feed) <= MAX_FALLBACK_POST_AGE_MS) return feed;
+  throw createServiceError(`Fallback X feed for @${handle} is stale`, 502);
+}
+
 class XFeedService {
   constructor({ cache } = {}) {
     this.cache = cache;
@@ -219,7 +233,7 @@ class XFeedService {
       .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
       .slice(0, MAX_POSTS_PER_ACCOUNT);
 
-    return { handle, posts };
+    return ensureFallbackIsRecent({ handle, posts, source: "syndication" }, handle);
   }
 
   /**
@@ -238,7 +252,7 @@ class XFeedService {
       });
     } catch (err) {
       const lastKnownGood = this.cache.get(latestGoodKey);
-      if (lastKnownGood) return lastKnownGood;
+      if (lastKnownGood && newestPostAgeMs(lastKnownGood) <= MAX_FALLBACK_POST_AGE_MS) return lastKnownGood;
       throw err;
     }
   }
