@@ -27,63 +27,77 @@ function truncate(text, max) {
   return text.slice(0, max - 1) + "…";
 }
 
+// A chat target is either a plain chat id ("-1001841650798") or a chat id
+// plus a forum "topic" thread within it ("-1001841650798:6297"). Accepting
+// both a raw string and an already-parsed {chatId, threadId} object keeps
+// this tolerant of how config/env.js hands the list over.
+function normalizeTarget(entry) {
+  if (entry && typeof entry === "object") return entry;
+  const [chatId, threadId] = String(entry || "").split(":").map((part) => part.trim());
+  return threadId ? { chatId, threadId } : { chatId };
+}
+
 class TelegramService {
   constructor({ botToken, chatIds }) {
     this._botToken = botToken;
-    this._chatIds = chatIds; // string[]
+    this._chatIds = (chatIds || []).map(normalizeTarget);
   }
 
   get configured() {
     return !!(this._botToken && this._chatIds.length);
   }
 
-  async _send(chatId, text) {
+  async _send(target, text) {
     const url = `${TELEGRAM_API}/bot${this._botToken}/sendMessage`;
+    const body = {
+      chat_id: target.chatId,
+      text: truncate(text, MAX_MSG_LEN),
+      parse_mode: "HTML",
+      disable_web_page_preview: true,
+    };
+    if (target.threadId) body.message_thread_id = Number(target.threadId);
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: truncate(text, MAX_MSG_LEN),
-        parse_mode: "HTML",
-        disable_web_page_preview: true,
-      }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) {
-      const body = await res.text();
-      throw createServiceError(`Telegram sendMessage failed (${res.status}): ${body.slice(0, 300)}`, 502);
+      const responseBody = await res.text();
+      throw createServiceError(`Telegram sendMessage failed (${res.status}): ${responseBody.slice(0, 300)}`, 502);
     }
     return res.json();
   }
 
   async _sendToAll(text) {
-    for (const chatId of this._chatIds) {
-      await this._send(chatId, text);
+    for (const target of this._chatIds) {
+      await this._send(target, text);
     }
   }
 
-  async _sendPhoto(chatId, photoUrl, caption) {
+  async _sendPhoto(target, photoUrl, caption) {
     const url = `${TELEGRAM_API}/bot${this._botToken}/sendPhoto`;
+    const body = {
+      chat_id: target.chatId,
+      photo: photoUrl,
+      caption,
+      parse_mode: "HTML",
+    };
+    if (target.threadId) body.message_thread_id = Number(target.threadId);
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        photo: photoUrl,
-        caption,
-        parse_mode: "HTML",
-      }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) {
-      const body = await res.text();
-      throw createServiceError(`Telegram sendPhoto failed (${res.status}): ${body.slice(0, 300)}`, 502);
+      const responseBody = await res.text();
+      throw createServiceError(`Telegram sendPhoto failed (${res.status}): ${responseBody.slice(0, 300)}`, 502);
     }
     return res.json();
   }
 
   async _sendPhotoToAll(photoUrl, caption) {
-    for (const chatId of this._chatIds) {
-      await this._sendPhoto(chatId, photoUrl, caption);
+    for (const target of this._chatIds) {
+      await this._sendPhoto(target, photoUrl, caption);
     }
   }
 
@@ -128,13 +142,13 @@ class TelegramService {
     }
   }
 
-  async sendTest(chatId) {
-    await this._send(chatId, "✅ <b>Market Command</b> — Telegram connection test successful.");
+  async sendTest(target) {
+    await this._send(target, "✅ <b>Market Command</b> — Telegram connection test successful.");
   }
 
   async testAll() {
-    for (const chatId of this._chatIds) {
-      await this.sendTest(chatId);
+    for (const target of this._chatIds) {
+      await this.sendTest(target);
     }
   }
 }
