@@ -14,6 +14,9 @@ const FEED_TTL_MS = 15 * 60 * 1000;
 const LATEST_GOOD_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_POSTS_PER_ACCOUNT = 8;
 const MAX_FALLBACK_POST_AGE_MS = 45 * 24 * 60 * 60 * 1000;
+// Recent-search query length cap on the Basic tier.
+const MAX_QUERY_LENGTH = 512;
+const MAX_RESULTS_PER_BATCH = 100;
 
 const BROWSER_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
@@ -137,6 +140,32 @@ function newestPostAgeMs(feed) {
   return newest ? Date.now() - newest : Infinity;
 }
 
+function batchQuery(handles) {
+  const terms = handles.map((handle) => `from:${handle}`).join(" OR ");
+  return `(${terms}) -is:retweet -is:reply`;
+}
+
+/**
+ * Packs handles into as few recent-search queries as fit under the query
+ * length cap, so a page refresh costs a couple of API requests instead of
+ * one per account (which blows through the per-15-minute rate limit).
+ */
+function buildQueryBatches(handles) {
+  const batches = [];
+  let current = [];
+  for (const handle of handles) {
+    const candidate = current.concat(handle);
+    if (current.length && batchQuery(candidate).length > MAX_QUERY_LENGTH) {
+      batches.push(current);
+      current = [handle];
+    } else {
+      current = candidate;
+    }
+  }
+  if (current.length) batches.push(current);
+  return batches;
+}
+
 function ensureFallbackIsRecent(feed, handle) {
   if (newestPostAgeMs(feed) <= MAX_FALLBACK_POST_AGE_MS) return feed;
   throw createServiceError(`Fallback X feed for @${handle} is stale`, 502);
@@ -145,17 +174,23 @@ function ensureFallbackIsRecent(feed, handle) {
 class XFeedService {
   constructor({ cache } = {}) {
     this.cache = cache;
+    this._inflightBatches = new Map();
   }
 
-  async _fetchApiFeed(handle) {
+  /**
+   * One recent-search request covering every handle in the batch. Returns a
+   * Map of handle -> feed; handles with no posts in the search window map to
+   * an empty feed so the caller can decide how to fall back.
+   */
+  async _fetchApiBatch(handles) {
     const token = xBearerToken();
     if (!token) {
       throw createServiceError("X API bearer token is not configured", 503);
     }
 
     const params = new URLSearchParams({
-      query: `from:${handle} -is:retweet -is:reply`,
-      max_results: String(Math.max(10, MAX_POSTS_PER_ACCOUNT)),
+      query: batchQuery(handles),
+      max_results: String(MAX_RESULTS_PER_BATCH),
       sort_order: "recency",
       "tweet.fields": "author_id,created_at,attachments",
       expansions: "author_id,attachments.media_keys",
@@ -170,41 +205,50 @@ class XFeedService {
       },
     });
     if (!response.ok) {
-      throw createServiceError(`X API returned ${response.status} for @${handle}`, 502);
+      throw createServiceError(
+        `X API returned ${response.status} for batch of ${handles.length} handles`,
+        502,
+      );
     }
 
     const data = await response.json();
     const tweets = Array.isArray(data.data) ? data.data : [];
-    if (!tweets.length) {
-      throw createServiceError(`No X API posts found for @${handle}`, 502);
-    }
-
     const usersById = new Map((data.includes?.users || []).map((user) => [user.id, user]));
     const mediaByKey = new Map((data.includes?.media || []).map((media) => [media.media_key, media]));
-    const posts = tweets
-      .filter((tweet) => tweet.id && tweet.text)
-      .map((tweet) => mapXApiPost(tweet, usersById, mediaByKey, handle))
-      .filter((post) => post.publishedAt)
-      .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
-      .slice(0, MAX_POSTS_PER_ACCOUNT);
 
-    if (!posts.length) {
-      throw createServiceError(`No usable X API posts found for @${handle}`, 502);
+    const postsByHandle = new Map(handles.map((handle) => [handle.toLowerCase(), []]));
+    for (const tweet of tweets) {
+      if (!tweet.id || !tweet.text) continue;
+      const username = usersById.get(tweet.author_id)?.username;
+      const bucket = username ? postsByHandle.get(username.toLowerCase()) : null;
+      if (bucket) bucket.push(mapXApiPost(tweet, usersById, mediaByKey, username));
     }
 
-    return { handle, posts };
+    const feeds = new Map();
+    for (const handle of handles) {
+      const posts = postsByHandle
+        .get(handle.toLowerCase())
+        .filter((post) => post.publishedAt)
+        .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
+        .slice(0, MAX_POSTS_PER_ACCOUNT);
+      feeds.set(handle, { handle, posts, source: "api" });
+    }
+    return feeds;
   }
 
-  async _fetchFeed(handle) {
-    if (xBearerToken()) {
-      try {
-        return await this._fetchApiFeed(handle);
-      } catch (err) {
-        // Fall through to syndication. It is less reliable, but better than
-        // blanking the whole X Intelligence page during an API hiccup.
-      }
-    }
+  _fetchApiBatchDeduped(handles) {
+    const key = handles.join(",");
+    const inflight = this._inflightBatches.get(key);
+    if (inflight) return inflight;
 
+    const pending = this._fetchApiBatch(handles).finally(() => {
+      this._inflightBatches.delete(key);
+    });
+    this._inflightBatches.set(key, pending);
+    return pending;
+  }
+
+  async _fetchSyndicationFeed(handle) {
     const response = await fetchWithTimeout(SYNDICATION_URL(handle), REQUEST_TIMEOUT_MS);
     if (!response.ok) {
       throw createServiceError(`Syndication endpoint returned ${response.status} for @${handle}`, 502);
@@ -236,25 +280,94 @@ class XFeedService {
     return ensureFallbackIsRecent({ handle, posts, source: "syndication" }, handle);
   }
 
+  _cacheFreshFeed(handle, feed) {
+    this.cache.set(`x:feed:${handle}`, feed, FEED_TTL_MS);
+    this.cache.set(`x:feed:latest:${handle}`, feed, LATEST_GOOD_TTL_MS);
+  }
+
   /**
-   * Keeps posts on screen across refreshes/restarts instead of them
-   * disappearing: successful fetches are also written to a long-lived
-   * "last known good" entry, which is served as a fallback whenever a fresh
-   * fetch fails (X's syndication endpoint is unofficial and can be flaky).
+   * Serves the long-lived "last known good" entry so posts stay on screen
+   * across refreshes/restarts when a fresh fetch fails, marked stale so the
+   * client can tell it apart from a live feed.
    */
-  async getAccountFeed(handle) {
-    const latestGoodKey = `x:feed:latest:${handle}`;
+  _lastKnownGoodFeed(handle) {
+    const lastKnownGood = this.cache.get(`x:feed:latest:${handle}`);
+    if (lastKnownGood && newestPostAgeMs(lastKnownGood) <= MAX_FALLBACK_POST_AGE_MS) {
+      return { ...lastKnownGood, source: "cache", stale: true };
+    }
+    return null;
+  }
+
+  async _fallbackFeed(handle, reason) {
     try {
-      return await this.cache.getOrLoad(`x:feed:${handle}`, FEED_TTL_MS, async () => {
-        const feed = await this._fetchFeed(handle);
-        this.cache.set(latestGoodKey, feed, LATEST_GOOD_TTL_MS);
-        return feed;
-      });
+      const feed = await this._fetchSyndicationFeed(handle);
+      this._cacheFreshFeed(handle, feed);
+      return feed;
     } catch (err) {
-      const lastKnownGood = this.cache.get(latestGoodKey);
-      if (lastKnownGood && newestPostAgeMs(lastKnownGood) <= MAX_FALLBACK_POST_AGE_MS) return lastKnownGood;
+      const lastKnownGood = this._lastKnownGoodFeed(handle);
+      if (lastKnownGood) return lastKnownGood;
+      console.warn(`[x-feed] @${handle}: ${reason}; syndication fallback failed: ${err.message}`);
       throw err;
     }
+  }
+
+  /**
+   * Fetches feeds for all handles at once. Fresh cache entries are served
+   * directly; the remaining handles are packed into batched X API queries.
+   * Handles the API returns nothing for (quiet account, rate limit, missing
+   * token) fall back to syndication, then to the last-known-good cache.
+   */
+  async getAccountFeeds(handles) {
+    const feeds = new Map();
+    const misses = [];
+    for (const handle of handles) {
+      const cached = this.cache.get(`x:feed:${handle}`);
+      if (cached) feeds.set(handle, cached);
+      else misses.push(handle);
+    }
+    if (!misses.length) return feeds;
+
+    const apiFailures = new Map();
+    if (xBearerToken()) {
+      const batches = buildQueryBatches(misses);
+      const settled = await Promise.allSettled(
+        batches.map((batch) => this._fetchApiBatchDeduped(batch)),
+      );
+      settled.forEach((result, index) => {
+        if (result.status === "fulfilled") {
+          for (const [handle, feed] of result.value) {
+            if (!feed.posts.length) continue;
+            this._cacheFreshFeed(handle, feed);
+            feeds.set(handle, feed);
+          }
+          return;
+        }
+        const message = result.reason?.message || "X API request failed";
+        console.warn(`[x-feed] X API batch failed (${batches[index].join(", ")}): ${message}`);
+        batches[index].forEach((handle) => apiFailures.set(handle, message));
+      });
+    }
+
+    await Promise.all(
+      misses
+        .filter((handle) => !feeds.has(handle))
+        .map(async (handle) => {
+          const reason = apiFailures.get(handle) || "no recent X API posts";
+          try {
+            feeds.set(handle, await this._fallbackFeed(handle, reason));
+          } catch (err) {
+            feeds.set(handle, { handle, posts: null, error: err.message });
+          }
+        }),
+    );
+    return feeds;
+  }
+
+  async getAccountFeed(handle) {
+    const feeds = await this.getAccountFeeds([handle]);
+    const feed = feeds.get(handle);
+    if (feed?.error) throw createServiceError(feed.error, 502);
+    return feed;
   }
 }
 

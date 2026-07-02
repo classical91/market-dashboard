@@ -293,6 +293,17 @@
     root.appendChild(err);
   }
 
+  function renderStaleNotice(root, staleFeeds) {
+    if (!staleFeeds || !staleFeeds.length) return;
+    var note = document.createElement("div");
+    note.className = "x-feed-stale";
+    note.textContent =
+      "Showing older cached posts for: " +
+      staleFeeds.map(function (a) { return "@" + a.handle; }).join(", ") +
+      " (live fetch unavailable)";
+    root.appendChild(note);
+  }
+
   function loadAccountsFeed() {
     return fetch("/api/x/accounts")
       .then(function (res) {
@@ -331,10 +342,12 @@
       if (state.mode === ALL_MODE) {
         renderPostCards(pane, state.feedData.posts, "No posts found yet.");
         renderFeedError(pane, state.feedData.failedFeeds);
+        renderStaleNotice(pane, state.feedData.staleFeeds);
         return;
       }
       var handlePosts = state.feedData.posts.filter(function (p) { return p.handle === state.handle; });
       var failed = (state.feedData.failedFeeds || []).some(function (a) { return a.handle === state.handle; });
+      var stale = (state.feedData.staleFeeds || []).filter(function (a) { return a.handle === state.handle; });
       renderPostCards(
         pane,
         handlePosts,
@@ -342,6 +355,7 @@
           ? "Couldn't load current posts for @" + state.handle + " right now."
           : "No recent posts found for @" + state.handle + "."
       );
+      renderStaleNotice(pane, stale);
     }
 
     function refreshList() {
@@ -377,7 +391,11 @@
       // transient failure), instead of wiping out posts that were already
       // on screen.
       if (hasFreshPosts || !state.loaded) {
-        state.feedData = { posts: data.posts || [], failedFeeds: data.failedFeeds || [] };
+        state.feedData = {
+          posts: data.posts || [],
+          failedFeeds: data.failedFeeds || [],
+          staleFeeds: (data.accounts || []).filter(function (a) { return a.stale; }),
+        };
       }
       state.loaded = true;
       if (hasFreshPosts) writeCachedFeed(state.feedData);
