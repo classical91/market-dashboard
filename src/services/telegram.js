@@ -1,5 +1,11 @@
+const { createServiceError } = require("../utils/errors");
+
 const TELEGRAM_API = "https://api.telegram.org";
 const MAX_MSG_LEN = 4096;
+const MAX_CAPTION_LEN = 1024;
+// Leaves headroom below Telegram's hard caption cap for HTML-entity escaping
+// (e.g. "&" -> "&amp;") to expand the string a little without tipping it over.
+const CAPTION_SAFETY_MARGIN = 100;
 
 function escapeHtml(text) {
   return text
@@ -45,7 +51,7 @@ class TelegramService {
     });
     if (!res.ok) {
       const body = await res.text();
-      throw new Error(`Telegram ${res.status}: ${body}`);
+      throw createServiceError(`Telegram sendMessage failed (${res.status}): ${body.slice(0, 300)}`, 502);
     }
     return res.json();
   }
@@ -70,7 +76,7 @@ class TelegramService {
     });
     if (!res.ok) {
       const body = await res.text();
-      throw new Error(`Telegram ${res.status}: ${body}`);
+      throw createServiceError(`Telegram sendPhoto failed (${res.status}): ${body.slice(0, 300)}`, 502);
     }
     return res.json();
   }
@@ -105,14 +111,20 @@ class TelegramService {
     const header = `${verdictEmoji} <b>${escapeHtml(result.label || result.symbol || "")}</b> · ${escapeHtml(
       result.interval || "",
     )} — <b>${escapeHtml(result.verdict || "NO CALL")}</b>\n\n`;
-    const body = formatForTelegram(result.analysis || "");
-    // Telegram photo captions are capped at 1024 chars (vs 4096 for text messages).
-    const caption = truncate(header + body, 1024);
+
+    // Truncate the *raw* analysis text before converting it to HTML, not
+    // after: slicing an already-tagged string (e.g. "...<b>Vol") can cut a
+    // tag in half, which makes Telegram's parse_mode=HTML reject the whole
+    // message with "can't parse entities" and silently drop the broadcast.
+    const maxLen = result.chartUrl ? MAX_CAPTION_LEN : MAX_MSG_LEN;
+    const budget = Math.max(0, maxLen - CAPTION_SAFETY_MARGIN - header.length);
+    const body = formatForTelegram(truncate(result.analysis || "", budget));
+    const message = header + body;
 
     if (result.chartUrl) {
-      await this._sendPhotoToAll(result.chartUrl, caption);
+      await this._sendPhotoToAll(result.chartUrl, message);
     } else {
-      await this._sendToAll(truncate(header + body, MAX_MSG_LEN));
+      await this._sendToAll(message);
     }
   }
 
