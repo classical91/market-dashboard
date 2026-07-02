@@ -64,11 +64,30 @@ const ignoredAddresses = Array.from(
   ),
 );
 
+function parseJsonArray(value) {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 const config = {
   port: parseNumber(process.env.PORT, 3000),
   reporter: {
     apiKey: process.env.OPENAI_API_KEY || "",
     model: process.env.REPORTER_MODEL || "gpt-5.4-mini",
+  },
+  aiAnalysis: {
+    openaiApiKey: process.env.OPENAI_API_KEY || "",
+    model: process.env.AI_ANALYSIS_MODEL || process.env.REPORTER_MODEL || "gpt-5.4-mini",
+    chartImgApiKey: process.env.CHART_IMG_API_KEY || "",
+    chartImgBaseUrl:
+      process.env.CHART_IMG_BASE_URL || "https://api.chart-img.com/v2/tradingview/advanced-chart/storage",
+    cacheMs: parseNumber(process.env.AI_ANALYSIS_CACHE_MS, 30 * 60 * 1000),
+    presets: parseJsonArray(process.env.AI_ANALYSIS_SYMBOLS),
   },
   telegram: {
     botToken: process.env.TELEGRAM_BOT_TOKEN || "",

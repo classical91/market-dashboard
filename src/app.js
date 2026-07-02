@@ -2,6 +2,7 @@ const express = require("express");
 const path = require("path");
 
 const { config } = require("./config/env");
+const { createAIAnalysisRouter } = require("./routes/ai-analysis");
 const { createHealthRouter } = require("./routes/health");
 const { createOnchainRouter } = require("./routes/onchain");
 const { createOverviewRouter } = require("./routes/overview");
@@ -11,6 +12,7 @@ const { createYoutubeRouter } = require("./routes/youtube");
 const { createXFeedRouter } = require("./routes/x-feed");
 const { YOUTUBE_CHANNELS } = require("./config/youtube-channels");
 const { X_ACCOUNTS } = require("./config/x-accounts");
+const { AIAnalysisService } = require("./services/ai-analysis");
 const { MemoryCache } = require("./services/cache");
 const { PersistentReporterCache } = require("./services/persistent-cache");
 const { CovalentService } = require("./services/covalent");
@@ -31,6 +33,7 @@ function createApp() {
   const dataDir = resolveDataDir();
   const reporterCache = new PersistentReporterCache(path.join(dataDir, "reporter-cache.json"));
   const xFeedCache = new PersistentReporterCache(path.join(dataDir, "x-feed-cache.json"));
+  const aiAnalysisCache = new PersistentReporterCache(path.join(dataDir, "ai-analysis-cache.json"));
   const defillamaService = new DefiLlamaService(config.defillama);
   const etherscanService = new EtherscanService(config.etherscan);
   const covalentService = new CovalentService(config.covalent);
@@ -58,6 +61,15 @@ function createApp() {
   });
   const youtubeService = new YouTubeFeedService({ cache });
   const xFeedService = new XFeedService({ cache: xFeedCache });
+  const aiAnalysisService = new AIAnalysisService({
+    cache: aiAnalysisCache,
+    dataDir,
+    openaiApiKey: config.aiAnalysis.openaiApiKey,
+    chartImgApiKey: config.aiAnalysis.chartImgApiKey,
+    chartImgBaseUrl: config.aiAnalysis.chartImgBaseUrl,
+    model: config.aiAnalysis.model,
+    presets: config.aiAnalysis.presets,
+  });
 
   app.disable("x-powered-by");
   app.use(express.json({ limit: "2mb" }));
@@ -86,6 +98,7 @@ function createApp() {
       dataSource: config.onchain.dataSourceLabel,
     }),
   );
+  app.use("/api/ai-analysis", createAIAnalysisRouter({ aiAnalysisService }));
   app.use("/api/onchain", createOnchainRouter({ onchainService }));
   app.use("/api/overview", createOverviewRouter({ overviewService }));
   app.use("/api/daily-report", createReporterRouter({ reporterService }));
