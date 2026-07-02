@@ -42,6 +42,10 @@
 
     var grid = document.getElementById('aia-grid');
     var notice = document.getElementById('aia-notice');
+    var COLLAPSE_KEY = 'aia_collapsed';
+    // Latest server data per card, so button handlers always act on the
+    // freshest generation/broadcast state rather than a stale closure.
+    var latestByCard = {};
 
     function escapeHtml(str) {
       return String(str || '').replace(/[&<>"']/g, function (ch) {
@@ -68,13 +72,11 @@
       return 'aia-verdict';
     }
 
-    function formatGeneratedAt(iso) {
+    function formatTime(iso) {
       if (!iso) return '';
       var d = new Date(iso);
       if (isNaN(d.getTime())) return '';
-      return 'Generated ' + d.toLocaleString(undefined, {
-        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-      });
+      return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
     }
 
     function cardId(preset) {
@@ -85,40 +87,70 @@
       return Boolean(preset.chartUrl && preset.analysis);
     }
 
+    function alreadySent(preset) {
+      return Boolean(preset.broadcastAt && preset.generatedAt && preset.broadcastAt >= preset.generatedAt);
+    }
+
+    function getCollapsed() {
+      try { return JSON.parse(localStorage.getItem(COLLAPSE_KEY) || 'null'); } catch { return null; }
+    }
+
+    function saveCollapsed(list) {
+      try { localStorage.setItem(COLLAPSE_KEY, JSON.stringify(list)); } catch {}
+    }
+
     function renderCard(preset) {
-      var id = cardId(preset);
       return (
-        '<div class="aia-card" id="' + id + '" data-symbol="' + escapeHtml(preset.symbol) + '" data-interval="' + escapeHtml(preset.interval) + '">' +
-          '<div class="aia-card-head">' +
-            '<div class="aia-card-symbol">' + escapeHtml(preset.label) + ' <span class="aia-card-interval">&middot; ' + escapeHtml(preset.interval) + '</span></div>' +
+        '<div class="aia-card" id="' + cardId(preset) + '">' +
+          '<div class="aia-card-head" data-role="head">' +
+            '<div class="aia-card-symbol">' + escapeHtml(preset.label) +
+              ' <span class="aia-card-interval">&middot; ' + escapeHtml(preset.interval) + '</span>' +
+              '<span class="aia-gen-badge" data-role="gen"></span>' +
+            '</div>' +
             '<div class="aia-card-actions">' +
-              '<span class="' + verdictClass(preset.verdict) + '" data-role="verdict">' + (preset.verdict || 'NO CALL') + '</span>' +
+              '<span class="aia-verdict" data-role="verdict"></span>' +
               '<button class="aia-run-btn" type="button" data-role="run">Analyze</button>' +
-              '<button class="aia-broadcast-btn" type="button" data-role="broadcast"' + (hasResult(preset) ? '' : ' disabled') + '>&#128226; Broadcast</button>' +
+              '<button class="aia-broadcast-btn" type="button" data-role="broadcast" disabled>&#128226; Broadcast</button>' +
+              '<span class="aia-chevron" aria-hidden="true">&#9660;</span>' +
             '</div>' +
           '</div>' +
-          '<div class="aia-chart" data-role="chart">' +
-            (preset.chartUrl
-              ? '<img src="' + escapeHtml(preset.chartUrl) + '" alt="' + escapeHtml(preset.label) + ' chart" loading="lazy" />'
-              : '<span class="aia-chart-empty">No chart yet &mdash; click Analyze to generate one.</span>') +
+          '<div class="aia-card-content" data-role="content">' +
+            '<div class="aia-chart" data-role="chart"></div>' +
+            '<div class="aia-body">' +
+              '<div class="aia-analysis" data-role="analysis"></div>' +
+              '<div class="aia-error" data-role="error" style="display:none"></div>' +
+              '<div class="aia-broadcast-status" data-role="broadcast-status" style="display:none"></div>' +
+            '</div>' +
+            '<div class="aia-meta" data-role="meta"></div>' +
           '</div>' +
-          '<div class="aia-body">' +
-            '<div class="aia-analysis" data-role="analysis">' + renderAnalysis(preset.analysis) + '</div>' +
-            '<div class="aia-error" data-role="error" style="display:none"></div>' +
-            '<div class="aia-broadcast-status" data-role="broadcast-status" style="display:none"></div>' +
-          '</div>' +
-          '<div class="aia-meta" data-role="meta">' + formatGeneratedAt(preset.generatedAt) + '</div>' +
         '</div>'
       );
+    }
+
+    function refreshBroadcastButton(card, preset) {
+      var btn = card.querySelector('[data-role="broadcast"]');
+      var sent = alreadySent(preset);
+      btn.disabled = !hasResult(preset) || sent;
+      btn.innerHTML = sent ? '&#9989; Sent' : '&#128226; Broadcast';
     }
 
     function updateCard(preset) {
       var card = document.getElementById(cardId(preset));
       if (!card) return;
+      latestByCard[cardId(preset)] = preset;
 
       var verdictEl = card.querySelector('[data-role="verdict"]');
       verdictEl.className = verdictClass(preset.verdict);
       verdictEl.textContent = preset.verdict || 'NO CALL';
+
+      var genEl = card.querySelector('[data-role="gen"]');
+      if (preset.generatedAt) {
+        genEl.className = 'aia-gen-badge generated';
+        genEl.textContent = '✓ ' + formatTime(preset.generatedAt);
+      } else {
+        genEl.className = 'aia-gen-badge';
+        genEl.textContent = 'not generated';
+      }
 
       var chartEl = card.querySelector('[data-role="chart"]');
       chartEl.innerHTML = preset.chartUrl
@@ -126,8 +158,13 @@
         : '<span class="aia-chart-empty">No chart yet &mdash; click Analyze to generate one.</span>';
 
       card.querySelector('[data-role="analysis"]').innerHTML = renderAnalysis(preset.analysis);
-      card.querySelector('[data-role="meta"]').textContent = formatGeneratedAt(preset.generatedAt);
-      card.querySelector('[data-role="broadcast"]').disabled = !hasResult(preset);
+
+      var metaParts = [];
+      if (preset.generatedAt) metaParts.push('Generated ' + formatTime(preset.generatedAt));
+      if (alreadySent(preset)) metaParts.push('Broadcast ' + formatTime(preset.broadcastAt));
+      card.querySelector('[data-role="meta"]').textContent = metaParts.join(' · ');
+
+      refreshBroadcastButton(card, preset);
 
       var statusEl = card.querySelector('[data-role="broadcast-status"]');
       statusEl.style.display = 'none';
@@ -143,13 +180,32 @@
       }
     }
 
-    function wireRunButton(preset) {
-      var card = document.getElementById(cardId(preset));
+    function setCollapsed(card, id, collapsed, persist) {
+      card.classList.toggle('collapsed', collapsed);
+      if (!persist) return;
+      var list = getCollapsed() || [];
+      var i = list.indexOf(id);
+      if (collapsed && i === -1) list.push(id);
+      if (!collapsed && i > -1) list.splice(i, 1);
+      saveCollapsed(list);
+    }
+
+    function wireCard(preset, defaultCollapsedIds) {
+      var id = cardId(preset);
+      var card = document.getElementById(id);
       if (!card) return;
-      var btn = card.querySelector('[data-role="run"]');
-      btn.addEventListener('click', function () {
-        btn.disabled = true;
-        btn.textContent = 'Analyzing…';
+
+      setCollapsed(card, id, defaultCollapsedIds.indexOf(id) > -1, false);
+
+      card.querySelector('[data-role="head"]').addEventListener('click', function () {
+        setCollapsed(card, id, !card.classList.contains('collapsed'), true);
+      });
+
+      var runBtn = card.querySelector('[data-role="run"]');
+      runBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        runBtn.disabled = true;
+        runBtn.textContent = 'Analyzing…';
         fetch('/api/ai-analysis/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -161,30 +217,31 @@
               var errorEl = card.querySelector('[data-role="error"]');
               errorEl.style.display = 'block';
               errorEl.textContent = data.reason || 'AI Analysis is not configured.';
+              setCollapsed(card, id, false, true);
               return;
             }
             updateCard(data);
+            setCollapsed(card, id, false, true);
           })
           .catch(function (err) {
             var errorEl = card.querySelector('[data-role="error"]');
             errorEl.style.display = 'block';
             errorEl.textContent = 'Request failed: ' + err.message;
+            setCollapsed(card, id, false, true);
           })
           .finally(function () {
-            btn.disabled = false;
-            btn.textContent = 'Analyze';
+            runBtn.disabled = false;
+            runBtn.textContent = 'Analyze';
           });
       });
-    }
 
-    function wireBroadcastButton(preset) {
-      var card = document.getElementById(cardId(preset));
-      if (!card) return;
-      var btn = card.querySelector('[data-role="broadcast"]');
-      var statusEl = card.querySelector('[data-role="broadcast-status"]');
-      btn.addEventListener('click', function () {
-        btn.disabled = true;
-        btn.textContent = 'Sending…';
+      var broadcastBtn = card.querySelector('[data-role="broadcast"]');
+      broadcastBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var statusEl = card.querySelector('[data-role="broadcast-status"]');
+        var errorEl = card.querySelector('[data-role="error"]');
+        broadcastBtn.disabled = true;
+        broadcastBtn.textContent = 'Sending…';
         statusEl.style.display = 'none';
         statusEl.textContent = '';
         fetch('/api/ai-analysis/broadcast', {
@@ -194,27 +251,28 @@
         })
           .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
           .then(function (result) {
-            var errorEl = card.querySelector('[data-role="error"]');
+            var latest = latestByCard[id] || preset;
             if (result.ok && result.data.ok) {
+              latest.broadcastAt = result.data.broadcastAt || new Date().toISOString();
               var groupCount = result.data.channelCount;
               statusEl.style.display = 'block';
               statusEl.textContent = '✅ Sent to Telegram (' + groupCount + ' group' + (groupCount === 1 ? '' : 's') + ')';
+              var metaEl = card.querySelector('[data-role="meta"]');
+              metaEl.textContent = 'Generated ' + formatTime(latest.generatedAt) + ' · Broadcast ' + formatTime(latest.broadcastAt);
+            } else if (result.data.alreadyBroadcast) {
+              latest.broadcastAt = result.data.broadcastAt;
+              statusEl.style.display = 'block';
+              statusEl.textContent = 'Already sent ' + formatTime(latest.broadcastAt) + ' — generate a new analysis to broadcast again.';
             } else {
               errorEl.style.display = 'block';
               errorEl.textContent = result.data.error || 'Broadcast failed.';
             }
+            refreshBroadcastButton(card, latest);
           })
           .catch(function (err) {
-            var errorEl = card.querySelector('[data-role="error"]');
             errorEl.style.display = 'block';
             errorEl.textContent = 'Broadcast request failed: ' + err.message;
-          })
-          .finally(function () {
-            // Re-derive from the live DOM rather than the closed-over preset,
-            // since a prior Analyze click may have populated the chart since
-            // this button was first wired up.
-            btn.disabled = !card.querySelector('[data-role="chart"] img');
-            btn.textContent = '📢 Broadcast';
+            refreshBroadcastButton(card, latestByCard[id] || preset);
           });
       });
     }
@@ -228,8 +286,17 @@
         }
         var presets = data.presets || [];
         grid.innerHTML = presets.map(renderCard).join('');
-        presets.forEach(wireRunButton);
-        presets.forEach(wireBroadcastButton);
+        // First visit: start every card collapsed; afterwards honor whatever
+        // the user last left open.
+        var stored = getCollapsed();
+        var defaultCollapsedIds = stored === null ? presets.map(cardId) : stored;
+        // Persist the first-visit default now, so the first manual toggle
+        // edits this baseline instead of starting from an empty list.
+        if (stored === null) saveCollapsed(defaultCollapsedIds);
+        presets.forEach(function (preset) {
+          updateCard(preset);
+          wireCard(preset, defaultCollapsedIds);
+        });
       })
       .catch(function (err) {
         grid.innerHTML = '<div class="aia-notice" style="display:block">Failed to load AI Analysis: ' + err.message + '</div>';

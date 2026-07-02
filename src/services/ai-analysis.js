@@ -184,6 +184,20 @@ class AIAnalysisService {
   }
 
   /**
+   * Record that the current generation for this symbol/interval has been
+   * broadcast, so the same generation can't be sent twice. A fresh generate()
+   * overwrites the entry without broadcastAt, re-arming the broadcast.
+   */
+  markBroadcasted(symbol, interval) {
+    const key = this._latestCacheKey(symbol, interval);
+    const cached = this._cache.get(key);
+    if (!cached) return null;
+    const updated = { ...cached, broadcastAt: new Date().toISOString() };
+    this._cache.set(key, updated, PERSIST_TTL_MS);
+    return updated;
+  }
+
+  /**
    * Read-only: return the preset info merged with its last generated result
    * (if any), for broadcasting an already-generated analysis.
    */

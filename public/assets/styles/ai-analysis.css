@@ -17,6 +17,9 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
   gap: 16px;
+  /* Collapsed cards hug their header instead of stretching to the height of
+     an expanded neighbor in the same grid row. */
+  align-items: start;
 }
 
 .aia-card {
@@ -37,7 +40,30 @@
   gap: 10px;
   padding: 14px 16px;
   border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s;
 }
+.aia-card-head:hover { background: rgba(77,163,255,0.06); }
+.aia-card.collapsed .aia-card-head { border-bottom: 0; }
+.aia-card.collapsed .aia-card-content { display: none; }
+
+.aia-chevron {
+  color: var(--muted);
+  font-size: 11px;
+  transition: transform 0.2s ease;
+}
+.aia-card.collapsed .aia-chevron { transform: rotate(-90deg); }
+
+.aia-gen-badge {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  margin-left: 8px;
+  color: var(--dim);
+}
+.aia-gen-badge.generated { color: var(--green); }
 
 .aia-card-symbol {
   font-size: 13px;

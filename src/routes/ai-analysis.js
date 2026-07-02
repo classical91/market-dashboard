@@ -51,8 +51,21 @@ function createAIAnalysisRouter({ aiAnalysisService, telegramService }) {
         res.status(400).json({ error: "No analysis to broadcast yet — click Analyze first" });
         return;
       }
+      if (cached.broadcastAt && cached.generatedAt && cached.broadcastAt >= cached.generatedAt) {
+        res.status(409).json({
+          error: "Already broadcast — generate a new analysis first",
+          alreadyBroadcast: true,
+          broadcastAt: cached.broadcastAt,
+        });
+        return;
+      }
       await telegramService.postAIAnalysis(cached);
-      res.json({ ok: true, channelCount: telegramService._chatIds.length });
+      const updated = aiAnalysisService.markBroadcasted(symbol, interval);
+      res.json({
+        ok: true,
+        channelCount: telegramService._chatIds.length,
+        broadcastAt: updated ? updated.broadcastAt : new Date().toISOString(),
+      });
     } catch (err) {
       next(err);
     }
