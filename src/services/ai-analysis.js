@@ -9,6 +9,10 @@ const DEFAULT_STUDIES = [
   { name: "Relative Strength Index" },
 ];
 
+// Dominance/market-cap indices (CRYPTOCAP:*) have no volume series, so
+// requesting the Volume study on them just renders an empty pane.
+const INDEX_STUDIES = [{ name: "MACD" }, { name: "Relative Strength Index" }];
+
 const ANALYSIS_PROMPT =
   "Analyze this chart and end with BUY/SELL/HOLD. Also put a space between each list, and use emojis creatively.";
 
@@ -23,7 +27,15 @@ const DEFAULT_PRESETS = [
   { symbol: "BINANCE:BTCUSDT", label: "BTCUSDT", interval: "4h" },
   { symbol: "BINANCE:ETHUSDT", label: "ETHUSDT", interval: "4h" },
   { symbol: "BINANCE:SOLUSDT", label: "SOLUSDT", interval: "4h" },
+  { symbol: "CRYPTOCAP:BTC.D", label: "BTC.D", interval: "4h" },
+  { symbol: "CRYPTOCAP:ETH.D", label: "ETH.D", interval: "4h" },
+  { symbol: "CRYPTOCAP:USDT.D", label: "USDT.D", interval: "4h" },
+  { symbol: "CRYPTOCAP:TOTAL", label: "TOTAL", interval: "4h" },
 ];
+
+function studiesForSymbol(symbol) {
+  return symbol.startsWith("CRYPTOCAP:") ? INDEX_STUDIES : DEFAULT_STUDIES;
+}
 
 function normalizePresets(presets) {
   if (!Array.isArray(presets) || !presets.length) return DEFAULT_PRESETS;
@@ -111,7 +123,7 @@ class AIAnalysisService {
           theme: "dark",
           interval,
           symbol,
-          studies: DEFAULT_STUDIES,
+          studies: studiesForSymbol(symbol),
         }),
         signal: controller.signal,
       });
