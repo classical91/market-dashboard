@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Analysis · Market Command</title>
+  <script src="/assets/js/settings.js"></script>
+  <link rel="stylesheet" href="/assets/styles/command.css" />
+  <link rel="stylesheet" href="/assets/styles/ai-analysis.css" />
+</head>
+<body>
+<div class="app">
+  <aside class="cmd-sidebar"></aside>
+  <main class="cmd-main">
+
+    <div class="cmd-page-header">
+      <div>
+        <div class="cmd-page-title">&#129504; AI Analysis</div>
+        <div class="cmd-page-subtitle">TradingView chart snapshot + OpenAI vision read &mdash; ends in a BUY / SELL / HOLD call</div>
+      </div>
+      <div class="cmd-clock" id="cmd-clock"></div>
+    </div>
+
+    <div class="aia-notice" id="aia-notice" style="display:none"></div>
+
+    <div class="aia-grid" id="aia-grid"></div>
+
+    <footer>AI Analysis &mdash; <a href="/">Overview</a> &mdash; <a href="/overview-v2.html">Overview V2</a> &mdash; <a href="/crypto.html">Crypto Hub</a></footer>
+
+  </main>
+</div>
+<script src="/assets/js/sidebar.js"></script>
+<script>
+  (function () {
+    function tick() {
+      var el = document.getElementById('cmd-clock');
+      if (el) el.textContent = new Date().toLocaleString(undefined, {
+        weekday: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit'
+      });
+    }
+    tick(); setInterval(tick, 1000);
+
+    var grid = document.getElementById('aia-grid');
+    var notice = document.getElementById('aia-notice');
+
+    function escapeHtml(str) {
+      return String(str || '').replace(/[&<>"']/g, function (ch) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+      });
+    }
+
+    // Minimal, safe markdown-lite: escape everything first, then re-enable
+    // **bold** spans and paragraph breaks so the model's formatting reads
+    // cleanly without opening up to arbitrary HTML.
+    function renderAnalysis(text) {
+      if (!text) return '<span class="aia-chart-empty">No analysis yet.</span>';
+      var escaped = escapeHtml(text);
+      var bolded = escaped.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+      return bolded.split(/\n{2,}/).map(function (para) {
+        return '<p>' + para.replace(/\n/g, '<br>') + '</p>';
+      }).join('');
+    }
+
+    function verdictClass(verdict) {
+      if (verdict === 'BUY') return 'aia-verdict aia-verdict--buy';
+      if (verdict === 'SELL') return 'aia-verdict aia-verdict--sell';
+      if (verdict === 'HOLD') return 'aia-verdict aia-verdict--hold';
+      return 'aia-verdict';
+    }
+
+    function formatGeneratedAt(iso) {
+      if (!iso) return '';
+      var d = new Date(iso);
+      if (isNaN(d.getTime())) return '';
+      return 'Generated ' + d.toLocaleString(undefined, {
+        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+      });
+    }
+
+    function cardId(preset) {
+      return 'aia-card-' + preset.symbol.replace(/[^a-z0-9]+/gi, '-') + '-' + preset.interval;
+    }
+
+    function renderCard(preset) {
+      var id = cardId(preset);
+      return (
+        '<div class="aia-card" id="' + id + '" data-symbol="' + escapeHtml(preset.symbol) + '" data-interval="' + escapeHtml(preset.interval) + '">' +
+          '<div class="aia-card-head">' +
+            '<div class="aia-card-symbol">' + escapeHtml(preset.label) + ' <span class="aia-card-interval">&middot; ' + escapeHtml(preset.interval) + '</span></div>' +
+            '<div class="aia-card-actions">' +
+              '<span class="' + verdictClass(preset.verdict) + '" data-role="verdict">' + (preset.verdict || 'NO CALL') + '</span>' +
+              '<button class="aia-run-btn" type="button" data-role="run">Analyze</button>' +
+            '</div>' +
+          '</div>' +
+          '<div class="aia-chart" data-role="chart">' +
+            (preset.chartUrl
+              ? '<img src="' + escapeHtml(preset.chartUrl) + '" alt="' + escapeHtml(preset.label) + ' chart" loading="lazy" />'
+              : '<span class="aia-chart-empty">No chart yet &mdash; click Analyze to generate one.</span>') +
+          '</div>' +
+          '<div class="aia-body">' +
+            '<div class="aia-analysis" data-role="analysis">' + renderAnalysis(preset.analysis) + '</div>' +
+            '<div class="aia-error" data-role="error" style="display:none"></div>' +
+          '</div>' +
+          '<div class="aia-meta" data-role="meta">' + formatGeneratedAt(preset.generatedAt) + '</div>' +
+        '</div>'
+      );
+    }
+
+    function updateCard(preset) {
+      var card = document.getElementById(cardId(preset));
+      if (!card) return;
+
+      var verdictEl = card.querySelector('[data-role="verdict"]');
+      verdictEl.className = verdictClass(preset.verdict);
+      verdictEl.textContent = preset.verdict || 'NO CALL';
+
+      var chartEl = card.querySelector('[data-role="chart"]');
+      chartEl.innerHTML = preset.chartUrl
+        ? '<img src="' + escapeHtml(preset.chartUrl) + '" alt="' + escapeHtml(preset.label) + ' chart" loading="lazy" />'
+        : '<span class="aia-chart-empty">No chart yet &mdash; click Analyze to generate one.</span>';
+
+      card.querySelector('[data-role="analysis"]').innerHTML = renderAnalysis(preset.analysis);
+      card.querySelector('[data-role="meta"]').textContent = formatGeneratedAt(preset.generatedAt);
+
+      var errorEl = card.querySelector('[data-role="error"]');
+      if (preset.error) {
+        errorEl.style.display = 'block';
+        errorEl.textContent = (preset.rateLimited ? '⏳ ' : '') + preset.error;
+      } else {
+        errorEl.style.display = 'none';
+        errorEl.textContent = '';
+      }
+    }
+
+    function wireRunButton(preset) {
+      var card = document.getElementById(cardId(preset));
+      if (!card) return;
+      var btn = card.querySelector('[data-role="run"]');
+      btn.addEventListener('click', function () {
+        btn.disabled = true;
+        btn.textContent = 'Analyzing…';
+        fetch('/api/ai-analysis/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ symbol: preset.symbol, interval: preset.interval })
+        })
+          .then(function (res) { return res.json(); })
+          .then(function (data) {
+            if (data.configured === false) {
+              var errorEl = card.querySelector('[data-role="error"]');
+              errorEl.style.display = 'block';
+              errorEl.textContent = data.reason || 'AI Analysis is not configured.';
+              return;
+            }
+            updateCard(data);
+          })
+          .catch(function (err) {
+            var errorEl = card.querySelector('[data-role="error"]');
+            errorEl.style.display = 'block';
+            errorEl.textContent = 'Request failed: ' + err.message;
+          })
+          .finally(function () {
+            btn.disabled = false;
+            btn.textContent = 'Analyze';
+          });
+      });
+    }
+
+    fetch('/api/ai-analysis')
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        if (!data.configured) {
+          notice.style.display = 'block';
+          notice.innerHTML = '&#9888;&#65039; AI Analysis is not fully configured on the server. Set <code>OPENAI_API_KEY</code> and <code>CHART_IMG_API_KEY</code> to enable it.';
+        }
+        var presets = data.presets || [];
+        grid.innerHTML = presets.map(renderCard).join('');
+        presets.forEach(wireRunButton);
+      })
+      .catch(function (err) {
+        grid.innerHTML = '<div class="aia-notice" style="display:block">Failed to load AI Analysis: ' + err.message + '</div>';
+      });
+  })();
+</script>
+</body>
+</html>

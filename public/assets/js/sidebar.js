@@ -8,6 +8,7 @@
   var workspace = [
     { href: "/", dot: true, label: "Overview" },
     { href: "/overview-v2.html", icon: "&#128202;", label: "Overview V2" },
+    { href: "/ai-analysis.html", icon: "&#129504;", label: "AI Analysis" },
     { href: "/terminal-suite.html", icon: "&#128421;", label: "Terminal Suite" },
     {
       label: "Reporter",

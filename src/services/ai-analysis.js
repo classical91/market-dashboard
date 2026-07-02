@@ -1,0 +1,226 @@
+const fs = require("fs");
+const path = require("path");
+const OpenAI = require("openai");
+const { resolveDataDir } = require("../utils/data-dir");
+
+const DEFAULT_STUDIES = [
+  { name: "Volume", forceOverlay: true },
+  { name: "MACD" },
+  { name: "Relative Strength Index" },
+];
+
+const ANALYSIS_PROMPT =
+  "Analyze this chart and end with BUY/SELL/HOLD. Also put a space between each list, and use emojis creatively.";
+
+const DEFAULT_PRESETS = [
+  { symbol: "BINANCE:BTCUSDT", label: "BTCUSDT", interval: "4h" },
+  { symbol: "BINANCE:ETHUSDT", label: "ETHUSDT", interval: "4h" },
+  { symbol: "BINANCE:SOLUSDT", label: "SOLUSDT", interval: "4h" },
+];
+
+function normalizePresets(presets) {
+  if (!Array.isArray(presets) || !presets.length) return DEFAULT_PRESETS;
+  const normalized = presets
+    .map((preset) => ({
+      symbol: String(preset.symbol || "").trim(),
+      label: String(preset.label || preset.symbol || "").trim(),
+      interval: String(preset.interval || "4h").trim(),
+    }))
+    .filter((preset) => preset.symbol);
+  return normalized.length ? normalized : DEFAULT_PRESETS;
+}
+
+function extractVerdict(text) {
+  if (!text) return null;
+  const matches = text.match(/\b(BUY|SELL|HOLD)\b/gi);
+  if (!matches || !matches.length) return null;
+  return matches[matches.length - 1].toUpperCase();
+}
+
+function presetKey(symbol, interval) {
+  return `${symbol}::${interval}`;
+}
+
+class AIAnalysisService {
+  constructor({ cache, dataDir, openaiApiKey, chartImgApiKey, chartImgBaseUrl, model, presets }) {
+    this._cache = cache;
+    this._chartImgApiKey = chartImgApiKey || "";
+    this._chartImgBaseUrl = chartImgBaseUrl || "https://api.chart-img.com/v2/tradingview/advanced-chart/storage";
+    this._client = openaiApiKey ? new OpenAI({ apiKey: openaiApiKey }) : null;
+    this._model = model || "gpt-5.4-mini";
+    this._presets = normalizePresets(presets);
+    this._logFile = path.join(dataDir || resolveDataDir(), "ai-analysis-log.json");
+    this._rateLimitedUntil = new Map();
+  }
+
+  get presets() {
+    return this._presets;
+  }
+
+  isConfigured() {
+    return Boolean(this._client && this._chartImgApiKey);
+  }
+
+  _latestCacheKey(symbol, interval) {
+    return `ai-analysis:latest:${presetKey(symbol, interval)}`;
+  }
+
+  _readLog() {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(this._logFile, "utf8"));
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  _writeLog(entries) {
+    try {
+      const dir = path.dirname(this._logFile);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(this._logFile, JSON.stringify(entries.slice(0, 200), null, 2), "utf8");
+    } catch (err) {
+      console.error("[AIAnalysis] Failed to write generation log:", err.message);
+    }
+  }
+
+  _logGeneration(entry) {
+    const log = this._readLog();
+    log.unshift(entry);
+    this._writeLog(log);
+  }
+
+  async _fetchChartUrl(symbol, interval) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 20000);
+    try {
+      const response = await fetch(this._chartImgBaseUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": this._chartImgApiKey,
+        },
+        body: JSON.stringify({
+          theme: "dark",
+          interval,
+          symbol,
+          studies: DEFAULT_STUDIES,
+        }),
+        signal: controller.signal,
+      });
+      const text = await response.text();
+      let payload = null;
+      if (text) {
+        try {
+          payload = JSON.parse(text);
+        } catch {
+          payload = null;
+        }
+      }
+      if (!response.ok) {
+        const detail = payload?.message || payload?.error || text.slice(0, 200) || response.statusText;
+        const error = new Error(`chart-img HTTP ${response.status} ${detail}`);
+        error.statusCode = response.status;
+        throw error;
+      }
+      if (!payload?.url) {
+        throw new Error("chart-img response did not include an image url");
+      }
+      return payload.url;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  async _analyzeChart(chartUrl) {
+    const res = await this._client.responses.create({
+      model: this._model,
+      input: [
+        {
+          role: "user",
+          content: [
+            { type: "input_image", image_url: chartUrl },
+            { type: "input_text", text: ANALYSIS_PROMPT },
+          ],
+        },
+      ],
+    });
+    return res.output_text;
+  }
+
+  _isRateLimitError(err) {
+    const status = err?.status || err?.statusCode || err?.response?.status;
+    return status === 429 || /rate limit|429/i.test(err?.message || "");
+  }
+
+  /**
+   * Read-only: return cached analyses for every configured preset. Never
+   * triggers generation, so simply viewing the page can't spend API calls.
+   */
+  peekAll() {
+    return this._presets.map((preset) => {
+      const cached = this._cache.get(this._latestCacheKey(preset.symbol, preset.interval));
+      return { ...preset, ...(cached || {}) };
+    });
+  }
+
+  /**
+   * Generate (or reuse a cached) analysis for one symbol/interval preset.
+   */
+  async generate(symbol, interval, ttlMs) {
+    if (!this._client) {
+      return { configured: false, reason: "OPENAI_API_KEY is not set" };
+    }
+    if (!this._chartImgApiKey) {
+      return { configured: false, reason: "CHART_IMG_API_KEY is not set" };
+    }
+
+    const preset = this._presets.find((p) => p.symbol === symbol && p.interval === interval) || {
+      symbol,
+      interval,
+      label: symbol,
+    };
+    const key = this._latestCacheKey(symbol, interval);
+    const cached = this._cache.get(key);
+    if (cached && cached.generatedAt && Date.now() - new Date(cached.generatedAt).getTime() < ttlMs) {
+      return { ...preset, ...cached, generationSkipped: true, generationSkippedReason: "cached" };
+    }
+
+    const cooldown = this._rateLimitedUntil.get(key) || 0;
+    if (cooldown > Date.now()) {
+      return {
+        ...preset,
+        ...(cached || {}),
+        rateLimited: true,
+        rateLimitedUntil: new Date(cooldown).toISOString(),
+        error: "Rate-limited. Showing the last saved analysis instead of retrying immediately.",
+      };
+    }
+
+    try {
+      const chartUrl = await this._fetchChartUrl(symbol, interval);
+      const analysis = await this._analyzeChart(chartUrl);
+      const verdict = extractVerdict(analysis);
+      const generatedAt = new Date().toISOString();
+      const result = { chartUrl, analysis, verdict, model: this._model, generatedAt };
+      this._cache.set(key, result, Math.max(ttlMs, 5 * 60 * 1000));
+      this._logGeneration({ symbol, interval, label: preset.label, ...result });
+      return { ...preset, ...result };
+    } catch (err) {
+      if (this._isRateLimitError(err)) {
+        const untilMs = Date.now() + 5 * 60 * 1000;
+        this._rateLimitedUntil.set(key, untilMs);
+        return {
+          ...preset,
+          ...(cached || {}),
+          rateLimited: true,
+          rateLimitedUntil: new Date(untilMs).toISOString(),
+          error: "Rate-limited. Showing any saved analysis instead of retrying immediately.",
+        };
+      }
+      throw err;
+    }
+  }
+}
+
+module.exports = { AIAnalysisService };
