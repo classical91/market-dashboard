@@ -29,7 +29,7 @@
 
   var localModeKey = "xIntelligence:lastMode";
   var localKey = "xIntelligence:lastHandle";
-  var localFeedKey = "xIntelligence:feedCache:v1";
+  var localFeedKey = "xIntelligence:feedCache:v2";
   var ALL_MODE = "all";
 
   function readCachedFeed() {

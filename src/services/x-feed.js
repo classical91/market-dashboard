@@ -1,23 +1,30 @@
 const { createServiceError } = require("../utils/errors");
 
 /**
- * X (Twitter) has no free official RSS/API. This pulls from the same
- * undocumented syndication endpoint X's own `widgets.js` embed uses to
- * render a profile timeline, since public Nitter-style mirrors have largely
- * been shut down. It's unofficial and could change or stop working without
- * notice — there is no supported alternative that doesn't require a paid
- * X API plan.
+ * Prefer the official X API when a bearer token is configured. The
+ * syndication endpoint remains as a fallback because some deployments may not
+ * have paid X API access yet.
  */
+const X_API_URL = "https://api.x.com/2/tweets/search/recent";
 const SYNDICATION_URL = (handle) =>
   `https://syndication.twitter.com/srv/timeline-profile/screen-name/${encodeURIComponent(handle)}?showReplies=false`;
 
-const REQUEST_TIMEOUT_MS = 5000;
+const REQUEST_TIMEOUT_MS = 10000;
 const FEED_TTL_MS = 15 * 60 * 1000;
 const LATEST_GOOD_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_POSTS_PER_ACCOUNT = 8;
 
 const BROWSER_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+
+function xBearerToken() {
+  return (
+    process.env.X_API_BEARER_TOKEN ||
+    process.env.X_BEARER_TOKEN ||
+    process.env.TWITTER_BEARER_TOKEN ||
+    ""
+  ).trim();
+}
 
 function extractNextData(html) {
   const match = html.match(/<script[^>]*id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
@@ -89,12 +96,101 @@ async function fetchWithTimeout(url, timeoutMs) {
   }
 }
 
+async function fetchJsonWithTimeout(url, { headers = {}, timeoutMs = REQUEST_TIMEOUT_MS } = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, {
+      headers: { Accept: "application/json", ...headers },
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function mapXApiPost(tweet, usersById, mediaByKey, handle) {
+  const user = tweet.author_id ? usersById.get(tweet.author_id) : null;
+  const username = user?.username || handle;
+  const mediaKey = Array.isArray(tweet.attachments?.media_keys) ? tweet.attachments.media_keys[0] : null;
+  const media = mediaKey ? mediaByKey.get(mediaKey) : null;
+  const image =
+    media?.type === "photo" ? media.url :
+    media?.type === "video" || media?.type === "animated_gif" ? media.preview_image_url :
+    null;
+
+  return {
+    id: tweet.id,
+    text: tweet.text,
+    image: image || null,
+    url: `https://x.com/${username}/status/${tweet.id}`,
+    publishedAt: tweet.created_at ? new Date(tweet.created_at).toISOString() : null,
+  };
+}
+
 class XFeedService {
   constructor({ cache } = {}) {
     this.cache = cache;
   }
 
+  async _fetchApiFeed(handle) {
+    const token = xBearerToken();
+    if (!token) {
+      throw createServiceError("X API bearer token is not configured", 503);
+    }
+
+    const params = new URLSearchParams({
+      query: `from:${handle} -is:retweet -is:reply`,
+      max_results: String(Math.max(10, MAX_POSTS_PER_ACCOUNT)),
+      sort_order: "recency",
+      "tweet.fields": "author_id,created_at,attachments",
+      expansions: "author_id,attachments.media_keys",
+      "user.fields": "name,username",
+      "media.fields": "type,url,preview_image_url",
+    });
+
+    const response = await fetchJsonWithTimeout(`${X_API_URL}?${params.toString()}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "User-Agent": "MarketDashboard/1.0",
+      },
+    });
+    if (!response.ok) {
+      throw createServiceError(`X API returned ${response.status} for @${handle}`, 502);
+    }
+
+    const data = await response.json();
+    const tweets = Array.isArray(data.data) ? data.data : [];
+    if (!tweets.length) {
+      throw createServiceError(`No X API posts found for @${handle}`, 502);
+    }
+
+    const usersById = new Map((data.includes?.users || []).map((user) => [user.id, user]));
+    const mediaByKey = new Map((data.includes?.media || []).map((media) => [media.media_key, media]));
+    const posts = tweets
+      .filter((tweet) => tweet.id && tweet.text)
+      .map((tweet) => mapXApiPost(tweet, usersById, mediaByKey, handle))
+      .filter((post) => post.publishedAt)
+      .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
+      .slice(0, MAX_POSTS_PER_ACCOUNT);
+
+    if (!posts.length) {
+      throw createServiceError(`No usable X API posts found for @${handle}`, 502);
+    }
+
+    return { handle, posts };
+  }
+
   async _fetchFeed(handle) {
+    if (xBearerToken()) {
+      try {
+        return await this._fetchApiFeed(handle);
+      } catch (err) {
+        // Fall through to syndication. It is less reliable, but better than
+        // blanking the whole X Intelligence page during an API hiccup.
+      }
+    }
+
     const response = await fetchWithTimeout(SYNDICATION_URL(handle), REQUEST_TIMEOUT_MS);
     if (!response.ok) {
       throw createServiceError(`Syndication endpoint returned ${response.status} for @${handle}`, 502);
