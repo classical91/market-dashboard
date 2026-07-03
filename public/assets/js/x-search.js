@@ -11,56 +11,24 @@
     try { localStorage.setItem(localKey, query); } catch (err) {}
   }
 
-  function runSearch(query, resultsRoot, submitButton) {
+  function openSearch(query) {
     var trimmed = query.trim();
-    if (!trimmed) {
-      window.XPosts.renderPostCards(resultsRoot, [], "Type something to search X.");
-      return;
-    }
-
+    if (!trimmed) return;
     writeLastQuery(trimmed);
-    submitButton.disabled = true;
-    submitButton.textContent = "Searching...";
-    window.XPosts.renderPostCards(resultsRoot, [], "Searching X for “" + trimmed + "”…");
-
-    fetch("/api/x/search?q=" + encodeURIComponent(trimmed))
-      .then(function (res) {
-        return res.json().then(function (data) {
-          if (!res.ok) throw new Error(data.error || data.message || "Search failed");
-          return data;
-        });
-      })
-      .then(function (data) {
-        window.XPosts.renderPostCards(resultsRoot, data.posts || [], "No results found for “" + trimmed + "”.");
-      })
-      .catch(function (err) {
-        window.XPosts.renderPostCards(resultsRoot, [], err.message || "Search failed.");
-      })
-      .then(function () {
-        submitButton.disabled = false;
-        submitButton.textContent = "Search";
-      });
+    window.open("https://x.com/search?q=" + encodeURIComponent(trimmed) + "&src=typed_query", "_blank", "noopener");
   }
 
   function init() {
     var form = document.getElementById("xSearchForm");
     var input = document.getElementById("xSearchInput");
-    var submitButton = document.getElementById("xSearchSubmit");
-    var resultsRoot = document.getElementById("xSearchResults");
-    if (!form || !input || !resultsRoot) return;
+    if (!form || !input) return;
 
     form.addEventListener("submit", function (event) {
       event.preventDefault();
-      runSearch(input.value, resultsRoot, submitButton);
+      openSearch(input.value);
     });
 
-    var lastQuery = readLastQuery();
-    if (lastQuery) {
-      input.value = lastQuery;
-      runSearch(lastQuery, resultsRoot, submitButton);
-    } else {
-      window.XPosts.renderPostCards(resultsRoot, [], "Type something to search X.");
-    }
+    input.value = readLastQuery();
   }
 
   if (document.readyState === "loading") {
