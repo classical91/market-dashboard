@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>X Search · Market Command</title>
+  <script src="/assets/js/settings.js"></script>
+  <link rel="stylesheet" href="/assets/styles/command.css" />
+  <link rel="stylesheet" href="/assets/styles/components.css" />
+  <link rel="stylesheet" href="/assets/styles/x-intelligence.css" />
+</head>
+<body>
+<div class="app">
+  <aside class="cmd-sidebar"></aside>
+  <main class="cmd-main">
+
+    <div class="cmd-page-header">
+      <div>
+        <div class="cmd-page-title">X Search</div>
+        <div class="cmd-page-subtitle">Search all of X for a keyword, ticker, or handle and open the live results on X</div>
+      </div>
+      <div class="cmd-clock" id="cmd-clock"></div>
+    </div>
+
+    <form class="x-search-form" id="xSearchForm">
+      <input
+        class="x-search-input"
+        id="xSearchInput"
+        type="search"
+        placeholder="Search X — e.g. $BTC, FOMC, from:elonmusk..."
+        autocomplete="off"
+      />
+      <button class="x-search-submit" id="xSearchSubmit" type="submit">Search &#8599;</button>
+    </form>
+
+    <footer>X Search &mdash; <a href="/x-intelligence.html">X Intelligence</a> &mdash; <a href="/">Overview</a></footer>
+
+  </main>
+</div>
+<script src="/assets/js/sidebar.js"></script>
+<script src="/assets/js/x-search.js"></script>
+<script>
+  (function () {
+    function tick() {
+      var el = document.getElementById('cmd-clock');
+      if (el) el.textContent = new Date().toLocaleString(undefined, {
+        weekday: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit'
+      });
+    }
+    tick(); setInterval(tick, 1000);
+  })();
+</script>
+</body>
+</html>
