@@ -3,6 +3,7 @@ const { createServiceError } = require("../utils/errors");
 const TELEGRAM_API = "https://api.telegram.org";
 const MAX_MSG_LEN = 4096;
 const MAX_CAPTION_LEN = 1024;
+const AI_ANALYSIS_TELEGRAM_WORD_LIMIT = 150;
 // Leaves headroom below Telegram's hard caption cap for HTML-entity escaping
 // (e.g. "&" -> "&amp;") to expand the string a little without tipping it over.
 const CAPTION_SAFETY_MARGIN = 100;
@@ -25,6 +26,36 @@ function formatForTelegram(raw) {
 function truncate(text, max) {
   if (text.length <= max) return text;
   return text.slice(0, max - 1) + "…";
+}
+
+function visibleTextForWordCount(text) {
+  return String(text || "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\*\*/g, "");
+}
+
+function countWords(text) {
+  const trimmed = visibleTextForWordCount(text).trim();
+  if (!trimmed) return 0;
+  return trimmed.split(/\s+/).filter(Boolean).length;
+}
+
+function truncateWords(text, maxWords) {
+  const source = String(text || "");
+  if (maxWords <= 0) return "";
+  let count = 0;
+  let end = 0;
+  const wordPattern = /\S+/g;
+  let match;
+  while ((match = wordPattern.exec(source))) {
+    count += 1;
+    if (count === maxWords) {
+      end = wordPattern.lastIndex;
+      break;
+    }
+  }
+  if (count < maxWords || !wordPattern.exec(source)) return source;
+  return source.slice(0, end).trimEnd();
 }
 
 // A chat target is either a plain chat id ("-1001841650798") or a chat id
@@ -144,7 +175,9 @@ class TelegramService {
     // message with "can't parse entities" and silently drop the broadcast.
     const maxLen = result.chartUrl ? MAX_CAPTION_LEN : MAX_MSG_LEN;
     const budget = Math.max(0, maxLen - CAPTION_SAFETY_MARGIN - header.length);
-    const body = formatForTelegram(truncate(result.analysis || "", budget));
+    const headerWordCount = countWords(header);
+    const bodyWordLimit = Math.max(0, AI_ANALYSIS_TELEGRAM_WORD_LIMIT - headerWordCount);
+    const body = formatForTelegram(truncate(truncateWords(result.analysis || "", bodyWordLimit), budget));
     const message = header + body;
 
     if (result.chartUrl) {
@@ -231,4 +264,4 @@ class TelegramService {
   }
 }
 
-module.exports = { TelegramService };
+module.exports = { TelegramService, AI_ANALYSIS_TELEGRAM_WORD_LIMIT, countWords };

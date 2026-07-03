@@ -130,7 +130,8 @@
 
     function renderIntervalOptions(selected) {
       return availableIntervals.map(function (tf) {
-        return '<option value="' + escapeHtml(tf) + '"' + (tf === selected ? ' selected' : '') + '>' + escapeHtml(tf) + '</option>';
+        return '<button class="aia-tf-option' + (tf === selected ? ' active' : '') + '" type="button" data-role="tf-option" data-value="' +
+          escapeHtml(tf) + '">' + escapeHtml(tf) + '</button>';
       }).join('');
     }
 
@@ -139,7 +140,12 @@
         '<div class="aia-card" id="' + cardId(preset.symbol) + '">' +
           '<div class="aia-card-head" data-role="head">' +
             '<div class="aia-card-symbol">' + escapeHtml(preset.label) +
-              '<select class="aia-tf-select" data-role="tf" aria-label="Timeframe">' + renderIntervalOptions(preset.interval) + '</select>' +
+              '<div class="aia-tf-menu" data-role="tf-menu">' +
+                '<button class="aia-tf-select" type="button" data-role="tf" aria-haspopup="listbox" aria-expanded="false">' +
+                  '<span data-role="tf-label">' + escapeHtml(preset.interval) + '</span><span class="aia-tf-caret" aria-hidden="true">&#9662;</span>' +
+                '</button>' +
+                '<div class="aia-tf-options" data-role="tf-options" role="listbox">' + renderIntervalOptions(preset.interval) + '</div>' +
+              '</div>' +
               '<span class="aia-gen-badge" data-role="gen"></span>' +
             '</div>' +
             '<div class="aia-card-actions">' +
@@ -243,20 +249,51 @@
       });
 
       var tfSelect = card.querySelector('[data-role="tf"]');
-      tfSelect.addEventListener('click', function (e) { e.stopPropagation(); });
-      tfSelect.addEventListener('change', function () {
+      var tfMenu = card.querySelector('[data-role="tf-menu"]');
+      var tfLabel = card.querySelector('[data-role="tf-label"]');
+      var tfOptions = card.querySelector('[data-role="tf-options"]');
+      function closeTfMenu() {
+        tfMenu.classList.remove('open');
+        card.classList.remove('tf-open');
+        tfSelect.setAttribute('aria-expanded', 'false');
+      }
+      function setTimeframe(value) {
         var state = cardState[id];
-        state.interval = tfSelect.value;
+        state.interval = value;
+        tfLabel.textContent = value;
+        tfOptions.querySelectorAll('[data-role="tf-option"]').forEach(function (option) {
+          option.classList.toggle('active', option.getAttribute('data-value') === value);
+        });
         state.data = null;
         updateCard(id);
         fetch('/api/ai-analysis/peek?symbol=' + encodeURIComponent(state.symbol) + '&interval=' + encodeURIComponent(state.interval))
           .then(function (res) { return res.json(); })
           .then(function (payload) {
-            if (state.interval !== tfSelect.value) return; // superseded by another change
+            if (state.interval !== value) return; // superseded by another change
             state.data = payload.result || null;
             updateCard(id);
           })
           .catch(function () { /* leave the "not generated" placeholder in place */ });
+      }
+      tfMenu.addEventListener('click', function (e) { e.stopPropagation(); });
+      tfSelect.addEventListener('click', function () {
+        var willOpen = !tfMenu.classList.contains('open');
+        document.querySelectorAll('.aia-tf-menu.open').forEach(function (menu) {
+          menu.classList.remove('open');
+          var openCard = menu.closest('.aia-card');
+          if (openCard) openCard.classList.remove('tf-open');
+          var button = menu.querySelector('[data-role="tf"]');
+          if (button) button.setAttribute('aria-expanded', 'false');
+        });
+        tfMenu.classList.toggle('open', willOpen);
+        card.classList.toggle('tf-open', willOpen);
+        tfSelect.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+      });
+      tfOptions.querySelectorAll('[data-role="tf-option"]').forEach(function (option) {
+        option.addEventListener('click', function () {
+          closeTfMenu();
+          setTimeframe(option.getAttribute('data-value'));
+        });
       });
 
       var runBtn = card.querySelector('[data-role="run"]');
@@ -339,6 +376,16 @@
           });
       });
     }
+
+    document.addEventListener('click', function () {
+      document.querySelectorAll('.aia-tf-menu.open').forEach(function (menu) {
+        menu.classList.remove('open');
+        var openCard = menu.closest('.aia-card');
+        if (openCard) openCard.classList.remove('tf-open');
+        var button = menu.querySelector('[data-role="tf"]');
+        if (button) button.setAttribute('aria-expanded', 'false');
+      });
+    });
 
     function renderLogEntry(entry) {
       var bucket = dayBucket(entry.generatedAt);
