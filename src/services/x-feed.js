@@ -6,12 +6,18 @@ const { createServiceError } = require("../utils/errors");
  * have paid X API access yet.
  */
 const X_API_URL = "https://api.x.com/2/tweets/search/recent";
+const X_USER_LOOKUP_URL = (handle) =>
+  `https://api.x.com/2/users/by/username/${encodeURIComponent(handle)}`;
+const X_USER_TIMELINE_URL = (userId) =>
+  `https://api.x.com/2/users/${encodeURIComponent(userId)}/tweets`;
 const SYNDICATION_URL = (handle) =>
   `https://syndication.twitter.com/srv/timeline-profile/screen-name/${encodeURIComponent(handle)}?showReplies=false`;
 
 const REQUEST_TIMEOUT_MS = 10000;
 const FEED_TTL_MS = 15 * 60 * 1000;
 const LATEST_GOOD_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+// User IDs never change, so cache the handle -> ID mapping for a long time.
+const USER_ID_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const MAX_POSTS_PER_ACCOUNT = 8;
 const MAX_FALLBACK_POST_AGE_MS = 45 * 24 * 60 * 60 * 1000;
 // Recent-search query length cap on the Basic tier.
@@ -132,6 +138,13 @@ async function fetchJsonWithTimeout(url, { headers = {}, timeoutMs = REQUEST_TIM
   }
 }
 
+const TWEET_LOOKUP_PARAMS = {
+  "tweet.fields": "author_id,created_at,attachments",
+  expansions: "author_id,attachments.media_keys",
+  "user.fields": "name,username",
+  "media.fields": "type,url,preview_image_url",
+};
+
 function mapXApiPost(tweet, usersById, mediaByKey, handle) {
   const user = tweet.author_id ? usersById.get(tweet.author_id) : null;
   const username = user?.username || handle;
@@ -194,6 +207,7 @@ class XFeedService {
   constructor({ cache } = {}) {
     this.cache = cache;
     this._inflightBatches = new Map();
+    this._inflightTimelines = new Map();
   }
 
   /**
@@ -214,10 +228,7 @@ class XFeedService {
       query: batchQuery(handles),
       max_results: String(maxResults),
       sort_order: "recency",
-      "tweet.fields": "author_id,created_at,attachments",
-      expansions: "author_id,attachments.media_keys",
-      "user.fields": "name,username",
-      "media.fields": "type,url,preview_image_url",
+      ...TWEET_LOOKUP_PARAMS,
     });
 
     const response = await fetchJsonWithTimeout(`${X_API_URL}?${params.toString()}`, {
@@ -268,6 +279,90 @@ class XFeedService {
       this._inflightBatches.delete(key);
     });
     this._inflightBatches.set(key, pending);
+    return pending;
+  }
+
+  async _lookupUserId(handle) {
+    const cacheKey = `x:userid:${handle.toLowerCase()}`;
+    const cached = this.cache.get(cacheKey);
+    if (cached) return cached;
+
+    const response = await fetchJsonWithTimeout(X_USER_LOOKUP_URL(handle), {
+      headers: {
+        Authorization: `Bearer ${xBearerToken()}`,
+        "User-Agent": "MarketDashboard/1.0",
+      },
+    });
+    if (!response.ok) {
+      throw createServiceError(
+        `X API returned ${response.status} looking up @${handle}${apiStatusHint(response.status)}`,
+        502,
+      );
+    }
+    const data = await response.json();
+    const userId = data.data?.id;
+    if (!userId) {
+      throw createServiceError(`X API returned no user for @${handle}`, 502);
+    }
+    this.cache.set(cacheKey, userId, USER_ID_TTL_MS);
+    return userId;
+  }
+
+  /**
+   * Recent search only covers the last ~7 days, so an account that posts
+   * infrequently comes back empty even though it has a perfectly good
+   * timeline. The user-timeline endpoint returns the account's latest posts
+   * regardless of age, at the cost of two extra requests (user lookup is
+   * cached long-term, so usually one).
+   */
+  async _fetchTimelineFeed(handle) {
+    const token = xBearerToken();
+    if (!token) {
+      throw createServiceError("X API bearer token is not configured", 503);
+    }
+
+    const userId = await this._lookupUserId(handle);
+    const params = new URLSearchParams({
+      max_results: "10",
+      exclude: "retweets,replies",
+      ...TWEET_LOOKUP_PARAMS,
+    });
+    const response = await fetchJsonWithTimeout(`${X_USER_TIMELINE_URL(userId)}?${params.toString()}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "User-Agent": "MarketDashboard/1.0",
+      },
+    });
+    if (!response.ok) {
+      throw createServiceError(
+        `X API returned ${response.status} for @${handle}'s timeline${apiStatusHint(response.status)}`,
+        502,
+      );
+    }
+
+    const data = await response.json();
+    const tweets = Array.isArray(data.data) ? data.data : [];
+    const usersById = new Map((data.includes?.users || []).map((user) => [user.id, user]));
+    const mediaByKey = new Map((data.includes?.media || []).map((media) => [media.media_key, media]));
+
+    const posts = tweets
+      .filter((tweet) => tweet.id && tweet.text)
+      .map((tweet) => mapXApiPost(tweet, usersById, mediaByKey, handle))
+      .filter((post) => post.publishedAt)
+      .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
+      .slice(0, MAX_POSTS_PER_ACCOUNT);
+
+    return { handle, posts, source: "api-timeline" };
+  }
+
+  _fetchTimelineFeedDeduped(handle) {
+    const inflight = this._inflightTimelines.get(handle);
+    if (inflight) return inflight;
+
+    const pending = this._fetchTimelineFeed(handle).finally(() => {
+      this._inflightTimelines.delete(handle);
+    });
+    this._inflightTimelines.set(handle, pending);
     return pending;
   }
 
@@ -322,6 +417,18 @@ class XFeedService {
   }
 
   async _fallbackFeed(handle, reason) {
+    if (xBearerToken()) {
+      try {
+        const feed = await this._fetchTimelineFeedDeduped(handle);
+        if (feed.posts.length) {
+          this._cacheFreshFeed(handle, feed);
+          return feed;
+        }
+      } catch (err) {
+        console.warn(`[x-feed] @${handle}: ${reason}; timeline fallback failed: ${err.message}`);
+      }
+    }
+
     try {
       const feed = await this._fetchSyndicationFeed(handle);
       this._cacheFreshFeed(handle, feed);
@@ -338,7 +445,8 @@ class XFeedService {
    * Fetches feeds for all handles at once. Fresh cache entries are served
    * directly; the remaining handles are packed into batched X API queries.
    * Handles the API returns nothing for (quiet account, rate limit, missing
-   * token) fall back to syndication, then to the last-known-good cache.
+   * token) fall back to the account's user timeline, then syndication, then
+   * the last-known-good cache.
    */
   async getAccountFeeds(handles) {
     const feeds = new Map();
