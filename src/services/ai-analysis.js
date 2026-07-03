@@ -14,7 +14,8 @@ const DEFAULT_STUDIES = [
 const INDEX_STUDIES = [{ name: "MACD" }, { name: "Relative Strength Index" }];
 
 const ANALYSIS_PROMPT =
-  "Analyze this chart and end with BUY/SELL/HOLD. Also put a space between each list, and use emojis creatively.";
+  "Analyze this chart for a Telegram broadcast in 120 words max. Use short bullets only: Trend, Levels, Momentum, Risk, Final call. End exactly BUY, SELL, or HOLD. Be direct and avoid long explanations.";
+const MAX_ANALYSIS_WORDS = 150;
 
 // The last generated result for each symbol/interval is kept in the
 // persistent cache indefinitely (until a fresh generation overwrites it), so
@@ -57,6 +58,24 @@ function extractVerdict(text) {
   const matches = text.match(/\b(BUY|SELL|HOLD)\b/gi);
   if (!matches || !matches.length) return null;
   return matches[matches.length - 1].toUpperCase();
+}
+
+function truncateWords(text, maxWords) {
+  const source = String(text || "");
+  if (maxWords <= 0) return "";
+  let count = 0;
+  let end = 0;
+  const wordPattern = /\S+/g;
+  let match;
+  while ((match = wordPattern.exec(source))) {
+    count += 1;
+    if (count === maxWords) {
+      end = wordPattern.lastIndex;
+      break;
+    }
+  }
+  if (count < maxWords || !wordPattern.exec(source)) return source;
+  return source.slice(0, end).trimEnd();
 }
 
 function presetKey(symbol, interval) {
@@ -274,8 +293,9 @@ class AIAnalysisService {
 
     try {
       const chartUrl = await this._fetchChartUrl(symbol, interval);
-      const analysis = await this._analyzeChart(chartUrl);
-      const verdict = extractVerdict(analysis);
+      const rawAnalysis = await this._analyzeChart(chartUrl);
+      const verdict = extractVerdict(rawAnalysis);
+      const analysis = truncateWords(rawAnalysis, MAX_ANALYSIS_WORDS);
       const generatedAt = new Date().toISOString();
       const result = { chartUrl, analysis, verdict, model: this._model, generatedAt };
       this._cache.set(key, result, PERSIST_TTL_MS);

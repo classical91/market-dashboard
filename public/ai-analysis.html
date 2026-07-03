@@ -53,6 +53,7 @@
     var notice = document.getElementById('aia-notice');
     var logRoot = document.getElementById('aia-log');
     var COLLAPSE_KEY = 'aia_collapsed';
+    var MAX_ANALYSIS_WORDS = 150;
     // One entry per symbol, holding whichever timeframe is currently
     // selected for that card plus its last-fetched result, so switching
     // timeframes and clicking Analyze/Broadcast always act on current state
@@ -69,9 +70,27 @@
     // Minimal, safe markdown-lite: escape everything first, then re-enable
     // **bold** spans and paragraph breaks so the model's formatting reads
     // cleanly without opening up to arbitrary HTML.
+    function truncateWords(text, maxWords) {
+      var source = String(text || '');
+      if (maxWords <= 0) return '';
+      var count = 0;
+      var end = 0;
+      var match;
+      var wordPattern = /\S+/g;
+      while ((match = wordPattern.exec(source))) {
+        count += 1;
+        if (count === maxWords) {
+          end = wordPattern.lastIndex;
+          break;
+        }
+      }
+      if (count < maxWords || !wordPattern.exec(source)) return source;
+      return source.slice(0, end).trimEnd();
+    }
+
     function renderAnalysis(text) {
       if (!text) return '<span class="aia-chart-empty">No analysis yet.</span>';
-      var escaped = escapeHtml(text);
+      var escaped = escapeHtml(truncateWords(text, MAX_ANALYSIS_WORDS));
       var bolded = escaped.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
       return bolded.split(/\n{2,}/).map(function (para) {
         return '<p>' + para.replace(/\n/g, '<br>') + '</p>';
