@@ -13,7 +13,27 @@ function createAIAnalysisRouter({ aiAnalysisService, telegramService, requireAdm
     res.json({
       configured: aiAnalysisService.isConfigured(),
       presets: aiAnalysisService.peekAll(),
+      availableIntervals: aiAnalysisService.availableIntervals,
     });
+  });
+
+  // Read-only: the cached analysis (if any) for an arbitrary symbol/interval
+  // combo — used when switching a card's timeframe, so viewing a previously
+  // generated higher timeframe never spends API credits.
+  router.get("/peek", (req, res) => {
+    const symbol = typeof req.query.symbol === "string" ? req.query.symbol.trim() : "";
+    const interval = typeof req.query.interval === "string" ? req.query.interval.trim() : "";
+    if (!symbol || !interval) {
+      res.status(400).json({ error: "symbol and interval are required" });
+      return;
+    }
+    res.json({ result: aiAnalysisService.getCached(symbol, interval) });
+  });
+
+  // Read-only: recent generation events across every symbol/interval, for the
+  // page's generation log.
+  router.get("/log", (req, res) => {
+    res.json({ entries: aiAnalysisService.getLog(100) });
   });
 
   // Explicit generation — triggered only by a user action. Admin-guarded

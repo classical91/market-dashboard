@@ -25,6 +25,14 @@
 
     <div class="aia-grid" id="aia-grid"></div>
 
+    <div class="aia-log-section">
+      <div class="aia-log-head">
+        <div class="aia-log-title">Generation Log</div>
+        <div class="aia-log-subtitle">When each analysis was generated, grouped by day</div>
+      </div>
+      <div class="aia-log" id="aia-log"></div>
+    </div>
+
     <footer>AI Analysis &mdash; <a href="/">Overview</a> &mdash; <a href="/crypto.html">Crypto Hub</a></footer>
 
   </main>
@@ -43,10 +51,14 @@
 
     var grid = document.getElementById('aia-grid');
     var notice = document.getElementById('aia-notice');
+    var logRoot = document.getElementById('aia-log');
     var COLLAPSE_KEY = 'aia_collapsed';
-    // Latest server data per card, so button handlers always act on the
-    // freshest generation/broadcast state rather than a stale closure.
-    var latestByCard = {};
+    // One entry per symbol, holding whichever timeframe is currently
+    // selected for that card plus its last-fetched result, so switching
+    // timeframes and clicking Analyze/Broadcast always act on current state
+    // rather than a stale closure.
+    var cardState = {};
+    var availableIntervals = [];
 
     function escapeHtml(str) {
       return String(str || '').replace(/[&<>"']/g, function (ch) {
@@ -80,16 +92,32 @@
       return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
     }
 
-    function cardId(preset) {
-      return 'aia-card-' + preset.symbol.replace(/[^a-z0-9]+/gi, '-') + '-' + preset.interval;
+    function startOfDay(d) {
+      return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
     }
 
-    function hasResult(preset) {
-      return Boolean(preset.chartUrl && preset.analysis);
+    // Buckets a timestamp relative to today so the log (and card badges) can
+    // read "Today"/"Yesterday" instead of forcing you to parse a full date
+    // every time to tell how stale a generation is.
+    function dayBucket(iso) {
+      var d = new Date(iso);
+      if (isNaN(d.getTime())) return { key: 'unknown', label: 'Unknown' };
+      var diffDays = Math.round((startOfDay(new Date()) - startOfDay(d)) / 86400000);
+      if (diffDays <= 0) return { key: 'today', label: 'Today' };
+      if (diffDays === 1) return { key: 'yesterday', label: 'Yesterday' };
+      return { key: 'day-' + startOfDay(d), label: d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) };
     }
 
-    function alreadySent(preset) {
-      return Boolean(preset.broadcastAt && preset.generatedAt && preset.broadcastAt >= preset.generatedAt);
+    function cardId(symbol) {
+      return 'aia-card-' + symbol.replace(/[^a-z0-9]+/gi, '-');
+    }
+
+    function hasResult(data) {
+      return Boolean(data && data.chartUrl && data.analysis);
+    }
+
+    function alreadySent(data) {
+      return Boolean(data && data.broadcastAt && data.generatedAt && data.broadcastAt >= data.generatedAt);
     }
 
     function getCollapsed() {
@@ -100,12 +128,18 @@
       try { localStorage.setItem(COLLAPSE_KEY, JSON.stringify(list)); } catch {}
     }
 
+    function renderIntervalOptions(selected) {
+      return availableIntervals.map(function (tf) {
+        return '<option value="' + escapeHtml(tf) + '"' + (tf === selected ? ' selected' : '') + '>' + escapeHtml(tf) + '</option>';
+      }).join('');
+    }
+
     function renderCard(preset) {
       return (
-        '<div class="aia-card" id="' + cardId(preset) + '">' +
+        '<div class="aia-card" id="' + cardId(preset.symbol) + '">' +
           '<div class="aia-card-head" data-role="head">' +
             '<div class="aia-card-symbol">' + escapeHtml(preset.label) +
-              ' <span class="aia-card-interval">&middot; ' + escapeHtml(preset.interval) + '</span>' +
+              '<select class="aia-tf-select" data-role="tf" aria-label="Timeframe">' + renderIntervalOptions(preset.interval) + '</select>' +
               '<span class="aia-gen-badge" data-role="gen"></span>' +
             '</div>' +
             '<div class="aia-card-actions">' +
@@ -128,53 +162,58 @@
       );
     }
 
-    function refreshBroadcastButton(card, preset) {
+    function refreshBroadcastButton(card, data) {
       var btn = card.querySelector('[data-role="broadcast"]');
-      var sent = alreadySent(preset);
-      btn.disabled = !hasResult(preset) || sent;
+      var sent = alreadySent(data);
+      btn.disabled = !hasResult(data) || sent;
       btn.innerHTML = sent ? '&#9989; Sent' : '&#128226; Broadcast';
     }
 
-    function updateCard(preset) {
-      var card = document.getElementById(cardId(preset));
-      if (!card) return;
-      latestByCard[cardId(preset)] = preset;
+    function updateCard(id) {
+      var state = cardState[id];
+      var card = document.getElementById(id);
+      if (!state || !card) return;
+      var data = state.data || {};
 
       var verdictEl = card.querySelector('[data-role="verdict"]');
-      verdictEl.className = verdictClass(preset.verdict);
-      verdictEl.textContent = preset.verdict || 'NO CALL';
+      verdictEl.className = verdictClass(data.verdict);
+      verdictEl.textContent = data.verdict || 'NO CALL';
 
       var genEl = card.querySelector('[data-role="gen"]');
-      if (preset.generatedAt) {
-        genEl.className = 'aia-gen-badge generated';
-        genEl.textContent = '✓ ' + formatTime(preset.generatedAt);
+      if (data.generatedAt) {
+        var bucket = dayBucket(data.generatedAt);
+        // Today's generations stay green with the exact time so a fresh call
+        // is obvious at a glance; anything older just says which day it was,
+        // since the precise time stops mattering once it's not "today".
+        genEl.className = 'aia-gen-badge' + (bucket.key === 'today' ? ' generated' : ' stale');
+        genEl.textContent = '✓ ' + (bucket.key === 'today' ? formatTime(data.generatedAt) : bucket.label) + ' · ' + state.interval;
       } else {
         genEl.className = 'aia-gen-badge';
         genEl.textContent = 'not generated';
       }
 
       var chartEl = card.querySelector('[data-role="chart"]');
-      chartEl.innerHTML = preset.chartUrl
-        ? '<img src="' + escapeHtml(preset.chartUrl) + '" alt="' + escapeHtml(preset.label) + ' chart" loading="lazy" />'
+      chartEl.innerHTML = data.chartUrl
+        ? '<img src="' + escapeHtml(data.chartUrl) + '" alt="' + escapeHtml(state.label) + ' chart" loading="lazy" />'
         : '<span class="aia-chart-empty">No chart yet &mdash; click Analyze to generate one.</span>';
 
-      card.querySelector('[data-role="analysis"]').innerHTML = renderAnalysis(preset.analysis);
+      card.querySelector('[data-role="analysis"]').innerHTML = renderAnalysis(data.analysis);
 
       var metaParts = [];
-      if (preset.generatedAt) metaParts.push('Generated ' + formatTime(preset.generatedAt));
-      if (alreadySent(preset)) metaParts.push('Broadcast ' + formatTime(preset.broadcastAt));
+      if (data.generatedAt) metaParts.push('Generated ' + formatTime(data.generatedAt) + ' · ' + state.interval);
+      if (alreadySent(data)) metaParts.push('Broadcast ' + formatTime(data.broadcastAt));
       card.querySelector('[data-role="meta"]').textContent = metaParts.join(' · ');
 
-      refreshBroadcastButton(card, preset);
+      refreshBroadcastButton(card, data);
 
       var statusEl = card.querySelector('[data-role="broadcast-status"]');
       statusEl.style.display = 'none';
       statusEl.textContent = '';
 
       var errorEl = card.querySelector('[data-role="error"]');
-      if (preset.error) {
+      if (data.error) {
         errorEl.style.display = 'block';
-        errorEl.textContent = (preset.rateLimited ? '⏳ ' : '') + preset.error;
+        errorEl.textContent = (data.rateLimited ? '⏳ ' : '') + data.error;
       } else {
         errorEl.style.display = 'none';
         errorEl.textContent = '';
@@ -192,25 +231,44 @@
     }
 
     function wireCard(preset, defaultCollapsedIds) {
-      var id = cardId(preset);
+      var id = cardId(preset.symbol);
       var card = document.getElementById(id);
       if (!card) return;
 
       setCollapsed(card, id, defaultCollapsedIds.indexOf(id) > -1, false);
 
-      card.querySelector('[data-role="head"]').addEventListener('click', function () {
+      card.querySelector('[data-role="head"]').addEventListener('click', function (e) {
+        if (e.target && e.target.getAttribute('data-role') === 'tf') return;
         setCollapsed(card, id, !card.classList.contains('collapsed'), true);
+      });
+
+      var tfSelect = card.querySelector('[data-role="tf"]');
+      tfSelect.addEventListener('click', function (e) { e.stopPropagation(); });
+      tfSelect.addEventListener('change', function () {
+        var state = cardState[id];
+        state.interval = tfSelect.value;
+        state.data = null;
+        updateCard(id);
+        fetch('/api/ai-analysis/peek?symbol=' + encodeURIComponent(state.symbol) + '&interval=' + encodeURIComponent(state.interval))
+          .then(function (res) { return res.json(); })
+          .then(function (payload) {
+            if (state.interval !== tfSelect.value) return; // superseded by another change
+            state.data = payload.result || null;
+            updateCard(id);
+          })
+          .catch(function () { /* leave the "not generated" placeholder in place */ });
       });
 
       var runBtn = card.querySelector('[data-role="run"]');
       runBtn.addEventListener('click', function (e) {
         e.stopPropagation();
+        var state = cardState[id];
         runBtn.disabled = true;
         runBtn.textContent = 'Analyzing…';
         AdminKey.fetch('/api/ai-analysis/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ symbol: preset.symbol, interval: preset.interval })
+          body: JSON.stringify({ symbol: state.symbol, interval: state.interval })
         })
           .then(function (res) { return res.json(); })
           .then(function (data) {
@@ -221,8 +279,10 @@
               setCollapsed(card, id, false, true);
               return;
             }
-            updateCard(data);
+            state.data = data;
+            updateCard(id);
             setCollapsed(card, id, false, true);
+            loadLog();
           })
           .catch(function (err) {
             var errorEl = card.querySelector('[data-role="error"]');
@@ -239,6 +299,7 @@
       var broadcastBtn = card.querySelector('[data-role="broadcast"]');
       broadcastBtn.addEventListener('click', function (e) {
         e.stopPropagation();
+        var state = cardState[id];
         var statusEl = card.querySelector('[data-role="broadcast-status"]');
         var errorEl = card.querySelector('[data-role="error"]');
         broadcastBtn.disabled = true;
@@ -248,18 +309,18 @@
         AdminKey.fetch('/api/ai-analysis/broadcast', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ symbol: preset.symbol, interval: preset.interval })
+          body: JSON.stringify({ symbol: state.symbol, interval: state.interval })
         })
           .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
           .then(function (result) {
-            var latest = latestByCard[id] || preset;
+            var latest = state.data || {};
             if (result.ok && result.data.ok) {
               latest.broadcastAt = result.data.broadcastAt || new Date().toISOString();
               var groupCount = result.data.channelCount;
               statusEl.style.display = 'block';
               statusEl.textContent = '✅ Sent to Telegram (' + groupCount + ' group' + (groupCount === 1 ? '' : 's') + ')';
               var metaEl = card.querySelector('[data-role="meta"]');
-              metaEl.textContent = 'Generated ' + formatTime(latest.generatedAt) + ' · Broadcast ' + formatTime(latest.broadcastAt);
+              metaEl.textContent = 'Generated ' + formatTime(latest.generatedAt) + ' · ' + state.interval + ' · Broadcast ' + formatTime(latest.broadcastAt);
             } else if (result.data.alreadyBroadcast) {
               latest.broadcastAt = result.data.broadcastAt;
               statusEl.style.display = 'block';
@@ -268,14 +329,61 @@
               errorEl.style.display = 'block';
               errorEl.textContent = result.data.error || 'Broadcast failed.';
             }
+            state.data = latest;
             refreshBroadcastButton(card, latest);
           })
           .catch(function (err) {
             errorEl.style.display = 'block';
             errorEl.textContent = 'Broadcast request failed: ' + err.message;
-            refreshBroadcastButton(card, latestByCard[id] || preset);
+            refreshBroadcastButton(card, state.data || {});
           });
       });
+    }
+
+    function renderLogEntry(entry) {
+      var bucket = dayBucket(entry.generatedAt);
+      var isToday = bucket.key === 'today';
+      return (
+        '<div class="aia-log-item' + (isToday ? ' aia-log-item--today' : '') + '">' +
+          '<span class="' + verdictClass(entry.verdict) + ' aia-log-verdict">' + escapeHtml(entry.verdict || 'NO CALL') + '</span>' +
+          '<span class="aia-log-symbol">' + escapeHtml(entry.label || entry.symbol) + '</span>' +
+          '<span class="aia-log-tf">' + escapeHtml(entry.interval) + '</span>' +
+          '<span class="aia-log-time">' + (isToday ? formatTime(entry.generatedAt) : bucket.label) + '</span>' +
+        '</div>'
+      );
+    }
+
+    function renderLog(entries) {
+      if (!entries.length) {
+        logRoot.innerHTML = '<div class="aia-chart-empty">No generations yet — click Analyze on a card above.</div>';
+        return;
+      }
+      var order = [];
+      var groups = {};
+      entries.forEach(function (entry) {
+        var bucket = dayBucket(entry.generatedAt);
+        if (!groups[bucket.key]) {
+          groups[bucket.key] = { label: bucket.label, items: [] };
+          order.push(bucket.key);
+        }
+        groups[bucket.key].items.push(entry);
+      });
+      logRoot.innerHTML = order.map(function (key) {
+        var group = groups[key];
+        return (
+          '<div class="aia-log-group">' +
+            '<div class="aia-log-group-title' + (key === 'today' ? ' aia-log-group-title--today' : '') + '">' + escapeHtml(group.label) + '</div>' +
+            group.items.map(renderLogEntry).join('') +
+          '</div>'
+        );
+      }).join('');
+    }
+
+    function loadLog() {
+      fetch('/api/ai-analysis/log')
+        .then(function (res) { return res.json(); })
+        .then(function (data) { renderLog(data.entries || []); })
+        .catch(function () { logRoot.innerHTML = '<div class="aia-chart-empty">Failed to load the generation log.</div>'; });
     }
 
     fetch('/api/ai-analysis')
@@ -285,23 +393,31 @@
           notice.style.display = 'block';
           notice.innerHTML = '&#9888;&#65039; AI Analysis is not fully configured on the server. Set <code>OPENAI_API_KEY</code> and <code>CHART_IMG_API_KEY</code> to enable it.';
         }
+        availableIntervals = data.availableIntervals || ['4h'];
         var presets = data.presets || [];
         grid.innerHTML = presets.map(renderCard).join('');
+        presets.forEach(function (preset) {
+          var id = cardId(preset.symbol);
+          cardState[id] = { symbol: preset.symbol, label: preset.label, interval: preset.interval, data: preset };
+        });
         // First visit: start every card collapsed; afterwards honor whatever
         // the user last left open.
+        var allIds = presets.map(function (preset) { return cardId(preset.symbol); });
         var stored = getCollapsed();
-        var defaultCollapsedIds = stored === null ? presets.map(cardId) : stored;
+        var defaultCollapsedIds = stored === null ? allIds : stored;
         // Persist the first-visit default now, so the first manual toggle
         // edits this baseline instead of starting from an empty list.
         if (stored === null) saveCollapsed(defaultCollapsedIds);
         presets.forEach(function (preset) {
-          updateCard(preset);
+          updateCard(cardId(preset.symbol));
           wireCard(preset, defaultCollapsedIds);
         });
       })
       .catch(function (err) {
         grid.innerHTML = '<div class="aia-notice" style="display:block">Failed to load AI Analysis: ' + err.message + '</div>';
       });
+
+    loadLog();
   })();
 </script>
 </body>

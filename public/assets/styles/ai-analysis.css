@@ -63,18 +63,34 @@
   margin-left: 8px;
   color: var(--dim);
 }
+/* Green + exact time only while the generation is from today; once it's a
+   day old or more the badge switches to a neutral tone (see updateCard's
+   dayBucket check) so a green checkmark always means "fresh today". */
 .aia-gen-badge.generated { color: var(--green); }
+.aia-gen-badge.stale { color: var(--muted); }
 
 .aia-card-symbol {
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.03em;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
-.aia-card-interval {
-  color: var(--muted);
-  font-weight: 500;
+.aia-tf-select {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--soft);
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 3px 6px;
+  margin-left: 8px;
+  cursor: pointer;
 }
+.aia-tf-select:hover { border-color: rgba(77,163,255,0.4); }
 
 .aia-card-actions {
   display: flex;
@@ -184,3 +200,82 @@
 @media (max-width: 640px) {
   .aia-grid { grid-template-columns: 1fr; }
 }
+
+/* ── Generation log ───────────────────────────────────── */
+.aia-log-section {
+  margin-top: 24px;
+}
+
+.aia-log-head {
+  margin-bottom: 12px;
+}
+
+.aia-log-title {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.aia-log-subtitle {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.aia-log {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.012)),
+    var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 16px;
+}
+
+.aia-log-group {
+  padding: 10px 0;
+}
+.aia-log-group + .aia-log-group {
+  border-top: 1px solid var(--border);
+}
+
+.aia-log-group-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.aia-log-group-title--today { color: var(--green); }
+
+.aia-log-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  font-size: 12px;
+  color: var(--soft);
+}
+
+.aia-log-verdict {
+  font-size: 9px;
+  padding: 2px 7px;
+}
+
+.aia-log-symbol {
+  font-weight: 700;
+  color: var(--text);
+  min-width: 90px;
+}
+
+.aia-log-tf {
+  color: var(--muted);
+  min-width: 32px;
+}
+
+.aia-log-time {
+  margin-left: auto;
+  color: var(--dim);
+  font-size: 11px;
+}
+
+.aia-log-item--today .aia-log-time { color: var(--green); }
