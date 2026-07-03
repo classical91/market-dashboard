@@ -63,6 +63,14 @@ function createXFeedRouter({ xFeedService, accounts }) {
     }),
   );
 
+  router.get(
+    "/search",
+    asyncRoute(async (req, res) => {
+      const result = await xFeedService.searchPosts(req.query.q);
+      res.json(result);
+    }),
+  );
+
   return router;
 }
 

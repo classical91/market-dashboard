@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>X Intelligence · Market Command</title>
+  <title>X Search · Market Command</title>
   <script src="/assets/js/settings.js"></script>
   <link rel="stylesheet" href="/assets/styles/command.css" />
   <link rel="stylesheet" href="/assets/styles/components.css" />
@@ -16,33 +16,32 @@
 
     <div class="cmd-page-header">
       <div>
-        <div class="cmd-page-title">X Intelligence</div>
-        <div class="cmd-page-subtitle">Curated trader &amp; analyst feeds, latest posts pulled from X</div>
+        <div class="cmd-page-title">X Search</div>
+        <div class="cmd-page-subtitle">Search all of X for a keyword, ticker, or handle and see the live results</div>
       </div>
       <div class="cmd-clock" id="cmd-clock"></div>
     </div>
 
-    <div class="x-split">
-      <div class="x-timeline-pane">
-        <div class="x-timeline-head">
-          <span id="xTimelineLabel">&mdash;</span>
-          <a id="xTimelineLink" href="https://x.com/" target="_blank" rel="noopener">Open on X &#8599;</a>
-        </div>
-        <div class="x-timeline-frame" id="xTimelinePane"></div>
-        <p class="x-rss-placeholder">
-          Uses the official X API when a bearer token is configured. If that is unavailable, the dashboard falls back to X's public syndication feed and may show the last posts that feed returned.
-        </p>
-      </div>
-      <div class="x-account-list" id="xAccountList"></div>
-    </div>
+    <form class="x-search-form" id="xSearchForm">
+      <input
+        class="x-search-input"
+        id="xSearchInput"
+        type="search"
+        placeholder="Search X — e.g. $BTC, FOMC, from:elonmusk..."
+        autocomplete="off"
+      />
+      <button class="x-search-submit" id="xSearchSubmit" type="submit">Search</button>
+    </form>
 
-    <footer>X Intelligence &mdash; <a href="/">Overview</a></footer>
+    <div class="x-search-results" id="xSearchResults"></div>
+
+    <footer>X Search &mdash; <a href="/x-intelligence.html">X Intelligence</a> &mdash; <a href="/">Overview</a></footer>
 
   </main>
 </div>
 <script src="/assets/js/sidebar.js"></script>
 <script src="/assets/js/x-posts.js"></script>
-<script src="/assets/js/x-intelligence.js"></script>
+<script src="/assets/js/x-search.js"></script>
 <script>
   (function () {
     function tick() {

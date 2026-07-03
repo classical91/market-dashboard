@@ -530,6 +530,66 @@ class XFeedService {
     if (feed?.error) throw createServiceError(feed.error, 502);
     return feed;
   }
+
+  /**
+   * Free-text keyword search across all of X, not just the curated accounts.
+   * Only the official recent-search API supports this (the syndication
+   * fallback only ever returns a single account's timeline), so this
+   * requires a bearer token with recent-search access.
+   */
+  async searchPosts(query) {
+    const trimmed = String(query || "").trim();
+    if (!trimmed) {
+      throw createServiceError("Search query is required", 400);
+    }
+    if (trimmed.length > MAX_QUERY_LENGTH) {
+      throw createServiceError(`Search query is too long (max ${MAX_QUERY_LENGTH} characters)`, 400);
+    }
+
+    const token = xBearerToken();
+    if (!token) {
+      throw createServiceError(
+        "X API bearer token is not configured; keyword search needs X_API_BEARER_TOKEN",
+        503,
+      );
+    }
+
+    const params = new URLSearchParams({
+      query: trimmed,
+      max_results: String(MAX_RESULTS_PER_BATCH),
+      sort_order: "recency",
+      ...TWEET_LOOKUP_PARAMS,
+    });
+
+    const response = await fetchJsonWithTimeout(`${X_API_URL}?${params.toString()}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "User-Agent": "MarketDashboard/1.0",
+      },
+    });
+    if (!response.ok) {
+      throw createServiceError(
+        `X API returned ${response.status} for search query${apiStatusHint(response.status)}`,
+        502,
+      );
+    }
+
+    const data = await response.json();
+    const tweets = Array.isArray(data.data) ? data.data : [];
+    const usersById = new Map((data.includes?.users || []).map((user) => [user.id, user]));
+    const mediaByKey = new Map((data.includes?.media || []).map((media) => [media.media_key, media]));
+
+    const posts = tweets
+      .filter((tweet) => tweet.id && tweet.text)
+      .map((tweet) => {
+        const username = usersById.get(tweet.author_id)?.username || "x";
+        return { ...mapXApiPost(tweet, usersById, mediaByKey, username), handle: username };
+      })
+      .filter((post) => post.publishedAt)
+      .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+
+    return { query: trimmed, posts };
+  }
 }
 
 module.exports = { XFeedService };

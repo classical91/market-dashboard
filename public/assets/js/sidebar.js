@@ -155,6 +155,7 @@
       children: [
         { href: "https://x.com/", icon: "&#120143;", label: "Open X.com" },
         { href: "/x-intelligence.html", icon: "&#120143;", label: "X Intelligence" },
+        { href: "/x-search.html", icon: "&#128269;", label: "Search X" },
       ],
     },
     {
