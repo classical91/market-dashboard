@@ -1,0 +1,117 @@
+/* ─────────────────────────────────────────────────────────
+   Overview Hybrid — live /api/overview dashboard (overview.css)
+   plus the TradingView widget sections from Overview V2,
+   restyled onto the overview.css design tokens.
+───────────────────────────────────────────────────────── */
+
+/* ── Collapsible section headers (ported from command.css) ── */
+.section-header {
+  display: flex; align-items: center; justify-content: space-between;
+  cursor: pointer; user-select: none;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  margin-bottom: 12px; padding: 10px 14px;
+  border-radius: 13px;
+  background: rgba(255,255,255,0.035);
+  border: 1px solid var(--border);
+  transition: background 0.15s;
+}
+.section-header:hover { background: rgba(77,163,255,0.08); }
+.section-label {
+  font-size: 11px; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--muted);
+  font-weight: 600; transition: color 0.15s;
+  font-family: inherit;
+}
+.section-header:hover .section-label { color: var(--text); }
+.section-chevron {
+  font-size: 11px; color: var(--muted);
+  transition: transform 0.2s ease, color 0.15s;
+  font-family: inherit;
+}
+.section-header:hover .section-chevron { color: var(--soft); }
+.section-header.collapsed .section-chevron { transform: rotate(-90deg); }
+
+.ovh-section-sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin: -6px 0 10px 2px;
+}
+
+/* ── TradingView widget panels ────────────────────────── */
+.ovh-widget-panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 20px;
+  transition: max-height 0.25s ease, opacity 0.2s ease, margin-bottom 0.25s ease;
+  max-height: 3000px; opacity: 1;
+}
+.ovh-widget-panel.collapsed { max-height: 0; opacity: 0; margin-bottom: 0.5rem; pointer-events: none; }
+
+.ovh-widget-body { height: 380px; }
+.ovh-widget-body--tall { height: 480px; }
+
+/* Market Overview panel — chart + tabs + watchlist, full width */
+.ovh-mo-panel { padding: 4px; }
+.ovh-mo-body { height: 620px; }
+@media (max-width: 640px) {
+  .ovh-mo-body { height: 520px; }
+}
+
+/* ── Technical Analysis grid ──────────────────────────── */
+.ovh-ta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+  overflow: hidden;
+  transition: max-height 0.25s ease, opacity 0.2s ease, margin-bottom 0.25s ease;
+  max-height: 6000px; opacity: 1;
+}
+.ovh-ta-grid.collapsed { max-height: 0; opacity: 0; margin-bottom: 0.5rem; pointer-events: none; }
+
+@media (max-width: 980px) {
+  .ovh-ta-grid { grid-template-columns: 1fr; }
+}
+
+.ovh-ta-item {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.ovh-ta-symbol {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--soft);
+  padding: 12px 15px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255,255,255,0.02);
+}
+
+.ovh-ta-body { height: 460px; }
+
+.ovh-widgets-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 780px) {
+  .ovh-widgets-row { grid-template-columns: 1fr; }
+}
+
+/* ── Quick-link grids (reuse .tool-card look, collapsible) ── */
+.ovh-link-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+  overflow: hidden;
+  transition: max-height 0.25s ease, opacity 0.2s ease, margin-bottom 0.25s ease;
+  max-height: 3000px; opacity: 1;
+}
+.ovh-link-grid.collapsed { max-height: 0; opacity: 0; margin-bottom: 0.5rem; pointer-events: none; }

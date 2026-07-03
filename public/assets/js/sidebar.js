@@ -25,6 +25,7 @@
       ],
     },
     { href: "/overview-v2.html", icon: "&#128202;", label: "Overview V2" },
+    { href: "/overview-hybrid.html", icon: "&#129520;", label: "Overview Hybrid" },
     { href: "/ai-analysis.html", icon: "&#129504;", label: "AI Analysis" },
     { href: "/terminal-suite.html", icon: "&#128421;", label: "Terminal Suite" },
     {
