@@ -76,6 +76,11 @@ function parseJsonArray(value) {
 
 const config = {
   port: parseNumber(process.env.PORT, 3000),
+  admin: {
+    // Shared secret guarding action/mutation endpoints. When empty, those
+    // endpoints are disabled rather than left open (see admin-auth middleware).
+    apiKey: process.env.ADMIN_API_KEY || "",
+  },
   reporter: {
     apiKey: process.env.OPENAI_API_KEY || "",
     model: process.env.REPORTER_MODEL || "gpt-5.4-mini",

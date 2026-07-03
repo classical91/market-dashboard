@@ -1,6 +1,6 @@
 const { Router } = require("express");
 
-function createAIAnalysisRouter({ aiAnalysisService, telegramService }) {
+function createAIAnalysisRouter({ aiAnalysisService, telegramService, requireAdmin }) {
   const router = Router();
 
   function resolveTtlMs(req) {
@@ -16,8 +16,9 @@ function createAIAnalysisRouter({ aiAnalysisService, telegramService }) {
     });
   });
 
-  // Explicit generation — triggered only by a user action.
-  router.post("/generate", async (req, res, next) => {
+  // Explicit generation — triggered only by a user action. Admin-guarded
+  // because it spends Chart-img + OpenAI credits.
+  router.post("/generate", requireAdmin, async (req, res, next) => {
     try {
       const symbol = typeof req.body?.symbol === "string" ? req.body.symbol.trim() : "";
       const interval = typeof req.body?.interval === "string" ? req.body.interval.trim() : "";
@@ -34,7 +35,8 @@ function createAIAnalysisRouter({ aiAnalysisService, telegramService }) {
 
   // Manually broadcast the last generated analysis for one symbol/interval to
   // Telegram. Never generates a fresh analysis itself — run /generate first.
-  router.post("/broadcast", async (req, res, next) => {
+  // Admin-guarded because it pushes messages to every configured channel.
+  router.post("/broadcast", requireAdmin, async (req, res, next) => {
     try {
       const symbol = typeof req.body?.symbol === "string" ? req.body.symbol.trim() : "";
       const interval = typeof req.body?.interval === "string" ? req.body.interval.trim() : "";

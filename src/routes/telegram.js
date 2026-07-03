@@ -1,6 +1,6 @@
 const { Router } = require("express");
 
-function createTelegramRouter({ telegramService }) {
+function createTelegramRouter({ telegramService, requireAdmin }) {
   const router = Router();
 
   router.get("/status", (req, res) => {
@@ -12,7 +12,8 @@ function createTelegramRouter({ telegramService }) {
 
   // Read-only config check: validates the token (getMe) and each chat id
   // (getChat) against the live Telegram API without sending any message.
-  router.get("/diagnose", async (req, res, next) => {
+  // Admin-guarded: it can reveal bot-id / token-length and target chat detail.
+  router.get("/diagnose", requireAdmin, async (req, res, next) => {
     try {
       res.json(await telegramService.diagnose());
     } catch (err) {
@@ -20,7 +21,7 @@ function createTelegramRouter({ telegramService }) {
     }
   });
 
-  router.post("/test", async (req, res, next) => {
+  router.post("/test", requireAdmin, async (req, res, next) => {
     try {
       if (!telegramService.configured) {
         return res.status(400).json({ error: "Telegram not configured" });

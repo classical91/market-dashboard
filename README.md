@@ -11,7 +11,7 @@ The app is intentionally lightweight: no bundler, no frontend framework, and no 
 - Config: dotenv
 - Frontend: HTML, CSS, vanilla JavaScript
 - Deployment: Railway via `railway.toml`
-- CI: GitHub Actions with `npm run lint` and `npm run build`
+- CI: GitHub Actions with `npm run lint`, `npm run build`, and `npm test`
 
 ## Main Surfaces
 
@@ -47,9 +47,20 @@ npm start
 ```bash
 npm run lint
 npm run build
+npm test
 ```
 
-`npm run lint` checks JavaScript syntax across source, scripts, and public assets. `npm run build` boots the Express app and verifies static HTML asset references and required docs.
+`npm run lint` checks JavaScript syntax across source, scripts, and public assets. `npm run build` boots the Express app and verifies static HTML asset references and required docs. `npm test` runs the `node:test` API suite covering the admin guard and public probes.
+
+## Access Control
+
+Action/mutation endpoints are guarded by a shared secret so a public deploy cannot let anonymous visitors spend API credits or send Telegram messages. Set `ADMIN_API_KEY` on the server to enable them; while it is blank these endpoints return `503`:
+
+- `POST /api/daily-report/generate`, `POST /api/daily-report/logs/import`
+- `POST /api/ai-analysis/generate`, `POST /api/ai-analysis/broadcast`
+- `POST /api/telegram/test`, `GET /api/telegram/diagnose`
+
+Guarded requests must carry an `x-admin-key` header matching `ADMIN_API_KEY`. The Reporter, AI Analysis, and Settings pages prompt for the key on first use and store it in the browser's `localStorage`. Read-only views (overview, on-chain, YouTube, `/api/telegram/status`) stay public. The public `/api/health` probe returns only `{ "status": "ok" }`; provider-key and cache detail are returned only to admin requests.
 
 ## Environment Variables
 
@@ -59,6 +70,7 @@ Most keys are optional. The app is designed to degrade to fallback data where po
 
 - `PORT` - local/server port, defaults to `3000`.
 - `DATA_DIR` - persistent file directory for reporter logs/caches and X feed cache. On Railway, set this to the mounted volume path, usually `/app/data`.
+- `ADMIN_API_KEY` - shared secret enabling action/mutation endpoints (see [Access Control](#access-control)). Blank means those endpoints are disabled (`503`).
 - `OPENAI_API_KEY` - enables report generation.
 - `REPORTER_MODEL` - OpenAI model for reporter generation, defaults to `gpt-5.4-mini`.
 - `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_IDS` - enable Telegram delivery.
@@ -127,7 +139,7 @@ market-dashboard/
 
 ## Roadmap
 
-- Add real automated tests for services and routes.
+- Expand the automated test suite (the admin guard and public probes are covered; service-level coverage is still pending).
 - Add a formatter once the repo is ready for broader mechanical changes.
 - Extract more repeated card/link HTML into data-driven renderers.
 - Add visual regression checks for core pages.

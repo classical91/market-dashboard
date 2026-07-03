@@ -26,6 +26,7 @@ const { TelegramService } = require("./services/telegram");
 const { YouTubeFeedService } = require("./services/youtube");
 const { XFeedService } = require("./services/x-feed");
 const { resolveDataDir } = require("./utils/data-dir");
+const { createRequireAdmin } = require("./middleware/admin-auth");
 
 function createApp() {
   const app = express();
@@ -71,6 +72,8 @@ function createApp() {
     presets: config.aiAnalysis.presets,
   });
 
+  const requireAdmin = createRequireAdmin({ adminKey: config.admin.apiKey });
+
   app.disable("x-powered-by");
   app.use(express.json({ limit: "2mb" }));
   app.get(["/earthwatch", "/earthwatch.html"], (req, res) => {
@@ -96,13 +99,14 @@ function createApp() {
       etherscanService,
       covalentService,
       dataSource: config.onchain.dataSourceLabel,
+      adminKey: config.admin.apiKey,
     }),
   );
-  app.use("/api/ai-analysis", createAIAnalysisRouter({ aiAnalysisService, telegramService }));
+  app.use("/api/ai-analysis", createAIAnalysisRouter({ aiAnalysisService, telegramService, requireAdmin }));
   app.use("/api/onchain", createOnchainRouter({ onchainService }));
   app.use("/api/overview", createOverviewRouter({ overviewService }));
-  app.use("/api/daily-report", createReporterRouter({ reporterService }));
-  app.use("/api/telegram", createTelegramRouter({ telegramService }));
+  app.use("/api/daily-report", createReporterRouter({ reporterService, requireAdmin }));
+  app.use("/api/telegram", createTelegramRouter({ telegramService, requireAdmin }));
   app.use("/api/youtube", createYoutubeRouter({ youtubeService, channels: YOUTUBE_CHANNELS }));
   app.use("/api/x", createXFeedRouter({ xFeedService, accounts: X_ACCOUNTS }));
 
