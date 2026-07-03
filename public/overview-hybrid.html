@@ -26,6 +26,15 @@
           <button class="button" id="refreshBtn">↺ Refresh</button>
         </section>
 
+        <div class="ovh-hero">
+          <div class="ovh-hero-eyebrow">Market Command · Overview Hybrid</div>
+          <div class="ovh-hero-title">&#9889; Live Dashboard + TradingView Intelligence</div>
+          <div class="ovh-hero-subtitle">
+            Your live <code>/api/overview</code> feed — KPIs, market pulse, watchlist, alerts —
+            merged with TradingView's market overview, technical analysis, and heatmap widgets in one scroll.
+          </div>
+        </div>
+
         <div id="statusBanner" class="banner" role="status" aria-live="polite"></div>
 
         <section class="ticker" id="ticker" aria-label="Live ticker">
@@ -188,9 +197,17 @@
 
         <!-- ── TradingView sections (from Overview V2) ─────── -->
 
+        <div class="ovh-divider">
+          <span class="ovh-divider-icon">&#128225;</span>
+          <div>
+            <div class="ovh-divider-title">TradingView Intelligence Widgets</div>
+            <div class="ovh-divider-sub">Macro positioning, per-symbol technicals, and derivatives links — official TradingView embeds</div>
+          </div>
+        </div>
+
         <!-- MARKET OVERVIEW -->
-        <div class="section-header" data-section="ovh-market-overview">
-          <span class="section-label">TradingView Market Overview</span>
+        <div class="section-header ovh-accent-blue" data-section="ovh-market-overview">
+          <span class="section-label"><span class="section-icon">&#128202;</span>Market Overview</span>
           <span class="section-chevron">&#9660;</span>
         </div>
         <p class="ovh-section-sub">Crypto and macro watchlist</p>
@@ -267,8 +284,8 @@
         </div>
 
         <!-- TECHNICAL ANALYSIS -->
-        <div class="section-header" data-section="ovh-technical-analysis">
-          <span class="section-label">Technical Analysis</span>
+        <div class="section-header ovh-accent-purple" data-section="ovh-technical-analysis">
+          <span class="section-label"><span class="section-icon">&#128200;</span>Technical Analysis</span>
           <span class="section-chevron">&#9660;</span>
         </div>
         <p class="ovh-section-sub">BTCUSDT, ETHUSDT, SOLUSDT, SPY, QQQ, DXY</p>
@@ -349,8 +366,8 @@
         </div>
 
         <!-- DERIVATIVES & POSITIONING -->
-        <div class="section-header" data-section="ovh-derivatives">
-          <span class="section-label">Derivatives &amp; Positioning</span>
+        <div class="section-header ovh-accent-red" data-section="ovh-derivatives">
+          <span class="section-label"><span class="section-icon">&#9878;&#65039;</span>Derivatives &amp; Positioning</span>
           <span class="section-chevron">&#9660;</span>
         </div>
         <div class="ovh-link-grid" id="ovh-derivatives">
@@ -377,8 +394,8 @@
         </div>
 
         <!-- LIQUIDITY & VOLATILITY -->
-        <div class="section-header" data-section="ovh-liquidity">
-          <span class="section-label">Liquidity &amp; Volatility</span>
+        <div class="section-header ovh-accent-yellow" data-section="ovh-liquidity">
+          <span class="section-label"><span class="section-icon">&#128167;</span>Liquidity &amp; Volatility</span>
           <span class="section-chevron">&#9660;</span>
         </div>
         <div class="ovh-link-grid" id="ovh-liquidity">
@@ -405,8 +422,8 @@
         </div>
 
         <!-- CRYPTO HEATMAP -->
-        <div class="section-header" data-section="ovh-heatmap">
-          <span class="section-label">Crypto Heatmap</span>
+        <div class="section-header ovh-accent-green" data-section="ovh-heatmap">
+          <span class="section-label"><span class="section-icon">&#127777;&#65039;</span>Crypto Heatmap</span>
           <span class="section-chevron">&#9660;</span>
         </div>
         <div class="ovh-widget-panel" id="ovh-heatmap">
@@ -437,8 +454,8 @@
         <div class="ovh-widgets-row">
           <div>
             <!-- ECONOMIC CALENDAR -->
-            <div class="section-header" data-section="ovh-econ-calendar">
-              <span class="section-label">Economic Calendar</span>
+            <div class="section-header ovh-accent-blue" data-section="ovh-econ-calendar">
+              <span class="section-label"><span class="section-icon">&#128197;</span>Economic Calendar</span>
               <span class="section-chevron">&#9660;</span>
             </div>
             <div class="ovh-widget-panel" id="ovh-econ-calendar">
@@ -463,8 +480,8 @@
 
           <div>
             <!-- TOP STORIES -->
-            <div class="section-header" data-section="ovh-top-stories">
-              <span class="section-label">Top Stories</span>
+            <div class="section-header ovh-accent-purple" data-section="ovh-top-stories">
+              <span class="section-label"><span class="section-icon">&#128240;</span>Top Stories</span>
               <span class="section-chevron">&#9660;</span>
             </div>
             <div class="ovh-widget-panel" id="ovh-top-stories">
