@@ -12,6 +12,7 @@ const DEFAULT_STUDIES = [
 // Dominance/market-cap indices (CRYPTOCAP:*) have no volume series, so
 // requesting the Volume study on them just renders an empty pane.
 const INDEX_STUDIES = [{ name: "MACD" }, { name: "Relative Strength Index" }];
+const NO_VOLUME_SYMBOL_PREFIXES = ["CRYPTOCAP:", "TVC:", "SP:", "CBOE:", "FX:", "OANDA:"];
 
 const ANALYSIS_PROMPT =
   "Analyze this chart for a Telegram broadcast in 120 words max. Use short bullets only: Trend, Levels, Momentum, Risk, Final call. End exactly BUY, SELL, or HOLD. Be direct and avoid long explanations.";
@@ -35,10 +36,16 @@ const DEFAULT_PRESETS = [
   { symbol: "CRYPTOCAP:ETH.D", label: "ETH.D", interval: "4h" },
   { symbol: "CRYPTOCAP:USDT.D", label: "USDT.D", interval: "4h" },
   { symbol: "CRYPTOCAP:TOTAL", label: "TOTAL", interval: "4h" },
+  { symbol: "TVC:DXY", label: "DXY", interval: "4h" },
+  { symbol: "SP:SPX", label: "S&P 500", interval: "4h" },
+  { symbol: "OANDA:XAUUSD", label: "Gold", interval: "4h" },
+  { symbol: "TVC:US02Y", label: "US 2Y", interval: "4h" },
+  { symbol: "CBOE:VIX", label: "VIX", interval: "4h" },
+  { symbol: "FX:EURUSD", label: "EUR/USD", interval: "4h" },
 ];
 
 function studiesForSymbol(symbol) {
-  return symbol.startsWith("CRYPTOCAP:") ? INDEX_STUDIES : DEFAULT_STUDIES;
+  return NO_VOLUME_SYMBOL_PREFIXES.some((prefix) => symbol.startsWith(prefix)) ? INDEX_STUDIES : DEFAULT_STUDIES;
 }
 
 function normalizePresets(presets) {

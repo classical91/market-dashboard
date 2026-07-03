@@ -21,6 +21,7 @@ The app is intentionally lightweight: no bundler, no frontend framework, and no 
 - `/traditional.html` - Traditional market research links.
 - `/on-chain.html` - Curated on-chain tools hub.
 - `/onchain.html` - API-backed on-chain analytics dashboard.
+- `/ai-analysis.html` - TradingView chart snapshots with AI reads for crypto plus BTC-correlated macro tickers.
 - `/youtube-v2.html` - YouTube Intelligence RSS upload dashboard.
 - `/indicators.html` - Trading and market glossary.
 - `/reporter.html` - Daily report generation workflow.
