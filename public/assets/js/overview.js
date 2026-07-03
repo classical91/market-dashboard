@@ -8,8 +8,15 @@
     overview: null,
     loading: false,
     error: null,
-    search: "",
   };
+
+  // Standard session hours in UTC (not adjusted for daylight saving).
+  const TRADING_SESSIONS = [
+    { name: "Sydney", open: 22, close: 7 },
+    { name: "Tokyo", open: 0, close: 9 },
+    { name: "London", open: 8, close: 17 },
+    { name: "New York", open: 13, close: 22 },
+  ];
 
   const els = {};
 
@@ -32,7 +39,7 @@
       lastUpdated: $("lastUpdated"),
       clock: $("clock"),
       refresh: $("refreshBtn"),
-      search: $("searchInput"),
+      session: $("sessionIndicator"),
       ticker: $("tickerTrack"),
       kpiGrid: $("kpiGrid"),
       pulseStatus: $("pulseStatus"),
@@ -56,18 +63,15 @@
       }),
     );
 
-    els.search.addEventListener("input", (event) => {
-      state.search = event.target.value.trim().toLowerCase();
-      renderWatchlist();
-    });
-
     els.refresh.addEventListener("click", () => loadOverview());
 
     renderDashboardLoading();
     loadOverview();
     setInterval(loadOverview, REFRESH_INTERVAL_MS);
     setInterval(updateClock, 1000);
+    setInterval(updateSession, 60_000);
     updateClock();
+    updateSession();
   }
 
   async function loadOverview() {
@@ -225,17 +229,9 @@
   function renderWatchlist() {
     const data = state.overview;
     if (!data) return;
-    const q = state.search;
-    const rows = (data.watchlist || []).filter((s) => {
-      if (!q) return true;
-      return (
-        (s.symbol || "").toLowerCase().includes(q) ||
-        (s.name || "").toLowerCase().includes(q) ||
-        (s.type || "").toLowerCase().includes(q)
-      );
-    });
+    const rows = data.watchlist || [];
     if (!rows.length) {
-      els.watchlistBody.innerHTML = `<tr><td colspan="4">${ui().emptyState("No matches", "Try another symbol, asset name, or market type.")}</td></tr>`;
+      els.watchlistBody.innerHTML = `<tr><td colspan="4">${ui().emptyState("No watchlist data", "Symbols will appear once the feed loads.")}</td></tr>`;
       return;
     }
     els.watchlistBody.innerHTML = rows
@@ -441,6 +437,40 @@
       minute: "2-digit",
       second: "2-digit",
     });
+  }
+
+  function inSessionWindow(hour, open, close) {
+    // Sessions that wrap past midnight (e.g. Sydney 22:00-07:00) need the
+    // OR form; same-day sessions need the AND form.
+    return open < close ? hour >= open && hour < close : hour >= open || hour < close;
+  }
+
+  function isWeekendClose(day, hour) {
+    // The forex week runs Sunday 22:00 UTC (Sydney open) to Friday 22:00 UTC
+    // (New York close).
+    if (day === 6) return true;
+    if (day === 0 && hour < 22) return true;
+    if (day === 5 && hour >= 22) return true;
+    return false;
+  }
+
+  function updateSession() {
+    if (!els.session) return;
+    const now = new Date();
+    const day = now.getUTCDay();
+    const hour = now.getUTCHours() + now.getUTCMinutes() / 60;
+
+    if (isWeekendClose(day, hour)) {
+      els.session.className = "chip fallback";
+      els.session.textContent = "● Markets Closed — Weekend";
+      return;
+    }
+
+    // Sydney, Tokyo, London, and New York together span all 24 hours, so
+    // outside the weekend close at least one session is always open.
+    const open = TRADING_SESSIONS.filter((s) => inSessionWindow(hour, s.open, s.close));
+    els.session.className = "chip live";
+    els.session.textContent = `● ${open.map((s) => s.name).join(" + ")} Session${open.length > 1 ? " (Overlap)" : ""}`;
   }
 
   function money(value) {

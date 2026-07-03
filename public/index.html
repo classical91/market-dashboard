@@ -14,11 +14,7 @@
 
       <main class="main">
         <section class="topbar">
-          <input
-            id="searchInput"
-            class="search"
-            placeholder="Search symbol, asset, sector, news…"
-          />
+          <span id="sessionIndicator" class="chip" title="Current global trading session">Loading session…</span>
           <span id="sourceBadge" class="chip fallback" title="Data source status">● Loading…</span>
           <span id="lastUpdated" class="chip" title="Last refresh time"></span>
           <div class="chip" id="clock">Loading…</div>
@@ -198,7 +194,7 @@
               <div class="card-header">
                 <div>
                   <div class="card-title">Watchlist</div>
-                  <div class="card-subtitle">Filtered by your search</div>
+                  <div class="card-subtitle">Symbols you're tracking</div>
                 </div>
               </div>
               <div class="ui-table-shell">

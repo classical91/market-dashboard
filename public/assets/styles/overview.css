@@ -227,20 +227,6 @@ body {
   align-items: center;
   margin-bottom: 16px;
 }
-.search {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  padding: 14px 16px;
-  color: var(--text);
-  outline: none;
-  width: 100%;
-  font-size: 14px;
-  font-family: inherit;
-}
-.search::placeholder {
-  color: var(--muted);
-}
 .chip {
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.05);
