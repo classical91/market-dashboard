@@ -15,8 +15,7 @@ The app is intentionally lightweight: no bundler, no frontend framework, and no 
 
 ## Main Surfaces
 
-- `/` - Market Command overview dashboard with ticker, KPIs, chart, heatmap, watchlist, alerts, calendar, and news.
-- `/overview-v2.html` - TradingView-powered overview page.
+- `/` - Market Command overview dashboard: live ticker, KPIs, chart, heatmap, watchlist, alerts, calendar, and news, plus TradingView market overview, technical analysis, and heatmap widgets.
 - `/crypto.html` - Crypto research and market links.
 - `/market-intel.html` - Cross-asset and macro research links.
 - `/traditional.html` - Traditional market research links.

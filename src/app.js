@@ -79,6 +79,9 @@ function createApp() {
   app.get(["/earthwatch", "/earthwatch.html"], (req, res) => {
     res.redirect(302, "https://earth-watch-production-e3c6.up.railway.app/");
   });
+  app.get(["/overview-v2.html", "/overview-hybrid.html"], (req, res) => {
+    res.redirect(301, "/");
+  });
   app.use(express.static(path.join(__dirname, "..", "public"), {
     setHeaders(res, filePath) {
       if (filePath.endsWith("reporter.html")) {

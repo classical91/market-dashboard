@@ -25,6 +25,15 @@
           <button class="button" id="refreshBtn">↺ Refresh</button>
         </section>
 
+        <div class="ovh-hero">
+          <div class="ovh-hero-eyebrow">Market Command · Overview</div>
+          <div class="ovh-hero-title">&#9889; Live Dashboard + TradingView Intelligence</div>
+          <div class="ovh-hero-subtitle">
+            Your live <code>/api/overview</code> feed — KPIs, market pulse, watchlist, alerts —
+            merged with TradingView's market overview, technical analysis, and heatmap widgets in one scroll.
+          </div>
+        </div>
+
         <div id="statusBanner" class="banner" role="status" aria-live="polite"></div>
 
         <section class="ticker" id="ticker" aria-label="Live ticker">
@@ -118,6 +127,16 @@
             </article>
 
             <article class="card" id="allocationCard"></article>
+
+            <article class="card" id="risk-meter">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">Risk Meter</div>
+                  <div class="card-subtitle">Multi-factor risk model</div>
+                </div>
+              </div>
+              <div class="risk-box" id="riskBox"></div>
+            </article>
           </div>
 
           <div class="stack">
@@ -141,16 +160,6 @@
                   <tbody id="watchlistBody"></tbody>
                 </table>
               </div>
-            </article>
-
-            <article class="card" id="risk-meter">
-              <div class="card-header">
-                <div>
-                  <div class="card-title">Risk Meter</div>
-                  <div class="card-subtitle">Multi-factor risk model</div>
-                </div>
-              </div>
-              <div class="risk-box" id="riskBox"></div>
             </article>
 
             <article class="card" id="alerts">
@@ -185,7 +194,317 @@
           </div>
         </section>
 
-        <p class="footer-note">Market Command — data via /api/overview</p>
+        <!-- ── TradingView widget sections ─────── -->
+
+        <div class="ovh-divider">
+          <span class="ovh-divider-icon">&#128225;</span>
+          <div>
+            <div class="ovh-divider-title">TradingView Intelligence Widgets</div>
+            <div class="ovh-divider-sub">Macro positioning, per-symbol technicals, and derivatives links — official TradingView embeds</div>
+          </div>
+        </div>
+
+        <!-- MARKET OVERVIEW -->
+        <div class="section-header ovh-accent-blue" data-section="ovh-market-overview">
+          <span class="section-label"><span class="section-icon">&#128202;</span>Market Overview</span>
+          <span class="section-chevron">&#9660;</span>
+        </div>
+        <p class="ovh-section-sub">Crypto and macro watchlist</p>
+        <div class="ovh-widget-panel ovh-mo-panel" id="ovh-market-overview">
+          <div class="ovh-widget-body ovh-mo-body">
+            <div class="tradingview-widget-container">
+              <div class="tradingview-widget-container__widget"></div>
+              <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-market-overview.js" async>
+              {
+                "colorTheme": "dark",
+                "dateRange": "12M",
+                "showChart": true,
+                "locale": "en",
+                "width": "100%",
+                "height": "100%",
+                "isTransparent": true,
+                "showSymbolLogo": true,
+                "showFloatingTooltip": false,
+                "plotLineColorGrowing": "rgba(77, 163, 255, 1)",
+                "plotLineColorFalling": "rgba(77, 163, 255, 1)",
+                "gridLineColor": "rgba(240, 243, 250, 0)",
+                "scaleFontColor": "rgba(170, 183, 207, 1)",
+                "belowLineFillColorGrowing": "rgba(77, 163, 255, 0.12)",
+                "belowLineFillColorFalling": "rgba(77, 163, 255, 0.12)",
+                "belowLineFillColorGrowingBottom": "rgba(77, 163, 255, 0)",
+                "belowLineFillColorFallingBottom": "rgba(77, 163, 255, 0)",
+                "symbolActiveColor": "rgba(77, 163, 255, 0.12)",
+                "tabs": [
+                  {
+                    "title": "Crypto",
+                    "symbols": [
+                      { "s": "BINANCE:BTCUSDT", "d": "Bitcoin" },
+                      { "s": "BINANCE:ETHUSDT", "d": "Ethereum" },
+                      { "s": "BINANCE:SOLUSDT", "d": "Solana" },
+                      { "s": "CRYPTOCAP:TOTAL", "d": "Total Mkt Cap" },
+                      { "s": "CRYPTOCAP:BTC.D", "d": "BTC Dominance" },
+                      { "s": "BINANCE:XRPUSDT", "d": "XRP" }
+                    ]
+                  },
+                  {
+                    "title": "Markets",
+                    "symbols": [
+                      { "s": "AMEX:SPY", "d": "SPY" },
+                      { "s": "NASDAQ:QQQ", "d": "QQQ" },
+                      { "s": "TVC:DXY", "d": "DXY" },
+                      { "s": "CBOE:VIX", "d": "VIX" },
+                      { "s": "TVC:GOLD", "d": "Gold" },
+                      { "s": "TVC:US10Y", "d": "US 10Y Yield" }
+                    ]
+                  },
+                  {
+                    "title": "Forex",
+                    "symbols": [
+                      { "s": "FX:EURUSD", "d": "EUR/USD" },
+                      { "s": "FX:GBPUSD", "d": "GBP/USD" },
+                      { "s": "FX:USDJPY", "d": "USD/JPY" },
+                      { "s": "TVC:DXY", "d": "DXY" }
+                    ]
+                  },
+                  {
+                    "title": "Futures",
+                    "symbols": [
+                      { "s": "CME_MINI:ES1!", "d": "S&P 500" },
+                      { "s": "COMEX:GC1!", "d": "Gold" },
+                      { "s": "NYMEX:CL1!", "d": "Crude Oil" },
+                      { "s": "CBOT:ZN1!", "d": "10Y T-Note" }
+                    ]
+                  }
+                ]
+              }
+              </script>
+            </div>
+          </div>
+        </div>
+
+        <!-- TECHNICAL ANALYSIS -->
+        <div class="section-header ovh-accent-purple" data-section="ovh-technical-analysis">
+          <span class="section-label"><span class="section-icon">&#128200;</span>Technical Analysis</span>
+          <span class="section-chevron">&#9660;</span>
+        </div>
+        <p class="ovh-section-sub">BTCUSDT, ETHUSDT, SOLUSDT, SPY, QQQ, DXY</p>
+        <div class="ovh-ta-grid" id="ovh-technical-analysis">
+
+          <div class="ovh-ta-item">
+            <div class="ovh-ta-symbol">BTCUSDT</div>
+            <div class="ovh-ta-body">
+              <div class="tradingview-widget-container">
+                <div class="tradingview-widget-container__widget"></div>
+                <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js" async>
+                { "interval": "1h", "width": "100%", "isTransparent": true, "height": "100%", "symbol": "BINANCE:BTCUSDT", "showIntervalTabs": true, "displayMode": "single", "locale": "en", "colorTheme": "dark" }
+                </script>
+              </div>
+            </div>
+          </div>
+
+          <div class="ovh-ta-item">
+            <div class="ovh-ta-symbol">ETHUSDT</div>
+            <div class="ovh-ta-body">
+              <div class="tradingview-widget-container">
+                <div class="tradingview-widget-container__widget"></div>
+                <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js" async>
+                { "interval": "1h", "width": "100%", "isTransparent": true, "height": "100%", "symbol": "BINANCE:ETHUSDT", "showIntervalTabs": true, "displayMode": "single", "locale": "en", "colorTheme": "dark" }
+                </script>
+              </div>
+            </div>
+          </div>
+
+          <div class="ovh-ta-item">
+            <div class="ovh-ta-symbol">SOLUSDT</div>
+            <div class="ovh-ta-body">
+              <div class="tradingview-widget-container">
+                <div class="tradingview-widget-container__widget"></div>
+                <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js" async>
+                { "interval": "1h", "width": "100%", "isTransparent": true, "height": "100%", "symbol": "BINANCE:SOLUSDT", "showIntervalTabs": true, "displayMode": "single", "locale": "en", "colorTheme": "dark" }
+                </script>
+              </div>
+            </div>
+          </div>
+
+          <div class="ovh-ta-item">
+            <div class="ovh-ta-symbol">SPY</div>
+            <div class="ovh-ta-body">
+              <div class="tradingview-widget-container">
+                <div class="tradingview-widget-container__widget"></div>
+                <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js" async>
+                { "interval": "1h", "width": "100%", "isTransparent": true, "height": "100%", "symbol": "AMEX:SPY", "showIntervalTabs": true, "displayMode": "single", "locale": "en", "colorTheme": "dark" }
+                </script>
+              </div>
+            </div>
+          </div>
+
+          <div class="ovh-ta-item">
+            <div class="ovh-ta-symbol">QQQ</div>
+            <div class="ovh-ta-body">
+              <div class="tradingview-widget-container">
+                <div class="tradingview-widget-container__widget"></div>
+                <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js" async>
+                { "interval": "1h", "width": "100%", "isTransparent": true, "height": "100%", "symbol": "NASDAQ:QQQ", "showIntervalTabs": true, "displayMode": "single", "locale": "en", "colorTheme": "dark" }
+                </script>
+              </div>
+            </div>
+          </div>
+
+          <div class="ovh-ta-item">
+            <div class="ovh-ta-symbol">DXY</div>
+            <div class="ovh-ta-body">
+              <div class="tradingview-widget-container">
+                <div class="tradingview-widget-container__widget"></div>
+                <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js" async>
+                { "interval": "1h", "width": "100%", "isTransparent": true, "height": "100%", "symbol": "TVC:DXY", "showIntervalTabs": true, "displayMode": "single", "locale": "en", "colorTheme": "dark" }
+                </script>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- DERIVATIVES & POSITIONING -->
+        <div class="section-header ovh-accent-red" data-section="ovh-derivatives">
+          <span class="section-label"><span class="section-icon">&#9878;&#65039;</span>Derivatives &amp; Positioning</span>
+          <span class="section-chevron">&#9660;</span>
+        </div>
+        <div class="ovh-link-grid" id="ovh-derivatives">
+          <a class="tool-card" href="https://www.coinglass.com/FundingRate/BTC" target="_blank" rel="noopener">
+            <div class="tool-card-top"><span class="tool-badge" style="background:rgba(255,77,109,0.14);color:var(--red)">FUNDING</span><span class="tool-arrow">&#8599;</span></div>
+            <div class="tool-name">BTC Funding Rates</div>
+            <div class="tool-src">coinglass.com</div>
+          </a>
+          <a class="tool-card" href="https://www.coinglass.com/LongShortRatio" target="_blank" rel="noopener">
+            <div class="tool-card-top"><span class="tool-badge" style="background:rgba(77,163,255,0.16);color:var(--blue)">LONG/SHORT</span><span class="tool-arrow">&#8599;</span></div>
+            <div class="tool-name">Long/Short Positioning</div>
+            <div class="tool-src">coinglass.com</div>
+          </a>
+          <a class="tool-card" href="https://www.coinglass.com/pro/futures/FuturesOpenInterest" target="_blank" rel="noopener">
+            <div class="tool-card-top"><span class="tool-badge" style="background:rgba(77,163,255,0.16);color:var(--blue)">FUTURES OI</span><span class="tool-arrow">&#8599;</span></div>
+            <div class="tool-name">Futures OI by Exchange</div>
+            <div class="tool-src">coinglass.com</div>
+          </a>
+          <a class="tool-card" href="https://www.coinglass.com/etf/bitcoin" target="_blank" rel="noopener">
+            <div class="tool-card-top"><span class="tool-badge" style="background:rgba(77,163,255,0.16);color:var(--blue)">BTC ETF</span><span class="tool-arrow">&#8599;</span></div>
+            <div class="tool-name">Bitcoin Spot ETF Flows</div>
+            <div class="tool-src">coinglass.com</div>
+          </a>
+        </div>
+
+        <!-- LIQUIDITY & VOLATILITY -->
+        <div class="section-header ovh-accent-yellow" data-section="ovh-liquidity">
+          <span class="section-label"><span class="section-icon">&#128167;</span>Liquidity &amp; Volatility</span>
+          <span class="section-chevron">&#9660;</span>
+        </div>
+        <div class="ovh-link-grid" id="ovh-liquidity">
+          <a class="tool-card" href="https://www.coinglass.com/pro/futures/LiquidationHeatMap" target="_blank" rel="noopener">
+            <div class="tool-card-top"><span class="tool-badge" style="background:rgba(77,163,255,0.16);color:var(--blue)">HEATMAP</span><span class="tool-arrow">&#8599;</span></div>
+            <div class="tool-name">Liquidation Heatmap</div>
+            <div class="tool-src">coinglass.com</div>
+          </a>
+          <a class="tool-card" href="https://www.coinglass.com/liquidations" target="_blank" rel="noopener">
+            <div class="tool-card-top"><span class="tool-badge" style="background:rgba(77,163,255,0.16);color:var(--blue)">LIVE LIQS</span><span class="tool-arrow">&#8599;</span></div>
+            <div class="tool-name">Crypto Liquidations</div>
+            <div class="tool-src">coinglass.com</div>
+          </a>
+          <a class="tool-card" href="https://alternative.me/crypto/fear-and-greed-index/" target="_blank" rel="noopener">
+            <div class="tool-card-top"><span class="tool-badge" style="background:rgba(255,77,109,0.14);color:var(--red)">FEAR &amp; GREED</span><span class="tool-arrow">&#8599;</span></div>
+            <div class="tool-name">Crypto Fear &amp; Greed Index</div>
+            <div class="tool-src">alternative.me</div>
+          </a>
+          <a class="tool-card" href="https://www.tradingview.com/news/markets/crypto/" target="_blank" rel="noopener">
+            <div class="tool-card-top"><span class="tool-badge" style="background:rgba(245,197,66,0.16);color:var(--yellow)">CRYPTO NEWS</span><span class="tool-arrow">&#8599;</span></div>
+            <div class="tool-name">Crypto Market News</div>
+            <div class="tool-src">tradingview.com</div>
+          </a>
+        </div>
+
+        <!-- CRYPTO HEATMAP -->
+        <div class="section-header ovh-accent-green" data-section="ovh-heatmap">
+          <span class="section-label"><span class="section-icon">&#127777;&#65039;</span>Crypto Heatmap</span>
+          <span class="section-chevron">&#9660;</span>
+        </div>
+        <div class="ovh-widget-panel" id="ovh-heatmap">
+          <div class="ovh-widget-body ovh-widget-body--tall">
+            <div class="tradingview-widget-container">
+              <div class="tradingview-widget-container__widget"></div>
+              <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-crypto-coins-heatmap.js" async>
+              {
+                "dataSource": "Crypto",
+                "blockSize": "market_cap_calc",
+                "blockColor": "change",
+                "locale": "en",
+                "symbolUrl": "",
+                "colorTheme": "dark",
+                "hasTopBar": false,
+                "isDataSetEnabled": false,
+                "isZoomEnabled": true,
+                "hasSymbolTooltip": true,
+                "isMonoSize": false,
+                "width": "100%",
+                "height": "100%"
+              }
+              </script>
+            </div>
+          </div>
+        </div>
+
+        <div class="ovh-widgets-row">
+          <div>
+            <!-- ECONOMIC CALENDAR -->
+            <div class="section-header ovh-accent-blue" data-section="ovh-econ-calendar">
+              <span class="section-label"><span class="section-icon">&#128197;</span>Economic Calendar</span>
+              <span class="section-chevron">&#9660;</span>
+            </div>
+            <div class="ovh-widget-panel" id="ovh-econ-calendar">
+              <div class="ovh-widget-body">
+                <div class="tradingview-widget-container">
+                  <div class="tradingview-widget-container__widget"></div>
+                  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-events.js" async>
+                  {
+                    "colorTheme": "dark",
+                    "isTransparent": true,
+                    "width": "100%",
+                    "height": "100%",
+                    "locale": "en",
+                    "importanceFilter": "-1,0,1",
+                    "countryFilter": "us,eu,gb,jp,cn"
+                  }
+                  </script>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <!-- TOP STORIES -->
+            <div class="section-header ovh-accent-purple" data-section="ovh-top-stories">
+              <span class="section-label"><span class="section-icon">&#128240;</span>Top Stories</span>
+              <span class="section-chevron">&#9660;</span>
+            </div>
+            <div class="ovh-widget-panel" id="ovh-top-stories">
+              <div class="ovh-widget-body">
+                <div class="tradingview-widget-container">
+                  <div class="tradingview-widget-container__widget"></div>
+                  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-timeline.js" async>
+                  {
+                    "feedMode": "all_symbols",
+                    "colorTheme": "dark",
+                    "isTransparent": true,
+                    "displayMode": "regular",
+                    "width": "100%",
+                    "height": "100%",
+                    "locale": "en"
+                  }
+                  </script>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <p class="footer-note">Market Command — live data via /api/overview + TradingView widgets</p>
       </main>
     </div>
 
@@ -193,5 +512,9 @@
     <script src="/assets/js/sidebar.js"></script>
     <script src="/assets/js/overview.js"></script>
     <script src="/assets/js/tools.js"></script>
+    <script src="/assets/js/sections.js"></script>
+    <script>
+      initSections("overview_collapsed");
+    </script>
   </body>
 </html>
