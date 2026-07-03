@@ -315,16 +315,6 @@
       });
   }
 
-  function readHashSelection(accounts) {
-    var hash = decodeURIComponent(window.location.hash.slice(1) || "");
-    if (!hash) return null;
-    if (hash.toLowerCase() === "all") return { mode: ALL_MODE };
-    var found = accounts.filter(function (a) {
-      return a.handle.toLowerCase() === hash.toLowerCase();
-    })[0];
-    return found ? { mode: "account", handle: found.handle } : null;
-  }
-
   function init() {
     var listRoot = document.getElementById("xAccountList");
     var pane = document.getElementById("xTimelinePane");
@@ -333,16 +323,13 @@
     if (!listRoot || !pane) return;
 
     var accounts = allAccounts();
-    var hashSelection = readHashSelection(accounts);
     var lastHandle = readLastHandle();
     var validLast = accounts.some(function (a) { return a.handle === lastHandle; });
     var lastMode = readLastMode();
     var cached = readCachedFeed();
     var state = {
-      mode: hashSelection ? hashSelection.mode : lastMode === ALL_MODE ? ALL_MODE : "account",
-      handle: hashSelection && hashSelection.mode === "account"
-        ? hashSelection.handle
-        : validLast ? lastHandle : accounts[0].handle,
+      mode: lastMode === ALL_MODE ? ALL_MODE : "account",
+      handle: validLast ? lastHandle : accounts[0].handle,
       feedData: cached || { posts: [], failedFeeds: [] },
       loaded: !!cached,
     };
@@ -397,13 +384,6 @@
 
     refreshList();
     if (state.mode === ALL_MODE) selectAll(); else selectHandle(state.handle);
-
-    window.addEventListener("hashchange", function () {
-      var next = readHashSelection(accounts);
-      if (!next) return;
-      if (next.mode === ALL_MODE) selectAll();
-      else selectHandle(next.handle);
-    });
 
     loadAccountsFeed().then(function (data) {
       var hasFreshPosts = Array.isArray(data.posts) && data.posts.length > 0;
