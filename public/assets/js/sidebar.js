@@ -31,17 +31,11 @@
         { href: "/#ovh-top-stories", icon: "&#128240;", label: "Top Stories" },
       ],
     },
+    { href: "/ai-analysis.html", icon: "&#129504;", label: "AI Analysis" },
     {
-      label: "AI Analysis",
-      icon: "&#129504;",
-      children: [
-        { href: "/ai-analysis.html", icon: "&#129504;", label: "AI Analysis" },
-        {
-          href: "https://commentfarm-production-fc8b.up.railway.app/queue",
-          icon: "&#128444;",
-          label: "Open ImageQueue",
-        },
-      ],
+      href: "https://commentfarm-production-fc8b.up.railway.app/queue",
+      icon: "&#128444;",
+      label: "Open ImageQueue",
     },
     { href: "/terminal-suite.html", icon: "&#128421;", label: "Terminal Suite" },
     {
