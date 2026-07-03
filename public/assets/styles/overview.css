@@ -498,6 +498,21 @@ table {
   width: 100%;
   border-collapse: collapse;
 }
+/* The watchlist can list 15+ rows, which otherwise stretches the right
+   column of .grid far past the left column and leaves it looking empty
+   underneath. Cap it with an internal scroll instead. */
+#watchlist .ui-table-shell {
+  max-height: 420px;
+  overflow-y: auto;
+}
+#watchlist thead th {
+  position: sticky;
+  top: 0;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.025)),
+    var(--panel);
+  z-index: 1;
+}
 th,
 td {
   padding: 13px 16px;
