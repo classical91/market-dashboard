@@ -1,6 +1,6 @@
 const { Router } = require("express");
 
-function createReporterRouter({ reporterService }) {
+function createReporterRouter({ reporterService, requireAdmin }) {
   const router = Router();
 
   function resolveTtlMs(req) {
@@ -25,8 +25,9 @@ function createReporterRouter({ reporterService }) {
     }
   });
 
-  // Explicit generation — triggered only by a user action.
-  router.post("/generate", async (req, res, next) => {
+  // Explicit generation — triggered only by a user action. Admin-guarded
+  // because it spends OpenAI credits.
+  router.post("/generate", requireAdmin, async (req, res, next) => {
     try {
       const report = await reporterService.generateReport(resolveTtlMs(req), resolveSection(req), resolvePrompt(req));
       res.json(report);
@@ -37,7 +38,8 @@ function createReporterRouter({ reporterService }) {
 
   // Import readable browser-backed logs into the server store so reports can
   // be shared across devices after a persistent volume is attached.
-  router.post("/logs/import", (req, res, next) => {
+  // Admin-guarded because it writes into the shared server-side report store.
+  router.post("/logs/import", requireAdmin, (req, res, next) => {
     try {
       const report = reporterService.importLogEntries(req.body?.entries, resolveTtlMs(req));
       res.json(report);

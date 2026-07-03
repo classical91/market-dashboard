@@ -30,6 +30,7 @@
   </main>
 </div>
 <script src="/assets/js/sidebar.js"></script>
+<script src="/assets/js/admin-key.js"></script>
 <script>
   (function () {
     function tick() {
@@ -206,7 +207,7 @@
         e.stopPropagation();
         runBtn.disabled = true;
         runBtn.textContent = 'Analyzing…';
-        fetch('/api/ai-analysis/generate', {
+        AdminKey.fetch('/api/ai-analysis/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ symbol: preset.symbol, interval: preset.interval })
@@ -244,7 +245,7 @@
         broadcastBtn.textContent = 'Sending…';
         statusEl.style.display = 'none';
         statusEl.textContent = '';
-        fetch('/api/ai-analysis/broadcast', {
+        AdminKey.fetch('/api/ai-analysis/broadcast', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ symbol: preset.symbol, interval: preset.interval })

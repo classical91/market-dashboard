@@ -130,8 +130,8 @@ Format each item:
 }
 
 function economicsPrompt(dateStr) {
-  return `ðŸ—“ï¸ðŸŒ ${dateStr}
-ðŸ’¹ TOP 10 GLOBAL ECONOMIC DEVELOPMENTS BRIEF (LAST 24-48 HOURS) ðŸ’¹
+  return `🗓️🌍 ${dateStr}
+💹 TOP 10 GLOBAL ECONOMIC DEVELOPMENTS BRIEF (LAST 24-48 HOURS) 💹
 
 Search for current and verified economic events, indicators, policy moves, market data, or macro developments from the last 24-48 hours and produce a TOP 10 report.
 
@@ -156,7 +156,7 @@ PRIORITY ORDER (when more than 10 items compete):
 FORMAT RULES (STRICT):
 - Output EXACTLY 10 items (no more, no less)
 - Each item must begin with a bold numbered heading on its own line, structured as:
-  **#[N] [COUNTRY/REGION] â€” [HEADLINE TITLE]**
+  **#[N] [COUNTRY/REGION] — [HEADLINE TITLE]**
 - Use only simple hyphen bullets (-) for sub-details beneath each heading
 - Keep each item short and structured (max 6 lines total including heading)
 - For data releases, include: DATA + actual vs. expected where relevant
@@ -166,7 +166,7 @@ GOAL: concise, globally balanced daily economics snapshot.`;
 }
 
 function marketsPrompt(dateStr) {
-  return `ðŸ—“ï¸ ${dateStr}
+  return `🗓️ ${dateStr}
 
 Create a TOP 10 global markets news brief from the past 24-48 hours.
 

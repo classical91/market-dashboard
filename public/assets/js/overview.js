@@ -126,8 +126,8 @@
     const cls = dq.live ? "warning" : "error";
     els.banner.className = `banner show ${cls}`;
     const headline = dq.live
-      ? "Some sections are using fallback data."
-      : "Live market data unavailable — showing fallback values.";
+      ? "Some sections are using fallback data — figures tagged “Fallback” are not live."
+      : "⚠ Sample fallback data — these are NOT live market prices. Do not trade on them.";
     els.banner.innerHTML = `<strong>${headline}</strong>${
       warnings.length ? `<ul>${warnings.map((w) => `<li>${escapeHtml(w)}</li>`).join("")}</ul>` : ""
     }`;
@@ -190,7 +190,7 @@
         return `<article class="card kpi">
           <div class="kpi-top"><span>${escapeHtml(k.label)}</span><span class="${cls}">${changeText}</span></div>
           <div class="kpi-value">${escapeHtml(String(k.value))}</div>
-          <div class="kpi-bottom"><span>${escapeHtml(k.note || "")}</span><span>${data.dataQuality?.live ? "Live" : "Fallback"}</span></div>
+          <div class="kpi-bottom"><span>${escapeHtml(k.note || "")}</span><span>${data.dataQuality?.live ? "Live" : "Sample · not live"}</span></div>
         </article>`;
       })
       .join("");

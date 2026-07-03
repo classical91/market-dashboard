@@ -7,7 +7,8 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "lint": "node scripts/lint.js",
-    "build": "node scripts/build-check.js"
+    "build": "node scripts/build-check.js",
+    "test": "node --test"
   },
   "dependencies": {
     "dotenv": "^16.6.1",

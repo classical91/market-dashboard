@@ -262,6 +262,7 @@
 <div class="toast" id="toast">✓ Saved</div>
 
 <script src="/assets/js/sidebar.js"></script>
+<script src="/assets/js/admin-key.js"></script>
 <script>
   /* ── Clock ─────────────────────────────────────────────── */
   (function () {
@@ -383,7 +384,7 @@
     btn.addEventListener('click', function () {
       btn.disabled = true;
       btn.textContent = 'Sending…';
-      fetch('/api/telegram/test', { method: 'POST' })
+      AdminKey.fetch('/api/telegram/test', { method: 'POST' })
         .then(function (r) { return r.json(); })
         .then(function (data) {
           btn.textContent = data.ok ? '✓ Sent!' : '✗ Failed';

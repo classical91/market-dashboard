@@ -319,6 +319,7 @@
 </div>
 
 <script src="/assets/js/sidebar.js"></script>
+<script src="/assets/js/admin-key.js"></script>
 <script>
   /* ── Clock ──────────────────────────────────────────────── */
   (function () {
@@ -676,7 +677,9 @@
         return entry && entry.content && entry.generatedAt && !serverKeys[logEntryKey(entry)];
       }).slice(0, 25);
       if (!entries.length) return Promise.resolve(null);
-      return fetch('/api/daily-report/logs/import?ttlHours=' + currentTtl(), {
+      // Background sync — attach the admin key only if one is already stored,
+      // never prompt on load, and tolerate 401/503 for anonymous viewers.
+      return AdminKey.fetchSilent('/api/daily-report/logs/import?ttlHours=' + currentTtl(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ entries: entries })
@@ -823,7 +826,7 @@
         '<div class="reporter-loading"><span class="spinner"></span>' +
         'Generating briefing — this can take up to a minute&hellip;</div>';
 
-      fetch('/api/daily-report/generate?ttlHours=' + currentTtl() + '&section=' + encodeURIComponent(section), {
+      AdminKey.fetch('/api/daily-report/generate?ttlHours=' + currentTtl() + '&section=' + encodeURIComponent(section), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: currentPromptOverride(section) })
