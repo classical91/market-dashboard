@@ -113,6 +113,52 @@ function renderTransferTable(rows) {
   return html;
 }
 
+function renderFlowBars(rows, direction) {
+  if (!rows || rows.length === 0) {
+    return emptyState("No tracked flow data for this refresh.");
+  }
+  const max = Math.max(...rows.map((row) => Math.abs(Number(row.usd) || 0)), 1);
+  return rows.slice(0, 10).map((row, index) => {
+    const value = Math.abs(Number(row.usd) || 0);
+    const width = Math.max(3, Math.round((value / max) * 100));
+    const cls = direction === "outflow" ? "smart-flow-fill outflow" : "smart-flow-fill inflow";
+    const symbol = row.symbol || row.token || "TOKEN";
+    return `<div class="smart-flow-row">
+      <div class="smart-flow-rank">${index + 1}</div>
+      <div class="smart-flow-token">${symbol}</div>
+      <div class="smart-flow-bar"><span class="${cls}" style="width:${width}%"></span></div>
+      <div class="smart-flow-value">${fmtUsd(value)}</div>
+    </div>`;
+  }).join("");
+}
+
+function renderFlowMoves(rows) {
+  if (!rows || rows.length === 0) {
+    return emptyState("No large flow moves yet. Add provider labels for SpotOnChain-style routing.");
+  }
+  return rows.slice(0, 8).map((row) => {
+    const txLink = row.txHash
+      ? `<a class="smart-flow-chip" href="${etherscanTx(row.txHash)}" target="_blank">${fmtAddr(row.txHash)}</a>`
+      : "";
+    return `<div class="smart-move">
+      <div>
+        <div class="smart-move-title">${row.token || "TOKEN"} large transfer</div>
+        <div class="smart-move-sub">From ${fmtAddr(row.address)}${row.time ? ` · ${fmtTime(row.time)}` : ""}</div>
+      </div>
+      <div class="smart-move-side">
+        ${txLink}
+        <div class="mono val-neutral">${fmtUsd(row.usd)}</div>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function renderSmartFlow(data) {
+  $("smartInflowList").innerHTML = renderFlowBars(data.accumulatedTokens, "inflow");
+  $("smartOutflowList").innerHTML = renderFlowBars(data.distributedTokens, "outflow");
+  $("smartMovesList").innerHTML = renderFlowMoves(data.largeTransfers);
+}
+
 // --- Load Overview ---------------------------------------------
 let overviewData = null;
 
@@ -126,6 +172,9 @@ async function loadOverview() {
   $("accumTable").innerHTML = skeleton(6);
   $("distTable").innerHTML = skeleton(6);
   $("transfersTable").innerHTML = skeleton(10);
+  $("smartInflowList").innerHTML = skeleton(8);
+  $("smartOutflowList").innerHTML = skeleton(8);
+  $("smartMovesList").innerHTML = skeleton(6);
 
   $("statusDot").className = "status-dot";
   $("statusText").textContent = "Fetching...";
@@ -160,6 +209,7 @@ async function loadOverview() {
     $("accumTable").innerHTML = renderTokenTable(data.accumulatedTokens);
     $("distTable").innerHTML = renderTokenTable(data.distributedTokens);
     $("transfersTable").innerHTML = renderTransferTable(data.largeTransfers);
+    renderSmartFlow(data);
 
     $("statusDot").className = "status-dot live";
     $("statusText").textContent = "Live";
@@ -179,6 +229,9 @@ async function loadOverview() {
     $("accumTable").innerHTML = msg;
     $("distTable").innerHTML = msg;
     $("transfersTable").innerHTML = msg;
+    $("smartInflowList").innerHTML = msg;
+    $("smartOutflowList").innerHTML = msg;
+    $("smartMovesList").innerHTML = msg;
   }
 
   btn.classList.remove("loading");

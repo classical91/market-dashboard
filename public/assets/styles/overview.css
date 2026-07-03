@@ -417,6 +417,9 @@ body {
   gap: 18px;
   align-items: start;
 }
+.overview-grid {
+  margin-bottom: 18px;
+}
 .stack {
   display: grid;
   gap: 18px;
@@ -735,53 +738,6 @@ td strong {
   color: var(--blue);
 }
 
-.allocation {
-  padding: 18px;
-  display: grid;
-  grid-template-columns: 150px 1fr;
-  gap: 18px;
-  align-items: center;
-}
-.donut {
-  width: 140px;
-  height: 140px;
-  border-radius: 50%;
-  background: conic-gradient(var(--muted) 0 100%);
-  position: relative;
-  flex-shrink: 0;
-}
-.donut::after {
-  content: "";
-  width: 92px;
-  height: 92px;
-  background: var(--panel);
-  border-radius: 50%;
-  position: absolute;
-  inset: 24px;
-}
-.legend {
-  display: grid;
-  gap: 11px;
-  font-size: 13px;
-  color: var(--soft);
-}
-.legend-item {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-}
-.legend-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.legend-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
 .footer-note {
   color: var(--muted);
   font-size: 12px;
@@ -1006,8 +962,7 @@ td strong {
   .heatmap {
     grid-template-columns: repeat(2, 1fr);
   }
-  .risk-box,
-  .allocation {
+  .risk-box {
     grid-template-columns: 1fr;
   }
   th:nth-child(4),
@@ -1145,8 +1100,8 @@ html {
     var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 22px 26px;
-  margin: 18px 0 16px;
+  padding: 16px 20px;
+  margin: 14px 0 12px;
   box-shadow: var(--shadow);
 }
 .ovh-hero-eyebrow {
@@ -1158,10 +1113,10 @@ html {
   margin-bottom: 8px;
 }
 .ovh-hero-title {
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 800;
   letter-spacing: -0.02em;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 .ovh-hero-subtitle {
   font-size: 13.5px;
@@ -1215,7 +1170,7 @@ html {
 /* ── Collapsible section headers (ported from command.css) ── */
 .section-header {
   display: flex; align-items: center; justify-content: space-between;
-  cursor: pointer; user-select: none;
+  cursor: default; user-select: none;
   -webkit-tap-highlight-color: transparent; touch-action: manipulation;
   margin-bottom: 12px; padding: 11px 16px;
   border-radius: 13px;

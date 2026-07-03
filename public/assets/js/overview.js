@@ -2,7 +2,6 @@
   "use strict";
 
   const REFRESH_INTERVAL_MS = 90_000;
-  const DONUT_COLORS = ["#4da3ff", "#00e396", "#9b7bff", "#f5c542", "#ff4d6d", "#8492aa"];
 
   const state = {
     range: "1D",
@@ -40,7 +39,6 @@
       pulseVolatility: $("pulseVolatility"),
       pulseChange: $("pulseChange"),
       heatmap: $("heatmap"),
-      allocation: $("allocationCard"),
       watchlistBody: $("watchlistBody"),
       riskBox: $("riskBox"),
       alerts: $("alertsFeed"),
@@ -106,7 +104,6 @@
     renderKpis(data);
     renderPulse(data);
     renderHeatmap(data);
-    renderAllocation(data);
     renderWatchlist();
     renderRiskBox(data);
     renderAlerts(data);
@@ -223,52 +220,6 @@
         </div>`;
       })
       .join("");
-  }
-
-  function renderAllocation(data) {
-    const allocation = data.allocation;
-    if (!allocation || !Array.isArray(allocation.segments) || !allocation.segments.length) {
-      els.allocation.innerHTML = `
-        <div class="card-header">
-          <div>
-            <div class="card-title">Market Cap Allocation</div>
-            <div class="card-subtitle">Asset class snapshot</div>
-          </div>
-        </div>
-        ${ui().emptyState("No allocation data", "Market-cap dominance is unavailable for this refresh.")}`;
-      return;
-    }
-    const segments = allocation.segments;
-    let cumulative = 0;
-    const stops = segments
-      .map((seg, i) => {
-        const start = cumulative;
-        cumulative += seg.percent;
-        return `${DONUT_COLORS[i % DONUT_COLORS.length]} ${start}% ${cumulative}%`;
-      })
-      .join(", ");
-    els.allocation.innerHTML = `
-      <div class="card-header">
-        <div>
-          <div class="card-title">${escapeHtml(allocation.title || "Market Allocation")}</div>
-          <div class="card-subtitle">${escapeHtml(allocation.subtitle || "")}${allocation.live ? "" : " · fallback"}</div>
-        </div>
-      </div>
-      <div class="allocation">
-        <div class="donut" style="background:conic-gradient(${stops})" role="img"
-          aria-label="Allocation by symbol"></div>
-        <div class="legend">
-          ${segments
-            .map(
-              (seg, i) => `
-            <div class="legend-item">
-              <div class="legend-left"><span class="legend-dot" style="background:${DONUT_COLORS[i % DONUT_COLORS.length]}"></span> ${escapeHtml(seg.label)}</div>
-              <strong>${seg.percent.toFixed(2)}%</strong>
-            </div>`,
-            )
-            .join("")}
-        </div>
-      </div>`;
   }
 
   function renderWatchlist() {

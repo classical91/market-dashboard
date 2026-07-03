@@ -16,7 +16,6 @@
         { href: "/#kpiGrid", icon: "&#128202;", label: "Key Indicators" },
         { href: "/#market-pulse", icon: "&#128201;", label: "Market Pulse" },
         { href: "/#market-heatmap", icon: "&#127777;&#65039;", label: "Market Heatmap" },
-        { href: "/#allocationCard", icon: "&#129383;", label: "Allocation" },
         { href: "/#risk-meter", icon: "&#9878;&#65039;", label: "Risk Meter" },
         { href: "/#watchlist", icon: "&#128065;&#65039;", label: "Watchlist" },
         { href: "/#alerts", icon: "&#128276;", label: "Alerts" },

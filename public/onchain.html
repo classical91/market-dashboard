@@ -59,6 +59,33 @@
     </div>
   </div>
 
+  <!-- Smart Money Flow -->
+  <div class="section section-smart-flow" id="sectionSmartFlow">
+    <div class="section-header" onclick="toggleSection('sectionSmartFlow')">
+      <h2>Smart Money Flow <span class="badge badge-blue">Tracked Flow Proxy</span></h2>
+      <span class="toggle">â–¼</span>
+    </div>
+    <div class="section-body">
+      <div class="smart-flow-note">
+        Current data uses tracked token transfers and wallet flow aggregation. Connect Nansen, Arkham, CryptoQuant, or Glassnode for true labeled smart-money and exchange-entity flow.
+      </div>
+      <div class="smart-flow-grid">
+        <div class="smart-flow-card">
+          <div class="smart-flow-title">Top Tracked Inflow</div>
+          <div id="smartInflowList"></div>
+        </div>
+        <div class="smart-flow-card">
+          <div class="smart-flow-title">Top Tracked Outflow</div>
+          <div id="smartOutflowList"></div>
+        </div>
+        <div class="smart-flow-card smart-flow-card-wide">
+          <div class="smart-flow-title">Large Flow Moves</div>
+          <div id="smartMovesList"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Top Inflows -->
   <div class="section" id="sectionInflows">
     <div class="section-header" onclick="toggleSection('sectionInflows')">
