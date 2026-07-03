@@ -1099,3 +1099,19 @@ td strong {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* In-page section navigation (sidebar "Overview" dropdown jumps to sections).
+   Smooth-scroll the window and offset targets so they clear the sticky mobile
+   top bar (56px) instead of hiding under it. */
+html {
+  scroll-behavior: smooth;
+}
+.main section[id],
+.main article[id] {
+  scroll-margin-top: 64px;
+}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
