@@ -6,7 +6,24 @@
   }
 
   var workspace = [
-    { href: "/", dot: true, label: "Overview" },
+    {
+      label: "Overview",
+      icon: "&#128202;",
+      children: [
+        { href: "/", icon: "&#127968;", label: "Top" },
+        { href: "/#ticker", icon: "&#128200;", label: "Ticker" },
+        { href: "/#calendars-tools", icon: "&#128197;", label: "Calendars & Tools" },
+        { href: "/#kpiGrid", icon: "&#128202;", label: "Key Indicators" },
+        { href: "/#market-pulse", icon: "&#128201;", label: "Market Pulse" },
+        { href: "/#market-heatmap", icon: "&#127777;&#65039;", label: "Market Heatmap" },
+        { href: "/#allocationCard", icon: "&#129383;", label: "Allocation" },
+        { href: "/#watchlist", icon: "&#128065;&#65039;", label: "Watchlist" },
+        { href: "/#risk-meter", icon: "&#9878;&#65039;", label: "Risk Meter" },
+        { href: "/#alerts", icon: "&#128276;", label: "Alerts" },
+        { href: "/#macro-calendar", icon: "&#128198;", label: "Macro Calendar" },
+        { href: "/#news-pulse", icon: "&#128240;", label: "News Pulse" },
+      ],
+    },
     { href: "/overview-v2.html", icon: "&#128202;", label: "Overview V2" },
     { href: "/ai-analysis.html", icon: "&#129504;", label: "AI Analysis" },
     { href: "/terminal-suite.html", icon: "&#128421;", label: "Terminal Suite" },
@@ -345,6 +362,11 @@
       overlay.classList.add("open");
       hamburger.setAttribute("aria-expanded", "true");
       document.body.style.overflow = "hidden";
+    });
+    // Tapping an actual nav link (not a dropdown toggle) closes the drawer so
+    // in-page section jumps aren't hidden behind it.
+    drawer.addEventListener("click", function (event) {
+      if (event.target.closest("a[data-nav-href]")) closeDrawer();
     });
     document.addEventListener("keydown", function (event) {
       if (event.key === "Escape") closeDrawer();
