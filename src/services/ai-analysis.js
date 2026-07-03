@@ -14,6 +14,10 @@ const DEFAULT_STUDIES = [
 const INDEX_STUDIES = [{ name: "MACD" }, { name: "Relative Strength Index" }];
 const NO_VOLUME_SYMBOL_PREFIXES = ["CRYPTOCAP:", "TVC:", "SP:", "CBOE:", "FX:", "OANDA:"];
 
+// Telegram sends this as a photo caption (1024-char hard cap), so the model
+// needs to self-limit rather than relying on a downstream truncate() to chop
+// it — a hard mid-sentence cut reads as a broken message. ~120 words keeps
+// comfortably clear of that cap even after markdown is converted to HTML.
 const ANALYSIS_PROMPT =
   "Analyze this chart for a Telegram broadcast in 120 words max. Use short bullets only: Trend, Levels, Momentum, Risk, Final call. End exactly BUY, SELL, or HOLD. Be direct and avoid long explanations.";
 const MAX_ANALYSIS_WORDS = 150;

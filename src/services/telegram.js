@@ -23,9 +23,16 @@ function formatForTelegram(raw) {
     .replace(/\*\*(.*?)\*\*/g, "<b>$1</b>");
 }
 
+// Safety net for the rare case the model ignores its length instruction —
+// cuts at the last word boundary within budget instead of mid-word, so an
+// overflow reads as an intentionally shortened message rather than a broken
+// one (e.g. "...bullish for crypto m" -> "...bullish for crypto…").
 function truncate(text, max) {
   if (text.length <= max) return text;
-  return text.slice(0, max - 1) + "…";
+  const slice = text.slice(0, max - 1);
+  const lastSpace = slice.lastIndexOf(" ");
+  const cut = lastSpace > max * 0.6 ? slice.slice(0, lastSpace) : slice;
+  return cut.replace(/[.,;:!?-]+$/, "") + "…";
 }
 
 function visibleTextForWordCount(text) {
