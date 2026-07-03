@@ -23,6 +23,9 @@ const ANALYSIS_PROMPT =
 // the manual generatedAt check below) — it does not expire the display copy.
 const PERSIST_TTL_MS = 100 * 365 * 24 * 60 * 60 * 1000;
 
+// Selectable timeframes for the per-card dropdown, roughly low-to-high.
+const AVAILABLE_INTERVALS = ["15m", "1h", "4h", "1D", "1W", "1M"];
+
 const DEFAULT_PRESETS = [
   { symbol: "BINANCE:BTCUSDT", label: "BTCUSDT", interval: "4h" },
   { symbol: "BINANCE:ETHUSDT", label: "ETHUSDT", interval: "4h" },
@@ -74,6 +77,23 @@ class AIAnalysisService {
 
   get presets() {
     return this._presets;
+  }
+
+  get availableIntervals() {
+    return AVAILABLE_INTERVALS;
+  }
+
+  /**
+   * Labels are defined per default preset (e.g. "BINANCE:BTCUSDT" -> "BTCUSDT").
+   * A symbol analyzed at a timeframe outside its default preset still deserves
+   * the same friendly label, so look it up by symbol alone before falling
+   * back to the raw symbol string.
+   */
+  _labelForSymbol(symbol) {
+    const match = this._presets.find((p) => p.symbol === symbol);
+    if (match) return match.label;
+    const idx = symbol.indexOf(":");
+    return idx === -1 ? symbol : symbol.slice(idx + 1);
   }
 
   isConfigured() {
@@ -205,10 +225,18 @@ class AIAnalysisService {
     const preset = this._presets.find((p) => p.symbol === symbol && p.interval === interval) || {
       symbol,
       interval,
-      label: symbol,
+      label: this._labelForSymbol(symbol),
     };
     const cached = this._cache.get(this._latestCacheKey(symbol, interval));
     return cached ? { ...preset, ...cached } : null;
+  }
+
+  /**
+   * Read-only: the most recent generation events (any symbol/interval),
+   * newest first, for the page's generation log.
+   */
+  getLog(limit) {
+    return this._readLog().slice(0, limit || 100);
   }
 
   /**
@@ -225,7 +253,7 @@ class AIAnalysisService {
     const preset = this._presets.find((p) => p.symbol === symbol && p.interval === interval) || {
       symbol,
       interval,
-      label: symbol,
+      label: this._labelForSymbol(symbol),
     };
     const key = this._latestCacheKey(symbol, interval);
     const cached = this._cache.get(key);
