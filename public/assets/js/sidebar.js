@@ -32,6 +32,7 @@
     },
     { href: "/ai-analysis.html", icon: "&#129504;", label: "AI Analysis" },
     { href: "/layout-analysis.html", icon: "&#128248;", label: "My Layouts" },
+    { href: "/pattern-scanner.html", icon: "&#128200;", label: "Pattern Scanner" },
     {
       href: "https://commentfarm-production-fc8b.up.railway.app/queue",
       icon: "&#128444;",
