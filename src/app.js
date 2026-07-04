@@ -5,6 +5,7 @@ const { config } = require("./config/env");
 const { createAIAnalysisRouter } = require("./routes/ai-analysis");
 const { createLayoutAnalysisRouter } = require("./routes/layout-analysis");
 const { createPatternScannerRouter } = require("./routes/pattern-scanner");
+const { createSignalScreenerRouter } = require("./routes/signal-screener");
 const { createHealthRouter } = require("./routes/health");
 const { createOnchainRouter } = require("./routes/onchain");
 const { createOverviewRouter } = require("./routes/overview");
@@ -18,6 +19,7 @@ const { AIAnalysisService } = require("./services/ai-analysis");
 const { LayoutAnalysisService } = require("./services/layout-analysis");
 const { LayoutCaptureService } = require("./services/layout-capture");
 const { PatternScannerService } = require("./services/pattern-scanner");
+const { SignalScreenerService } = require("./services/signal-screener");
 const { MemoryCache } = require("./services/cache");
 const { PersistentReporterCache } = require("./services/persistent-cache");
 const { CovalentService } = require("./services/covalent");
@@ -90,6 +92,7 @@ function createApp() {
     screenshotUrlPrefix: "/layout-screenshots",
   });
   const patternScannerService = new PatternScannerService({ cache });
+  const signalScreenerService = new SignalScreenerService({ cache });
 
   const requireAdmin = createRequireAdmin({ adminKey: config.admin.apiKey });
 
@@ -131,6 +134,7 @@ function createApp() {
     createLayoutAnalysisRouter({ layoutAnalysisService, telegramService, requireAdmin }),
   );
   app.use("/api/pattern-scanner", createPatternScannerRouter({ patternScannerService, aiAnalysisService }));
+  app.use("/api/signal-screener", createSignalScreenerRouter({ signalScreenerService }));
   app.use("/api/onchain", createOnchainRouter({ onchainService }));
   app.use("/api/overview", createOverviewRouter({ overviewService }));
   app.use("/api/daily-report", createReporterRouter({ reporterService, requireAdmin }));
