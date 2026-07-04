@@ -148,6 +148,41 @@ test("scanAll scans every configured token across every timeframe", async () => 
   }
 });
 
+test("scanToken hits carry drawable chart geometry with rebased coordinates", async () => {
+  const originalFetch = global.fetch;
+  global.fetch = async () => {
+    // Falling-wedge shaped klines: converging zigzag between two down-sloping
+    // trendlines. Gentler slopes than the classifyWindow tests because this
+    // series is 90 bars long — steeper lines would cross before the end,
+    // inverting the channel inside the scan window.
+    const rows = [];
+    for (let i = 0; i < 90; i++) {
+      const upper = 110 + -0.15 * i;
+      const lower = 90 + -0.05 * i;
+      const mid = (upper + lower) / 2;
+      const amp = (upper - lower) / 2;
+      const wave = Math.cos(((i % 6) / 6) * 2 * Math.PI);
+      const close = mid + amp * wave;
+      rows.push([i * 3600000, String(close), String(close + Math.abs(amp) * 0.02 + 0.01), String(close - Math.abs(amp) * 0.02 - 0.01), String(close), "100"]);
+    }
+    return { ok: true, json: async () => rows };
+  };
+  try {
+    const service = new PatternScannerService({ cache: new MemoryCache(), tokens: ["BTCUSDT"] });
+    const result = await service.scanToken("BTCUSDT", "4h");
+    assert.ok(result.pattern, "expected a pattern hit");
+    assert.ok(result.chart, "hit should include chart data");
+    assert.ok(Array.isArray(result.chart.candles) && result.chart.candles.length >= 36);
+    const p = result.chart.pattern;
+    assert.ok(p, "chart should include pattern trendlines");
+    assert.ok(p.x0 >= 0 && p.x1 < result.chart.candles.length, "line x coords must fall inside the candle slice");
+    [p.upper.y0, p.upper.y1, p.lower.y0, p.lower.y1].forEach((v) => assert.ok(Number.isFinite(v)));
+    assert.ok(!("lines" in result.pattern), "raw geometry should live on chart, not the pattern summary");
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
 test("classifyWindow returns null for a flat, non-converging channel", () => {
   const candles = makeZigzagCandles({
     count: 36,

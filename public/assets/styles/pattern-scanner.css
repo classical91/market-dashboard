@@ -113,6 +113,16 @@
   grid-column: 1 / -1;
 }
 
+.ps-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-bottom: 12px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
 /* Divergence block below a pattern block in the same card */
 .ps-divergence {
   margin-top: 12px;

@@ -139,22 +139,29 @@ function classifyWindow(candles, opts) {
 
   const r2 = Math.min(upper.r2, lower.r2);
 
+  // Trendline endpoints evaluated at the window edges, so the client can
+  // draw the fitted lines over the candles without re-running the fit.
+  const lines = {
+    upper: { y0: priceAt(upper, firstX), y1: priceAt(upper, lastX) },
+    lower: { y0: priceAt(lower, firstX), y1: priceAt(lower, lastX) },
+  };
+
   // Wedges: both trendlines slope the same direction and converge.
   if (upper.slope > 0 && lower.slope > 0 && lower.slope > upper.slope && isCompressing) {
-    return build("Rising Wedge", "bearish", status, r2, widthRatio, impulseReturn, volumeRatio);
+    return build("Rising Wedge", "bearish", status, r2, widthRatio, impulseReturn, volumeRatio, lines);
   }
   if (upper.slope < 0 && lower.slope < 0 && Math.abs(upper.slope) > Math.abs(lower.slope) && isCompressing) {
-    return build("Falling Wedge", "bullish", status, r2, widthRatio, impulseReturn, volumeRatio);
+    return build("Falling Wedge", "bullish", status, r2, widthRatio, impulseReturn, volumeRatio, lines);
   }
 
   // Flags: a strong directional pole, then a roughly parallel, opposite (or
   // sideways) consolidation channel.
   const isParallel = Math.abs(upper.slope - lower.slope) < Math.abs(upper.slope + lower.slope || 1) * 0.6 + 1e-9;
   if (impulseReturn >= opts.impulseMin && upper.slope <= 0 && lower.slope <= 0 && isParallel) {
-    return build("Bull Flag", "bullish", status, r2, widthRatio, impulseReturn, volumeRatio);
+    return build("Bull Flag", "bullish", status, r2, widthRatio, impulseReturn, volumeRatio, lines);
   }
   if (impulseReturn <= -opts.impulseMin && upper.slope >= 0 && lower.slope >= 0 && isParallel) {
-    return build("Bear Flag", "bearish", status, r2, widthRatio, impulseReturn, volumeRatio);
+    return build("Bear Flag", "bearish", status, r2, widthRatio, impulseReturn, volumeRatio, lines);
   }
 
   return null;
@@ -209,6 +216,12 @@ function detectDivergence(candles, opts) {
       priceDeltaPct: Number(priceDeltaPct.toFixed(2)),
       rsiDelta: Number(rsiDelta.toFixed(1)),
       barsAgo,
+      // Indices are into the candle array the detector ran on; scanToken
+      // rebases them onto the chart slice it returns to the client.
+      pivots: [
+        { index: i1, price: p1 },
+        { index: i2, price: p2 },
+      ],
     });
   }
 
@@ -219,7 +232,7 @@ function detectDivergence(candles, opts) {
   return candidates[0];
 }
 
-function build(pattern, bias, status, r2, widthRatio, impulseReturn, volumeRatio) {
+function build(pattern, bias, status, r2, widthRatio, impulseReturn, volumeRatio, lines) {
   // Simple composite score, 0-100: fit quality, compression, impulse
   // strength, and a declining-volume-into-consolidation bonus all push it up.
   const compressionScore = Math.max(0, 1 - widthRatio) * 100;
@@ -234,6 +247,7 @@ function build(pattern, bias, status, r2, widthRatio, impulseReturn, volumeRatio
     widthRatio: Number(widthRatio.toFixed(3)),
     impulseReturnPct: Number((impulseReturn * 100).toFixed(2)),
     volumeRatio: Number(volumeRatio.toFixed(2)),
+    lines,
   };
 }
 
@@ -281,11 +295,44 @@ class PatternScannerService {
       const windowed = candles.slice(-this._options.window);
       const detection = classifyWindow(windowed, this._options);
       const divergence = detectDivergence(candles, this._options);
-      return { detection, divergence, scannedAt: new Date().toISOString(), candleCount: candles.length };
+
+      // Only hits carry chart data — 75 combos of mostly-empty results would
+      // otherwise ship thousands of candles nobody renders. The slice starts
+      // early enough to include the first divergence pivot when there is one,
+      // and all x coordinates are rebased onto the slice.
+      let chart = null;
+      if (detection || divergence) {
+        const windowStart = candles.length - windowed.length;
+        let chartStart = windowStart;
+        if (divergence) chartStart = Math.min(chartStart, Math.max(0, divergence.pivots[0].index - 2));
+        chart = {
+          candles: candles.slice(chartStart).map((c) => [c.openTime, c.open, c.high, c.low, c.close]),
+          pattern: detection
+            ? { x0: windowStart - chartStart, x1: candles.length - 1 - chartStart, upper: detection.lines.upper, lower: detection.lines.lower }
+            : null,
+          divergence: divergence
+            ? { pivots: divergence.pivots.map((p) => ({ x: p.index - chartStart, price: p.price })) }
+            : null,
+        };
+      }
+      return { detection, divergence, chart, scannedAt: new Date().toISOString(), candleCount: candles.length };
     };
     try {
       const result = force ? await this._cache.set(key, await load(), this._cacheMs) : await this._cache.getOrLoad(key, this._cacheMs, load);
-      return { symbol: pair, label, interval, pattern: result.detection, divergence: result.divergence, scannedAt: result.scannedAt };
+      // The raw geometry (trendline endpoints, pivot indices) lives on
+      // result.chart in rebased coordinates; don't also ship it inside the
+      // pattern/divergence summaries.
+      const { pivots, ...divergencePublic } = result.divergence || {};
+      const { lines, ...patternPublic } = result.detection || {};
+      return {
+        symbol: pair,
+        label,
+        interval,
+        pattern: result.detection ? patternPublic : null,
+        divergence: result.divergence ? divergencePublic : null,
+        chart: result.chart || null,
+        scannedAt: result.scannedAt,
+      };
     } catch (err) {
       return { symbol: pair, label, interval, pattern: null, divergence: null, error: err.message };
     }
