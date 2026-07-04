@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pattern Scanner · Market Command</title>
+  <script src="/assets/js/settings.js"></script>
+  <link rel="stylesheet" href="/assets/styles/command.css" />
+  <link rel="stylesheet" href="/assets/styles/ai-analysis.css" />
+  <link rel="stylesheet" href="/assets/styles/pattern-scanner.css" />
+</head>
+<body>
+<div class="app">
+  <aside class="cmd-sidebar"></aside>
+  <main class="cmd-main">
+
+    <div class="cmd-page-header">
+      <div>
+        <div class="cmd-page-title">&#128200; Pattern Scanner</div>
+        <div class="cmd-page-subtitle">Geometric flag &amp; wedge detection over Binance candles &mdash; a scanner, not a signal: confirm with breakout, volume, and higher-timeframe trend before acting</div>
+      </div>
+      <div class="cmd-clock" id="cmd-clock"></div>
+    </div>
+
+    <div class="aia-notice" id="ps-notice" style="display:none"></div>
+
+    <div class="ps-toolbar">
+      <button class="aia-run-btn" type="button" id="ps-refresh-btn">Rescan</button>
+      <span class="ps-updated" id="ps-updated"></span>
+    </div>
+
+    <div class="ps-grid" id="ps-grid"></div>
+
+    <footer>Pattern Scanner &mdash; <a href="/ai-analysis.html">AI Analysis</a> &mdash; <a href="/layout-analysis.html">My Layouts</a> &mdash; <a href="/">Overview</a></footer>
+
+  </main>
+</div>
+<script src="/assets/js/sidebar.js"></script>
+<script>
+  (function () {
+    function tick() {
+      var el = document.getElementById('cmd-clock');
+      if (el) el.textContent = new Date().toLocaleString(undefined, {
+        weekday: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit'
+      });
+    }
+    tick(); setInterval(tick, 1000);
+
+    var grid = document.getElementById('ps-grid');
+    var notice = document.getElementById('ps-notice');
+    var updatedEl = document.getElementById('ps-updated');
+    var refreshBtn = document.getElementById('ps-refresh-btn');
+
+    function escapeHtml(str) {
+      return String(str || '').replace(/[&<>"']/g, function (ch) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+      });
+    }
+
+    function biasClass(bias) {
+      if (bias === 'bullish') return 'ps-bias ps-bias--bullish';
+      if (bias === 'bearish') return 'ps-bias ps-bias--bearish';
+      return 'ps-bias';
+    }
+
+    function renderCard(entry) {
+      var pattern = entry.pattern;
+      if (entry.error) {
+        return (
+          '<div class="ps-card ps-card--empty">' +
+            '<div class="ps-card-symbol">' + escapeHtml(entry.label) + '<span class="ps-tf">' + escapeHtml(entry.interval) + '</span></div>' +
+            '<div class="ps-empty">Scan failed: ' + escapeHtml(entry.error) + '</div>' +
+          '</div>'
+        );
+      }
+      if (!pattern) {
+        return (
+          '<div class="ps-card ps-card--empty">' +
+            '<div class="ps-card-symbol">' + escapeHtml(entry.label) + '<span class="ps-tf">' + escapeHtml(entry.interval) + '</span></div>' +
+            '<div class="ps-empty">No flag/wedge geometry detected right now.</div>' +
+          '</div>'
+        );
+      }
+      return (
+        '<div class="ps-card">' +
+          '<div class="ps-card-head">' +
+            '<div class="ps-card-symbol">' + escapeHtml(entry.label) + '<span class="ps-tf">' + escapeHtml(entry.interval) + '</span></div>' +
+            '<span class="' + biasClass(pattern.bias) + '">' + escapeHtml(pattern.bias) + '</span>' +
+          '</div>' +
+          '<div class="ps-pattern-name">' + escapeHtml(pattern.pattern) + '</div>' +
+          '<div class="ps-status ps-status--' + escapeHtml(pattern.status) + '">' + (pattern.status === 'breakout' ? '&#9889; Breakout' : '&#8987; Forming') + '</div>' +
+          '<div class="ps-metrics">' +
+            '<div class="ps-metric"><span>Score</span><b>' + pattern.score + '</b></div>' +
+            '<div class="ps-metric"><span>Width ratio</span><b>' + pattern.widthRatio + '</b></div>' +
+            '<div class="ps-metric"><span>Impulse</span><b>' + pattern.impulseReturnPct + '%</b></div>' +
+            '<div class="ps-metric"><span>Vol ratio</span><b>' + pattern.volumeRatio + '</b></div>' +
+          '</div>' +
+        '</div>'
+      );
+    }
+
+    function render(results) {
+      var withPattern = results.filter(function (r) { return r.pattern; });
+      var without = results.filter(function (r) { return !r.pattern; });
+      var ordered = withPattern.concat(without);
+      grid.innerHTML = ordered.length
+        ? ordered.map(renderCard).join('')
+        : '<div class="ps-empty">No Binance-tradeable symbols configured (dominance/macro presets like BTC.D or DXY have no Binance data).</div>';
+    }
+
+    function load(force) {
+      refreshBtn.disabled = true;
+      refreshBtn.textContent = 'Scanning…';
+      fetch('/api/pattern-scanner' + (force ? '?force=true' : ''))
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          render(data.results || []);
+          updatedEl.textContent = 'Updated ' + new Date().toLocaleTimeString();
+        })
+        .catch(function (err) {
+          notice.style.display = 'block';
+          notice.innerHTML = '&#9888;&#65039; Failed to load pattern scan: ' + escapeHtml(err.message);
+        })
+        .finally(function () {
+          refreshBtn.disabled = false;
+          refreshBtn.textContent = 'Rescan';
+        });
+    }
+
+    refreshBtn.addEventListener('click', function () { load(true); });
+    load(false);
+  })();
+</script>
+</body>
+</html>
