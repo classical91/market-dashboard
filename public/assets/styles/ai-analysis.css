@@ -3,6 +3,38 @@
    vision verdict, one card per tracked symbol
 ───────────────────────────────────────────────────────── */
 
+.aia-mode-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.aia-mode-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.aia-select {
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  background: #202735;
+  border: 1px solid rgba(170,183,207,0.28);
+  border-radius: 7px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.aia-select:hover,
+.aia-select:focus {
+  border-color: rgba(77,163,255,0.75);
+  outline: none;
+}
+
 .aia-notice {
   background: var(--amber-bg);
   border: 1px solid rgba(245,197,66,0.3);
