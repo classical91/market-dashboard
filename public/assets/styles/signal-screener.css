@@ -90,6 +90,17 @@
 .ss-summary-bias--off { color: #ff1744; }
 .ss-summary-bias--neutral { color: #9e9e9e; }
 
+.ss-ticker-link {
+  color: inherit;
+  text-decoration: none;
+}
+.ss-ticker-link:hover { color: #4da3ff; }
+.ss-ticker-arrow {
+  font-size: 9px;
+  color: #8892a6;
+}
+.ss-ticker-link:hover .ss-ticker-arrow { color: #4da3ff; }
+
 .ss-error-row td {
   color: var(--coral);
   font-size: 11px;

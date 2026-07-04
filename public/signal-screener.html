@@ -116,6 +116,15 @@
       return '&#9679; FLAT';
     }
 
+    var TV_INTERVALS = { '1h': '60', '4h': '240', '1D': 'D' };
+
+    function tickerLink(symbol) {
+      var url = 'https://www.tradingview.com/chart/?symbol=' + encodeURIComponent('BINANCE:' + symbol) +
+        '&interval=' + encodeURIComponent(TV_INTERVALS[intervalSelect.value] || '240');
+      return '<a class="ss-ticker-link" href="' + url + '" target="_blank" rel="noopener" title="Open ' +
+        escapeHtml(symbol) + ' ' + escapeHtml(intervalSelect.value) + ' on TradingView">' + escapeHtml(symbol) + ' <span class="ss-ticker-arrow">&#8599;</span></a>';
+    }
+
     function renderRow(entry) {
       if (entry.error) {
         return (
@@ -127,7 +136,7 @@
       var signalClass = entry.signal === 'LONG' ? 'ss-signal--long' : entry.signal === 'SHORT' ? 'ss-signal--short' : 'ss-signal--flat';
       return (
         '<tr class="' + rowClass + '">' +
-          '<td>' + escapeHtml(entry.symbol) + '</td>' +
+          '<td>' + tickerLink(entry.symbol) + '</td>' +
           '<td>' + fmtPrice(entry.price) + '</td>' +
           '<td class="' + signalClass + '">' + signalLabel(entry.signal) + '</td>' +
           '<td><span class="ss-badge ' + scoreClass(entry.score) + '">' + entry.score + '%</span></td>' +
