@@ -1,0 +1,97 @@
+/* ─────────────────────────────────────────────────────────
+   Signal Screener — Razor Phantom style multi-token table
+───────────────────────────────────────────────────────── */
+
+.ss-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.ss-updated {
+  font-size: 11px;
+  color: var(--dim);
+}
+
+.ss-table-wrap {
+  overflow-x: auto;
+  border-radius: var(--radius);
+  border: 2px solid rgba(74,74,170,0.3);
+}
+
+.ss-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 640px;
+  background: #0a0a14;
+}
+
+.ss-table th,
+.ss-table td {
+  padding: 8px 12px;
+  font-size: 12px;
+  border-bottom: 1px solid rgba(42,42,74,0.6);
+  white-space: nowrap;
+}
+
+.ss-table thead th {
+  background: #12122a;
+  color: #8892a6;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 10px;
+  text-align: center;
+}
+.ss-table thead th:first-child { text-align: left; }
+
+.ss-table tbody td:first-child {
+  text-align: left;
+  font-weight: 700;
+  color: #fff;
+}
+.ss-table tbody td { text-align: center; color: #c9d4e8; }
+
+.ss-row--long { background: #0d3320; }
+.ss-row--short { background: #330d0d; }
+.ss-row--flat:nth-child(odd) { background: #0d0d1a; }
+.ss-row--flat:nth-child(even) { background: #111124; }
+
+.ss-signal--long { color: #00e676; font-weight: 700; }
+.ss-signal--short { color: #ff1744; font-weight: 700; }
+.ss-signal--flat { color: #9e9e9e; font-weight: 700; }
+
+.ss-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-weight: 700;
+  color: #fff;
+}
+.ss-score--high { background: rgba(0,200,83,0.3); }
+.ss-score--mid { background: rgba(100,221,23,0.4); }
+.ss-score--neutral { background: rgba(255,152,0,0.4); }
+.ss-score--low { background: rgba(255,0,0,0.4); }
+
+.ss-rsi--high { background: rgba(0,200,83,0.5); }
+.ss-rsi--low { background: rgba(255,23,68,0.5); }
+.ss-rsi--mid { background: rgba(128,128,128,0.3); }
+
+.ss-adx--trending { background: rgba(0,128,128,0.5); }
+.ss-adx--flat { background: rgba(128,128,128,0.3); }
+
+.ss-summary td {
+  background: #1a1a3e;
+  font-weight: 700;
+  color: #fff;
+}
+.ss-summary-bias--on { color: #00e676; }
+.ss-summary-bias--off { color: #ff1744; }
+.ss-summary-bias--neutral { color: #9e9e9e; }
+
+.ss-error-row td {
+  color: var(--coral);
+  font-size: 11px;
+  text-align: left !important;
+}
