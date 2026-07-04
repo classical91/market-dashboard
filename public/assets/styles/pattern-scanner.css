@@ -113,6 +113,17 @@
   grid-column: 1 / -1;
 }
 
+.ps-ticker-link {
+  color: inherit;
+  text-decoration: none;
+}
+.ps-ticker-link:hover { color: var(--blue); }
+.ps-ticker-arrow {
+  font-size: 10px;
+  color: var(--muted);
+}
+.ps-ticker-link:hover .ps-ticker-arrow { color: var(--blue); }
+
 .ps-chart {
   display: block;
   width: 100%;

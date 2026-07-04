@@ -63,6 +63,18 @@
       return 'ps-bias';
     }
 
+    var TV_INTERVALS = { '1h': '60', '4h': '240', '1D': 'D' };
+
+    function tvChartUrl(symbol, interval) {
+      return 'https://www.tradingview.com/chart/?symbol=' + encodeURIComponent('BINANCE:' + symbol) +
+        '&interval=' + encodeURIComponent(TV_INTERVALS[interval] || '240');
+    }
+
+    function tickerLink(entry) {
+      return '<a class="ps-ticker-link" href="' + tvChartUrl(entry.symbol, entry.interval) + '" target="_blank" rel="noopener" title="Open ' +
+        escapeHtml(entry.symbol) + ' ' + escapeHtml(entry.interval) + ' on TradingView">' + escapeHtml(entry.label) + ' <span class="ps-ticker-arrow">&#8599;</span></a>';
+    }
+
     function patternBlock(pattern) {
       if (!pattern) return '';
       return (
@@ -106,7 +118,7 @@
       return (
         '<div class="ps-card">' +
           '<div class="ps-card-head">' +
-            '<div class="ps-card-symbol">' + escapeHtml(entry.label) + '<span class="ps-tf">' + escapeHtml(entry.interval) + '</span></div>' +
+            '<div class="ps-card-symbol">' + tickerLink(entry) + '<span class="ps-tf">' + escapeHtml(entry.interval) + '</span></div>' +
             '<span class="' + biasClass(bias) + '">' + escapeHtml(bias) + '</span>' +
           '</div>' +
           chartHtml +
