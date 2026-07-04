@@ -21,6 +21,7 @@ const { LayoutAnalysisService } = require("./services/layout-analysis");
 const { LayoutCaptureService } = require("./services/layout-capture");
 const { PatternScannerService } = require("./services/pattern-scanner");
 const { SignalScreenerService } = require("./services/signal-screener");
+const { SignalBotService } = require("./services/signal-bot");
 const { MemoryCache } = require("./services/cache");
 const { PersistentReporterCache } = require("./services/persistent-cache");
 const { CovalentService } = require("./services/covalent");
@@ -94,6 +95,14 @@ function createApp() {
   });
   const patternScannerService = new PatternScannerService({ cache, tokens: TOP_TOKENS });
   const signalScreenerService = new SignalScreenerService({ cache });
+  const signalBotService = new SignalBotService({
+    signalScreenerService,
+    telegramService,
+    stateCache: new PersistentReporterCache(path.join(dataDir, "signal-bot-state.json")),
+    intervalMs: config.signalBot.intervalMs,
+    timeframes: config.signalBot.timeframes,
+    minChecks: config.signalBot.minChecks,
+  });
 
   const requireAdmin = createRequireAdmin({ adminKey: config.admin.apiKey });
 
@@ -161,6 +170,10 @@ function createApp() {
 
     res.status(status).json({ error: message });
   });
+
+  // The interval loop is started by server.js, not here — createApp() is also
+  // used by tests and the build check, which must not leave timers running.
+  app.locals.signalBot = signalBotService;
 
   return app;
 }

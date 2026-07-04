@@ -106,6 +106,13 @@ const config = {
     botToken: process.env.TELEGRAM_BOT_TOKEN || "",
     chatIds: parseList(process.env.TELEGRAM_CHAT_IDS),
   },
+  signalBot: {
+    // On by default whenever Telegram is configured; set SIGNAL_BOT_ENABLED=false to opt out.
+    enabled: process.env.SIGNAL_BOT_ENABLED !== "false",
+    intervalMs: parseNumber(process.env.SIGNAL_BOT_INTERVAL_MS, 15 * 60 * 1000),
+    timeframes: parseList(process.env.SIGNAL_BOT_TIMEFRAMES),
+    minChecks: parseNumber(process.env.SIGNAL_BOT_MIN_CHECKS, 4),
+  },
   defillama: {
     baseUrl: process.env.DEFILLAMA_API_BASE_URL || "https://stablecoins.llama.fi/",
     coinsBaseUrl: process.env.DEFILLAMA_COINS_API_BASE_URL || "https://coins.llama.fi/",

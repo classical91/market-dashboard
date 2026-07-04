@@ -195,6 +195,23 @@ class TelegramService {
   }
 
   /**
+   * One batched message per scan cycle listing every screener signal flip,
+   * e.g. "🟢 BTCUSDT · 4h: FLAT → LONG (83%)". Batched because a volatile
+   * scan can flip a dozen tokens at once and one message reads far better
+   * than a burst of twelve.
+   */
+  async postSignalAlerts(transitions) {
+    if (!this.configured || !transitions.length) return;
+    const rows = transitions.map((t) => {
+      const emoji = { LONG: "🟢", SHORT: "🔴" }[t.to] || "⚪";
+      const score = t.score != null ? ` (${t.score}%)` : "";
+      return `${emoji} <b>${escapeHtml(t.symbol)}</b> · ${escapeHtml(t.interval)}: ${escapeHtml(t.from)} → <b>${escapeHtml(t.to)}</b>${score}`;
+    });
+    const header = "⚡ <b>SIGNAL SCREENER</b>\n\n";
+    await this._sendToAll(truncate(header + rows.join("\n"), MAX_MSG_LEN));
+  }
+
+  /**
    * Read-only health report: verifies the token against getMe and each
    * configured chat against getChat, so a misconfigured deploy can be
    * debugged from /api/telegram/diagnose without reading server logs.
