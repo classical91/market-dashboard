@@ -8,13 +8,9 @@ const BINANCE_KLINES_URL = "https://data-api.binance.vision/api/v3/klines";
 
 const INTERVAL_MAP = { "1h": "1h", "4h": "4h", "1D": "1d" };
 
-// Spot equivalents of the screener's 20 USDT-perpetual tokens.
-const DEFAULT_TOKENS = [
-  "BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "BNBUSDT",
-  "DOGEUSDT", "AVAXUSDT", "LINKUSDT", "SUIUSDT", "ADAUSDT",
-  "DOTUSDT", "NEARUSDT", "INJUSDT", "OPUSDT", "ARBUSDT",
-  "PENDLEUSDT", "WIFUSDT", "FETUSDT", "PEPEUSDT", "LTCUSDT",
-];
+// Shared top-tokens universe (spot equivalents of the original screener's
+// USDT-perpetual list, extended to 25).
+const { TOP_TOKENS: DEFAULT_TOKENS } = require("../config/market-symbols");
 
 function sma(values, length, endIndex) {
   let sum = 0;

@@ -14,6 +14,8 @@
 // meant for exactly this read-only use case.
 const BINANCE_KLINES_URL = "https://data-api.binance.vision/api/v3/klines";
 
+const { rsi } = require("./signal-screener");
+
 // Our preset intervals (shared with the AI Analysis page) use TradingView's
 // spelling; Binance's klines endpoint wants its own enum.
 const BINANCE_INTERVAL = {
@@ -25,6 +27,11 @@ const BINANCE_INTERVAL = {
   "1M": "1M",
 };
 
+// Every Binance-tradeable preset symbol is scanned across all of these, so
+// a setup forming on one timeframe isn't missed just because the preset's
+// display interval is another.
+const SCAN_INTERVALS = ["1h", "4h", "1D"];
+
 const DEFAULTS = {
   window: 36,
   impulseWindow: 20,
@@ -32,6 +39,14 @@ const DEFAULTS = {
   minR2: 0.35,
   impulseMin: 0.04,
   breakoutBuffer: 0.002,
+  rsiLen: 14,
+  // Ignore divergences whose second pivot is older than this many bars —
+  // a divergence that resolved 30 bars ago is history, not a setup.
+  divergenceMaxAge: 12,
+  // Minimum RSI-points and price-percent separation between the two pivots,
+  // so near-equal pivots don't read as divergence.
+  divergenceMinRsiDelta: 1.5,
+  divergenceMinPriceDeltaPct: 0.1,
 };
 
 function linearRegression(points) {
@@ -149,6 +164,61 @@ function avg(values) {
   return values.length ? values.reduce((sum, v) => sum + v, 0) / values.length : 0;
 }
 
+/**
+ * RSI divergence against price, using the same fractal pivots as the
+ * pattern detector. Compares the last two pivot lows (bullish variants) and
+ * the last two pivot highs (bearish variants):
+ *   price LL + RSI HL -> Regular Bullish   (reversal warning in a downtrend)
+ *   price HL + RSI LL -> Hidden Bullish    (continuation signal in an uptrend)
+ *   price HH + RSI LH -> Regular Bearish   (reversal warning in an uptrend)
+ *   price LH + RSI HH -> Hidden Bearish    (continuation signal in a downtrend)
+ * Returns the freshest qualifying divergence, or null.
+ */
+function detectDivergence(candles, opts) {
+  const closes = candles.map((c) => c.close);
+  const rsiSeries = rsi(closes, opts.rsiLen);
+  const { highs, lows } = findPivots(candles, opts.pivotOrder);
+  const lastIndex = candles.length - 1;
+  const candidates = [];
+
+  function compare(pivots, kind) {
+    if (pivots.length < 2) return;
+    const [i1, p1] = pivots[pivots.length - 2];
+    const [i2, p2] = pivots[pivots.length - 1];
+    const r1 = rsiSeries[i1];
+    const r2 = rsiSeries[i2];
+    if (r1 == null || r2 == null) return;
+    const barsAgo = lastIndex - i2;
+    if (barsAgo > opts.divergenceMaxAge) return;
+    const priceDeltaPct = ((p2 - p1) / p1) * 100;
+    const rsiDelta = r2 - r1;
+    if (Math.abs(priceDeltaPct) < opts.divergenceMinPriceDeltaPct) return;
+    if (Math.abs(rsiDelta) < opts.divergenceMinRsiDelta) return;
+
+    let type = null;
+    if (kind === "low" && priceDeltaPct < 0 && rsiDelta > 0) type = "Regular Bullish";
+    if (kind === "low" && priceDeltaPct > 0 && rsiDelta < 0) type = "Hidden Bullish";
+    if (kind === "high" && priceDeltaPct > 0 && rsiDelta < 0) type = "Regular Bearish";
+    if (kind === "high" && priceDeltaPct < 0 && rsiDelta > 0) type = "Hidden Bearish";
+    if (!type) return;
+
+    candidates.push({
+      type,
+      bias: type.endsWith("Bullish") ? "bullish" : "bearish",
+      indicator: "RSI",
+      priceDeltaPct: Number(priceDeltaPct.toFixed(2)),
+      rsiDelta: Number(rsiDelta.toFixed(1)),
+      barsAgo,
+    });
+  }
+
+  compare(lows, "low");
+  compare(highs, "high");
+  if (!candidates.length) return null;
+  candidates.sort((a, b) => a.barsAgo - b.barsAgo);
+  return candidates[0];
+}
+
 function build(pattern, bias, status, r2, widthRatio, impulseReturn, volumeRatio) {
   // Simple composite score, 0-100: fit quality, compression, impulse
   // strength, and a declining-volume-into-consolidation bonus all push it up.
@@ -168,14 +238,17 @@ function build(pattern, bias, status, r2, widthRatio, impulseReturn, volumeRatio
 }
 
 class PatternScannerService {
-  constructor({ cache, cacheMs, options } = {}) {
+  constructor({ cache, cacheMs, tokens, options } = {}) {
     this._cache = cache;
     this._cacheMs = cacheMs || 5 * 60 * 1000;
+    this._tokens = tokens || [];
     this._options = { ...DEFAULTS, ...(options || {}) };
   }
 
   async _fetchKlines(pair, binanceInterval) {
-    const limit = this._options.window + this._options.impulseWindow + this._options.pivotOrder * 2 + 5;
+    // The extra rsiLen covers RSI warm-up so divergence pivots near the start
+    // of the pattern window still have valid RSI values to compare.
+    const limit = this._options.window + this._options.impulseWindow + this._options.pivotOrder * 2 + this._options.rsiLen + 5;
     const url = `${BINANCE_KLINES_URL}?symbol=${encodeURIComponent(pair)}&interval=${encodeURIComponent(binanceInterval)}&limit=${limit}`;
     const res = await fetch(url);
     if (!res.ok) {
@@ -193,40 +266,44 @@ class PatternScannerService {
   }
 
   /**
-   * Scans one symbol/interval preset. `preset.symbol` is TradingView-style
-   * (e.g. "BINANCE:BTCUSDT"); only Binance-tradeable pairs are supported —
-   * dominance/macro presets (CRYPTOCAP:, TVC:, etc.) have no Binance data
-   * and are filtered out by the caller before this is reached.
+   * Scans one Binance spot pair (e.g. "BTCUSDT") on one interval for both a
+   * flag/wedge pattern and an RSI divergence.
    */
-  async scanPreset(preset, { force } = {}) {
-    const pair = preset.symbol.replace(/^BINANCE:/, "");
-    const binanceInterval = BINANCE_INTERVAL[preset.interval];
+  async scanToken(pair, interval, { force } = {}) {
+    const label = pair.replace(/USDT$/, "");
+    const binanceInterval = BINANCE_INTERVAL[interval];
     if (!binanceInterval) {
-      return { ...preset, pattern: null, error: `Unsupported interval "${preset.interval}"` };
+      return { symbol: pair, label, interval, pattern: null, divergence: null, error: `Unsupported interval "${interval}"` };
     }
     const key = `pattern-scan:${pair}:${binanceInterval}`;
     const load = async () => {
       const candles = await this._fetchKlines(pair, binanceInterval);
       const windowed = candles.slice(-this._options.window);
       const detection = classifyWindow(windowed, this._options);
-      return { detection, scannedAt: new Date().toISOString(), candleCount: candles.length };
+      const divergence = detectDivergence(candles, this._options);
+      return { detection, divergence, scannedAt: new Date().toISOString(), candleCount: candles.length };
     };
     try {
       const result = force ? await this._cache.set(key, await load(), this._cacheMs) : await this._cache.getOrLoad(key, this._cacheMs, load);
-      return { ...preset, pattern: result.detection, scannedAt: result.scannedAt };
+      return { symbol: pair, label, interval, pattern: result.detection, divergence: result.divergence, scannedAt: result.scannedAt };
     } catch (err) {
-      return { ...preset, pattern: null, error: err.message };
+      return { symbol: pair, label, interval, pattern: null, divergence: null, error: err.message };
     }
   }
 
-  binanceSupportedPresets(presets) {
-    return (presets || []).filter((p) => p.symbol.startsWith("BINANCE:") && BINANCE_INTERVAL[p.interval]);
+  get scanIntervals() {
+    return SCAN_INTERVALS;
   }
 
-  async scanAll(presets, { force } = {}) {
-    const scannable = this.binanceSupportedPresets(presets);
-    return Promise.all(scannable.map((preset) => this.scanPreset(preset, { force })));
+  async scanAll({ force } = {}) {
+    const jobs = [];
+    for (const pair of this._tokens) {
+      for (const interval of SCAN_INTERVALS) {
+        jobs.push(this.scanToken(pair, interval, { force }));
+      }
+    }
+    return Promise.all(jobs);
   }
 }
 
-module.exports = { PatternScannerService, classifyWindow, findPivots, linearRegression };
+module.exports = { PatternScannerService, classifyWindow, detectDivergence, findPivots, linearRegression, SCAN_INTERVALS };
