@@ -18,14 +18,13 @@ const NO_VOLUME_SYMBOL_PREFIXES = ["CRYPTOCAP:", "TVC:", "SP:", "CBOE:", "FX:", 
 // Selectable timeframes for the per-card dropdown, roughly low-to-high.
 const AVAILABLE_INTERVALS = ["15m", "1h", "4h", "1D", "1W", "1M"];
 
+const { DOMINANCE_PRESETS } = require("../config/market-symbols");
+
 const DEFAULT_PRESETS = [
   { symbol: "BINANCE:BTCUSDT", label: "BTCUSDT", interval: "4h" },
   { symbol: "BINANCE:ETHUSDT", label: "ETHUSDT", interval: "4h" },
   { symbol: "BINANCE:SOLUSDT", label: "SOLUSDT", interval: "4h" },
-  { symbol: "CRYPTOCAP:BTC.D", label: "BTC.D", interval: "4h" },
-  { symbol: "CRYPTOCAP:ETH.D", label: "ETH.D", interval: "4h" },
-  { symbol: "CRYPTOCAP:USDT.D", label: "USDT.D", interval: "4h" },
-  { symbol: "CRYPTOCAP:TOTAL", label: "TOTAL", interval: "4h" },
+  ...DOMINANCE_PRESETS,
   { symbol: "TVC:DXY", label: "DXY", interval: "4h" },
   { symbol: "SP:SPX", label: "S&P 500", interval: "4h" },
   { symbol: "OANDA:XAUUSD", label: "Gold", interval: "4h" },

@@ -17,7 +17,7 @@
     <div class="cmd-page-header">
       <div>
         <div class="cmd-page-title">&#128200; Pattern Scanner</div>
-        <div class="cmd-page-subtitle">Geometric flag &amp; wedge detection over Binance candles &mdash; a scanner, not a signal: confirm with breakout, volume, and higher-timeframe trend before acting</div>
+        <div class="cmd-page-subtitle">Flags, wedges &amp; RSI divergences over Binance candles (1h / 4h / 1D, top 25 tokens) &mdash; a scanner, not a signal: confirm with breakout, volume, and higher-timeframe trend before acting</div>
       </div>
       <div class="cmd-clock" id="cmd-clock"></div>
     </div>
@@ -63,8 +63,36 @@
       return 'ps-bias';
     }
 
+    function patternBlock(pattern) {
+      if (!pattern) return '';
+      return (
+        '<div class="ps-pattern-name">' + escapeHtml(pattern.pattern) + '</div>' +
+        '<div class="ps-status ps-status--' + escapeHtml(pattern.status) + '">' + (pattern.status === 'breakout' ? '&#9889; Breakout' : '&#8987; Forming') + '</div>' +
+        '<div class="ps-metrics">' +
+          '<div class="ps-metric"><span>Score</span><b>' + pattern.score + '</b></div>' +
+          '<div class="ps-metric"><span>Width ratio</span><b>' + pattern.widthRatio + '</b></div>' +
+          '<div class="ps-metric"><span>Impulse</span><b>' + pattern.impulseReturnPct + '%</b></div>' +
+          '<div class="ps-metric"><span>Vol ratio</span><b>' + pattern.volumeRatio + '</b></div>' +
+        '</div>'
+      );
+    }
+
+    function divergenceBlock(div) {
+      if (!div) return '';
+      return (
+        '<div class="ps-divergence">' +
+          '<div class="ps-pattern-name">' + escapeHtml(div.type) + ' Divergence</div>' +
+          '<div class="ps-metrics">' +
+            '<div class="ps-metric"><span>Indicator</span><b>' + escapeHtml(div.indicator) + '</b></div>' +
+            '<div class="ps-metric"><span>Price &Delta;</span><b>' + div.priceDeltaPct + '%</b></div>' +
+            '<div class="ps-metric"><span>RSI &Delta;</span><b>' + div.rsiDelta + '</b></div>' +
+            '<div class="ps-metric"><span>Bars ago</span><b>' + div.barsAgo + '</b></div>' +
+          '</div>' +
+        '</div>'
+      );
+    }
+
     function renderCard(entry) {
-      var pattern = entry.pattern;
       if (entry.error) {
         return (
           '<div class="ps-card ps-card--empty">' +
@@ -73,39 +101,31 @@
           '</div>'
         );
       }
-      if (!pattern) {
-        return (
-          '<div class="ps-card ps-card--empty">' +
-            '<div class="ps-card-symbol">' + escapeHtml(entry.label) + '<span class="ps-tf">' + escapeHtml(entry.interval) + '</span></div>' +
-            '<div class="ps-empty">No flag/wedge geometry detected right now.</div>' +
-          '</div>'
-        );
-      }
+      var bias = (entry.pattern && entry.pattern.bias) || (entry.divergence && entry.divergence.bias) || '';
       return (
         '<div class="ps-card">' +
           '<div class="ps-card-head">' +
             '<div class="ps-card-symbol">' + escapeHtml(entry.label) + '<span class="ps-tf">' + escapeHtml(entry.interval) + '</span></div>' +
-            '<span class="' + biasClass(pattern.bias) + '">' + escapeHtml(pattern.bias) + '</span>' +
+            '<span class="' + biasClass(bias) + '">' + escapeHtml(bias) + '</span>' +
           '</div>' +
-          '<div class="ps-pattern-name">' + escapeHtml(pattern.pattern) + '</div>' +
-          '<div class="ps-status ps-status--' + escapeHtml(pattern.status) + '">' + (pattern.status === 'breakout' ? '&#9889; Breakout' : '&#8987; Forming') + '</div>' +
-          '<div class="ps-metrics">' +
-            '<div class="ps-metric"><span>Score</span><b>' + pattern.score + '</b></div>' +
-            '<div class="ps-metric"><span>Width ratio</span><b>' + pattern.widthRatio + '</b></div>' +
-            '<div class="ps-metric"><span>Impulse</span><b>' + pattern.impulseReturnPct + '%</b></div>' +
-            '<div class="ps-metric"><span>Vol ratio</span><b>' + pattern.volumeRatio + '</b></div>' +
-          '</div>' +
+          patternBlock(entry.pattern) +
+          divergenceBlock(entry.divergence) +
         '</div>'
       );
     }
 
+    // 25 tokens x 3 timeframes is 75 combos — show only the hits (pattern or
+    // divergence) plus any failed scans, not 70 "nothing here" cards.
     function render(results) {
-      var withPattern = results.filter(function (r) { return r.pattern; });
-      var without = results.filter(function (r) { return !r.pattern; });
-      var ordered = withPattern.concat(without);
-      grid.innerHTML = ordered.length
-        ? ordered.map(renderCard).join('')
-        : '<div class="ps-empty">No Binance-tradeable symbols configured (dominance/macro presets like BTC.D or DXY have no Binance data).</div>';
+      var hits = results.filter(function (r) { return r.pattern || r.divergence; });
+      var errors = results.filter(function (r) { return r.error; });
+      hits.sort(function (a, b) {
+        var scoreA = (a.pattern && a.pattern.score) || 0;
+        var scoreB = (b.pattern && b.pattern.score) || 0;
+        return scoreB - scoreA;
+      });
+      var scannedNote = '<div class="ps-empty">Scanned ' + results.length + ' token/timeframe combos &mdash; ' + hits.length + ' with a pattern or divergence.</div>';
+      grid.innerHTML = scannedNote + hits.map(renderCard).join('') + errors.map(renderCard).join('');
     }
 
     function load(force) {

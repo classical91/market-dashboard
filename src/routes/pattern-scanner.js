@@ -1,6 +1,6 @@
 const { Router } = require("express");
 
-function createPatternScannerRouter({ patternScannerService, aiAnalysisService }) {
+function createPatternScannerRouter({ patternScannerService }) {
   const router = Router();
 
   // Read-only, unauthenticated: scans public market data only, no API spend
@@ -9,8 +9,8 @@ function createPatternScannerRouter({ patternScannerService, aiAnalysisService }
   router.get("/", async (req, res, next) => {
     try {
       const force = req.query.force === "true" || req.query.force === "1";
-      const results = await patternScannerService.scanAll(aiAnalysisService.presets, { force });
-      res.json({ results });
+      const results = await patternScannerService.scanAll({ force });
+      res.json({ intervals: patternScannerService.scanIntervals, results });
     } catch (err) {
       next(err);
     }

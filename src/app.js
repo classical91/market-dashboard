@@ -15,6 +15,7 @@ const { createYoutubeRouter } = require("./routes/youtube");
 const { createXFeedRouter } = require("./routes/x-feed");
 const { YOUTUBE_CHANNELS } = require("./config/youtube-channels");
 const { X_ACCOUNTS } = require("./config/x-accounts");
+const { TOP_TOKENS } = require("./config/market-symbols");
 const { AIAnalysisService } = require("./services/ai-analysis");
 const { LayoutAnalysisService } = require("./services/layout-analysis");
 const { LayoutCaptureService } = require("./services/layout-capture");
@@ -91,7 +92,7 @@ function createApp() {
     screenshotDir: layoutScreenshotsDir,
     screenshotUrlPrefix: "/layout-screenshots",
   });
-  const patternScannerService = new PatternScannerService({ cache });
+  const patternScannerService = new PatternScannerService({ cache, tokens: TOP_TOKENS });
   const signalScreenerService = new SignalScreenerService({ cache });
 
   const requireAdmin = createRequireAdmin({ adminKey: config.admin.apiKey });
@@ -133,7 +134,7 @@ function createApp() {
     "/api/layout-analysis",
     createLayoutAnalysisRouter({ layoutAnalysisService, telegramService, requireAdmin }),
   );
-  app.use("/api/pattern-scanner", createPatternScannerRouter({ patternScannerService, aiAnalysisService }));
+  app.use("/api/pattern-scanner", createPatternScannerRouter({ patternScannerService }));
   app.use("/api/signal-screener", createSignalScreenerRouter({ signalScreenerService }));
   app.use("/api/onchain", createOnchainRouter({ onchainService }));
   app.use("/api/overview", createOverviewRouter({ overviewService }));
