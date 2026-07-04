@@ -3,6 +3,7 @@ const path = require("path");
 
 const { config } = require("./config/env");
 const { createAIAnalysisRouter } = require("./routes/ai-analysis");
+const { createLayoutAnalysisRouter } = require("./routes/layout-analysis");
 const { createHealthRouter } = require("./routes/health");
 const { createOnchainRouter } = require("./routes/onchain");
 const { createOverviewRouter } = require("./routes/overview");
@@ -13,6 +14,8 @@ const { createXFeedRouter } = require("./routes/x-feed");
 const { YOUTUBE_CHANNELS } = require("./config/youtube-channels");
 const { X_ACCOUNTS } = require("./config/x-accounts");
 const { AIAnalysisService } = require("./services/ai-analysis");
+const { LayoutAnalysisService } = require("./services/layout-analysis");
+const { LayoutCaptureService } = require("./services/layout-capture");
 const { MemoryCache } = require("./services/cache");
 const { PersistentReporterCache } = require("./services/persistent-cache");
 const { CovalentService } = require("./services/covalent");
@@ -35,6 +38,7 @@ function createApp() {
   const reporterCache = new PersistentReporterCache(path.join(dataDir, "reporter-cache.json"));
   const xFeedCache = new PersistentReporterCache(path.join(dataDir, "x-feed-cache.json"));
   const aiAnalysisCache = new PersistentReporterCache(path.join(dataDir, "ai-analysis-cache.json"));
+  const layoutAnalysisCache = new PersistentReporterCache(path.join(dataDir, "layout-analysis-cache.json"));
   const defillamaService = new DefiLlamaService(config.defillama);
   const etherscanService = new EtherscanService(config.etherscan);
   const covalentService = new CovalentService(config.covalent);
@@ -71,6 +75,18 @@ function createApp() {
     model: config.aiAnalysis.model,
     presets: config.aiAnalysis.presets,
   });
+  const layoutScreenshotsDir = path.join(dataDir, "layout-screenshots");
+  const layoutCaptureService = new LayoutCaptureService({ timeoutMs: config.layoutAnalysis.timeoutMs });
+  const layoutAnalysisService = new LayoutAnalysisService({
+    cache: layoutAnalysisCache,
+    dataDir,
+    openaiApiKey: config.aiAnalysis.openaiApiKey,
+    model: config.aiAnalysis.model,
+    layouts: config.layoutAnalysis.layouts,
+    captureService: layoutCaptureService,
+    screenshotDir: layoutScreenshotsDir,
+    screenshotUrlPrefix: "/layout-screenshots",
+  });
 
   const requireAdmin = createRequireAdmin({ adminKey: config.admin.apiKey });
 
@@ -89,6 +105,7 @@ function createApp() {
       }
     },
   }));
+  app.use("/layout-screenshots", express.static(layoutScreenshotsDir));
 
   app.get(["/emerging-markets.html", "/economics-top-10.html", "/markets-top-10.html"], (req, res) => {
     res.setHeader("Cache-Control", "no-store");
@@ -106,6 +123,10 @@ function createApp() {
     }),
   );
   app.use("/api/ai-analysis", createAIAnalysisRouter({ aiAnalysisService, telegramService, requireAdmin }));
+  app.use(
+    "/api/layout-analysis",
+    createLayoutAnalysisRouter({ layoutAnalysisService, telegramService, requireAdmin }),
+  );
   app.use("/api/onchain", createOnchainRouter({ onchainService }));
   app.use("/api/overview", createOverviewRouter({ overviewService }));
   app.use("/api/daily-report", createReporterRouter({ reporterService, requireAdmin }));

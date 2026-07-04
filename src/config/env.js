@@ -94,6 +94,14 @@ const config = {
     cacheMs: parseNumber(process.env.AI_ANALYSIS_CACHE_MS, 30 * 60 * 1000),
     presets: parseJsonArray(process.env.AI_ANALYSIS_SYMBOLS),
   },
+  layoutAnalysis: {
+    // Free alternative to the chart-img presets above: screenshots your own
+    // saved/shared TradingView layouts (tradingview.com/x/<id>/) with a
+    // headless browser instead of a paid chart-rendering API. Configure as
+    // AI_ANALYSIS_LAYOUTS='[{"id":"btc-4h","label":"BTC 4h Setup","url":"https://www.tradingview.com/x/XXXXXXXX/"}]'
+    layouts: parseJsonArray(process.env.AI_ANALYSIS_LAYOUTS) || [],
+    timeoutMs: parseNumber(process.env.LAYOUT_CAPTURE_TIMEOUT_MS, 25000),
+  },
   telegram: {
     botToken: process.env.TELEGRAM_BOT_TOKEN || "",
     chatIds: parseList(process.env.TELEGRAM_CHAT_IDS),

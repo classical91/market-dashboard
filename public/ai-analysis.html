@@ -21,6 +21,14 @@
       <div class="cmd-clock" id="cmd-clock"></div>
     </div>
 
+    <div class="aia-mode-row">
+      <label class="aia-mode-label" for="aia-mode-select">View</label>
+      <select class="aia-select" id="aia-mode-select">
+        <option value="/ai-analysis.html" selected>Presets</option>
+        <option value="/layout-analysis.html">My Layouts</option>
+      </select>
+    </div>
+
     <div class="aia-notice" id="aia-notice" style="display:none"></div>
 
     <div class="aia-grid" id="aia-grid"></div>
@@ -48,6 +56,10 @@
       });
     }
     tick(); setInterval(tick, 1000);
+
+    document.getElementById('aia-mode-select').addEventListener('change', function (e) {
+      window.location.href = e.target.value;
+    });
 
     var grid = document.getElementById('aia-grid');
     var notice = document.getElementById('aia-notice');

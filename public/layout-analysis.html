@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Layouts · Market Command</title>
+  <script src="/assets/js/settings.js"></script>
+  <link rel="stylesheet" href="/assets/styles/command.css" />
+  <link rel="stylesheet" href="/assets/styles/ai-analysis.css" />
+</head>
+<body>
+<div class="app">
+  <aside class="cmd-sidebar"></aside>
+  <main class="cmd-main">
+
+    <div class="cmd-page-header">
+      <div>
+        <div class="cmd-page-title">&#129504; My Layouts</div>
+        <div class="cmd-page-subtitle">Your saved TradingView layout snapshot + OpenAI vision read &mdash; free, no chart-img subscription</div>
+      </div>
+      <div class="cmd-clock" id="cmd-clock"></div>
+    </div>
+
+    <div class="aia-mode-row">
+      <label class="aia-mode-label" for="aia-mode-select">View</label>
+      <select class="aia-select" id="aia-mode-select">
+        <option value="/ai-analysis.html">Presets</option>
+        <option value="/layout-analysis.html" selected>My Layouts</option>
+      </select>
+      <label class="aia-mode-label" for="aia-layout-select">Layout</label>
+      <select class="aia-select" id="aia-layout-select"></select>
+    </div>
+
+    <div class="aia-notice" id="aia-notice" style="display:none"></div>
+
+    <div class="aia-grid" id="aia-grid"></div>
+
+    <div class="aia-log-section">
+      <div class="aia-log-head">
+        <div class="aia-log-title">Generation Log</div>
+        <div class="aia-log-subtitle">When each layout was captured, grouped by day</div>
+      </div>
+      <div class="aia-log" id="aia-log"></div>
+    </div>
+
+    <footer>My Layouts &mdash; <a href="/ai-analysis.html">AI Analysis</a> &mdash; <a href="/">Overview</a></footer>
+
+  </main>
+</div>
+<script src="/assets/js/sidebar.js"></script>
+<script src="/assets/js/admin-key.js"></script>
+<script>
+  (function () {
+    function tick() {
+      var el = document.getElementById('cmd-clock');
+      if (el) el.textContent = new Date().toLocaleString(undefined, {
+        weekday: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit'
+      });
+    }
+    tick(); setInterval(tick, 1000);
+
+    document.getElementById('aia-mode-select').addEventListener('change', function (e) {
+      window.location.href = e.target.value;
+    });
+
+    var grid = document.getElementById('aia-grid');
+    var notice = document.getElementById('aia-notice');
+    var logRoot = document.getElementById('aia-log');
+    var layoutSelect = document.getElementById('aia-layout-select');
+    var MAX_ANALYSIS_WORDS = 150;
+    var layouts = [];
+    var activeId = null;
+    var activeData = null;
+
+    function escapeHtml(str) {
+      return String(str || '').replace(/[&<>"']/g, function (ch) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+      });
+    }
+
+    function truncateWords(text, maxWords) {
+      var source = String(text || '');
+      if (maxWords <= 0) return '';
+      var count = 0;
+      var end = 0;
+      var match;
+      var wordPattern = /\S+/g;
+      while ((match = wordPattern.exec(source))) {
+        count += 1;
+        if (count === maxWords) {
+          end = wordPattern.lastIndex;
+          break;
+        }
+      }
+      if (count < maxWords || !wordPattern.exec(source)) return source;
+      return source.slice(0, end).trimEnd();
+    }
+
+    function renderAnalysis(text) {
+      if (!text) return '<span class="aia-chart-empty">No analysis yet.</span>';
+      var escaped = escapeHtml(truncateWords(text, MAX_ANALYSIS_WORDS));
+      var bolded = escaped.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+      return bolded.split(/\n{2,}/).map(function (para) {
+        return '<p>' + para.replace(/\n/g, '<br>') + '</p>';
+      }).join('');
+    }
+
+    function verdictClass(verdict) {
+      if (verdict === 'BUY') return 'aia-verdict aia-verdict--buy';
+      if (verdict === 'SELL') return 'aia-verdict aia-verdict--sell';
+      if (verdict === 'HOLD') return 'aia-verdict aia-verdict--hold';
+      return 'aia-verdict';
+    }
+
+    function formatTime(iso) {
+      if (!iso) return '';
+      var d = new Date(iso);
+      if (isNaN(d.getTime())) return '';
+      return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+
+    function startOfDay(d) {
+      return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    }
+
+    function dayBucket(iso) {
+      var d = new Date(iso);
+      if (isNaN(d.getTime())) return { key: 'unknown', label: 'Unknown' };
+      var diffDays = Math.round((startOfDay(new Date()) - startOfDay(d)) / 86400000);
+      if (diffDays <= 0) return { key: 'today', label: 'Today' };
+      if (diffDays === 1) return { key: 'yesterday', label: 'Yesterday' };
+      return { key: 'day-' + startOfDay(d), label: d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) };
+    }
+
+    function hasResult(data) {
+      return Boolean(data && data.chartUrl && data.analysis);
+    }
+
+    function alreadySent(data) {
+      return Boolean(data && data.broadcastAt && data.generatedAt && data.broadcastAt >= data.generatedAt);
+    }
+
+    function renderPanel() {
+      var layout = layouts.find(function (l) { return l.id === activeId; }) || {};
+      var data = activeData || layout || {};
+      grid.innerHTML = (
+        '<div class="aia-card" id="aia-active-card">' +
+          '<div class="aia-card-head">' +
+            '<div class="aia-card-symbol">' + escapeHtml(layout.label || '') +
+              '<span class="aia-gen-badge" id="aia-gen-badge"></span>' +
+            '</div>' +
+            '<div class="aia-card-actions">' +
+              '<span class="aia-verdict" id="aia-verdict"></span>' +
+              '<button class="aia-run-btn" type="button" id="aia-run-btn">Capture &amp; Analyze</button>' +
+              '<button class="aia-broadcast-btn" type="button" id="aia-broadcast-btn" disabled>&#128226; Broadcast</button>' +
+            '</div>' +
+          '</div>' +
+          '<div class="aia-card-content">' +
+            '<div class="aia-chart" id="aia-chart"></div>' +
+            '<div class="aia-body">' +
+              '<div class="aia-analysis" id="aia-analysis"></div>' +
+              '<div class="aia-error" id="aia-error" style="display:none"></div>' +
+              '<div class="aia-broadcast-status" id="aia-broadcast-status" style="display:none"></div>' +
+            '</div>' +
+            '<div class="aia-meta" id="aia-meta"></div>' +
+          '</div>' +
+        '</div>'
+      );
+
+      var verdictEl = document.getElementById('aia-verdict');
+      verdictEl.className = verdictClass(data.verdict);
+      verdictEl.textContent = data.verdict || 'NO CALL';
+
+      var genEl = document.getElementById('aia-gen-badge');
+      if (data.generatedAt) {
+        var bucket = dayBucket(data.generatedAt);
+        genEl.className = 'aia-gen-badge' + (bucket.key === 'today' ? ' generated' : ' stale');
+        genEl.textContent = '✓ ' + (bucket.key === 'today' ? formatTime(data.generatedAt) : bucket.label);
+      } else {
+        genEl.className = 'aia-gen-badge';
+        genEl.textContent = 'not captured yet';
+      }
+
+      var chartEl = document.getElementById('aia-chart');
+      chartEl.innerHTML = data.chartUrl
+        ? '<img src="' + escapeHtml(data.chartUrl) + '" alt="' + escapeHtml(layout.label || '') + ' chart" loading="lazy" />'
+        : '<span class="aia-chart-empty">No chart yet &mdash; click Capture &amp; Analyze.</span>';
+
+      document.getElementById('aia-analysis').innerHTML = renderAnalysis(data.analysis);
+
+      var metaParts = [];
+      if (data.generatedAt) metaParts.push('Captured ' + formatTime(data.generatedAt));
+      if (alreadySent(data)) metaParts.push('Broadcast ' + formatTime(data.broadcastAt));
+      document.getElementById('aia-meta').textContent = metaParts.join(' · ');
+
+      var broadcastBtn = document.getElementById('aia-broadcast-btn');
+      var sent = alreadySent(data);
+      broadcastBtn.disabled = !hasResult(data) || sent;
+      broadcastBtn.innerHTML = sent ? '&#9989; Sent' : '&#128226; Broadcast';
+
+      var errorEl = document.getElementById('aia-error');
+      if (data.error) {
+        errorEl.style.display = 'block';
+        errorEl.textContent = (data.rateLimited ? '⏳ ' : '') + data.error;
+      } else {
+        errorEl.style.display = 'none';
+        errorEl.textContent = '';
+      }
+
+      wirePanel();
+    }
+
+    function wirePanel() {
+      var runBtn = document.getElementById('aia-run-btn');
+      runBtn.addEventListener('click', function () {
+        runBtn.disabled = true;
+        runBtn.textContent = 'Capturing…';
+        AdminKey.fetch('/api/layout-analysis/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: activeId })
+        })
+          .then(function (res) { return res.json(); })
+          .then(function (data) {
+            if (data.configured === false) {
+              activeData = { error: data.reason || 'My Layouts is not configured.' };
+              renderPanel();
+              return;
+            }
+            activeData = data;
+            renderPanel();
+            loadLog();
+          })
+          .catch(function (err) {
+            activeData = Object.assign({}, activeData, { error: 'Request failed: ' + err.message });
+            renderPanel();
+          })
+          .finally(function () {
+            var btn = document.getElementById('aia-run-btn');
+            if (btn) { btn.disabled = false; btn.textContent = 'Capture & Analyze'; }
+          });
+      });
+
+      var broadcastBtn = document.getElementById('aia-broadcast-btn');
+      broadcastBtn.addEventListener('click', function () {
+        var statusEl = document.getElementById('aia-broadcast-status');
+        var errorEl = document.getElementById('aia-error');
+        broadcastBtn.disabled = true;
+        broadcastBtn.textContent = 'Sending…';
+        statusEl.style.display = 'none';
+        statusEl.textContent = '';
+        AdminKey.fetch('/api/layout-analysis/broadcast', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: activeId })
+        })
+          .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+          .then(function (result) {
+            if (result.ok && result.data.ok) {
+              activeData.broadcastAt = result.data.broadcastAt || new Date().toISOString();
+              var groupCount = result.data.channelCount;
+              statusEl.style.display = 'block';
+              statusEl.textContent = '✅ Sent to Telegram (' + groupCount + ' group' + (groupCount === 1 ? '' : 's') + ')';
+            } else if (result.data.alreadyBroadcast) {
+              activeData.broadcastAt = result.data.broadcastAt;
+              statusEl.style.display = 'block';
+              statusEl.textContent = 'Already sent ' + formatTime(activeData.broadcastAt) + ' — capture again to broadcast again.';
+            } else {
+              errorEl.style.display = 'block';
+              errorEl.textContent = result.data.error || 'Broadcast failed.';
+            }
+            renderPanel();
+          })
+          .catch(function (err) {
+            errorEl.style.display = 'block';
+            errorEl.textContent = 'Broadcast request failed: ' + err.message;
+            renderPanel();
+          });
+      });
+    }
+
+    function setActive(id) {
+      activeId = id;
+      activeData = layouts.find(function (l) { return l.id === id; }) || null;
+      layoutSelect.value = id;
+      renderPanel();
+    }
+
+    layoutSelect.addEventListener('change', function (e) {
+      setActive(e.target.value);
+    });
+
+    function renderLogEntry(entry) {
+      var bucket = dayBucket(entry.generatedAt);
+      var isToday = bucket.key === 'today';
+      return (
+        '<div class="aia-log-item' + (isToday ? ' aia-log-item--today' : '') + '">' +
+          '<span class="' + verdictClass(entry.verdict) + ' aia-log-verdict">' + escapeHtml(entry.verdict || 'NO CALL') + '</span>' +
+          '<span class="aia-log-symbol">' + escapeHtml(entry.label || entry.layoutId) + '</span>' +
+          '<span class="aia-log-time">' + (isToday ? formatTime(entry.generatedAt) : bucket.label) + '</span>' +
+        '</div>'
+      );
+    }
+
+    function renderLog(entries) {
+      if (!entries.length) {
+        logRoot.innerHTML = '<div class="aia-chart-empty">No captures yet — pick a layout above and click Capture &amp; Analyze.</div>';
+        return;
+      }
+      var order = [];
+      var groups = {};
+      entries.forEach(function (entry) {
+        var bucket = dayBucket(entry.generatedAt);
+        if (!groups[bucket.key]) {
+          groups[bucket.key] = { label: bucket.label, items: [] };
+          order.push(bucket.key);
+        }
+        groups[bucket.key].items.push(entry);
+      });
+      logRoot.innerHTML = order.map(function (key) {
+        var group = groups[key];
+        return (
+          '<div class="aia-log-group">' +
+            '<div class="aia-log-group-title' + (key === 'today' ? ' aia-log-group-title--today' : '') + '">' + escapeHtml(group.label) + '</div>' +
+            group.items.map(renderLogEntry).join('') +
+          '</div>'
+        );
+      }).join('');
+    }
+
+    function loadLog() {
+      fetch('/api/layout-analysis/log')
+        .then(function (res) { return res.json(); })
+        .then(function (data) { renderLog(data.entries || []); })
+        .catch(function () { logRoot.innerHTML = '<div class="aia-chart-empty">Failed to load the generation log.</div>'; });
+    }
+
+    fetch('/api/layout-analysis')
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        layouts = data.layouts || [];
+        if (!data.configured || !layouts.length) {
+          notice.style.display = 'block';
+          notice.innerHTML = '&#9888;&#65039; My Layouts is not configured. Set <code>OPENAI_API_KEY</code> and <code>AI_ANALYSIS_LAYOUTS</code> (a JSON list of your saved TradingView shared-layout links) to enable it.';
+        }
+        layoutSelect.innerHTML = layouts.map(function (l) {
+          return '<option value="' + escapeHtml(l.id) + '">' + escapeHtml(l.label) + '</option>';
+        }).join('');
+        if (layouts.length) setActive(layouts[0].id);
+        else renderPanel();
+      })
+      .catch(function (err) {
+        grid.innerHTML = '<div class="aia-notice" style="display:block">Failed to load My Layouts: ' + err.message + '</div>';
+      });
+
+    loadLog();
+  })();
+</script>
+</body>
+</html>
