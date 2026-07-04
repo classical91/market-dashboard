@@ -9,7 +9,7 @@
     "lint": "node scripts/lint.js",
     "build": "node scripts/build-check.js",
     "test": "node --test",
-    "postinstall": "playwright install --with-deps chromium || true"
+    "postinstall": "playwright install chromium || true"
   },
   "dependencies": {
     "dotenv": "^16.6.1",
