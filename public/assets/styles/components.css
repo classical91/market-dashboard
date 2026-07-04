@@ -31,7 +31,6 @@
 .tf,
 .nav-item,
 .cmd-nav-item,
-.search,
 .glossary-search,
 .cmd-search {
   outline: none;
@@ -42,7 +41,6 @@
 .tf:focus-visible,
 .nav-item:focus-visible,
 .cmd-nav-item:focus-visible,
-.search:focus-visible,
 .glossary-search:focus-visible,
 .cmd-search:focus-visible {
   box-shadow: var(--ui-focus);
