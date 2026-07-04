@@ -1,5 +1,6 @@
-// Free alternative to chart-img.com: screenshots a public TradingView shared
-// layout URL (tradingview.com/x/<id>/) directly with a headless browser
+// Free alternative to chart-img.com: screenshots a public TradingView chart
+// URL — a live layout (tradingview.com/chart/<id>/?symbol=...) or a static
+// snapshot (tradingview.com/x/<id>/) — directly with a headless browser
 // instead of paying a third-party rendering API. More fragile than a
 // purpose-built image API — TradingView can change its markup at any time —
 // but avoids a paid subscription for personal/low-volume use.
@@ -17,7 +18,7 @@ const CHART_SELECTORS = [".layout__area--center", ".chart-container"];
 class LayoutCaptureService {
   constructor({ timeoutMs, settleMs } = {}) {
     this._timeoutMs = timeoutMs || 25000;
-    this._settleMs = settleMs || 2500;
+    this._settleMs = settleMs || 4000;
     this._browserPromise = null;
   }
 
@@ -63,10 +64,13 @@ class LayoutCaptureService {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
     const page = await context.newPage();
     try {
-      await page.goto(layoutUrl, { waitUntil: "networkidle", timeout: this._timeoutMs });
+      // A live chart page never reaches "networkidle" — TradingView keeps
+      // websocket/quote traffic streaming forever — so waiting for it is a
+      // guaranteed timeout. Wait for the DOM plus a rendered chart canvas
+      // instead, then give indicators a fixed beat to finish painting.
+      await page.goto(layoutUrl, { waitUntil: "domcontentloaded", timeout: this._timeoutMs });
+      await page.waitForSelector("canvas", { timeout: this._timeoutMs }).catch(() => {});
       await this._dismissOverlays(page);
-      // Chart drawing (indicators, studies) can finish slightly after the
-      // network goes idle, so give it a moment before capturing.
       await page.waitForTimeout(this._settleMs);
 
       let target = page;
