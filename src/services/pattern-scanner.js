@@ -8,7 +8,11 @@
 // for a human (or a further confirmation layer — breakout candle, volume,
 // higher-timeframe trend, invalidation level) to evaluate, not something to
 // trade on directly.
-const BINANCE_KLINES_URL = "https://api.binance.com/api/v3/klines";
+// api.binance.com geo-blocks several regions (HTTP 451) on its trading API,
+// including US-hosted servers. data-api.binance.vision is Binance's own
+// public-data-only mirror — no auth, market data only, not geo-restricted —
+// meant for exactly this read-only use case.
+const BINANCE_KLINES_URL = "https://data-api.binance.vision/api/v3/klines";
 
 // Our preset intervals (shared with the AI Analysis page) use TradingView's
 // spelling; Binance's klines endpoint wants its own enum.
