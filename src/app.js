@@ -75,7 +75,6 @@ function createApp() {
     cache: reporterCache,
     apiKey: config.reporter.apiKey,
     model: config.reporter.model,
-    telegramService,
     dataDir,
   });
   const marketDataService = new MarketDataService();

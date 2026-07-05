@@ -216,12 +216,11 @@ function promptCacheKey(prompt) {
 }
 
 class ReporterService {
-  constructor({ cache, apiKey, model, telegramService, dataDir }) {
+  constructor({ cache, apiKey, model, dataDir }) {
     this._cache = cache;
     this._apiKey = apiKey;
     this._client = apiKey ? new OpenAI({ apiKey }) : null;
     this._model = model || "gpt-5.4-mini";
-    this._telegram = telegramService || null;
     this._logFile = path.join(dataDir || resolveDataDir(), "reporter-generation-log.json");
     this._rateLimitedUntil = new Map();
   }
@@ -445,12 +444,6 @@ class ReporterService {
         prompt: generatedEntry ? generatedEntry.prompt : null,
       });
       report.generationLog = this._readLog();
-    }
-
-    if (created && this._telegram && report.crypto && report.economics && report.markets) {
-      this._telegram.postReport(report).catch((err) => {
-        console.error("[Telegram] Failed to post report:", err.message);
-      });
     }
 
     return report;
