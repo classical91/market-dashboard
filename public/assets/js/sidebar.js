@@ -43,12 +43,6 @@
       ],
     },
     {
-      href: "https://commentfarm-production-fc8b.up.railway.app/queue",
-      icon: "&#128444;",
-      label: "Open ImageQueue",
-    },
-    { href: "/terminal-suite.html", icon: "&#128421;", label: "Terminal Suite" },
-    {
       label: "Reporter",
       icon: "&#128240;",
       children: [
@@ -176,6 +170,13 @@
       featured: "worldmonitor",
     },
     { href: "https://www.tradingview.com/", icon: "&#128200;", label: "Open TradingView.com", featured: "tradingview" },
+    {
+      href: "https://commentfarm-production-fc8b.up.railway.app/queue",
+      icon: "&#128444;",
+      label: "Open ImageQueue",
+      featured: "imagequeue",
+    },
+    { href: "/terminal-suite.html", icon: "&#128421;", label: "Terminal Suite" },
     {
       href: "https://trading-strategy-production-1b41.up.railway.app/",
       icon: "&#129504;",
