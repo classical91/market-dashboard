@@ -118,6 +118,17 @@
   flex-wrap: wrap;
 }
 
+.aia-ticker-link {
+  color: inherit;
+  text-decoration: none;
+}
+.aia-ticker-link:hover { color: var(--blue); }
+.aia-ticker-arrow {
+  font-size: 10px;
+  color: var(--muted);
+}
+.aia-ticker-link:hover .aia-ticker-arrow { color: var(--blue); }
+
 .aia-tf-menu {
   position: relative;
   display: inline-flex;

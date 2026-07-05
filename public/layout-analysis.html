@@ -143,10 +143,14 @@
     function renderPanel() {
       var layout = layouts.find(function (l) { return l.id === activeId; }) || {};
       var data = activeData || layout || {};
+      var tickerLink = layout.url
+        ? '<a class="aia-ticker-link" href="' + escapeHtml(layout.url) + '" target="_blank" rel="noopener" title="Open on TradingView">' +
+          escapeHtml(layout.label || '') + ' <span class="aia-ticker-arrow">&#8599;</span></a>'
+        : escapeHtml(layout.label || '');
       grid.innerHTML = (
         '<div class="aia-card" id="aia-active-card">' +
           '<div class="aia-card-head">' +
-            '<div class="aia-card-symbol">' + escapeHtml(layout.label || '') +
+            '<div class="aia-card-symbol">' + tickerLink +
               '<span class="aia-gen-badge" id="aia-gen-badge"></span>' +
             '</div>' +
             '<div class="aia-card-actions">' +
