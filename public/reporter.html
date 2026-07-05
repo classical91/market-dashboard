@@ -271,6 +271,56 @@
       content: "–"; position: absolute; left: 0; color: var(--muted);
     }
     .story strong { color: var(--text); }
+
+    /* Crypto-themed background, added only to the Emerging Markets page
+       (see configurePageShell) — the Economics/Markets pages share this
+       same template and stay on the plain default background. */
+    body.crypto-bg {
+      background:
+        radial-gradient(circle at 12% 18%, rgba(247,147,26,0.16), transparent 30%),
+        radial-gradient(circle at 85% 12%, rgba(98,126,234,0.14), transparent 32%),
+        radial-gradient(circle at 20% 85%, rgba(0,227,150,0.12), transparent 34%),
+        radial-gradient(circle at 90% 80%, rgba(155,123,255,0.13), transparent 32%),
+        linear-gradient(135deg, #050711, #08101e 45%, #050711);
+      background-size: 140% 140%, 140% 140%, 140% 140%, 140% 140%, 100% 100%;
+      animation: crypto-bg-drift 26s ease-in-out infinite;
+    }
+    @keyframes crypto-bg-drift {
+      0%   { background-position: 0% 0%, 100% 0%, 0% 100%, 100% 100%, 0 0; }
+      50%  { background-position: 10% 8%, 90% 10%, 8% 92%, 92% 88%, 0 0; }
+      100% { background-position: 0% 0%, 100% 0%, 0% 100%, 100% 100%, 0 0; }
+    }
+
+    .crypto-bg-decor {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .crypto-bg-decor span {
+      position: absolute;
+      font-size: 64px;
+      opacity: 0.05;
+      filter: blur(0.3px);
+      animation: crypto-float 18s ease-in-out infinite;
+    }
+    .crypto-bg-decor span:nth-child(1) { top: 8%;  left: 6%;  font-size: 88px; animation-duration: 22s; }
+    .crypto-bg-decor span:nth-child(2) { top: 62%; left: 4%;  font-size: 60px; animation-duration: 19s; animation-delay: -4s; }
+    .crypto-bg-decor span:nth-child(3) { top: 20%; left: 88%; font-size: 70px; animation-duration: 24s; animation-delay: -9s; }
+    .crypto-bg-decor span:nth-child(4) { top: 78%; left: 85%; font-size: 56px; animation-duration: 20s; animation-delay: -2s; }
+    .crypto-bg-decor span:nth-child(5) { top: 45%; left: 46%; font-size: 48px; animation-duration: 26s; animation-delay: -13s; }
+    @keyframes crypto-float {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      50%      { transform: translateY(-22px) rotate(6deg); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      body.crypto-bg { animation: none; }
+      .crypto-bg-decor span { animation: none; }
+    }
+
+    /* App content sits above the fixed decor layer. */
+    .app { position: relative; z-index: 1; }
   </style>
 </head>
 <body>
@@ -465,6 +515,12 @@
         links.innerHTML =
           '<a href="https://coinmarketcap.com/trending-cryptocurrencies/" target="_blank" rel="noopener">CoinMarketCap Trending ↗</a>' +
           '<a href="https://cryptobubbles.net/en" target="_blank" rel="noopener">CryptoBubbles ↗</a>';
+        document.body.classList.add('crypto-bg');
+        var decor = document.createElement('div');
+        decor.className = 'crypto-bg-decor';
+        decor.setAttribute('aria-hidden', 'true');
+        decor.innerHTML = '<span>&#8383;</span><span>&#926;</span><span>&#127765;</span><span>&#128640;</span><span>&#128142;</span>';
+        document.body.appendChild(decor);
       } else {
         links.style.display = 'none';
         links.innerHTML = '';
