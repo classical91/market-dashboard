@@ -139,11 +139,19 @@
 
     var TV_INTERVALS = { '1h': '60', '4h': '240', '1D': 'D' };
 
+    // A plain (non-link) label plus an always-visible, clearly-a-button chart
+    // link — a hover-tinted arrow next to plain text doesn't read as
+    // tappable on mobile, where there's no hover state at all.
     function tickerLink(symbol) {
       var url = 'https://www.tradingview.com/chart/?symbol=' + encodeURIComponent('BINANCE:' + symbol) +
         '&interval=' + encodeURIComponent(TV_INTERVALS[intervalSelect.value] || '240');
-      return '<a class="ss-ticker-link" href="' + url + '" target="_blank" rel="noopener" title="Open ' +
-        escapeHtml(symbol) + ' ' + escapeHtml(intervalSelect.value) + ' on TradingView">' + escapeHtml(symbol) + ' <span class="ss-ticker-arrow">&#8599;</span></a>';
+      return (
+        '<span class="ss-ticker-cell">' +
+          '<span class="ss-ticker-label">' + escapeHtml(symbol) + '</span>' +
+          '<a class="ss-chart-link" href="' + url + '" target="_blank" rel="noopener" title="Open ' +
+          escapeHtml(symbol) + ' ' + escapeHtml(intervalSelect.value) + ' on TradingView">&#128200; Chart</a>' +
+        '</span>'
+      );
     }
 
     function renderRow(entry) {

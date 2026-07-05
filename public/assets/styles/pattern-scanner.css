@@ -155,16 +155,26 @@
   grid-column: 1 / -1;
 }
 
-.ps-ticker-link {
+.ps-ticker-label {
   color: inherit;
-  text-decoration: none;
 }
-.ps-ticker-link:hover { color: var(--blue); }
-.ps-ticker-arrow {
+
+.ps-chart-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   font-size: 10px;
-  color: var(--muted);
+  font-weight: 600;
+  color: var(--blue);
+  background: var(--blue-bg);
+  border: 1px solid rgba(77,163,255,0.35);
+  border-radius: 6px;
+  padding: 3px 7px;
+  text-decoration: none;
+  white-space: nowrap;
 }
-.ps-ticker-link:hover .ps-ticker-arrow { color: var(--blue); }
+.ps-chart-link:hover,
+.ps-chart-link:active { background: rgba(77,163,255,0.28); border-color: var(--blue); }
 
 .ps-chart {
   display: block;

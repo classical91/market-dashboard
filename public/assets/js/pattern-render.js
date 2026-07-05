@@ -25,9 +25,15 @@
       "&interval=" + encodeURIComponent(TV_INTERVALS[interval] || "240");
   }
 
+  // A plain (non-link) label plus an always-visible, clearly-a-button chart
+  // link — a hover-tinted arrow next to plain text doesn't read as tappable
+  // on mobile, where there's no hover state at all.
   function tickerLink(entry) {
-    return '<a class="ps-ticker-link" data-role="ticker-link" href="' + tvChartUrl(entry.symbol, entry.interval) + '" target="_blank" rel="noopener" title="Open ' +
-      escapeHtml(entry.symbol) + " " + escapeHtml(entry.interval) + ' on TradingView">' + escapeHtml(entry.label) + ' <span class="ps-ticker-arrow">&#8599;</span></a>';
+    return (
+      '<span class="ps-ticker-label">' + escapeHtml(entry.label) + "</span>" +
+      '<a class="ps-chart-link" data-role="ticker-link" href="' + tvChartUrl(entry.symbol, entry.interval) + '" target="_blank" rel="noopener" title="Open ' +
+      escapeHtml(entry.symbol) + " " + escapeHtml(entry.interval) + ' on TradingView">&#128200; Chart</a>'
+    );
   }
 
   function patternBlock(pattern) {
