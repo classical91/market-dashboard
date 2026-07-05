@@ -173,9 +173,15 @@
         '&interval=' + encodeURIComponent(TV_INTERVALS[interval] || 'D');
     }
 
+    // A plain (non-link) label plus an always-visible, clearly-a-button chart
+    // link — a hover-tinted arrow next to plain text doesn't read as
+    // tappable on mobile, where there's no hover state at all.
     function tickerLink(preset) {
-      return '<a class="aia-ticker-link" data-role="ticker-link" href="' + tvChartUrl(preset.symbol, preset.interval) +
-        '" target="_blank" rel="noopener" title="Open on TradingView">' + escapeHtml(preset.label) + ' <span class="aia-ticker-arrow">&#8599;</span></a>';
+      return (
+        '<span class="aia-ticker-label">' + escapeHtml(preset.label) + '</span>' +
+        '<a class="aia-chart-link" data-role="ticker-link" href="' + tvChartUrl(preset.symbol, preset.interval) +
+        '" target="_blank" rel="noopener" title="Open on TradingView">&#128200; Chart</a>'
+      );
     }
 
     function renderCard(preset) {
