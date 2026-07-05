@@ -212,6 +212,24 @@ class TelegramService {
   }
 
   /**
+   * One batched message per Pattern Scanner cycle listing new breakouts and
+   * fresh divergences, e.g. "⚡ BTCUSDT · 4h: Falling Wedge → Breakout (62)"
+   * or "🔀 ETHUSDT · 1D: Regular Bullish Divergence (RSI)".
+   */
+  async postPatternAlerts(events) {
+    if (!this.configured || !events.length) return;
+    const rows = events.map((e) => {
+      const biasEmoji = e.bias === "bullish" ? "🟢" : "🔴";
+      if (e.kind === "breakout") {
+        return `${biasEmoji} <b>${escapeHtml(e.symbol)}</b> · ${escapeHtml(e.interval)}: ${escapeHtml(e.name)} → <b>Breakout</b> (${e.score})`;
+      }
+      return `${biasEmoji} <b>${escapeHtml(e.symbol)}</b> · ${escapeHtml(e.interval)}: <b>${escapeHtml(e.name)}</b> Divergence`;
+    });
+    const header = "📈 <b>PATTERN SCANNER</b>\n\n";
+    await this._sendToAll(truncate(header + rows.join("\n"), MAX_MSG_LEN));
+  }
+
+  /**
    * Read-only health report: verifies the token against getMe and each
    * configured chat against getChat, so a misconfigured deploy can be
    * debugged from /api/telegram/diagnose without reading server logs.

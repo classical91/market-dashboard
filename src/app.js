@@ -1,12 +1,24 @@
 const express = require("express");
 const path = require("path");
 
+// Binance's public-data mirror (see pattern-scanner.js for why this domain,
+// not api.binance.com) has a lightweight ticker endpoint just for the
+// current price — cheaper than pulling klines when all the tracker needs is
+// "what's it worth now" to resolve a pending pattern/divergence entry.
+async function fetchBinancePrice(symbol) {
+  const res = await fetch(`https://data-api.binance.vision/api/v3/ticker/price?symbol=${encodeURIComponent(symbol)}`);
+  if (!res.ok) throw new Error(`Binance ticker HTTP ${res.status} for ${symbol}`);
+  const data = await res.json();
+  return Number(data.price);
+}
+
 const { config } = require("./config/env");
 const { createAIAnalysisRouter } = require("./routes/ai-analysis");
 const { createLayoutAnalysisRouter } = require("./routes/layout-analysis");
 const { createPatternScannerRouter } = require("./routes/pattern-scanner");
 const { createSignalScreenerRouter } = require("./routes/signal-screener");
 const { createWatchlistRouter } = require("./routes/watchlist");
+const { createPatternTrackerRouter } = require("./routes/pattern-tracker");
 const { createHealthRouter } = require("./routes/health");
 const { createOnchainRouter } = require("./routes/onchain");
 const { createOverviewRouter } = require("./routes/overview");
@@ -24,6 +36,7 @@ const { PatternScannerService } = require("./services/pattern-scanner");
 const { SignalScreenerService } = require("./services/signal-screener");
 const { SignalBotService } = require("./services/signal-bot");
 const { WatchlistService } = require("./services/watchlist");
+const { PatternTrackerService } = require("./services/pattern-tracker");
 const { MemoryCache } = require("./services/cache");
 const { PersistentReporterCache } = require("./services/persistent-cache");
 const { CovalentService } = require("./services/covalent");
@@ -98,8 +111,11 @@ function createApp() {
   const patternScannerService = new PatternScannerService({ cache, tokens: TOP_TOKENS });
   const signalScreenerService = new SignalScreenerService({ cache });
   const watchlistService = new WatchlistService({ dataDir });
+  const patternTrackerService = new PatternTrackerService({ dataDir, fetchPrice: fetchBinancePrice });
   const signalBotService = new SignalBotService({
     signalScreenerService,
+    patternScannerService,
+    patternTrackerService,
     telegramService,
     stateCache: new PersistentReporterCache(path.join(dataDir, "signal-bot-state.json")),
     intervalMs: config.signalBot.intervalMs,
@@ -149,6 +165,7 @@ function createApp() {
   app.use("/api/pattern-scanner", createPatternScannerRouter({ patternScannerService }));
   app.use("/api/signal-screener", createSignalScreenerRouter({ signalScreenerService }));
   app.use("/api/watchlist", createWatchlistRouter({ watchlistService, requireAdmin }));
+  app.use("/api/pattern-tracker", createPatternTrackerRouter({ patternTrackerService }));
   app.use("/api/onchain", createOnchainRouter({ onchainService }));
   app.use("/api/overview", createOverviewRouter({ overviewService }));
   app.use("/api/daily-report", createReporterRouter({ reporterService, requireAdmin }));
