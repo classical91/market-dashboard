@@ -38,6 +38,7 @@
         { href: "/layout-analysis.html", icon: "&#128248;", label: "My Layouts" },
         { href: "/pattern-scanner.html", icon: "&#128200;", label: "Pattern Scanner" },
         { href: "/pattern-scanner-trades.html", icon: "&#9733;", label: "My Trades" },
+        { href: "/pattern-scanner-stats.html", icon: "&#128202;", label: "Track Record" },
         { href: "/signal-screener.html", icon: "&#9889;", label: "Signal Screener" },
       ],
     },

@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Track Record · Market Command</title>
+  <script src="/assets/js/settings.js"></script>
+  <link rel="stylesheet" href="/assets/styles/command.css" />
+  <link rel="stylesheet" href="/assets/styles/ai-analysis.css" />
+  <link rel="stylesheet" href="/assets/styles/signal-screener.css" />
+  <link rel="stylesheet" href="/assets/styles/pattern-scanner.css" />
+</head>
+<body>
+<div class="app">
+  <aside class="cmd-sidebar"></aside>
+  <main class="cmd-main">
+
+    <div class="cmd-page-header">
+      <div>
+        <div class="cmd-page-title">&#128202; Track Record</div>
+        <div class="cmd-page-subtitle">Real accuracy of every Pattern Scanner breakout and divergence, checked against what price actually did afterward &mdash; not trusting the heuristics blind</div>
+      </div>
+      <div class="cmd-clock" id="cmd-clock"></div>
+    </div>
+
+    <div class="aia-notice" id="ts-notice" style="display:none"></div>
+
+    <div class="ss-summary-strip" id="ts-overall"></div>
+
+    <div class="ts-section-title">By pattern / divergence type</div>
+    <div class="ss-table-wrap">
+      <table class="ss-table">
+        <thead><tr><th>Name</th><th>Hits</th><th>Misses</th><th>Flat</th><th>Hit rate</th><th>Total</th></tr></thead>
+        <tbody id="ts-by-pattern"></tbody>
+      </table>
+    </div>
+
+    <div class="ts-section-title">Recent</div>
+    <div class="ss-table-wrap">
+      <table class="ss-table">
+        <thead><tr><th>Token</th><th>Type</th><th>Bias</th><th>Detected</th><th>Status</th><th>Return</th></tr></thead>
+        <tbody id="ts-recent"></tbody>
+      </table>
+    </div>
+
+    <footer>Track Record &mdash; <a href="/pattern-scanner.html">Pattern Scanner</a> &mdash; <a href="/pattern-scanner-trades.html">My Trades</a> &mdash; <a href="/">Overview</a></footer>
+
+  </main>
+</div>
+<script src="/assets/js/sidebar.js"></script>
+<script>
+  (function () {
+    function tick() {
+      var el = document.getElementById('cmd-clock');
+      if (el) el.textContent = new Date().toLocaleString(undefined, {
+        weekday: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit'
+      });
+    }
+    tick(); setInterval(tick, 1000);
+
+    function escapeHtml(str) {
+      return String(str || '').replace(/[&<>"']/g, function (ch) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+      });
+    }
+
+    function formatDate(iso) {
+      if (!iso) return '—';
+      var d = new Date(iso);
+      if (isNaN(d.getTime())) return '—';
+      return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+
+    var notice = document.getElementById('ts-notice');
+    var overallEl = document.getElementById('ts-overall');
+    var byPatternBody = document.getElementById('ts-by-pattern');
+    var recentBody = document.getElementById('ts-recent');
+
+    function renderOverall(overall, pending) {
+      var rateText = overall.hitRate == null ? 'n/a (no resolved decisive calls yet)' : overall.hitRate + '%';
+      overallEl.innerHTML = (
+        '<span>' + overall.total + ' resolved</span>' +
+        '<span>&#9989; ' + overall.hits + '&nbsp;&nbsp;&#10060; ' + overall.misses + '&nbsp;&nbsp;&#9679; ' + overall.flats + ' flat</span>' +
+        '<span>Hit rate: <b>' + rateText + '</b></span>' +
+        '<span>' + pending + ' pending</span>'
+      );
+    }
+
+    function renderByPattern(byPattern) {
+      var names = Object.keys(byPattern).sort(function (a, b) { return byPattern[b].total - byPattern[a].total; });
+      if (!names.length) {
+        byPatternBody.innerHTML = '<tr><td colspan="6" class="ss-empty-row">No resolved entries yet &mdash; check back after a few breakouts/divergences have had time to play out.</td></tr>';
+        return;
+      }
+      byPatternBody.innerHTML = names.map(function (name) {
+        var s = byPattern[name];
+        var rateText = s.hitRate == null ? '—' : s.hitRate + '%';
+        return (
+          '<tr><td>' + escapeHtml(name) + '</td><td>' + s.hits + '</td><td>' + s.misses + '</td><td>' + s.flats + '</td>' +
+          '<td><span class="ss-badge ' + (s.hitRate >= 55 ? 'ss-score--high' : s.hitRate >= 45 ? 'ss-score--neutral' : 'ss-score--low') + '">' + rateText + '</span></td>' +
+          '<td>' + s.total + '</td></tr>'
+        );
+      }).join('');
+    }
+
+    function outcomeBadge(entry) {
+      if (entry.status === 'pending') return '<span class="ps-status">&#8987; Pending</span>';
+      if (entry.outcome === 'hit') return '<span class="ss-signal--long">&#9989; Hit</span>';
+      if (entry.outcome === 'miss') return '<span class="ss-signal--short">&#10060; Miss</span>';
+      return '<span class="ss-signal--flat">&#9679; Flat</span>';
+    }
+
+    function renderRecent(entries) {
+      if (!entries.length) {
+        recentBody.innerHTML = '<tr><td colspan="6" class="ss-empty-row">Nothing logged yet &mdash; entries appear as the Signal Bot observes new breakouts/divergences.</td></tr>';
+        return;
+      }
+      recentBody.innerHTML = entries.map(function (e) {
+        return (
+          '<tr><td>' + escapeHtml(e.symbol) + ' <span class="ps-tf">' + escapeHtml(e.interval) + '</span></td>' +
+          '<td>' + escapeHtml(e.name) + '</td>' +
+          '<td class="' + (e.bias === 'bullish' ? 'ss-signal--long' : 'ss-signal--short') + '">' + escapeHtml(e.bias) + '</td>' +
+          '<td>' + formatDate(e.detectedAt) + '</td>' +
+          '<td>' + outcomeBadge(e) + '</td>' +
+          '<td>' + (e.returnPct != null ? e.returnPct + '%' : '—') + '</td></tr>'
+        );
+      }).join('');
+    }
+
+    Promise.all([
+      fetch('/api/pattern-tracker/stats').then(function (r) { return r.json(); }),
+      fetch('/api/pattern-tracker/log?limit=100').then(function (r) { return r.json(); }),
+    ])
+      .then(function (results) {
+        var stats = results[0];
+        var log = results[1];
+        renderOverall(stats.overall, stats.pending);
+        renderByPattern(stats.byPattern);
+        renderRecent(log.entries || []);
+      })
+      .catch(function (err) {
+        notice.style.display = 'block';
+        notice.innerHTML = '&#9888;&#65039; Failed to load track record: ' + escapeHtml(err.message);
+      });
+  })();
+</script>
+</body>
+</html>

@@ -70,6 +70,13 @@
 .ps-track-btn--active { color: var(--amber); border-color: rgba(245,197,66,0.4); background: var(--amber-bg); }
 .ps-track-btn:disabled { opacity: 0.5; cursor: default; }
 
+.ts-section-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 24px 0 10px;
+}
+
 .ps-trades-link {
   text-decoration: none;
   display: inline-flex;
