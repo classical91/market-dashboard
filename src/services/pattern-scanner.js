@@ -14,7 +14,7 @@
 // meant for exactly this read-only use case.
 const BINANCE_KLINES_URL = "https://data-api.binance.vision/api/v3/klines";
 
-const { rsi } = require("./signal-screener");
+const { rsi, dropUnclosedCandle } = require("./signal-screener");
 
 // Our preset intervals (shared with the AI Analysis page) use TradingView's
 // spelling; Binance's klines endpoint wants its own enum.
@@ -276,6 +276,7 @@ class PatternScannerService {
       low: Number(row[3]),
       close: Number(row[4]),
       volume: Number(row[5]),
+      closeTime: Number(row[6]),
     }));
   }
 
@@ -291,7 +292,10 @@ class PatternScannerService {
     }
     const key = `pattern-scan:${pair}:${binanceInterval}`;
     const load = async () => {
-      const candles = await this._fetchKlines(pair, binanceInterval);
+      // Confirm on closed candles only — a live candle poking through a
+      // trendline mid-bar would flip breakout status back and forth the same
+      // way it whipsawed the screener's borderline signals.
+      const candles = dropUnclosedCandle(await this._fetchKlines(pair, binanceInterval));
       const windowed = candles.slice(-this._options.window);
       const detection = classifyWindow(windowed, this._options);
       const divergence = detectDivergence(candles, this._options);
