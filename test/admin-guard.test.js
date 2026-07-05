@@ -54,6 +54,35 @@ test("a valid admin key passes the guard through to the handler", async () => {
   assert.match(body.error, /not configured/i);
 });
 
+test("watchlist POST rejects a missing admin key, then succeeds and is readable anonymously", async () => {
+  const rejected = await fetch(`${base}/api/watchlist`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ symbol: "BTCUSDT", interval: "4h" }),
+  });
+  assert.equal(rejected.status, 401);
+
+  const added = await fetch(`${base}/api/watchlist`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-admin-key": ADMIN_KEY },
+    body: JSON.stringify({ symbol: "BTCUSDT", interval: "4h", label: "BTC" }),
+  });
+  assert.equal(added.status, 200);
+
+  // GET is public/unauthenticated, same as every other read-only route.
+  const anon = await (await fetch(`${base}/api/watchlist`)).json();
+  assert.ok(anon.items.some((i) => i.symbol === "BTCUSDT" && i.interval === "4h"));
+
+  const removed = await fetch(`${base}/api/watchlist`, {
+    method: "DELETE",
+    headers: { "content-type": "application/json", "x-admin-key": ADMIN_KEY },
+    body: JSON.stringify({ symbol: "BTCUSDT", interval: "4h" }),
+  });
+  assert.equal(removed.status, 200);
+  const afterRemove = await removed.json();
+  assert.ok(!afterRemove.items.some((i) => i.symbol === "BTCUSDT" && i.interval === "4h"));
+});
+
 test("health reveals provider detail to a valid admin key", async () => {
   const anon = await (await fetch(`${base}/api/health`)).json();
   assert.ok(!("etherscanKeySet" in anon));

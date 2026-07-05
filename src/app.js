@@ -6,6 +6,7 @@ const { createAIAnalysisRouter } = require("./routes/ai-analysis");
 const { createLayoutAnalysisRouter } = require("./routes/layout-analysis");
 const { createPatternScannerRouter } = require("./routes/pattern-scanner");
 const { createSignalScreenerRouter } = require("./routes/signal-screener");
+const { createWatchlistRouter } = require("./routes/watchlist");
 const { createHealthRouter } = require("./routes/health");
 const { createOnchainRouter } = require("./routes/onchain");
 const { createOverviewRouter } = require("./routes/overview");
@@ -22,6 +23,7 @@ const { LayoutCaptureService } = require("./services/layout-capture");
 const { PatternScannerService } = require("./services/pattern-scanner");
 const { SignalScreenerService } = require("./services/signal-screener");
 const { SignalBotService } = require("./services/signal-bot");
+const { WatchlistService } = require("./services/watchlist");
 const { MemoryCache } = require("./services/cache");
 const { PersistentReporterCache } = require("./services/persistent-cache");
 const { CovalentService } = require("./services/covalent");
@@ -95,6 +97,7 @@ function createApp() {
   });
   const patternScannerService = new PatternScannerService({ cache, tokens: TOP_TOKENS });
   const signalScreenerService = new SignalScreenerService({ cache });
+  const watchlistService = new WatchlistService({ dataDir });
   const signalBotService = new SignalBotService({
     signalScreenerService,
     telegramService,
@@ -145,6 +148,7 @@ function createApp() {
   );
   app.use("/api/pattern-scanner", createPatternScannerRouter({ patternScannerService }));
   app.use("/api/signal-screener", createSignalScreenerRouter({ signalScreenerService }));
+  app.use("/api/watchlist", createWatchlistRouter({ watchlistService, requireAdmin }));
   app.use("/api/onchain", createOnchainRouter({ onchainService }));
   app.use("/api/overview", createOverviewRouter({ overviewService }));
   app.use("/api/daily-report", createReporterRouter({ reporterService, requireAdmin }));
