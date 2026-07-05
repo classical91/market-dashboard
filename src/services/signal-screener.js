@@ -12,6 +12,19 @@ const INTERVAL_MAP = { "1h": "1h", "4h": "4h", "1D": "1d" };
 // USDT-perpetual list, extended to 25).
 const { TOP_TOKENS: DEFAULT_TOKENS } = require("../config/market-symbols");
 
+// Binance's last kline row is the live, still-open candle. Scoring it makes
+// borderline tokens whipsaw: on 1D the candle mutates all day, so a token
+// sitting at exactly minChecks (RSI ~50, price ~VWAP) flips LONG/SHORT on
+// every 15-minute bot scan — observed as PENDLE 1D alternating SHORT→LONG→
+// SHORT within hours. Signals confirm on bar close instead, the standard
+// TradingView "on bar close" alert semantics: a 1D signal can then change
+// at most once per day.
+function dropUnclosedCandle(candles, now = Date.now()) {
+  if (!candles.length) return candles;
+  const last = candles[candles.length - 1];
+  return last.closeTime && last.closeTime > now ? candles.slice(0, -1) : candles;
+}
+
 function sma(values, length, endIndex) {
   let sum = 0;
   for (let i = endIndex - length + 1; i <= endIndex; i++) sum += values[i];
@@ -170,6 +183,7 @@ class SignalScreenerService {
       low: Number(row[3]),
       close: Number(row[4]),
       volume: Number(row[5]),
+      closeTime: Number(row[6]),
     }));
   }
 
@@ -221,7 +235,12 @@ class SignalScreenerService {
     const key = `signal-screener:${symbol}:${binanceInterval}:${resolvedMinChecks}`;
     const load = async () => {
       const candles = await this._fetchKlines(symbol, binanceInterval);
-      return this._computeSignal(candles, resolvedMinChecks);
+      const livePrice = candles.length ? candles[candles.length - 1].close : null;
+      const result = this._computeSignal(dropUnclosedCandle(candles), resolvedMinChecks);
+      // Signal checks confirm on closed candles, but the displayed price
+      // should still be current, not up to a full bar stale.
+      if (!result.error && livePrice != null) result.price = livePrice;
+      return result;
     };
     try {
       const result = force ? await this._cache.set(key, await load(), this._cacheMs) : await this._cache.getOrLoad(key, this._cacheMs, load);
@@ -236,4 +255,4 @@ class SignalScreenerService {
   }
 }
 
-module.exports = { SignalScreenerService, DEFAULT_TOKENS, rsi, ema, macd, vwapSeries, adxSeries };
+module.exports = { SignalScreenerService, DEFAULT_TOKENS, dropUnclosedCandle, rsi, ema, macd, vwapSeries, adxSeries };
