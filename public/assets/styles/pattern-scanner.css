@@ -38,8 +38,30 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 10px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
+.ps-card.collapsed .ps-card-head { margin-bottom: 0; }
+.ps-card:not(.collapsed) .ps-card-head { margin-bottom: 10px; }
+
+.ps-card-content {
+  overflow: hidden;
+}
+.ps-card.collapsed .ps-card-content { display: none; }
+
+.ps-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ps-chevron {
+  color: var(--muted);
+  font-size: 11px;
+  transition: transform 0.2s ease;
+}
+.ps-card.collapsed .ps-chevron { transform: rotate(-90deg); }
 
 .ps-card-symbol {
   font-size: 13px;
@@ -140,7 +162,7 @@
   padding-top: 12px;
   border-top: 1px dashed var(--border);
 }
-.ps-card > .ps-divergence:first-of-type:nth-child(2) {
+.ps-card-content > .ps-divergence:first-child {
   /* Card with only a divergence (no pattern block above it) needs no divider */
   margin-top: 0;
   padding-top: 0;

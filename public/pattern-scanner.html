@@ -26,6 +26,7 @@
 
     <div class="ps-toolbar">
       <button class="aia-run-btn" type="button" id="ps-refresh-btn">Rescan</button>
+      <button class="aia-run-btn" type="button" id="ps-toggle-all-btn">Expand All</button>
       <span class="ps-updated" id="ps-updated"></span>
     </div>
 
@@ -50,6 +51,10 @@
     var notice = document.getElementById('ps-notice');
     var updatedEl = document.getElementById('ps-updated');
     var refreshBtn = document.getElementById('ps-refresh-btn');
+    var toggleAllBtn = document.getElementById('ps-toggle-all-btn');
+    // Cards start collapsed (header + bias only) so a full scan reads as a
+    // scannable list; expanding one (or all) reveals the chart + metrics.
+    var allExpanded = false;
 
     function escapeHtml(str) {
       return String(str || '').replace(/[&<>"']/g, function (ch) {
@@ -116,14 +121,19 @@
       var bias = (entry.pattern && entry.pattern.bias) || (entry.divergence && entry.divergence.bias) || '';
       var chartHtml = entry.chart ? '<canvas class="ps-chart" data-chart-index="' + index + '" width="640" height="280"></canvas>' : '';
       return (
-        '<div class="ps-card">' +
-          '<div class="ps-card-head">' +
+        '<div class="ps-card' + (allExpanded ? '' : ' collapsed') + '">' +
+          '<div class="ps-card-head" data-role="head">' +
             '<div class="ps-card-symbol">' + tickerLink(entry) + '<span class="ps-tf">' + escapeHtml(entry.interval) + '</span></div>' +
-            '<span class="' + biasClass(bias) + '">' + escapeHtml(bias) + '</span>' +
+            '<div class="ps-card-actions">' +
+              '<span class="' + biasClass(bias) + '">' + escapeHtml(bias) + '</span>' +
+              '<span class="ps-chevron" aria-hidden="true">&#9660;</span>' +
+            '</div>' +
           '</div>' +
-          chartHtml +
-          patternBlock(entry.pattern) +
-          divergenceBlock(entry.divergence) +
+          '<div class="ps-card-content" data-role="content">' +
+            chartHtml +
+            patternBlock(entry.pattern) +
+            divergenceBlock(entry.divergence) +
+          '</div>' +
         '</div>'
       );
     }
@@ -243,6 +253,23 @@
           refreshBtn.textContent = 'Rescan';
         });
     }
+
+    // Delegated so it keeps working across every re-render (grid.innerHTML
+    // is replaced wholesale on each scan) without re-binding per card.
+    grid.addEventListener('click', function (e) {
+      if (e.target.closest('[data-role="ticker-link"], .ps-ticker-link')) return;
+      var head = e.target.closest('[data-role="head"]');
+      if (!head) return;
+      head.closest('.ps-card').classList.toggle('collapsed');
+    });
+
+    toggleAllBtn.addEventListener('click', function () {
+      allExpanded = !allExpanded;
+      toggleAllBtn.textContent = allExpanded ? 'Collapse All' : 'Expand All';
+      grid.querySelectorAll('.ps-card').forEach(function (card) {
+        card.classList.toggle('collapsed', !allExpanded);
+      });
+    });
 
     refreshBtn.addEventListener('click', function () { load(true); });
     load(false);
