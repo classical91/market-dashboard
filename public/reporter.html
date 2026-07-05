@@ -292,6 +292,7 @@
     <div class="reporter-header-row" id="reporterHeaderRow" style="display:none">
       <div class="reporter-date-badge" id="reporterDate"></div>
       <div class="reporter-gen-badge" id="reporterGen"></div>
+      <button class="open-all-btn reporter-generate-cta" id="reporterRegenBtn" type="button" style="margin-left:auto">&#9889; Regenerate</button>
     </div>
 
     <!-- Tabs -->
@@ -819,6 +820,8 @@
     function generateReport(sectionOverride) {
       if (generating) return;
       generating = true;
+      var regenBtnEl = document.getElementById('reporterRegenBtn');
+      if (regenBtnEl) { regenBtnEl.disabled = true; regenBtnEl.textContent = '⚡ Generating…'; }
       var section = sectionOverride || activeTab;
       if (sectionOverride) setActiveTab(sectionOverride);
       var content = document.getElementById('reporterContent');
@@ -851,6 +854,7 @@
         })
         .finally(function () {
           generating = false;
+          if (regenBtnEl) { regenBtnEl.disabled = false; regenBtnEl.textContent = '⚡ Regenerate'; }
         });
     }
 
@@ -886,6 +890,8 @@
     document.getElementById('reporterContent').addEventListener('click', function (e) {
       if (e.target.closest('.reporter-generate-cta')) generateReport();
     });
+    var regenBtn = document.getElementById('reporterRegenBtn');
+    if (regenBtn) regenBtn.addEventListener('click', function () { generateReport(); });
     configurePageShell();
     setActiveTab(activeTab);
 
