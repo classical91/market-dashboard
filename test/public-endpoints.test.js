@@ -54,6 +54,7 @@ test("action endpoints are disabled (503) when ADMIN_API_KEY is unset", async ()
     "/api/ai-analysis/broadcast",
     "/api/layout-analysis/generate",
     "/api/layout-analysis/broadcast",
+    "/api/watchlist",
     "/api/telegram/test",
   ];
   for (const route of routes) {

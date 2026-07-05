@@ -56,6 +56,26 @@
   gap: 8px;
 }
 
+.ps-track-btn {
+  font-size: 16px;
+  line-height: 1;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 3px 7px;
+  cursor: pointer;
+}
+.ps-track-btn:hover { border-color: var(--amber); color: var(--amber); }
+.ps-track-btn--active { color: var(--amber); border-color: rgba(245,197,66,0.4); background: var(--amber-bg); }
+.ps-track-btn:disabled { opacity: 0.5; cursor: default; }
+
+.ps-trades-link {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
 .ps-chevron {
   color: var(--muted);
   font-size: 11px;

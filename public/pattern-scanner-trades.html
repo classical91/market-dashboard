@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Trades · Market Command</title>
+  <script src="/assets/js/settings.js"></script>
+  <link rel="stylesheet" href="/assets/styles/command.css" />
+  <link rel="stylesheet" href="/assets/styles/ai-analysis.css" />
+  <link rel="stylesheet" href="/assets/styles/pattern-scanner.css" />
+</head>
+<body>
+<div class="app">
+  <aside class="cmd-sidebar"></aside>
+  <main class="cmd-main">
+
+    <div class="cmd-page-header">
+      <div>
+        <div class="cmd-page-title">&#9733; My Trades</div>
+        <div class="cmd-page-subtitle">Tokens you've starred on Pattern Scanner &mdash; their live pattern/divergence status, so you can keep up with what you're actually trading</div>
+      </div>
+      <div class="cmd-clock" id="cmd-clock"></div>
+    </div>
+
+    <div class="aia-notice" id="ps-notice" style="display:none"></div>
+
+    <div class="ps-toolbar">
+      <button class="aia-run-btn" type="button" id="ps-refresh-btn">Refresh</button>
+      <a class="aia-run-btn ps-trades-link" href="/pattern-scanner.html">&#128200; Pattern Scanner</a>
+      <span class="ps-updated" id="ps-updated"></span>
+    </div>
+
+    <div class="ps-grid" id="ps-grid"></div>
+
+    <footer>My Trades &mdash; <a href="/pattern-scanner.html">Pattern Scanner</a> &mdash; <a href="/ai-analysis.html">AI Analysis</a> &mdash; <a href="/">Overview</a></footer>
+
+  </main>
+</div>
+<script src="/assets/js/sidebar.js"></script>
+<script src="/assets/js/admin-key.js"></script>
+<script src="/assets/js/pattern-render.js"></script>
+<script>
+  (function () {
+    function tick() {
+      var el = document.getElementById('cmd-clock');
+      if (el) el.textContent = new Date().toLocaleString(undefined, {
+        weekday: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit'
+      });
+    }
+    tick(); setInterval(tick, 1000);
+
+    var grid = document.getElementById('ps-grid');
+    var notice = document.getElementById('ps-notice');
+    var updatedEl = document.getElementById('ps-updated');
+    var refreshBtn = document.getElementById('ps-refresh-btn');
+
+    var escapeHtml = PatternRender.escapeHtml;
+    var renderCard = PatternRender.renderCard;
+    var drawChart = PatternRender.drawChart;
+
+    // Untracking here always removes (there's no "add" state on this page),
+    // so the star only ever needs to go one direction.
+    function toggleTrack(btn) {
+      var symbol = btn.getAttribute('data-symbol');
+      var interval = btn.getAttribute('data-interval');
+      btn.disabled = true;
+      AdminKey.fetch('/api/watchlist', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbol: symbol, interval: interval })
+      })
+        .then(function () { load(); })
+        .catch(function () { btn.disabled = false; });
+    }
+
+    grid.addEventListener('click', function (e) {
+      if (e.target.closest('[data-role="ticker-link"], .ps-ticker-link')) return;
+      var trackBtn = e.target.closest('[data-role="track-btn"]');
+      if (trackBtn) { toggleTrack(trackBtn); return; }
+      var head = e.target.closest('[data-role="head"]');
+      if (!head) return;
+      head.closest('.ps-card').classList.toggle('collapsed');
+    });
+
+    function render(items, scanByKey) {
+      if (!items.length) {
+        grid.innerHTML = '<div class="ps-empty">Nothing tracked yet. Star a card on <a href="/pattern-scanner.html">Pattern Scanner</a> to follow it here.</div>';
+        return;
+      }
+      var entries = items.map(function (item) {
+        var key = item.symbol + ':' + item.interval;
+        var scan = scanByKey[key];
+        if (scan) return scan;
+        // Not in the current scan result (e.g. scan failed for it, or it's
+        // simply not flagged with a pattern/divergence right now) — still
+        // show it, just with nothing detected.
+        return { symbol: item.symbol, interval: item.interval, label: item.label || item.symbol, pattern: null, divergence: null };
+      });
+      grid.innerHTML = entries.map(function (entry, i) {
+        return renderCard(entry, i, { collapsed: false, tracked: true });
+      }).join('');
+      grid.querySelectorAll('canvas[data-chart-index]').forEach(function (canvas) {
+        var entry = entries[Number(canvas.getAttribute('data-chart-index'))];
+        if (entry && entry.chart) drawChart(canvas, entry.chart);
+      });
+    }
+
+    function load() {
+      refreshBtn.disabled = true;
+      refreshBtn.textContent = 'Loading…';
+      Promise.all([
+        fetch('/api/watchlist').then(function (res) { return res.json(); }),
+        fetch('/api/pattern-scanner').then(function (res) { return res.json(); })
+      ])
+        .then(function (results) {
+          var items = results[0].items || [];
+          var scanResults = results[1].results || [];
+          var scanByKey = {};
+          scanResults.forEach(function (r) { scanByKey[r.symbol + ':' + r.interval] = r; });
+          render(items, scanByKey);
+          updatedEl.textContent = 'Updated ' + new Date().toLocaleTimeString();
+        })
+        .catch(function (err) {
+          notice.style.display = 'block';
+          notice.innerHTML = '&#9888;&#65039; Failed to load: ' + escapeHtml(err.message);
+        })
+        .finally(function () {
+          refreshBtn.disabled = false;
+          refreshBtn.textContent = 'Refresh';
+        });
+    }
+
+    refreshBtn.addEventListener('click', load);
+    load();
+  })();
+</script>
+</body>
+</html>
