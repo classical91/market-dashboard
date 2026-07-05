@@ -166,11 +166,23 @@
       }).join('');
     }
 
+    var TV_INTERVALS = { '15m': '15', '1h': '60', '4h': '240', '1D': 'D', '1W': 'W', '1M': 'M' };
+
+    function tvChartUrl(symbol, interval) {
+      return 'https://www.tradingview.com/chart/?symbol=' + encodeURIComponent(symbol) +
+        '&interval=' + encodeURIComponent(TV_INTERVALS[interval] || 'D');
+    }
+
+    function tickerLink(preset) {
+      return '<a class="aia-ticker-link" data-role="ticker-link" href="' + tvChartUrl(preset.symbol, preset.interval) +
+        '" target="_blank" rel="noopener" title="Open on TradingView">' + escapeHtml(preset.label) + ' <span class="aia-ticker-arrow">&#8599;</span></a>';
+    }
+
     function renderCard(preset) {
       return (
         '<div class="aia-card" id="' + cardId(preset.symbol) + '">' +
           '<div class="aia-card-head" data-role="head">' +
-            '<div class="aia-card-symbol">' + escapeHtml(preset.label) +
+            '<div class="aia-card-symbol">' + tickerLink(preset) +
               '<div class="aia-tf-menu" data-role="tf-menu">' +
                 '<button class="aia-tf-select" type="button" data-role="tf" aria-haspopup="listbox" aria-expanded="false">' +
                   '<span data-role="tf-label">' + escapeHtml(preset.interval) + '</span><span class="aia-tf-caret" aria-hidden="true">&#9662;</span>' +
@@ -276,6 +288,7 @@
 
       card.querySelector('[data-role="head"]').addEventListener('click', function (e) {
         if (e.target && e.target.getAttribute('data-role') === 'tf') return;
+        if (e.target && e.target.closest('[data-role="ticker-link"]')) return;
         setCollapsed(card, id, !card.classList.contains('collapsed'), true);
       });
 
@@ -288,10 +301,12 @@
         card.classList.remove('tf-open');
         tfSelect.setAttribute('aria-expanded', 'false');
       }
+      var tickerLinkEl = card.querySelector('[data-role="ticker-link"]');
       function setTimeframe(value) {
         var state = cardState[id];
         state.interval = value;
         tfLabel.textContent = value;
+        if (tickerLinkEl) tickerLinkEl.setAttribute('href', tvChartUrl(state.symbol, value));
         tfOptions.querySelectorAll('[data-role="tf-option"]').forEach(function (option) {
           option.classList.toggle('active', option.getAttribute('data-value') === value);
         });

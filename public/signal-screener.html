@@ -40,21 +40,46 @@
       <span class="ss-updated" id="ss-updated"></span>
     </div>
 
-    <div class="ss-table-wrap">
-      <table class="ss-table">
-        <thead>
-          <tr>
-            <th>Token</th>
-            <th>Price</th>
-            <th>Signal</th>
-            <th>Score</th>
-            <th>RSI</th>
-            <th>ADX</th>
-          </tr>
-        </thead>
-        <tbody id="ss-tbody"></tbody>
-        <tfoot id="ss-tfoot"></tfoot>
-      </table>
+    <div class="ss-summary-strip" id="ss-summary-strip"></div>
+
+    <div class="ss-split">
+      <div class="ss-panel ss-panel--bullish">
+        <div class="ss-panel-head">
+          <span class="ss-panel-title">&#128994; Bullish</span>
+          <span class="ss-panel-count" id="ss-bull-count"></span>
+        </div>
+        <div class="ss-table-wrap">
+          <table class="ss-table">
+            <thead><tr><th>Token</th><th>Price</th><th>Score</th><th>RSI</th><th>ADX</th></tr></thead>
+            <tbody id="ss-tbody-long"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="ss-panel ss-panel--bearish">
+        <div class="ss-panel-head">
+          <span class="ss-panel-title">&#128308; Bearish</span>
+          <span class="ss-panel-count" id="ss-bear-count"></span>
+        </div>
+        <div class="ss-table-wrap">
+          <table class="ss-table">
+            <thead><tr><th>Token</th><th>Price</th><th>Score</th><th>RSI</th><th>ADX</th></tr></thead>
+            <tbody id="ss-tbody-short"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="ss-panel ss-panel--flat">
+      <div class="ss-panel-head">
+        <span class="ss-panel-title">&#9898; Flat / No signal</span>
+        <span class="ss-panel-count" id="ss-flat-count"></span>
+      </div>
+      <div class="ss-table-wrap">
+        <table class="ss-table">
+          <thead><tr><th>Token</th><th>Price</th><th>Score</th><th>RSI</th><th>ADX</th></tr></thead>
+          <tbody id="ss-tbody-flat"></tbody>
+        </table>
+      </div>
     </div>
 
     <footer>Signal Screener &mdash; <a href="/pattern-scanner.html">Pattern Scanner</a> &mdash; <a href="/ai-analysis.html">AI Analysis</a> &mdash; <a href="/">Overview</a></footer>
@@ -72,8 +97,10 @@
     }
     tick(); setInterval(tick, 1000);
 
-    var tbody = document.getElementById('ss-tbody');
-    var tfoot = document.getElementById('ss-tfoot');
+    var tbodyLong = document.getElementById('ss-tbody-long');
+    var tbodyShort = document.getElementById('ss-tbody-short');
+    var tbodyFlat = document.getElementById('ss-tbody-flat');
+    var summaryStrip = document.getElementById('ss-summary-strip');
     var notice = document.getElementById('ss-notice');
     var updatedEl = document.getElementById('ss-updated');
     var refreshBtn = document.getElementById('ss-refresh-btn');
@@ -110,12 +137,6 @@
       return adx != null && adx > 25 ? 'ss-adx--trending' : 'ss-adx--flat';
     }
 
-    function signalLabel(signal) {
-      if (signal === 'LONG') return '&#9650; LONG';
-      if (signal === 'SHORT') return '&#9660; SHORT';
-      return '&#9679; FLAT';
-    }
-
     var TV_INTERVALS = { '1h': '60', '4h': '240', '1D': 'D' };
 
     function tickerLink(symbol) {
@@ -128,17 +149,15 @@
     function renderRow(entry) {
       if (entry.error) {
         return (
-          '<tr class="ss-error-row"><td>' + escapeHtml(entry.symbol) + '</td><td colspan="5">' +
+          '<tr class="ss-error-row"><td>' + escapeHtml(entry.symbol) + '</td><td colspan="4">' +
           escapeHtml(entry.error) + '</td></tr>'
         );
       }
       var rowClass = entry.signal === 'LONG' ? 'ss-row--long' : entry.signal === 'SHORT' ? 'ss-row--short' : 'ss-row--flat';
-      var signalClass = entry.signal === 'LONG' ? 'ss-signal--long' : entry.signal === 'SHORT' ? 'ss-signal--short' : 'ss-signal--flat';
       return (
         '<tr class="' + rowClass + '">' +
           '<td>' + tickerLink(entry.symbol) + '</td>' +
           '<td>' + fmtPrice(entry.price) + '</td>' +
-          '<td class="' + signalClass + '">' + signalLabel(entry.signal) + '</td>' +
           '<td><span class="ss-badge ' + scoreClass(entry.score) + '">' + entry.score + '%</span></td>' +
           '<td><span class="ss-badge ' + rsiClass(entry.rsi) + '">' + entry.rsi + '</span></td>' +
           '<td><span class="ss-badge ' + adxClass(entry.adx) + '">' + (entry.adx == null ? '—' : entry.adx) + '</span></td>' +
@@ -146,18 +165,33 @@
       );
     }
 
-    function renderSummary(results) {
-      var longCount = results.filter(function (r) { return r.signal === 'LONG'; }).length;
-      var shortCount = results.filter(function (r) { return r.signal === 'SHORT'; }).length;
-      var bias = longCount > shortCount ? 'RISK ON' : shortCount > longCount ? 'RISK OFF' : 'NEUTRAL';
-      var biasClass = longCount > shortCount ? 'ss-summary-bias--on' : shortCount > longCount ? 'ss-summary-bias--off' : 'ss-summary-bias--neutral';
-      tfoot.innerHTML = (
-        '<tr class="ss-summary">' +
-          '<td>Summary</td>' +
-          '<td>' + (longCount + shortCount) + ' signals</td>' +
-          '<td>&#9650; ' + longCount + '&nbsp;&nbsp;&#9660; ' + shortCount + '</td>' +
-          '<td colspan="3" class="' + biasClass + '">' + bias + '</td>' +
-        '</tr>'
+    function emptyRow(text) {
+      return '<tr><td colspan="5" class="ss-empty-row">' + escapeHtml(text) + '</td></tr>';
+    }
+
+    function renderSplit(results) {
+      var errors = results.filter(function (r) { return r.error; });
+      var longRows = results.filter(function (r) { return r.signal === 'LONG'; });
+      var shortRows = results.filter(function (r) { return r.signal === 'SHORT'; });
+      var flatRows = results.filter(function (r) { return r.signal === 'FLAT'; });
+      longRows.sort(function (a, b) { return b.score - a.score; });
+      shortRows.sort(function (a, b) { return b.score - a.score; });
+
+      tbodyLong.innerHTML = (longRows.length ? longRows.map(renderRow).join('') : emptyRow('No bullish signals right now.')) +
+        errors.map(renderRow).join('');
+      tbodyShort.innerHTML = shortRows.length ? shortRows.map(renderRow).join('') : emptyRow('No bearish signals right now.');
+      tbodyFlat.innerHTML = flatRows.length ? flatRows.map(renderRow).join('') : emptyRow('Nothing flat right now.');
+
+      document.getElementById('ss-bull-count').textContent = longRows.length;
+      document.getElementById('ss-bear-count').textContent = shortRows.length;
+      document.getElementById('ss-flat-count').textContent = flatRows.length;
+
+      var bias = longRows.length > shortRows.length ? 'RISK ON' : shortRows.length > longRows.length ? 'RISK OFF' : 'NEUTRAL';
+      var biasClass = longRows.length > shortRows.length ? 'ss-summary-bias--on' : shortRows.length > longRows.length ? 'ss-summary-bias--off' : 'ss-summary-bias--neutral';
+      summaryStrip.innerHTML = (
+        '<span>' + (longRows.length + shortRows.length) + ' signals</span>' +
+        '<span>&#9650; ' + longRows.length + '&nbsp;&nbsp;&#9660; ' + shortRows.length + '</span>' +
+        '<span class="' + biasClass + '">' + bias + '</span>'
       );
     }
 
@@ -172,9 +206,7 @@
       fetch('/api/signal-screener?' + params.toString())
         .then(function (res) { return res.json(); })
         .then(function (data) {
-          var results = data.results || [];
-          tbody.innerHTML = results.map(renderRow).join('');
-          renderSummary(results);
+          renderSplit(data.results || []);
           updatedEl.textContent = 'Updated ' + new Date().toLocaleTimeString();
         })
         .catch(function (err) {
