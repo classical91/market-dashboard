@@ -53,6 +53,18 @@ const FALLBACK_CALENDAR = [
   { time: "16:30", title: "Oil Inventories", impact: "Medium" },
 ];
 
+// Default Finnhub instruments for the macro board. Free-tier Finnhub keys can
+// quote US ETFs, so DXY/VIX/gold/oil default to liquid ETF proxies; rows whose
+// provider symbol is a proxy are flagged so the UI can score on direction
+// instead of absolute level. Override via MACRO_SYMBOLS, e.g.
+// MACRO_SYMBOLS=DXY=UUP,VIX=VIXY,XAU=OANDA:XAU_USD,WTI=OANDA:WTICO_USD
+const DEFAULT_MACRO_INSTRUMENTS = [
+  { symbol: "XAU", name: "Gold", providerSymbol: "GLD" },
+  { symbol: "DXY", name: "Dollar Index", providerSymbol: "UUP" },
+  { symbol: "WTI", name: "Crude Oil", providerSymbol: "USO" },
+  { symbol: "VIX", name: "Volatility Index", providerSymbol: "VIXY" },
+];
+
 const RANGE_TO_DAYS = { "1D": 1, "1W": 7, "1M": 30, "3M": 90 };
 
 class MarketDataService {
@@ -74,6 +86,12 @@ class MarketDataService {
       newsUrl: config.newsUrl || process.env.MARKET_NEWS_URL || "",
       finnhubApiKey: config.finnhubApiKey || process.env.FINNHUB_API_KEY || "",
       finnhubBaseUrl: config.finnhubBaseUrl || process.env.FINNHUB_BASE_URL || "https://finnhub.io/api/v1",
+      macroProvider: config.macroProvider || process.env.MACRO_DATA_PROVIDER || "",
+      macroUrl: config.macroUrl || process.env.MACRO_DATA_URL || "",
+      macroInstruments: parseMacroInstruments(
+        config.macroSymbols || process.env.MACRO_SYMBOLS || "",
+      ),
+      calendarUrl: config.calendarUrl || process.env.MACRO_CALENDAR_URL || "",
     };
     // Last-known-good live responses, keyed per data type, so a transient
     // CoinGecko rate-limit (429) serves slightly stale real data instead of
@@ -146,7 +164,7 @@ class MarketDataService {
   staleOr(cacheKey, fallback, error) {
     const good = this.recallGood(cacheKey);
     if (good) {
-      return { ...good, live: false, stale: true, source: "coingecko-stale", error: error?.message };
+      return { ...good, live: false, stale: true, source: `${good.source}-stale`, error: error?.message };
     }
     return error ? { ...fallback, error: error.message } : fallback;
   }
@@ -250,12 +268,83 @@ class MarketDataService {
     };
   }
 
+  hasLiveMacroSource() {
+    if (this.config.macroProvider === "none") return false;
+    return Boolean(this.config.macroUrl || this.config.finnhubApiKey);
+  }
+
   async getMacro() {
-    return {
-      live: false,
-      source: "fallback",
-      items: FALLBACK_MACRO.map((entry) => ({ ...entry, type: "macro" })),
-    };
+    if (this.config.macroProvider === "none") {
+      return macroFallback();
+    }
+    if (this.config.macroUrl) {
+      return this.getMacroFromJsonUrl();
+    }
+    if (this.config.finnhubApiKey) {
+      return this.getMacroFromFinnhub();
+    }
+    return macroFallback();
+  }
+
+  async getMacroFromJsonUrl() {
+    const cacheKey = "macro:url";
+    try {
+      const data = await this.singleFetch(this.config.macroUrl, { Accept: "application/json" }, "Macro feed");
+      const items = normalizeMacro(data);
+      if (!items.length) {
+        return this.staleOr(cacheKey, macroFallback());
+      }
+      const result = { live: true, source: "macro_data_url", items };
+      this.rememberGood(cacheKey, result);
+      return result;
+    } catch (error) {
+      return this.staleOr(cacheKey, macroFallback(), error);
+    }
+  }
+
+  async getMacroFromFinnhub() {
+    const cacheKey = "macro:finnhub";
+    let firstError = null;
+    let liveCount = 0;
+    const seedBySymbol = new Map(FALLBACK_MACRO.map((entry) => [entry.symbol, entry]));
+    const items = await Promise.all(
+      this.config.macroInstruments.map(async (instrument) => {
+        const seed = seedBySymbol.get(instrument.symbol) || {
+          symbol: instrument.symbol,
+          name: instrument.name,
+          price: 0,
+          changePercent: 0,
+          volume: "-",
+        };
+        const base = {
+          ...seed,
+          name: instrument.name || seed.name,
+          type: "macro",
+          proxy: instrument.proxy,
+        };
+        try {
+          const url = `${this.config.finnhubBaseUrl}/quote?symbol=${encodeURIComponent(
+            instrument.providerSymbol,
+          )}&token=${encodeURIComponent(this.config.finnhubApiKey)}`;
+          const data = await this.singleFetch(url, { Accept: "application/json" }, "Finnhub macro");
+          const price = Number(data?.c ?? 0);
+          if (!price) {
+            return base;
+          }
+          liveCount += 1;
+          return { ...base, price, changePercent: Number(data?.dp ?? 0), volume: "-" };
+        } catch (error) {
+          if (!firstError) firstError = error;
+          return base;
+        }
+      }),
+    );
+    if (liveCount === 0) {
+      return this.staleOr(cacheKey, { ...macroFallback(), error: firstError?.message }, firstError);
+    }
+    const result = { live: true, source: "finnhub", items };
+    this.rememberGood(cacheKey, result);
+    return result;
   }
 
   async getNews() {
@@ -281,11 +370,20 @@ class MarketDataService {
   }
 
   async getCalendar() {
-    return {
-      live: false,
-      source: "fallback",
-      items: FALLBACK_CALENDAR.map((item) => ({ ...item })),
-    };
+    const url = this.config.calendarUrl;
+    if (!url) {
+      return calendarFallback();
+    }
+    try {
+      const data = await this.singleFetch(url, { Accept: "application/json" }, "Macro calendar");
+      const items = normalizeCalendar(data);
+      if (!items.length) {
+        return calendarFallback();
+      }
+      return { live: true, source: "macro_calendar_url", items };
+    } catch (error) {
+      return { ...calendarFallback(), error: error.message };
+    }
   }
 
   async fetchJson(url) {
@@ -368,6 +466,118 @@ function parseRetryAfter(value) {
     return Math.max(0, dateMs - Date.now());
   }
   return null;
+}
+
+function macroFallback() {
+  return {
+    live: false,
+    source: "fallback",
+    items: FALLBACK_MACRO.map((entry) => ({ ...entry, type: "macro" })),
+  };
+}
+
+function calendarFallback() {
+  return {
+    live: false,
+    source: "fallback",
+    items: FALLBACK_CALENDAR.map((item) => ({ ...item })),
+  };
+}
+
+// Parse MACRO_SYMBOLS pairs like "DXY=UUP,XAU=OANDA:XAU_USD" into instrument
+// rows. A bare US ticker that differs from the display symbol (UUP for DXY,
+// VIXY for VIX) is an ETF proxy: its change tracks the instrument but its
+// price is not the real index level, so mark it for level-sensitive scoring.
+function parseMacroInstruments(value) {
+  const knownNames = new Map(FALLBACK_MACRO.map((entry) => [entry.symbol, entry.name]));
+  const withProxyFlag = (instrument) => ({
+    ...instrument,
+    proxy:
+      !instrument.providerSymbol.includes(":") &&
+      instrument.providerSymbol.toUpperCase() !== instrument.symbol.toUpperCase(),
+  });
+
+  const pairs = String(value || "")
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const eq = part.indexOf("=");
+      const symbol = (eq === -1 ? part : part.slice(0, eq)).trim().toUpperCase();
+      const providerSymbol = (eq === -1 ? part : part.slice(eq + 1)).trim();
+      if (!symbol || !providerSymbol) return null;
+      return withProxyFlag({
+        symbol,
+        name: knownNames.get(symbol) || symbol,
+        providerSymbol,
+      });
+    })
+    .filter(Boolean);
+
+  return pairs.length ? pairs : DEFAULT_MACRO_INSTRUMENTS.map(withProxyFlag);
+}
+
+// Normalize a generic macro JSON feed (array or {items|results|data:[...]})
+// into the dashboard's macro row shape.
+function normalizeMacro(data) {
+  const rows = Array.isArray(data) ? data : data?.items || data?.results || data?.data || [];
+  if (!Array.isArray(rows)) {
+    return [];
+  }
+  return rows
+    .map((row) => {
+      if (!row || typeof row !== "object") return null;
+      const symbol = String(row.symbol || row.ticker || "").trim().toUpperCase();
+      const price = Number(row.price ?? row.value ?? row.last ?? NaN);
+      if (!symbol || !Number.isFinite(price)) return null;
+      return {
+        symbol,
+        name: String(row.name || row.label || symbol).slice(0, 60),
+        price,
+        changePercent: Number(row.changePercent ?? row.change_percent ?? row.change ?? 0) || 0,
+        volume: String(row.volume || "-"),
+        type: "macro",
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 12);
+}
+
+// Normalize a macro-calendar JSON feed (array or {events|items|data:[...]})
+// into the dashboard's calendar event shape.
+function normalizeCalendar(data) {
+  const rows = Array.isArray(data) ? data : data?.events || data?.items || data?.data || [];
+  if (!Array.isArray(rows)) {
+    return [];
+  }
+  return rows
+    .map((row) => {
+      if (!row || typeof row !== "object") return null;
+      const title = String(row.title || row.event || row.name || "").trim();
+      if (!title) return null;
+      const impactRaw = String(row.impact || row.importance || "Low").trim();
+      const impact = impactRaw.charAt(0).toUpperCase() + impactRaw.slice(1).toLowerCase();
+      return {
+        time: normalizeCalendarTime(row.time || row.datetime || row.date),
+        title: title.slice(0, 120),
+        impact: ["High", "Medium", "Low"].includes(impact) ? impact : "Low",
+        country: row.country ? String(row.country).slice(0, 40) : null,
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 10);
+}
+
+function normalizeCalendarTime(value) {
+  if (value == null) return "--";
+  const text = String(value).trim();
+  // Already a clock-style label (e.g. "08:30" or "14:00 ET"): keep as-is.
+  if (/^\d{1,2}:\d{2}/.test(text)) return text.slice(0, 20);
+  const date = new Date(typeof value === "number" && value < 1e12 ? value * 1000 : value);
+  if (!Number.isNaN(date.getTime())) {
+    return date.toISOString().slice(11, 16);
+  }
+  return text.slice(0, 20) || "--";
 }
 
 // Normalize a variety of news-feed JSON shapes (NewsAPI, Finnhub, generic

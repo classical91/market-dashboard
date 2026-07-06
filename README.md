@@ -81,8 +81,12 @@ Most keys are optional. The app is designed to degrade to fallback data where po
 - `MARKET_DATA_PROVIDER` - defaults to `coingecko`.
 - `MARKET_DATA_BASE_URL`, `MARKET_DATA_TIMEOUT_MS`, `MARKET_DATA_RETRIES`.
 - `COINGECKO_DEMO_API_KEY`, `COINGECKO_API_KEY`, `COINGECKO_KEY_HEADER` - optional CoinGecko auth.
-- `FINNHUB_API_KEY`, `FINNHUB_BASE_URL` - live equity quotes.
+- `FINNHUB_API_KEY`, `FINNHUB_BASE_URL` - live equity quotes (also powers the macro/FX board by default).
 - `MARKET_NEWS_URL` - optional JSON news feed.
+- `MACRO_DATA_URL` - optional JSON macro feed (`{symbol, name, price, changePercent}` rows); takes priority over Finnhub for the macro board.
+- `MACRO_SYMBOLS` - `DISPLAY=PROVIDER_SYMBOL` pairs for the Finnhub macro adapter; defaults to free-tier ETF proxies (`XAU=GLD,DXY=UUP,WTI=USO,VIX=VIXY`).
+- `MACRO_DATA_PROVIDER` - set to `none` to force static macro fallback.
+- `MACRO_CALENDAR_URL` - optional JSON macro-calendar feed (`{time, title, impact, country}` rows).
 
 ### On-Chain
 
@@ -90,6 +94,8 @@ Most keys are optional. The app is designed to degrade to fallback data where po
 - `ETHERSCAN_API_KEY`, `ETHERSCAN_KEY`, `ETHERSCAN_API_BASE_URL`, `ETHERSCAN_CHAIN_ID`.
 - `COVALENT_API_KEY`, `COVALENT_KEY`, `COVALENT_API_BASE_URL`, `COVALENT_CHAIN_NAME`.
 - `ONCHAIN_TRACKED_TOKENS`, `ONCHAIN_IGNORED_ADDRESSES`.
+- `ONCHAIN_MODE` - `cheap` (default), `normal`, or `deep`; presets Covalent page counts/sizes, lookback, and cache TTL so overview refreshes don't burn credits. Individual `ONCHAIN_*` vars override the preset.
+- `ONCHAIN_COOLDOWN_CACHE_MS` - how long to serve the cached overview while Covalent cools down after a 402/429. During that window tracked-token flows fall back to Etherscan when `ETHERSCAN_API_KEY` is set.
 - `ONCHAIN_*` tuning values for lookbacks, page sizes, row counts, thresholds, and cache TTLs.
 
 See `.env.example` for the full list.
