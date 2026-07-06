@@ -36,9 +36,6 @@
     Object.assign(els, {
       banner: $("statusBanner"),
       sourceBadge: $("sourceBadge"),
-      lastUpdated: $("lastUpdated"),
-      clock: $("clock"),
-      refresh: $("refreshBtn"),
       session: $("sessionIndicator"),
       ticker: $("tickerTrack"),
       kpiGrid: $("kpiGrid"),
@@ -63,21 +60,16 @@
       }),
     );
 
-    els.refresh.addEventListener("click", () => loadOverview());
-
     renderDashboardLoading();
     loadOverview();
     setInterval(loadOverview, REFRESH_INTERVAL_MS);
-    setInterval(updateClock, 1000);
     setInterval(updateSession, 60_000);
-    updateClock();
     updateSession();
   }
 
   async function loadOverview() {
     if (state.loading) return;
     state.loading = true;
-    els.refresh.disabled = true;
     try {
       const response = await fetch(`/api/overview?range=${encodeURIComponent(state.range)}`, {
         headers: { Accept: "application/json" },
@@ -94,7 +86,6 @@
       renderError(error.message);
     } finally {
       state.loading = false;
-      els.refresh.disabled = false;
     }
   }
 
@@ -103,7 +94,6 @@
     if (!data) return;
     renderBanner(data);
     renderSourceBadge(data);
-    renderLastUpdated(data);
     renderTicker(data);
     renderKpis(data);
     renderPulse(data);
@@ -147,19 +137,6 @@
       els.sourceBadge.textContent = "● Fallback";
     }
     els.sourceBadge.title = (dq.sources || []).join(", ") || "no live sources";
-  }
-
-  function renderLastUpdated(data) {
-    if (!data.updatedAt) {
-      els.lastUpdated.textContent = "";
-      return;
-    }
-    const updated = new Date(data.updatedAt);
-    els.lastUpdated.textContent = `Updated ${updated.toLocaleTimeString(undefined, {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    })}`;
   }
 
   function renderTicker(data) {
@@ -428,15 +405,6 @@
     els.banner.innerHTML = `<strong>Overview API failed:</strong> ${escapeHtml(message)}. Showing last cached data if available.`;
     els.sourceBadge.className = "chip error";
     els.sourceBadge.textContent = "● Error";
-  }
-
-  function updateClock() {
-    els.clock.textContent = new Date().toLocaleString(undefined, {
-      weekday: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
   }
 
   function inSessionWindow(hour, open, close) {
