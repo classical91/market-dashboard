@@ -108,35 +108,41 @@
 
   function renderBanner(data) {
     const dq = data.dataQuality || {};
-    const warnings = Array.isArray(dq.warnings) ? dq.warnings : [];
-    if (!warnings.length && dq.live) {
+    // A fully live feed needs no banner. A merely partial feed (some
+    // sections on fallback) is surfaced compactly as a "⚠" on the source
+    // chip instead of a full-width banner — see renderSourceBadge. Only a
+    // wholesale fallback (no live data at all) is severe enough to warrant
+    // the persistent "do not trade on this" banner.
+    if (dq.live) {
       els.banner.classList.remove("show", "warning", "error");
       els.banner.innerHTML = "";
       return;
     }
-    const cls = dq.live ? "warning" : "error";
-    els.banner.className = `banner show ${cls}`;
-    const headline = dq.live
-      ? "Some sections are using fallback data — figures tagged “Fallback” are not live."
-      : "⚠ Sample fallback data — these are NOT live market prices. Do not trade on them.";
-    els.banner.innerHTML = `<strong>${headline}</strong>${
+    const warnings = Array.isArray(dq.warnings) ? dq.warnings : [];
+    els.banner.className = "banner show error";
+    els.banner.innerHTML = `<strong>⚠ Sample fallback data — these are NOT live market prices. Do not trade on them.</strong>${
       warnings.length ? `<ul>${warnings.map((w) => `<li>${escapeHtml(w)}</li>`).join("")}</ul>` : ""
     }`;
   }
 
   function renderSourceBadge(data) {
     const dq = data.dataQuality || {};
+    const warnings = Array.isArray(dq.warnings) ? dq.warnings : [];
     if (dq.live && !dq.partial) {
       els.sourceBadge.className = "chip live";
       els.sourceBadge.textContent = "● Live";
+      els.sourceBadge.title = (dq.sources || []).join(", ") || "no live sources";
     } else if (dq.live) {
       els.sourceBadge.className = "chip fallback";
-      els.sourceBadge.textContent = "● Partial";
+      els.sourceBadge.textContent = warnings.length ? "● Partial ⚠" : "● Partial";
+      els.sourceBadge.title = warnings.length
+        ? warnings.join(" • ")
+        : (dq.sources || []).join(", ") || "no live sources";
     } else {
       els.sourceBadge.className = "chip fallback";
       els.sourceBadge.textContent = "● Fallback";
+      els.sourceBadge.title = (dq.sources || []).join(", ") || "no live sources";
     }
-    els.sourceBadge.title = (dq.sources || []).join(", ") || "no live sources";
   }
 
   function renderTicker(data) {
