@@ -29,7 +29,13 @@ class OnchainService {
   }
 
   async getOverview() {
-    return this.cache.getOrLoad("onchain:overview", this.config.overviewCacheMs, async () => {
+    // During a Covalent cooldown, hold the (degraded) overview in cache longer
+    // so the fallback path isn't rebuilt on every refresh.
+    const cooldownAtEntry = Date.now() < this.covalentCooldownUntil;
+    const cacheTtl = cooldownAtEntry
+      ? Math.max(this.config.overviewCacheMs, this.config.cooldownCacheMs || 0)
+      : this.config.overviewCacheMs;
+    return this.cache.getOrLoad("onchain:overview", cacheTtl, async () => {
       const stablecoinNetflow = await this.defillamaService.getStablecoinNetflow(
         this.config.trackedTokens,
         this.config.defillamaChain,
@@ -37,14 +43,8 @@ class OnchainService {
 
       const cooldownActive = Date.now() < this.covalentCooldownUntil;
       if (!this.covalentService.isConfigured() || cooldownActive) {
-        return this.createOverviewPayload({
+        return this.buildDegradedOverview({
           stablecoinNetflow,
-          topInflows: [],
-          topOutflows: [],
-          accumulatedTokens: [],
-          distributedTokens: [],
-          largeTransfers: [],
-          metaSource: "defillama-fallback",
           note: cooldownActive ? this.covalentCooldownReason : null,
         });
       }
@@ -67,43 +67,9 @@ class OnchainService {
           startBlock,
         });
 
-        const walletFlows = this.aggregateWalletFlows(transfers);
-        const tokenTotals = this.aggregateTokenTotals(transfers);
-        const topInflows = walletFlows
-          .filter((row) => row.usd > 0)
-          .sort((left, right) => right.usd - left.usd)
-          .slice(0, this.config.maxWalletRows);
-        const topOutflows = walletFlows
-          .filter((row) => row.usd < 0)
-          .sort((left, right) => left.usd - right.usd)
-          .slice(0, this.config.maxWalletRows);
-        const accumulatedTokens = tokenTotals
-          .filter((row) => row.usd > 0)
-          .sort((left, right) => right.usd - left.usd)
-          .slice(0, this.config.maxTokenRows);
-        const distributedTokens = tokenTotals
-          .filter((row) => row.usd < 0)
-          .sort((left, right) => left.usd - right.usd)
-          .slice(0, this.config.maxTokenRows);
-        const largeTransfers = transfers
-          .filter((transfer) => transfer.usd >= this.config.largeTransferThresholdUsd)
-          .sort((left, right) => right.timestamp - left.timestamp)
-          .slice(0, this.config.maxLargeTransfers)
-          .map((transfer) => ({
-            txHash: transfer.txHash,
-            address: transfer.from,
-            token: transfer.tokenSymbol,
-            usd: transfer.usd,
-            time: transfer.time,
-          }));
-
-        return this.createOverviewPayload({
+        return this.buildOverviewFromTransfers({
           stablecoinNetflow,
-          topInflows,
-          topOutflows,
-          accumulatedTokens,
-          distributedTokens,
-          largeTransfers,
+          transfers,
           metaSource: this.etherscanService.isConfigured()
             ? "defillama-covalent-etherscan"
             : "defillama-covalent",
@@ -113,19 +79,127 @@ class OnchainService {
           this.startCovalentCooldown(error);
           // Degrade gracefully: keep the DefiLlama-derived stablecoin netflow
           // and pause Covalent rather than failing the whole on-chain section.
-          return this.createOverviewPayload({
+          return this.buildDegradedOverview({
             stablecoinNetflow,
-            topInflows: [],
-            topOutflows: [],
-            accumulatedTokens: [],
-            distributedTokens: [],
-            largeTransfers: [],
-            metaSource: "defillama-fallback",
             note: this.covalentCooldownReason,
           });
         }
         throw error;
       }
+    });
+  }
+
+  // Covalent is unavailable (unconfigured or cooling down). If Etherscan is
+  // configured, keep wallet/token flows alive from its tracked-token transfer
+  // feed; otherwise fall back to the DefiLlama-only payload.
+  async buildDegradedOverview({ stablecoinNetflow, note }) {
+    const emptyPayload = () =>
+      this.createOverviewPayload({
+        stablecoinNetflow,
+        topInflows: [],
+        topOutflows: [],
+        accumulatedTokens: [],
+        distributedTokens: [],
+        largeTransfers: [],
+        metaSource: "defillama-fallback",
+        note,
+      });
+
+    if (!this.etherscanService.isConfigured()) {
+      return emptyPayload();
+    }
+
+    try {
+      const cutoffTimestamp = Math.floor(Date.now() / 1000) - this.config.overviewLookbackHours * 3600;
+      const [priceMap, startBlock] = await Promise.all([
+        this.defillamaService.getTokenPrices(
+          this.config.trackedTokens.map((token) => token.contractAddress),
+          this.config.defillamaCoinChain,
+        ),
+        this.getOptionalStartBlock(cutoffTimestamp),
+      ]);
+
+      const transfers = await this.getTrackedTokenTransfersViaEtherscan({
+        cutoffTimestamp,
+        priceMap,
+        startBlock,
+      });
+
+      const etherscanNote = "Tracked-token flows served via Etherscan while Covalent is unavailable.";
+      return this.buildOverviewFromTransfers({
+        stablecoinNetflow,
+        transfers,
+        metaSource: "defillama-etherscan",
+        note: note ? `${note} ${etherscanNote}` : etherscanNote,
+      });
+    } catch {
+      // The Etherscan stand-in is best-effort only; never let it break the
+      // DefiLlama-only degraded payload.
+      return emptyPayload();
+    }
+  }
+
+  async getTrackedTokenTransfersViaEtherscan({ cutoffTimestamp, priceMap, startBlock }) {
+    const tokenTransfers = await Promise.all(
+      this.config.trackedTokens.map(async (token) => {
+        const rows = await this.etherscanService.getTokenTransfers({
+          contractAddress: token.contractAddress,
+          startBlock: Number.isFinite(startBlock) ? startBlock : 0,
+          endBlock: MAX_BLOCK_NUMBER,
+          page: 1,
+          offset: this.config.pageSize,
+          sort: "desc",
+        });
+
+        return rows
+          .map((row) => this.mapEtherscanTransferRow(row, token, priceMap.get(token.contractAddress) || 1))
+          .filter((row) => row && row.timestamp >= cutoffTimestamp);
+      }),
+    );
+
+    return tokenTransfers.flat();
+  }
+
+  buildOverviewFromTransfers({ stablecoinNetflow, transfers, metaSource, note = null }) {
+    const walletFlows = this.aggregateWalletFlows(transfers);
+    const tokenTotals = this.aggregateTokenTotals(transfers);
+    const topInflows = walletFlows
+      .filter((row) => row.usd > 0)
+      .sort((left, right) => right.usd - left.usd)
+      .slice(0, this.config.maxWalletRows);
+    const topOutflows = walletFlows
+      .filter((row) => row.usd < 0)
+      .sort((left, right) => left.usd - right.usd)
+      .slice(0, this.config.maxWalletRows);
+    const accumulatedTokens = tokenTotals
+      .filter((row) => row.usd > 0)
+      .sort((left, right) => right.usd - left.usd)
+      .slice(0, this.config.maxTokenRows);
+    const distributedTokens = tokenTotals
+      .filter((row) => row.usd < 0)
+      .sort((left, right) => left.usd - right.usd)
+      .slice(0, this.config.maxTokenRows);
+    const largeTransfers = transfers
+      .filter((transfer) => transfer.usd >= this.config.largeTransferThresholdUsd)
+      .sort((left, right) => right.timestamp - left.timestamp)
+      .slice(0, this.config.maxLargeTransfers)
+      .map((transfer) => ({
+        txHash: transfer.txHash,
+        address: transfer.from,
+        token: transfer.tokenSymbol,
+        usd: transfer.usd,
+        time: transfer.time,
+      }));
+
+    return this.createOverviewPayload({
+      stablecoinNetflow,
+      topInflows,
+      topOutflows,
+      accumulatedTokens,
+      distributedTokens,
+      largeTransfers,
+      metaSource,
+      note,
     });
   }
 

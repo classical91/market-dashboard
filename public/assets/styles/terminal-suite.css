@@ -227,6 +227,86 @@
   color: var(--term-red);
 }
 
+.terminal-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px;
+  border: 1px solid var(--term-line);
+  border-top: 0;
+  background: rgba(250, 253, 247, 0.72);
+  overflow-x: auto;
+}
+
+.terminal-preset-btn {
+  border: 0;
+  border-right: 1px solid var(--term-line);
+  background: transparent;
+  color: var(--term-muted);
+  padding: 11px 16px;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.terminal-preset-btn:hover,
+.terminal-preset-btn.active {
+  color: var(--term-green);
+  background: rgba(22, 122, 67, 0.09);
+}
+
+.terminal-health {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+  margin: 14px 0 0;
+}
+
+.terminal-health:empty {
+  display: none;
+}
+
+.terminal-health-card {
+  border: 1px solid var(--term-line);
+  background: rgba(250, 253, 247, 0.72);
+  padding: 10px 12px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: help;
+}
+
+.terminal-health-card span {
+  color: var(--term-muted);
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-weight: 800;
+}
+
+.terminal-health-card strong {
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.terminal-health-card.tone-good strong,
+.tone-good { color: var(--term-green); }
+.terminal-health-card.tone-warn strong,
+.tone-warn { color: var(--term-amber); }
+.terminal-health-card.tone-bad strong,
+.tone-bad { color: var(--term-red); }
+
+.terminal-health-card.tone-good { border-left: 3px solid var(--term-green); }
+.terminal-health-card.tone-warn { border-left: 3px solid var(--term-amber); }
+.terminal-health-card.tone-bad { border-left: 3px solid var(--term-red); }
+
 .terminal-banner {
   display: none;
   margin: 14px 0;
@@ -607,6 +687,90 @@
 .terminal-page .down { color: var(--term-red); }
 .terminal-page .flat { color: var(--term-amber); }
 
+.terminal-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(31, 48, 40, 0.45);
+  backdrop-filter: blur(2px);
+  z-index: 60;
+}
+
+.terminal-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(420px, 92vw);
+  z-index: 61;
+  overflow-y: auto;
+  border-left: 2px solid var(--term-line);
+  background: var(--term-paper);
+  box-shadow: var(--term-shadow);
+  color: var(--term-ink);
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.terminal-drawer-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px;
+  border-bottom: 1px solid var(--term-line);
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.terminal-drawer-head h2 {
+  margin: 4px 0 0;
+  font-size: 30px;
+  letter-spacing: 0.04em;
+}
+
+.terminal-drawer-name {
+  margin: 4px 0 0;
+  color: var(--term-muted);
+  font-style: italic;
+  font-size: 13px;
+}
+
+.terminal-drawer-body {
+  padding: 16px 18px 24px;
+  display: grid;
+  gap: 18px;
+}
+
+.terminal-drawer-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.terminal-drawer-section p {
+  margin: 8px 0 0;
+  color: var(--term-muted);
+  line-height: 1.55;
+  font-size: 14px;
+}
+
+.terminal-drawer-section .terminal-indicator-row {
+  padding: 11px 2px;
+}
+
+.terminal-drawer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.terminal-drawer-links .terminal-section-label {
+  width: 100%;
+}
+
+.terminal-drawer-links .terminal-button {
+  text-decoration: none;
+}
+
 @media (max-width: 1320px) {
   .terminal-layout {
     grid-template-columns: minmax(230px, 0.85fr) minmax(420px, 1.6fr);
@@ -640,6 +804,10 @@
 
   .terminal-micro-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .terminal-health {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -677,6 +845,14 @@
 
   .terminal-micro-grid,
   .terminal-crypto-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .terminal-health {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .terminal-drawer-stats {
     grid-template-columns: 1fr;
   }
 

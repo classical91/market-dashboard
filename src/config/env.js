@@ -74,6 +74,38 @@ function parseJsonArray(value) {
   }
 }
 
+// ONCHAIN_MODE presets tune how many Covalent pages/credits an overview
+// refresh may spend. Explicit ONCHAIN_* env vars still override the preset.
+// cheap (default): 1 page of 50 rows over 6h, cached 5 min — survives small
+// credit budgets. normal: the previous defaults. deep: wider scans for manual
+// deep dives.
+const ONCHAIN_MODE_PRESETS = {
+  cheap: {
+    overviewCacheMs: 300000,
+    overviewLookbackHours: 6,
+    pageSize: 50,
+    overviewPageLimit: 1,
+    tokenPageLimit: 1,
+  },
+  normal: {
+    overviewCacheMs: 180000,
+    overviewLookbackHours: 24,
+    pageSize: 100,
+    overviewPageLimit: 2,
+    tokenPageLimit: 2,
+  },
+  deep: {
+    overviewCacheMs: 120000,
+    overviewLookbackHours: 24,
+    pageSize: 100,
+    overviewPageLimit: 4,
+    tokenPageLimit: 4,
+  },
+};
+
+const onchainMode = String(process.env.ONCHAIN_MODE || "cheap").toLowerCase();
+const onchainModeDefaults = ONCHAIN_MODE_PRESETS[onchainMode] || ONCHAIN_MODE_PRESETS.cheap;
+
 const config = {
   port: parseNumber(process.env.PORT, 3000),
   admin: {
@@ -135,18 +167,28 @@ const config = {
   },
   onchain: {
     dataSourceLabel: "DefiLlama + Etherscan + Covalent (Dune-free)",
-    overviewCacheMs: parseNumber(process.env.ONCHAIN_OVERVIEW_CACHE_MS, 180000),
+    mode: onchainMode,
+    overviewCacheMs: parseNumber(process.env.ONCHAIN_OVERVIEW_CACHE_MS, onchainModeDefaults.overviewCacheMs),
     detailCacheMs: parseNumber(process.env.ONCHAIN_DETAIL_CACHE_MS, 60000),
     // How long to pause Covalent calls after a credit (402) or rate-limit (429)
     // error, so an exhausted account isn't re-hit on every overview refresh.
     covalentCreditCooldownMs: parseNumber(process.env.COVALENT_CREDIT_COOLDOWN_MS, 1800000),
     covalentRateCooldownMs: parseNumber(process.env.COVALENT_RATELIMIT_COOLDOWN_MS, 120000),
-    overviewLookbackHours: parseNumber(process.env.ONCHAIN_OVERVIEW_LOOKBACK_HOURS, 24),
+    // Serve the cached overview longer while Covalent is cooling down, so the
+    // degraded window doesn't burn Etherscan/DefiLlama calls every refresh.
+    cooldownCacheMs: parseNumber(process.env.ONCHAIN_COOLDOWN_CACHE_MS, 600000),
+    overviewLookbackHours: parseNumber(
+      process.env.ONCHAIN_OVERVIEW_LOOKBACK_HOURS,
+      onchainModeDefaults.overviewLookbackHours,
+    ),
     detailLookbackDays: parseNumber(process.env.ONCHAIN_DETAIL_LOOKBACK_DAYS, 7),
-    pageSize: parseNumber(process.env.ONCHAIN_OVERVIEW_PAGE_SIZE, 100),
+    pageSize: parseNumber(process.env.ONCHAIN_OVERVIEW_PAGE_SIZE, onchainModeDefaults.pageSize),
     detailPageSize: parseNumber(process.env.ONCHAIN_DETAIL_PAGE_SIZE, 100),
-    overviewPageLimit: parseNumber(process.env.ONCHAIN_OVERVIEW_PAGE_LIMIT, 2),
-    tokenPageLimit: parseNumber(process.env.ONCHAIN_TOKEN_PAGE_LIMIT, 2),
+    overviewPageLimit: parseNumber(
+      process.env.ONCHAIN_OVERVIEW_PAGE_LIMIT,
+      onchainModeDefaults.overviewPageLimit,
+    ),
+    tokenPageLimit: parseNumber(process.env.ONCHAIN_TOKEN_PAGE_LIMIT, onchainModeDefaults.tokenPageLimit),
     maxLargeTransfers: parseNumber(process.env.ONCHAIN_MAX_LARGE_TRANSFERS, 25),
     maxWalletRows: parseNumber(process.env.ONCHAIN_MAX_WALLET_ROWS, 10),
     maxTokenRows: parseNumber(process.env.ONCHAIN_MAX_TOKEN_ROWS, 10),

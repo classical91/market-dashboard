@@ -56,12 +56,32 @@ class OverviewService {
     else if (globalData.error) warnings.push(withReason("Crypto allocation using fallback", globalData.error));
     if (equities.live) sources.push("finnhub:equities");
     else warnings.push(withReason("Equities using fallback (set FINNHUB_API_KEY for live)", equities.error));
-    if (!macro.live) warnings.push("Macro/FX using fallback (no provider configured).");
-    if (!news.live) warnings.push("News feed using fallback (no MARKET_NEWS_URL configured).");
-    if (!calendar.live) warnings.push("Macro calendar using fallback (no provider configured).");
+    if (macro.live) {
+      sources.push(`${macro.source}:macro`);
+    } else if (macro.stale) {
+      sources.push(`${macro.source}:macro (delayed)`);
+      warnings.push(withReason("Macro/FX delayed — showing last live values", macro.error));
+    } else {
+      warnings.push(withReason("Macro/FX using fallback (set FINNHUB_API_KEY or MACRO_DATA_URL for live)", macro.error));
+    }
+    if (news.live) sources.push("news:feed");
+    else warnings.push(withReason("News feed using fallback (set MARKET_NEWS_URL for live)", news.error));
+    if (calendar.live) sources.push("calendar:feed");
+    else warnings.push(withReason("Macro calendar using fallback (set MACRO_CALENDAR_URL for live)", calendar.error));
     if (onchainResult.error) warnings.push(withReason("On-chain service unavailable", onchainResult.error.message));
     if (onchain?.meta?.note) warnings.push(onchain.meta.note);
     if (onchain) sources.push("internal:onchain");
+
+    // Per-module health so the UI can show status cards instead of relying on
+    // parsing warning strings.
+    const modules = {
+      crypto: crypto.live ? "live" : crypto.stale ? "delayed" : "fallback",
+      equities: equities.live ? "live" : "fallback",
+      macro: macro.live ? "live" : macro.stale ? "delayed" : "fallback",
+      news: news.live ? "live" : "fallback",
+      calendar: calendar.live ? "live" : "fallback",
+      onchain: buildOnchainModuleStatus(onchain),
+    };
 
     const ticker = [...crypto.items, ...equities.items, ...macro.items].map((item) => ({
       symbol: item.symbol,
@@ -69,6 +89,7 @@ class OverviewService {
       price: item.price,
       changePercent: item.changePercent,
       volume: item.volume,
+      ...(item.proxy ? { proxy: true } : {}),
     }));
 
     const watchlist = ticker.map((row, index) => {
@@ -116,8 +137,9 @@ class OverviewService {
     const traditionalTicker = [
       ...equities.items.map((item) => ({ ...item, type: "equity" })),
       ...macro.items.map((item) => ({ ...item, type: "macro" })),
-    ].map(({ symbol, name, price, changePercent, volume, type }) => ({
+    ].map(({ symbol, name, price, changePercent, volume, type, proxy }) => ({
       symbol, name, price, changePercent, volume, type,
+      ...(proxy ? { proxy: true } : {}),
     }));
 
     return {
@@ -140,6 +162,7 @@ class OverviewService {
         partial,
         sources,
         warnings,
+        modules,
       },
       scopes: {
         crypto: {
@@ -380,6 +403,18 @@ function buildAllocation(globalData) {
     })),
     live: Boolean(globalData.live),
   };
+}
+
+// full = DefiLlama + Covalent flows; limited = Etherscan standing in for
+// Covalent; paused = Covalent cooling down after 402/429; defillama-only =
+// Covalent not configured; unavailable = the on-chain service errored.
+function buildOnchainModuleStatus(onchain) {
+  if (!onchain) return "unavailable";
+  const source = String(onchain.meta?.source || "");
+  if (source.startsWith("defillama-covalent")) return "full";
+  if (source.startsWith("defillama-etherscan")) return "limited";
+  if (onchain.meta?.note) return "paused";
+  return "defillama-only";
 }
 
 function safe(fn) {

@@ -48,7 +48,11 @@
           </div>
         </section>
 
+        <section class="terminal-presets" id="terminalPresets" role="group" aria-label="Terminal presets"></section>
+
         <div id="terminalBanner" class="terminal-banner" role="status" aria-live="polite"></div>
+
+        <section class="terminal-health" id="terminalHealth" aria-label="Module health"></section>
 
         <section class="terminal-tape" aria-label="Cross asset ticker">
           <div class="terminal-tape-track" id="terminalTape"></div>
@@ -154,6 +158,19 @@
         <p class="terminal-footer">Terminal Suite uses the existing Market Command overview feed: <code>/api/overview</code>.</p>
       </main>
     </div>
+
+    <div class="terminal-drawer-backdrop" id="drawerBackdrop" hidden></div>
+    <aside class="terminal-drawer" id="assetDrawer" role="dialog" aria-modal="true" aria-label="Asset detail" hidden>
+      <div class="terminal-drawer-head">
+        <div>
+          <div class="terminal-section-label" id="drawerType">Asset</div>
+          <h2 id="drawerSymbol">--</h2>
+          <p class="terminal-drawer-name" id="drawerName"></p>
+        </div>
+        <button class="terminal-button" id="drawerClose" type="button">✕ Close</button>
+      </div>
+      <div class="terminal-drawer-body" id="drawerBody"></div>
+    </aside>
 
     <script src="/assets/js/ui.js"></script>
     <script src="/assets/js/sidebar.js"></script>
