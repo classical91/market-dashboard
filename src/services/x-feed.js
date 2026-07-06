@@ -23,6 +23,9 @@ const MAX_FALLBACK_POST_AGE_MS = 45 * 24 * 60 * 60 * 1000;
 // Recent-search query length cap on the Basic tier.
 const MAX_QUERY_LENGTH = 512;
 const MAX_RESULTS_PER_BATCH = 100;
+// Recent search only indexes ~7 days; a since_id older than that is rejected
+// with a 400, so only poll incrementally when the anchor post is younger.
+const SINCE_ID_MAX_AGE_MS = 6 * 24 * 60 * 60 * 1000;
 
 const BROWSER_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
@@ -139,7 +142,7 @@ async function fetchJsonWithTimeout(url, { headers = {}, timeoutMs = REQUEST_TIM
 }
 
 const TWEET_LOOKUP_PARAMS = {
-  "tweet.fields": "author_id,created_at,attachments",
+  "tweet.fields": "author_id,created_at,attachments,note_tweet",
   expansions: "author_id,attachments.media_keys",
   "user.fields": "name,username",
   "media.fields": "type,url,preview_image_url",
@@ -157,7 +160,9 @@ function mapXApiPost(tweet, usersById, mediaByKey, handle) {
 
   return {
     id: tweet.id,
-    text: tweet.text,
+    // Long-form posts (>280 chars) arrive truncated in `text`; the full body
+    // lives in `note_tweet` when requested.
+    text: tweet.note_tweet?.text || tweet.text,
     image: image || null,
     url: `https://x.com/${username}/status/${tweet.id}`,
     publishedAt: tweet.created_at ? new Date(tweet.created_at).toISOString() : null,
@@ -170,6 +175,32 @@ function newestPostAgeMs(feed) {
     return Math.max(latest, Number.isFinite(time) ? time : 0);
   }, 0);
   return newest ? Date.now() - newest : Infinity;
+}
+
+// Post IDs are 64-bit snowflakes serialized as strings; compare as BigInt.
+function comparePostIds(a, b) {
+  try {
+    const diff = BigInt(a) - BigInt(b);
+    return diff > 0n ? 1 : diff < 0n ? -1 : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function newestPostId(posts) {
+  let newest = null;
+  for (const post of posts || []) {
+    if (post.id && (!newest || comparePostIds(post.id, newest) > 0)) newest = post.id;
+  }
+  return newest;
+}
+
+function mergePosts(fresh, prior) {
+  const seen = new Set(fresh.map((post) => post.id));
+  return fresh
+    .concat((prior || []).filter((post) => !seen.has(post.id)))
+    .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
+    .slice(0, MAX_POSTS_PER_ACCOUNT);
 }
 
 function batchQuery(handles) {
@@ -217,7 +248,7 @@ class XFeedService {
    * filled a whole page, an empty feed may just mean the handle was crowded
    * out by higher-volume accounts rather than genuinely quiet.
    */
-  async _fetchApiBatch(handles) {
+  async _fetchApiBatch(handles, sinceId) {
     const token = xBearerToken();
     if (!token) {
       throw createServiceError("X API bearer token is not configured", 503);
@@ -228,6 +259,7 @@ class XFeedService {
       query: batchQuery(handles),
       max_results: String(maxResults),
       sort_order: "recency",
+      ...(sinceId ? { since_id: sinceId } : {}),
       ...TWEET_LOOKUP_PARAMS,
     });
 
@@ -270,12 +302,12 @@ class XFeedService {
     return { feeds, truncated };
   }
 
-  _fetchApiBatchDeduped(handles) {
-    const key = handles.join(",");
+  _fetchApiBatchDeduped(handles, sinceId) {
+    const key = `${handles.join(",")}@${sinceId || ""}`;
     const inflight = this._inflightBatches.get(key);
     if (inflight) return inflight;
 
-    const pending = this._fetchApiBatch(handles).finally(() => {
+    const pending = this._fetchApiBatch(handles, sinceId).finally(() => {
       this._inflightBatches.delete(key);
     });
     this._inflightBatches.set(key, pending);
@@ -460,18 +492,49 @@ class XFeedService {
 
     const apiFailures = new Map();
     if (xBearerToken()) {
-      const batches = buildQueryBatches(misses);
+      // Poll incrementally where possible: a handle whose last known feed is
+      // recent enough gets a since_id anchor, so recent search only returns
+      // (and only bills against the monthly post cap) posts newer than what
+      // we already have, instead of re-fetching the same page every refresh.
+      const priorPosts = new Map();
+      const anchors = new Map();
+      for (const handle of misses) {
+        const prior = this.cache.get(`x:feed:latest:${handle}`);
+        if (!prior?.posts?.length) continue;
+        priorPosts.set(handle, prior.posts);
+        const anchor = newestPostId(prior.posts);
+        if (anchor && newestPostAgeMs(prior) <= SINCE_ID_MAX_AGE_MS) anchors.set(handle, anchor);
+      }
+      const cacheMerged = (handle, freshPosts) => {
+        const posts = mergePosts(freshPosts, priorPosts.get(handle));
+        if (!posts.length) return false;
+        const feed = { handle, posts, source: "api" };
+        this._cacheFreshFeed(handle, feed);
+        feeds.set(handle, feed);
+        return true;
+      };
+
+      const incremental = misses.filter((handle) => anchors.has(handle));
+      const cold = misses.filter((handle) => !anchors.has(handle));
+      const batches = [
+        ...buildQueryBatches(incremental).map((batch) => ({
+          handles: batch,
+          // The oldest anchor in the batch, so no handle can miss a post.
+          sinceId: batch
+            .map((handle) => anchors.get(handle))
+            .reduce((a, b) => (comparePostIds(a, b) <= 0 ? a : b)),
+        })),
+        ...buildQueryBatches(cold).map((batch) => ({ handles: batch, sinceId: null })),
+      ];
+
       const settled = await Promise.allSettled(
-        batches.map((batch) => this._fetchApiBatchDeduped(batch)),
+        batches.map(({ handles: batchHandles, sinceId }) => this._fetchApiBatchDeduped(batchHandles, sinceId)),
       );
       const crowdedOut = [];
       settled.forEach((result, index) => {
         if (result.status === "fulfilled") {
           for (const [handle, feed] of result.value.feeds) {
-            if (feed.posts.length) {
-              this._cacheFreshFeed(handle, feed);
-              feeds.set(handle, feed);
-            } else if (result.value.truncated) {
+            if (!cacheMerged(handle, feed.posts) && result.value.truncated) {
               // A full page sorted by recency can be dominated by one
               // high-volume account (e.g. Barchart), leaving quieter handles
               // with zero posts even though they tweeted recently.
@@ -481,8 +544,8 @@ class XFeedService {
           return;
         }
         const message = result.reason?.message || "X API request failed";
-        console.warn(`[x-feed] X API batch failed (${batches[index].join(", ")}): ${message}`);
-        batches[index].forEach((handle) => apiFailures.set(handle, message));
+        console.warn(`[x-feed] X API batch failed (${batches[index].handles.join(", ")}): ${message}`);
+        batches[index].handles.forEach((handle) => apiFailures.set(handle, message));
       });
 
       if (crowdedOut.length) {
@@ -490,16 +553,12 @@ class XFeedService {
           `[x-feed] batch page was full; re-fetching crowded-out handles individually: ${crowdedOut.join(", ")}`,
         );
         const topUps = await Promise.allSettled(
-          crowdedOut.map((handle) => this._fetchApiBatchDeduped([handle])),
+          crowdedOut.map((handle) => this._fetchApiBatchDeduped([handle], anchors.get(handle) || null)),
         );
         topUps.forEach((result, index) => {
           const handle = crowdedOut[index];
           if (result.status === "fulfilled") {
-            const feed = result.value.feeds.get(handle);
-            if (feed.posts.length) {
-              this._cacheFreshFeed(handle, feed);
-              feeds.set(handle, feed);
-            }
+            cacheMerged(handle, result.value.feeds.get(handle).posts);
             return;
           }
           const message = result.reason?.message || "X API request failed";
