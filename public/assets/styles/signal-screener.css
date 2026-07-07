@@ -12,7 +12,7 @@
 
 .ss-updated {
   font-size: 11px;
-  color: var(--dim);
+  color: var(--green);
 }
 
 .ss-updated--stale {
