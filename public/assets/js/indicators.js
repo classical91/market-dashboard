@@ -629,6 +629,26 @@
       read: "Good risk management keeps one bad idea from damaging the account. Define risk before entry, not after price moves against you.",
     },
     {
+      id: "market-regime", term: "Market Regime", category: "Trading Risk & Strategy",
+      def: "The prevailing state of the market — risk-on, risk-off, trending, ranging, high-volatility, or low-volatility — that should be identified before choosing which setups or indicators to lean on.",
+      read: "Trend tools underperform in a ranging regime, and range tools underperform in a trending one. Identify the regime first, then pick your tools, not the other way around.",
+    },
+    {
+      id: "setup-quality", term: "Setup Quality", category: "Trading Risk & Strategy",
+      def: "A second layer of scoring on top of a raw signal, weighing regime alignment, trend strength, and news risk to judge whether a signal is worth acting on — not just whether it fired.",
+      read: "A trader watching 20 markets should only act on the 1-3 with the highest setup quality. More indicators firing doesn't help if the regime or news risk cancels the edge.",
+    },
+    {
+      id: "correlation", term: "Correlation (Cross-Asset)", category: "Trading Risk & Strategy",
+      def: "How closely two assets' price movements track each other, measured from -1 (perfect inverse) to +1 (perfect together).",
+      read: "Holding several \"different\" positions that are all highly correlated (e.g. long BTC, long ETH, long QQQ) is really one large concentrated bet. Size and risk should account for that, not just the number of open tickets.",
+    },
+    {
+      id: "execution-trigger", term: "Execution Trigger", category: "Trading Risk & Strategy",
+      def: "The specific, observable condition that turns a thesis into a trade — a break of structure, a retest, trend continuation, a liquidity sweep, a support/resistance reaction, or volume confirmation.",
+      read: "A thesis without an execution trigger is just an opinion. Write the trigger down before the trade, not after price has already moved.",
+    },
+    {
       id: "using-calculus", term: "Using Calculus", category: "Trading Risk & Strategy",
       def: "Applying rate-of-change, slope, acceleration, and curvature concepts to understand how price, volatility, or momentum is changing.",
       read: "In practice, calculus ideas show up as momentum, acceleration, and derivative-style signals. Use them to study change, not to overfit trades.",
@@ -721,7 +741,7 @@
     {
       id: "money-flow-between-assets", term: "Money Flow Between Assets", category: "Market Cap & Dominance",
       def: "Rotation of capital between asset classes, sectors, or tokens as investors seek risk, safety, yield, or momentum.",
-      read: "Track flow from cash to bonds, equities, commodities, BTC, ETH, and alts. Rotation often explains relative strength before headlines do.",
+      read: "Track flow from cash to bonds, equities, commodities, BTC, ETH, and alts. A common cross-asset sequence runs stocks to bonds to USD to gold to oil to BTC/crypto to forex, though the order isn't fixed and can run in reverse. Rotation often explains relative strength before headlines do.",
     },
     {
       id: "venture-capitalist", term: "Venture Capitalist (VC)", category: "Market Participants",
@@ -824,6 +844,11 @@
       read: "Good shortcuts remove friction without hiding risk. Keep automations transparent enough that you can audit their output.",
     },
     {
+      id: "trading-system-layers", term: "Trading System Layers", category: "Trading Tools & Workflows",
+      def: "A four-layer mental model for a trading practice: the dashboard maps the market (regime, rotation, setups), the strategy defines entry rules, the risk system defines survival (sizing, invalidation, max loss), and the journal drives improvement (grading past signals against outcomes).",
+      read: "Keep the layers separate. A dashboard cluttered with every indicator doesn't replace a strategy, and a strategy without a journal never actually improves — each layer has one job.",
+    },
+    {
       id: "website-ideas", term: "Website to Visit Ideas", category: "Trading Tools & Workflows",
       def: "A curated research list of data sources, dashboards, news feeds, screeners, and charting tools.",
       read: "Group websites by decision type: macro, crypto, on-chain, derivatives, news, execution, and watchlists.",
@@ -902,6 +927,11 @@
       id: "global-liquidity", term: "Global Liquidity", category: "Macro & Global Liquidity",
       def: "The availability of money and credit across the global financial system, influenced by central banks, fiscal policy, banking conditions, and dollar funding.",
       read: "Rising global liquidity tends to support risk assets; tightening liquidity pressures them. Track dollar strength, yields, central-bank balance sheets, and credit spreads.",
+    },
+    {
+      id: "liquidity-rotation", term: "Liquidity Rotation", category: "Macro & Global Liquidity",
+      def: "The idea that QE, fiscal deficits, and bailouts push new liquidity into the financial system, and that money doesn't disappear — it rotates through assets, not wages, historically in a rough order: bonds, then stocks, then real assets, then speculation, then collapse.",
+      read: "Treat it as a liquidity-timing argument, not a \"money printer go brr forever\" thesis. The further the rotation has run into the speculative stage, the more the environment favors tightening risk over adding it.",
     },
     {
       id: "non-farm-payrolls", term: "Non-Farm Payrolls (NFP)", category: "Macro & Global Liquidity",
