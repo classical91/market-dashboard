@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="/assets/styles/command.css" />
     <link rel="stylesheet" href="/assets/styles/components.css" />
     <link rel="stylesheet" href="/assets/styles/terminal-suite.css" />
+    <link rel="stylesheet" href="/assets/styles/strategy-engine.css" />
     <script src="/assets/js/settings.js"></script>
   </head>
   <body>
@@ -32,6 +33,7 @@
         <section class="terminal-tabs" aria-label="Terminal tools">
           <a class="terminal-tab active" href="#macro-regime">Macro Regime</a>
           <a class="terminal-tab" href="#confluence">Confluence</a>
+          <a class="terminal-tab" href="#strategy-engine">Strategy Engine</a>
           <a class="terminal-tab" href="#cross-asset">Cross-Asset</a>
           <a class="terminal-tab" href="#calendar">Calendar</a>
           <a class="terminal-tab" href="/crypto.html#interactive-dashboards">Dashboards</a>
@@ -109,6 +111,24 @@
               </div>
             </article>
 
+            <article class="terminal-panel" id="strategy-engine">
+              <div class="terminal-panel-head">
+                <div>
+                  <div class="terminal-section-label">Strategy Engine</div>
+                  <h2>EMA/VWAP/RSI Backtest</h2>
+                </div>
+                <span class="terminal-mini-tag" id="strategyStatus">Loading</span>
+              </div>
+              <div class="strategy-controls" aria-label="Strategy controls">
+                <select id="strategySymbol" class="strategy-select" aria-label="Strategy symbol"></select>
+                <select id="strategyInterval" class="strategy-select" aria-label="Strategy timeframe"></select>
+                <button class="terminal-button" id="strategyRun" type="button">Run Strategy</button>
+              </div>
+              <div class="strategy-grid" id="strategySignal"></div>
+              <div class="strategy-metrics" id="strategyMetrics"></div>
+              <div class="strategy-trades" id="strategyTrades"></div>
+            </article>
+
             <article class="terminal-panel terminal-thesis-card">
               <div class="terminal-panel-head">
                 <div>
@@ -155,7 +175,7 @@
           </aside>
         </section>
 
-        <p class="terminal-footer">Terminal Suite uses the existing Market Command overview feed: <code>/api/overview</code>.</p>
+        <p class="terminal-footer">Terminal Suite uses the existing Market Command overview feed plus <code>/api/strategy-engine</code> for candle-based strategy testing.</p>
       </main>
     </div>
 
@@ -176,5 +196,6 @@
     <script src="/assets/js/sidebar.js"></script>
     <script src="/assets/js/terminal-suite-fixes.js"></script>
     <script src="/assets/js/terminal-suite.js"></script>
+    <script src="/assets/js/strategy-engine-widget.js"></script>
   </body>
 </html>
