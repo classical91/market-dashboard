@@ -18,6 +18,7 @@ const { createDecisionRouter } = require("./routes/decision");
 const { createLayoutAnalysisRouter } = require("./routes/layout-analysis");
 const { createPatternScannerRouter } = require("./routes/pattern-scanner");
 const { createSignalScreenerRouter } = require("./routes/signal-screener");
+const { createStrategyEngineRouter } = require("./routes/strategy-engine");
 const { createWatchlistRouter } = require("./routes/watchlist");
 const { createPatternTrackerRouter } = require("./routes/pattern-tracker");
 const { createHealthRouter } = require("./routes/health");
@@ -37,6 +38,7 @@ const { LayoutAnalysisService } = require("./services/layout-analysis");
 const { LayoutCaptureService } = require("./services/layout-capture");
 const { PatternScannerService } = require("./services/pattern-scanner");
 const { SignalScreenerService } = require("./services/signal-screener");
+const { StrategyEngineService } = require("./services/strategy-engine");
 const { SignalBotService } = require("./services/signal-bot");
 const { WatchlistService } = require("./services/watchlist");
 const { PatternTrackerService } = require("./services/pattern-tracker");
@@ -112,6 +114,7 @@ function createApp() {
   });
   const patternScannerService = new PatternScannerService({ cache, tokens: TOP_TOKENS });
   const signalScreenerService = new SignalScreenerService({ cache });
+  const strategyEngineService = new StrategyEngineService({ signalScreenerService });
   const watchlistService = new WatchlistService({ dataDir });
   const patternTrackerService = new PatternTrackerService({ dataDir, fetchPrice: fetchBinancePrice });
   const decisionEngineService = new DecisionEngineService({
@@ -173,6 +176,7 @@ function createApp() {
   );
   app.use("/api/pattern-scanner", createPatternScannerRouter({ patternScannerService }));
   app.use("/api/signal-screener", createSignalScreenerRouter({ signalScreenerService }));
+  app.use("/api/strategy-engine", createStrategyEngineRouter({ strategyEngineService }));
   app.use("/api/decision", createDecisionRouter({ decisionEngineService, tradeJournalService, requireAdmin }));
   app.use("/api/watchlist", createWatchlistRouter({ watchlistService, requireAdmin }));
   app.use("/api/pattern-tracker", createPatternTrackerRouter({ patternTrackerService }));
