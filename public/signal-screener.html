@@ -94,6 +94,7 @@
       if (el) el.textContent = new Date().toLocaleString(undefined, {
         weekday: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit'
       });
+      renderUpdated();
     }
     tick(); setInterval(tick, 1000);
 
@@ -135,6 +136,33 @@
 
     function adxClass(adx) {
       return adx != null && adx > 25 ? 'ss-adx--trending' : 'ss-adx--flat';
+    }
+
+    var lastScanAt = null;
+
+    // Calendar-day difference, not a 24h rolling window — a scan at 11:58pm
+    // read the next morning should say "yesterday", not "0 days ago".
+    function daysAgo(date, now) {
+      var startOfDay = function (d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); };
+      return Math.round((startOfDay(now) - startOfDay(date)) / 86400000);
+    }
+
+    function renderUpdated() {
+      if (!lastScanAt) return;
+      var now = new Date();
+      var age = daysAgo(lastScanAt, now);
+      var full = lastScanAt.toLocaleString(undefined, {
+        weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+      });
+      if (age <= 0) {
+        updatedEl.className = 'ss-updated';
+        updatedEl.textContent = 'Updated ' + full;
+      } else {
+        updatedEl.className = 'ss-updated ss-updated--stale';
+        var when = age === 1 ? 'yesterday' : age + ' days ago';
+        updatedEl.textContent = '⚠️ Last scanned ' + when + ' — ' + full;
+      }
     }
 
     var TV_INTERVALS = { '1h': '60', '4h': '240', '1D': 'D' };
@@ -215,7 +243,8 @@
         .then(function (res) { return res.json(); })
         .then(function (data) {
           renderSplit(data.results || []);
-          updatedEl.textContent = 'Updated ' + new Date().toLocaleTimeString();
+          lastScanAt = new Date();
+          renderUpdated();
         })
         .catch(function (err) {
           notice.style.display = 'block';

@@ -15,6 +15,11 @@
   color: var(--dim);
 }
 
+.ss-updated--stale {
+  color: var(--red);
+  font-weight: 700;
+}
+
 .ss-summary-strip {
   display: flex;
   gap: 20px;
