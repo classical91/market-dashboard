@@ -34,6 +34,7 @@
       label: "AI Analysis",
       icon: "&#129504;",
       children: [
+        { href: "/decision.html", icon: "&#127919;", label: "Decision Engine" },
         { href: "/ai-analysis.html", icon: "&#129504;", label: "AI Analysis" },
         { href: "/layout-analysis.html", icon: "&#128248;", label: "My Layouts" },
         { href: "/pattern-scanner.html", icon: "&#128200;", label: "Pattern Scanner" },

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Decision Engine · Market Command</title>
+  <script src="/assets/js/settings.js"></script>
+  <link rel="stylesheet" href="/assets/styles/command.css" />
+  <link rel="stylesheet" href="/assets/styles/ai-analysis.css" />
+  <link rel="stylesheet" href="/assets/styles/decision.css" />
+</head>
+<body>
+<div class="app">
+  <aside class="cmd-sidebar"></aside>
+  <main class="cmd-main">
+
+    <div class="cmd-page-header">
+      <div>
+        <div class="cmd-page-title">&#127919; Decision Engine</div>
+        <div class="cmd-page-subtitle">What environment am I in, and which setup has the best risk-adjusted odds right now &mdash; regime, rotation, setup ranking, execution levels and the journal that grades it all</div>
+      </div>
+      <div class="cmd-clock" id="cmd-clock"></div>
+    </div>
+
+    <div class="aia-notice" id="de-notice" style="display:none"></div>
+
+    <div class="de-toolbar">
+      <select class="aia-select" id="de-interval">
+        <option value="1h">1h</option>
+        <option value="4h" selected>4h</option>
+        <option value="1D">1D</option>
+      </select>
+      <button class="aia-run-btn" type="button" id="de-refresh-btn">Refresh</button>
+      <span class="de-updated" id="de-updated"></span>
+    </div>
+
+    <div class="de-warnings" id="de-warnings" style="display:none"></div>
+
+    <div class="de-top-grid">
+      <div class="de-card" id="de-regime-card">
+        <div class="de-card-title">Market Regime</div>
+        <div id="de-regime-body"><div class="de-empty">Loading regime&hellip;</div></div>
+      </div>
+      <div class="de-card">
+        <div class="de-card-title">Rotation Board</div>
+        <div id="de-rotation-body"><div class="de-empty">Loading rotation&hellip;</div></div>
+      </div>
+    </div>
+
+    <div class="de-news-strip de-news--low" id="de-news-strip" style="display:none"></div>
+
+    <div class="de-section">
+      <div class="de-section-head">
+        <span class="de-section-title">Setup Ranking</span>
+        <span class="de-section-hint">Screener confluence &times; regime alignment &times; trend strength &times; news risk &mdash; a scanner ranking, not blind entries</span>
+      </div>
+      <div class="de-table-wrap">
+        <table class="de-table" id="de-setups-table">
+          <thead>
+            <tr>
+              <th>Token</th><th>Signal</th><th>Setup Score</th><th>Action</th>
+              <th>Confluence</th><th>Regime Fit</th><th>Trend</th><th>News</th><th>Price</th>
+            </tr>
+          </thead>
+          <tbody id="de-setups-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="de-section">
+      <div class="de-section-head">
+        <span class="de-section-title">Execution Panel</span>
+        <span class="de-section-hint">Trigger / invalidation / target from recent swing structure and ATR &mdash; verify levels on the chart before acting</span>
+      </div>
+      <div class="de-exec-grid" id="de-exec-grid"><div class="de-empty">Loading plans&hellip;</div></div>
+    </div>
+
+    <div class="de-section">
+      <div class="de-section-head">
+        <span class="de-section-title">Trading Journal</span>
+        <span class="de-section-hint">Log signals, grade outcomes, and check whether the engine&rsquo;s scores are actually predictive (admin key needed to write)</span>
+      </div>
+      <div class="de-journal-stats" id="de-journal-stats" style="display:none"></div>
+      <div class="de-table-wrap">
+        <table class="de-table de-journal-table">
+          <thead>
+            <tr>
+              <th>Logged</th><th>Token</th><th>Signal</th><th>Score</th><th>Regime</th><th>Plan R:R</th>
+              <th>Taken</th><th>Result</th><th>Review</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="de-journal-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <footer>Decision Engine &mdash; <a href="/signal-screener.html">Signal Screener</a> &mdash; <a href="/pattern-scanner.html">Pattern Scanner</a> &mdash; <a href="/">Overview</a></footer>
+
+  </main>
+</div>
+<script src="/assets/js/sidebar.js"></script>
+<script src="/assets/js/admin-key.js"></script>
+<script src="/assets/js/decision.js"></script>
+</body>
+</html>
