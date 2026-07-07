@@ -534,9 +534,19 @@
       read: "Post-only helps avoid taker fees and prevents accidental marketable fills, but it can miss fast-moving entries.",
     },
     {
-      id: "bid-ask-takers", term: "Puts, Ask Price, Bid Price, and Takers", category: "Order Types & Execution",
-      def: "Puts are options that gain value when the underlying falls; bid is the highest buyer price; ask is the lowest seller price; takers execute immediately against resting liquidity.",
-      read: "A wide bid-ask spread means expensive execution. Heavy taker buying or selling shows urgency, but can also mark exhaustion if price stops moving.",
+      id: "bid-ask-price", term: "Bid & Ask (Offer) Price", category: "Order Types & Execution",
+      def: "The bid is the highest price a buyer is currently willing to pay for a security; the ask (or offer) is the lowest price a seller is currently willing to accept. Sellers typically receive the bid; buyers typically pay the ask.",
+      read: "The bid sits at or below the ask in a functioning market — the gap between them is the bid-ask spread. Watch how each side moves as you approach a trade: a bid pulling away as you try to buy signals thinning liquidity on that side.",
+    },
+    {
+      id: "makers-vs-takers", term: "Makers vs. Takers", category: "Order Types & Execution",
+      def: "Takers execute immediately at the current bid or ask — a market order to buy takes the lowest ask, a market order to sell takes the highest bid — removing that resting order from the book. Makers place orders that aren't immediately matched (limit orders away from the current price), adding depth to the book instead.",
+      read: "Most venues charge takers more than makers, since takers remove liquidity while makers supply it. Heavy taker buying/selling shows urgency and can mark exhaustion once it stops moving price further; heavy maker activity building on one side shows resting interest at that level.",
+    },
+    {
+      id: "put-option", term: "Put Option", category: "Futures & Derivatives",
+      def: "An options contract that gains value as the underlying asset's price falls, giving the holder the right — not the obligation — to sell at a set strike price before expiration.",
+      read: "Puts are used both to speculate on a decline and to hedge an existing long position. Weigh implied volatility and time decay against the expected move before buying one outright.",
     },
     {
       id: "option-trading", term: "Option Trading", category: "Futures & Derivatives",
@@ -1152,18 +1162,179 @@
     },
   ];
 
+  var CORE_VOCAB_GLOSSARY = [
+    {
+      id: "bulls-bears", term: "Bulls & Bears", category: "Core Trading Vocabulary",
+      def: "Bulls are traders/investors buying because they expect price to rise; bears are those selling or shorting because they expect price to fall — the market's basic two-sided vocabulary for buyer vs. seller conviction.",
+      read: "A “bullish” market, asset, or setup means net buying pressure is expected to win; “bearish” means net selling pressure is expected to win. Don't confuse the label with certainty — both sides are trading at every price.",
+    },
+    {
+      id: "long-short", term: "Long & Short", category: "Core Trading Vocabulary",
+      def: "Going long means opening a position expecting price to rise (buy first, profit if it goes up); going short means opening a position expecting price to fall (sell or borrow first, profit if it goes down).",
+      read: "Shorting typically carries different mechanics and risk than going long — borrowing costs, funding rates, and in a naked short, theoretically unlimited loss. Know your instrument's specific short mechanics before using it.",
+    },
+    {
+      id: "dominant-trend-direction", term: "Dominant Trend Direction (DTD)", category: "Core Trading Vocabulary",
+      def: "The main direction the market is moving on the timeframe you're trading — the higher-order bias that pullbacks and legs happen inside of.",
+      read: "Establish DTD before looking at entries. Trades aligned with DTD have a structural tailwind; counter-DTD trades need a stronger, confirmed reason to work.",
+    },
+    {
+      id: "consolidated-ranging-market", term: "Consolidated / Ranging Market", category: "Core Trading Vocabulary",
+      def: "A period where price lacks a clear directional leader, typically driven by low volume, indecision, or uncertainty, and stays contained between a floor and a ceiling rather than trending.",
+      read: "Range tools (RSI, stochastics, Bollinger Bands, VWAP) tend to work better here than trend tools. Wait for a confirmed break with acceptance before treating a range edge as the start of a new trend.",
+      pages: [{ label: "Indicators Glossary → Ranging Market Indicators", href: "/indicators.html#term-ranging-market-indicators" }],
+    },
+    {
+      id: "naked-charts", term: "Naked Charts", category: "Core Trading Vocabulary",
+      def: "Clean price charts showing only price bars or candles, with no indicators or signals overlaid.",
+      read: "Naked-chart reading forces you to judge structure, momentum, and liquidity directly from price and volume — useful for building chart-reading skill without leaning on lagging indicators.",
+    },
+  ];
+
+  var PRICE_ACTION_EXTRA_GLOSSARY = [
+    {
+      id: "big-mid-small-players", term: "Big Players, Mid Players & Small Players", category: "Market Participants",
+      def: "A size-based way to bucket market participants: Big Players (central banks, major financial institutions), Mid Players (mid- or small-sized banks, large hedge funds, market makers, large corporate or commercial companies), and Small Players (retail or private individual traders).",
+      read: "Size roughly maps to how a participant moves the market: big players can move price with a single order, mid players move it by accumulating over time, and small players mostly react to the moves the other two create.",
+    },
+    {
+      id: "ceiling-floor", term: "Ceiling & Floor (Horizontal Resistance / Support)", category: "Price Action & Liquidity",
+      def: "A ceiling is a horizontal upper resistance line confirmed by at least two touches of price highs at roughly the same level; a floor is the equivalent horizontal lower support line confirmed by at least two touches of price lows.",
+      read: "Require the two-touch confirmation before trusting a ceiling or floor as a real level — a single high or low is just a swing point, not yet a defended line.",
+    },
+    {
+      id: "upper-lower-lines", term: "Upper Resistance Line & Lower Support Line", category: "Price Action & Liquidity",
+      def: "The upper resistance line is drawn using at least two price highs; the lower support line is drawn using at least two price lows — together they form the boundaries of a channel or range.",
+      read: "Like a ceiling/floor, these lines need at least two touches to be considered valid, rather than an arbitrary line connecting one high to a guess.",
+    },
+    {
+      id: "price-channels", term: "Price Channels", category: "Price Action & Liquidity",
+      def: "A continuation pattern where price is bounded between a sloping upper resistance line and a sloping lower support line, moving up or down together like a slanted rectangle.",
+      read: "Trade the channel by fading the edges back toward the middle, or by watching for a clean break of either line as an early signal the channel — and the trend inside it — may be ending.",
+    },
+    {
+      id: "fibonacci-retracement", term: "Fibonacci Retracement (Fib / Fib Ret)", category: "Price Action & Liquidity",
+      def: "A tool that marks likely pullback levels — commonly 23.6%, 38.2%, 50%, 61.8%, and 78.6% — between a swing high and swing low, based on Fibonacci ratios.",
+      read: "Treat fib levels as areas of interest, not exact turning points. They're far more useful when they overlap with structure, liquidity, or a volume level than when used in isolation.",
+      pages: [{ label: "Indicators Glossary → Golden Pocket", href: "/indicators.html#term-golden-pocket" }],
+    },
+    {
+      id: "head-and-shoulders", term: "Head & Shoulders (H&S)", category: "Price Action & Liquidity",
+      def: "A reversal chart pattern made of three peaks (or troughs, for the inverse) — a higher center peak (head) flanked by two lower peaks (shoulders) at roughly similar height, with a “neckline” connecting the two troughs between them.",
+      read: "Confirmation comes from a decisive close through the neckline, not just the visual shape. Measure the target as the head-to-neckline distance, projected from the break.",
+    },
+    {
+      id: "leg-pullback", term: "Leg & Pullback", category: "Price Action & Liquidity",
+      def: "A leg is a single directional price movement; a pullback is a move — of one or more bars or legs — against the prevailing trend direction before it resumes, commonly modeled as a 3-leg structure.",
+      read: "Distinguish a normal pullback (shallow, low volume, holds structure) from a reversal (breaks structure, high volume) — leg count and retracement depth are your first clues.",
+    },
+    {
+      id: "liquid-illiquid-market", term: "Liquid vs. Illiquid (Thin) Market", category: "Price Action & Liquidity",
+      def: "A liquid market has plenty of active buyers and sellers, which tightens the bid-ask spread and lets trades execute quickly near the last price. An illiquid (thin) market has few active participants, wide spreads, and larger price impact per trade.",
+      read: "Size down in thin markets — slippage and gaps get worse exactly when you need a clean exit. Liquidity itself changes by session and by proximity to news, not just by asset.",
+      pages: [{ label: "Indicators Glossary → Liquidity", href: "/indicators.html#term-liquidity" }],
+    },
+    {
+      id: "price-action-pa", term: "Price Action (PA)", category: "Price Action & Liquidity",
+      def: "The study of an asset's price movement itself — candles, chart patterns, structure, and for some traders volume — used to make trading decisions without relying primarily on lagging indicators.",
+      read: "Price action reads faster than most indicators because it's the rawest data available; the tradeoff is it requires more subjective interpretation and experience to apply consistently.",
+    },
+    {
+      id: "price-cyclicity", term: "Price Cyclicity", category: "Price Action & Liquidity",
+      def: "The tendency of price to move up and down in waves — pullbacks and countertrend legs — even while a clear larger trend is in place.",
+      read: "Expect cyclicity inside any trend. The presence of a pullback doesn't by itself mean the trend has changed — only a structure break against the trend (a BOS the wrong way, or a ChoCH) does.",
+      pages: [{ label: "Indicators Glossary → Change of Character", href: "/indicators.html#term-change-of-character" }],
+    },
+    {
+      id: "pin-bar", term: "Pin Bar", category: "Candlestick Patterns",
+      def: "A single candle with a long wick (high test or low test) and a small real body, showing price rejected a level within the bar — the general form behind patterns like the hammer, shooting star, and bullish/bearish pin bar.",
+      read: "A high-test pin bar (long upper wick) signals rejection of higher prices; a low-test pin bar (long lower wick) signals rejection of lower prices. Context — support/resistance, trend, volume — matters more than the shape alone.",
+    },
+    {
+      id: "momentum-vs-trend-indicators", term: "Momentum vs. Trend Indicators", category: "Technical Indicators",
+      def: "Momentum indicators (RSI, MACD, stochastics) measure the speed and strength of a price move and flag overbought/oversold conditions. Trend indicators (moving averages, Bollinger Bands, Ichimoku Cloud) identify the direction and strength of the prevailing trend — up, down, or sideways.",
+      read: "Some tools (moving averages) do double duty. Use trend indicators to decide whether to look for longs or shorts at all, and momentum indicators to time entries/exits within that bias — momentum readings against a strong trend are weaker signals than the same reading in a range.",
+    },
+  ];
+
+  var ICT_GLOSSARY = [
+    {
+      id: "kill-zones", term: "Kill Zones (London / New York)", category: "ICT / Smart Money Concepts",
+      def: "Specific windows during the London and New York sessions — roughly the first 1–2 hours of each — when ICT-style traders expect the highest-probability liquidity raids and directional moves, driven by session-open volume.",
+      read: "Kill zones matter because volume and volatility cluster there. A setup that looks clean outside a kill zone often lacks the participation to follow through.",
+    },
+    {
+      id: "amd-power-of-three", term: "AMD / Power of Three (PO3)", category: "ICT / Smart Money Concepts",
+      def: "A three-phase model for how a trading range unfolds: Accumulation (quiet, range-bound build-up), Manipulation (a stop hunt or liquidity sweep beyond the range, often at a session open), and Distribution (the real directional move away from the range).",
+      read: "Use it to avoid entering during the manipulation phase — a sharp move against the expected direction right at a session open or kill zone is often the manipulation leg, not the real trend.",
+    },
+    {
+      id: "optimal-trade-entry", term: "Optimal Trade Entry (OTE)", category: "ICT / Smart Money Concepts",
+      def: "An entry zone, typically the 62–79% Fibonacci retracement of the most recent impulsive leg, where price is expected to react before continuing in the leg's direction.",
+      read: "OTE marks a location to look for confluence, not a standalone trigger — combine it with an order block, fair value gap, or liquidity sweep rather than trading the fib zone alone.",
+      pages: [{ label: "Indicators Glossary → Order Blocks", href: "/indicators.html#term-order-blocks" }],
+    },
+    {
+      id: "turtle-soup", term: "Turtle Soup (TS)", category: "ICT / Smart Money Concepts",
+      def: "A reversal setup where price makes a new high or low beyond a recent swing point (often to trigger stops) and then quickly reverses back inside the prior range — a liquidity-sweep-based fade.",
+      read: "The name references the classic Turtle trend-following breakout system: Turtle Soup fades the breakout the Turtles would have bought or sold, betting it's a stop-hunt rather than genuine continuation.",
+    },
+    {
+      id: "ict-acronyms", term: "ICT / Smart Money Concepts (SMC) Acronyms", category: "ICT / Smart Money Concepts",
+      def: "A reference list of shorthand used across ICT (Inner Circle Trader) and Smart Money Concepts material — session times, structure labels, block types, and liquidity terms — for reading SMC-style charts, videos, and notes without decoding each term from scratch. PDH/PDL/PWH/PWL (previous day/week high/low), DH/DL/MH/ML (daily/monthly high/low), BMS/SMS/MS (break/shift in/market structure), OB/+OB/-OB (order block, bullish/bearish), BRK/+BRK/-BRK (breaker, bullish/bearish), PB (propulsion block), VB (vacuum block), MB (mitigation block), RTB (return to breaker), RTO (return to order block/origin), FVG (fair value gap), CE (consequent encroachment, 50% of FVG), LV/LVG (liquidity void / liquidity void gap), BISI/SIBI (buy-side/sell-side imbalance, sell-side/buy-side inefficiency), BSL/SSL (buyside/sellside liquidity), EQH/EQL (equal high/low), LP (liquidity pool), SH/SP/SL/TP (stop hunt, stops purged, stop loss, take profit), OTE (optimal trade entry), IPDA (interbank price delivery algorithm), IOF (institutional order flow), SMT (smart money tool/divergence), AMD/PO3 (accumulation, manipulation, distribution / power of three), TSBM/TSSM (turtle soup buy/sell model), CBDR (central bank dealer range), RN (round numbers), OSOK (one shot one kill), WDYS (what do you see), LO/NYO (London/New York open), LOKZ/NYKZ (London/New York kill zone), CME (Chicago Mercantile Exchange, bond market open), HTF/LTF (higher/lower timeframe), 1D/1W/1M (daily/weekly/monthly timeframe), RR (risk to reward), MJH (Michael J. Huddleston, founder of the ICT methodology), COT (Commitment of Traders), NFP (Non-Farm Payroll).",
+      read: "Most of these describe the same handful of ideas — market structure shifts, order blocks/breakers, liquidity pools and sweeps, session timing — under different shorthand. Learn the concept once (structure break, imbalance, liquidity raid, session timing) and the acronym becomes a label, not a new thing to memorize.",
+      illustration:
+        '<table class="gi-table"><tbody>' +
+        '<tr><td><span class="gi-cell gi-flat">PDH / PDL</span></td><td>Previous Day High / Low</td></tr>' +
+        '<tr><td><span class="gi-cell gi-flat">PWH / PWL</span></td><td>Previous Week High / Low</td></tr>' +
+        '<tr><td><span class="gi-cell gi-flat">DH / DL / MH / ML</span></td><td>Daily / Monthly High / Low</td></tr>' +
+        '<tr><td><span class="gi-cell gi-flat">BMS / SMS / MS</span></td><td>Break / Shift in / Market Structure</td></tr>' +
+        '<tr><td><span class="gi-cell gi-up">+OB</span> / <span class="gi-cell gi-down">-OB</span></td><td>Bullish / Bearish Order Block</td></tr>' +
+        '<tr><td><span class="gi-cell gi-up">+BRK</span> / <span class="gi-cell gi-down">-BRK</span></td><td>Bullish / Bearish Breaker</td></tr>' +
+        '<tr><td><span class="gi-cell gi-flat">PB / VB / MB</span></td><td>Propulsion / Vacuum / Mitigation Block</td></tr>' +
+        '<tr><td><span class="gi-cell gi-flat">RTB / RTO</span></td><td>Return to Breaker / Return to Order Block (Origin)</td></tr>' +
+        '<tr><td><span class="gi-cell gi-flat">FVG / CE</span></td><td>Fair Value Gap / Consequent Encroachment (50% of FVG)</td></tr>' +
+        '<tr><td><span class="gi-cell gi-flat">LV / LVG</span></td><td>Liquidity Void / Liquidity Void Gap</td></tr>' +
+        '<tr><td><span class="gi-cell gi-flat">BISI / SIBI</span></td><td>Buy-Side Imbalance / Sell-Side Imbalance (Inefficiency)</td></tr>' +
+        '<tr><td><span class="gi-cell gi-flat">BSL / SSL</span></td><td>Buyside / Sellside Liquidity</td></tr>' +
+        '<tr><td><span class="gi-cell gi-flat">EQH / EQL</span></td><td>Equal High / Equal Low</td></tr>' +
+        '<tr><td><span class="gi-cell gi-flat">LP</span></td><td>Liquidity Pool</td></tr>' +
+        '<tr><td><span class="gi-cell gi-flat">SH / SP / SL / TP</span></td><td>Stop Hunt / Stops Purged / Stop Loss / Take Profit</td></tr>' +
+        '<tr><td><span class="gi-cell gi-flat">OTE</span></td><td>Optimal Trade Entry</td></tr>' +
+        '<tr><td><span class="gi-cell gi-flat">IPDA / IOF</span></td><td>Interbank Price Delivery Algorithm / Institutional Order Flow</td></tr>' +
+        '<tr><td><span class="gi-cell gi-flat">SMT</span></td><td>Smart Money Tool (Divergence)</td></tr>' +
+        '<tr><td><span class="gi-cell gi-flat">AMD / PO3</span></td><td>Accumulation, Manipulation, Distribution / Power of Three</td></tr>' +
+        '<tr><td><span class="gi-cell gi-flat">TSBM / TSSM</span></td><td>Turtle Soup Buy Model / Sell Model</td></tr>' +
+        '<tr><td><span class="gi-cell gi-flat">CBDR</span></td><td>Central Bank Dealer Range</td></tr>' +
+        '<tr><td><span class="gi-cell gi-flat">RN / OSOK / WDYS</span></td><td>Round Numbers / One Shot One Kill / What Do You See</td></tr>' +
+        '<tr><td><span class="gi-cell gi-flat">LO / NYO</span></td><td>London Open / New York Open</td></tr>' +
+        '<tr><td><span class="gi-cell gi-flat">LOKZ / NYKZ</span></td><td>London Kill Zone / New York Kill Zone</td></tr>' +
+        '<tr><td><span class="gi-cell gi-flat">CME</span></td><td>Chicago Mercantile Exchange (bond market open)</td></tr>' +
+        '<tr><td><span class="gi-cell gi-flat">HTF / LTF</span></td><td>Higher / Lower Timeframe</td></tr>' +
+        '<tr><td><span class="gi-cell gi-flat">1D / 1W / 1M</span></td><td>Daily / Weekly / Monthly Timeframe</td></tr>' +
+        '<tr><td><span class="gi-cell gi-flat">RR</span></td><td>Risk to Reward</td></tr>' +
+        '<tr><td><span class="gi-cell gi-flat">MJH</span></td><td>Michael J. Huddleston (ICT founder)</td></tr>' +
+        "</tbody></table>",
+    },
+  ];
+
   var ALL_GLOSSARY = GLOSSARY.concat(USER_GLOSSARY)
     .concat(DECISION_ENGINE_GLOSSARY)
     .concat(MARKET_FUNDAMENTALS_GLOSSARY)
     .concat(CANDLESTICK_GLOSSARY)
-    .concat(ILLUSTRATED_GLOSSARY);
+    .concat(ILLUSTRATED_GLOSSARY)
+    .concat(CORE_VOCAB_GLOSSARY)
+    .concat(PRICE_ACTION_EXTRA_GLOSSARY)
+    .concat(ICT_GLOSSARY);
 
   var CATEGORY_ORDER = [
     "Market Fundamentals",
     "Decision Engine & Trading Framework",
+    "Core Trading Vocabulary",
     "Candlestick Patterns",
     "Technical Indicators",
     "Price Action & Liquidity",
+    "ICT / Smart Money Concepts",
     "Market Profile & Volume",
     "Futures & Derivatives",
     "Order Types & Execution",
