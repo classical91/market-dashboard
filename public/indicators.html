@@ -115,6 +115,52 @@
       box-shadow: 0 0 0 2px rgba(77, 163, 255, 0.35);
       transition: box-shadow 0.2s ease, border-color 0.2s ease;
     }
+    .glossary-illustration {
+      margin-bottom: 10px;
+      overflow-x: auto;
+    }
+    .gi-table {
+      border-collapse: collapse;
+      width: 100%;
+      font-size: 11px;
+    }
+    .gi-table th {
+      text-align: left;
+      color: var(--muted);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 4px 6px;
+      border-bottom: 1px solid var(--border);
+    }
+    .gi-table td { padding: 3px 6px; }
+    .gi-cell {
+      display: block;
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-weight: 600;
+      text-align: center;
+      white-space: nowrap;
+    }
+    .gi-up { background: rgba(60, 179, 113, 0.18); color: #4ade80; }
+    .gi-down { background: rgba(220, 60, 60, 0.18); color: #f87171; }
+    .gi-flat { background: rgba(148, 163, 184, 0.18); color: var(--soft); }
+    .gi-diagram {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: 11px;
+      color: var(--soft);
+    }
+    .gi-line { flex: 1; height: 2px; background: var(--border); position: relative; }
+    .gi-line span {
+      position: absolute; top: -9px; left: 50%; transform: translateX(-50%);
+      white-space: nowrap; font-size: 10px; color: var(--muted);
+    }
   </style>
 </head>
 <body>

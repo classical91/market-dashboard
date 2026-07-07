@@ -325,13 +325,13 @@
     },
     {
       id: "break-of-structure", term: "Break of Structure (BOS)", category: "Price Action & Liquidity",
-      def: "A decisive break of a prior swing high or swing low that confirms trend continuation in the current direction.",
-      read: "A bullish BOS breaks a prior high; a bearish BOS breaks a prior low. Look for displacement and follow-through rather than a tiny wick break.",
+      def: "A decisive break of the trend's most recent swing in the trend's own direction — a higher high broken in an uptrend, or a lower low broken in a downtrend — confirming the existing trend is continuing.",
+      read: "Example: in an uptrend, price makes a higher low, then breaks above the prior high — that's a bullish BOS confirming the uptrend. Look for displacement and follow-through past the level, not just a wick poking through it. Contrast with Change of Character, which breaks against the trend instead of with it.",
     },
     {
       id: "change-of-character", term: "Change of Character (ChoCh)", category: "Price Action & Liquidity",
-      def: "An early structure shift where price breaks the most recent counter-trend swing, suggesting the prior trend may be weakening.",
-      read: "ChoCh is an early warning, not full confirmation. Pair it with a retest, volume, or liquidity sweep to avoid false reversals.",
+      def: "A break in the opposite direction of the current trend's structure — the first sign the trend may be reversing, before a full reversal is confirmed.",
+      read: "Example: in an uptrend, if price breaks below the most recent higher low, that's a ChoCH warning the uptrend may be ending. It's an early flag, not confirmation — pair it with a retest, volume, or liquidity sweep before treating it as a full reversal. Contrast with Break of Structure, which continues the trend instead of challenging it.",
     },
     {
       id: "reversal", term: "Reversal", category: "Price Action & Liquidity",
@@ -1010,10 +1010,158 @@
     },
   ];
 
-  var ALL_GLOSSARY = GLOSSARY.concat(USER_GLOSSARY).concat(DECISION_ENGINE_GLOSSARY);
+  var MARKET_FUNDAMENTALS_GLOSSARY = [
+    {
+      id: "supply-demand", term: "Supply & Demand", category: "Market Fundamentals",
+      def: "The balance between buying pressure (demand) and selling pressure (supply) at each price level — the basic force that sets price in any market.",
+      read: "Price is a magnet to imbalance: buyers overpowering sellers push price up, sellers dominating pull it down. Watch order flow, volume, and how price reacts at a level to spot which side is winning before the move is obvious.",
+    },
+    {
+      id: "market-sentiment-psychology", term: "Market Sentiment & Psychology", category: "Market Fundamentals",
+      def: "The collective emotional state of participants — fear, greed, complacency, panic — that drives price beyond what fundamentals alone would justify.",
+      read: "Markets are driven more by emotion than logic more often than traders like to admit. Staying calm when others panic, and skeptical when others are euphoric, is a structural edge rather than just a saying.",
+      pages: [{ label: "Indicators Glossary → Fear & Greed Index", href: "/indicators.html#term-fear-greed" }],
+    },
+    {
+      id: "news-macro-events", term: "News & Macro Events", category: "Market Fundamentals",
+      def: "Economic reports, central bank decisions, and geopolitical developments that can trigger sudden, outsized price moves as the market reprices its expectations.",
+      read: "Headlines become candles. Markets react to the surprise versus the forecast, not the raw number — know the calendar (CPI, FOMC, NFP, geopolitical shocks) so a release doesn't catch you mid-trade.",
+      pages: [{ label: "Overview → Calendars & Tools", href: "/#calendars-tools" }],
+    },
+    {
+      id: "stock-market", term: "Stock Market", category: "Market Fundamentals",
+      def: "The market for buying and selling ownership shares (equities) in public companies, e.g. Apple or Tesla.",
+      read: "Generally suits longer-term growth, dividend, and blue-chip strategies; moves on earnings, rates, and sector rotation more than on 24-hour news cycles.",
+    },
+    {
+      id: "forex-market", term: "Forex (FX) Market", category: "Market Fundamentals",
+      def: "The market for trading currency pairs (e.g. EUR/USD) against each other.",
+      read: "Extremely liquid and open roughly 24/5, which suits technical and session-based trading. Highly sensitive to central bank policy and interest-rate differentials between the two currencies in a pair.",
+    },
+    {
+      id: "crypto-market", term: "Crypto Market", category: "Market Fundamentals",
+      def: "The market for digital assets like Bitcoin and Ethereum, trading on centralized and decentralized exchanges.",
+      read: "Trades 24/7 with no close and tends to be more volatile than traditional markets, which suits momentum and swing approaches — but thinner liquidity outside the majors means bigger slippage and sharper reversals.",
+    },
+    {
+      id: "futures-market", term: "Futures Market", category: "Market Fundamentals",
+      def: "Contracts to buy or sell an underlying commodity, index, or currency at a set price on a future date, traded on regulated exchanges like the CME.",
+      read: "Heavily leveraged by design — a small margin deposit controls a much larger notional position — so define risk per contract before sizing, not after a move goes against you.",
+      pages: [{ label: "Indicators Glossary → Types of Contracts", href: "/indicators.html#term-types-of-contracts" }],
+    },
+    {
+      id: "trading-vs-investing", term: "Trading vs. Investing", category: "Market Fundamentals",
+      def: "Trading targets short-term price movement (minutes to weeks) using price action, charts, and news, and requires active monitoring. Investing targets long-term wealth growth (years) based on company or protocol fundamentals, and tolerates short-term drawdowns.",
+      read: "The two aren't mutually exclusive — many participants hold a long-term core position alongside shorter-term tactical trades. The common, avoidable mistake is conflating the two: panic-selling a long-term thesis because of daily noise, or treating a trade's stop level like a long-term investment's drawdown tolerance.",
+    },
+    {
+      id: "retail-traders", term: "Retail Traders", category: "Market Participants",
+      def: "Individual, non-professional traders investing their own capital, typically through retail brokers or exchanges.",
+      read: "Retail flow often follows trends, headlines, and social sentiment rather than leading them — useful as a contrarian crowd-positioning signal at extremes rather than a source of edge to copy directly.",
+    },
+    {
+      id: "institutional-investors", term: "Institutional Investors", category: "Market Participants",
+      def: "Large organizations — hedge funds, banks, pension funds, insurers — trading substantial size on behalf of others.",
+      read: "Their large orders can move markets and often execute over time (accumulation or distribution) rather than in one print, which is why volume and open-interest trends can reveal institutional activity before price confirms it.",
+    },
+    {
+      id: "high-frequency-traders", term: "High-Frequency Traders (HFTs)", category: "Market Participants",
+      def: "Firms using algorithms and low-latency infrastructure to profit from small, extremely short-term price movements.",
+      read: "HFT activity is largely invisible on a normal chart but shows up as tighter spreads and rapid order-book churn — a reason very short-term price noise shouldn't be over-interpreted as a directional signal.",
+    },
+    {
+      id: "liquidity-providers", term: "Liquidity Providers", category: "Market Participants",
+      def: "Participants — often market makers or dedicated LP firms — who commit to continuously quoting both sides of the market so trades execute smoothly.",
+      read: "Think of liquidity providers as the market's “oil”: more of them, quoting tighter and deeper, means less slippage. When they pull back around news events or stress, spreads widen and slippage jumps sharply.",
+    },
+  ];
+
+  var CANDLESTICK_GLOSSARY = [
+    {
+      id: "bullish-engulfing", term: "Bullish Engulfing", category: "Candlestick Patterns",
+      def: "A two-candle bullish reversal pattern where a large bullish candle fully engulfs the prior bearish candle's real body, showing buyers overwhelming the recent selling.",
+      read: "Most reliable at support, after a liquidity sweep of lows, or at the bottom of a pullback in an uptrend. A bullish engulfing candle in the middle of a range carries much less weight.",
+    },
+    {
+      id: "bearish-engulfing", term: "Bearish Engulfing", category: "Candlestick Patterns",
+      def: "A two-candle bearish reversal pattern where a large bearish candle fully engulfs the prior bullish candle's real body, showing sellers overwhelming recent buying.",
+      read: "Most meaningful at resistance or after a liquidity run above old highs — treat it as a reason to tighten risk rather than an automatic short trigger on its own.",
+    },
+    {
+      id: "shooting-star", term: "Shooting Star", category: "Candlestick Patterns",
+      def: "A single bearish reversal candle with a small body near the low and a long upper wick, forming after an uptrend when buyers push price up but sellers overwhelm them into the close.",
+      read: "Strongest at resistance, after a liquidity sweep of old highs, or into a supply zone. Confirmation comes from the next candle closing lower, not the shooting star alone.",
+    },
+    {
+      id: "hammer", term: "Hammer", category: "Candlestick Patterns",
+      def: "A bullish reversal candle with a small body near the top and a long lower wick, forming after a downtrend when sellers push price down but buyers step in before the close.",
+      read: "Strongest at support, after a liquidity sweep of old lows, or inside a demand zone. Confirm with the next candle closing higher rather than trading the hammer in isolation.",
+    },
+    {
+      id: "inverted-hammer", term: "Inverted Hammer", category: "Candlestick Patterns",
+      def: "A potential bullish reversal candle after a downtrend, with a small body near the low and a long upper wick, showing buyers tested higher prices before the close.",
+      read: "Needs a bullish follow-through candle to confirm — on its own it only shows buyers are starting to test the sellers' control, not that they've won it.",
+    },
+    {
+      id: "hanging-man", term: "Hanging Man", category: "Candlestick Patterns",
+      def: "The same shape as a hammer — small body, long lower wick — but forming after an uptrend, warning that sellers are starting to test control.",
+      read: "Confirmation requires the next candle to close lower; without it, the hanging man alone is just a shape, not a signal.",
+    },
+    {
+      id: "doji", term: "Doji", category: "Candlestick Patterns",
+      def: "A candle where the open and close are virtually equal, leaving little or no real body — a visual sign of indecision between buyers and sellers.",
+      read: "A doji after a strong trend, especially at a key level, can flag exhaustion. In the middle of a range it usually just means low conviction, not an imminent reversal.",
+    },
+    {
+      id: "morning-star", term: "Morning Star", category: "Candlestick Patterns",
+      def: "A three-candle bullish reversal pattern: a long bearish candle, a small-bodied indecision candle, then a strong bullish candle closing well into the first candle's body.",
+      read: "More reliable at support or demand zones after a clear downtrend. The third candle's strength and close location matter more than matching the textbook shape exactly.",
+    },
+    {
+      id: "evening-star", term: "Evening Star", category: "Candlestick Patterns",
+      def: "A three-candle bearish reversal pattern: a long bullish candle, a small indecision candle, then a strong bearish candle closing well into the first candle's body.",
+      read: "Most significant at resistance or supply zones after a clear uptrend. Treat it as a warning to manage risk, not a guaranteed top.",
+    },
+  ];
+
+  var ILLUSTRATED_GLOSSARY = [
+    {
+      id: "support-resistance", term: "Support & Resistance", category: "Price Action & Liquidity",
+      def: "Support is a price zone where historical buying has been strong enough to halt or reverse a decline; resistance is a zone where historical selling has been strong enough to halt or reverse an advance.",
+      read: "The more times a level is tested and holds, the more traders watch it — but each retest also slightly weakens it. A support level that finally breaks often flips into resistance on the retest, and vice versa, since the traders trapped on the wrong side now have a level to defend.",
+      illustration:
+        '<div class="gi-diagram" style="flex-direction:column;align-items:stretch;gap:6px;">' +
+        '<span class="gi-cell gi-down">Resistance — sellers likely to defend</span>' +
+        '<span class="gi-cell gi-flat">Price trades in between</span>' +
+        '<span class="gi-cell gi-up">Support — buyers likely to defend</span>' +
+        "</div>",
+    },
+    {
+      id: "btc-dominance-cycle", term: "Bitcoin Dominance Cycle (BTC.D vs. BTC vs. Alts)", category: "Market Cap & Dominance",
+      def: "A cheat-sheet mapping how BTC dominance (BTC.D), Bitcoin's own price, and total altcoin market cap tend to move relative to each other. Because BTC.D is itself a ratio (BTC market cap / total crypto market cap), its direction depends on how BTC and alts move together, not on BTC.D in isolation.",
+      read: "Two rows matter most: BTC.D and BTC both rising while alts fall means capital is consolidating into Bitcoin (alt weakness); BTC.D falling while BTC and alts both rise fast is classic alt season. The remaining rows describe quieter accumulation or distribution phases rather than a decisive rotation.",
+      illustration:
+        '<table class="gi-table"><thead><tr><th>BTC.D</th><th>BTC</th><th>Alts</th></tr></thead><tbody>' +
+        '<tr><td><span class="gi-cell gi-up">Increases</span></td><td><span class="gi-cell gi-up">Increases</span></td><td><span class="gi-cell gi-down">Decreases</span></td></tr>' +
+        '<tr><td><span class="gi-cell gi-up">Increases</span></td><td><span class="gi-cell gi-down">Decreases</span></td><td><span class="gi-cell gi-down">Decreases Fast (Dump)</span></td></tr>' +
+        '<tr><td><span class="gi-cell gi-up">Increases</span></td><td><span class="gi-cell gi-flat">Stable</span></td><td><span class="gi-cell gi-flat">Stable (Accumulation)</span></td></tr>' +
+        '<tr><td><span class="gi-cell gi-down">Decreases</span></td><td><span class="gi-cell gi-up">Increases</span></td><td><span class="gi-cell gi-up">Increases Fast (Alt Season)</span></td></tr>' +
+        '<tr><td><span class="gi-cell gi-down">Decreases</span></td><td><span class="gi-cell gi-down">Decreases</span></td><td><span class="gi-cell gi-flat">Stable</span></td></tr>' +
+        '<tr><td><span class="gi-cell gi-down">Decreases</span></td><td><span class="gi-cell gi-flat">Stable</span></td><td><span class="gi-cell gi-up">Increases</span></td></tr>' +
+        "</tbody></table>",
+    },
+  ];
+
+  var ALL_GLOSSARY = GLOSSARY.concat(USER_GLOSSARY)
+    .concat(DECISION_ENGINE_GLOSSARY)
+    .concat(MARKET_FUNDAMENTALS_GLOSSARY)
+    .concat(CANDLESTICK_GLOSSARY)
+    .concat(ILLUSTRATED_GLOSSARY);
 
   var CATEGORY_ORDER = [
+    "Market Fundamentals",
     "Decision Engine & Trading Framework",
+    "Candlestick Patterns",
     "Technical Indicators",
     "Price Action & Liquidity",
     "Market Profile & Volume",
@@ -1048,6 +1196,9 @@
     return "cat-" + category.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
   }
 
+  // entry.illustration is authored, trusted HTML (defined in this file, not
+  // user input) — rendered as-is so glossary entries can carry a small
+  // diagram or reference table alongside the def/read text.
   function cardHtml(entry) {
     var usedIn = (entry.pages || [])
       .map(function (p) {
@@ -1059,6 +1210,7 @@
       '<div class="glossary-term">' + escapeHtml(entry.term) + "</div>" +
       '<div class="glossary-def">' + escapeHtml(entry.def) + "</div>" +
       '<div class="glossary-read"><strong>How to read it:</strong> ' + escapeHtml(entry.read) + "</div>" +
+      (entry.illustration ? '<div class="glossary-illustration">' + entry.illustration + "</div>" : "") +
       (usedIn ? '<div class="glossary-used-in">' + usedIn + "</div>" : "") +
       "</article>"
     );
