@@ -313,17 +313,36 @@ function buildRiskFactors({ crypto, macro }) {
   return [
     {
       label: "Crypto Volatility",
-      value: Math.min(100, Math.round(((btcChange + ethChange) / 2) * 18)),
+      value: clampRisk(Math.round(((btcChange + ethChange) / 2) * 18)),
     },
     {
-      label: "Dollar Strength",
-      value: dxy ? Math.min(100, Math.round(50 + (dxy.changePercent || 0) * 10)) : 50,
+      label: dxy?.proxy ? "Dollar Strength (proxy)" : "Dollar Strength",
+      value: dxy ? clampRisk(Math.round(50 + (dxy.changePercent || 0) * 10)) : 50,
     },
     {
-      label: "Equity Risk (VIX)",
-      value: vix ? Math.min(100, Math.round((vix.price || 15) * 3.5)) : 50,
+      label: vix?.proxy ? "Equity Risk (VIX proxy)" : "Equity Risk (VIX)",
+      value: buildVolatilityRiskScore(vix),
     },
   ];
+}
+
+function buildVolatilityRiskScore(vix) {
+  if (!vix) return 50;
+
+  // ETF proxies like VIXY are tradable products, not the VIX index level.
+  // Their price cannot be scored as a VIX level, so use direction/magnitude
+  // of the 24h percentage move around a neutral 50 baseline instead.
+  if (vix.proxy) {
+    return clampRisk(Math.round(50 + (Number(vix.changePercent) || 0) * 12));
+  }
+
+  const level = Number(vix.price);
+  if (!Number.isFinite(level) || level <= 0) return 50;
+  return clampRisk(Math.round(level * 3.5));
+}
+
+function clampRisk(value) {
+  return Math.max(0, Math.min(100, value));
 }
 
 function buildAlerts({ crypto, macro, onchain }) {
