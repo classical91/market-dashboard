@@ -6,6 +6,7 @@
   }
 
   var workspace = [
+    { href: "/terminal-suite.html", icon: "&#128421;", label: "Terminal Suite" },
     {
       label: "Overview",
       icon: "&#128202;",
@@ -177,7 +178,6 @@
       label: "Open ImageQueue",
       featured: "imagequeue",
     },
-    { href: "/terminal-suite.html", icon: "&#128421;", label: "Terminal Suite" },
     {
       href: "https://trading-strategy-production-1b41.up.railway.app/",
       icon: "&#129504;",
@@ -193,7 +193,6 @@
       icon: "&#9992;&#65039;",
       label: "Trader Lab",
     },
-    { href: "https://earth-watch-production-e3c6.up.railway.app/", icon: "&#127757;", label: "Earth Watch" },
     { href: "/indicators.html", icon: "&#128218;", label: "Indicators Glossary" },
     { href: "/settings.html", icon: "&#9881;&#65039;", label: "Settings" },
   ];
