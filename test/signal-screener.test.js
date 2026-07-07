@@ -39,6 +39,22 @@ test("vwapSeries resets at each UTC day boundary", () => {
   assert.equal(result[2], 100);
 });
 
+test("vwapSeries with anchor='month' does not reset on daily candles", () => {
+  // Regression test: on 1D candles, a day-anchored VWAP resets every single
+  // bar, collapsing it to that bar's own typical price. A month anchor keeps
+  // the accumulation window meaningfully longer than one 1D bar.
+  const dayMs = 86400000;
+  const candles = [
+    { openTime: 0, high: 10, low: 10, close: 10, volume: 100 },
+    { openTime: dayMs, high: 20, low: 20, close: 20, volume: 100 },
+    { openTime: dayMs * 2, high: 100, low: 100, close: 100, volume: 100 },
+  ];
+  const dayAnchored = vwapSeries(candles, "day");
+  const monthAnchored = vwapSeries(candles, "month");
+  assert.equal(dayAnchored[2], 100, "day anchor collapses to the last bar's own typical price");
+  assert.ok(monthAnchored[2] < 100, "month anchor should still be dragged down by the earlier bars");
+});
+
 test("adxSeries returns null until warmed up, then a finite number", () => {
   const candles = Array.from({ length: 60 }, (_, i) => ({
     openTime: i * 3600000,
