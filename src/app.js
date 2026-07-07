@@ -14,6 +14,7 @@ async function fetchBinancePrice(symbol) {
 
 const { config } = require("./config/env");
 const { createAIAnalysisRouter } = require("./routes/ai-analysis");
+const { createDecisionRouter } = require("./routes/decision");
 const { createLayoutAnalysisRouter } = require("./routes/layout-analysis");
 const { createPatternScannerRouter } = require("./routes/pattern-scanner");
 const { createSignalScreenerRouter } = require("./routes/signal-screener");
@@ -30,6 +31,8 @@ const { YOUTUBE_CHANNELS } = require("./config/youtube-channels");
 const { X_ACCOUNTS } = require("./config/x-accounts");
 const { TOP_TOKENS } = require("./config/market-symbols");
 const { AIAnalysisService } = require("./services/ai-analysis");
+const { DecisionEngineService } = require("./services/decision-engine");
+const { TradeJournalService } = require("./services/trade-journal");
 const { LayoutAnalysisService } = require("./services/layout-analysis");
 const { LayoutCaptureService } = require("./services/layout-capture");
 const { PatternScannerService } = require("./services/pattern-scanner");
@@ -111,6 +114,13 @@ function createApp() {
   const signalScreenerService = new SignalScreenerService({ cache });
   const watchlistService = new WatchlistService({ dataDir });
   const patternTrackerService = new PatternTrackerService({ dataDir, fetchPrice: fetchBinancePrice });
+  const decisionEngineService = new DecisionEngineService({
+    marketDataService,
+    signalScreenerService,
+    cache,
+    cacheTtlMs: Number(process.env.DECISION_CACHE_MS) || 120_000,
+  });
+  const tradeJournalService = new TradeJournalService({ dataDir });
   const signalBotService = new SignalBotService({
     signalScreenerService,
     patternScannerService,
@@ -163,6 +173,7 @@ function createApp() {
   );
   app.use("/api/pattern-scanner", createPatternScannerRouter({ patternScannerService }));
   app.use("/api/signal-screener", createSignalScreenerRouter({ signalScreenerService }));
+  app.use("/api/decision", createDecisionRouter({ decisionEngineService, tradeJournalService, requireAdmin }));
   app.use("/api/watchlist", createWatchlistRouter({ watchlistService, requireAdmin }));
   app.use("/api/pattern-tracker", createPatternTrackerRouter({ patternTrackerService }));
   app.use("/api/onchain", createOnchainRouter({ onchainService }));

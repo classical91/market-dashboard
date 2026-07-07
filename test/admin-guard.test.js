@@ -83,6 +83,44 @@ test("watchlist POST rejects a missing admin key, then succeeds and is readable 
   assert.ok(!afterRemove.items.some((i) => i.symbol === "BTCUSDT" && i.interval === "4h"));
 });
 
+test("journal writes are gated, reads stay public, and grading round-trips", async () => {
+  const rejected = await fetch(`${base}/api/decision/journal`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ symbol: "BTCUSDT", signal: "LONG" }),
+  });
+  assert.equal(rejected.status, 401);
+
+  const logged = await fetch(`${base}/api/decision/journal`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-admin-key": ADMIN_KEY },
+    body: JSON.stringify({ symbol: "BTCUSDT", interval: "4h", signal: "LONG", setupScore: 80 }),
+  });
+  assert.equal(logged.status, 201);
+  const { item } = await logged.json();
+  assert.ok(item.id);
+
+  const graded = await fetch(`${base}/api/decision/journal/${item.id}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json", "x-admin-key": ADMIN_KEY },
+    body: JSON.stringify({ taken: true, result: "win", regimeCorrect: true }),
+  });
+  assert.equal(graded.status, 200);
+  const gradedBody = await graded.json();
+  assert.equal(gradedBody.item.result, "win");
+  assert.equal(gradedBody.stats.wins, 1);
+
+  const anon = await (await fetch(`${base}/api/decision/journal`)).json();
+  assert.ok(anon.items.some((row) => row.id === item.id));
+  assert.equal(anon.stats.total, 1);
+
+  const removed = await fetch(`${base}/api/decision/journal/${item.id}`, {
+    method: "DELETE",
+    headers: { "x-admin-key": ADMIN_KEY },
+  });
+  assert.equal(removed.status, 200);
+});
+
 test("health reveals provider detail to a valid admin key", async () => {
   const anon = await (await fetch(`${base}/api/health`)).json();
   assert.ok(!("etherscanKeySet" in anon));

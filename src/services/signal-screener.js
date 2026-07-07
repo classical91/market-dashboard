@@ -253,6 +253,16 @@ class SignalScreenerService {
   async scanAll(interval, minChecks, { force } = {}) {
     return Promise.all(this._tokens.map((symbol) => this.scanToken(symbol, interval, minChecks, { force })));
   }
+
+  // Raw candles for callers that need levels (swing highs/lows, ATR) rather
+  // than the computed signal — cached separately so a decision-engine refresh
+  // doesn't re-hit Binance for symbols the screener just pulled.
+  async getCandles(symbol, interval) {
+    const binanceInterval = INTERVAL_MAP[interval];
+    if (!binanceInterval) throw new Error(`Unsupported interval "${interval}"`);
+    const key = `signal-screener:klines:${symbol}:${binanceInterval}`;
+    return this._cache.getOrLoad(key, this._cacheMs, () => this._fetchKlines(symbol, binanceInterval));
+  }
 }
 
 module.exports = { SignalScreenerService, DEFAULT_TOKENS, dropUnclosedCandle, rsi, ema, macd, vwapSeries, adxSeries };

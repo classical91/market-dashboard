@@ -22,6 +22,7 @@ The app is intentionally lightweight: no bundler, no frontend framework, and no 
 - `/on-chain.html` - Curated on-chain tools hub.
 - `/onchain.html` - API-backed on-chain analytics dashboard.
 - `/ai-analysis.html` - TradingView chart snapshots with AI reads for crypto plus BTC-correlated macro tickers.
+- `/decision.html` - Decision Engine: multi-asset regime score (BTC, breadth, SPY, QQQ, DXY, VIX, gold, oil, optional US10Y), asset-class rotation board, setup-quality ranking layered over the signal screener, execution levels (trigger / invalidation / target / R:R with explicit "do not trade" reasons), and a trading journal that grades whether the engine's calls were right.
 - `/youtube-v2.html` - YouTube Intelligence RSS upload dashboard.
 - `/indicators.html` - Trading and market glossary.
 - `/reporter.html` - Daily report generation workflow.
@@ -59,6 +60,7 @@ Action/mutation endpoints are guarded by a shared secret so a public deploy cann
 - `POST /api/daily-report/generate`, `POST /api/daily-report/logs/import`
 - `POST /api/ai-analysis/generate`, `POST /api/ai-analysis/broadcast`
 - `POST /api/telegram/test`, `GET /api/telegram/diagnose`
+- `POST/PATCH/DELETE /api/decision/journal` (trading-journal writes; reads stay public)
 
 Guarded requests must carry an `x-admin-key` header matching `ADMIN_API_KEY`. The Reporter, AI Analysis, and Settings pages prompt for the key on first use and store it in the browser's `localStorage`. Read-only views (overview, on-chain, YouTube, `/api/telegram/status`) stay public. The public `/api/health` probe returns only `{ "status": "ok" }`; provider-key and cache detail are returned only to admin requests.
 
@@ -87,6 +89,7 @@ Most keys are optional. The app is designed to degrade to fallback data where po
 - `MACRO_SYMBOLS` - `DISPLAY=PROVIDER_SYMBOL` pairs for the Finnhub macro adapter; defaults to free-tier ETF proxies (`XAU=GLD,DXY=UUP,WTI=USO,VIX=VIXY`).
 - `MACRO_DATA_PROVIDER` - set to `none` to force static macro fallback.
 - `MACRO_CALENDAR_URL` - optional JSON macro-calendar feed (`{time, title, impact, country}` rows).
+- `DECISION_CACHE_MS` - Decision Engine payload cache TTL, defaults to `120000`. The engine reuses the feeds above; adding a `US10Y` row via `MACRO_SYMBOLS` or `MACRO_DATA_URL` enriches its regime score and rotation board with live yields.
 
 ### On-Chain
 
