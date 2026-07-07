@@ -1055,7 +1055,7 @@
       })
       .join("");
     return (
-      '<article class="glossary-card" data-search="' + escapeHtml((entry.term + " " + entry.category + " " + entry.def + " " + entry.read).toLowerCase()) + '" data-category="' + escapeHtml(entry.category) + '">' +
+      '<article class="glossary-card" id="term-' + escapeHtml(entry.id) + '" data-search="' + escapeHtml((entry.term + " " + entry.category + " " + entry.def + " " + entry.read).toLowerCase()) + '" data-category="' + escapeHtml(entry.category) + '">' +
       '<div class="glossary-term">' + escapeHtml(entry.term) + "</div>" +
       '<div class="glossary-def">' + escapeHtml(entry.def) + "</div>" +
       '<div class="glossary-read"><strong>How to read it:</strong> ' + escapeHtml(entry.read) + "</div>" +
@@ -1118,8 +1118,36 @@
     if (emptyEl) emptyEl.hidden = Object.keys(anyVisible).length > 0;
   }
 
+  function populateJumpMenu() {
+    var jump = document.getElementById("glossaryJump");
+    if (!jump) return;
+    var sorted = ALL_GLOSSARY.slice().sort(function (a, b) { return a.term.localeCompare(b.term); });
+    var options = sorted.map(function (entry) {
+      return '<option value="' + escapeHtml(entry.id) + '">' + escapeHtml(entry.term) + "</option>";
+    });
+    jump.insertAdjacentHTML("beforeend", options.join(""));
+    jump.addEventListener("change", function () {
+      var id = jump.value;
+      jump.value = "";
+      if (!id) return;
+      var search = document.getElementById("glossarySearch");
+      if (search && search.value) {
+        search.value = "";
+        applyFilter("");
+      }
+      var card = document.getElementById("term-" + id);
+      if (!card) return;
+      card.scrollIntoView({ behavior: "smooth", block: "center" });
+      card.classList.add("glossary-card--highlight");
+      setTimeout(function () {
+        card.classList.remove("glossary-card--highlight");
+      }, 1600);
+    });
+  }
+
   function init() {
     render();
+    populateJumpMenu();
     var search = document.getElementById("glossarySearch");
     if (search) {
       search.addEventListener("input", function () {

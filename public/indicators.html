@@ -92,6 +92,29 @@
       padding: 24px 0;
       text-align: center;
     }
+    .glossary-toolbar {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    .glossary-toolbar .glossary-search { margin-bottom: 0; flex: 1 1 320px; }
+    .glossary-jump {
+      flex: 0 1 260px;
+      padding: 12px 16px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      color: var(--text);
+      font-size: 14px;
+      font-family: inherit;
+    }
+    .glossary-jump:focus { outline: none; border-color: var(--border-hover); }
+    .glossary-card--highlight {
+      border-color: var(--blue, #4da3ff);
+      box-shadow: 0 0 0 2px rgba(77, 163, 255, 0.35);
+      transition: box-shadow 0.2s ease, border-color 0.2s ease;
+    }
   </style>
 </head>
 <body>
@@ -107,7 +130,12 @@
       <div class="cmd-clock" id="cmd-clock"></div>
     </div>
 
-    <input class="glossary-search" id="glossarySearch" type="search" placeholder="Search indicators — e.g. MACD, funding rate, MVRV..." />
+    <div class="glossary-toolbar">
+      <input class="glossary-search" id="glossarySearch" type="search" placeholder="Search indicators — e.g. MACD, funding rate, MVRV..." />
+      <select class="glossary-jump" id="glossaryJump">
+        <option value="">Jump to a concept (A–Z)&hellip;</option>
+      </select>
+    </div>
 
     <nav class="nav-pills" id="glossaryPills"></nav>
 
