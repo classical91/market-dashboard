@@ -83,17 +83,30 @@ function macd(closes, fastLen, slowLen, signalLen) {
   return { macdLine, signalLine };
 }
 
-// Anchored VWAP, resetting at each UTC day boundary (TradingView's default
-// session anchor) rather than a true exchange session calendar.
-function vwapSeries(candles) {
+function vwapPeriodKey(openTime, anchor) {
+  if (anchor === "month") {
+    const d = new Date(openTime);
+    return d.getUTCFullYear() * 12 + d.getUTCMonth();
+  }
+  return Math.floor(openTime / 86400000);
+}
+
+// Anchored VWAP. Default anchor resets at each UTC day boundary (TradingView's
+// default session anchor for intraday charts) rather than a true exchange
+// session calendar — correct for 1h/4h candles, where a day spans many bars.
+// A daily reset is meaningless on 1D candles though: each bar *is* one day,
+// so it collapses VWAP to that bar's own typical price. Callers on the 1D
+// interval should pass anchor="month" so the accumulation window is still
+// longer than one bar.
+function vwapSeries(candles, anchor = "day") {
   const out = new Array(candles.length).fill(null);
   let cumPV = 0;
   let cumV = 0;
-  let currentDay = null;
+  let currentPeriod = null;
   for (let i = 0; i < candles.length; i++) {
-    const day = Math.floor(candles[i].openTime / 86400000);
-    if (day !== currentDay) {
-      currentDay = day;
+    const period = vwapPeriodKey(candles[i].openTime, anchor);
+    if (period !== currentPeriod) {
+      currentPeriod = period;
       cumPV = 0;
       cumV = 0;
     }
@@ -187,14 +200,16 @@ class SignalScreenerService {
     }));
   }
 
-  _computeSignal(candles, minChecks) {
+  _computeSignal(candles, minChecks, interval) {
     const closes = candles.map((c) => c.close);
     const volumes = candles.map((c) => c.volume);
     const last = candles.length - 1;
 
     const rsiSeries = rsi(closes, this._options.rsiLen);
     const { macdLine, signalLine } = macd(closes, this._options.macdFast, this._options.macdSlow, this._options.macdSignal);
-    const vwap = vwapSeries(candles);
+    // A daily VWAP reset is a no-op on 1D candles (one bar = one reset), so
+    // anchor to the calendar month there instead — see vwapSeries' comment.
+    const vwap = vwapSeries(candles, interval === "1D" ? "month" : "day");
     const ema20 = ema(closes, 20);
     const ema50 = ema(closes, 50);
     const ema200 = ema(closes, 200);
@@ -236,7 +251,7 @@ class SignalScreenerService {
     const load = async () => {
       const candles = await this._fetchKlines(symbol, binanceInterval);
       const livePrice = candles.length ? candles[candles.length - 1].close : null;
-      const result = this._computeSignal(dropUnclosedCandle(candles), resolvedMinChecks);
+      const result = this._computeSignal(dropUnclosedCandle(candles), resolvedMinChecks, interval);
       // Signal checks confirm on closed candles, but the displayed price
       // should still be current, not up to a full bar stale.
       if (!result.error && livePrice != null) result.price = livePrice;
