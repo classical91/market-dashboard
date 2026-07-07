@@ -965,9 +965,55 @@
     },
   ];
 
-  var ALL_GLOSSARY = GLOSSARY.concat(USER_GLOSSARY);
+  var DECISION_ENGINE_GLOSSARY = [
+    {
+      id: "market-map-framework", term: "Dashboard vs. Strategy vs. Risk System vs. Journal", category: "Decision Engine & Trading Framework",
+      def: "A multi-asset trader's toolkit splits into four separate layers: the dashboard maps the market (regime, rotation, cleanest setups), the strategy defines entry rules, the risk system enforces survival (sizing, invalidation, exposure limits), and the journal drives improvement by grading past calls.",
+      read: "Keep the layers separate. The dashboard's job is to answer “where is the cleanest opportunity with the best risk?” — not to place trades for you. If a page tries to do all four jobs at once, it gets cluttered and none of them work well.",
+      pages: [{ label: "Decision Engine", href: "/decision.html" }],
+    },
+    {
+      id: "market-regime", term: "Market Regime (Risk-On / Risk-Off / Defensive / Volatile / Trend Mode / Choppy)", category: "Decision Engine & Trading Framework",
+      def: "A single read on “what environment are we in,” built by voting BTC, crypto breadth, SPY, QQQ, DXY, VIX, gold, oil and US10Y (when available) each –10..+1 on risk appetite, weighting them, and turning the result into a 0–100 score and a label.",
+      read: "Score ≥62 is Risk-On, ≤38 is Risk-Off; in between it falls back to Defensive (gold bid + soft equities), Volatile (VIX/crypto swings large), Trend Mode (inputs agree and lean hard one way), or Choppy (inputs disagree or are flat). Use it to set directional bias, not as an entry trigger.",
+      pages: [{ label: "Decision Engine → Market Regime", href: "/decision.html#de-regime-card" }],
+    },
+    {
+      id: "rotation-board", term: "Rotation Board", category: "Decision Engine & Trading Framework",
+      def: "A table showing where money is flowing right now across Crypto, Stocks, USD, Gold, Oil, and Bonds/Yields — each class's move is scaled against its own normal daily range (a 0.5% DXY move counts as “strong” the same way a 3% crypto move does) so the classes are comparable head-to-head.",
+      read: "Check the “leader” call before picking which market to trade: it names the asset class with the largest scaled move. A trader watching 20 markets uses this to narrow down to the 1–3 that actually have flow behind them.",
+      pages: [{ label: "Decision Engine → Rotation Board", href: "/decision.html#de-rotation-body" }],
+    },
+    {
+      id: "setup-quality-score", term: "Setup Quality Score", category: "Decision Engine & Trading Framework",
+      def: "A 0–100 ranking layered on top of the signal screener's confluence score for each LONG/SHORT candidate, blending confluence (45%), regime alignment (25%), trend strength/ADX (15%), and news safety (15%) into one number and an action.",
+      read: "≥75 = “Ready — watch for entry,” ≥60 = “Watch,” ≥45 = “Low edge,” below that = “Skip.” A high-impact news window overrides the score entirely to “Stand down.” It ranks candidates — it doesn't replace chart confirmation.",
+      pages: [{ label: "Decision Engine → Setup Ranking", href: "/decision.html#de-setups-table" }],
+    },
+    {
+      id: "execution-plan", term: "Execution Plan (Trigger / Invalidation / Target)", category: "Decision Engine & Trading Framework",
+      def: "Trigger, invalidation, and target levels computed from recent swing high/low structure and ATR for the top-ranked setups: trigger at the breakout level, invalidation at the structure stop (capped at 2.5× ATR from trigger), target from the swing range or 1.5× risk, whichever is larger — plus the resulting risk/reward ratio.",
+      read: "Each plan also lists explicit “do not trade” reasons — a high-impact news window, the signal conflicting with the regime, a volatile regime, or risk/reward under 1.5 — any of which should make you skip it even with a high setup score. Verify levels on the actual chart before acting; this is a starting plan, not an order ticket.",
+      pages: [{ label: "Decision Engine → Execution Panel", href: "/decision.html#de-exec-grid" }],
+    },
+    {
+      id: "trading-journal-feedback-loop", term: "Trading Journal / Feedback Loop", category: "Decision Engine & Trading Framework",
+      def: "Every logged signal snapshots what the engine said at the time (setup score, regime, plan levels). You grade it later — was it taken, was the result a win/loss/breakeven, was the regime read correct, was the pattern correct, was news risk missed — and the journal aggregates win rate and review accuracy across all graded entries.",
+      read: "This is what turns a dashboard from a market map into a trading assistant: the win rate and regime/pattern accuracy stats tell you whether the engine's scoring is actually predictive for you, rather than just looking reasonable in the moment.",
+      pages: [{ label: "Decision Engine → Trading Journal", href: "/decision.html#de-journal-stats" }],
+    },
+    {
+      id: "news-risk-window", term: "News Risk Window", category: "Decision Engine & Trading Framework",
+      def: "A calendar-aware risk read that scans today's high-impact economic events: “high” when one falls inside a –15/+45 minute window of now (the pre-release chop and post-release whipsaw), “medium” when high-impact events exist later today, “low” otherwise.",
+      read: "Treat a “high” reading as a hard stand-down for new entries — it overrides setup score and regime alignment alike, since whipsaw around CPI/FOMC-type prints can invalidate a clean technical setup in seconds.",
+      pages: [{ label: "Decision Engine → News Risk", href: "/decision.html#de-news-strip" }],
+    },
+  ];
+
+  var ALL_GLOSSARY = GLOSSARY.concat(USER_GLOSSARY).concat(DECISION_ENGINE_GLOSSARY);
 
   var CATEGORY_ORDER = [
+    "Decision Engine & Trading Framework",
     "Technical Indicators",
     "Price Action & Liquidity",
     "Market Profile & Volume",
