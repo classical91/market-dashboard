@@ -59,7 +59,7 @@ body {
 /* ── Sidebar ──────────────────────────────────────────── */
 .cmd-sidebar {
   border-right: 1px solid var(--border);
-  background: rgba(8,12,22,0.86);
+  background: color-mix(in srgb, var(--panel) 86%, transparent);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   padding: 24px 18px;
@@ -398,7 +398,7 @@ header, .back, .back-group { display: none !important; }
 .cmd-mobile-bar {
   display: none;
   position: sticky; top: 0; z-index: 100;
-  background: rgba(7,10,18,0.96);
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
   backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--border);
   padding: 0 16px; height: 56px;
@@ -438,7 +438,7 @@ header, .back, .back-group { display: none !important; }
 .cmd-drawer {
   position: fixed; top: 0; left: 0; bottom: 0;
   width: min(290px, 88vw);
-  background: rgba(7,10,18,0.98);
+  background: color-mix(in srgb, var(--panel) 95%, transparent);
   backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
   border-right: 1px solid var(--border);
   z-index: 201; padding: 22px 16px;
