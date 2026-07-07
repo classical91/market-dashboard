@@ -1318,6 +1318,72 @@
     },
   ];
 
+  var VOLUME_FLOW_GLOSSARY = [
+    {
+      id: "cvd-exhaustion", term: "CVD Exhaustion", category: "Market Profile & Volume",
+      def: "A momentum-fading signal where price prints a new high but CVD fails to make a new high, or price prints a new low but CVD fails to make a new low.",
+      read: "Price extending without matching aggressive-volume follow-through often means the move is running on thinner participation — a warning sign for continuation, not a reversal trigger by itself.",
+      pages: [{ label: "Indicators Glossary → Cumulative Volume Delta (CVD)", href: "/indicators.html#term-cumulative-volume-delta" }],
+    },
+    {
+      id: "cvd-absorption", term: "CVD Absorption", category: "Market Profile & Volume",
+      def: "The mirror signal to CVD exhaustion: CVD makes a new high but price can't break higher (sellers absorbing buyers), or CVD makes a new low but price can't break lower (buyers absorbing sellers).",
+      read: "Absorption shows real resting size defending a level against aggressive flow. Repeated absorption at the same price is a stronger support/resistance signal than the level being tested alone.",
+      pages: [{ label: "Indicators Glossary → Cumulative Volume Delta (CVD)", href: "/indicators.html#term-cumulative-volume-delta" }],
+    },
+  ];
+
+  var CHART_PATTERNS_GLOSSARY = [
+    {
+      id: "falling-wedge", term: "Falling Wedge", category: "Chart Patterns",
+      def: "A converging bullish pattern where price makes lower highs and lower lows that narrow together, both sloping downward — selling momentum fades as the range compresses.",
+      read: "Usually resolves bullish: momentum fading inside the wedge plus a decisive break above wedge resistance, ideally on rising volume, is the signal — not the wedge shape alone.",
+    },
+    {
+      id: "bull-pennant", term: "Bull Pennant", category: "Chart Patterns",
+      def: "A bullish continuation pattern: a small symmetrical consolidation (the pennant) following a sharp, high-volume impulse move (the flagpole).",
+      read: "Works best as a continuation, not a reversal — look for volume to expand again on the breakout from the pennant, in the same direction as the flagpole.",
+    },
+    {
+      id: "ascending-triangle", term: "Ascending Triangle", category: "Chart Patterns",
+      def: "A pattern with a flat horizontal resistance line and a rising line of higher lows, showing buyers stepping in earlier each time while sellers defend one fixed level.",
+      read: "Bullish if price accepts above resistance with follow-through. A break that immediately fails and falls back inside the triangle is a false breakout, not confirmation.",
+    },
+    {
+      id: "harmonic-patterns", term: "Harmonic Patterns", category: "Chart Patterns",
+      def: "Ratio-based reversal or continuation structures (e.g. Gartley, Bat, Butterfly, Crab) built from specific Fibonacci retracement and extension ratios between swing points.",
+      read: "Treat the completion zone (commonly called the PRZ) as an area to watch for a reaction, not an automatic entry — confirm with structure, volume, or a lower-timeframe reversal signal before acting.",
+      pages: [{ label: "Indicators Glossary → Fibonacci Retracement", href: "/indicators.html#term-fibonacci-retracement" }],
+    },
+    {
+      id: "rising-three-methods", term: "Rising Three Methods", category: "Candlestick Patterns",
+      def: "A five-candle bullish continuation pattern: one long bullish candle, three small bearish or consolidating candles that stay within its range, then a strong bullish candle closing above the first candle's high.",
+      read: "Only meaningful inside an existing uptrend — it's a pause-and-continue signal, not a reversal pattern, so it carries little weight after a downtrend or inside a range.",
+    },
+  ];
+
+  var CONFLUENCE_GLOSSARY = [
+    {
+      id: "oi-cheat-sheet", term: "Open Interest Cheat Sheet (Price vs. OI)", category: "Futures & Derivatives",
+      def: "A reference for reading the four combinations of price direction and open-interest direction together, since OI alone doesn't tell you which way price will go.",
+      read: "Key rule: OI does not tell direction by itself — pair it with price, CVD, funding, liquidations, and structure before drawing a conclusion.",
+      illustration:
+        '<table class="gi-table"><thead><tr><th>Price</th><th>OI</th><th>Reading</th></tr></thead><tbody>' +
+        '<tr><td><span class="gi-cell gi-up">Up</span></td><td><span class="gi-cell gi-up">Up</span></td><td>Fresh leverage entering — bullish if spot/CVD confirms. Risk: crowded longs.</td></tr>' +
+        '<tr><td><span class="gi-cell gi-up">Up</span></td><td><span class="gi-cell gi-down">Down</span></td><td>Short covering / positions closing. Can be a squeeze, but continuation may weaken once shorts are flushed.</td></tr>' +
+        '<tr><td><span class="gi-cell gi-down">Down</span></td><td><span class="gi-cell gi-up">Up</span></td><td>Fresh leverage entering to the downside — bearish if CVD/funding confirms. Risk: crowded shorts.</td></tr>' +
+        '<tr><td><span class="gi-cell gi-down">Down</span></td><td><span class="gi-cell gi-down">Down</span></td><td>Longs closing or being liquidated. Bearish during the flush, but watch for exhaustion if price rejects support.</td></tr>' +
+        "</tbody></table>",
+      pages: [{ label: "Indicators Glossary → Open Interest (OI)", href: "/indicators.html#term-open-interest" }],
+    },
+    {
+      id: "confluence-model", term: "Best Confluence Model (Bullish/Bearish Setup Checklist)", category: "Decision Engine & Trading Framework",
+      def: "A checklist of conditions that typically stack up in a strong setup: higher-timeframe support/resistance, a liquidity sweep, a ChoCH into a BOS in the new direction, a retest of an FVG or order block, CVD confirmation (or divergence/absorption), OI/funding that isn't dangerously crowded, and a clear invalidation and target.",
+      read: "No single item on the list is a trade signal by itself — the edge comes from how many independently line up. A setup missing several of these is a lower-quality version of the same idea, not a different one, and should be sized or skipped accordingly.",
+      pages: [{ label: "Decision Engine → Setup Ranking", href: "/decision.html#de-setups-table" }],
+    },
+  ];
+
   var ALL_GLOSSARY = GLOSSARY.concat(USER_GLOSSARY)
     .concat(DECISION_ENGINE_GLOSSARY)
     .concat(MARKET_FUNDAMENTALS_GLOSSARY)
@@ -1325,13 +1391,17 @@
     .concat(ILLUSTRATED_GLOSSARY)
     .concat(CORE_VOCAB_GLOSSARY)
     .concat(PRICE_ACTION_EXTRA_GLOSSARY)
-    .concat(ICT_GLOSSARY);
+    .concat(ICT_GLOSSARY)
+    .concat(VOLUME_FLOW_GLOSSARY)
+    .concat(CHART_PATTERNS_GLOSSARY)
+    .concat(CONFLUENCE_GLOSSARY);
 
   var CATEGORY_ORDER = [
     "Market Fundamentals",
     "Decision Engine & Trading Framework",
     "Core Trading Vocabulary",
     "Candlestick Patterns",
+    "Chart Patterns",
     "Technical Indicators",
     "Price Action & Liquidity",
     "ICT / Smart Money Concepts",
