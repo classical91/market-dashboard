@@ -1,6 +1,6 @@
 const { Router } = require("express");
 
-function createReporterRouter({ reporterService, requireAdmin }) {
+function createReporterRouter({ reporterService, telegramService, requireAdmin }) {
   const router = Router();
 
   function resolveTtlMs(req) {
@@ -31,6 +31,45 @@ function createReporterRouter({ reporterService, requireAdmin }) {
     try {
       const report = await reporterService.generateReport(resolveTtlMs(req), resolveSection(req), resolvePrompt(req));
       res.json(report);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // Manually broadcast the current aggregate report (whichever sections have
+  // saved content) to Telegram. Never generates anything itself — run
+  // /generate for each section first. Admin-guarded because it pushes
+  // messages to every configured channel.
+  router.post("/broadcast", requireAdmin, async (req, res, next) => {
+    try {
+      if (!telegramService.configured) {
+        res.status(400).json({ error: "Telegram is not configured (set TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_IDS)" });
+        return;
+      }
+      const report = reporterService.peekReport(resolveTtlMs(req));
+      if (!report.configured) {
+        res.status(400).json({ error: "Reporter is not configured (set OPENAI_API_KEY)" });
+        return;
+      }
+      if (!report.crypto && !report.economics && !report.markets) {
+        res.status(400).json({ error: "No report to broadcast yet — generate at least one section first" });
+        return;
+      }
+      const broadcastAt = reporterService.getBroadcastAt();
+      if (broadcastAt && report.generatedAt && broadcastAt >= report.generatedAt) {
+        res.status(409).json({
+          error: "Already broadcast — generate a new section first",
+          alreadyBroadcast: true,
+          broadcastAt,
+        });
+        return;
+      }
+      await telegramService.postReport(report);
+      res.json({
+        ok: true,
+        channelCount: telegramService._chatIds.length,
+        broadcastAt: reporterService.markBroadcasted(),
+      });
     } catch (err) {
       next(err);
     }
