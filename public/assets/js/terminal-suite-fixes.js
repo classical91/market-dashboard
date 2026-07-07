@@ -45,6 +45,10 @@
     patchEngineNote();
   }
 
+  function setText(el, value) {
+    if (el && el.textContent !== value) el.textContent = value;
+  }
+
   function patchRangeCopy() {
     const range = document.querySelector(".terminal-range");
     if (!range) return;
@@ -75,13 +79,13 @@
       }
 
       if (text === "Dollar" && dxy?.proxy) {
-        label.textContent = "Dollar Proxy";
-        if (note) note.textContent = "USD proxy 24h";
+        setText(label, "Dollar Proxy");
+        setText(note, "USD proxy 24h");
       }
 
       if (text === "Volatility" && vix?.proxy) {
-        label.textContent = "VIX Proxy";
-        if (note) note.textContent = "ETF proxy 24h";
+        setText(label, "VIX Proxy");
+        setText(note, "ETF proxy 24h");
       }
     });
   }
@@ -97,13 +101,13 @@
       const text = label?.textContent?.trim();
 
       if (text === "Dollar Index" && dxy?.proxy) {
-        label.textContent = "Dollar Proxy";
-        if (note && !/proxy/i.test(note.textContent)) note.textContent = `${note.textContent} · proxy`;
+        setText(label, "Dollar Proxy");
+        if (note && !/proxy/i.test(note.textContent)) setText(note, `${note.textContent} · proxy`);
       }
 
       if (text === "Volatility Index" && vix?.proxy) {
-        label.textContent = "VIX Proxy";
-        if (note && !/proxy/i.test(note.textContent)) note.textContent = `${note.textContent} · proxy`;
+        setText(label, "VIX Proxy");
+        if (note && !/proxy/i.test(note.textContent)) setText(note, `${note.textContent} · proxy`);
       }
     });
   }
@@ -114,7 +118,7 @@
 
     const factorCount = document.getElementById("factorCount");
     if (factorCount && !/24h/i.test(factorCount.textContent)) {
-      factorCount.textContent = `${factorCount.textContent} · 24h`;
+      setText(factorCount, `${factorCount.textContent} · 24h`);
     }
 
     document.querySelectorAll("#confluenceRows tr").forEach((row) => {
@@ -124,28 +128,28 @@
       const text = label?.textContent?.trim();
 
       if (text === "Dollar (DXY)" && dxy?.proxy) {
-        label.textContent = "Dollar (DXY proxy)";
-        if (subLabel) subLabel.textContent = "USD pressure proxy";
-        if (readingNote) readingNote.textContent = readingNote.textContent.replace("Dollar", "Dollar proxy");
+        setText(label, "Dollar (DXY proxy)");
+        setText(subLabel, "USD pressure proxy");
+        if (readingNote) setText(readingNote, readingNote.textContent.replace("Dollar", "Dollar proxy"));
       }
 
       if (text === "Volatility (VIX)" && vix?.proxy) {
-        label.textContent = "Volatility (VIX proxy)";
-        if (subLabel) subLabel.textContent = "market stress ETF proxy";
+        setText(label, "Volatility (VIX proxy)");
+        setText(subLabel, "market stress ETF proxy");
       }
     });
 
     document.querySelectorAll(".terminal-section-label").forEach((label) => {
       if (label.textContent.trim() === "TraderClaw Macro Confluence") {
-        label.textContent = "TraderClaw Macro Confluence · 24h factors";
+        setText(label, "TraderClaw Macro Confluence · 24h factors");
       }
     });
   }
 
   function patchEngineNote() {
     const note = document.querySelector("#terminalThesis .terminal-small-note");
-    if (!note) return;
-    note.textContent = "Confluence uses 24h asset moves; range buttons change the BTC market-pulse chart only. Confirm structure on TradingView before acting.";
+    const message = "Confluence uses 24h asset moves; range buttons change the BTC market-pulse chart only. Confirm structure on TradingView before acting.";
+    setText(note, message);
   }
 
   function getAsset(data, symbol) {
