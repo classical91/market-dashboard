@@ -234,6 +234,30 @@ class ReporterService {
     return `reporter:latest:${section}`;
   }
 
+  _broadcastKey() {
+    return "reporter:broadcastAt";
+  }
+
+  /**
+   * Read-only: the ISO timestamp the aggregate report was last broadcast to
+   * Telegram, or null if it never has been (or the guard expired).
+   */
+  getBroadcastAt() {
+    return this._cache.get(this._broadcastKey()) || null;
+  }
+
+  /**
+   * Record that the current aggregate report has been broadcast, so the same
+   * generation can't be sent twice. A fresh generateReport() call for any
+   * section advances the report's generatedAt past this timestamp, which
+   * re-arms the broadcast gate in the route.
+   */
+  markBroadcasted() {
+    const broadcastAt = new Date().toISOString();
+    this._cache.set(this._broadcastKey(), broadcastAt, 7 * 24 * 60 * 60 * 1000);
+    return broadcastAt;
+  }
+
   _readLog() {
     try {
       const parsed = JSON.parse(fs.readFileSync(this._logFile, "utf8"));

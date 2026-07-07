@@ -182,7 +182,7 @@ function createApp() {
   app.use("/api/pattern-tracker", createPatternTrackerRouter({ patternTrackerService }));
   app.use("/api/onchain", createOnchainRouter({ onchainService }));
   app.use("/api/overview", createOverviewRouter({ overviewService }));
-  app.use("/api/daily-report", createReporterRouter({ reporterService, requireAdmin }));
+  app.use("/api/daily-report", createReporterRouter({ reporterService, telegramService, requireAdmin }));
   app.use("/api/telegram", createTelegramRouter({ telegramService, requireAdmin }));
   app.use("/api/youtube", createYoutubeRouter({ youtubeService, channels: YOUTUBE_CHANNELS }));
   app.use("/api/x", createXFeedRouter({ xFeedService, accounts: X_ACCOUNTS }));

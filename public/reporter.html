@@ -25,6 +25,14 @@
       border: 1px solid var(--border);
       padding: 5px 12px; border-radius: 10px;
     }
+    .reporter-gen-badge--fresh { color: var(--green); }
+    .reporter-gen-badge--stale { color: var(--red); font-weight: 700; }
+    .reporter-broadcast-status {
+      font-size: 11px; color: var(--muted);
+      flex-basis: 100%;
+    }
+    .reporter-broadcast-status.error { color: var(--red); }
+    .reporter-broadcast-status.ok { color: var(--green); }
     .reporter-actions {
       display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
     }
@@ -342,7 +350,11 @@
     <div class="reporter-header-row" id="reporterHeaderRow" style="display:none">
       <div class="reporter-date-badge" id="reporterDate"></div>
       <div class="reporter-gen-badge" id="reporterGen"></div>
-      <button class="open-all-btn reporter-generate-cta" id="reporterRegenBtn" type="button" style="margin-left:auto">&#9889; Regenerate</button>
+      <div class="reporter-actions" style="margin-left:auto">
+        <button class="open-all-btn" id="reporterBroadcastBtn" type="button">&#128226; Broadcast</button>
+        <button class="open-all-btn reporter-generate-cta" id="reporterRegenBtn" type="button">&#9889; Regenerate</button>
+      </div>
+      <span class="reporter-broadcast-status" id="reporterBroadcastStatus" style="display:none"></span>
     </div>
 
     <!-- Tabs -->
@@ -464,6 +476,37 @@
       var ts = new Date(value);
       if (Number.isNaN(ts.getTime())) return false;
       return dateKey(ts) === dateKey();
+    }
+
+    // Calendar-day difference, not a 24h rolling window — a report generated
+    // at 11:58pm read the next morning should say "yesterday", not "0 days ago".
+    function daysAgo(date, now) {
+      var startOfDay = function (d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); };
+      return Math.round((startOfDay(now) - startOfDay(date)) / 86400000);
+    }
+
+    function formatGeneratedBadge(iso) {
+      if (!iso) return { text: '', className: 'reporter-gen-badge' };
+      var ts = new Date(iso);
+      if (Number.isNaN(ts.getTime())) return { text: '', className: 'reporter-gen-badge' };
+      var age = daysAgo(ts, new Date());
+      var full = ts.toLocaleString(undefined, {
+        weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+      });
+      if (age <= 0) {
+        return { text: 'Generated ' + full, className: 'reporter-gen-badge reporter-gen-badge--fresh' };
+      }
+      var when = age === 1 ? 'yesterday' : age + ' days ago';
+      return { text: '⚠️ Generated ' + when + ' — ' + full, className: 'reporter-gen-badge reporter-gen-badge--stale' };
+    }
+
+    function renderGenBadge() {
+      var genEl = document.getElementById('reporterGen');
+      if (!genEl || !reportData || !reportData.generatedAt) return;
+      var badge = formatGeneratedBadge(reportData.generatedAt);
+      genEl.textContent = badge.text;
+      genEl.className = badge.className;
     }
 
     function generateCta(label) {
@@ -834,14 +877,7 @@
       var dateEl = document.getElementById('reporterDate');
       if (dateEl && data.dateStr) dateEl.textContent = '🗓️ ' + data.dateStr;
 
-      var genEl = document.getElementById('reporterGen');
-      if (genEl && data.generatedAt) {
-        var ts = new Date(data.generatedAt);
-        genEl.textContent = 'Generated ' + ts.toLocaleString(undefined, {
-          month: 'short', day: 'numeric',
-          hour: '2-digit', minute: '2-digit'
-        });
-      }
+      renderGenBadge();
 
       renderLog(data.generationLog);
       if (!data[activeTab] && data.latestSection) {
@@ -948,9 +984,50 @@
     });
     var regenBtn = document.getElementById('reporterRegenBtn');
     if (regenBtn) regenBtn.addEventListener('click', function () { generateReport(); });
+
+    /* Broadcast — sends whichever sections have saved content to Telegram. */
+    var broadcasting = false;
+    var broadcastBtn = document.getElementById('reporterBroadcastBtn');
+    var broadcastStatusEl = document.getElementById('reporterBroadcastStatus');
+    function showBroadcastStatus(text, kind) {
+      if (!broadcastStatusEl) return;
+      broadcastStatusEl.textContent = text;
+      broadcastStatusEl.className = 'reporter-broadcast-status' + (kind ? ' ' + kind : '');
+      broadcastStatusEl.style.display = text ? 'block' : 'none';
+    }
+    if (broadcastBtn) broadcastBtn.addEventListener('click', function () {
+      if (broadcasting) return;
+      broadcasting = true;
+      broadcastBtn.disabled = true;
+      broadcastBtn.textContent = 'Sending…';
+      showBroadcastStatus('', '');
+      AdminKey.fetch('/api/daily-report/broadcast?ttlHours=' + currentTtl(), { method: 'POST' })
+        .then(function (res) {
+          return res.json().then(function (body) { return { ok: res.ok, status: res.status, body: body }; });
+        })
+        .then(function (result) {
+          if (result.ok) {
+            showBroadcastStatus('✅ Sent to ' + result.body.channelCount + ' channel' + (result.body.channelCount === 1 ? '' : 's') + '.', 'ok');
+          } else if (result.body && result.body.alreadyBroadcast) {
+            showBroadcastStatus('Already broadcast — generate a new section first to send again.', 'error');
+          } else {
+            showBroadcastStatus(result.body && result.body.error ? result.body.error : 'Broadcast failed.', 'error');
+          }
+        })
+        .catch(function (err) {
+          showBroadcastStatus('Broadcast request failed: ' + err.message, 'error');
+        })
+        .finally(function () {
+          broadcasting = false;
+          broadcastBtn.disabled = false;
+          broadcastBtn.textContent = '📣 Broadcast';
+        });
+    });
+
     configurePageShell();
     setActiveTab(activeTab);
 
+    setInterval(renderGenBadge, 1000);
     loadReport();
   })();
 </script>
