@@ -90,3 +90,25 @@ test("macro delayed status when serving stale values", async () => {
   assert.equal(payload.dataQuality.modules.macro, "delayed");
   assert.equal(payload.dataQuality.modules.onchain, "unavailable");
 });
+
+test("VIX proxy risk uses percent change instead of proxy price", async () => {
+  const service = new OverviewService({
+    marketDataService: makeMarketDataStub({
+      getMacro: async () => ({
+        live: true,
+        source: "finnhub",
+        items: [
+          { symbol: "DXY", name: "Dollar Index", price: 104, changePercent: 0.1, type: "macro", proxy: true },
+          { symbol: "VIX", name: "Volatility Index", price: 60, changePercent: 2, type: "macro", proxy: true },
+        ],
+      }),
+    }),
+    onchainService: null,
+    cache: passthroughCache,
+    cacheTtlMs: 0,
+  });
+
+  const payload = await service.getOverview("1D");
+  const vixRisk = payload.riskFactors.find((factor) => factor.label === "Equity Risk (VIX proxy)");
+  assert.equal(vixRisk.value, 74);
+});
