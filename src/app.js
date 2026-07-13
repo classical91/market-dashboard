@@ -20,6 +20,7 @@ const { createPatternScannerRouter } = require("./routes/pattern-scanner");
 const { createSignalScreenerRouter } = require("./routes/signal-screener");
 const { createStrategyEngineRouter } = require("./routes/strategy-engine");
 const { createWatchlistRouter } = require("./routes/watchlist");
+const { createBotCommandsRouter } = require("./routes/bot-commands");
 const { createPatternTrackerRouter } = require("./routes/pattern-tracker");
 const { createHealthRouter } = require("./routes/health");
 const { createOnchainRouter } = require("./routes/onchain");
@@ -41,6 +42,7 @@ const { SignalScreenerService } = require("./services/signal-screener");
 const { StrategyEngineService } = require("./services/strategy-engine");
 const { SignalBotService } = require("./services/signal-bot");
 const { WatchlistService } = require("./services/watchlist");
+const { BotCommandsService } = require("./services/bot-commands");
 const { PatternTrackerService } = require("./services/pattern-tracker");
 const { MemoryCache } = require("./services/cache");
 const { PersistentReporterCache } = require("./services/persistent-cache");
@@ -116,6 +118,7 @@ function createApp() {
   const signalScreenerService = new SignalScreenerService({ cache });
   const strategyEngineService = new StrategyEngineService({ signalScreenerService });
   const watchlistService = new WatchlistService({ dataDir });
+  const botCommandsService = new BotCommandsService({ dataDir });
   const patternTrackerService = new PatternTrackerService({ dataDir, fetchPrice: fetchBinancePrice });
   const decisionEngineService = new DecisionEngineService({
     marketDataService,
@@ -179,6 +182,7 @@ function createApp() {
   app.use("/api/strategy-engine", createStrategyEngineRouter({ strategyEngineService }));
   app.use("/api/decision", createDecisionRouter({ decisionEngineService, tradeJournalService, requireAdmin }));
   app.use("/api/watchlist", createWatchlistRouter({ watchlistService, requireAdmin }));
+  app.use("/api/bot-commands", createBotCommandsRouter({ botCommandsService }));
   app.use("/api/pattern-tracker", createPatternTrackerRouter({ patternTrackerService }));
   app.use("/api/onchain", createOnchainRouter({ onchainService }));
   app.use("/api/overview", createOverviewRouter({ overviewService }));

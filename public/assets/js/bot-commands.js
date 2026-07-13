@@ -31,6 +31,43 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state.commands));
   }
 
+  // Server sync — no admin key, since this is a personal reference list, not
+  // an action that spends credits. localStorage stays as the offline/instant
+  // -render cache; the server is the source of truth once reachable, so a
+  // command saved on one device shows up on every other device.
+  function syncFromServer() {
+    return fetch("/api/bot-commands")
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        var serverItems = Array.isArray(data.items) ? data.items : [];
+        if (!serverItems.length && state.commands.length) {
+          // First run on a device that already has local-only commands from
+          // before server sync existed: upload them once so they aren't lost.
+          return Promise.all(state.commands.map(function (entry) {
+            return fetch("/api/bot-commands", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(entry),
+            }).catch(function () { return null; });
+          })).then(function () {
+            return fetch("/api/bot-commands").then(function (res) { return res.json(); });
+          }).then(function (merged) {
+            serverItems = Array.isArray(merged.items) ? merged.items : state.commands;
+            state.commands = serverItems;
+            saveCommands();
+            render();
+          });
+        }
+        state.commands = serverItems;
+        saveCommands();
+        render();
+      })
+      .catch(function () {
+        // Offline or server unreachable — the localStorage cache already
+        // rendered, so there's nothing more to do here.
+      });
+  }
+
   function formValue(id) {
     return ($(id).value || "").trim();
   }
@@ -64,6 +101,14 @@
     saveCommands();
     resetForm();
     render();
+
+    // Best-effort background sync — the local save above already gives an
+    // instant, offline-safe result regardless of whether this succeeds.
+    fetch("/api/bot-commands", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(entry),
+    }).catch(function () {});
   }
 
   function editCommand(id) {
@@ -83,6 +128,7 @@
     state.commands = state.commands.filter(function (item) { return item.id !== id; });
     saveCommands();
     render();
+    fetch("/api/bot-commands/" + encodeURIComponent(id), { method: "DELETE" }).catch(function () {});
   }
 
   function copyCommand(id) {
@@ -179,6 +225,7 @@
       render();
     });
     render();
+    syncFromServer();
   }
 
   if (document.readyState === "loading") {
