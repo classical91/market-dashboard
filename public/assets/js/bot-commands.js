@@ -32,35 +32,50 @@
   }
 
   // Server sync — no admin key, since this is a personal reference list, not
-  // an action that spends credits. localStorage stays as the offline/instant
-  // -render cache; the server is the source of truth once reachable, so a
-  // command saved on one device shows up on every other device.
+  // an action that spends credits. This is an additive UNION merge, never a
+  // replace: a sync must never make this device's visible list shrink, even
+  // if a previous upload partially failed or the server briefly has fewer
+  // items (e.g. mid-deploy). Anything local the server doesn't have yet gets
+  // (re-)posted; anything the server has that's missing locally gets pulled
+  // in; the merged result — never a subset of what was already local — is
+  // what gets saved back to localStorage.
   function syncFromServer() {
     return fetch("/api/bot-commands")
       .then(function (res) { return res.json(); })
       .then(function (data) {
         var serverItems = Array.isArray(data.items) ? data.items : [];
-        if (!serverItems.length && state.commands.length) {
-          // First run on a device that already has local-only commands from
-          // before server sync existed: upload them once so they aren't lost.
-          return Promise.all(state.commands.map(function (entry) {
-            return fetch("/api/bot-commands", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(entry),
-            }).catch(function () { return null; });
-          })).then(function () {
-            return fetch("/api/bot-commands").then(function (res) { return res.json(); });
-          }).then(function (merged) {
-            serverItems = Array.isArray(merged.items) ? merged.items : state.commands;
-            state.commands = serverItems;
-            saveCommands();
-            render();
+        var serverById = {};
+        serverItems.forEach(function (item) { serverById[item.id] = item; });
+        var localById = {};
+        state.commands.forEach(function (item) { localById[item.id] = item; });
+
+        var missingFromServer = state.commands.filter(function (item) { return !serverById[item.id]; });
+        var uploadPromise = missingFromServer.length
+          ? Promise.all(missingFromServer.map(function (entry) {
+              return fetch("/api/bot-commands", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(entry),
+              }).catch(function () { return null; });
+            }))
+          : Promise.resolve();
+
+        return uploadPromise.then(function () {
+          var mergedById = Object.assign({}, serverById, localById);
+          // Same id on both sides (edited on one device, not yet synced to
+          // the other) — keep whichever copy is actually newer.
+          Object.keys(localById).forEach(function (id) {
+            var serverEntry = serverById[id];
+            if (serverEntry && new Date(serverEntry.updatedAt || 0) > new Date(localById[id].updatedAt || 0)) {
+              mergedById[id] = serverEntry;
+            }
           });
-        }
-        state.commands = serverItems;
-        saveCommands();
-        render();
+          state.commands = Object.keys(mergedById)
+            .map(function (id) { return mergedById[id]; })
+            .sort(function (a, b) { return new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0); });
+          saveCommands();
+          render();
+        });
       })
       .catch(function () {
         // Offline or server unreachable — the localStorage cache already
