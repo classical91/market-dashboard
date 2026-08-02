@@ -19,7 +19,6 @@
         <div class="cmd-page-title">&#9733; My Trades</div>
         <div class="cmd-page-subtitle">Tokens you've starred on Pattern Scanner &mdash; their live pattern/divergence status, so you can keep up with what you're actually trading</div>
       </div>
-      <div class="cmd-clock" id="cmd-clock"></div>
     </div>
 
     <div class="aia-notice" id="ps-notice" style="display:none"></div>
@@ -41,14 +40,6 @@
 <script src="/assets/js/pattern-render.js"></script>
 <script>
   (function () {
-    function tick() {
-      var el = document.getElementById('cmd-clock');
-      if (el) el.textContent = new Date().toLocaleString(undefined, {
-        weekday: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit'
-      });
-    }
-    tick(); setInterval(tick, 1000);
-
     var grid = document.getElementById('ps-grid');
     var notice = document.getElementById('ps-notice');
     var updatedEl = document.getElementById('ps-updated');

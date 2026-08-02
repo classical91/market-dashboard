@@ -17,7 +17,6 @@
         <div class="cmd-page-title">🔗 On-Chain Analytics</div>
         <div class="cmd-page-subtitle">Exchange flows, network activity, whale tracking &amp; DeFi</div>
       </div>
-      <div class="cmd-clock" id="cmd-clock"></div>
     </div>
 
     <nav class="nav-pills">
@@ -138,13 +137,6 @@
 <script src="/assets/js/sections.js"></script>
 <script>
   (function () {
-    function tick() {
-      var el = document.getElementById('cmd-clock');
-      if (el) el.textContent = new Date().toLocaleString(undefined, {
-        weekday: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit'
-      });
-    }
-    tick(); setInterval(tick, 1000);
     /* sections.js expects getElementById('id') or getElementById('cards-id');
        on-chain.html uses '{section}-cards' pattern so we fall back to direct IDs */
     initSections('onchain_collapsed');

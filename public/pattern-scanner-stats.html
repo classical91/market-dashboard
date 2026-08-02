@@ -20,7 +20,6 @@
         <div class="cmd-page-title">&#128202; Track Record</div>
         <div class="cmd-page-subtitle">Real accuracy of every Pattern Scanner breakout and divergence, checked against what price actually did afterward &mdash; not trusting the heuristics blind</div>
       </div>
-      <div class="cmd-clock" id="cmd-clock"></div>
     </div>
 
     <div class="aia-notice" id="ts-notice" style="display:none"></div>
@@ -50,14 +49,6 @@
 <script src="/assets/js/sidebar.js"></script>
 <script>
   (function () {
-    function tick() {
-      var el = document.getElementById('cmd-clock');
-      if (el) el.textContent = new Date().toLocaleString(undefined, {
-        weekday: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit'
-      });
-    }
-    tick(); setInterval(tick, 1000);
-
     function escapeHtml(str) {
       return String(str || '').replace(/[&<>"']/g, function (ch) {
         return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];

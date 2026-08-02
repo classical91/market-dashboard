@@ -240,13 +240,6 @@ body {
 }
 .cmd-page-title { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
 .cmd-page-subtitle { font-size: 13px; color: var(--muted); margin-top: 3px; }
-.cmd-clock {
-  border: 1px solid var(--border);
-  background: rgba(255,255,255,0.04);
-  color: var(--muted); padding: 8px 14px;
-  border-radius: 12px; font-size: 12px; white-space: nowrap;
-}
-
 /* ── Nav pills (sub-page) ─────────────────────────────── */
 .nav-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; }
 .nav-pill {

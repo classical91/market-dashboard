@@ -18,7 +18,6 @@
         <div class="cmd-page-title">&#129504; My Layouts</div>
         <div class="cmd-page-subtitle">Your saved TradingView layout snapshot + OpenAI vision read &mdash; free, no chart-img subscription</div>
       </div>
-      <div class="cmd-clock" id="cmd-clock"></div>
     </div>
 
     <div class="aia-mode-row">
@@ -51,14 +50,6 @@
 <script src="/assets/js/admin-key.js"></script>
 <script>
   (function () {
-    function tick() {
-      var el = document.getElementById('cmd-clock');
-      if (el) el.textContent = new Date().toLocaleString(undefined, {
-        weekday: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit'
-      });
-    }
-    tick(); setInterval(tick, 1000);
-
     document.getElementById('aia-mode-select').addEventListener('change', function (e) {
       window.location.href = e.target.value;
     });
