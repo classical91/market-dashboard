@@ -32,7 +32,14 @@
           Uses the official X API when a bearer token is configured. If that is unavailable, the dashboard falls back to X's public syndication feed and may show the last posts that feed returned.
         </p>
       </div>
-      <div class="x-account-list" id="xAccountList"></div>
+      <div class="x-account-panel is-collapsed" id="xAccountPanel">
+        <button type="button" class="x-account-toggle" id="xAccountToggle"
+                aria-expanded="false" aria-controls="xAccountList">
+          <span class="x-account-toggle-label" id="xAccountToggleLabel">Accounts</span>
+          <span class="x-account-toggle-chevron" aria-hidden="true">&#9662;</span>
+        </button>
+        <div class="x-account-list" id="xAccountList"></div>
+      </div>
     </div>
 
     <footer>X Intelligence &mdash; <a href="/">Overview</a></footer>
