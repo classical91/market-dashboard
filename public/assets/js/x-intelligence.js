@@ -27,7 +27,10 @@
     },
   ];
 
-  var localModeKey = "xIntelligence:lastMode";
+  // Bumped to :v2 to drop selections saved under the old default, where an
+  // unset mode meant "first account" — devices that had never explicitly
+  // chosen were stuck on a single handle's 8 posts.
+  var localModeKey = "xIntelligence:lastMode:v2";
   var localKey = "xIntelligence:lastHandle";
   var localFeedKey = "xIntelligence:feedCache:v3";
   var ALL_MODE = "all";
@@ -142,8 +145,19 @@
       if (panelToggle) panelToggle.setAttribute("aria-expanded", open ? "true" : "false");
     }
 
-    function setPanelLabel(text) {
-      if (panelToggleLabel) panelToggleLabel.textContent = "Accounts · " + text;
+    function visiblePostCount() {
+      var posts = state.feedData.posts || [];
+      if (state.mode === ALL_MODE) return posts.length;
+      return posts.filter(function (p) { return p.handle === state.handle; }).length;
+    }
+
+    // Reads e.g. "Accounts · All Accounts (147)" — the count makes it obvious
+    // that a single handle is a much smaller slice than the full feed.
+    function syncPanelLabel() {
+      if (!panelToggleLabel) return;
+      var selection = state.mode === ALL_MODE ? "All Accounts" : "@" + state.handle;
+      panelToggleLabel.textContent =
+        "Accounts · " + selection + (state.loaded ? " (" + visiblePostCount() + ")" : "");
     }
 
     if (panelToggle && panel) {
@@ -158,13 +172,15 @@
     var lastMode = readLastMode();
     var cached = readCachedFeed();
     var state = {
-      mode: lastMode === ALL_MODE ? ALL_MODE : "account",
+      // Default to the full feed; a single account only shows its own posts.
+      mode: lastMode === "account" ? "account" : ALL_MODE,
       handle: validLast ? lastHandle : accounts[0].handle,
       feedData: cached || { posts: [], failedFeeds: [] },
       loaded: !!cached,
     };
 
     function renderPane() {
+      syncPanelLabel();
       if (!state.loaded) {
         renderPostCards(pane, [], "Loading latest posts…");
         return;
@@ -197,7 +213,6 @@
       writeLastMode(ALL_MODE);
       if (paneLabel) paneLabel.textContent = "All Accounts";
       if (paneLink) paneLink.href = "https://x.com/";
-      setPanelLabel("All Accounts");
       setPanelOpen(false);
       renderPane();
       refreshList();
@@ -210,7 +225,6 @@
       writeLastHandle(handle);
       if (paneLabel) paneLabel.textContent = "@" + handle;
       if (paneLink) paneLink.href = "https://x.com/" + handle;
-      setPanelLabel("@" + handle);
       setPanelOpen(false);
       renderPane();
       refreshList();
