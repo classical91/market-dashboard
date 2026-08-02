@@ -47,6 +47,13 @@
   min-height: 180px;
 }
 
+.x-account-panel {
+  min-width: 0;
+}
+
+/* Desktop keeps the list permanently open — the toggle is mobile-only. */
+.x-account-toggle { display: none; }
+
 .x-account-list {
   display: flex;
   flex-direction: column;
@@ -297,10 +304,57 @@
   .x-split {
     display: flex;
     flex-direction: column;
+    /* The grid rule's `align-items: start` would shrink-wrap each stacked
+       child; stretch keeps the picker and the feed full-bleed. */
+    align-items: stretch;
   }
 
-  .x-account-list {
+  /* The account picker sits above the feed, but collapsed by default so the
+     posts are what you land on. Tapping the toggle opens the list. */
+  .x-account-panel {
     order: -1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .x-account-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    text-align: left;
+    color: var(--text);
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015)),
+      var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 11px 14px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .x-account-toggle:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 2px;
+  }
+
+  .x-account-toggle-chevron {
+    font-size: 11px;
+    color: var(--muted);
+    transition: transform 0.2s ease;
+  }
+  .x-account-panel:not(.is-collapsed) .x-account-toggle-chevron {
+    transform: rotate(180deg);
+  }
+
+  .x-account-panel.is-collapsed .x-account-list { display: none; }
+
+  .x-account-list {
     max-height: 260px;
     overflow-y: auto;
     padding-right: 2px;

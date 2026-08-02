@@ -127,7 +127,30 @@
     var pane = document.getElementById("xTimelinePane");
     var paneLabel = document.getElementById("xTimelineLabel");
     var paneLink = document.getElementById("xTimelineLink");
+    var panel = document.getElementById("xAccountPanel");
+    var panelToggle = document.getElementById("xAccountToggle");
+    var panelToggleLabel = document.getElementById("xAccountToggleLabel");
     if (!listRoot || !pane) return;
+
+    // Mobile only (CSS hides the toggle above 980px): the account list starts
+    // collapsed so the page opens on the posts, and folds itself away again
+    // once a selection is made.
+    function setPanelOpen(open) {
+      if (!panel) return;
+      if (open) panel.classList.remove("is-collapsed");
+      else panel.classList.add("is-collapsed");
+      if (panelToggle) panelToggle.setAttribute("aria-expanded", open ? "true" : "false");
+    }
+
+    function setPanelLabel(text) {
+      if (panelToggleLabel) panelToggleLabel.textContent = "Accounts · " + text;
+    }
+
+    if (panelToggle && panel) {
+      panelToggle.addEventListener("click", function () {
+        setPanelOpen(panel.classList.contains("is-collapsed"));
+      });
+    }
 
     var accounts = allAccounts();
     var lastHandle = readLastHandle();
@@ -174,6 +197,8 @@
       writeLastMode(ALL_MODE);
       if (paneLabel) paneLabel.textContent = "All Accounts";
       if (paneLink) paneLink.href = "https://x.com/";
+      setPanelLabel("All Accounts");
+      setPanelOpen(false);
       renderPane();
       refreshList();
     }
@@ -185,6 +210,8 @@
       writeLastHandle(handle);
       if (paneLabel) paneLabel.textContent = "@" + handle;
       if (paneLink) paneLink.href = "https://x.com/" + handle;
+      setPanelLabel("@" + handle);
+      setPanelOpen(false);
       renderPane();
       refreshList();
     }
