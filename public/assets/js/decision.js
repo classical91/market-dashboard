@@ -1,14 +1,6 @@
 (function () {
   "use strict";
 
-  function tick() {
-    var el = document.getElementById("cmd-clock");
-    if (el) el.textContent = new Date().toLocaleString(undefined, {
-      weekday: "short", hour: "2-digit", minute: "2-digit", second: "2-digit"
-    });
-  }
-  tick(); setInterval(tick, 1000);
-
   var notice = document.getElementById("de-notice");
   var warningsEl = document.getElementById("de-warnings");
   var updatedEl = document.getElementById("de-updated");

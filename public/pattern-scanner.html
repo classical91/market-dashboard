@@ -19,7 +19,6 @@
         <div class="cmd-page-title">&#128200; Pattern Scanner</div>
         <div class="cmd-page-subtitle">Flags, wedges &amp; RSI divergences over Binance candles (1h / 4h / 1D, top 25 tokens) &mdash; a scanner, not a signal: confirm with breakout, volume, and higher-timeframe trend before acting</div>
       </div>
-      <div class="cmd-clock" id="cmd-clock"></div>
     </div>
 
     <div class="aia-notice" id="ps-notice" style="display:none"></div>
@@ -43,14 +42,6 @@
 <script src="/assets/js/pattern-render.js"></script>
 <script>
   (function () {
-    function tick() {
-      var el = document.getElementById('cmd-clock');
-      if (el) el.textContent = new Date().toLocaleString(undefined, {
-        weekday: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit'
-      });
-    }
-    tick(); setInterval(tick, 1000);
-
     var grid = document.getElementById('ps-grid');
     var notice = document.getElementById('ps-notice');
     var updatedEl = document.getElementById('ps-updated');

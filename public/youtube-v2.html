@@ -19,7 +19,6 @@
         <div class="cmd-page-title">&#127916; YouTube Intelligence</div>
         <div class="cmd-page-subtitle">Latest uploads from trusted channels, sorted by most recent release</div>
       </div>
-      <div class="cmd-clock" id="cmd-clock"></div>
     </div>
 
     <div class="yt-split" style="margin-top:14px">
@@ -64,13 +63,6 @@
 <script src="/assets/js/youtube-v2.js"></script>
 <script>
   (function () {
-    function tick() {
-      var el = document.getElementById('cmd-clock');
-      if (el) el.textContent = new Date().toLocaleString(undefined, {
-        weekday: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit'
-      });
-    }
-    tick(); setInterval(tick, 1000);
     initSections('youtube_v2_collapsed');
   })();
 </script>

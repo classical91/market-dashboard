@@ -173,7 +173,6 @@
         <div class="cmd-page-title">&#128218; Indicators Glossary</div>
         <div class="cmd-page-subtitle">What each metric means, how to read it, and where it shows up in this dashboard</div>
       </div>
-      <div class="cmd-clock" id="cmd-clock"></div>
     </div>
 
     <div class="glossary-toolbar">
@@ -195,16 +194,5 @@
 
 <script src="/assets/js/sidebar.js"></script>
 <script src="/assets/js/indicators.js"></script>
-<script>
-  (function () {
-    function tick() {
-      var el = document.getElementById('cmd-clock');
-      if (el) el.textContent = new Date().toLocaleString(undefined, {
-        weekday: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit'
-      });
-    }
-    tick(); setInterval(tick, 1000);
-  })();
-</script>
 </body>
 </html>

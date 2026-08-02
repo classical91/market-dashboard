@@ -17,7 +17,6 @@
         <div class="cmd-page-title">₿ Crypto Hub</div>
         <div class="cmd-page-subtitle">Market overview, crypto research, alts, on-chain &amp; positioning</div>
       </div>
-      <div class="cmd-clock" id="cmd-clock"></div>
     </div>
 
     <!-- INTERACTIVE DASHBOARDS -->
@@ -325,13 +324,6 @@
 <script src="/assets/js/sections.js"></script>
 <script>
   (function () {
-    function tick() {
-      var el = document.getElementById('cmd-clock');
-      if (el) el.textContent = new Date().toLocaleString(undefined, {
-        weekday: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit'
-      });
-    }
-    tick(); setInterval(tick, 1000);
     initSections('crypto_collapsed');
 
     /* ── Indicator explanations ── */

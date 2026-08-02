@@ -185,7 +185,6 @@
         <div class="cmd-page-title">⚙️ Settings</div>
         <div class="cmd-page-subtitle">Appearance and reporter preferences</div>
       </div>
-      <div class="cmd-clock" id="cmd-clock"></div>
     </div>
 
     <!-- Appearance -->
@@ -264,17 +263,6 @@
 <script src="/assets/js/sidebar.js"></script>
 <script src="/assets/js/admin-key.js"></script>
 <script>
-  /* ── Clock ─────────────────────────────────────────────── */
-  (function () {
-    function tick() {
-      var el = document.getElementById('cmd-clock');
-      if (el) el.textContent = new Date().toLocaleString(undefined, {
-        weekday: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit'
-      });
-    }
-    tick(); setInterval(tick, 1000);
-  })();
-
   /* ── Toast ─────────────────────────────────────────────── */
   function showToast() {
     var t = document.getElementById('toast');

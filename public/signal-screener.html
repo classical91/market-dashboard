@@ -19,7 +19,6 @@
         <div class="cmd-page-title">&#9889; Signal Screener</div>
         <div class="cmd-page-subtitle">Multi-check confluence (RSI, MACD, VWAP, volume, EMA trend, HTF) across 20 tokens &mdash; a screener, not a signal to trade blindly</div>
       </div>
-      <div class="cmd-clock" id="cmd-clock"></div>
     </div>
 
     <div class="aia-notice" id="ss-notice" style="display:none"></div>
@@ -89,14 +88,8 @@
 <script src="/assets/js/sidebar.js"></script>
 <script>
   (function () {
-    function tick() {
-      var el = document.getElementById('cmd-clock');
-      if (el) el.textContent = new Date().toLocaleString(undefined, {
-        weekday: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit'
-      });
-      renderUpdated();
-    }
-    tick(); setInterval(tick, 1000);
+    renderUpdated();
+    setInterval(renderUpdated, 1000);
 
     var tbodyLong = document.getElementById('ss-tbody-long');
     var tbodyShort = document.getElementById('ss-tbody-short');
