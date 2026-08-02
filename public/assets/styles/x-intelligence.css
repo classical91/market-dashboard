@@ -324,4 +324,10 @@
   .x-timeline-head {
     padding: 11px 14px;
   }
+
+  /* Tapping the card already selects the account — the per-account
+     "Open ↗" link is just noise on a phone-width list. */
+  .x-account-open {
+    display: none;
+  }
 }
