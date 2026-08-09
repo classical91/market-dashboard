@@ -180,7 +180,15 @@ function createApp() {
   app.use("/api/pattern-scanner", createPatternScannerRouter({ patternScannerService }));
   app.use("/api/signal-screener", createSignalScreenerRouter({ signalScreenerService }));
   app.use("/api/strategy-engine", createStrategyEngineRouter({ strategyEngineService }));
-  app.use("/api/decision", createDecisionRouter({ decisionEngineService, tradeJournalService, requireAdmin }));
+  app.use(
+    "/api/decision",
+    createDecisionRouter({
+      decisionEngineService,
+      tradeJournalService,
+      requireAdmin,
+      traderclaw: config.traderclaw,
+    }),
+  );
   app.use("/api/watchlist", createWatchlistRouter({ watchlistService, requireAdmin }));
   app.use("/api/bot-commands", createBotCommandsRouter({ botCommandsService }));
   app.use("/api/pattern-tracker", createPatternTrackerRouter({ patternTrackerService }));

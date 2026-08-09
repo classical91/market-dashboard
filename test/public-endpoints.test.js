@@ -14,6 +14,7 @@ process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "md-public-"));
 delete process.env.ADMIN_API_KEY;
 delete process.env.TELEGRAM_BOT_TOKEN;
 delete process.env.TELEGRAM_CHAT_IDS;
+delete process.env.TRADERCLAW_BASE_URL;
 
 const { createApp } = require("../src/app");
 
@@ -44,6 +45,14 @@ test("telegram status stays public", async () => {
   assert.equal(res.status, 200);
   const body = await res.json();
   assert.equal(typeof body.configured, "boolean");
+});
+
+test("TraderClaw edge endpoint stays read-only and degrades when unconfigured", async () => {
+  const res = await fetch(`${base}/api/decision/traderclaw-edge`);
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.configured, false);
+  assert.deepEqual(body.bots, []);
 });
 
 test("action endpoints are disabled (503) when ADMIN_API_KEY is unset", async () => {
