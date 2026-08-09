@@ -266,10 +266,17 @@
 
   function renderJournalStats(stats) {
     if (!stats || !stats.total) { journalStats.style.display = "none"; return; }
+    var edge = stats.edge && stats.edge.overall ? stats.edge.overall : {};
     journalStats.style.display = "flex";
+    var edgeHtml =
+      "<span>Expectancy <b>" + (edge.expectancyR != null ? edge.expectancyR.toFixed(2) + "R" : "-") + "</b></span>" +
+      "<span>Profit factor <b>" + (edge.profitFactor != null ? edge.profitFactor.toFixed(2) : "-") + "</b></span>" +
+      "<span>Max DD <b>" + (edge.maxDrawdownR != null ? edge.maxDrawdownR.toFixed(2) + "R" : "-") + "</b></span>" +
+      "<span>Worst loss streak <b>" + (edge.worstLosingStreak != null ? edge.worstLosingStreak : "-") + "</b></span>";
     journalStats.innerHTML =
       "<span><b>" + stats.total + "</b> logged</span>" +
       "<span><b>" + stats.taken + "</b> taken</span>" +
+      edgeHtml +
       "<span>Win rate <b>" + (stats.winRate != null ? stats.winRate + "%" : "—") + "</b> (" + stats.wins + "W / " + stats.losses + "L)</span>" +
       "<span>Avg score W <b>" + (stats.avgSetupScoreWins != null ? stats.avgSetupScoreWins : "—") + "</b> vs L <b>" + (stats.avgSetupScoreLosses != null ? stats.avgSetupScoreLosses : "—") + "</b></span>" +
       "<span>Regime read right <b>" + (stats.regimeAccuracy != null ? stats.regimeAccuracy + "%" : "—") + "</b></span>" +

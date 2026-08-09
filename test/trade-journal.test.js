@@ -96,6 +96,33 @@ test("stats aggregate the feedback loop", () => {
   assert.equal(stats.newsRiskMissed, 1);
 });
 
+test("stats include R-multiple edge metrics and groups", () => {
+  const service = makeService();
+  const a = service.log(sampleEntry({ setupScore: 86, plan: { riskReward: 2.5 } }));
+  const b = service.log(sampleEntry({ symbol: "BTCUSDT", setupScore: 78, plan: { riskReward: 2 } }));
+  const c = service.log(sampleEntry({ symbol: "ETHUSDT", setupScore: 62, regimeLabel: "Choppy" }));
+  const d = service.log(sampleEntry({ symbol: "SOLUSDT", setupScore: 52, regimeLabel: "Choppy" }));
+
+  service.update(a.id, { taken: true, result: "win" });
+  service.update(b.id, { taken: true, result: "loss" });
+  service.update(c.id, { taken: true, result: "loss" });
+  service.update(d.id, { taken: true, result: "breakeven" });
+
+  const stats = service.stats();
+  assert.equal(stats.edge.overall.trades, 4);
+  assert.equal(stats.edge.overall.netR, 0.5);
+  assert.equal(stats.edge.overall.expectancyR, 0.13);
+  assert.equal(stats.edge.overall.profitFactor, 1.25);
+  assert.equal(stats.edge.overall.maxDrawdownR, -2);
+  assert.equal(stats.edge.overall.worstLosingStreak, 2);
+  assert.deepEqual(
+    stats.edge.bySetupScoreBucket.map((bucket) => bucket.label),
+    ["85+", "75-84", "<60", "60-74"],
+  );
+  assert.equal(stats.edge.bySymbol.find((row) => row.label === "BTCUSDT").expectancyR, 0.75);
+  assert.equal(stats.edge.byRegime.find((row) => row.label === "Choppy").expectancyR, -0.5);
+});
+
 test("remove deletes an entry and persists across instances", () => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "md-journal-"));
   const first = new TradeJournalService({ dataDir });

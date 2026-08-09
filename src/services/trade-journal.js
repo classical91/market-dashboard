@@ -24,6 +24,80 @@ function cleanString(value, max) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
 }
 
+function safeRound(value, digits = 2) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  const factor = 10 ** digits;
+  return Math.round(n * factor) / factor;
+}
+
+function resultToR(row) {
+  if (row.result === "win") {
+    const rr = Number(row.plan && row.plan.riskReward);
+    return Number.isFinite(rr) && rr > 0 ? rr : 1;
+  }
+  if (row.result === "loss") return -1;
+  if (row.result === "breakeven") return 0;
+  return null;
+}
+
+function scoreBucket(score) {
+  const n = Number(score);
+  if (!Number.isFinite(n)) return "No score";
+  if (n >= 85) return "85+";
+  if (n >= 75) return "75-84";
+  if (n >= 60) return "60-74";
+  return "<60";
+}
+
+function summarizeR(rows) {
+  const multiples = rows.map(resultToR).filter(Number.isFinite);
+  const wins = multiples.filter((r) => r > 0);
+  const losses = multiples.filter((r) => r < 0);
+  const grossWinR = wins.reduce((sum, r) => sum + r, 0);
+  const grossLossR = Math.abs(losses.reduce((sum, r) => sum + r, 0));
+  let equityR = 0;
+  let peakR = 0;
+  let maxDrawdownR = 0;
+  let losingStreak = 0;
+  let worstLosingStreak = 0;
+
+  for (const r of multiples) {
+    equityR += r;
+    peakR = Math.max(peakR, equityR);
+    maxDrawdownR = Math.min(maxDrawdownR, equityR - peakR);
+    if (r < 0) {
+      losingStreak += 1;
+      worstLosingStreak = Math.max(worstLosingStreak, losingStreak);
+    } else if (r > 0) {
+      losingStreak = 0;
+    }
+  }
+
+  return {
+    trades: multiples.length,
+    netR: safeRound(multiples.reduce((sum, r) => sum + r, 0), 2),
+    expectancyR: multiples.length ? safeRound(multiples.reduce((sum, r) => sum + r, 0) / multiples.length, 2) : null,
+    profitFactor: grossLossR ? safeRound(grossWinR / grossLossR, 2) : wins.length ? null : 0,
+    averageWinR: wins.length ? safeRound(grossWinR / wins.length, 2) : null,
+    averageLossR: losses.length ? safeRound(grossLossR / losses.length, 2) : null,
+    maxDrawdownR: safeRound(maxDrawdownR, 2),
+    worstLosingStreak,
+  };
+}
+
+function summarizeGroups(rows, keyFn) {
+  const groups = new Map();
+  for (const row of rows) {
+    const key = keyFn(row) || "Unknown";
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(row);
+  }
+  return Array.from(groups.entries())
+    .map(([label, groupRows]) => ({ label, ...summarizeR(groupRows) }))
+    .sort((a, b) => (b.expectancyR ?? -Infinity) - (a.expectancyR ?? -Infinity) || b.trades - a.trades);
+}
+
 class TradeJournalService {
   constructor({ dataDir }) {
     this._file = path.join(dataDir, "trade-journal.json");
@@ -168,6 +242,12 @@ class TradeJournalService {
       regimeAccuracy: reviewAccuracy("regimeCorrect"),
       patternAccuracy: reviewAccuracy("patternCorrect"),
       newsRiskMissed: items.filter((row) => row.newsRiskMissed === true).length,
+      edge: {
+        overall: summarizeR(graded),
+        bySymbol: summarizeGroups(graded, (row) => row.symbol),
+        byRegime: summarizeGroups(graded, (row) => row.regimeLabel),
+        bySetupScoreBucket: summarizeGroups(graded, (row) => scoreBucket(row.setupScore)),
+      },
     };
   }
 }
