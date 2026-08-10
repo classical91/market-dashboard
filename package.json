@@ -9,6 +9,7 @@
     "lint": "node scripts/lint.js",
     "build": "node scripts/build-check.js",
     "test": "node --test",
+    "parity": "node scripts/traderclaw-parity.js",
     "postinstall": "playwright install chromium || true"
   },
   "dependencies": {

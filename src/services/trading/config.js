@@ -1,0 +1,165 @@
+"use strict";
+
+// Trading Lab configuration — the single source of truth for risk sizing,
+// position limits, kill-switch thresholds and volatility assumptions, ported
+// from TraderClaw's config.py. Every Trading Lab module reads its numbers from
+// here rather than re-reading process.env, so a change to risk policy happens
+// in exactly one place and paper results stay comparable across runs.
+//
+// Environment variable names match TraderClaw's so an existing deployment's
+// settings carry over unchanged.
+
+class TradingConfigError extends Error {}
+
+function envString(name, fallback) {
+  const raw = process.env[name];
+  return raw === undefined || raw === "" ? fallback : raw;
+}
+
+function envNumber(name, fallback) {
+  const raw = envString(name, undefined);
+  if (raw === undefined) return fallback;
+  const n = Number(raw);
+  if (!Number.isFinite(n)) {
+    throw new TradingConfigError(`${name} must be a number, got ${JSON.stringify(raw)}`);
+  }
+  return n;
+}
+
+function envInt(name, fallback) {
+  return Math.trunc(envNumber(name, fallback));
+}
+
+function envBool(name, fallback) {
+  const raw = envString(name, undefined);
+  if (raw === undefined) return fallback;
+  return ["1", "true", "yes", "on"].includes(String(raw).trim().toLowerCase());
+}
+
+function validate(config) {
+  if (config.accountSize <= 0) {
+    throw new TradingConfigError("ACCOUNT_SIZE must be positive");
+  }
+  if (!(config.maxRiskPerTrade > 0 && config.maxRiskPerTrade <= 0.1)) {
+    throw new TradingConfigError("MAX_RISK_PER_TRADE must be in (0, 0.1] — it is a fraction, not a percent");
+  }
+  if (!(config.maxTotalRisk > 0 && config.maxTotalRisk <= 1)) {
+    throw new TradingConfigError("MAX_TOTAL_RISK must be in (0, 1]");
+  }
+  if (config.maxRiskPerTrade > config.maxTotalRisk) {
+    throw new TradingConfigError("MAX_RISK_PER_TRADE cannot exceed MAX_TOTAL_RISK");
+  }
+  if (config.maxOpenPositions < 1) {
+    throw new TradingConfigError("MAX_OPEN_POSITIONS must be at least 1");
+  }
+  if (!(config.atrFallbackPct > 0 && config.atrFallbackPct < 1)) {
+    throw new TradingConfigError("ATR_FALLBACK_PCT must be in (0, 1)");
+  }
+  if (config.slAtrMultiple <= 0) {
+    throw new TradingConfigError("SL_ATR_MULTIPLE must be positive");
+  }
+  if (!(config.tp1CloseFraction > 0 && config.tp1CloseFraction < 1)) {
+    throw new TradingConfigError(
+      "TP1_CLOSE_FRACTION must be in (0, 1) — 1.0 would close the whole position at TP1",
+    );
+  }
+  if (config.tp2RMultiple <= config.tp1RMultiple) {
+    throw new TradingConfigError("TP2_R_MULTIPLE must be greater than TP1_R_MULTIPLE");
+  }
+  if (config.tradingMode !== "paper" && config.tradingMode !== "live") {
+    throw new TradingConfigError(`TRADING_MODE must be 'paper' or 'live', got ${JSON.stringify(config.tradingMode)}`);
+  }
+  // Live trading needs every safety belt fastened before startup succeeds.
+  if (config.tradingMode === "live" && !config.allowLiveTrading) {
+    throw new TradingConfigError(
+      "TRADING_MODE=live requires ALLOW_LIVE_TRADING=true. Refusing to start in an ambiguous live/paper state.",
+    );
+  }
+}
+
+function loadTradingConfig(overrides = {}) {
+  const config = {
+    // ── Mode ────────────────────────────────────────────────────────────────
+    // Live execution needs both gates to agree; see `liveEnabled` below. A
+    // single mistaken environment variable can never send a real order.
+    tradingMode: String(envString("TRADING_MODE", "paper")).trim().toLowerCase(),
+    allowLiveTrading: envBool("ALLOW_LIVE_TRADING", false),
+
+    // ── Risk ────────────────────────────────────────────────────────────────
+    accountSize: envNumber("ACCOUNT_SIZE", 10000),
+    maxRiskPerTrade: envNumber("MAX_RISK_PER_TRADE", 0.01),
+    maxTotalRisk: envNumber("MAX_TOTAL_RISK", 0.04),
+    maxOpenPositions: envInt("MAX_OPEN_POSITIONS", 3),
+
+    // ── Volatility assumptions ──────────────────────────────────────────────
+    // Used only when an incoming signal carries no ATR. One value for every
+    // code path — two different synthetic volatility assumptions would make
+    // paper results incomparable.
+    atrFallbackPct: envNumber("ATR_FALLBACK_PCT", 0.01),
+    slAtrMultiple: envNumber("SL_ATR_MULTIPLE", 1.5),
+    tp1RMultiple: envNumber("TP1_R_MULTIPLE", 1.5),
+    tp2RMultiple: envNumber("TP2_R_MULTIPLE", 2.5),
+
+    // ── Trade management ────────────────────────────────────────────────────
+    tp1CloseFraction: envNumber("TP1_CLOSE_FRACTION", 0.5),
+    moveStopToBreakevenAtTp1: envBool("MOVE_STOP_TO_BREAKEVEN_AT_TP1", true),
+
+    // ── Kill switches ───────────────────────────────────────────────────────
+    dailyLossLimitPct: envNumber("DAILY_LOSS_LIMIT_PCT", 3),
+    weeklyLossLimitPct: envNumber("WEEKLY_LOSS_LIMIT_PCT", 6),
+    maxConsecutiveLosses: envInt("MAX_CONSECUTIVE_LOSSES", 3),
+    maxAtrRatio: envNumber("MAX_ATR_RATIO", 3),
+    fundingKillAbs: envNumber("FUNDING_KILL_ABS", 0.001),
+    fundingNeutralAbs: envNumber("FUNDING_NEUTRAL_ABS", 0.0005),
+
+    // ── Scoring ─────────────────────────────────────────────────────────────
+    // Points awarded when entry-trigger indicators are absent. Missing data is
+    // not evidence for a trade, so this defaults to zero.
+    missingIndicatorPoints: envInt("MISSING_INDICATOR_POINTS", 0),
+
+    // ── Edge gate ───────────────────────────────────────────────────────────
+    edgeMinSampleTrades: envInt("EDGE_MIN_SAMPLE_TRADES", 20),
+    edgeMinExpectancyR: envNumber("EDGE_MIN_EXPECTANCY_R", 0.05),
+    edgeMinProfitFactor: envNumber("EDGE_MIN_PROFIT_FACTOR", 1.1),
+    edgeMaxDrawdownPct: envNumber("EDGE_MAX_DRAWDOWN_PCT", 15),
+    edgeSoftDrawdownPct: envNumber("EDGE_SOFT_DRAWDOWN_PCT", 10),
+    edgeSoftExpectancyR: envNumber("EDGE_SOFT_EXPECTANCY_R", 0.15),
+
+    ...overrides,
+  };
+
+  // Derived values, kept out of the override surface so they can never drift
+  // from the fractions they come from.
+  config.maxTotalRiskPct = config.maxTotalRisk * 100;
+  config.riskUsdPerTrade = config.accountSize * config.maxRiskPerTrade;
+  // Both gates must agree before any live order path is reachable.
+  config.liveEnabled = config.tradingMode === "live" && config.allowLiveTrading === true;
+
+  validate(config);
+  return config;
+}
+
+let cached = null;
+
+function getTradingConfig() {
+  if (!cached) cached = loadTradingConfig();
+  return cached;
+}
+
+// Tests and the Trading Lab's what-if runs build a config without touching the
+// process environment.
+function makeTradingConfig(overrides = {}) {
+  return loadTradingConfig(overrides);
+}
+
+function resetTradingConfig() {
+  cached = null;
+}
+
+module.exports = {
+  TradingConfigError,
+  loadTradingConfig,
+  makeTradingConfig,
+  getTradingConfig,
+  resetTradingConfig,
+};

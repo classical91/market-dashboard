@@ -192,6 +192,11 @@ class SignalScreenerService {
     const rows = await res.json();
     return rows.map((row) => ({
       openTime: row[0],
+      // The open is unused by the indicator maths, which works off closes and
+      // the high/low range — but the backtester needs it to replay a bar in
+      // order (open, then the extremes, then close) rather than as a single
+      // point.
+      open: Number(row[1]),
       high: Number(row[2]),
       low: Number(row[3]),
       close: Number(row[4]),
