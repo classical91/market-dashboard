@@ -138,42 +138,50 @@ class SignalTradeBridge {
 
     const events = [];
     for (const group of groups.values()) {
-      let candles;
-      try {
-        candles = await this._screener.getCandles(group.symbol, group.interval);
-      } catch (err) {
-        this._logger.warn?.(
-          `[SignalBridge] Candle marking unavailable for ${group.symbol} ${group.interval}: ${err.message}`,
-        );
-        return trader.updatePositions();
-      }
+      events.push(...(await this._markGroup(trader, group)));
+    }
+    return events;
+  }
 
-      if (!Array.isArray(candles) || !candles.length) {
-        this._logger.warn?.(`[SignalBridge] No candles available for ${group.symbol} ${group.interval}`);
-        return trader.updatePositions();
-      }
+  // One symbol's replay. Every pass is scoped to `only: [symbol]` so a symbol
+  // is only ever marked against its own bars — and a fallback for one symbol
+  // cannot re-mark another that has already been replayed, nor discard the
+  // events that replay produced.
+  async _markGroup(trader, group) {
+    const only = [group.symbol];
+    const tickerFallback = (message) => {
+      this._logger.warn?.(`[SignalBridge] ${message} for ${group.symbol} ${group.interval}`);
+      return trader.updatePositions(null, { only });
+    };
 
-      const closedAll = dropUnclosedCandle(candles);
-      if (!closedAll.length) {
-        this._logger.warn?.(`[SignalBridge] No closed candles available for ${group.symbol} ${group.interval}`);
-        return trader.updatePositions();
-      }
+    let candles;
+    try {
+      candles = await this._screener.getCandles(group.symbol, group.interval);
+    } catch (err) {
+      return tickerFallback(`Candle marking unavailable (${err.message})`);
+    }
 
-      const closed = closedAll
-        .filter((c) => candleCloseTime(c) > group.since)
-        .sort((a, b) => candleCloseTime(a) - candleCloseTime(b));
-      if (!closed.length) continue;
+    if (!Array.isArray(candles) || !candles.length) return tickerFallback("No candles available");
 
-      for (const candle of closed) {
-        const symbolPositions = trader.getOpenPositions().filter((p) => p.symbol === group.symbol);
-        if (!symbolPositions.length) break;
-        const ordering = replayOrderForPositions(symbolPositions, candle);
-        for (const price of ordering.prices) {
-          const next = await trader.updatePositions({ [group.symbol]: price });
-          events.push(...next);
-        }
-        this._stampLastMarked(trader, group.symbol, group.interval, candleCloseTime(candle));
+    const closedAll = dropUnclosedCandle(candles);
+    if (!closedAll.length) return tickerFallback("No closed candles available");
+
+    const closed = closedAll
+      .filter((c) => candleCloseTime(c) > group.since)
+      .sort((a, b) => candleCloseTime(a) - candleCloseTime(b));
+    // Already marked through the latest close: waiting for the next bar is the
+    // point of bar-based fills, so this is up to date, not stale.
+    if (!closed.length) return [];
+
+    const events = [];
+    for (const candle of closed) {
+      const symbolPositions = trader.getOpenPositions().filter((p) => p.symbol === group.symbol);
+      if (!symbolPositions.length) break;
+      const ordering = replayOrderForPositions(symbolPositions, candle);
+      for (const price of ordering.prices) {
+        events.push(...(await trader.updatePositions({ [group.symbol]: price }, { only })));
       }
+      this._stampLastMarked(trader, group.symbol, group.interval, candleCloseTime(candle));
     }
     return events;
   }
