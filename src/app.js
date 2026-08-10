@@ -44,6 +44,7 @@ const { PatternScannerService } = require("./services/pattern-scanner");
 const { SignalScreenerService } = require("./services/signal-screener");
 const { StrategyEngineService } = require("./services/strategy-engine");
 const { SignalBotService } = require("./services/signal-bot");
+const { SignalTradeBridge } = require("./services/trading/signal-bridge");
 const { WatchlistService } = require("./services/watchlist");
 const { BotCommandsService } = require("./services/bot-commands");
 const { PatternTrackerService } = require("./services/pattern-tracker");
@@ -142,11 +143,23 @@ function createApp() {
   // a backtest and a forward paper run agree by construction. It reuses the
   // screener's cached klines rather than fetching its own.
   const backtestService = new BacktestService({ signalScreenerService });
+  // Signal transitions are the replacement for the TradingView alert webhooks:
+  // the bot already detects FLAT -> LONG/SHORT on closed candles, on a timer,
+  // without a subscription. The bridge scores those through the Trading Lab —
+  // log-only until SIGNAL_BOT_PAPER_TRADE_ENABLED=true.
+  const signalTradeBridge = new SignalTradeBridge({
+    tradingLabService,
+    signalScreenerService,
+    paperTradeEnabled: config.signalBot.paperTradeEnabled,
+    autoMarkEnabled: config.signalBot.autoMarkEnabled,
+    book: config.signalBot.book,
+  });
   const signalBotService = new SignalBotService({
     signalScreenerService,
     patternScannerService,
     patternTrackerService,
     telegramService,
+    tradeBridge: signalTradeBridge,
     stateCache: new PersistentReporterCache(path.join(dataDir, "signal-bot-state.json")),
     intervalMs: config.signalBot.intervalMs,
     timeframes: config.signalBot.timeframes,

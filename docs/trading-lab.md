@@ -172,24 +172,67 @@ Done:
 6. Main / Shadow / Alts modelled as named books.
 7. Parity check against the Python engines passing.
 8. Backtesting — bar replay over the same paper-trading engine.
+9. Signal-bot bridge — signal transitions feed the Lab, replacing TradingView
+   alert ingestion. See "Signal source" below.
+10. Auto-marking on the signal-bot interval.
 
 Still to do, in order:
 
-9. **TradingView webhook ingestion** — port `signal_handler.py` and
-   `security.py`. Needs HMAC verification and a replay window before any
-   endpoint is exposed; do not ship the route without them.
-10. **Auto-marking** — positions currently only mark to market on demand.
-    Hooking `updatePositions()` into the existing signal-bot interval loop
-    would let stops and targets fire without the page being open.
 11. **Bitget integration** — port `bitget_client.py` as an isolated exchange
     adapter behind the existing two-gate safety model. Last, and separately
     reviewed.
-12. **Archive TraderClaw** once 9-11 land and parity still passes. Archive
+12. **Archive TraderClaw** once 11 lands and parity still passes. Archive
     first; delete only after a period of confidence that nothing was missed.
 
-Note that parity passing on metrics and the edge gate is not parity on
-webhooks or Bitget, since those are not ported — the archive decision needs
-those in place first.
+Note that parity passing on metrics and the edge gate is not parity on Bitget,
+which is not ported — the archive decision needs it in place first.
+
+## Signal source
+
+TradingView alert webhooks are **not** the signal source. The subscription that
+produced them is gone, so alert delivery is not something to build on, and
+`signal_handler.py` / `security.py` are deliberately not ported.
+
+The Signal Bot supplies entries instead. It already re-scans the confluence
+screener on a timer and detects transitions on *closed* candles, which is the
+same "on bar close" semantics the alerts had, with no subscription and no
+inbound endpoint to authenticate.
+
+    SignalBot (FLAT -> LONG/SHORT)  ->  SignalTradeBridge  ->  TradingLab.execute()
+
+`src/services/trading/signal-bridge.js`, wired into the bot's interval loop:
+
+- **Dry run by default.** Every entry transition is scored through the whole
+  checklist -> edge gate -> risk sizing pipeline and logged with its verdict,
+  but nothing is opened until `SIGNAL_BOT_PAPER_TRADE_ENABLED=true`. The
+  decision trail exists before anything is allowed to act on it.
+- **Paper only.** It goes through `TradingLabService.execute()`, the same path
+  the dashboard uses. No live-order code is reachable from the bridge, and it
+  never touches `TRADING_MODE` / `ALLOW_LIVE_TRADING`.
+- **Entries only, once each.** Only `FLAT -> LONG/SHORT` opens anything; flips
+  and exits do not. A symbol with a position already open in the target book is
+  skipped, including when it transitions on two timeframes in one scan.
+- **Entry price is the signal's price**, carried on the transition rather than
+  re-fetched, so the fill matches the bar the signal confirmed on. ATR comes
+  from the screener's cached klines; if those fail, sizing falls back to
+  `ATR_FALLBACK_PCT` rather than skipping the setup.
+- **Degrades quietly.** An unreachable decision engine costs the setup its
+  trend/macro points and evaluation continues; any bridge failure is caught so
+  that a paper-trading fault never costs the deploy its Telegram alerts.
+- **Auto-marking** runs first in each cycle, over *every* book — so hand-opened
+  positions are managed too — letting stops and targets fire without the page
+  open. It updates the ledger the kill switches read before that cycle's
+  entries are judged.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `SIGNAL_BOT_PAPER_TRADE_ENABLED` | `false` | Opt in, by exact value `true`, to opening paper positions. Otherwise log-only. |
+| `SIGNAL_BOT_BOOK` | `main` | Which book bridged trades land in. |
+| `SIGNAL_BOT_AUTO_MARK_ENABLED` | `true` | Mark open positions to market each interval. |
+
+Auto-marking alone does not start the loop — it is a passive add-on to a cycle
+that is already happening. The loop runs when Telegram is configured or paper
+trading is enabled.
 
 The `TRADERCLAW_BASE_URL` HTTP bridge on the Decision Engine page still works
 and is untouched by this change. It should be removed only once the running

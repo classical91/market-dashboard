@@ -21,6 +21,7 @@ class SignalBotService {
     patternScannerService,
     telegramService,
     patternTrackerService,
+    tradeBridge,
     stateCache,
     intervalMs,
     timeframes,
@@ -30,6 +31,7 @@ class SignalBotService {
     this._patternScanner = patternScannerService;
     this._telegram = telegramService;
     this._tracker = patternTrackerService;
+    this._bridge = tradeBridge && tradeBridge.active ? tradeBridge : null;
     this._stateCache = stateCache;
     this._intervalMs = intervalMs || 15 * 60 * 1000;
     this._timeframes = timeframes && timeframes.length ? timeframes : ["4h", "1D"];
@@ -38,13 +40,18 @@ class SignalBotService {
     this._running = false;
   }
 
+  // The loop earns its keep either by alerting (Telegram) or by driving paper
+  // trades through the Trading Lab bridge. Auto-marking rides along on a cycle
+  // that is already happening; it is not on its own a reason to start scanning.
   get enabled() {
-    return Boolean(this._telegram && this._telegram.configured);
+    return Boolean(
+      (this._telegram && this._telegram.configured) || (this._bridge && this._bridge.requiresSchedule),
+    );
   }
 
   start() {
     if (!this.enabled) {
-      console.log("[SignalBot] Telegram not configured — signal alerts disabled");
+      console.log("[SignalBot] Telegram not configured and trade bridge inactive — signal loop disabled");
       return;
     }
     if (this._timer) return;
@@ -78,7 +85,17 @@ class SignalBotService {
         // added to the list): record silently rather than "alerting" the
         // standing state.
         if (last == null || last === result.signal) continue;
-        transitions.push({ symbol: result.symbol, interval, from: last, to: result.signal, score: result.score });
+        // The price rides along with the transition: the Trading Lab bridge
+        // sizes its entry off it, and re-fetching later would enter at a
+        // different price than the one the signal confirmed at.
+        transitions.push({
+          symbol: result.symbol,
+          interval,
+          from: last,
+          to: result.signal,
+          score: result.score,
+          price: result.price ?? null,
+        });
       }
     }
     return transitions;
@@ -141,13 +158,26 @@ class SignalBotService {
     return events;
   }
 
+  // Trading Lab bridge, isolated from the scan proper: a paper-trading fault
+  // must never cost the deploy its signal alerts.
+  async _runBridge(screenerTransitions) {
+    if (!this._bridge) return [];
+    try {
+      await this._bridge.markOpenPositions();
+      return await this._bridge.handleTransitions(screenerTransitions);
+    } catch (err) {
+      console.error("[SignalBot] Trade bridge failed:", err.message);
+      return [];
+    }
+  }
+
   /**
    * One scan cycle: screener + pattern scans, diffed against persisted
    * state, alerted, tracker-logged, then the new state persisted. Exposed
    * for tests and returns everything it alerted.
    */
   async runOnce() {
-    if (this._running) return { screenerTransitions: [], patternEvents: [] }; // a slow cycle shouldn't stack another on top
+    if (this._running) return { screenerTransitions: [], patternEvents: [], tradeActions: [] }; // a slow cycle shouldn't stack another on top
     this._running = true;
     try {
       const known = this._stateCache.get(STATE_KEY) || {};
@@ -162,7 +192,14 @@ class SignalBotService {
       if (this._tracker) {
         await this._tracker.resolveDue().catch((err) => console.error("[SignalBot] resolveDue failed:", err.message));
       }
-      return { screenerTransitions, patternEvents };
+
+      // Marking runs before the new transitions are considered: a stop or TP
+      // that just filled frees a position slot and updates the loss counters
+      // the checklist's kill switches read, so this cycle's entries are judged
+      // against the current ledger rather than a stale one.
+      const tradeActions = await this._runBridge(screenerTransitions);
+
+      return { screenerTransitions, patternEvents, tradeActions };
     } finally {
       this._running = false;
     }
