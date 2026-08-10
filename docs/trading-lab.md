@@ -114,13 +114,31 @@ history. The parity check found this; it is why the check exists.
 npm run parity -- --traderclaw ../traderclaw
 ```
 
-Runs identical sample trades — chosen to cover negative-value rounding, an
-infinite profit factor, drawdown off a running peak, and grouping-key
-fallbacks — through both engines and fails on any disagreeing field. It
-currently reports exact agreement on every compared field.
+Runs identical inputs through both engines and fails on any disagreeing field.
+It currently reports **exact agreement on all 486 compared fields**.
+
+What it covers:
+
+| Area | Cases | Compared |
+| --- | --- | --- |
+| Summary metrics | 8 trades | Every field of `calculate_trade_metrics`, over fixtures chosen for negative-value rounding, an infinite profit factor, drawdown off a running peak, and grouping-key fallbacks. |
+| Grouped leaderboards | 3 dimensions | Row-by-row metrics *and* the ranking order, which is its own logic. |
+| Edge gate | 4 | Decision and size multiplier at no history, a small sample, a deep losing sample and a deep winning one. |
+| Checklist | 23 | Decision, score, size multiplier and kill-switch flag — one scenario per rule that can change the verdict, so a divergence names the rule that broke. |
+| Sizing and levels | 7 | Stop, both targets, stop distance, resolved ATR and position size, both directions, with and without an ATR on the signal. |
+| Paper-trade lifecycles | 8 | Position state, every individual exit (reason/price/size/P&L), archived history and account totals, across the TP1 scale-out, the breakeven stop, gapped fills and both targets in one mark. |
 
 Reason strings are prose and are allowed to differ; decisions, size
-multipliers and every numeric metric are not.
+multipliers, and every numeric field are not.
+
+**What it does not cover**, because those modules are not ported: TradingView
+webhook ingestion, the Bitget client, Polymarket, and Telegram notifications.
+Parity on the engines above is not parity on those — the archive decision needs
+them ported first.
+
+Running the checklist, sizing and lifecycle comparisons needs `python-dotenv`
+and `requests` importable, since those TraderClaw modules load `config.py` at
+import time. The metrics and edge-gate comparisons have no such dependency.
 
 ## API
 

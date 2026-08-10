@@ -58,7 +58,7 @@ npm test
 npm run parity -- --traderclaw ../traderclaw
 ```
 
-`npm run parity` runs identical sample trades through the ported JavaScript engines and the original TraderClaw Python ones and fails on any disagreeing field. It needs a TraderClaw checkout and a `python3`; without either it reports that it skipped and exits 0. This is the check that gates archiving TraderClaw — see [docs/trading-lab.md](docs/trading-lab.md).
+`npm run parity` runs identical inputs through the ported JavaScript engines and the original TraderClaw Python ones and fails on any disagreeing field — covering summary and grouped metrics, edge-gate verdicts, checklist verdicts, sizing/levels, and full paper-trade lifecycles down to each individual exit. It needs a TraderClaw checkout and a `python3` (with `python-dotenv` and `requests` for the modules that import `config.py`); without them it reports that it skipped and exits 0. This is the check that gates archiving TraderClaw — see [docs/trading-lab.md](docs/trading-lab.md).
 
 ## Access Control
 
