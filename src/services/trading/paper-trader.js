@@ -349,15 +349,22 @@ class PaperTradingService {
   // Mark every open position to market and fire any SL/TP that the new price
   // reaches. `prices` is an optional { symbol: price } override used by tests
   // and backtests; anything not covered falls through to the price feed.
-  async updatePositions(prices = null) {
+  //
+  // `only` restricts the pass to the named symbols. Bar replay needs this:
+  // replaying one symbol's candles must not drag every *other* open symbol
+  // along at the live ticker, which would both fill them at a price from the
+  // wrong moment and re-hit the ticker endpoint once per replayed price.
+  async updatePositions(prices = null, { only = null } = {}) {
     const positions = this.getPositions();
     const events = [];
     const cache = {};
+    const wanted = only ? new Set(only) : null;
 
     for (const pos of positions) {
       if (pos.status !== "open") continue;
 
       const symbol = pos.symbol || "BTCUSDT";
+      if (wanted && !wanted.has(symbol)) continue;
       if (cache[symbol] === undefined) cache[symbol] = await this.resolvePrice(symbol, prices);
       const price = cache[symbol];
       if (!price || price <= 0) continue;

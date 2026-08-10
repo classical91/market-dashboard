@@ -235,9 +235,12 @@ test("auto-marking resolves take-profits on the bot's interval, with no page ope
   await bridge.handleTransitions([transition()]);
   const position = lab.book("main").getOpenPositions()[0];
 
-  // TP2 sits at 2.5R above a $1.50 stop distance.
+  // TP2 sits at 2.5R above a $1.50 stop distance. Delivered as a closed bar,
+  // so this exercises the replay path the bot actually runs — backdated, since
+  // only bars that closed after the entry are replayed.
   price = position.tp2 + 1;
-  bridge._screener = null;
+  setOpenedAt(lab.book("main"), new Date(Date.now() - 86_400_000).toISOString());
+  bridge._screener = { async getCandles() { return [closedCandle({ high: position.tp2 + 1 })]; } };
   const marks = await bridge.markOpenPositions();
 
   assert.equal(marks.length, 1);
@@ -323,6 +326,64 @@ test("auto-marking can be switched off, and marks every book when on", async () 
   bridge.autoMarkEnabled = true;
   const marks = await bridge.markOpenPositions();
   assert.deepEqual(marks.map((m) => m.book).sort(), ["main", "shadow"]);
+});
+
+test("replaying one symbol's bars never marks another symbol", async () => {
+  let feedCalls = 0;
+  // A ticker far below ETH's stop: if ETH is ever marked against it rather
+  // than its own bars, it stops out at the wrong price and the wrong moment.
+  const lab = makeLab({ priceFeed: async () => { feedCalls += 1; return 50; } });
+  const trader = lab.book("main");
+  for (const symbol of ["BTCUSDT", "ETHUSDT"]) {
+    trader.openPosition({
+      symbol, direction: "LONG", size: 1, entryPrice: 100,
+      stopLoss: 98.5, tp1: 102.25, tp2: 103.75, riskUsd: 25,
+      signalSource: "signal-bot:4h",
+    });
+  }
+  setOpenedAt(trader, new Date(Date.now() - 86_400_000).toISOString());
+
+  // Quiet bars for both symbols: nothing should fire at all.
+  const { bridge } = makeBridge({ lab, candles: [closedCandle()] });
+  const marks = await bridge.markOpenPositions();
+
+  assert.deepEqual(marks[0].events, [], "a quiet bar fires nothing for either symbol");
+  assert.equal(trader.getOpenPositions().length, 2, "neither position was closed at the ticker price");
+  assert.equal(feedCalls, 0, "replay uses the bars, never the live ticker");
+});
+
+test("a candle failure for one symbol does not disturb another symbol's replay", async () => {
+  const lab = makeLab({ priceFeed: async () => 104 });
+  const trader = lab.book("main");
+  for (const symbol of ["BTCUSDT", "ETHUSDT"]) {
+    trader.openPosition({
+      symbol, direction: "LONG", size: 1, entryPrice: 100,
+      stopLoss: 98.5, tp1: 102.25, tp2: 103.75, riskUsd: 25,
+      signalSource: "signal-bot:4h",
+    });
+  }
+  setOpenedAt(trader, new Date(Date.now() - 86_400_000).toISOString());
+
+  const { bridge } = makeBridge({
+    lab,
+    signalScreenerService: {
+      async getCandles(symbol) {
+        if (symbol === "ETHUSDT") throw new Error("Binance klines HTTP 500");
+        return [closedCandle()]; // quiet bar: BTC should not move
+      },
+    },
+  });
+
+  const marks = await bridge.markOpenPositions();
+
+  // ETH falls back to the ticker at 104 and takes both targets; BTC keeps its
+  // bar-replayed result rather than being dragged along to the ticker.
+  const eth = trader.getHistory().filter((t) => t.symbol === "ETHUSDT");
+  assert.equal(eth.length, 1, "the failing symbol still gets a ticker mark");
+  assert.ok(marks[0].events.length >= 1, "events from the fallback are not discarded");
+  const btc = trader.getOpenPositions().filter((p) => p.symbol === "BTCUSDT");
+  assert.equal(btc.length, 1, "the healthy symbol stays open on its quiet bar");
+  assert.equal(btc[0].currentPrice, 100, "and was never marked at the other symbol's ticker price");
 });
 
 test("an unreachable decision engine degrades to a neutral state instead of failing", async () => {
