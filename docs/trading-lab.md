@@ -32,6 +32,7 @@ follows, and records what happened so the next answer is better informed.
 | `checklist.py` | `src/services/trading/checklist.js` | Kill switches, regime gates, 0-100 scoring. |
 | `executor.py` (sizing half) | `src/services/trading/risk.js` | ATR sizing and stop/target geometry. Order placement deliberately excluded. |
 | `paper_trader.py` | `src/services/trading/paper-trader.js` | TP1/TP2 scale-outs, breakeven stop, gap-aware stop fills, daily/weekly rollover. |
+| — | `src/services/trading/backtest.js` | New: bar replay over the same paper-trading engine. |
 | `shadow_trader.py`, `alts_trader.py` | *books* in `trading-lab.js` | Main / Shadow / Alts are named books over one engine rather than three near-duplicate services. |
 | `app.py`, `dashboard.py`, Flask routes | `src/routes/trading-lab.js`, `public/trading-lab.html` | Retired; Market Dashboard's Express + vanilla JS replaces them. |
 
@@ -55,6 +56,50 @@ These are the details that make paper results honest, and each has a test:
   account itself and override whatever was passed.
 - **Paper by default.** `TRADING_MODE=live` requires `ALLOW_LIVE_TRADING=true`
   as a second gate. No live order path exists in this code at all yet.
+
+## Backtesting
+
+`backtest.js` replays historical candles through the **same**
+`PaperTradingService` that live paper trading uses. It does not reimplement
+fills, so a backtest and a forward paper run agree by construction — same TP1
+scale-out, same breakeven move, same gap-aware stop, same metrics.
+
+Two things make a backtest lie, and both are addressed explicitly:
+
+- **Lookahead.** Indicators and signals at bar *i* are computed from bars
+  `0..i` only, and entries fill at bar *i*'s close — never at a price the
+  strategy could not have known when it decided. Tested directly: the strategy
+  callback's window is asserted to grow by exactly one bar per call.
+- **Optimistic intra-bar ordering.** A candle gives open/high/low/close but not
+  the path between them. When a stop and a target both sit inside one bar's
+  range, assuming the target came first inflates every result. Each bar is
+  therefore replayed as a *sequence* — open, then the **adverse** extreme, then
+  the favourable one, then close — so the paper trader fires the stop first
+  whenever both were reachable. Results are pessimistic by design.
+
+That second point is why the module drives the paper trader with a price
+sequence rather than a single price per bar: the pessimism is expressed purely
+as the order the extremes are fed in, with no duplicated fill logic.
+
+Other honesty properties, each with a test:
+
+- A position still open when the candles run out is **reported, not
+  force-closed**. Force-closing would invent an exit the strategy never
+  signalled and pollute expectancy.
+- Backtests run against a **throwaway ledger in a temp directory**, deleted in
+  a `finally`. The live books are never touched, and the run's edge gate sees
+  only the trades that run produced.
+- Refused candidates are recorded with the reasons they were refused, so a
+  strategy that never trades is distinguishable from one with no signals.
+
+The load-bearing test is `a trend strategy finds no edge in a driftless random
+walk`: across four seeds, the built-in trend-breakout strategy must not show
+expectancy above 0.15R or a profit factor above 1.5. There is no trend to
+follow in a random walk, so if that test ever starts passing with a healthy
+edge, the backtester has developed a lookahead or an optimistic fill — far
+likelier than the strategy having become good. A companion test on a strongly
+trending series checks the opposite failure: that the pessimistic fills have
+not simply made *every* strategy lose.
 
 ### One intentional divergence
 
@@ -94,6 +139,7 @@ ledger is admin-gated via `x-admin-key`.
 | POST | `/api/trading-lab/positions` | admin | Evaluate, then open if every gate agrees. |
 | POST | `/api/trading-lab/positions/:id/close` | admin | Close the remainder manually. |
 | POST | `/api/trading-lab/mark` | admin | Mark to market; fires any stop/target reached. |
+| POST | `/api/trading-lab/backtest` | admin | Replay a symbol's candles. Admin-gated despite being read-only: it replays hundreds of bars and pulls candles per call, so it should not be spinnable by anonymous visitors. Writes only to a temp ledger. |
 | POST | `/api/trading-lab/reset` | admin | Wipe a book back to its starting balance. |
 
 ## Migration status
@@ -107,19 +153,25 @@ Done:
 5. Decision Engine connected to the paper trader.
 6. Main / Shadow / Alts modelled as named books.
 7. Parity check against the Python engines passing.
+8. Backtesting — bar replay over the same paper-trading engine.
 
 Still to do, in order:
 
-8. **TradingView webhook ingestion** — port `signal_handler.py` and
+9. **TradingView webhook ingestion** — port `signal_handler.py` and
    `security.py`. Needs HMAC verification and a replay window before any
    endpoint is exposed; do not ship the route without them.
-9. **Backtesting** — the paper trader already accepts an explicit price map in
-   `updatePositions()`, which is the seam a bar-replay backtester plugs into.
-10. **Bitget integration** — port `bitget_client.py` as an isolated exchange
+10. **Auto-marking** — positions currently only mark to market on demand.
+    Hooking `updatePositions()` into the existing signal-bot interval loop
+    would let stops and targets fire without the page being open.
+11. **Bitget integration** — port `bitget_client.py` as an isolated exchange
     adapter behind the existing two-gate safety model. Last, and separately
     reviewed.
-11. **Archive TraderClaw** once 8-10 land and parity still passes. Archive
+12. **Archive TraderClaw** once 9-11 land and parity still passes. Archive
     first; delete only after a period of confidence that nothing was missed.
+
+Note that parity passing on metrics and the edge gate is not parity on
+webhooks or Bitget, since those are not ported — the archive decision needs
+those in place first.
 
 The `TRADERCLAW_BASE_URL` HTTP bridge on the Decision Engine page still works
 and is untouched by this change. It should be removed only once the running

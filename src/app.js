@@ -37,6 +37,7 @@ const { AIAnalysisService } = require("./services/ai-analysis");
 const { DecisionEngineService } = require("./services/decision-engine");
 const { TradeJournalService } = require("./services/trade-journal");
 const { TradingLabService } = require("./services/trading/trading-lab");
+const { BacktestService } = require("./services/trading/backtest");
 const { LayoutAnalysisService } = require("./services/layout-analysis");
 const { LayoutCaptureService } = require("./services/layout-capture");
 const { PatternScannerService } = require("./services/pattern-scanner");
@@ -137,6 +138,10 @@ function createApp() {
     priceFeed: fetchBinancePrice,
     decisionEngineService,
   });
+  // Backtests replay the same paper-trading engine over historical candles, so
+  // a backtest and a forward paper run agree by construction. It reuses the
+  // screener's cached klines rather than fetching its own.
+  const backtestService = new BacktestService({ signalScreenerService });
   const signalBotService = new SignalBotService({
     signalScreenerService,
     patternScannerService,
@@ -199,7 +204,7 @@ function createApp() {
       traderclaw: config.traderclaw,
     }),
   );
-  app.use("/api/trading-lab", createTradingLabRouter({ tradingLabService, requireAdmin }));
+  app.use("/api/trading-lab", createTradingLabRouter({ tradingLabService, backtestService, requireAdmin }));
   app.use("/api/watchlist", createWatchlistRouter({ watchlistService, requireAdmin }));
   app.use("/api/bot-commands", createBotCommandsRouter({ botCommandsService }));
   app.use("/api/pattern-tracker", createPatternTrackerRouter({ patternTrackerService }));

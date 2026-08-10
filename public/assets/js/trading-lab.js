@@ -13,6 +13,10 @@
   var candidatesTbody = document.getElementById("tl-candidates-tbody");
   var metricsEl = document.getElementById("tl-metrics");
   var historyTbody = document.getElementById("tl-history-tbody");
+  var btSymbol = document.getElementById("tl-bt-symbol");
+  var btInterval = document.getElementById("tl-bt-interval");
+  var btRunBtn = document.getElementById("tl-bt-run");
+  var btResult = document.getElementById("tl-bt-result");
 
   function escapeHtml(str) {
     return String(str == null ? "" : str).replace(/[&<>"']/g, function (ch) {
@@ -293,6 +297,84 @@
       });
     });
   }
+
+  /* ── Backtest ──────────────────────────────────────────── */
+
+  // A compact inline equity curve. No chart library on this page, and one
+  // polyline says everything a sparkline needs to.
+  function equitySparkline(curve) {
+    if (!curve || curve.length < 2) return "";
+    var values = curve.map(function (p) { return p.equity; });
+    var min = Math.min.apply(null, values);
+    var max = Math.max.apply(null, values);
+    var span = max - min || 1;
+    var width = 600;
+    var height = 60;
+    var points = values
+      .map(function (v, i) {
+        var x = (i / (values.length - 1)) * width;
+        var y = height - ((v - min) / span) * height;
+        return x.toFixed(1) + "," + y.toFixed(1);
+      })
+      .join(" ");
+    var up = values[values.length - 1] >= values[0];
+    return (
+      '<svg class="tl-spark" viewBox="0 0 ' + width + " " + height + '" preserveAspectRatio="none" ' +
+      'role="img" aria-label="Equity curve">' +
+      '<polyline fill="none" stroke-width="2" points="' + points + '" ' +
+      'stroke="' + (up ? "#00e676" : "#ff5252") + '" /></svg>'
+    );
+  }
+
+  function renderBacktest(data) {
+    var s = data.stats;
+    var m = s.riskMetrics || {};
+    var tiles =
+      statTile("Net P&L", fmtUsd(s.realizedPnl), pnlClass(s.realizedPnl)) +
+      statTile("Closed trades", m.closedTrades || 0) +
+      statTile("Win rate", s.totalTrades ? s.winRate + "%" : "—") +
+      statTile("Expectancy", m.closedTrades ? (m.expectancyR > 0 ? "+" : "") + m.expectancyR + "R" : "—", pnlClass(m.expectancyR)) +
+      statTile("Profit factor", m.profitFactor == null ? (m.closedTrades ? "∞" : "—") : m.profitFactor) +
+      statTile("Max drawdown", m.closedTrades ? m.maxDrawdownPct + "%" : "—") +
+      statTile("Worst streak", m.worstConsecutiveLosses || 0) +
+      statTile("Refused", (data.skipped || []).length);
+
+    var caveats = (data.caveats || []).concat(
+      data.openAtEnd && data.openAtEnd.length
+        ? [data.openAtEnd.length + " position(s) still open at the end — excluded from closed-trade stats rather than force-closed"]
+        : [],
+    );
+
+    btResult.innerHTML =
+      '<div class="tl-stat-grid">' + tiles + "</div>" +
+      equitySparkline(data.equityCurve) +
+      '<div class="tl-bt-meta">' +
+      escapeHtml(data.symbol) + " " + escapeHtml(data.interval) +
+      " · " + data.bars + " bars (" + data.warmupBars + " warmup)" +
+      " · " + fmtTime(data.from) + " → " + fmtTime(data.to) +
+      "</div>" +
+      (caveats.length
+        ? '<div class="de-warnings" style="display:block">' +
+          caveats.map(function (c) { return "<div>" + escapeHtml(c) + "</div>"; }).join("") +
+          "</div>"
+        : "");
+  }
+
+  btRunBtn.addEventListener("click", function () {
+    var symbol = (btSymbol.value || "").trim().toUpperCase();
+    if (!symbol) {
+      showError("Enter a symbol to backtest.");
+      return;
+    }
+    btRunBtn.disabled = true;
+    btResult.innerHTML = '<div class="de-empty">Replaying bars&hellip;</div>';
+    postAdmin("/api/trading-lab/backtest", { symbol: symbol, interval: btInterval.value })
+      .then(renderBacktest)
+      .catch(function (err) {
+        btResult.innerHTML = '<div class="de-empty">Backtest failed: ' + escapeHtml(err.message) + "</div>";
+      })
+      .then(function () { btRunBtn.disabled = false; });
+  });
 
   refreshBtn.addEventListener("click", refresh);
   bookSelect.addEventListener("change", refresh);

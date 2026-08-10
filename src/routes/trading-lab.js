@@ -23,7 +23,7 @@ function requireFields(body, fields) {
   }
 }
 
-function createTradingLabRouter({ tradingLabService, requireAdmin }) {
+function createTradingLabRouter({ tradingLabService, backtestService, requireAdmin }) {
   const router = Router();
 
   // ── Reads ─────────────────────────────────────────────────────────────────
@@ -133,6 +133,27 @@ function createTradingLabRouter({ tradingLabService, requireAdmin }) {
     const trader = tradingLabService.book((req.body || {}).book || req.query.book);
     const events = await trader.updatePositions((req.body || {}).prices || null);
     res.json({ book: trader.book, events, stats: await trader.getStats() });
+  }));
+
+  // Admin-gated despite being read-only: unlike the other reads it replays
+  // hundreds of bars per call and pulls candles from Binance, so it is not
+  // something an anonymous visitor should be able to spin in a loop. It writes
+  // only to a temp ledger that is deleted when the run ends — the live books
+  // are never touched.
+  router.post("/backtest", requireAdmin, asyncRoute(async (req, res) => {
+    if (!backtestService) {
+      res.status(503).json({ error: "Backtesting is not configured" });
+      return;
+    }
+    const body = req.body || {};
+    requireFields(body, ["symbol"]);
+    res.json(
+      await backtestService.backtestSymbol({
+        symbol: String(body.symbol).toUpperCase(),
+        interval: typeof body.interval === "string" ? body.interval : "4h",
+        options: body.options || {},
+      }),
+    );
   }));
 
   router.post("/reset", requireAdmin, (req, res) => {

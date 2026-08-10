@@ -71,6 +71,21 @@
     </div>
 
     <div class="de-card">
+      <div class="de-card-title">Backtest</div>
+      <div class="de-card-note">Replays historical candles through the same paper-trading engine, so a backtest and a forward paper run agree by construction. Entries fill at the signalling bar's close, and when one bar contains both the stop and a target the stop is taken &mdash; results are pessimistic by design.</div>
+      <div class="de-toolbar">
+        <input class="aia-select tl-input" id="tl-bt-symbol" type="text" value="BTCUSDT" placeholder="Symbol" />
+        <select class="aia-select" id="tl-bt-interval">
+          <option value="1h">1h</option>
+          <option value="4h" selected>4h</option>
+          <option value="1D">1D</option>
+        </select>
+        <button class="aia-run-btn" type="button" id="tl-bt-run">Run backtest</button>
+      </div>
+      <div id="tl-bt-result"><div class="de-empty">No backtest run yet.</div></div>
+    </div>
+
+    <div class="de-card">
       <div class="de-card-title">Strategy Metrics</div>
       <div class="de-card-note">Expectancy, profit factor, drawdown and R-multiples from closed trades only &mdash; open P&amp;L belongs in equity, not in the edge calculation.</div>
       <div id="tl-metrics"></div>

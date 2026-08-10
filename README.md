@@ -23,7 +23,7 @@ The app is intentionally lightweight: no bundler, no frontend framework, and no 
 - `/onchain.html` - API-backed on-chain analytics dashboard.
 - `/ai-analysis.html` - TradingView chart snapshots with AI reads for crypto plus BTC-correlated macro tickers.
 - `/decision.html` - Decision Engine: multi-asset regime score (BTC, breadth, SPY, QQQ, DXY, VIX, gold, oil, optional US10Y), asset-class rotation board, setup-quality ranking layered over the signal screener, execution levels (trigger / invalidation / target / R:R with explicit "do not trade" reasons), and a trading journal that grades whether the engine's calls were right.
-- `/trading-lab.html` - Trading Lab: paper execution with real TP1/TP2 scale-outs, ATR risk sizing, kill switches, and a historical edge gate that scores every Decision Engine plan against how setups like it have actually performed. See [docs/trading-lab.md](docs/trading-lab.md).
+- `/trading-lab.html` - Trading Lab: paper execution with real TP1/TP2 scale-outs, ATR risk sizing, kill switches, a historical edge gate that scores every Decision Engine plan against how setups like it have actually performed, and bar-replay backtesting over the same engine. See [docs/trading-lab.md](docs/trading-lab.md).
 - `/youtube-v2.html` - YouTube Intelligence RSS upload dashboard.
 - `/indicators.html` - Trading and market glossary.
 - `/reporter.html` - Daily report generation workflow.
@@ -139,6 +139,7 @@ market-dashboard/
         checklist.js      kill switches and 0-100 setup scoring
         risk.js           ATR position sizing and stop/target levels
         paper-trader.js   paper execution with TP1/TP2 scale-outs
+        backtest.js       bar replay over the paper-trading engine
         trading-lab.js    composition + Decision Engine bridge
     utils/                validators, errors, mappers
   docs/
