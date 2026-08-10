@@ -115,9 +115,12 @@ test("stats include R-multiple edge metrics and groups", () => {
   assert.equal(stats.edge.overall.profitFactor, 1.25);
   assert.equal(stats.edge.overall.maxDrawdownR, -2);
   assert.equal(stats.edge.overall.worstLosingStreak, 2);
+  // Buckets are ranked by expectancy, not by score — the point of the table is
+  // "which setup grades actually paid", so the 86 (+2.5R) leads, the 52
+  // (breakeven, 0R) comes next, and the two losing buckets trail.
   assert.deepEqual(
-    stats.edge.bySetupScoreBucket.map((bucket) => bucket.label),
-    ["85+", "75-84", "<60", "60-74"],
+    stats.edge.bySetupScoreBucket.map((bucket) => [bucket.label, bucket.expectancyR]),
+    [["85+", 2.5], ["<60", 0], ["60-74", -1], ["75-84", -1]],
   );
   assert.equal(stats.edge.bySymbol.find((row) => row.label === "BTCUSDT").expectancyR, 0.75);
   assert.equal(stats.edge.byRegime.find((row) => row.label === "Choppy").expectancyR, -0.5);

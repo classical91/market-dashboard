@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trading Lab &middot; Market Command</title>
+  <script src="/assets/js/settings.js"></script>
+  <link rel="stylesheet" href="/assets/styles/command.css" />
+  <link rel="stylesheet" href="/assets/styles/ai-analysis.css" />
+  <link rel="stylesheet" href="/assets/styles/decision.css" />
+  <link rel="stylesheet" href="/assets/styles/trading-lab.css" />
+</head>
+<body>
+<div class="app">
+  <aside class="cmd-sidebar"></aside>
+  <main class="cmd-main">
+
+    <div class="cmd-page-header">
+      <div>
+        <div class="cmd-page-title">&#129514; Trading Lab</div>
+        <div class="cmd-page-subtitle">Paper execution, risk sizing and the historical edge gate &mdash; the Decision Engine says a setup looks good, the Lab says whether setups like it have actually paid</div>
+      </div>
+    </div>
+
+    <div class="aia-notice" id="tl-notice" style="display:none"></div>
+
+    <div class="de-toolbar">
+      <select class="aia-select" id="tl-book"></select>
+      <select class="aia-select" id="tl-interval">
+        <option value="1h">1h</option>
+        <option value="4h" selected>4h</option>
+        <option value="1D">1D</option>
+      </select>
+      <button class="aia-run-btn" type="button" id="tl-refresh-btn">Refresh</button>
+      <button class="aia-run-btn" type="button" id="tl-mark-btn" title="Mark open positions to market and fire any stop or target reached">Mark to market</button>
+      <span class="tl-mode" id="tl-mode"></span>
+      <span class="de-updated" id="tl-updated"></span>
+    </div>
+
+    <div class="tl-stat-grid" id="tl-stats"></div>
+
+    <div class="de-card">
+      <div class="de-card-title">Open Positions</div>
+      <div class="de-table-wrap">
+        <table class="de-table">
+          <thead>
+            <tr>
+              <th>Symbol</th><th>Dir</th><th>Entry</th><th>Now</th><th>Size</th>
+              <th>Stop</th><th>TP1</th><th>TP2</th><th>Realized</th><th>Unrealized</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="tl-positions-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="de-card">
+      <div class="de-card-title">Decision Engine Candidates</div>
+      <div class="de-card-note">Every execution plan the Decision Engine produced, run through the checklist and the historical edge gate at the plan's own trigger price.</div>
+      <div class="de-table-wrap">
+        <table class="de-table">
+          <thead>
+            <tr>
+              <th>Symbol</th><th>Signal</th><th>Setup</th><th>Checklist</th><th>Edge</th>
+              <th>Size</th><th>Entry</th><th>Stop</th><th>TP1</th><th>TP2</th><th>Risk</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="tl-candidates-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="de-card">
+      <div class="de-card-title">Strategy Metrics</div>
+      <div class="de-card-note">Expectancy, profit factor, drawdown and R-multiples from closed trades only &mdash; open P&amp;L belongs in equity, not in the edge calculation.</div>
+      <div id="tl-metrics"></div>
+    </div>
+
+    <div class="de-card">
+      <div class="de-card-title">Closed Trades</div>
+      <div class="de-table-wrap">
+        <table class="de-table">
+          <thead>
+            <tr>
+              <th>Closed</th><th>Symbol</th><th>Dir</th><th>Entry</th><th>Exit</th>
+              <th>Reason</th><th>Exits</th><th>P&amp;L</th><th>R</th><th>Score</th>
+            </tr>
+          </thead>
+          <tbody id="tl-history-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <footer>Trading Lab &mdash; <a href="/decision.html">Decision Engine</a> &mdash; <a href="/signal-screener.html">Signal Screener</a> &mdash; <a href="/">Overview</a></footer>
+
+  </main>
+</div>
+<script src="/assets/js/sidebar.js"></script>
+<script src="/assets/js/admin-key.js"></script>
+<script src="/assets/js/trading-lab.js"></script>
+</body>
+</html>

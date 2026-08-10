@@ -23,6 +23,7 @@ The app is intentionally lightweight: no bundler, no frontend framework, and no 
 - `/onchain.html` - API-backed on-chain analytics dashboard.
 - `/ai-analysis.html` - TradingView chart snapshots with AI reads for crypto plus BTC-correlated macro tickers.
 - `/decision.html` - Decision Engine: multi-asset regime score (BTC, breadth, SPY, QQQ, DXY, VIX, gold, oil, optional US10Y), asset-class rotation board, setup-quality ranking layered over the signal screener, execution levels (trigger / invalidation / target / R:R with explicit "do not trade" reasons), and a trading journal that grades whether the engine's calls were right.
+- `/trading-lab.html` - Trading Lab: paper execution with real TP1/TP2 scale-outs, ATR risk sizing, kill switches, and a historical edge gate that scores every Decision Engine plan against how setups like it have actually performed. See [docs/trading-lab.md](docs/trading-lab.md).
 - `/youtube-v2.html` - YouTube Intelligence RSS upload dashboard.
 - `/indicators.html` - Trading and market glossary.
 - `/reporter.html` - Daily report generation workflow.
@@ -51,7 +52,13 @@ npm run build
 npm test
 ```
 
-`npm run lint` checks JavaScript syntax across source, scripts, and public assets. `npm run build` boots the Express app and verifies static HTML asset references and required docs. `npm test` runs the `node:test` API suite covering the admin guard and public probes.
+`npm run lint` checks JavaScript syntax across source, scripts, and public assets. `npm run build` boots the Express app and verifies static HTML asset references and required docs. `npm test` runs the `node:test` API suite covering the admin guard, public probes, and the Trading Lab engines.
+
+```bash
+npm run parity -- --traderclaw ../traderclaw
+```
+
+`npm run parity` runs identical sample trades through the ported JavaScript engines and the original TraderClaw Python ones and fails on any disagreeing field. It needs a TraderClaw checkout and a `python3`; without either it reports that it skipped and exits 0. This is the check that gates archiving TraderClaw — see [docs/trading-lab.md](docs/trading-lab.md).
 
 ## Access Control
 
@@ -124,10 +131,22 @@ market-dashboard/
     config/env.js         environment parsing
     routes/               API routers
     services/             provider clients and aggregation
+      trading/            Trading Lab engines (ported from TraderClaw)
+        config.js         risk policy, kill-switch thresholds, live-mode gates
+        round.js          Python-compatible half-to-even rounding
+        metrics.js        expectancy, profit factor, drawdown, R-multiples
+        edge-gate.js      historical edge gate over closed-trade history
+        checklist.js      kill switches and 0-100 setup scoring
+        risk.js           ATR position sizing and stop/target levels
+        paper-trader.js   paper execution with TP1/TP2 scale-outs
+        trading-lab.js    composition + Decision Engine bridge
     utils/                validators, errors, mappers
+  docs/
+    trading-lab.md        migration map and remaining work
   scripts/
     lint.js
     build-check.js
+    traderclaw-parity.js  JS vs Python engine comparison
   .github/workflows/ci.yml
   AGENTS.md
 ```

@@ -19,6 +19,7 @@ const { createLayoutAnalysisRouter } = require("./routes/layout-analysis");
 const { createPatternScannerRouter } = require("./routes/pattern-scanner");
 const { createSignalScreenerRouter } = require("./routes/signal-screener");
 const { createStrategyEngineRouter } = require("./routes/strategy-engine");
+const { createTradingLabRouter } = require("./routes/trading-lab");
 const { createWatchlistRouter } = require("./routes/watchlist");
 const { createBotCommandsRouter } = require("./routes/bot-commands");
 const { createPatternTrackerRouter } = require("./routes/pattern-tracker");
@@ -35,6 +36,7 @@ const { TOP_TOKENS } = require("./config/market-symbols");
 const { AIAnalysisService } = require("./services/ai-analysis");
 const { DecisionEngineService } = require("./services/decision-engine");
 const { TradeJournalService } = require("./services/trade-journal");
+const { TradingLabService } = require("./services/trading/trading-lab");
 const { LayoutAnalysisService } = require("./services/layout-analysis");
 const { LayoutCaptureService } = require("./services/layout-capture");
 const { PatternScannerService } = require("./services/pattern-scanner");
@@ -127,6 +129,14 @@ function createApp() {
     cacheTtlMs: Number(process.env.DECISION_CACHE_MS) || 120_000,
   });
   const tradeJournalService = new TradeJournalService({ dataDir });
+  // Trading Lab: the paper-execution, risk-sizing and historical-edge layer
+  // ported from TraderClaw. It reuses the same Binance ticker the pattern
+  // tracker resolves entries with, so marks and paper fills agree on price.
+  const tradingLabService = new TradingLabService({
+    dataDir,
+    priceFeed: fetchBinancePrice,
+    decisionEngineService,
+  });
   const signalBotService = new SignalBotService({
     signalScreenerService,
     patternScannerService,
@@ -189,6 +199,7 @@ function createApp() {
       traderclaw: config.traderclaw,
     }),
   );
+  app.use("/api/trading-lab", createTradingLabRouter({ tradingLabService, requireAdmin }));
   app.use("/api/watchlist", createWatchlistRouter({ watchlistService, requireAdmin }));
   app.use("/api/bot-commands", createBotCommandsRouter({ botCommandsService }));
   app.use("/api/pattern-tracker", createPatternTrackerRouter({ patternTrackerService }));

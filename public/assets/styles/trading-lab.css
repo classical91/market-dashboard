@@ -1,0 +1,115 @@
+/* ─────────────────────────────────────────────────────────
+   Trading Lab — paper execution, risk sizing, edge gate.
+   Builds on decision.css (de-card / de-table / de-empty);
+   only the Lab-specific pieces live here.
+───────────────────────────────────────────────────────── */
+
+.de-card-note {
+  font-size: 11px;
+  color: var(--muted);
+  margin: -4px 0 12px;
+  line-height: 1.5;
+}
+
+/* ── Mode badge ─────────────────────────────────────────── */
+
+.tl-mode {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+.tl-mode--paper { color: var(--blue);  background: var(--blue-bg);  border: 1px solid rgba(77,163,255,0.35); }
+.tl-mode--live  { color: var(--coral); background: var(--coral-bg); border: 1px solid rgba(255,77,109,0.45); }
+
+/* ── Stat tiles ─────────────────────────────────────────── */
+
+.tl-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.tl-stat {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+
+.tl-stat-label {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-bottom: 6px;
+}
+
+.tl-stat-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.tl-up   { color: #00e676; }
+.tl-down { color: #ff5252; }
+.tl-flat { color: var(--soft); }
+
+/* ── Badges and inline tags ─────────────────────────────── */
+
+.tl-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 6px;
+}
+.tl-badge--take   { color: var(--green); background: var(--green-bg); }
+.tl-badge--reduce { color: var(--amber); background: var(--amber-bg); }
+.tl-badge--skip   { color: var(--coral); background: var(--coral-bg); }
+
+/* Marks a position that has already scaled out at TP1 and moved its stop to
+   breakeven — the two facts that most change how the rest should be read. */
+.tl-tag {
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 4px;
+  padding: 1px 4px;
+  vertical-align: middle;
+}
+
+/* ── Buttons ────────────────────────────────────────────── */
+
+.tl-open-btn,
+.tl-close-btn {
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.05);
+  color: var(--soft);
+  white-space: nowrap;
+}
+.tl-open-btn:hover:not(:disabled)  { color: var(--green); border-color: rgba(0,227,150,0.5); }
+.tl-close-btn:hover:not(:disabled) { color: var(--coral); border-color: rgba(255,77,109,0.5); }
+.tl-open-btn:disabled,
+.tl-close-btn:disabled { opacity: 0.45; cursor: default; }
+
+/* ── Metric groups ──────────────────────────────────────── */
+
+.tl-metric-group + .tl-metric-group { margin-top: 18px; }
+
+.tl-metric-title {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
