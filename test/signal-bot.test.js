@@ -163,11 +163,116 @@ test("a fresh divergence alerts and is tracker-logged, but does not re-alert whi
   assert.equal(logged.length, 1);
 });
 
-test("bot without configured telegram reports itself disabled", () => {
+test("bot without configured telegram or an active bridge reports itself disabled", () => {
   const bot = new SignalBotService({
     signalScreenerService: {},
     telegramService: { configured: false },
     stateCache: new MemoryCache(),
   });
   assert.equal(bot.enabled, false);
+});
+
+test("paper trading keeps the loop alive even with telegram switched off", () => {
+  const bot = new SignalBotService({
+    signalScreenerService: {},
+    telegramService: { configured: false },
+    tradeBridge: { active: true, requiresSchedule: true, async markOpenPositions() {}, async handleTransitions() { return []; } },
+    stateCache: new MemoryCache(),
+  });
+  assert.equal(bot.enabled, true);
+});
+
+// ── Trading Lab bridge ──────────────────────────────────────────────────────
+
+// One timeframe, one scanAll call per cycle — simpler than makeBot's
+// two-timeframe bookkeeping, which the bridge does not need.
+function makeBridgeBot({ bridge, signalsByCycle }) {
+  let cycle = -1;
+  return new SignalBotService({
+    signalScreenerService: {
+      async scanAll(interval) {
+        cycle += 1;
+        return signalsByCycle[Math.min(cycle, signalsByCycle.length - 1)].map((entry) => ({ ...entry, interval }));
+      },
+    },
+    telegramService: { configured: true, async postSignalAlerts() {}, async postPatternAlerts() {} },
+    tradeBridge: bridge,
+    stateCache: new MemoryCache(),
+    timeframes: ["4h"],
+  });
+}
+
+function recordingBridge(overrides = {}) {
+  const calls = [];
+  return {
+    calls,
+    active: true,
+    requiresSchedule: true,
+    async markOpenPositions() { calls.push(["mark"]); return []; },
+    async handleTransitions(transitions) {
+      calls.push(["handle", transitions]);
+      return transitions.map((t) => ({ symbol: t.symbol, status: "dry-run" }));
+    },
+    ...overrides,
+  };
+}
+
+test("transitions reach the bridge with their price, after open positions are marked", async () => {
+  const bridge = recordingBridge();
+  const bot = makeBridgeBot({
+    bridge,
+    signalsByCycle: [
+      [{ symbol: "BTCUSDT", signal: "FLAT", score: 50, price: 60000 }],
+      [{ symbol: "BTCUSDT", signal: "LONG", score: 83, price: 61250 }],
+    ],
+  });
+
+  await bot.runOnce(); // baseline
+  const second = await bot.runOnce();
+
+  // Marking runs first on both cycles so entries are judged against a current
+  // ledger, and the transition carries the confirming price.
+  assert.deepEqual(bridge.calls.map((c) => c[0]), ["mark", "handle", "mark", "handle"]);
+  const [, forwarded] = bridge.calls[3];
+  assert.equal(forwarded.length, 1);
+  assert.equal(forwarded[0].symbol, "BTCUSDT");
+  assert.equal(forwarded[0].from, "FLAT");
+  assert.equal(forwarded[0].to, "LONG");
+  assert.equal(forwarded[0].price, 61250);
+  assert.equal(second.tradeActions.length, 1);
+  assert.equal(second.tradeActions[0].status, "dry-run");
+});
+
+test("a bridge failure costs the paper trade, not the alert", async () => {
+  const bridge = recordingBridge({
+    async handleTransitions() { throw new Error("ledger write failed"); },
+  });
+  const bot = makeBridgeBot({
+    bridge,
+    signalsByCycle: [
+      [{ symbol: "ETHUSDT", signal: "FLAT", score: 50, price: 3000 }],
+      [{ symbol: "ETHUSDT", signal: "SHORT", score: 80, price: 2900 }],
+    ],
+  });
+
+  await bot.runOnce();
+  const second = await bot.runOnce();
+
+  assert.equal(second.screenerTransitions.length, 1, "the scan still reports its transition");
+  assert.deepEqual(second.tradeActions, []);
+});
+
+test("no bridge configured leaves the scan exactly as it was", async () => {
+  const bot = makeBridgeBot({
+    bridge: undefined,
+    signalsByCycle: [
+      [{ symbol: "BTCUSDT", signal: "FLAT", score: 50, price: 60000 }],
+      [{ symbol: "BTCUSDT", signal: "LONG", score: 83, price: 61250 }],
+    ],
+  });
+
+  await bot.runOnce();
+  const second = await bot.runOnce();
+  assert.equal(second.screenerTransitions.length, 1);
+  assert.deepEqual(second.tradeActions, []);
 });

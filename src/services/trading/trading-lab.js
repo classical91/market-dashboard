@@ -206,6 +206,20 @@ class TradingLabService {
     };
   }
 
+  // Market state for callers that have a timeframe but no decision payload —
+  // the signal bridge, mainly. Falls back to the neutral state rather than
+  // failing the caller: an unreachable decision engine should cost a setup its
+  // trend/macro points, not stop the evaluation from happening at all.
+  async stateForInterval(interval = "4h") {
+    if (!this.decisionEngineService) return marketState({});
+    try {
+      return marketStateFromDecision(await this.decisionEngineService.getDecision(interval));
+    } catch (err) {
+      console.warn(`[TradingLab] Decision state unavailable for ${interval}: ${err.message}`);
+      return marketState({});
+    }
+  }
+
   // ── Reporting ─────────────────────────────────────────────────────────────
 
   async overview() {

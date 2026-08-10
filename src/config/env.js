@@ -144,6 +144,15 @@ const config = {
     intervalMs: parseNumber(process.env.SIGNAL_BOT_INTERVAL_MS, 15 * 60 * 1000),
     timeframes: parseList(process.env.SIGNAL_BOT_TIMEFRAMES),
     minChecks: parseNumber(process.env.SIGNAL_BOT_MIN_CHECKS, 4),
+    // Trading Lab bridge. Off by default and opt-in by exact value: every
+    // FLAT -> LONG/SHORT transition is scored and logged either way, but
+    // nothing is opened — even on paper — until this is explicitly "true".
+    paperTradeEnabled: process.env.SIGNAL_BOT_PAPER_TRADE_ENABLED === "true",
+    book: process.env.SIGNAL_BOT_BOOK || "main",
+    // Marking open paper positions to market on the bot's interval is what
+    // lets stops and take-profits resolve without the dashboard open. Harmless
+    // when no positions are open, so it defaults on; set to "false" to opt out.
+    autoMarkEnabled: process.env.SIGNAL_BOT_AUTO_MARK_ENABLED !== "false",
   },
   traderclaw: {
     baseUrl: String(process.env.TRADERCLAW_BASE_URL || "").replace(/\/+$/, ""),
