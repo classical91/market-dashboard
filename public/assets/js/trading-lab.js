@@ -11,6 +11,7 @@
   var statsEl = document.getElementById("tl-stats");
   var positionsTbody = document.getElementById("tl-positions-tbody");
   var candidatesTbody = document.getElementById("tl-candidates-tbody");
+  var signalActionsTbody = document.getElementById("tl-signal-actions-tbody");
   var metricsEl = document.getElementById("tl-metrics");
   var historyTbody = document.getElementById("tl-history-tbody");
   var btSymbol = document.getElementById("tl-bt-symbol");
@@ -165,6 +166,34 @@
       .join("");
   }
 
+  function renderSignalActions(data) {
+    var rows = (data && data.items) || [];
+    if (!rows.length) {
+      signalActionsTbody.innerHTML = '<tr><td colspan="10" class="de-empty">No Signal Bot bridge actions recorded yet.</td></tr>';
+      return;
+    }
+    signalActionsTbody.innerHTML = rows
+      .map(function (row) {
+        var statusClass = row.status === "opened" ? "tl-badge--take" :
+          row.status === "dry-run" ? "tl-badge--reduce" : "tl-badge--skip";
+        return (
+          "<tr>" +
+          "<td>" + fmtTime(row.timestamp) + "</td>" +
+          "<td>" + escapeHtml(row.symbol) + "</td>" +
+          "<td>" + escapeHtml(row.interval) + "</td>" +
+          '<td class="' + (row.direction === "LONG" ? "tl-up" : "tl-down") + '">' + escapeHtml(row.direction) + "</td>" +
+          '<td><span class="tl-badge ' + statusClass + '">' + escapeHtml(row.status) + "</span></td>" +
+          "<td>" + escapeHtml(row.book) + "</td>" +
+          "<td>" + fmtPrice(row.entryPrice) + "</td>" +
+          "<td>" + (row.confidenceScore == null ? "&mdash;" : row.confidenceScore) + "</td>" +
+          "<td>" + (row.sizeMultiplier == null ? "&mdash;" : Number(row.sizeMultiplier).toFixed(2) + "x") + "</td>" +
+          "<td>" + escapeHtml(row.reason) + "</td>" +
+          "</tr>"
+        );
+      })
+      .join("");
+  }
+
   function renderMetrics(data) {
     var groups = (data && data.groups) || {};
     var names = { strategy: "By strategy", symbol: "By symbol", scoreBucket: "By setup score" };
@@ -256,6 +285,7 @@
     return Promise.all([
       getJson("/api/trading-lab/metrics?book=" + book).then(renderMetrics),
       getJson("/api/trading-lab/history?book=" + book + "&limit=50").then(function (d) { renderHistory(d.items); }),
+      getJson("/api/trading-lab/signal-actions?limit=25").then(renderSignalActions),
     ]);
   }
 

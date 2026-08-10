@@ -31,6 +31,7 @@ const { assessEdge } = require("./edge-gate");
 const { planTrade } = require("./risk");
 const { buildStrategyMetrics } = require("./metrics");
 const { PaperTradingService } = require("./paper-trader");
+const { replayOrder } = require("./replay-order");
 const { atr } = require("../decision-engine");
 const { ema, macd } = require("../signal-screener");
 
@@ -189,7 +190,7 @@ class BacktestService {
         // 1. Replay this bar against open positions BEFORE considering a new
         // entry, so a position opened last bar gets its stop and targets
         // tested on this one.
-        const ordering = this.replayOrder(trader, bar);
+        const ordering = replayOrder(trader, bar);
         if (ordering.mixed) mixedDirectionBars += 1;
         for (const price of ordering.prices) {
           await trader.updatePositions({ [symbol]: price });
@@ -248,18 +249,6 @@ class BacktestService {
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
-  }
-
-  // Order the bar's prices so the adverse extreme is tested first. For a long
-  // the adverse extreme is the low; for a short it is the high.
-  replayOrder(trader, bar) {
-    const open = trader.getOpenPositions();
-    const hasLong = open.some((p) => p.direction === "LONG");
-    const hasShort = open.some((p) => p.direction === "SHORT");
-    const adverseIsLow = hasLong || !hasShort;
-    const extremes = adverseIsLow ? [bar.low, bar.high] : [bar.high, bar.low];
-    const prices = [bar.open, ...extremes, bar.close].filter((p) => Number.isFinite(p) && p > 0);
-    return { prices, mixed: hasLong && hasShort };
   }
 
   // One candidate through the full gauntlet, entering at the signalling bar's

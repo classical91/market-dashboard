@@ -71,6 +71,22 @@
     </div>
 
     <div class="de-card">
+      <div class="de-card-title">Signal Bot Would-Have-Traded</div>
+      <div class="de-card-note">Recent Signal Bot bridge decisions. Dry-run remains the default unless SIGNAL_BOT_PAPER_TRADE_ENABLED=true.</div>
+      <div class="de-table-wrap">
+        <table class="de-table">
+          <thead>
+            <tr>
+              <th>Time</th><th>Symbol</th><th>TF</th><th>Dir</th><th>Status</th>
+              <th>Book</th><th>Entry</th><th>Score</th><th>Size</th><th>Reason</th>
+            </tr>
+          </thead>
+          <tbody id="tl-signal-actions-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="de-card">
       <div class="de-card-title">Backtest</div>
       <div class="de-card-note">Replays historical candles through the same paper-trading engine, so a backtest and a forward paper run agree by construction. Entries fill at the signalling bar's close, and when one bar contains both the stop and a target the stop is taken &mdash; results are pessimistic by design.</div>
       <div class="de-toolbar">

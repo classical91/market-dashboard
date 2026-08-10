@@ -45,6 +45,7 @@ const { SignalScreenerService } = require("./services/signal-screener");
 const { StrategyEngineService } = require("./services/strategy-engine");
 const { SignalBotService } = require("./services/signal-bot");
 const { SignalTradeBridge } = require("./services/trading/signal-bridge");
+const { SignalActionStore } = require("./services/trading/signal-action-store");
 const { WatchlistService } = require("./services/watchlist");
 const { BotCommandsService } = require("./services/bot-commands");
 const { PatternTrackerService } = require("./services/pattern-tracker");
@@ -124,6 +125,7 @@ function createApp() {
   const watchlistService = new WatchlistService({ dataDir });
   const botCommandsService = new BotCommandsService({ dataDir });
   const patternTrackerService = new PatternTrackerService({ dataDir, fetchPrice: fetchBinancePrice });
+  const signalActionStore = new SignalActionStore({ dataDir });
   const decisionEngineService = new DecisionEngineService({
     marketDataService,
     signalScreenerService,
@@ -150,6 +152,7 @@ function createApp() {
   const signalTradeBridge = new SignalTradeBridge({
     tradingLabService,
     signalScreenerService,
+    signalActionStore,
     paperTradeEnabled: config.signalBot.paperTradeEnabled,
     autoMarkEnabled: config.signalBot.autoMarkEnabled,
     book: config.signalBot.book,
@@ -217,7 +220,7 @@ function createApp() {
       traderclaw: config.traderclaw,
     }),
   );
-  app.use("/api/trading-lab", createTradingLabRouter({ tradingLabService, backtestService, requireAdmin }));
+  app.use("/api/trading-lab", createTradingLabRouter({ tradingLabService, backtestService, signalActionStore, requireAdmin }));
   app.use("/api/watchlist", createWatchlistRouter({ watchlistService, requireAdmin }));
   app.use("/api/bot-commands", createBotCommandsRouter({ botCommandsService }));
   app.use("/api/pattern-tracker", createPatternTrackerRouter({ patternTrackerService }));

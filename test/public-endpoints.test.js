@@ -55,6 +55,13 @@ test("TraderClaw edge endpoint stays read-only and degrades when unconfigured", 
   assert.deepEqual(body.bots, []);
 });
 
+test("signal bridge actions endpoint stays public and read-only", async () => {
+  const res = await fetch(`${base}/api/trading-lab/signal-actions?limit=5`);
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(Array.isArray(body.items), true);
+});
+
 test("action endpoints are disabled (503) when ADMIN_API_KEY is unset", async () => {
   const routes = [
     "/api/daily-report/generate",

@@ -24,13 +24,39 @@
 
 const { atr } = require("../decision-engine");
 const { dropUnclosedCandle } = require("../signal-screener");
+const { replayOrderForPositions } = require("./replay-order");
 
 const ENTRY_TRANSITIONS = new Set(["LONG", "SHORT"]);
+const DEFAULT_MARK_INTERVAL = "4h";
+
+function candleCloseTime(candle) {
+  const value = candle && (candle.closeTime ?? candle.openTime ?? candle.time);
+  const n = Number(value);
+  if (Number.isFinite(n)) return n;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function positionInterval(pos) {
+  const source = String((pos && pos.signalSource) || "");
+  const match = source.match(/^signal-bot:(.+)$/);
+  return match ? match[1] : DEFAULT_MARK_INTERVAL;
+}
+
+function lastMarkedTime(pos) {
+  const meta = (pos && pos.meta) || {};
+  const value = meta.signalBridgeLastMarkedCloseTime;
+  const n = Number(value);
+  if (Number.isFinite(n)) return n;
+  const opened = Date.parse(pos && pos.openedAt);
+  return Number.isFinite(opened) ? opened : 0;
+}
 
 class SignalTradeBridge {
   constructor({
     tradingLabService,
     signalScreenerService = null,
+    signalActionStore = null,
     paperTradeEnabled = false,
     autoMarkEnabled = true,
     book = "main",
@@ -38,6 +64,7 @@ class SignalTradeBridge {
   }) {
     this._lab = tradingLabService;
     this._screener = signalScreenerService;
+    this._actionStore = signalActionStore;
     this.paperTradeEnabled = Boolean(paperTradeEnabled);
     this.autoMarkEnabled = Boolean(autoMarkEnabled);
     this.book = String(book || "main").toLowerCase();
@@ -79,7 +106,7 @@ class SignalTradeBridge {
       const trader = this._lab.book(id);
       if (!trader.getOpenPositions().length) continue;
       try {
-        const events = await trader.updatePositions();
+        const events = await this._markBookWithCandles(trader);
         for (const event of events) {
           this._logger.log(`[SignalBridge] ${id}: ${event.type} on ${event.symbol} (${event.realized})`);
         }
@@ -89,6 +116,77 @@ class SignalTradeBridge {
       }
     }
     return marks;
+  }
+
+  async _markBookWithCandles(trader) {
+    if (!this._screener || typeof this._screener.getCandles !== "function") {
+      return trader.updatePositions();
+    }
+
+    const groups = new Map();
+    for (const pos of trader.getOpenPositions()) {
+      const interval = positionInterval(pos);
+      const key = `${pos.symbol}:${interval}`;
+      const since = lastMarkedTime(pos);
+      const existing = groups.get(key);
+      groups.set(key, {
+        symbol: pos.symbol,
+        interval,
+        since: existing ? Math.min(existing.since, since) : since,
+      });
+    }
+
+    const events = [];
+    for (const group of groups.values()) {
+      let candles;
+      try {
+        candles = await this._screener.getCandles(group.symbol, group.interval);
+      } catch (err) {
+        this._logger.warn?.(
+          `[SignalBridge] Candle marking unavailable for ${group.symbol} ${group.interval}: ${err.message}`,
+        );
+        return trader.updatePositions();
+      }
+
+      if (!Array.isArray(candles) || !candles.length) {
+        this._logger.warn?.(`[SignalBridge] No candles available for ${group.symbol} ${group.interval}`);
+        return trader.updatePositions();
+      }
+
+      const closedAll = dropUnclosedCandle(candles);
+      if (!closedAll.length) {
+        this._logger.warn?.(`[SignalBridge] No closed candles available for ${group.symbol} ${group.interval}`);
+        return trader.updatePositions();
+      }
+
+      const closed = closedAll
+        .filter((c) => candleCloseTime(c) > group.since)
+        .sort((a, b) => candleCloseTime(a) - candleCloseTime(b));
+      if (!closed.length) continue;
+
+      for (const candle of closed) {
+        const symbolPositions = trader.getOpenPositions().filter((p) => p.symbol === group.symbol);
+        if (!symbolPositions.length) break;
+        const ordering = replayOrderForPositions(symbolPositions, candle);
+        for (const price of ordering.prices) {
+          const next = await trader.updatePositions({ [group.symbol]: price });
+          events.push(...next);
+        }
+        this._stampLastMarked(trader, group.symbol, group.interval, candleCloseTime(candle));
+      }
+    }
+    return events;
+  }
+
+  _stampLastMarked(trader, symbol, interval, closeTime) {
+    const positions = trader.getPositions();
+    let changed = false;
+    for (const pos of positions) {
+      if (pos.status !== "open" || pos.symbol !== symbol || positionInterval(pos) !== interval) continue;
+      pos.meta = { ...(pos.meta || {}), signalBridgeLastMarkedCloseTime: closeTime };
+      changed = true;
+    }
+    if (changed) trader.savePositions(positions);
   }
 
   /**
@@ -173,21 +271,31 @@ class SignalTradeBridge {
 
   _record({ transition, status, reason, assessment = null, opened = null }) {
     const action = {
+      timestamp: new Date().toISOString(),
       symbol: transition.symbol,
       interval: transition.interval,
       direction: transition.to,
       book: this.book,
       status,
       reason,
+      entryPrice: Number(transition.price) || null,
       decision: assessment ? assessment.decision : null,
       confidenceScore: assessment ? assessment.checklist.confidenceScore : null,
       sizeMultiplier: assessment ? assessment.sizeMultiplier : null,
       opened,
     };
+    let stored = action;
+    if (this._actionStore && typeof this._actionStore.record === "function") {
+      try {
+        stored = this._actionStore.record(action) || action;
+      } catch (err) {
+        this._logger.error?.(`[SignalBridge] Failed to persist action: ${err.message}`);
+      }
+    }
     this._logger.log(
       `[SignalBridge] ${status.toUpperCase()} ${transition.symbol} ${transition.to} ${transition.interval}: ${reason}`,
     );
-    return action;
+    return stored;
   }
 }
 

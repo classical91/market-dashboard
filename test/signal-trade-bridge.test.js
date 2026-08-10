@@ -7,6 +7,7 @@ const os = require("node:os");
 const path = require("node:path");
 
 const { SignalTradeBridge } = require("../src/services/trading/signal-bridge");
+const { SignalActionStore } = require("../src/services/trading/signal-action-store");
 const { TradingLabService } = require("../src/services/trading/trading-lab");
 const { makeTradingConfig } = require("../src/services/trading/config");
 
@@ -49,6 +50,28 @@ function transition(overrides = {}) {
   return { symbol: "BTCUSDT", interval: "4h", from: "FLAT", to: "LONG", score: 83, price: 100, ...overrides };
 }
 
+function setOpenedAt(trader, iso) {
+  const positions = trader.getPositions();
+  positions.forEach((pos) => {
+    if (pos.status === "open") pos.openedAt = iso;
+  });
+  trader.savePositions(positions);
+}
+
+function closedCandle(overrides = {}) {
+  const closeTime = Date.now() - 1000;
+  return {
+    openTime: closeTime - 3600000,
+    open: 100,
+    high: 101,
+    low: 99,
+    close: 100,
+    volume: 10,
+    closeTime,
+    ...overrides,
+  };
+}
+
 test("dry run is the default: transitions are scored but nothing is opened", async () => {
   const { bridge, lab } = makeBridge();
 
@@ -62,6 +85,53 @@ test("dry run is the default: transitions are scored but nothing is opened", asy
   assert.equal(actions[0].decision, "TAKE_QUARTER");
   assert.ok(actions[0].confidenceScore > 0);
   assert.equal(lab.book("main").getOpenPositions().length, 0, "dry run must not touch the ledger");
+});
+
+test("signal bridge actions persist newest-first with every outcome status", async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "md-actions-"));
+  const signalActionStore = new SignalActionStore({ dataDir, logger: QUIET });
+
+  await makeBridge({ signalActionStore }).bridge.handleTransitions([transition({ symbol: "BTCUSDT" })]);
+  await makeBridge({ signalActionStore, paperTradeEnabled: true }).bridge.handleTransitions([
+    transition({ symbol: "ETHUSDT" }),
+  ]);
+  await makeBridge({ signalActionStore, paperTradeEnabled: true }).bridge.handleTransitions([
+    transition({ symbol: "SOLUSDT", price: null }),
+  ]);
+
+  const lab = makeLab({ configOverrides: { maxOpenPositions: 1 } });
+  const { bridge } = makeBridge({ lab, signalActionStore, paperTradeEnabled: true });
+  await bridge.handleTransitions([transition({ symbol: "AVAXUSDT" })]);
+  await bridge.handleTransitions([transition({ symbol: "LINKUSDT" })]);
+
+  const actions = signalActionStore.recent(10);
+  assert.deepEqual(new Set(actions.map((a) => a.status)), new Set(["dry-run", "opened", "skipped", "blocked"]));
+  assert.ok(actions.every((a) => a.timestamp), "each persisted action has a timestamp");
+  assert.ok(actions.every((a) => a.entryPrice === null || a.entryPrice > 0), "entry price is persisted when known");
+  assert.equal(actions[0].status, "blocked", "newest entries are returned first");
+});
+
+test("signal bridge action log is capped", () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "md-actions-cap-"));
+  const signalActionStore = new SignalActionStore({ dataDir, logger: QUIET, cap: 3 });
+
+  for (let i = 0; i < 5; i += 1) {
+    signalActionStore.record({ symbol: `T${i}`, interval: "4h", direction: "LONG", status: "dry-run" });
+  }
+
+  assert.deepEqual(signalActionStore.recent(10).map((a) => a.symbol), ["T4", "T3", "T2"]);
+});
+
+test("a signal action write failure is caught and the scan action still returns", async () => {
+  const { bridge } = makeBridge({
+    signalActionStore: {
+      record() { throw new Error("disk full"); },
+    },
+  });
+
+  const [action] = await bridge.handleTransitions([transition()]);
+  assert.equal(action.status, "dry-run");
+  assert.equal(action.symbol, "BTCUSDT");
 });
 
 test("only FLAT -> LONG/SHORT transitions are considered", async () => {
@@ -167,6 +237,7 @@ test("auto-marking resolves take-profits on the bot's interval, with no page ope
 
   // TP2 sits at 2.5R above a $1.50 stop distance.
   price = position.tp2 + 1;
+  bridge._screener = null;
   const marks = await bridge.markOpenPositions();
 
   assert.equal(marks.length, 1);
@@ -177,6 +248,59 @@ test("auto-marking resolves take-profits on the bot's interval, with no page ope
   const [closed] = lab.book("main").getHistory();
   assert.equal(closed.closeReason, "TP2");
   assert.ok(closed.pnl > 0);
+});
+
+test("candle replay marks a LONG stop even when the candle closes back above it", async () => {
+  const candle = closedCandle({ open: 100, low: 94, high: 108, close: 101 });
+  const lab = makeLab();
+  lab.book("main").openPosition({
+    symbol: "BTCUSDT", direction: "LONG", size: 1, entryPrice: 100,
+    stopLoss: 95, tp1: 110, tp2: 120, riskUsd: 5, signalSource: "signal-bot:4h",
+  });
+  setOpenedAt(lab.book("main"), new Date(candle.closeTime - 3600000).toISOString());
+  const { bridge } = makeBridge({ lab, candles: [candle] });
+
+  const marks = await bridge.markOpenPositions();
+
+  assert.deepEqual(marks[0].events.map((e) => e.type), ["STOP_HIT"]);
+  assert.equal(lab.book("main").getOpenPositions().length, 0);
+  const [closed] = lab.book("main").getHistory();
+  assert.equal(closed.closeReason, "STOP_LOSS");
+  assert.equal(closed.exitPrice, 94);
+});
+
+test("candle replay fills TP1 and TP2 in order on the same bar", async () => {
+  const candle = closedCandle({ open: 100, low: 99, high: 112, close: 111 });
+  const lab = makeLab();
+  lab.book("main").openPosition({
+    symbol: "BTCUSDT", direction: "LONG", size: 1, entryPrice: 100,
+    stopLoss: 95, tp1: 105, tp2: 110, riskUsd: 5, signalSource: "signal-bot:4h",
+  });
+  setOpenedAt(lab.book("main"), new Date(candle.closeTime - 3600000).toISOString());
+  const { bridge } = makeBridge({ lab, candles: [candle] });
+
+  const marks = await bridge.markOpenPositions();
+
+  assert.deepEqual(marks[0].events.map((e) => e.type), ["TP1_HIT", "TP2_HIT"]);
+  const [closed] = lab.book("main").getHistory();
+  assert.equal(closed.closeReason, "TP2");
+});
+
+test("auto-marking falls back to ticker marking when candles throw", async () => {
+  const lab = makeLab({ priceFeed: async () => 94 });
+  lab.book("main").openPosition({
+    symbol: "BTCUSDT", direction: "LONG", size: 1, entryPrice: 100,
+    stopLoss: 95, tp1: 105, tp2: 110, riskUsd: 5, signalSource: "signal-bot:4h",
+  });
+  const { bridge } = makeBridge({
+    lab,
+    signalScreenerService: { async getCandles() { throw new Error("Binance klines HTTP 500"); } },
+  });
+
+  const marks = await bridge.markOpenPositions();
+
+  assert.deepEqual(marks[0].events.map((e) => e.type), ["STOP_HIT"]);
+  assert.equal(lab.book("main").getOpenPositions().length, 0);
 });
 
 test("auto-marking can be switched off, and marks every book when on", async () => {

@@ -23,7 +23,7 @@ function requireFields(body, fields) {
   }
 }
 
-function createTradingLabRouter({ tradingLabService, backtestService, requireAdmin }) {
+function createTradingLabRouter({ tradingLabService, backtestService, signalActionStore = null, requireAdmin }) {
   const router = Router();
 
   // ── Reads ─────────────────────────────────────────────────────────────────
@@ -48,6 +48,17 @@ function createTradingLabRouter({ tradingLabService, backtestService, requireAdm
     const limit = Math.min(Math.max(numberOr(req.query.limit, 100), 1), 1000);
     const history = trader.getHistory();
     res.json({ book: trader.book, total: history.length, items: history.slice(-limit).reverse() });
+  });
+
+  router.get("/signal-actions", (req, res) => {
+    const limit = Math.min(Math.max(numberOr(req.query.limit, 50), 1), 2000);
+    const items = signalActionStore && typeof signalActionStore.recent === "function"
+      ? signalActionStore.recent(limit)
+      : [];
+    const total = signalActionStore && typeof signalActionStore.count === "function"
+      ? signalActionStore.count()
+      : items.length;
+    res.json({ total, items });
   });
 
   router.get("/metrics", (req, res) => {
