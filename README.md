@@ -105,7 +105,9 @@ Generates its own BTC signals from Bitget USDT-perpetual candles instead of wait
 - `ENABLE_LIVE_SCANNER` - off unless set to exactly `true`.
 - `LIVE_SCANNER_SYMBOL` - defaults to `BTCUSDT.P`; the `.P` suffix maps to Bitget's `BTCUSDT` contract on `USDT-FUTURES` and is kept as the ledger symbol.
 - `LIVE_SCANNER_TIMEFRAME` - `1m`, `3m`, `5m`, `15m` (default), `30m`, `1h`, `4h`, `6h`, `12h`, `1d`.
-- `LIVE_SCANNER_STRATEGY` - defaults to `mindset_v1` (EMA20/50 trend with an RSI band filter).
+- `LIVE_SCANNER_STRATEGY` - defaults to `mindset_v1` (EMA20/50 trend with an RSI band filter). The live scanner runs `mindset_v1` only; backtest-only strategies such as `smc_v1` are not selectable here.
+
+The **backtester** takes a strategy from its own registry (`GET /api/trading-lab/strategies`) and can compare strategies side by side over one candle fetch (`POST /api/trading-lab/backtest/compare`). See [docs/trading-lab.md](docs/trading-lab.md#strategies).
 - `LIVE_SCANNER_INTERVAL_MS` - poll cadence, defaults to `60000`.
 - `LIVE_SCANNER_CONTEXT_INTERVAL` - higher timeframe feeding the checklist's regime/daily-bias buckets, defaults to `4h`.
 - `LIVE_SCANNER_BOOK` - Trading Lab book scanner trades land in, defaults to `main`.

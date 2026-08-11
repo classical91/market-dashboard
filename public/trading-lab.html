@@ -102,9 +102,18 @@
           <option value="4h" selected>4h</option>
           <option value="1D">1D</option>
         </select>
+        <select class="aia-select" id="tl-bt-strategy" title="Which strategy to replay"></select>
         <button class="aia-run-btn" type="button" id="tl-bt-run">Run backtest</button>
+        <button class="aia-run-btn" type="button" id="tl-bt-compare" title="Run every strategy over the same symbol, interval and candles">Compare strategies</button>
       </div>
+      <div class="de-card-note" id="tl-bt-strategy-note"></div>
       <div id="tl-bt-result"><div class="de-empty">No backtest run yet.</div></div>
+    </div>
+
+    <div class="de-card">
+      <div class="de-card-title">Strategy Comparison</div>
+      <div class="de-card-note">Every registered strategy replayed over the same symbol, interval and candles. Backtest only &mdash; nothing here changes what the live scanner runs.</div>
+      <div id="tl-bt-compare-result"><div class="de-empty">No comparison run yet.</div></div>
     </div>
 
     <div class="de-card">

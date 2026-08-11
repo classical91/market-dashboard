@@ -101,6 +101,61 @@ likelier than the strategy having become good. A companion test on a strongly
 trending series checks the opposite failure: that the pessimistic fills have
 not simply made *every* strategy lose.
 
+## Strategies
+
+The backtester takes a **strategy** from a small registry
+(`src/services/trading/strategies/`), so several strategies can be replayed
+over the same candles through the same execution engine and compared on equal
+terms.
+
+A strategy is a plain object:
+
+```js
+{
+  id, name, description,
+  requiredWarmupBars,               // floor the run cannot undercut
+  evaluate(candles, index, context) // -> signal object
+}
+```
+
+`evaluate` must read nothing past `index` — that contract is what keeps a
+backtest honest, and the backtester enforces it by handing over a slice that
+ends at the decided bar. The signal it returns always carries `reasons[]` and
+`indicators{}`, so the UI can explain why a strategy fired *or* why it stayed
+flat, plus optional `confidence`, `stopHint` and `targetHint`.
+
+Stop and target hints are **recorded, not applied**: sizing and exits stay with
+`planTrade()` and the paper trader, so two strategies are compared on the same
+execution model rather than on who guessed a better stop.
+
+| id | What it is |
+| --- | --- |
+| `mindset_v1` | The live scanner's strategy, imported unchanged from `live-scanner.js` — EMA20/EMA50 trend with an RSI band filter. The default. |
+| `smc_v1` | Backtest-only Smart Money Concepts approximation (below). |
+
+### smc_v1
+
+Not "SMC done properly" — discretionary SMC reads liquidity, sessions and
+inducement, none of which is here. It takes the four ideas that *can* be
+written as replayable rules and requires all four to agree:
+
+1. **Trend alignment.** Higher-timeframe context when the caller supplies one,
+   otherwise EMA21/EMA50 on the traded chart. No counter-trend fades.
+2. **Break of structure.** A *close* beyond the most recent confirmed fractal
+   swing. Pivots are only used once bars have closed on both sides of them, so
+   there is no edge-of-chart pivot to peek at.
+3. **Displacement.** The break must leave a fair value gap — a three-bar
+   imbalance — delivered by a candle whose range is at least 1.2× ATR.
+4. **Retest.** Entry is a pullback *into* that gap, on a bar after the gap has
+   fully formed. Entering on the displacement candle itself is the commonest
+   way an SMC backtest flatters itself, and two tests exist to stop it.
+
+Anything short of all four is `FLAT` **with the reason it fell short**.
+
+smc_v1 is deliberately **backtest-only**. `LIVE_SCANNER_STRATEGY` still resolves
+against the live scanner's own registry, which contains `mindset_v1` alone;
+promoting a strategy is a separate, explicit change.
+
 ### One intentional divergence
 
 `round.js` implements Python's half-to-even rounding rather than JS's
@@ -157,7 +212,9 @@ ledger is admin-gated via `x-admin-key`.
 | POST | `/api/trading-lab/positions` | admin | Evaluate, then open if every gate agrees. |
 | POST | `/api/trading-lab/positions/:id/close` | admin | Close the remainder manually. |
 | POST | `/api/trading-lab/mark` | admin | Mark to market; fires any stop/target reached. |
-| POST | `/api/trading-lab/backtest` | admin | Replay a symbol's candles. Admin-gated despite being read-only: it replays hundreds of bars and pulls candles per call, so it should not be spinnable by anonymous visitors. Writes only to a temp ledger. |
+| GET | `/api/trading-lab/strategies` | — | The backtestable strategy catalogue and the default id. Static, so the UI selector can render before a key is entered. |
+| POST | `/api/trading-lab/backtest` | admin | Replay a symbol's candles. Body: `symbol`, `interval`, `strategy` (defaults to `mindset_v1`; an unknown id is a 400). Admin-gated despite being read-only: it replays hundreds of bars and pulls candles per call, so it should not be spinnable by anonymous visitors. Writes only to a temp ledger. |
+| POST | `/api/trading-lab/backtest/compare` | admin | Replay several strategies over **one** candle fetch and reduce each to the promotion numbers: bars, signals, closed trades, net P&L, expectancy R, profit factor, max drawdown, win rate, worst loss streak. Defaults to every registered strategy. |
 | POST | `/api/trading-lab/reset` | admin | Wipe a book back to its starting balance. |
 
 ## Migration status
