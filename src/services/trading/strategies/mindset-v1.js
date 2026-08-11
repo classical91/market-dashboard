@@ -20,8 +20,17 @@ const REQUIRED_WARMUP_BARS = Math.max(
 const mindsetV1 = {
   id: "mindset_v1",
   name: "Mindset v1",
+  // Bump this whenever the rules change. Experiments record it, so an old
+  // result stays attributable to the rules that actually produced it.
+  version: "1.0.0",
   description:
     "EMA20/EMA50 trend direction with an RSI band filter that refuses to chase a stretched move. The strategy the live scanner runs.",
+  // Running forward on live candles against a paper ledger — which is exactly
+  // what the live scanner does today, and is NOT the same as being approved
+  // for real money. liveEligible stays false.
+  status: "forward-paper",
+  supportsBacktest: true,
+  supportsLiveScanner: true,
   requiredWarmupBars: REQUIRED_WARMUP_BARS,
 
   evaluate(candles, index, context = {}) {

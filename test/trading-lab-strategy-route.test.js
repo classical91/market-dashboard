@@ -9,9 +9,14 @@ const assert = require("node:assert");
 const http = require("node:http");
 const express = require("express");
 
+const fs = require("node:fs");
+const os = require("node:os");
+const pathMod = require("node:path");
+
 const { createTradingLabRouter } = require("../src/routes/trading-lab");
 const { createRequireAdmin } = require("../src/middleware/admin-auth");
 const { BacktestService } = require("../src/services/trading/backtest");
+const { ExperimentStore } = require("../src/services/trading/experiment-store");
 const { makeTradingConfig } = require("../src/services/trading/config");
 
 const ADMIN_KEY = "strategy-route-test-key";
@@ -37,10 +42,14 @@ function candles(count = 400) {
 
 let server;
 let base;
+let experimentStore;
 
 test.before(async () => {
   const app = express();
   app.use(express.json());
+  experimentStore = new ExperimentStore({
+    dataDir: fs.mkdtempSync(pathMod.join(os.tmpdir(), "md-exp-route-")),
+  });
   app.use(
     "/api/trading-lab",
     createTradingLabRouter({
@@ -48,7 +57,9 @@ test.before(async () => {
       backtestService: new BacktestService({
         config: makeTradingConfig(),
         signalScreenerService: { getCandles: async () => candles() },
+        experimentStore,
       }),
+      experimentStore,
       requireAdmin: createRequireAdmin({ adminKey: ADMIN_KEY }),
     }),
   );
@@ -83,6 +94,82 @@ test("the strategy catalogue is public, so the selector can render before any ke
   assert.deepEqual(body.strategies.map((s) => s.id).sort(), ["mindset_v1", "smc_v1"]);
   for (const strategy of body.strategies) {
     assert.ok(strategy.name && strategy.description && strategy.requiredWarmupBars > 0);
+    // Lifecycle metadata rides along, so a client never has to guess what a
+    // strategy is cleared for.
+    assert.ok(strategy.version && strategy.status);
+    assert.equal(typeof strategy.supportsBacktest, "boolean");
+    assert.equal(typeof strategy.supportsLiveScanner, "boolean");
+    assert.equal(strategy.liveEligible, false, "nothing is live-eligible yet");
+  }
+});
+
+/* ── Research history ─────────────────────────────────────── */
+
+test("a backtest records an experiment only when asked, and the id is returned", async () => {
+  const before = experimentStore.count();
+
+  const plain = await (await post("/api/trading-lab/backtest", { symbol: "BTCUSDT", interval: "15m" })).json();
+  assert.equal(plain.experimentId, undefined);
+  assert.equal(experimentStore.count(), before, "an ordinary run must leave no trace");
+
+  const recorded = await (
+    await post("/api/trading-lab/backtest", {
+      symbol: "BTCUSDT",
+      interval: "15m",
+      strategy: "smc_v1",
+      record: true,
+      notes: "route smoke",
+    })
+  ).json();
+  assert.match(recorded.experimentId, /^exp_/);
+  assert.equal(experimentStore.count(), before + 1);
+});
+
+test("experiments are readable, filterable and individually fetchable", async () => {
+  const created = await (
+    await post("/api/trading-lab/backtest", {
+      symbol: "ETHUSDT",
+      interval: "1h",
+      strategy: "mindset_v1",
+      record: true,
+    })
+  ).json();
+
+  const list = await (await fetch(`${base}/api/trading-lab/experiments`)).json();
+  assert.ok(list.total >= 1);
+  assert.ok(list.items.some((e) => e.id === created.experimentId));
+
+  const filtered = await (
+    await fetch(`${base}/api/trading-lab/experiments?strategy=mindset_v1&symbol=ETHUSDT&timeframe=1h&version=1.0.0`)
+  ).json();
+  assert.ok(filtered.items.length >= 1);
+  for (const item of filtered.items) {
+    assert.equal(item.strategy, "mindset_v1");
+    assert.equal(item.symbol, "ETHUSDT");
+    assert.equal(item.timeframe, "1h");
+    assert.equal(item.strategyVersion, "1.0.0");
+  }
+
+  const one = await (await fetch(`${base}/api/trading-lab/experiments/${created.experimentId}`)).json();
+  assert.equal(one.experiment.id, created.experimentId);
+  // The cost assumptions are part of the record, not of the run that made it.
+  assert.ok(one.experiment.costs);
+  assert.equal(one.experiment.strategyStatus, "forward-paper");
+});
+
+test("an unknown experiment id is a 404", async () => {
+  const res = await fetch(`${base}/api/trading-lab/experiments/exp_nope`);
+  assert.equal(res.status, 404);
+  assert.match((await res.json()).error, /exp_nope/);
+});
+
+test("research history is public, and there are no promotion mutations to find", async () => {
+  assert.equal((await fetch(`${base}/api/trading-lab/experiments`)).status, 200);
+  // Promotion is a human decision for a later PR; nothing here may change a
+  // strategy's lifecycle state.
+  for (const path of ["/api/trading-lab/experiments", "/api/trading-lab/strategies/mindset_v1/promote"]) {
+    const res = await post(path, { status: "live-eligible" });
+    assert.equal(res.status, 404, `${path} must not accept mutations`);
   }
 });
 

@@ -33,6 +33,9 @@ follows, and records what happened so the next answer is better informed.
 | `executor.py` (sizing half) | `src/services/trading/risk.js` | ATR sizing and stop/target geometry. Order placement deliberately excluded. |
 | `paper_trader.py` | `src/services/trading/paper-trader.js` | TP1/TP2 scale-outs, breakeven stop, gap-aware stop fills, daily/weekly rollover. |
 | — | `src/services/trading/backtest.js` | New: bar replay over the same paper-trading engine. |
+| — | `src/services/trading/strategies/` | New: the strategy registry and its research lifecycle metadata. |
+| — | `src/services/trading/experiment-record.js` | New: turns a finished run into a research record. Pure. |
+| — | `src/services/trading/experiment-store.js` | New: where experiments are persisted. The seam a database would replace. |
 | `shadow_trader.py`, `alts_trader.py` | *books* in `trading-lab.js` | Main / Shadow / Alts are named books over one engine rather than three near-duplicate services. |
 | `app.py`, `dashboard.py`, Flask routes | `src/routes/trading-lab.js`, `public/trading-lab.html` | Retired; Market Dashboard's Express + vanilla JS replaces them. |
 
@@ -128,7 +131,10 @@ A strategy is a plain object:
 
 ```js
 {
-  id, name, description,
+  id, name, version, description,
+  status,                           // research lifecycle — see below
+  supportsBacktest,                 // may be replayed
+  supportsLiveScanner,              // may be run forward on live candles
   requiredWarmupBars,               // floor the run cannot undercut
   evaluate(candles, index, context) // -> signal object
 }
@@ -144,10 +150,97 @@ Stop and target hints are **recorded, not applied**: sizing and exits stay with
 `planTrade()` and the paper trader, so two strategies are compared on the same
 execution model rather than on who guessed a better stop.
 
-| id | What it is |
+| id | version | status | What it is |
+| --- | --- | --- | --- |
+| `mindset_v1` | 1.0.0 | `forward-paper` | The live scanner's strategy, imported unchanged from `live-scanner.js` — EMA20/EMA50 trend with an RSI band filter. The default. |
+| `smc_v1` | 1.0.0 | `backtest` | Backtest-only Smart Money Concepts approximation (below). |
+
+### Lifecycle
+
+A strategy's `status` is a claim about **evidence**, not a switch. Changing it
+makes nothing happen; it records what has actually been demonstrated.
+
+| status | Meaning |
 | --- | --- |
-| `mindset_v1` | The live scanner's strategy, imported unchanged from `live-scanner.js` — EMA20/EMA50 trend with an RSI band filter. The default. |
-| `smc_v1` | Backtest-only Smart Money Concepts approximation (below). |
+| `experimental` | Being written. May change shape without notice. |
+| `backtest` | Replayable, and that is all. |
+| `validated` | Backtests reviewed and believed; not yet forward-tested. |
+| `forward-paper` | Running forward on live candles against a **paper** ledger. |
+| `live-eligible` | Approved for real-money execution. |
+| `retired` | Kept to reproduce old experiments; not for new runs. |
+
+**Registry metadata is not promotion.** Being in the registry means a strategy
+can be *named*; it says nothing about what may run it. Two independent things
+must agree before `liveEligible` is true:
+
+```js
+liveEligible = supportsLiveScanner === true && status === "live-eligible"
+```
+
+`liveEligible` is **computed** in `strategies/lifecycle.js`, never declared by
+the strategy — a strategy object that sets `liveEligible: true` on itself is
+ignored. Today it is false for everything, which is correct: `mindset_v1` is
+`forward-paper` (paper ledger, real candles) and `smc_v1` has never seen a live
+candle. Even a `live-eligible` strategy would still face the two exchange-side
+gates (`TRADING_MODE=live` **and** `ALLOW_LIVE_TRADING=true`) that this repo
+never flips.
+
+The live scanner keeps its own strategy table, because it resolves a name from
+`LIVE_SCANNER_STRATEGY` at construction. A test asserts that table only
+contains strategies the registry marks `supportsLiveScanner` — which is what
+stops a backtest-only strategy from being reachable through an env var.
+
+The promotion *policy* — how many closed trades, what expectancy, what profit
+factor and drawdown justify a status change — is deliberately not implemented
+yet, and neither is any endpoint that could change a status.
+
+### Experiments
+
+A backtest is ephemeral; an **experiment** is the record that it happened.
+Recording is opt-in (`record: true` on the backtest request), so exploring a
+symbol does not fill the research log with noise, and a developer or test run
+leaves no trace. When a run is recorded, the response carries `experimentId`.
+
+Each record answers "what produced this number?":
+
+* identity — `id`, `createdAt`, `notes`, `source`
+* what ran — `strategy`, `strategyVersion`, `strategyStatus`, `gitCommit`
+* what it ran on — `symbol`, `timeframe`, `from`/`to`, `bars`, `warmupBars`
+* what happened — `signals`, `closedTrades`, `openAtEnd`, `winRate`,
+  `netPnlUsd`, `netReturnPct`, `expectancyR`, `profitFactor`,
+  `maxDrawdownPct`, `worstLossStreak`
+* under what assumptions — `options` and `costs`
+
+Every metric comes from `summarizeRun()` — the same reduction the comparison
+table uses, which reads the paper trader's own metrics. Nothing is
+recalculated: a stored experiment that disagreed with the table it came from
+would be worse than no experiment at all.
+
+**Why the cost assumptions are part of the record.** All three cost rates
+default to zero, and they are set per deployment. The same strategy over the
+same bars at 0% and at 0.06% taker fees produces different expectancy — so an
+experiment without its `costs` is not reproducible, and two experiments are
+only comparable if their `costs` match. `gitCommit` plays the same role for the
+rules themselves: without it, a stored number cannot be traced back to the code
+that produced it. It is read from the platform's build metadata
+(`GIT_COMMIT_SHA`, `RAILWAY_GIT_COMMIT_SHA`, …), falling back to `git rev-parse
+HEAD`, and is recorded as `null` rather than guessed when neither is available.
+
+**Persistence.** `ExperimentStore` (`experiment-store.js`) writes newest-first
+JSON to `<dataDir>/research/experiments.json` using the same write-then-rename
+the paper trader uses, so a crash mid-write leaves the previous file intact. A
+corrupt or wrongly-shaped file degrades to an empty list and is repaired by the
+next write — research history is not load-bearing for trading, and must never
+take the dashboard down.
+
+Two separations are deliberate:
+
+* **From the ledger.** Experiments live under `<dataDir>/research/`, never
+  under `<dataDir>/trading-lab/<book>/`. Resetting a paper book cannot touch
+  the record of what was tested.
+* **Behind an interface.** Routes and the backtester speak only
+  `record` / `get` / `list` / `count`. Moving this to SQLite or Postgres later
+  is a swap of one file, not a rewrite of the backtester.
 
 ### smc_v1
 
@@ -228,8 +321,10 @@ ledger is admin-gated via `x-admin-key`.
 | POST | `/api/trading-lab/positions` | admin | Evaluate, then open if every gate agrees. |
 | POST | `/api/trading-lab/positions/:id/close` | admin | Close the remainder manually. |
 | POST | `/api/trading-lab/mark` | admin | Mark to market; fires any stop/target reached. |
-| GET | `/api/trading-lab/strategies` | — | The backtestable strategy catalogue and the default id. Static, so the UI selector can render before a key is entered. |
-| POST | `/api/trading-lab/backtest` | admin | Replay a symbol's candles. Body: `symbol`, `interval`, `strategy` (defaults to `mindset_v1`; an unknown id is a 400). Admin-gated despite being read-only: it replays hundreds of bars and pulls candles per call, so it should not be spinnable by anonymous visitors. Writes only to a temp ledger. |
+| GET | `/api/trading-lab/strategies` | — | The strategy catalogue with lifecycle metadata (`version`, `status`, `supportsBacktest`, `supportsLiveScanner`, computed `liveEligible`) and the default id. Static, so the UI selector can render before a key is entered. |
+| GET | `/api/trading-lab/experiments?strategy=&version=&symbol=&timeframe=&limit=` | — | Research history, newest first. Read-only: there are no promotion mutations. |
+| GET | `/api/trading-lab/experiments/:id` | — | One experiment record, or 404. |
+| POST | `/api/trading-lab/backtest` | admin | Replay a symbol's candles. Body: `symbol`, `interval`, `strategy` (defaults to `mindset_v1`; an unknown id is a 400), `record` (opt-in experiment, returns `experimentId`), `notes`. Admin-gated despite being read-only: it replays hundreds of bars and pulls candles per call, so it should not be spinnable by anonymous visitors. Writes only to a temp ledger. |
 | POST | `/api/trading-lab/backtest/compare` | admin | Replay several strategies over **one** candle fetch and reduce each to the promotion numbers: bars, signals, closed trades, net P&L, expectancy R, profit factor, max drawdown, win rate, worst loss streak. Defaults to every registered strategy. |
 | POST | `/api/trading-lab/reset` | admin | Wipe a book back to its starting balance. |
 

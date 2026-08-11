@@ -35,6 +35,8 @@ const { replayOrder } = require("./replay-order");
 const { atr } = require("../decision-engine");
 const { ema, macd } = require("../signal-screener");
 const { getStrategy, DEFAULT_STRATEGY_ID } = require("./strategies");
+const { summarizeRun, costSummary } = require("./run-summary");
+const { buildExperimentRecord } = require("./experiment-record");
 
 // Bars needed before the first signal can be trusted: the slowest indicator
 // here is the MACD's 26-period slow EMA plus its 9-period signal line.
@@ -184,9 +186,14 @@ function stateFromContext(context) {
 }
 
 class BacktestService {
-  constructor({ config = getTradingConfig(), signalScreenerService = null } = {}) {
+  // `experimentStore` is optional and only ever written to when a caller asks
+  // for it: a run is research, and research is recorded on purpose, not as a
+  // side effect of pressing a button.
+  constructor({ config = getTradingConfig(), signalScreenerService = null, experimentStore = null, logger = console } = {}) {
     this.config = config;
     this.signalScreenerService = signalScreenerService;
+    this.experimentStore = experimentStore;
+    this._logger = logger;
   }
 
   async getCandles(symbol, interval) {
@@ -405,7 +412,7 @@ class BacktestService {
     }
   }
 
-  async backtestSymbol({ symbol, interval = "4h", options = {}, strategy } = {}) {
+  async backtestSymbol({ symbol, interval = "4h", options = {}, strategy, record = false, notes = null } = {}) {
     // Resolve the strategy BEFORE fetching: a typo should come back as a 400
     // immediately, not as whatever the candle source happened to do first.
     // Resolving here also fixes the default: a symbol backtest with no
@@ -413,7 +420,29 @@ class BacktestService {
     // than run()'s own trend-breakout placeholder.
     const resolved = typeof strategy === "function" ? strategy : resolveStrategy(strategy).definition;
     const candles = await this.getCandles(symbol, interval);
-    return this.run({ symbol, interval, candles, options, strategy: resolved });
+    const result = await this.run({ symbol, interval, candles, options, strategy: resolved });
+    return record ? this.recordExperiment(result, { notes }) : result;
+  }
+
+  /**
+   * Persist a finished run as an experiment and stamp its id onto the result.
+   *
+   * A failed write must not fail the backtest — the numbers on screen are
+   * still true, they just did not get filed. The result then carries
+   * `experimentId: null` plus the reason, which is honest about what happened
+   * rather than implying a record exists.
+   */
+  recordExperiment(result, { notes = null } = {}) {
+    if (!this.experimentStore) {
+      return { ...result, experimentId: null, experimentError: "No experiment store is configured" };
+    }
+    try {
+      const experiment = this.experimentStore.record(buildExperimentRecord(result, { notes }));
+      return { ...result, experimentId: experiment.id };
+    } catch (err) {
+      this._logger.error?.(`[Backtest] Failed to record experiment: ${err.message}`);
+      return { ...result, experimentId: null, experimentError: err.message };
+    }
   }
 
   // Run several strategies over the SAME candles and reduce each result to the
@@ -446,40 +475,6 @@ class BacktestService {
       ),
     };
   }
-}
-
-// The comparable slice of a full run. Deliberately small: these are the
-// numbers the promotion rules are written in, and nothing else belongs in a
-// side-by-side table.
-function summarizeRun(result) {
-  const m = result.stats.riskMetrics;
-  return {
-    strategy: result.strategy,
-    strategyName: result.strategyName,
-    symbol: result.symbol,
-    interval: result.interval,
-    bars: result.bars,
-    warmupBars: result.warmupBars,
-    signals: result.signals.length,
-    closedTrades: m.closedTrades,
-    openAtEnd: result.openAtEnd.length,
-    netPnlUsd: m.netReturnUsd,
-    netReturnPct: m.netReturnPct,
-    expectancyR: m.expectancyR,
-    profitFactor: m.profitFactor,
-    maxDrawdownPct: m.maxDrawdownPct,
-    winRate: result.stats.winRate,
-    worstLossStreak: m.worstConsecutiveLosses,
-    costs: result.costs,
-  };
-}
-
-function costSummary(config) {
-  return {
-    takerFeeRate: config.takerFeeRate,
-    slippageRate: config.slippageRate,
-    fundingRate8h: config.fundingRate8h,
-  };
 }
 
 module.exports = {
