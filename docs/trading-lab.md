@@ -72,6 +72,14 @@ fill records its fee, funding charge or credit, requested price, and
 slippage-adjusted fill price, so expectancy and R-multiple are net of costs
 rather than a cosmetic summary adjustment.
 
+All three rates default to **zero**, so an unconfigured deployment produces
+frictionless results. Every backtest and comparison payload therefore carries
+the `costs` it ran under, and the Backtest and Strategy Comparison cards print
+them beneath the numbers — a zero-cost run is labelled as such rather than
+quietly passing for a realistic one. Costs are charged per fill, so they weigh
+most on whichever strategy trades most often; that is a real difference between
+strategies, and it belongs in the comparison rather than outside it.
+
 Two things make a backtest lie, and both are addressed explicitly:
 
 - **Lookahead.** Indicators and signals at bar *i* are computed from bars

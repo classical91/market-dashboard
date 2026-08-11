@@ -422,6 +422,27 @@
     );
   }
 
+  // The backtester applies fees, slippage and funding inside the paper trader
+  // (see BACKTEST_* env vars). They default to zero, and a zero-cost run read
+  // as a realistic one is exactly the mistake this line exists to prevent —
+  // so say which assumptions produced the numbers above them, every time.
+  function pct(rate) {
+    return (Number(rate) * 100).toFixed(3).replace(/0+$/, "").replace(/\.$/, "") + "%";
+  }
+
+  function costsLine(costs) {
+    if (!costs) return "";
+    var free =
+      !Number(costs.takerFeeRate) && !Number(costs.slippageRate) && !Number(costs.fundingRate8h);
+    if (free) {
+      return '<div class="tl-bt-meta tl-bt-costs">&#9888;&#65039; Frictionless run: no fees, slippage or funding applied. ' +
+        "Set BACKTEST_TAKER_FEE_RATE, BACKTEST_SLIPPAGE_RATE and BACKTEST_FUNDING_RATE_8H for realistic costs.</div>";
+    }
+    return '<div class="tl-bt-meta tl-bt-costs">Costs applied: taker fee ' + pct(costs.takerFeeRate) +
+      " · slippage " + pct(costs.slippageRate) +
+      " · funding " + pct(costs.fundingRate8h) + " per 8h</div>";
+  }
+
   function renderBacktest(data) {
     var s = data.stats;
     var m = s.riskMetrics || {};
@@ -451,6 +472,7 @@
       " · " + data.bars + " bars (" + data.warmupBars + " warmup)" +
       " · " + fmtTime(data.from) + " → " + fmtTime(data.to) +
       "</div>" +
+      costsLine(data.costs) +
       (caveats.length
         ? '<div class="de-warnings" style="display:block">' +
           caveats.map(function (c) { return "<div>" + escapeHtml(c) + "</div>"; }).join("") +
@@ -528,7 +550,8 @@
       "</tr></thead><tbody>" + body + "</tbody></table></div>" +
       '<div class="tl-bt-meta">' + escapeHtml(data.symbol) + " " + escapeHtml(data.interval) +
       " · ranked by expectancy, then profit factor, then drawdown · " + fmtTime(data.ranAt) +
-      " · backtest only, the live scanner is unaffected</div>";
+      " · backtest only, the live scanner is unaffected</div>" +
+      costsLine(rows[0] && rows[0].costs);
   }
 
   btStrategy.addEventListener("change", renderStrategyNote);
