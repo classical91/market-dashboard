@@ -113,6 +113,12 @@ const config = {
     // endpoints are disabled rather than left open (see admin-auth middleware).
     apiKey: process.env.ADMIN_API_KEY || "",
   },
+  access: {
+    // Optional website-level login. Owner access can browse the whole dashboard;
+    // Alpha access is read-only and limited to shared ?view=alpha pages.
+    sitePassword: process.env.MARKET_DASHBOARD_LOGIN_PASSWORD || "",
+    alphaAccessCode: process.env.ALPHA_TEAM_ACCESS_CODE || "",
+  },
   reporter: {
     apiKey: process.env.OPENAI_API_KEY || "",
     model: process.env.REPORTER_MODEL || "gpt-5.4-mini",

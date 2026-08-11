@@ -62,6 +62,8 @@ npm run parity -- --traderclaw ../traderclaw
 
 ## Access Control
 
+Website access is optional but recommended for deploys. Set `MARKET_DASHBOARD_LOGIN_PASSWORD` to put the dashboard behind `/login`. That owner password unlocks the full website. Set `ALPHA_TEAM_ACCESS_CODE` to give the Alpha Team a separate read-only password for shared `?view=alpha` pages; that role can open the shared Signal Screener and Pattern Scanner review pages plus their read-only data APIs, but it cannot reach the rest of the dashboard or any mutation/broadcast endpoint. When both website passwords are blank, local/dev behavior stays open.
+
 Action/mutation endpoints are guarded by a shared secret so a public deploy cannot let anonymous visitors spend API credits or send Telegram messages. Set `ADMIN_API_KEY` on the server to enable them; while it is blank these endpoints return `503`:
 
 - `POST /api/daily-report/generate`, `POST /api/daily-report/logs/import`
@@ -69,7 +71,7 @@ Action/mutation endpoints are guarded by a shared secret so a public deploy cann
 - `POST /api/telegram/test`, `GET /api/telegram/diagnose`
 - `POST/PATCH/DELETE /api/decision/journal` (trading-journal writes; reads stay public)
 
-Guarded requests must carry an `x-admin-key` header matching `ADMIN_API_KEY`. The Reporter, AI Analysis, and Settings pages prompt for the key on first use and store it in the browser's `localStorage`. Read-only views (overview, on-chain, YouTube, `/api/telegram/status`) stay public. The public `/api/health` probe returns only `{ "status": "ok" }`; provider-key and cache detail are returned only to admin requests.
+Guarded requests must carry an `x-admin-key` header matching `ADMIN_API_KEY`. The Reporter, AI Analysis, and Settings pages prompt for the key on first use and store it in the browser's `localStorage`. `ADMIN_API_KEY` is separate from the website login: owner login controls browsing, while the admin key controls write/broadcast actions. The public `/api/health` probe returns only `{ "status": "ok" }`; provider-key and cache detail are returned only to admin requests.
 
 ## Environment Variables
 
@@ -79,12 +81,13 @@ Most keys are optional. The app is designed to degrade to fallback data where po
 
 - `PORT` - local/server port, defaults to `3000`.
 - `DATA_DIR` - persistent file directory for reporter logs/caches and X feed cache. On Railway, set this to the mounted volume path, usually `/app/data`.
+- `MARKET_DASHBOARD_LOGIN_PASSWORD` - optional owner website password. When set, unauthenticated visitors are redirected to `/login`.
 - `ADMIN_API_KEY` - shared secret enabling action/mutation endpoints (see [Access Control](#access-control)). Blank means those endpoints are disabled (`503`).
 - `OPENAI_API_KEY` - enables report generation.
 - `REPORTER_MODEL` - OpenAI model for reporter generation, defaults to `gpt-5.4-mini`.
 - `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_IDS` - enable Telegram delivery.
 - `MARKET_DASHBOARD_URL` - public base URL used for Alpha Team `Visit:` links.
-- `ALPHA_TEAM_ACCESS_CODE` - optional access code for Alpha Team shared pages opened with `?view=alpha`.
+- `ALPHA_TEAM_ACCESS_CODE` - optional read-only password for Alpha Team shared pages opened with `?view=alpha`.
 
 ### Market Overview
 
@@ -102,7 +105,7 @@ Most keys are optional. The app is designed to degrade to fallback data where po
 
 ### Signal Bot Telegram Alerts
 
-Signal Bot Telegram messages are formatted for Jason's Alpha Team group. They are intentionally high-signal ops updates: each signal includes tier, symbol/timeframe, pattern label, bias, trend regime, indicator evidence, Trading Lab verdict, concise risk framing, and a `Visit:` link when `MARKET_DASHBOARD_URL` is configured. Pattern Scanner alerts use the same style for breakouts and fresh divergences, linking only to available dashboard pages. Shared links open in Alpha review mode (`?view=alpha`), where the requested page renders without the dashboard sidebar/tabs. When `ALPHA_TEAM_ACCESS_CODE` is configured, the shared page stays blurred behind an Alpha Team access prompt until the code is accepted. Messages must stay free of secrets, private account details, account-mode wording, internal dry-run wording, and financial-advice framing. Unfinished setup sources should appear as blurred `BETA` modules inside the dashboard, not as direct group links.
+Signal Bot Telegram messages are formatted for Jason's Alpha Team group. They are intentionally high-signal ops updates: each signal includes tier, symbol/timeframe, pattern label, bias, trend regime, indicator evidence, Trading Lab verdict, concise risk framing, and a `Visit:` link when `MARKET_DASHBOARD_URL` is configured. Pattern Scanner alerts use the same style for breakouts and fresh divergences, linking only to available dashboard pages. Shared links open in Alpha review mode (`?view=alpha`), where the requested page renders without the dashboard sidebar/tabs. When `ALPHA_TEAM_ACCESS_CODE` is configured, the shared page can be opened with the Alpha Team read-only password. Messages must stay free of secrets, private account details, account-mode wording, internal dry-run wording, and financial-advice framing. Unfinished setup sources should appear as blurred `BETA` modules inside the dashboard, not as direct group links.
 
 ### Live Scanner
 

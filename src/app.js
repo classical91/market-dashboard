@@ -74,6 +74,7 @@ const { YouTubeFeedService } = require("./services/youtube");
 const { XFeedService } = require("./services/x-feed");
 const { resolveDataDir } = require("./utils/data-dir");
 const { createRequireAdmin } = require("./middleware/admin-auth");
+const { createSiteAuth } = require("./middleware/site-auth");
 
 function createApp() {
   const app = express();
@@ -210,11 +211,25 @@ function createApp() {
   }
 
   const requireAdmin = createRequireAdmin({ adminKey: config.admin.apiKey });
+  const siteAuth = createSiteAuth({
+    adminKey: config.admin.apiKey,
+    sitePassword: config.access.sitePassword,
+    alphaAccessCode: config.access.alphaAccessCode,
+  });
 
   app.disable("x-powered-by");
   app.use(express.json({ limit: "2mb" }));
+  app.use(express.urlencoded({ extended: false }));
+  app.get("/login", siteAuth.loginPage);
+  app.post("/auth/login", siteAuth.login);
+  app.post("/auth/logout", siteAuth.logout);
   app.post("/api/alpha-team/access", (req, res) => {
-    const accessCode = process.env.ALPHA_TEAM_ACCESS_CODE || "";
+    const accessCode = config.access.alphaAccessCode;
+    const session = siteAuth.sessionFromRequest(req);
+    if (session && (session.role === "owner" || session.role === "alpha")) {
+      res.json({ ok: true, configured: Boolean(accessCode), session: session.role });
+      return;
+    }
     if (!accessCode) {
       res.json({ ok: true, configured: false });
       return;
@@ -225,8 +240,10 @@ function createApp() {
       return;
     }
 
+    siteAuth.setSessionCookie(res, req, "alpha");
     res.json({ ok: true, configured: true });
   });
+  app.use(siteAuth.requireAccess);
   app.get(["/earthwatch", "/earthwatch.html"], (req, res) => {
     res.redirect(302, "https://earth-watch-production-e3c6.up.railway.app/");
   });
