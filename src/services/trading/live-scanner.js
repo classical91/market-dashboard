@@ -34,6 +34,8 @@
 
 const { ema, rsi, macd, dropUnclosedCandle } = require("../signal-screener");
 const { replayOrderForPositions } = require("./replay-order");
+const { buildTradeIntent, isExit, ENTRY_SIGNALS } = require("./trade-intent");
+const { TradeIntentHandler } = require("./intent-handler");
 
 const BITGET_CANDLES_URL = "https://api.bitget.com/api/v2/mix/market/candles";
 const BITGET_OK_CODE = "00000";
@@ -262,8 +264,30 @@ function evaluateMindsetV1(candles, overrides = {}) {
 
 const STRATEGIES = { mindset_v1: evaluateMindsetV1 };
 
-function entryKey(symbol, direction, candleCloseTime) {
-  return `${symbol}:${direction}:${candleCloseTime}`;
+function entryKey(symbol, direction, candleTs) {
+  return `${symbol}:${direction}:${candleTs}`;
+}
+
+// One bar can produce several intents (close the long, then consider the
+// short). The cycle reports the most consequential outcome rather than
+// whichever happened to be processed last — otherwise an executed exit would
+// be masked by the "already-evaluated" of the entry that followed it.
+const STATUS_PRIORITY = [
+  "exited",
+  "opened",
+  "blocked",
+  "dry-run",
+  "skipped",
+  "already-evaluated",
+  "ignored",
+  "flat",
+];
+
+function summarizeStatuses(statuses) {
+  for (const candidate of STATUS_PRIORITY) {
+    if (statuses.includes(candidate)) return candidate;
+  }
+  return "flat";
 }
 
 class LiveScannerService {
@@ -319,6 +343,17 @@ class LiveScannerService {
     }
     this.strategy = strategyName;
     this._strategyFn = strategyFn;
+
+    // The single boundary an intent crosses to become an action. Entries go
+    // through every gate; exits deliberately bypass them — see intent-handler.
+    this._handler = new TradeIntentHandler({
+      tradingLabService,
+      book: this.book,
+      contextInterval: this.contextInterval,
+      paperTradeEnabled: this.paperTradeEnabled,
+      signalSource: this._signalSource(),
+      logger,
+    });
 
     this._timer = null;
     this._running = false;
@@ -477,18 +512,85 @@ class LiveScannerService {
 
     if (evaluation.error) return { status: "not-ready", reason: evaluation.error, markEvents };
 
-    // Trend flip against an open position closes it, whatever bar we are on —
-    // an exit is time-critical in a way an entry is not.
-    const exit = await this._maybeExit(evaluation, candle);
-    if (exit) return { status: "exit", action: exit, markEvents };
+    const intents = this.intentsFor(evaluation, candle);
+    const actions = [];
+    const statuses = [];
 
-    if (evaluation.signal === "FLAT") return { status: "flat", markEvents };
-    // Entries confirm once per bar. Re-evaluating the same closed candle on the
-    // next 60s tick must not produce a second entry.
-    if (!isNewCandle) return { status: "already-evaluated", markEvents };
+    for (const intent of intents) {
+      // Exits are not rate-limited by the candle claim and are not de-duped
+      // against it: a broken thesis should be actionable on the bar it breaks,
+      // and re-emitting an exit for an already-closed position is a harmless
+      // no-op the handler absorbs.
+      if (isExit(intent)) {
+        const outcome = await this._handler.handle(intent);
+        if (outcome.status === "noop") continue;
+        actions.push(this._record(intent, outcome, evaluation));
+        statuses.push(outcome.status);
+        continue;
+      }
 
-    const action = await this._maybeEnter(evaluation, candle, state);
-    return { status: action ? action.status : "flat", action, markEvents };
+      // Entries confirm once per bar. Re-evaluating the same closed candle on
+      // the next 60s tick must not produce a second entry.
+      if (!isNewCandle) {
+        statuses.push("already-evaluated");
+        continue;
+      }
+      // De-dupe on symbol + direction + candle, persisted, so a restart
+      // mid-bar cannot re-enter a candle already acted on.
+      const key = entryKey(intent.symbol, intent.signal, intent.candleTs);
+      if (state.entryKeys.includes(key)) {
+        actions.push(this._record(intent, { status: "skipped", reason: "Already traded this candle" }, evaluation));
+        statuses.push("skipped");
+        continue;
+      }
+
+      // Claim the candle before handing it over. If the gates refuse, the
+      // candle stays claimed — a refusal is a decision about this bar, and
+      // retrying it 60 seconds later would re-run the same rejected setup.
+      if (this.paperTradeEnabled) {
+        state.entryKeys = [key, ...state.entryKeys].slice(0, ENTRY_KEY_CAP);
+        this._writeState(state);
+      }
+
+      const outcome = await this._handler.handle(intent);
+      actions.push(this._record(intent, outcome, evaluation));
+      statuses.push(outcome.status);
+    }
+
+    return { status: summarizeStatuses(statuses), actions, action: actions[actions.length - 1] || null, markEvents };
+  }
+
+  /**
+   * The scanner's entire decision surface: raw trade intent from candle data.
+   *
+   * A pure function of the strategy reading — it does not look at the book, and
+   * it never computes a level, a size or a score. An exit intent is emitted
+   * whenever the trend opposes a thesis, whether or not such a position is
+   * actually open; resolving that against the ledger is the handler's job.
+   *
+   * A single bar can produce both an exit and an entry (the trend flipped
+   * down: close the long, then consider the short). They are returned in that
+   * order so the position slot is freed before the entry is judged.
+   */
+  intentsFor(evaluation, candle) {
+    const common = {
+      symbol: this.symbol,
+      price: candle.close,
+      tf: this.timeframe,
+      source: "live_scanner",
+      strategy: this.strategy,
+      candleTs: new Date(candle.closeTime + 1).toISOString(),
+      indicators: evaluation.indicators,
+    };
+
+    const intents = [];
+    const trend = evaluation.indicators.trend;
+    if (trend === "DOWN") intents.push(buildTradeIntent({ ...common, signal: "EXIT_LONG" }));
+    if (trend === "UP") intents.push(buildTradeIntent({ ...common, signal: "EXIT_SHORT" }));
+    if (ENTRY_SIGNALS.has(evaluation.signal)) {
+      intents.push(buildTradeIntent({ ...common, signal: evaluation.signal }));
+    }
+    return intents;
   }
 
   async _markPositions(closed, since) {
@@ -522,132 +624,31 @@ class LiveScannerService {
     return events;
   }
 
-  async _maybeExit(evaluation, candle) {
-    if (!this._lab) return null;
-    const trader = this._lab.book(this.book);
-    const open = trader.getOpenPositions().filter((p) => p.symbol === this.symbol);
-    if (!open.length) return null;
-
-    const trend = evaluation.indicators.trend;
-    const opposed = open.filter(
-      (p) => (p.direction === "LONG" && trend === "DOWN") || (p.direction === "SHORT" && trend === "UP"),
-    );
-    if (!opposed.length) return null;
-
-    const closedIds = [];
-    for (const pos of opposed) {
-      const result = await trader.closePosition(pos.id, { reason: "SIGNAL_EXIT", exitPrice: candle.close });
-      if (result) closedIds.push(result.id);
-    }
-    if (!closedIds.length) return null;
-
-    return this._record({
-      direction: "EXIT",
-      status: "exited",
-      reason: `Trend flipped ${trend} — closed ${closedIds.join(", ")}`,
-      candle,
-      evaluation,
-    });
-  }
-
-  async _maybeEnter(evaluation, candle, state) {
-    const direction = evaluation.signal;
-    const key = entryKey(this.symbol, direction, candle.closeTime);
-
-    // De-dupe #1: this exact symbol + direction + candle has been acted on.
-    // Persisted, so a redeploy mid-bar cannot re-enter it.
-    if (state.entryKeys.includes(key)) {
-      return this._record({ direction, status: "skipped", reason: "Already traded this candle", candle, evaluation });
-    }
-
-    if (!this._lab) {
-      return this._record({ direction, status: "skipped", reason: "Trading Lab not configured", candle, evaluation });
-    }
-
-    // De-dupe #2: at most one open position per symbol, whoever opened it.
-    const trader = this._lab.book(this.book);
-    if (trader.getOpenPositions().some((p) => p.symbol === this.symbol)) {
-      return this._record({
-        direction,
-        status: "skipped",
-        reason: `Position already open on ${this.symbol}`,
-        candle,
-        evaluation,
-      });
-    }
-
-    const { atr, atrRatio, volumeRatio, macdBullish } = evaluation.indicators;
-    const input = {
-      book: this.book,
-      symbol: this.symbol,
-      direction,
-      entryPrice: candle.close,
-      atr,
-      // The strategy's own readings feed the checklist's entry-trigger, volume
-      // and volatility buckets; the higher-timeframe regime and daily bias come
-      // from the decision engine. Together they produce the 0-100 confidence
-      // score and the size multiplier — the scanner never scores a trade itself.
-      state: { ...(await this._lab.stateForInterval(this.contextInterval)), atrRatio, volumeRatio, macdBullish },
-      strategy: `live:${this.strategy}:${this.timeframe}`,
-    };
-
-    // Dry run: score it, log the verdict, open nothing.
-    if (!this.paperTradeEnabled) {
-      const assessment = this._lab.evaluate(input);
-      return this._record({
-        direction,
-        status: "dry-run",
-        reason: assessment.trade.ok ? "Would open (paper trading disabled)" : assessment.trade.reason,
-        candle,
-        evaluation,
-        assessment,
-      });
-    }
-
-    // Claim the candle before executing. If execute() throws, the candle stays
-    // claimed — a refusal to trade is a decision about this bar, and retrying
-    // it 60 seconds later would just re-run the same rejected setup.
-    state.entryKeys = [key, ...state.entryKeys].slice(0, ENTRY_KEY_CAP);
-    this._writeState(state);
-
-    try {
-      const assessment = await this._lab.execute({ ...input, signalSource: this._signalSource() });
-      return this._record({
-        direction,
-        status: assessment.opened ? "opened" : "blocked",
-        reason: assessment.opened ? `Opened ${assessment.opened.id}` : assessment.trade.reason,
-        candle,
-        evaluation,
-        assessment,
-        opened: assessment.opened || null,
-      });
-    } catch (err) {
-      // Position/risk limits surface as thrown 4xx errors from the paper
-      // trader — a refusal to trade, not a scanner fault.
-      return this._record({ direction, status: "blocked", reason: err.message, candle, evaluation });
-    }
-  }
-
-  // Every accepted *and* rejected signal is logged and persisted, so the
-  // decision trail exists even for the bars that never became trades.
-  _record({ direction, status, reason, candle, evaluation, assessment = null, opened = null }) {
+  // Every accepted *and* rejected intent is logged and persisted, so the
+  // decision trail exists even for the bars that never became trades. The
+  // scanner records what the handler decided; it does not decide anything here.
+  _record(intent, outcome, evaluation = null) {
+    const assessment = outcome.assessment || null;
     const action = {
       timestamp: new Date().toISOString(),
       source: "live-scanner",
-      symbol: this.symbol,
-      interval: this.timeframe,
-      strategy: this.strategy,
-      direction,
+      symbol: intent.symbol,
+      interval: intent.tf,
+      strategy: intent.strategy,
+      direction: intent.signal,
       book: this.book,
-      status,
-      reason,
-      entryPrice: candle.close,
-      candleCloseTime: candle.closeTime,
-      indicators: evaluation ? evaluation.indicators : null,
+      status: outcome.status,
+      reason: outcome.reason,
+      entryPrice: intent.price,
+      candleTs: intent.candleTs,
+      indicators: intent.indicators || (evaluation ? evaluation.indicators : null),
+      // Read back off the assessment for the audit trail. These are the
+      // Trading Lab's outputs, never the scanner's inputs.
       decision: assessment ? assessment.decision : null,
       confidenceScore: assessment ? assessment.checklist.confidenceScore : null,
       sizeMultiplier: assessment ? assessment.sizeMultiplier : null,
-      opened,
+      opened: outcome.opened || null,
+      closed: outcome.closed ? outcome.closed.map((p) => p.id) : null,
     };
 
     let stored = action;
@@ -659,7 +660,9 @@ class LiveScannerService {
       }
     }
     this._status.lastAction = stored;
-    this._logger.log(`[LiveScanner] ${status.toUpperCase()} ${this.symbol} ${direction} ${this.timeframe}: ${reason}`);
+    this._logger.log(
+      `[LiveScanner] ${outcome.status.toUpperCase()} ${intent.symbol} ${intent.signal} ${intent.tf}: ${outcome.reason}`,
+    );
     return stored;
   }
 
@@ -685,6 +688,8 @@ class LiveScannerService {
 
 module.exports = {
   LiveScannerService,
+  TradeIntentHandler,
+  buildTradeIntent,
   parseBitgetCandles,
   evaluateMindsetV1,
   atrSeries,

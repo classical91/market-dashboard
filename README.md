@@ -156,6 +156,8 @@ market-dashboard/
         trading-lab.js    composition + Decision Engine bridge
         signal-bridge.js  Signal Bot transitions -> paper trades
         live-scanner.js   native Bitget candle feed + strategy loop
+        trade-intent.js   raw strategy intent, with risk fields refused
+        intent-handler.js one boundary: gated entries, ungated exits
     utils/                validators, errors, mappers
   docs/
     trading-lab.md        migration map and remaining work

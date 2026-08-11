@@ -310,7 +310,7 @@ test("a new candle with a position already open is skipped, not stacked", async 
   scanner._fetch = async () => ({ ok: true, status: 200, json: async () => payload(rows) });
 
   const result = await scanner.runOnce();
-  assert.ok(result.action.candleCloseTime > first.action.candleCloseTime, "expected a newer candle");
+  assert.ok(result.action.candleTs > first.action.candleTs, "expected a newer candle");
 
   assert.equal(result.status, "skipped");
   assert.match(result.action.reason, /Position already open on BTCUSDT\.P/);
@@ -444,11 +444,11 @@ test("a trend flip against an open position closes it", async () => {
 
   const result = await scanner.runOnce();
 
-  assert.equal(result.status, "exit");
-  assert.equal(result.action.direction, "EXIT");
+  assert.equal(result.status, "exited");
+  assert.equal(result.action.direction, "EXIT_LONG");
   assert.equal(lab.book("main").getOpenPositions().length, 0);
   const history = lab.book("main").getHistory();
-  assert.equal(history[history.length - 1].closeReason, "SIGNAL_EXIT");
+  assert.equal(history[history.length - 1].closeReason, "SCANNER_EXIT");
 });
 
 // ── Status reporting ────────────────────────────────────────────────────────
