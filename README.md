@@ -98,6 +98,19 @@ Most keys are optional. The app is designed to degrade to fallback data where po
 - `MACRO_CALENDAR_URL` - optional JSON macro-calendar feed (`{time, title, impact, country}` rows).
 - `DECISION_CACHE_MS` - Decision Engine payload cache TTL, defaults to `120000`. The engine reuses the feeds above; adding a `US10Y` row via `MACRO_SYMBOLS` or `MACRO_DATA_URL` enriches its regime score and rotation board with live yields.
 
+### Live Scanner
+
+Generates its own BTC signals from Bitget USDT-perpetual candles instead of waiting on TradingView alert webhooks. Closed candles only, paper trades only, one open position per symbol, and one entry per symbol + direction + candle close time (persisted across restarts). Status is exposed at `GET /api/live-scanner/status` and rendered on `/trading-lab.html`.
+
+- `ENABLE_LIVE_SCANNER` - off unless set to exactly `true`.
+- `LIVE_SCANNER_SYMBOL` - defaults to `BTCUSDT.P`; the `.P` suffix maps to Bitget's `BTCUSDT` contract on `USDT-FUTURES` and is kept as the ledger symbol.
+- `LIVE_SCANNER_TIMEFRAME` - `1m`, `3m`, `5m`, `15m` (default), `30m`, `1h`, `4h`, `6h`, `12h`, `1d`.
+- `LIVE_SCANNER_STRATEGY` - defaults to `mindset_v1` (EMA20/50 trend with an RSI band filter).
+- `LIVE_SCANNER_INTERVAL_MS` - poll cadence, defaults to `60000`.
+- `LIVE_SCANNER_CONTEXT_INTERVAL` - higher timeframe feeding the checklist's regime/daily-bias buckets, defaults to `4h`.
+- `LIVE_SCANNER_BOOK` - Trading Lab book scanner trades land in, defaults to `main`.
+- `LIVE_SCANNER_PAPER_TRADE_ENABLED` - defaults to `true` once the scanner is enabled; set `false` for an observe-only run that scores and logs signals but opens nothing.
+
 ### On-Chain
 
 - `DEFILLAMA_API_BASE_URL`, `DEFILLAMA_COINS_API_BASE_URL`, `DEFILLAMA_CHAIN`, `DEFILLAMA_COIN_CHAIN`.
@@ -141,6 +154,8 @@ market-dashboard/
         paper-trader.js   paper execution with TP1/TP2 scale-outs
         backtest.js       bar replay over the paper-trading engine
         trading-lab.js    composition + Decision Engine bridge
+        signal-bridge.js  Signal Bot transitions -> paper trades
+        live-scanner.js   native Bitget candle feed + strategy loop
     utils/                validators, errors, mappers
   docs/
     trading-lab.md        migration map and remaining work

@@ -12,6 +12,7 @@
   var positionsTbody = document.getElementById("tl-positions-tbody");
   var candidatesTbody = document.getElementById("tl-candidates-tbody");
   var signalActionsTbody = document.getElementById("tl-signal-actions-tbody");
+  var scannerEl = document.getElementById("tl-scanner");
   var metricsEl = document.getElementById("tl-metrics");
   var historyTbody = document.getElementById("tl-history-tbody");
   var btSymbol = document.getElementById("tl-bt-symbol");
@@ -194,6 +195,57 @@
       .join("");
   }
 
+  // Live scanner health: enabled, last scan, last candle, last signal, last
+  // error — the five things that answer "is it actually running?" without
+  // needing the server logs.
+  function renderScanner(data) {
+    if (!scannerEl) return;
+    if (!data || !data.configured) {
+      scannerEl.innerHTML = '<div class="de-empty">Live scanner is not configured.</div>';
+      return;
+    }
+
+    var stateLabel = data.enabled ? (data.running ? "Running" : "Enabled (loop not started)") : "Disabled";
+    var stateClass = data.enabled && data.running ? "tl-up" : data.enabled ? "" : "tl-flat";
+    var signal = data.lastSignal;
+    var candle = data.lastCandle;
+    var signalClass = !signal ? "" : signal.signal === "LONG" ? "tl-up" : signal.signal === "SHORT" ? "tl-down" : "tl-flat";
+
+    var tiles =
+      statTile("State", escapeHtml(stateLabel), stateClass) +
+      statTile("Symbol", escapeHtml(data.symbol) + " &middot; " + escapeHtml(data.timeframe)) +
+      statTile("Strategy", escapeHtml(data.strategy)) +
+      statTile("Mode", data.paperTradeEnabled ? "Paper trading" : "Dry run", data.paperTradeEnabled ? "tl-up" : "tl-flat") +
+      statTile("Last scan", fmtTime(data.lastScanAt)) +
+      statTile("Last candle close", candle ? fmtTime(candle.closedAt) : "&mdash;") +
+      statTile("Last candle price", candle ? fmtPrice(candle.close) : "&mdash;") +
+      statTile("Last signal", signal ? escapeHtml(signal.signal) : "&mdash;", signalClass) +
+      statTile("Scans", data.scanCount + " / " + data.errorCount + " errors", data.errorCount ? "tl-down" : "") +
+      statTile("Last action", data.lastAction ? escapeHtml(data.lastAction.status) : "&mdash;");
+
+    var detail = "";
+    if (signal && signal.indicators) {
+      var ind = signal.indicators;
+      detail +=
+        '<div class="de-card-note">EMA20 ' + fmtPrice(ind.ema20) + " &middot; EMA50 " + fmtPrice(ind.ema50) +
+        " &middot; RSI " + Number(ind.rsi).toFixed(1) + " &middot; trend " + escapeHtml(ind.trend) +
+        " &middot; ATR " + fmtPrice(ind.atr) + "</div>";
+    }
+    if (signal && signal.error) {
+      detail += '<div class="de-card-note">' + escapeHtml(signal.error) + "</div>";
+    }
+    if (data.lastAction) {
+      detail += '<div class="de-card-note">Last action: ' + escapeHtml(data.lastAction.reason) + "</div>";
+    }
+    if (data.lastError) {
+      detail +=
+        '<div class="de-card-note tl-down">Last error (' + fmtTime(data.lastErrorAt) + "): " +
+        escapeHtml(data.lastError) + "</div>";
+    }
+
+    scannerEl.innerHTML = '<div class="tl-stat-grid">' + tiles + "</div>" + detail;
+  }
+
   function renderMetrics(data) {
     var groups = (data && data.groups) || {};
     var names = { strategy: "By strategy", symbol: "By symbol", scoreBucket: "By setup score" };
@@ -286,6 +338,15 @@
       getJson("/api/trading-lab/metrics?book=" + book).then(renderMetrics),
       getJson("/api/trading-lab/history?book=" + book + "&limit=50").then(function (d) { renderHistory(d.items); }),
       getJson("/api/trading-lab/signal-actions?limit=25").then(renderSignalActions),
+      // The scanner panel is independent of the book: a failure to read it
+      // must not blank the metrics and history alongside it.
+      getJson("/api/live-scanner/status")
+        .then(renderScanner)
+        .catch(function (err) {
+          if (scannerEl) {
+            scannerEl.innerHTML = '<div class="de-empty">Could not read scanner status: ' + escapeHtml(err.message) + "</div>";
+          }
+        }),
     ]);
   }
 
