@@ -17,8 +17,13 @@
   var historyTbody = document.getElementById("tl-history-tbody");
   var btSymbol = document.getElementById("tl-bt-symbol");
   var btInterval = document.getElementById("tl-bt-interval");
+  var btStrategy = document.getElementById("tl-bt-strategy");
+  var btStrategyNote = document.getElementById("tl-bt-strategy-note");
   var btRunBtn = document.getElementById("tl-bt-run");
+  var btCompareBtn = document.getElementById("tl-bt-compare");
   var btResult = document.getElementById("tl-bt-result");
+  var btCompareResult = document.getElementById("tl-bt-compare-result");
+  var strategies = [];
 
   function escapeHtml(str) {
     return String(str == null ? "" : str).replace(/[&<>"']/g, function (ch) {
@@ -440,7 +445,9 @@
       '<div class="tl-stat-grid">' + tiles + "</div>" +
       equitySparkline(data.equityCurve) +
       '<div class="tl-bt-meta">' +
-      escapeHtml(data.symbol) + " " + escapeHtml(data.interval) +
+      escapeHtml(data.strategyName || data.strategy || "—") +
+      " (" + escapeHtml(data.strategy || "—") + ")" +
+      " · " + escapeHtml(data.symbol) + " " + escapeHtml(data.interval) +
       " · " + data.bars + " bars (" + data.warmupBars + " warmup)" +
       " · " + fmtTime(data.from) + " → " + fmtTime(data.to) +
       "</div>" +
@@ -451,6 +458,101 @@
         : "");
   }
 
+  // The catalogue is public, so the selector fills in on page load whether or
+  // not an admin key has been entered. A failure here leaves the selector with
+  // the default option rather than blocking the card.
+  function loadStrategies() {
+    return fetch("/api/trading-lab/strategies")
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        strategies = (data && data.strategies) || [];
+        if (!strategies.length) return;
+        btStrategy.innerHTML = strategies
+          .map(function (s) {
+            var selected = s.id === data.default ? " selected" : "";
+            return '<option value="' + escapeHtml(s.id) + '"' + selected + ">" + escapeHtml(s.name) + "</option>";
+          })
+          .join("");
+        renderStrategyNote();
+      })
+      .catch(function () {
+        btStrategy.innerHTML = '<option value="mindset_v1" selected>Mindset v1</option>';
+      });
+  }
+
+  function selectedStrategy() {
+    return btStrategy.value || "mindset_v1";
+  }
+
+  function renderStrategyNote() {
+    var found = strategies.filter(function (s) { return s.id === selectedStrategy(); })[0];
+    btStrategyNote.textContent = found
+      ? found.description + " Needs " + found.requiredWarmupBars + " warmup bars."
+      : "";
+  }
+
+  function compareCell(value, className) {
+    return '<td class="' + (className || "") + '">' + value + "</td>";
+  }
+
+  function renderComparison(data) {
+    var rows = (data && data.results) || [];
+    if (!rows.length) {
+      btCompareResult.innerHTML = '<div class="de-empty">No strategies to compare.</div>';
+      return;
+    }
+
+    var body = rows
+      .map(function (r) {
+        return (
+          "<tr>" +
+          "<td>" + escapeHtml(r.strategyName || r.strategy) + "<br /><small>" + escapeHtml(r.strategy) + "</small></td>" +
+          compareCell(r.bars + " <small>(" + r.warmupBars + " warmup)</small>") +
+          compareCell(r.signals) +
+          compareCell(r.closedTrades) +
+          compareCell(fmtUsd(r.netPnlUsd), pnlClass(r.netPnlUsd)) +
+          compareCell(r.closedTrades ? (r.expectancyR > 0 ? "+" : "") + r.expectancyR + "R" : "—", pnlClass(r.expectancyR)) +
+          compareCell(r.profitFactor == null ? (r.closedTrades ? "∞" : "—") : r.profitFactor) +
+          compareCell(r.closedTrades ? r.maxDrawdownPct + "%" : "—") +
+          compareCell(r.closedTrades ? r.winRate + "%" : "—") +
+          compareCell(r.worstLossStreak) +
+          "</tr>"
+        );
+      })
+      .join("");
+
+    btCompareResult.innerHTML =
+      '<div class="de-table-wrap"><table class="de-table"><thead><tr>' +
+      "<th>Strategy</th><th>Bars</th><th>Signals</th><th>Closed</th><th>Net P&amp;L</th>" +
+      "<th>Expectancy</th><th>Profit factor</th><th>Max DD</th><th>Win rate</th><th>Worst streak</th>" +
+      "</tr></thead><tbody>" + body + "</tbody></table></div>" +
+      '<div class="tl-bt-meta">' + escapeHtml(data.symbol) + " " + escapeHtml(data.interval) +
+      " · ranked by expectancy, then profit factor, then drawdown · " + fmtTime(data.ranAt) +
+      " · backtest only, the live scanner is unaffected</div>";
+  }
+
+  btStrategy.addEventListener("change", renderStrategyNote);
+
+  btCompareBtn.addEventListener("click", function () {
+    var symbol = (btSymbol.value || "").trim().toUpperCase();
+    if (!symbol) {
+      showError("Enter a symbol to compare.");
+      return;
+    }
+    btCompareBtn.disabled = true;
+    btCompareResult.innerHTML = '<div class="de-empty">Replaying every strategy&hellip;</div>';
+    postAdmin("/api/trading-lab/backtest/compare", {
+      symbol: symbol,
+      interval: btInterval.value,
+      strategies: strategies.map(function (s) { return s.id; }),
+    })
+      .then(renderComparison)
+      .catch(function (err) {
+        btCompareResult.innerHTML = '<div class="de-empty">Comparison failed: ' + escapeHtml(err.message) + "</div>";
+      })
+      .then(function () { btCompareBtn.disabled = false; });
+  });
+
   btRunBtn.addEventListener("click", function () {
     var symbol = (btSymbol.value || "").trim().toUpperCase();
     if (!symbol) {
@@ -459,7 +561,11 @@
     }
     btRunBtn.disabled = true;
     btResult.innerHTML = '<div class="de-empty">Replaying bars&hellip;</div>';
-    postAdmin("/api/trading-lab/backtest", { symbol: symbol, interval: btInterval.value })
+    postAdmin("/api/trading-lab/backtest", {
+      symbol: symbol,
+      interval: btInterval.value,
+      strategy: selectedStrategy(),
+    })
       .then(renderBacktest)
       .catch(function (err) {
         btResult.innerHTML = '<div class="de-empty">Backtest failed: ' + escapeHtml(err.message) + "</div>";
@@ -521,5 +627,6 @@
       .catch(function (err) { showError(err.message); btn.disabled = false; });
   });
 
+  loadStrategies();
   refresh();
 })();

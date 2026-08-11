@@ -34,6 +34,7 @@ const { PaperTradingService } = require("./paper-trader");
 const { replayOrder } = require("./replay-order");
 const { atr } = require("../decision-engine");
 const { ema, macd } = require("../signal-screener");
+const { getStrategy, DEFAULT_STRATEGY_ID } = require("./strategies");
 
 // Bars needed before the first signal can be trusted: the slowest indicator
 // here is the MACD's 26-period slow EMA plus its 9-period signal line.
@@ -109,6 +110,62 @@ function trendBreakoutStrategy({ bars, context, options }) {
   return null;
 }
 
+// Accept either shape of strategy and return one calling convention.
+//
+//   * A registry id ("mindset_v1") or a strategy object — the interface in
+//     ./strategies, evaluate(candles, index, context) -> signal object.
+//   * A bare function — the original { bars, context, options, symbol } ->
+//     "LONG" | "SHORT" | null convention, kept because tests and callers use
+//     it to inject one-off rules without registering them.
+//
+// Everything downstream sees the richer signal object, so a legacy function's
+// output is widened rather than the new strategies' being narrowed.
+function resolveStrategy(strategy) {
+  if (typeof strategy === "function") {
+    return {
+      definition: {
+        id: "custom",
+        name: "Custom function",
+        description: "Inline strategy function supplied by the caller",
+        requiredWarmupBars: 0,
+      },
+      evaluate: ({ bars, context, options, symbol }) => {
+        const direction = strategy({ bars, context, options, symbol });
+        return {
+          signal: direction === "LONG" || direction === "SHORT" ? direction : "FLAT",
+          strategy: "custom",
+          price: context.close,
+          error: null,
+          reasons: [],
+          indicators: {},
+          confidence: null,
+          stopHint: null,
+          targetHint: null,
+        };
+      },
+    };
+  }
+
+  const definition =
+    strategy && typeof strategy === "object" && typeof strategy.evaluate === "function"
+      ? strategy
+      : getStrategy(strategy);
+
+  return {
+    definition,
+    evaluate: ({ bars, context, options, symbol }) =>
+      // `bars` is already truncated at the decided bar, so a strategy that
+      // ignored its `index` argument still could not see the future.
+      definition.evaluate(bars, bars.length - 1, {
+        options,
+        symbol,
+        trendUp: context.trendUp,
+        close: context.close,
+        atr: context.atr,
+      }),
+  };
+}
+
 // The market state the checklist scores. Regime and bias come from the same
 // trend read the strategy uses, so a backtest is internally consistent even
 // though it has no live macro feed to draw on.
@@ -152,6 +209,11 @@ class BacktestService {
     options = {},
     warmupBars = MIN_WARMUP_BARS,
   }) {
+    const resolved = resolveStrategy(strategy);
+    // A strategy's own warmup requirement is a floor, not a suggestion:
+    // signalling before its slowest input has settled is noise, not history.
+    const warmup = Math.max(warmupBars, resolved.definition.requiredWarmupBars || 0);
+
     const opts = {
       breakoutLookback: 20,
       trendFast: 21,
@@ -165,9 +227,9 @@ class BacktestService {
     const bars = (candles || []).filter(
       (c) => Number.isFinite(c.high) && Number.isFinite(c.low) && Number.isFinite(c.close),
     );
-    if (bars.length <= warmupBars + 1) {
+    if (bars.length <= warmup + 1) {
       throw Object.assign(
-        new Error(`Not enough candles to backtest: need more than ${warmupBars + 1}, got ${bars.length}`),
+        new Error(`Not enough candles to backtest: need more than ${warmup + 1}, got ${bars.length}`),
         { statusCode: 400, expose: true },
       );
     }
@@ -180,10 +242,11 @@ class BacktestService {
 
     const equityCurve = [];
     const skipped = [];
+    const signals = [];
     let mixedDirectionBars = 0;
 
     try {
-      for (let i = warmupBars; i < bars.length; i += 1) {
+      for (let i = warmup; i < bars.length; i += 1) {
         const history = bars.slice(0, i + 1);
         const bar = bars[i];
 
@@ -198,11 +261,30 @@ class BacktestService {
 
         // 2. Ask the strategy about the bar that just closed.
         const context = contextAtBar(history, opts);
-        const direction = strategy({ bars: history, context, options: opts, symbol });
+        const signal = resolved.evaluate({ bars: history, context, options: opts, symbol });
+        const direction = signal.signal;
 
         if (direction === "LONG" || direction === "SHORT") {
-          const outcome = this.tryOpen({ trader, symbol, direction, context, interval });
-          if (!outcome.opened) skipped.push({ at: bar.closeTime, direction, reasons: outcome.reasons });
+          signals.push({ at: bar.closeTime, signal: direction, price: signal.price ?? context.close, reasons: signal.reasons || [], indicators: signal.indicators || {}, confidence: signal.confidence ?? null });
+          const outcome = this.tryOpen({
+            trader,
+            symbol,
+            direction,
+            context,
+            interval,
+            strategyId: resolved.definition.id,
+            signal,
+          });
+          if (!outcome.opened) {
+            skipped.push({
+              at: bar.closeTime,
+              direction,
+              // The strategy's own reasoning first, then the gauntlet's — a
+              // refused candidate should say what fired it as well as what
+              // stopped it.
+              reasons: [...(signal.reasons || []), ...outcome.reasons],
+            });
+          }
         }
 
         const account = trader.getAccount();
@@ -228,9 +310,11 @@ class BacktestService {
       return {
         symbol,
         interval,
+        strategy: resolved.definition.id,
+        strategyName: resolved.definition.name,
         bars: bars.length,
-        warmupBars,
-        from: bars[warmupBars].closeTime,
+        warmupBars: warmup,
+        from: bars[warmup].closeTime,
         to: bars[bars.length - 1].closeTime,
         options: opts,
         stats,
@@ -238,6 +322,9 @@ class BacktestService {
         trades: trader.getHistory(),
         openAtEnd,
         skipped,
+        // Every entry signal the strategy produced, whether or not the
+        // gauntlet let it through, with the reasons it fired.
+        signals,
         equityCurve,
         // Surfaced rather than hidden: with long and short positions open on
         // the same symbol at once, one intra-bar ordering cannot be
@@ -254,7 +341,8 @@ class BacktestService {
   // One candidate through the full gauntlet, entering at the signalling bar's
   // close. Mirrors TradingLabService.evaluate() but against the backtest's own
   // isolated ledger.
-  tryOpen({ trader, symbol, direction, context, interval }) {
+  tryOpen({ trader, symbol, direction, context, interval, strategyId = DEFAULT_STRATEGY_ID, signal = null }) {
+    const signalSource = `backtest:${strategyId}:${interval}`;
     const state = marketState({ ...stateFromContext(context), ...trader.getRiskState() });
     const checklist = runChecklist({ symbol, direction, price: context.close, atr: context.atr }, state, this.config);
 
@@ -262,7 +350,7 @@ class BacktestService {
     const edge = assessEdge({
       history: trader.getHistory(),
       startingBalance: account.startingBalance,
-      strategy: `backtest:${interval}`,
+      strategy: signalSource,
       symbol,
       score: checklist.confidenceScore,
       config: this.config,
@@ -295,7 +383,18 @@ class BacktestService {
         tp2: trade.tp2,
         riskUsd: trade.riskUsd,
         confidenceScore: checklist.confidenceScore,
-        signalSource: `backtest:${interval}`,
+        signalSource,
+        // Stop and target HINTS from the strategy are recorded, not applied:
+        // sizing and exits stay with planTrade and the paper trader so two
+        // strategies' results are compared on the same execution model.
+        meta: signal
+          ? {
+              strategy: strategyId,
+              strategyConfidence: signal.confidence ?? null,
+              stopHint: signal.stopHint ?? null,
+              targetHint: signal.targetHint ?? null,
+            }
+          : { strategy: strategyId },
       });
       return { opened: true, reasons };
     } catch (err) {
@@ -305,13 +404,77 @@ class BacktestService {
   }
 
   async backtestSymbol({ symbol, interval = "4h", options = {}, strategy } = {}) {
+    // Resolve the strategy BEFORE fetching: a typo should come back as a 400
+    // immediately, not as whatever the candle source happened to do first.
+    // Resolving here also fixes the default: a symbol backtest with no
+    // strategy runs mindset_v1, the strategy the live scanner runs, rather
+    // than run()'s own trend-breakout placeholder.
+    const resolved = typeof strategy === "function" ? strategy : resolveStrategy(strategy).definition;
     const candles = await this.getCandles(symbol, interval);
-    return this.run({ symbol, interval, candles, options, strategy });
+    return this.run({ symbol, interval, candles, options, strategy: resolved });
   }
+
+  // Run several strategies over the SAME candles and reduce each result to the
+  // handful of numbers that decide whether one is better than another. One
+  // fetch, one candle set: a comparison where the strategies saw different
+  // data would not be a comparison.
+  async compare({ symbol, interval = "4h", strategies = [DEFAULT_STRATEGY_ID], options = {} } = {}) {
+    const ids = (Array.isArray(strategies) && strategies.length ? strategies : [DEFAULT_STRATEGY_ID]).map(
+      (id) => getStrategy(id).id,
+    );
+    const candles = await this.getCandles(symbol, interval);
+
+    const rows = [];
+    for (const id of ids) {
+      const result = await this.run({ symbol, interval, candles, options, strategy: id });
+      rows.push(summarizeRun(result));
+    }
+
+    return {
+      symbol,
+      interval,
+      ranAt: new Date().toISOString(),
+      // Same ordering rule the strategy metrics table uses: expectancy first,
+      // then profit factor, then the smaller drawdown.
+      results: rows.sort(
+        (a, b) =>
+          b.expectancyR - a.expectancyR ||
+          (b.profitFactor === null ? 999 : b.profitFactor) - (a.profitFactor === null ? 999 : a.profitFactor) ||
+          a.maxDrawdownPct - b.maxDrawdownPct,
+      ),
+    };
+  }
+}
+
+// The comparable slice of a full run. Deliberately small: these are the
+// numbers the promotion rules are written in, and nothing else belongs in a
+// side-by-side table.
+function summarizeRun(result) {
+  const m = result.stats.riskMetrics;
+  return {
+    strategy: result.strategy,
+    strategyName: result.strategyName,
+    symbol: result.symbol,
+    interval: result.interval,
+    bars: result.bars,
+    warmupBars: result.warmupBars,
+    signals: result.signals.length,
+    closedTrades: m.closedTrades,
+    openAtEnd: result.openAtEnd.length,
+    netPnlUsd: m.netReturnUsd,
+    netReturnPct: m.netReturnPct,
+    expectancyR: m.expectancyR,
+    profitFactor: m.profitFactor,
+    maxDrawdownPct: m.maxDrawdownPct,
+    winRate: result.stats.winRate,
+    worstLossStreak: m.worstConsecutiveLosses,
+  };
 }
 
 module.exports = {
   BacktestService,
+  summarizeRun,
+  resolveStrategy,
   trendBreakoutStrategy,
   contextAtBar,
   stateFromContext,

@@ -2,6 +2,8 @@
 
 const { Router } = require("express");
 
+const { listStrategies, DEFAULT_STRATEGY_ID } = require("../services/trading/strategies");
+
 function asyncRoute(handler) {
   return (req, res, next) => {
     Promise.resolve(handler(req, res, next)).catch(next);
@@ -33,6 +35,12 @@ function createTradingLabRouter({ tradingLabService, backtestService, signalActi
   router.get("/", asyncRoute(async (req, res) => {
     res.json(await tradingLabService.overview());
   }));
+
+  // The strategies the backtester can run. Public: it is a static catalogue,
+  // and the UI needs it to populate the selector before any admin key exists.
+  router.get("/strategies", (req, res) => {
+    res.json({ default: DEFAULT_STRATEGY_ID, strategies: listStrategies() });
+  });
 
   router.get("/books", (req, res) => {
     res.json({ books: tradingLabService.listBooks() });
@@ -159,9 +167,37 @@ function createTradingLabRouter({ tradingLabService, backtestService, signalActi
     const body = req.body || {};
     requireFields(body, ["symbol"]);
     res.json(
+      // An unknown strategy id throws a 400 from the registry rather than
+      // quietly falling back to the default.
       await backtestService.backtestSymbol({
         symbol: String(body.symbol).toUpperCase(),
         interval: typeof body.interval === "string" ? body.interval : "4h",
+        strategy: body.strategy === undefined || body.strategy === null || body.strategy === ""
+          ? DEFAULT_STRATEGY_ID
+          : String(body.strategy),
+        options: body.options || {},
+      }),
+    );
+  }));
+
+  // Same replay, several strategies, one candle set — the side-by-side that
+  // decides whether a new strategy is worth promoting. Admin-gated for the
+  // same reason as /backtest, and more so: it is N runs per call.
+  router.post("/backtest/compare", requireAdmin, asyncRoute(async (req, res) => {
+    if (!backtestService) {
+      res.status(503).json({ error: "Backtesting is not configured" });
+      return;
+    }
+    const body = req.body || {};
+    requireFields(body, ["symbol"]);
+    const strategies = Array.isArray(body.strategies) && body.strategies.length
+      ? body.strategies.map((id) => String(id))
+      : listStrategies().map((s) => s.id);
+    res.json(
+      await backtestService.compare({
+        symbol: String(body.symbol).toUpperCase(),
+        interval: typeof body.interval === "string" ? body.interval : "4h",
+        strategies,
         options: body.options || {},
       }),
     );
