@@ -5,21 +5,40 @@
 //
 // The status is a *claim about evidence*, not a switch. Moving a strategy from
 // `backtest` to `validated` does not make anything happen; it records that the
-// backtests were reviewed. The capability flags are what code actually reads,
-// and they are set by hand per strategy — never derived from "it is in the
-// registry, so it must be ready".
+// historical evidence was reviewed and passed. The two eligibility flags are
+// what code actually reads, and both are computed here — never declared by a
+// strategy about itself.
 //
-//   experimental   Being written. May change shape without notice.
-//   backtest       Replayable, and that is all. smc_v1 is here.
-//   validated      Backtests reviewed and believed; still not forward-tested.
-//   forward-paper  Running forward on live candles against a PAPER ledger.
-//                  mindset_v1 is here — the live scanner runs it, and no real
-//                  order exists anywhere in this codebase.
-//   live-eligible  Approved for real-money execution. Nothing is here, and
-//                  nothing gets here without a human decision plus the two
-//                  exchange-side gates (TRADING_MODE=live and
-//                  ALLOW_LIVE_TRADING=true) that this repo never flips.
-//   retired        Kept for reproducing old experiments; not for new runs.
+//   experimental         Being developed. May change shape without notice.
+//   backtest             Historical testing. smc_v1 is here.
+//   validated            Historical evidence has passed the promotion criteria.
+//                        Still has never met a live candle.
+//   forward-paper        Running against live market data with PAPER
+//                        execution. mindset_v1 is here — this is what the live
+//                        scanner runs, and no real order exists anywhere in
+//                        this codebase.
+//   real-money-eligible  Has completed validation and could POTENTIALLY be
+//                        approved for real-money execution later. Nothing is
+//                        here. Even here, it would still be gated by a human
+//                        decision plus the two exchange-side switches
+//                        (TRADING_MODE=live and ALLOW_LIVE_TRADING=true) that
+//                        this repo never flips.
+//   retired              No longer active. Kept to reproduce old experiments.
+//
+// ── Two eligibilities, deliberately not one ─────────────────────────────────
+//
+// "Live" is an ambiguous word here and the ambiguity is expensive, so it is
+// avoided entirely:
+//
+//   scannerEligible      May the LIVE SCANNER run this forward, on live
+//                        candles, against a PAPER ledger? True for mindset_v1.
+//   realMoneyEligible    Has this completed validation such that real-money
+//                        execution could later be approved? False for
+//                        everything, and there is no code path that would act
+//                        on it if it were true.
+//
+// A strategy can be scanner eligible while nowhere near real money — that is
+// the normal case, and it is exactly what forward-paper means.
 //
 // The promotion policy that decides when a status *may* change (trade count,
 // expectancy, profit factor, drawdown) is deliberately not here yet.
@@ -29,20 +48,32 @@ const LIFECYCLE_STATUSES = Object.freeze([
   "backtest",
   "validated",
   "forward-paper",
-  "live-eligible",
+  "real-money-eligible",
   "retired",
 ]);
 
-// Two independent conditions, both required, neither self-certified:
+// Statuses under which forward paper operation is a sensible thing to be
+// doing. `validated` is deliberately NOT here: passing historical criteria is
+// what earns a strategy the right to be *promoted* to forward-paper, and that
+// promotion is a decision someone makes, not a side effect of a status.
+const SCANNER_STATUSES = Object.freeze(["forward-paper", "real-money-eligible"]);
+
+// Both conditions required, neither self-certified:
 //
 //   1. the strategy declares it can run in the live scanner at all, and
-//   2. the research lifecycle has actually reached live-eligible.
+//   2. its lifecycle status permits forward-paper operation.
 //
-// A strategy object that sets `liveEligible: true` on itself is ignored —
-// eligibility is computed here or it does not exist. Today this returns false
-// for every registered strategy, which is the correct answer.
-function computeLiveEligible(strategy) {
-  return strategy.supportsLiveScanner === true && strategy.status === "live-eligible";
+// Registry presence confers nothing.
+function computeScannerEligible(strategy) {
+  return strategy.supportsLiveScanner === true && SCANNER_STATUSES.includes(strategy.status);
+}
+
+// Real-money eligibility is a lifecycle claim only. It is deliberately NOT
+// conditioned on supportsLiveScanner: whether the scanner can run something is
+// a different question from whether its evidence would justify real money.
+// Today this returns false for every registered strategy, which is correct.
+function computeRealMoneyEligible(strategy) {
+  return strategy.status === "real-money-eligible";
 }
 
 function assertValidLifecycle(strategy) {
@@ -66,8 +97,8 @@ function assertValidLifecycle(strategy) {
   return strategy;
 }
 
-// The public metadata shape. `liveEligible` is always computed, so callers
-// cannot be misled by a stale or optimistic field on the strategy itself.
+// The public metadata shape. Both eligibility fields are always computed, so
+// callers cannot be misled by a stale or optimistic field on the strategy.
 function describeStrategy(strategy) {
   return {
     id: strategy.id,
@@ -77,9 +108,17 @@ function describeStrategy(strategy) {
     status: strategy.status,
     supportsBacktest: strategy.supportsBacktest,
     supportsLiveScanner: strategy.supportsLiveScanner,
-    liveEligible: computeLiveEligible(strategy),
+    scannerEligible: computeScannerEligible(strategy),
+    realMoneyEligible: computeRealMoneyEligible(strategy),
     requiredWarmupBars: strategy.requiredWarmupBars,
   };
 }
 
-module.exports = { LIFECYCLE_STATUSES, computeLiveEligible, assertValidLifecycle, describeStrategy };
+module.exports = {
+  LIFECYCLE_STATUSES,
+  SCANNER_STATUSES,
+  computeScannerEligible,
+  computeRealMoneyEligible,
+  assertValidLifecycle,
+  describeStrategy,
+};

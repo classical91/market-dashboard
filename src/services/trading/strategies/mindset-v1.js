@@ -3,11 +3,13 @@
 // mindset_v1 as a Trading Lab strategy.
 //
 // This is an adapter, not a reimplementation: the signal logic is the exact
-// `evaluateMindsetV1` the live scanner runs, imported unchanged. If the two
-// ever disagree, the backtest stops being evidence about the live scanner,
-// which is the whole reason this file is thin.
+// `evaluateMindsetV1` the live scanner runs, imported from the shared rules
+// module both depend on. If the two ever disagree, the backtest stops being
+// evidence about the live scanner, which is the whole reason this file is
+// thin — and since the scanner now resolves its evaluator through this
+// registry entry, they cannot disagree at all.
 
-const { evaluateMindsetV1, MINDSET_V1_DEFAULTS } = require("../live-scanner");
+const { evaluateMindsetV1, MINDSET_V1_DEFAULTS } = require("./mindset-v1-rules");
 
 // The slowest input is the 50-period EMA; the ATR ratio needs 14 + 20 bars of
 // history on top of that before it means anything.
@@ -25,9 +27,9 @@ const mindsetV1 = {
   version: "1.0.0",
   description:
     "EMA20/EMA50 trend direction with an RSI band filter that refuses to chase a stretched move. The strategy the live scanner runs.",
-  // Running forward on live candles against a paper ledger — which is exactly
-  // what the live scanner does today, and is NOT the same as being approved
-  // for real money. liveEligible stays false.
+  // Running against live market data with paper execution — exactly what the
+  // live scanner does today. That makes it scanner eligible; it says nothing
+  // about real money, and realMoneyEligible stays false.
   status: "forward-paper",
   supportsBacktest: true,
   supportsLiveScanner: true,

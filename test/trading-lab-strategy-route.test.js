@@ -99,7 +99,9 @@ test("the strategy catalogue is public, so the selector can render before any ke
     assert.ok(strategy.version && strategy.status);
     assert.equal(typeof strategy.supportsBacktest, "boolean");
     assert.equal(typeof strategy.supportsLiveScanner, "boolean");
-    assert.equal(strategy.liveEligible, false, "nothing is live-eligible yet");
+    assert.equal(typeof strategy.scannerEligible, "boolean");
+    assert.equal(strategy.realMoneyEligible, false, "nothing is real-money eligible");
+    assert.equal(strategy.liveEligible, undefined, "the ambiguous field is gone");
   }
 });
 

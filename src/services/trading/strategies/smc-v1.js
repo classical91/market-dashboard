@@ -143,7 +143,9 @@ const smcV1 = {
   version: "1.0.0",
   // Backtest-only, deliberately. It has never run forward on a single live
   // candle, so anything above `backtest` would be a claim the evidence does
-  // not support.
+  // not support — and `backtest` is not a scanner-eligible status, so the live
+  // scanner will refuse to start it even if someone sets
+  // LIVE_SCANNER_STRATEGY=smc_v1.
   status: "backtest",
   supportsBacktest: true,
   supportsLiveScanner: false,
