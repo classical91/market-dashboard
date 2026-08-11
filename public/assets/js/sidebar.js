@@ -185,7 +185,7 @@
       label: "Decision Engine",
     },
     {
-      href: "https://traderclaw-production.up.railway.app/",
+      href: "/trading-lab.html",
       icon: "&#129408;",
       label: "Traderclaw Backtest",
     },
