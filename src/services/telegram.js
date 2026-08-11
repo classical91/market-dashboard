@@ -108,12 +108,26 @@ function actionForTransition(actions, transition) {
 function groupSafeReason(reason) {
   return String(reason || "Trading Lab reviewed")
     .replace(/\s*\(paper trading disabled\)/gi, "")
+    .replace(/\bwould\s+open\b/gi, "Setup passed review")
+    .replace(/\bdry[- ]run\b/gi, "review")
     .replace(/\bpaper\s+trading\b/gi, "trading")
     .replace(/\bpaper\s+trade\b/gi, "tracked setup")
     .replace(/\bpaper\b/gi, "tracked");
 }
 
-function formatSignalAlert(transition, actions) {
+function groupSafeStatus(status) {
+  const normalized = String(status || "checked").toLowerCase();
+  if (normalized === "dry-run") return "REVIEW";
+  if (normalized === "opened") return "TRACKED";
+  return normalized.toUpperCase();
+}
+
+function dashboardLink(baseUrl, path) {
+  if (!baseUrl) return null;
+  return `${String(baseUrl).replace(/\/+$/, "")}${path}`;
+}
+
+function formatSignalAlert(transition, actions, dashboardUrl = "") {
   const action = actionForTransition(actions, transition);
   const pattern = patternLabel(transition);
   const price = formatPrice(transition.price);
@@ -121,10 +135,11 @@ function formatSignalAlert(transition, actions) {
   const trend = transition.trendRegime || "MIXED";
   const evidence = evidenceLines(transition).join("; ") || "Confluence flip";
   const verdict = action
-    ? `${String(action.status || "checked").toUpperCase()}: ${groupSafeReason(action.reason)}`
+    ? `${groupSafeStatus(action.status)}: ${groupSafeReason(action.reason)}`
     : "WATCH: Trading Lab verdict pending";
   const decision = action && action.decision ? `Checklist: ${action.decision}` : null;
   const confidence = action && action.confidenceScore != null ? `Confidence: ${action.confidenceScore}` : null;
+  const view = dashboardLink(dashboardUrl, "/signal-screener.html");
 
   return [
     `<b>SIGNAL</b> | <b>${escapeHtml(transition.symbol)}</b> ${escapeHtml(transition.interval)} | ${escapeHtml(pattern)}`,
@@ -133,6 +148,7 @@ function formatSignalAlert(transition, actions) {
     `Evidence: ${escapeHtml(evidence)}`,
     decision || confidence ? [decision, confidence].filter(Boolean).join(" | ") : null,
     `Verdict: ${escapeHtml(verdict)}`,
+    view ? `View: ${escapeHtml(view)}` : null,
   ].filter(Boolean).join("\n");
 }
 
@@ -177,9 +193,10 @@ function sanitizeBotToken(raw) {
 }
 
 class TelegramService {
-  constructor({ botToken, chatIds }) {
+  constructor({ botToken, chatIds, dashboardUrl = "" }) {
     this._botToken = sanitizeBotToken(botToken);
     this._chatIds = (chatIds || []).map(normalizeTarget);
+    this._dashboardUrl = String(dashboardUrl || "").replace(/\/+$/, "");
   }
 
   get configured() {
@@ -291,7 +308,7 @@ class TelegramService {
    */
   async postSignalAlerts(transitions, tradeActions = []) {
     if (!this.configured || !transitions.length) return;
-    const rows = transitions.map((t) => formatSignalAlert(t, tradeActions));
+    const rows = transitions.map((t) => formatSignalAlert(t, tradeActions, this._dashboardUrl));
     const header = "⚡ <b>ALPHA TEAM SIGNALS</b>\n\n";
     await this._sendToAll(truncate(header + rows.join("\n\n"), MAX_MSG_LEN));
   }
@@ -303,6 +320,7 @@ class TelegramService {
    */
   async postPatternAlerts(events) {
     if (!this.configured || !events.length) return;
+    const view = dashboardLink(this._dashboardUrl, "/pattern-scanner.html");
     const rows = events.map((e) => {
       const biasEmoji = e.bias === "bullish" ? "🟢" : "🔴";
       if (e.kind === "breakout") {
@@ -312,15 +330,17 @@ class TelegramService {
           `Bias: ${escapeHtml(bias)} (${escapeHtml(String(e.score ?? "n/a"))})`,
           "Evidence: pattern moved from forming to breakout",
           "Verdict: watch for confirmation; act only after checklist/edge gate",
-        ].join("\n");
+          view ? `View: ${escapeHtml(view)}` : null,
+        ].filter(Boolean).join("\n");
       }
       const bias = e.bias === "bullish" ? "bullish reversal watch" : "bearish reversal watch";
       return [
         `${biasEmoji} <b>WATCH</b> | <b>${escapeHtml(e.symbol)}</b> ${escapeHtml(e.interval)} | ${escapeHtml(e.name)} divergence`,
         `Bias: ${escapeHtml(bias)}`,
         "Evidence: fresh divergence state detected",
-        "Verdict: watch for structure confirmation; no automatic live trade",
-      ].join("\n");
+        "Verdict: watch for structure confirmation; no automatic action",
+        view ? `View: ${escapeHtml(view)}` : null,
+      ].filter(Boolean).join("\n");
     });
     const header = "📈 <b>PATTERN SCANNER</b>\n\n";
     await this._sendToAll(truncate(header + rows.join("\n\n"), MAX_MSG_LEN));
