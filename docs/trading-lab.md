@@ -258,11 +258,60 @@ Bot timeframe because all three of its inputs differ:
   execute() runs: a setup the gates refuse stays refused for that bar instead
   of being retried every 60 seconds.
 
-Everything downstream is shared. The strategy produces a direction and its
-indicator readings; the 0-100 confidence score, the size multiplier and the
-stop/target levels still come from checklist -> edge gate -> risk sizing, with
-regime and daily bias supplied by the decision engine at
-`LIVE_SCANNER_CONTEXT_INTERVAL`. The scanner never scores a trade itself.
+#### The intent boundary
+
+The scanner's entire decision surface is a raw `TradeIntent`:
+
+```json
+{
+  "signal": "LONG | SHORT | EXIT_LONG | EXIT_SHORT",
+  "symbol": "BTCUSDT.P",
+  "price": 12345.6,
+  "tf": "15m",
+  "source": "live_scanner",
+  "strategy": "mindset_v1",
+  "candleTs": "2026-08-11T00:15:00.000Z",
+  "indicators": { "ema20": …, "rsi": …, "atr": … }
+}
+```
+
+A strategy finds setups; the Trading Lab decides whether a setup is worth
+taking and how big. So an intent carries *market observations* and nothing
+else — no stop, no target, no size, no risk amount, no confidence score. ATR
+rides along because it is a volatility measurement, not a stop distance;
+`risk.js` is what turns it into levels by applying `SL_ATR_MULTIPLE`.
+
+`trade-intent.js` enforces this at runtime rather than leaving it to reviewer
+discipline: `buildTradeIntent()` rejects any of the forbidden fields **on the
+caller's object, before destructuring** (validating the constructed intent
+would be theatre — it is built from a fixed set of keys, so a smuggled
+`stopLoss` would be silently dropped while the rule looked enforced),
+whitelists the indicators that may ride along, and freezes the result.
+`test/trade-intent.test.js` asserts no emitted intent carries a risk field.
+
+`intent-handler.js` is the one boundary an intent crosses to become an action,
+and what happens on the other side is deliberately asymmetric:
+
+    Entry  ->  runChecklist() -> assessEdge() -> planTrade() -> openPosition()
+    Exit   ->  closePosition(), no gates
+
+Entries need gates. Exits need **protection**. If the strategy reports its
+thesis has broken, a gate that could veto the close would convert a risk
+control into a risk — the edge gate would be holding a losing position open on
+the grounds that positions like it have done badly, which is exactly backwards.
+So an exit consults neither the checklist nor the edge gate and cannot be
+blocked by a kill switch, a loss limit or a position cap. It closes with reason
+`SCANNER_EXIT`. Exits are also exempt from the per-candle claim: a broken
+thesis should be actionable on the bar it breaks, and re-emitting an exit for
+an already-closed position is a no-op the handler absorbs.
+
+Exit intents are emitted from the strategy reading alone, without consulting
+the book — `intentsFor()` is a pure function of the candles. One bar can
+therefore produce both an exit and an entry (trend flipped down: close the
+long, then consider the short), returned in that order so the position slot is
+freed before the entry is judged. The cycle reports the most consequential
+outcome rather than the last, so an executed exit is never masked by the
+`already-evaluated` of the entry behind it.
 
 `mindset_v1` is the MVP strategy and deliberately small — EMA20/EMA50 for trend
 direction plus an RSI band filter (50-75 long, 25-50 short; the bands are what
