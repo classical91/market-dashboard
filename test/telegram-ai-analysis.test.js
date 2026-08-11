@@ -101,6 +101,7 @@ test("signal alerts include Alpha Team pattern evidence and Trading Lab verdict"
     assert.match(text, /Verdict: REVIEW/);
     assert.match(text, /Setup passed review/);
     assert.match(text, /View: https:\/\/market-dashboard\.example\/signal-screener\.html\?view=alpha/);
+    assert.match(text, /Readme: https:\/\/market-dashboard\.example\/alpha-team\.html\?view=alpha/);
     assert.doesNotMatch(text, /dry-run/i);
     assert.doesNotMatch(text, /Would open/i);
     assert.doesNotMatch(text, /paper/i);
@@ -137,6 +138,7 @@ test("Pattern Scanner alerts link only to the available dashboard page", async (
     assert.match(text, /PATTERN SCANNER/);
     assert.match(text, /WATCH/);
     assert.match(text, /View: https:\/\/market-dashboard\.example\/pattern-scanner\.html\?view=alpha/);
+    assert.match(text, /Readme: https:\/\/market-dashboard\.example\/alpha-team\.html\?view=alpha/);
     assert.doesNotMatch(text, /automatic live trade/i);
     assert.doesNotMatch(text, /paper/i);
   } finally {
