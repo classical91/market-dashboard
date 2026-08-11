@@ -359,7 +359,7 @@ class PaperTradingService {
     pos.remainingSize = 0;
     pos.size = 0;
     pos.unrealizedPnl = 0;
-    pos.closedAt = nowIso();
+    pos.closedAt = isoFrom(opts.at);
     pos.closeReason = reason;
     pos.exitPrice = pos.exits.length ? pos.exits[pos.exits.length - 1].price : exitPrice;
     pos.requestedExitPrice = exitPrice;

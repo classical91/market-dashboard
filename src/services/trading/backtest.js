@@ -396,7 +396,7 @@ class BacktestService {
               targetHint: signal.targetHint ?? null,
             }
           : { strategy: strategyId },
-        openedAt: context.bar.closeTime + (Number(this.config.executionLatencyMs) || 0),
+        openedAt: context.bar.closeTime,
       });
       return { opened: true, reasons };
     } catch (err) {
@@ -476,11 +476,9 @@ function summarizeRun(result) {
 
 function costSummary(config) {
   return {
-    makerFeeRate: config.makerFeeRate,
     takerFeeRate: config.takerFeeRate,
     slippageRate: config.slippageRate,
     fundingRate8h: config.fundingRate8h,
-    executionLatencyMs: config.executionLatencyMs,
   };
 }
 

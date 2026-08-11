@@ -110,11 +110,9 @@ test("a backtest reports the execution cost assumptions it used", async () => {
 
   const result = await service.run({ symbol: "BTCUSDT", candles: risingCandles(120) });
   assert.deepEqual(result.costs, {
-    makerFeeRate: 0,
     takerFeeRate: 0.0006,
     slippageRate: 0.0002,
     fundingRate8h: 0.0001,
-    executionLatencyMs: 0,
   });
 });
 

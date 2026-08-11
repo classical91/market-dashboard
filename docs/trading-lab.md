@@ -65,10 +65,10 @@ fills, so a backtest and a forward paper run agree by construction — same TP1
 scale-out, same breakeven move, same gap-aware stop, same metrics.
 
 Backtests can include execution costs through the same paper ledger. Configure
-`BACKTEST_MAKER_FEE_RATE`, `BACKTEST_TAKER_FEE_RATE`,
-`BACKTEST_SLIPPAGE_RATE`, `BACKTEST_FUNDING_RATE_8H`, and
-`BACKTEST_EXECUTION_LATENCY_MS` as decimal rates or milliseconds. Each fill
-records its fee, funding charge or credit, requested price, and
+`BACKTEST_TAKER_FEE_RATE`, `BACKTEST_SLIPPAGE_RATE`, and
+`BACKTEST_FUNDING_RATE_8H` as decimal rates. Cost-model v1 treats every fill as
+a taker fill, which is conservative for market-style backtest entries. Each
+fill records its fee, funding charge or credit, requested price, and
 slippage-adjusted fill price, so expectancy and R-multiple are net of costs
 rather than a cosmetic summary adjustment.
 

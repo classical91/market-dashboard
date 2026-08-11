@@ -222,6 +222,16 @@ test("execution costs are recorded on entry and exits", async () => {
   assert.ok(updated.realizedPnl < 7.5);
 });
 
+test("closed trades use the simulated exit timestamp when provided", async () => {
+  const trader = makeTrader();
+  openLong(trader, { openedAt: 0 });
+
+  await trader.updatePositions({ BTCUSDT: 85 }, { at: 12345 });
+  const [closed] = trader.getHistory();
+  assert.equal(closed.closedAt, new Date(12345).toISOString());
+  assert.equal(closed.exits[0].at, new Date(12345).toISOString());
+});
+
 test("daily and weekly P&L reset when the UTC day rolls over", () => {
   const trader = makeTrader();
   const account = trader.getAccount();
