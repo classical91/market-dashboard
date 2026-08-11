@@ -15,6 +15,7 @@ delete process.env.ADMIN_API_KEY;
 delete process.env.TELEGRAM_BOT_TOKEN;
 delete process.env.TELEGRAM_CHAT_IDS;
 delete process.env.TRADERCLAW_BASE_URL;
+delete process.env.ALPHA_TEAM_ACCESS_CODE;
 
 const { createApp } = require("../src/app");
 
@@ -60,6 +61,18 @@ test("signal bridge actions endpoint stays public and read-only", async () => {
   assert.equal(res.status, 200);
   const body = await res.json();
   assert.equal(Array.isArray(body.items), true);
+});
+
+test("alpha team access gate is open when no access code is configured", async () => {
+  const res = await fetch(`${base}/api/alpha-team/access`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: "{}",
+  });
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.ok, true);
+  assert.equal(body.configured, false);
 });
 
 test("action endpoints are disabled (503) when ADMIN_API_KEY is unset", async () => {

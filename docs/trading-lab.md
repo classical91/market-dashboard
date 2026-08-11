@@ -425,8 +425,10 @@ inbound endpoint to authenticate.
   watch/verdict structure. When `MARKET_DASHBOARD_URL` is configured, group
   alerts link only to available pages such as Signal Screener and Pattern
   Scanner. Those shared links open in Alpha review mode (`?view=alpha`), where
-  the requested page renders without the dashboard sidebar/tabs. Alerts also
-  include an Alpha Team readme link at `/alpha-team.html?view=alpha`.
+  the requested page renders without the dashboard sidebar/tabs. When
+  `ALPHA_TEAM_ACCESS_CODE` is configured, the shared page stays blurred behind
+  an Alpha Team access prompt until the code is accepted. Alerts also include
+  an Alpha Team readme link at `/alpha-team.html?view=alpha`.
   Unfinished setup sources stay visible as blurred `BETA` dashboard modules
   rather than direct group links.
 - **Auto-marking** runs first in each cycle, over *every* book — so hand-opened

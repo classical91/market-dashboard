@@ -1,5 +1,6 @@
 const express = require("express");
 const path = require("path");
+const crypto = require("crypto");
 
 // Binance's public-data mirror (see pattern-scanner.js for why this domain,
 // not api.binance.com) has a lightweight ticker endpoint just for the
@@ -10,6 +11,13 @@ async function fetchBinancePrice(symbol) {
   if (!res.ok) throw new Error(`Binance ticker HTTP ${res.status} for ${symbol}`);
   const data = await res.json();
   return Number(data.price);
+}
+
+function matchesSecret(provided, expected) {
+  const providedBuffer = Buffer.from(String(provided || ""));
+  const expectedBuffer = Buffer.from(String(expected || ""));
+  if (!expectedBuffer.length || providedBuffer.length !== expectedBuffer.length) return false;
+  return crypto.timingSafeEqual(providedBuffer, expectedBuffer);
 }
 
 const { config } = require("./config/env");
@@ -205,6 +213,20 @@ function createApp() {
 
   app.disable("x-powered-by");
   app.use(express.json({ limit: "2mb" }));
+  app.post("/api/alpha-team/access", (req, res) => {
+    const accessCode = process.env.ALPHA_TEAM_ACCESS_CODE || "";
+    if (!accessCode) {
+      res.json({ ok: true, configured: false });
+      return;
+    }
+
+    if (!matchesSecret(req.body && req.body.code, accessCode)) {
+      res.status(401).json({ error: "Invalid access code" });
+      return;
+    }
+
+    res.json({ ok: true, configured: true });
+  });
   app.get(["/earthwatch", "/earthwatch.html"], (req, res) => {
     res.redirect(302, "https://earth-watch-production-e3c6.up.railway.app/");
   });
@@ -291,4 +313,4 @@ function createApp() {
   return app;
 }
 
-module.exports = { createApp };
+module.exports = { createApp, matchesSecret };

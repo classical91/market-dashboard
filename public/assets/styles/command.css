@@ -77,6 +77,110 @@ body {
   min-height: 100vh;
 }
 
+.alpha-gate-active .app {
+  filter: blur(11px);
+  opacity: 0.42;
+  pointer-events: none;
+  user-select: none;
+}
+
+.alpha-gate-active body {
+  overflow: hidden;
+}
+
+.alpha-access-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background:
+    linear-gradient(180deg, rgba(5,7,17,0.74), rgba(5,7,17,0.9)),
+    rgba(5,7,17,0.74);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.alpha-access-card {
+  width: min(420px, 100%);
+  border: 1px solid var(--border-hover);
+  border-radius: var(--radius);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015)),
+    var(--surface);
+  box-shadow: var(--shadow);
+  padding: 24px;
+}
+
+.alpha-access-kicker {
+  margin-bottom: 9px;
+  color: var(--blue);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.alpha-access-title {
+  margin-bottom: 8px;
+  color: var(--text);
+  font-size: 23px;
+  line-height: 1.15;
+}
+
+.alpha-access-copy {
+  margin-bottom: 18px;
+  color: var(--soft);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.alpha-access-form {
+  display: grid;
+  gap: 10px;
+}
+
+.alpha-access-input {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.045);
+  color: var(--text);
+  padding: 0 12px;
+  font: inherit;
+  outline: none;
+}
+
+.alpha-access-input:focus {
+  border-color: rgba(77,163,255,0.58);
+  box-shadow: 0 0 0 3px rgba(77,163,255,0.12);
+}
+
+.alpha-access-button {
+  min-height: 44px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--blue);
+  color: #04101f;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 850;
+}
+
+.alpha-access-button:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
+.alpha-access-error {
+  min-height: 18px;
+  color: var(--coral);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 /* ── Sidebar ──────────────────────────────────────────── */
 .cmd-sidebar {
   border-right: 1px solid var(--border);
