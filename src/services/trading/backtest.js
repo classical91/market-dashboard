@@ -256,7 +256,7 @@ class BacktestService {
         const ordering = replayOrder(trader, bar);
         if (ordering.mixed) mixedDirectionBars += 1;
         for (const price of ordering.prices) {
-          await trader.updatePositions({ [symbol]: price });
+          await trader.updatePositions({ [symbol]: price }, { at: bar.closeTime });
         }
 
         // 2. Ask the strategy about the bar that just closed.
@@ -317,6 +317,7 @@ class BacktestService {
         from: bars[warmup].closeTime,
         to: bars[bars.length - 1].closeTime,
         options: opts,
+        costs: costSummary(this.config),
         stats,
         metrics: buildStrategyMetrics(trader.getHistory(), account.startingBalance),
         trades: trader.getHistory(),
@@ -395,6 +396,7 @@ class BacktestService {
               targetHint: signal.targetHint ?? null,
             }
           : { strategy: strategyId },
+        openedAt: context.bar.closeTime + (Number(this.config.executionLatencyMs) || 0),
       });
       return { opened: true, reasons };
     } catch (err) {
@@ -468,6 +470,17 @@ function summarizeRun(result) {
     maxDrawdownPct: m.maxDrawdownPct,
     winRate: result.stats.winRate,
     worstLossStreak: m.worstConsecutiveLosses,
+    costs: result.costs,
+  };
+}
+
+function costSummary(config) {
+  return {
+    makerFeeRate: config.makerFeeRate,
+    takerFeeRate: config.takerFeeRate,
+    slippageRate: config.slippageRate,
+    fundingRate8h: config.fundingRate8h,
+    executionLatencyMs: config.executionLatencyMs,
   };
 }
 

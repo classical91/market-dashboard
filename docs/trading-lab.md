@@ -64,6 +64,14 @@ These are the details that make paper results honest, and each has a test:
 fills, so a backtest and a forward paper run agree by construction — same TP1
 scale-out, same breakeven move, same gap-aware stop, same metrics.
 
+Backtests can include execution costs through the same paper ledger. Configure
+`BACKTEST_MAKER_FEE_RATE`, `BACKTEST_TAKER_FEE_RATE`,
+`BACKTEST_SLIPPAGE_RATE`, `BACKTEST_FUNDING_RATE_8H`, and
+`BACKTEST_EXECUTION_LATENCY_MS` as decimal rates or milliseconds. Each fill
+records its fee, funding charge or credit, requested price, and
+slippage-adjusted fill price, so expectancy and R-multiple are net of costs
+rather than a cosmetic summary adjustment.
+
 Two things make a backtest lie, and both are addressed explicitly:
 
 - **Lookahead.** Indicators and signals at bar *i* are computed from bars
