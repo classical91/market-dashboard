@@ -149,7 +149,7 @@ function formatSignalAlert(transition, actions, dashboardUrl = "") {
     `Evidence: ${escapeHtml(evidence)}`,
     decision || confidence ? [decision, confidence].filter(Boolean).join(" | ") : null,
     `Verdict: ${escapeHtml(verdict)}`,
-    view ? `View: ${escapeHtml(view)}` : null,
+    view ? `Visit: ${escapeHtml(view)}` : null,
     readme ? `Readme: ${escapeHtml(readme)}` : null,
   ].filter(Boolean).join("\n");
 }
@@ -333,7 +333,7 @@ class TelegramService {
           `Bias: ${escapeHtml(bias)} (${escapeHtml(String(e.score ?? "n/a"))})`,
           "Evidence: pattern moved from forming to breakout",
           "Verdict: watch for confirmation; act only after checklist/edge gate",
-          view ? `View: ${escapeHtml(view)}` : null,
+          view ? `Visit: ${escapeHtml(view)}` : null,
           readme ? `Readme: ${escapeHtml(readme)}` : null,
         ].filter(Boolean).join("\n");
       }
@@ -343,7 +343,7 @@ class TelegramService {
         `Bias: ${escapeHtml(bias)}`,
         "Evidence: fresh divergence state detected",
         "Verdict: watch for structure confirmation; no automatic action",
-        view ? `View: ${escapeHtml(view)}` : null,
+        view ? `Visit: ${escapeHtml(view)}` : null,
         readme ? `Readme: ${escapeHtml(readme)}` : null,
       ].filter(Boolean).join("\n");
     });

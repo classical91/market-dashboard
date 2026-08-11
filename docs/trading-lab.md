@@ -439,7 +439,7 @@ inbound endpoint to authenticate.
 | `SIGNAL_BOT_PAPER_TRADE_ENABLED` | `false` | Opt in, by exact value `true`, to opening paper positions. Otherwise log-only. |
 | `SIGNAL_BOT_BOOK` | `main` | Which book bridged trades land in. |
 | `SIGNAL_BOT_AUTO_MARK_ENABLED` | `true` | Mark open positions to market each interval. |
-| `MARKET_DASHBOARD_URL` | empty | Public dashboard origin for Alpha Team `View:` links. Alerts omit links when this is blank. |
+| `MARKET_DASHBOARD_URL` | empty | Public dashboard origin for Alpha Team `Visit:` links. Alerts omit links when this is blank. |
 
 Auto-marking alone does not start the loop — it is a passive add-on to a cycle
 that is already happening. The loop runs when Telegram is configured or paper
