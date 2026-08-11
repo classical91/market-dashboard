@@ -18,9 +18,9 @@
 //     evaluate(candles, index, context) -> signal
 //   }
 //
-// `liveEligible` is NOT a field a strategy sets. It is computed from status +
-// capability (./lifecycle.js), so being in the registry never implies being
-// ready to trade.
+// `scannerEligible` and `realMoneyEligible` are NOT fields a strategy sets.
+// Both are computed from status + capability (./lifecycle.js), so being in the
+// registry never implies permission to run anywhere.
 //
 // `evaluate` is handed the full candle array plus the index of the bar being
 // decided, and must read nothing past that index — that contract is what keeps
@@ -48,7 +48,9 @@ const { mindsetV1 } = require("./mindset-v1");
 const { smcV1 } = require("./smc-v1");
 const {
   LIFECYCLE_STATUSES,
-  computeLiveEligible,
+  SCANNER_STATUSES,
+  computeScannerEligible,
+  computeRealMoneyEligible,
   assertValidLifecycle,
   describeStrategy,
 } = require("./lifecycle");
@@ -65,14 +67,50 @@ const DEFAULT_STRATEGY_ID = "mindset_v1";
 // two real questions callers ask are "what can I backtest?" and "what may the
 // live scanner run?", and answering those by hand at each call site is how
 // capability checks drift apart.
-function listStrategies({ supportsBacktest, supportsLiveScanner, status, liveEligible } = {}) {
+function listStrategies({ supportsBacktest, supportsLiveScanner, status, scannerEligible, realMoneyEligible } = {}) {
   return STRATEGIES.map(describeStrategy).filter(
     (s) =>
       (supportsBacktest === undefined || s.supportsBacktest === supportsBacktest) &&
       (supportsLiveScanner === undefined || s.supportsLiveScanner === supportsLiveScanner) &&
       (status === undefined || s.status === status) &&
-      (liveEligible === undefined || s.liveEligible === liveEligible),
+      (scannerEligible === undefined || s.scannerEligible === scannerEligible) &&
+      (realMoneyEligible === undefined || s.realMoneyEligible === realMoneyEligible),
   );
+}
+
+/**
+ * Resolve a strategy for the LIVE SCANNER, or throw a configuration error
+ * naming what is actually allowed.
+ *
+ * This is the runtime enforcement of scanner eligibility. It lives in the
+ * registry rather than in the scanner so there is exactly one answer to "may
+ * this run forward?", and it refuses rather than falling back: a scanner
+ * quietly running a different strategy than the one configured is worse than a
+ * scanner that will not start.
+ */
+function getScannerStrategy(id) {
+  const key = String(id || "");
+  const strategy = BY_ID.get(key);
+  if (!strategy) {
+    throw new Error(
+      `Unknown strategy "${key}" (registered: ${[...BY_ID.keys()].join(", ")})`,
+    );
+  }
+
+  const meta = describeStrategy(strategy);
+  if (!meta.supportsLiveScanner) {
+    throw new Error(
+      `Strategy "${key}" does not support the live scanner (status ${meta.status}); ` +
+        `scanner-capable strategies: ${listStrategies({ scannerEligible: true }).map((s) => s.id).join(", ") || "none"}`,
+    );
+  }
+  if (!meta.scannerEligible) {
+    throw new Error(
+      `Strategy "${key}" is not scanner eligible: status ${meta.status} does not permit forward-paper operation ` +
+        `(needs one of ${SCANNER_STATUSES.join(", ")})`,
+    );
+  }
+  return strategy;
 }
 
 // The metadata for one strategy, or null. Unlike getStrategy() this does not
@@ -105,10 +143,13 @@ module.exports = {
   STRATEGIES,
   DEFAULT_STRATEGY_ID,
   LIFECYCLE_STATUSES,
+  SCANNER_STATUSES,
   listStrategies,
   describe,
   describeStrategy,
-  computeLiveEligible,
+  computeScannerEligible,
+  computeRealMoneyEligible,
   hasStrategy,
   getStrategy,
+  getScannerStrategy,
 };

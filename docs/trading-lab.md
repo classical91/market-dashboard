@@ -33,7 +33,7 @@ follows, and records what happened so the next answer is better informed.
 | `executor.py` (sizing half) | `src/services/trading/risk.js` | ATR sizing and stop/target geometry. Order placement deliberately excluded. |
 | `paper_trader.py` | `src/services/trading/paper-trader.js` | TP1/TP2 scale-outs, breakeven stop, gap-aware stop fills, daily/weekly rollover. |
 | — | `src/services/trading/backtest.js` | New: bar replay over the same paper-trading engine. |
-| — | `src/services/trading/strategies/` | New: the strategy registry and its research lifecycle metadata. |
+| — | `src/services/trading/strategies/` | New: the strategy registry, its research lifecycle metadata, and the shared mindset_v1 rules the scanner and backtester both run. |
 | — | `src/services/trading/experiment-record.js` | New: turns a finished run into a research record. Pure. |
 | — | `src/services/trading/experiment-store.js` | New: where experiments are persisted. The seam a database would replace. |
 | `shadow_trader.py`, `alts_trader.py` | *books* in `trading-lab.js` | Main / Shadow / Alts are named books over one engine rather than three near-duplicate services. |
@@ -152,8 +152,8 @@ execution model rather than on who guessed a better stop.
 
 | id | version | status | What it is |
 | --- | --- | --- | --- |
-| `mindset_v1` | 1.0.0 | `forward-paper` | The live scanner's strategy, imported unchanged from `live-scanner.js` — EMA20/EMA50 trend with an RSI band filter. The default. |
-| `smc_v1` | 1.0.0 | `backtest` | Backtest-only Smart Money Concepts approximation (below). |
+| `mindset_v1` | 1.0.0 | `forward-paper` | The live scanner's strategy — EMA20/EMA50 trend with an RSI band filter. Scanner eligible, **not** real-money eligible. The default. |
+| `smc_v1` | 1.0.0 | `backtest` | Backtest-only Smart Money Concepts approximation (below). Neither scanner nor real-money eligible. |
 
 ### Lifecycle
 
@@ -162,33 +162,64 @@ makes nothing happen; it records what has actually been demonstrated.
 
 | status | Meaning |
 | --- | --- |
-| `experimental` | Being written. May change shape without notice. |
-| `backtest` | Replayable, and that is all. |
-| `validated` | Backtests reviewed and believed; not yet forward-tested. |
-| `forward-paper` | Running forward on live candles against a **paper** ledger. |
-| `live-eligible` | Approved for real-money execution. |
-| `retired` | Kept to reproduce old experiments; not for new runs. |
+| `experimental` | Being developed. May change shape without notice. |
+| `backtest` | Historical testing. |
+| `validated` | Historical evidence has passed the promotion criteria. Has never met a live candle. |
+| `forward-paper` | Running against live market data with **paper** execution. |
+| `real-money-eligible` | Has completed validation and could *potentially* be approved for real-money execution later. |
+| `retired` | No longer active. Kept to reproduce old experiments. |
 
-**Registry metadata is not promotion.** Being in the registry means a strategy
-can be *named*; it says nothing about what may run it. Two independent things
-must agree before `liveEligible` is true:
+#### "Live scanner" ≠ "real money"
+
+These are different questions and the codebase keeps them apart, because the
+word "live" answers both and therefore neither:
+
+| computed field | The question it answers | Today |
+| --- | --- | --- |
+| `scannerEligible` | May the **live scanner** run this forward, on live candles, against a **paper** ledger? | `true` for `mindset_v1` |
+| `realMoneyEligible` | Has this completed validation such that real-money execution could later be approved? | `false` for everything |
+
+A strategy being scanner eligible says **nothing** about real money — that is
+the normal state of affairs, and it is exactly what `forward-paper` means.
+`mindset_v1` runs on live Bitget candles every 60 seconds and has never placed
+a real order; no code path in this repository can.
 
 ```js
-liveEligible = supportsLiveScanner === true && status === "live-eligible"
+scannerEligible   = supportsLiveScanner === true &&
+                    ["forward-paper", "real-money-eligible"].includes(status)
+realMoneyEligible = status === "real-money-eligible"
 ```
 
-`liveEligible` is **computed** in `strategies/lifecycle.js`, never declared by
-the strategy — a strategy object that sets `liveEligible: true` on itself is
-ignored. Today it is false for everything, which is correct: `mindset_v1` is
-`forward-paper` (paper ledger, real candles) and `smc_v1` has never seen a live
-candle. Even a `live-eligible` strategy would still face the two exchange-side
-gates (`TRADING_MODE=live` **and** `ALLOW_LIVE_TRADING=true`) that this repo
-never flips.
+Note what is missing from the scanner list: `validated`. Passing the historical
+criteria earns a strategy the right to *be promoted* to `forward-paper`; it is
+not the promotion itself. And `realMoneyEligible` is not conditioned on
+`supportsLiveScanner`, because whether the scanner can run something is a
+different question from whether its evidence would justify real money. Even a
+`real-money-eligible` strategy would still face a human decision plus the two
+exchange-side gates (`TRADING_MODE=live` **and** `ALLOW_LIVE_TRADING=true`)
+that this repo never flips.
 
-The live scanner keeps its own strategy table, because it resolves a name from
-`LIVE_SCANNER_STRATEGY` at construction. A test asserts that table only
-contains strategies the registry marks `supportsLiveScanner` — which is what
-stops a backtest-only strategy from being reachable through an env var.
+**Registry metadata is not promotion.** Being in the registry means a strategy
+can be *named*; it says nothing about what may run it. Both fields are
+**computed** in `strategies/lifecycle.js`, never declared — a strategy object
+that sets `scannerEligible: true` or `realMoneyEligible: true` on itself is
+ignored.
+
+#### Runtime enforcement
+
+The live scanner resolves `LIVE_SCANNER_STRATEGY` through
+`getScannerStrategy()` **at construction**. An id that is unknown, does not
+support the scanner, or is not scanner eligible throws a configuration error
+naming what is actually allowed — the scanner refuses to start rather than
+falling back to something else, because a scanner quietly running a different
+strategy than the one configured is worse than one that will not start.
+
+This used to be a test that read the scanner's source for a hard-coded table.
+It is now a real refusal, which was made possible by extracting the mindset_v1
+rules into `strategies/mindset-v1-rules.js`: the scanner and the registry both
+depend on that leaf, so the scanner can depend on the registry without a
+require cycle. The scanner then runs the registry entry's own `evaluate()`, so
+the forward path and the backtest path cannot drift apart.
 
 The promotion *policy* — how many closed trades, what expectancy, what profit
 factor and drawdown justify a status change — is deliberately not implemented
@@ -321,7 +352,7 @@ ledger is admin-gated via `x-admin-key`.
 | POST | `/api/trading-lab/positions` | admin | Evaluate, then open if every gate agrees. |
 | POST | `/api/trading-lab/positions/:id/close` | admin | Close the remainder manually. |
 | POST | `/api/trading-lab/mark` | admin | Mark to market; fires any stop/target reached. |
-| GET | `/api/trading-lab/strategies` | — | The strategy catalogue with lifecycle metadata (`version`, `status`, `supportsBacktest`, `supportsLiveScanner`, computed `liveEligible`) and the default id. Static, so the UI selector can render before a key is entered. |
+| GET | `/api/trading-lab/strategies` | — | The strategy catalogue with lifecycle metadata (`version`, `status`, `supportsBacktest`, `supportsLiveScanner`, computed `scannerEligible` and `realMoneyEligible`) and the default id. Static, so the UI selector can render before a key is entered. |
 | GET | `/api/trading-lab/experiments?strategy=&version=&symbol=&timeframe=&limit=` | — | Research history, newest first. Read-only: there are no promotion mutations. |
 | GET | `/api/trading-lab/experiments/:id` | — | One experiment record, or 404. |
 | POST | `/api/trading-lab/backtest` | admin | Replay a symbol's candles. Body: `symbol`, `interval`, `strategy` (defaults to `mindset_v1`; an unknown id is a 400), `record` (opt-in experiment, returns `experimentId`), `notes`. Admin-gated despite being read-only: it replays hundreds of bars and pulls candles per call, so it should not be spinnable by anonymous visitors. Writes only to a temp ledger. |

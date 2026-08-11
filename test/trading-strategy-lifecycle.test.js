@@ -1,21 +1,31 @@
 "use strict";
 
-// The registry says what a strategy IS, never what it is allowed to do.
-// These tests pin that distinction, because the failure mode they guard
-// against — a strategy quietly becoming live-eligible by existing — is the one
-// that costs real money.
+// The registry says what a strategy IS. Two separate questions follow from
+// that, and conflating them is the failure this file exists to prevent:
+//
+//   scannerEligible    may the live scanner run it forward on PAPER?
+//   realMoneyEligible  has it completed validation such that real money could
+//                      later be approved?
+//
+// mindset_v1 is the first and not the second. Nothing is the second.
 
 const test = require("node:test");
 const assert = require("node:assert");
 
 const {
   LIFECYCLE_STATUSES,
+  SCANNER_STATUSES,
   listStrategies,
   describe: describeById,
   describeStrategy,
-  computeLiveEligible,
+  computeScannerEligible,
+  computeRealMoneyEligible,
+  getScannerStrategy,
 } = require("../src/services/trading/strategies");
 const { assertValidLifecycle } = require("../src/services/trading/strategies/lifecycle");
+const { LiveScannerService } = require("../src/services/trading/live-scanner");
+
+/* ── Vocabulary ───────────────────────────────────────────── */
 
 test("the lifecycle vocabulary is the documented one", () => {
   assert.deepEqual(LIFECYCLE_STATUSES, [
@@ -23,9 +33,19 @@ test("the lifecycle vocabulary is the documented one", () => {
     "backtest",
     "validated",
     "forward-paper",
-    "live-eligible",
+    "real-money-eligible",
     "retired",
   ]);
+  // "live-eligible" was ambiguous between "the live scanner may run it" and
+  // "it may trade real money". It is gone, and must not come back.
+  assert.ok(!LIFECYCLE_STATUSES.includes("live-eligible"));
+});
+
+test("only forward-paper and real-money-eligible permit forward operation", () => {
+  assert.deepEqual(SCANNER_STATUSES, ["forward-paper", "real-money-eligible"]);
+  // `validated` deliberately does not: passing historical criteria earns the
+  // right to BE promoted to forward-paper, it is not the promotion itself.
+  assert.ok(!SCANNER_STATUSES.includes("validated"));
 });
 
 test("every registered strategy carries complete lifecycle metadata", () => {
@@ -37,57 +57,75 @@ test("every registered strategy carries complete lifecycle metadata", () => {
       assert.equal(typeof s[field], "string", `${s.id}.${field} must be a string`);
       assert.ok(s[field].length > 0, `${s.id}.${field} must not be empty`);
     }
-    for (const field of ["supportsBacktest", "supportsLiveScanner", "liveEligible"]) {
+    for (const field of ["supportsBacktest", "supportsLiveScanner", "scannerEligible", "realMoneyEligible"]) {
       assert.equal(typeof s[field], "boolean", `${s.id}.${field} must be a boolean`);
     }
     assert.ok(LIFECYCLE_STATUSES.includes(s.status), `${s.id} has an unknown status`);
     assert.ok(s.requiredWarmupBars > 0);
+    // The old ambiguous field must not be served to any client.
+    assert.equal(s.liveEligible, undefined);
   }
 });
 
-test("mindset_v1 is the forward-paper scanner strategy, and is not live-eligible", () => {
+/* ── The two eligibilities ────────────────────────────────── */
+
+test("mindset_v1 is scanner eligible but NOT real-money eligible", () => {
   const mindset = describeById("mindset_v1");
   assert.equal(mindset.status, "forward-paper");
   assert.equal(mindset.supportsBacktest, true);
   assert.equal(mindset.supportsLiveScanner, true);
-  // Running forward on a paper ledger is not approval to trade real money.
-  assert.equal(mindset.liveEligible, false);
+  assert.equal(mindset.scannerEligible, true, "the live paper scanner runs it today");
+  assert.equal(mindset.realMoneyEligible, false, "running forward on paper is not approval to trade real money");
   assert.equal(mindset.version, "1.0.0");
 });
 
-test("smc_v1 stays backtest-only", () => {
+test("smc_v1 is neither scanner eligible nor real-money eligible", () => {
   const smc = describeById("smc_v1");
   assert.equal(smc.status, "backtest");
   assert.equal(smc.supportsBacktest, true);
   assert.equal(smc.supportsLiveScanner, false);
-  assert.equal(smc.liveEligible, false);
+  assert.equal(smc.scannerEligible, false);
+  assert.equal(smc.realMoneyEligible, false);
 });
 
-test("nothing is live-eligible yet", () => {
-  assert.deepEqual(listStrategies({ liveEligible: true }), []);
+test("nothing is real-money eligible", () => {
+  assert.deepEqual(listStrategies({ realMoneyEligible: true }), []);
 });
 
-test("existing in the registry does not confer eligibility — status and capability must BOTH agree", () => {
-  const base = { id: "x", name: "X", version: "0.1.0", description: "d", requiredWarmupBars: 1 };
+test("scanner eligibility needs capability AND a status that permits it", () => {
+  const base = {
+    id: "x",
+    name: "X",
+    version: "0.1.0",
+    description: "d",
+    supportsBacktest: true,
+    requiredWarmupBars: 1,
+  };
 
-  // Capability without the lifecycle having got there.
-  assert.equal(
-    computeLiveEligible({ ...base, status: "forward-paper", supportsLiveScanner: true, supportsBacktest: true }),
-    false,
-  );
-  // Lifecycle there, but the strategy cannot run in the scanner.
-  assert.equal(
-    computeLiveEligible({ ...base, status: "live-eligible", supportsLiveScanner: false, supportsBacktest: true }),
-    false,
-  );
-  // Both.
-  assert.equal(
-    computeLiveEligible({ ...base, status: "live-eligible", supportsLiveScanner: true, supportsBacktest: true }),
-    true,
-  );
+  // Capable, but the lifecycle has not reached forward operation.
+  for (const status of ["experimental", "backtest", "validated", "retired"]) {
+    assert.equal(
+      computeScannerEligible({ ...base, status, supportsLiveScanner: true }),
+      false,
+      `${status} must not confer scanner eligibility`,
+    );
+  }
+  // Status permits it, but the strategy cannot run in the scanner at all.
+  for (const status of SCANNER_STATUSES) {
+    assert.equal(computeScannerEligible({ ...base, status, supportsLiveScanner: false }), false);
+    assert.equal(computeScannerEligible({ ...base, status, supportsLiveScanner: true }), true);
+  }
 });
 
-test("a strategy cannot self-certify as live-eligible", () => {
+test("real-money eligibility is a lifecycle claim, independent of scanner capability", () => {
+  const base = { id: "x", name: "X", version: "0.1.0", description: "d", supportsBacktest: true, requiredWarmupBars: 1 };
+
+  assert.equal(computeRealMoneyEligible({ ...base, status: "forward-paper", supportsLiveScanner: true }), false);
+  assert.equal(computeRealMoneyEligible({ ...base, status: "validated", supportsLiveScanner: true }), false);
+  assert.equal(computeRealMoneyEligible({ ...base, status: "real-money-eligible", supportsLiveScanner: false }), true);
+});
+
+test("a strategy cannot self-certify either eligibility", () => {
   const rogue = {
     id: "rogue_v1",
     name: "Rogue",
@@ -96,10 +134,13 @@ test("a strategy cannot self-certify as live-eligible", () => {
     status: "backtest",
     supportsBacktest: true,
     supportsLiveScanner: false,
-    liveEligible: true, // ignored — eligibility is computed, never declared
+    scannerEligible: true, // ignored
+    realMoneyEligible: true, // ignored
     requiredWarmupBars: 10,
   };
-  assert.equal(describeStrategy(rogue).liveEligible, false);
+  const described = describeStrategy(rogue);
+  assert.equal(described.scannerEligible, false);
+  assert.equal(described.realMoneyEligible, false);
 });
 
 test("registration rejects a strategy with a bad status or no version", () => {
@@ -114,32 +155,79 @@ test("registration rejects a strategy with a bad status or no version", () => {
     requiredWarmupBars: 5,
   };
   assert.doesNotThrow(() => assertValidLifecycle(ok));
-  assert.throws(() => assertValidLifecycle({ ...ok, status: "totally-ready" }), /expected one of/);
+  assert.throws(() => assertValidLifecycle({ ...ok, status: "live-eligible" }), /expected one of/);
   assert.throws(() => assertValidLifecycle({ ...ok, version: undefined }), /must declare a version/);
   assert.throws(() => assertValidLifecycle({ ...ok, supportsLiveScanner: "yes" }), /must declare supportsBacktest/);
 });
 
-// The live scanner keeps its own strategy table (it must — it resolves a name
-// from an env var at construction). This asserts the two never disagree, which
-// is what stops a backtest-only strategy from being reachable by
-// LIVE_SCANNER_STRATEGY.
-test("the live scanner only wires up strategies the registry says may run live", () => {
-  const source = require("fs").readFileSync(
-    require.resolve("../src/services/trading/live-scanner.js"),
-    "utf8",
+/* ── Runtime enforcement ──────────────────────────────────── */
+//
+// Previously this was only asserted by reading the scanner's source. Now the
+// scanner asks the registry at construction, so these are real refusals.
+
+const lab = { book: () => ({}) };
+
+test("the scanner resolves an eligible strategy through the registry", () => {
+  const scanner = new LiveScannerService({ tradingLabService: lab, strategy: "mindset_v1" });
+  assert.equal(scanner.strategy, "mindset_v1");
+  assert.equal(scanner.status().strategy, "mindset_v1");
+  assert.equal(scanner.status().strategyVersion, "1.0.0");
+  assert.equal(scanner.status().mode, "paper");
+});
+
+test("the scanner refuses a backtest-only strategy instead of falling back", () => {
+  assert.throws(
+    () => new LiveScannerService({ tradingLabService: lab, strategy: "smc_v1" }),
+    (err) => /smc_v1/.test(err.message) && /does not support the live scanner/.test(err.message),
   );
-  const match = source.match(/const STRATEGIES = \{([^}]*)\}/);
-  assert.ok(match, "expected the live scanner to declare a STRATEGIES map");
+});
 
-  const wired = match[1]
-    .split(",")
-    .map((entry) => entry.split(":")[0].trim())
-    .filter(Boolean);
+test("the scanner refuses an unknown strategy, and names what is registered", () => {
+  assert.throws(
+    () => new LiveScannerService({ tradingLabService: lab, strategy: "moon_v9" }),
+    (err) => /Unknown strategy "moon_v9"/.test(err.message) && /mindset_v1/.test(err.message),
+  );
+});
 
-  assert.deepEqual(wired, ["mindset_v1"]);
-  for (const id of wired) {
-    assert.equal(describeById(id).supportsLiveScanner, true, `${id} is wired live but not marked for it`);
+test("being in the registry confers no scanner permission by itself", () => {
+  // smc_v1 is a first-class registry citizen — backtestable, versioned,
+  // described — and is still refused by the scanner.
+  assert.ok(describeById("smc_v1"), "smc_v1 is registered");
+  assert.throws(() => getScannerStrategy("smc_v1"), /does not support the live scanner/);
+
+  // And a strategy whose status merely permits forward operation is still
+  // refused when it cannot run in the scanner.
+  assert.throws(
+    () =>
+      getScannerStrategy(
+        // not registered under any id — presence is the whole question
+        "validated_but_absent",
+      ),
+    /Unknown strategy/,
+  );
+});
+
+test("the scanner's evaluator is the registry's, so forward and backtest cannot drift", () => {
+  const scanner = new LiveScannerService({ tradingLabService: lab, strategy: "mindset_v1" });
+  const { evaluateMindsetV1 } = require("../src/services/trading/strategies/mindset-v1-rules");
+
+  const candles = [];
+  for (let i = 0; i < 120; i += 1) {
+    const close = 100 + i * 0.2 + Math.sin(i / 9) * 4;
+    candles.push({
+      openTime: i * 900000,
+      closeTime: (i + 1) * 900000 - 1,
+      open: close - 0.2,
+      high: close + 1,
+      low: close - 1,
+      close,
+      volume: 1000,
+    });
   }
-  // And the converse: smc_v1 is not reachable from the scanner at all.
-  assert.ok(!wired.includes("smc_v1"));
+
+  const direct = evaluateMindsetV1(candles);
+  const viaScanner = scanner._strategyFn(candles);
+  assert.equal(viaScanner.signal, direct.signal);
+  assert.deepEqual(viaScanner.indicators, direct.indicators);
+  assert.deepEqual(viaScanner.reasons, direct.reasons);
 });
