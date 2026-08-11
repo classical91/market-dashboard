@@ -23,6 +23,7 @@ const { createTradingLabRouter } = require("./routes/trading-lab");
 const { createWatchlistRouter } = require("./routes/watchlist");
 const { createBotCommandsRouter } = require("./routes/bot-commands");
 const { createPatternTrackerRouter } = require("./routes/pattern-tracker");
+const { createLiveScannerRouter } = require("./routes/live-scanner");
 const { createHealthRouter } = require("./routes/health");
 const { createOnchainRouter } = require("./routes/onchain");
 const { createOverviewRouter } = require("./routes/overview");
@@ -46,6 +47,7 @@ const { StrategyEngineService } = require("./services/strategy-engine");
 const { SignalBotService } = require("./services/signal-bot");
 const { SignalTradeBridge } = require("./services/trading/signal-bridge");
 const { SignalActionStore } = require("./services/trading/signal-action-store");
+const { LiveScannerService } = require("./services/trading/live-scanner");
 const { WatchlistService } = require("./services/watchlist");
 const { BotCommandsService } = require("./services/bot-commands");
 const { PatternTrackerService } = require("./services/pattern-tracker");
@@ -169,6 +171,32 @@ function createApp() {
     minChecks: config.signalBot.minChecks,
   });
 
+  // Native live scanner: its own Bitget candle feed and strategy on a 60s
+  // loop, feeding the same Trading Lab paper pipeline as the signal bridge.
+  // Constructed even when disabled so /api/live-scanner/status can report the
+  // configuration — but a broken config only fails the boot when someone has
+  // explicitly asked for the scanner, rather than taking the dashboard down
+  // over an unused variable.
+  let liveScannerService = null;
+  try {
+    liveScannerService = new LiveScannerService({
+      tradingLabService,
+      signalActionStore,
+      stateCache: new PersistentReporterCache(path.join(dataDir, "live-scanner-state.json")),
+      enabled: config.liveScanner.enabled,
+      paperTradeEnabled: config.liveScanner.paperTradeEnabled,
+      symbol: config.liveScanner.symbol,
+      timeframe: config.liveScanner.timeframe,
+      strategy: config.liveScanner.strategy,
+      intervalMs: config.liveScanner.intervalMs,
+      contextInterval: config.liveScanner.contextInterval,
+      book: config.liveScanner.book,
+    });
+  } catch (err) {
+    if (config.liveScanner.enabled) throw err;
+    console.warn(`[LiveScanner] Not configured: ${err.message}`);
+  }
+
   const requireAdmin = createRequireAdmin({ adminKey: config.admin.apiKey });
 
   app.disable("x-powered-by");
@@ -221,6 +249,7 @@ function createApp() {
     }),
   );
   app.use("/api/trading-lab", createTradingLabRouter({ tradingLabService, backtestService, signalActionStore, requireAdmin }));
+  app.use("/api/live-scanner", createLiveScannerRouter({ liveScannerService, requireAdmin }));
   app.use("/api/watchlist", createWatchlistRouter({ watchlistService, requireAdmin }));
   app.use("/api/bot-commands", createBotCommandsRouter({ botCommandsService }));
   app.use("/api/pattern-tracker", createPatternTrackerRouter({ patternTrackerService }));
@@ -253,6 +282,7 @@ function createApp() {
   // The interval loop is started by server.js, not here — createApp() is also
   // used by tests and the build check, which must not leave timers running.
   app.locals.signalBot = signalBotService;
+  app.locals.liveScanner = liveScannerService;
 
   return app;
 }

@@ -154,6 +154,26 @@ const config = {
     // when no positions are open, so it defaults on; set to "false" to opt out.
     autoMarkEnabled: process.env.SIGNAL_BOT_AUTO_MARK_ENABLED !== "false",
   },
+  liveScanner: {
+    // Native live paper-trading scanner: pulls its own Bitget perpetual
+    // candles and runs its own strategy, so no TradingView webhook is needed.
+    // Off unless explicitly switched on by exact value — an unset or
+    // misspelled variable leaves it disabled rather than trading.
+    enabled: process.env.ENABLE_LIVE_SCANNER === "true",
+    symbol: process.env.LIVE_SCANNER_SYMBOL || "BTCUSDT.P",
+    timeframe: process.env.LIVE_SCANNER_TIMEFRAME || "15m",
+    strategy: process.env.LIVE_SCANNER_STRATEGY || "mindset_v1",
+    intervalMs: parseNumber(process.env.LIVE_SCANNER_INTERVAL_MS, 60 * 1000),
+    // Higher-timeframe context for the checklist's regime/daily-bias buckets.
+    // A 15m bar has no opinion on the daily trend, so this stays coarse.
+    contextInterval: process.env.LIVE_SCANNER_CONTEXT_INTERVAL || "4h",
+    book: process.env.LIVE_SCANNER_BOOK || "main",
+    // Paper positions are the point of enabling the scanner, so this defaults
+    // on once ENABLE_LIVE_SCANNER=true. Set it to "false" for an observe-only
+    // run that still scores and logs every signal but opens nothing. Either
+    // way the ledger is paper — no live-order code is reachable from here.
+    paperTradeEnabled: process.env.LIVE_SCANNER_PAPER_TRADE_ENABLED !== "false",
+  },
   traderclaw: {
     baseUrl: String(process.env.TRADERCLAW_BASE_URL || "").replace(/\/+$/, ""),
     requestTimeoutMs: parseNumber(process.env.TRADERCLAW_REQUEST_TIMEOUT_MS, 8000),

@@ -71,6 +71,12 @@
     </div>
 
     <div class="de-card">
+      <div class="de-card-title">Live Scanner</div>
+      <div class="de-card-note">Native Bitget perpetual scanner &mdash; pulls its own candles and runs its own strategy on a 60s loop, so no TradingView webhook is needed. Evaluates closed candles only, one entry per symbol/direction/candle, paper trades only. Enable with ENABLE_LIVE_SCANNER=true.</div>
+      <div id="tl-scanner"><div class="de-empty">Loading&hellip;</div></div>
+    </div>
+
+    <div class="de-card">
       <div class="de-card-title">Signal Bot Would-Have-Traded</div>
       <div class="de-card-note">Recent Signal Bot bridge decisions. Dry-run remains the default unless SIGNAL_BOT_PAPER_TRADE_ENABLED=true.</div>
       <div class="de-table-wrap">

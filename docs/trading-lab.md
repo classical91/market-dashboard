@@ -234,6 +234,68 @@ Auto-marking alone does not start the loop — it is a passive add-on to a cycle
 that is already happening. The loop runs when Telegram is configured or paper
 trading is enabled.
 
+### Live Scanner
+
+The Signal Bot bridge covers 4h/1D confluence signals off Binance *spot*
+klines. The Live Scanner is the same idea one timeframe down and on the venue
+the strategy actually trades:
+
+    Bitget candles  ->  mindset_v1  ->  TradingLab.execute()
+
+`src/services/trading/live-scanner.js`, started by `server.js` when
+`ENABLE_LIVE_SCANNER=true`. It is a separate service rather than another Signal
+Bot timeframe because all three of its inputs differ:
+
+- **Venue.** It reads Bitget USDT-perpetuals, so `BTCUSDT.P` is a real
+  instrument here instead of being proxied by its spot pair. The `.P` name is
+  kept in the ledger so scanner trades never merge with the bot's spot ones.
+- **Cadence.** A 60s poll on a 15m bar acts on a close within a minute, rather
+  than up to a full bar later.
+- **De-dupe contract.** The Signal Bot de-dupes on *state change*
+  (`FLAT -> LONG`). The scanner de-dupes on symbol + direction + candle close
+  time, persisted to `live-scanner-state.json`, so a restart mid-bar cannot
+  re-enter a candle that was already traded. The candle is claimed *before*
+  execute() runs: a setup the gates refuse stays refused for that bar instead
+  of being retried every 60 seconds.
+
+Everything downstream is shared. The strategy produces a direction and its
+indicator readings; the 0-100 confidence score, the size multiplier and the
+stop/target levels still come from checklist -> edge gate -> risk sizing, with
+regime and daily bias supplied by the decision engine at
+`LIVE_SCANNER_CONTEXT_INTERVAL`. The scanner never scores a trade itself.
+
+`mindset_v1` is the MVP strategy and deliberately small — EMA20/EMA50 for trend
+direction plus an RSI band filter (50-75 long, 25-50 short; the bands are what
+stop it entering an exhausted move). It is the scaffolding the real
+Mindset-Aligned Trend Entry rules get ported into; SMC belongs in a separate
+strategy behind the same `LIVE_SCANNER_STRATEGY` switch.
+
+Safety properties, each covered by a test in `test/live-scanner.test.js`:
+disabled unless `ENABLE_LIVE_SCANNER=true`; paper only, with no exchange-order
+code reachable from the file; closed candles only; at most one open position
+per symbol; at most one entry per candle; and an unreachable exchange recorded
+as an error the next tick retries rather than a crash.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `ENABLE_LIVE_SCANNER` | `false` | Opt in, by exact value `true`. |
+| `LIVE_SCANNER_SYMBOL` | `BTCUSDT.P` | `.P` maps to the Bitget `USDT-FUTURES` contract. |
+| `LIVE_SCANNER_TIMEFRAME` | `15m` | `1m`…`1d`; an unsupported value fails at boot. |
+| `LIVE_SCANNER_STRATEGY` | `mindset_v1` | Strategy switch. |
+| `LIVE_SCANNER_INTERVAL_MS` | `60000` | Poll cadence. |
+| `LIVE_SCANNER_CONTEXT_INTERVAL` | `4h` | Higher timeframe for regime/daily bias. |
+| `LIVE_SCANNER_BOOK` | `main` | Which book scanner trades land in. |
+| `LIVE_SCANNER_PAPER_TRADE_ENABLED` | `true` | Set `false` to score and log without opening. |
+
+Positions carrying a `live-scanner:` signal source are skipped by the Signal
+Bot bridge's auto-marking: the scanner marks them itself, on its own venue and
+timeframe. Marking them in the bridge would price a Bitget perpetual off
+Binance spot klines on the wrong interval.
+
+`GET /api/live-scanner/status` reports enabled/running state, last scan, last
+candle, last signal with its indicator readings, last action and last error;
+the Trading Lab page renders it.
+
 The `TRADERCLAW_BASE_URL` HTTP bridge on the Decision Engine page still works
 and is untouched by this change. It should be removed only once the running
 TraderClaw deployment is retired, since it is what currently surfaces that

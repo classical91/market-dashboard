@@ -43,6 +43,14 @@ function positionInterval(pos) {
   return match ? match[1] : DEFAULT_MARK_INTERVAL;
 }
 
+// Positions opened by the live scanner are marked by the live scanner, on its
+// own venue and timeframe. Marking them here would price a Bitget perpetual
+// (BTCUSDT.P) off the Binance spot klines this bridge reads, on the wrong
+// interval — so they are left to their owner.
+function ownedByLiveScanner(pos) {
+  return String((pos && pos.signalSource) || "").startsWith("live-scanner:");
+}
+
 function lastMarkedTime(pos) {
   const meta = (pos && pos.meta) || {};
   const value = meta.signalBridgeLastMarkedCloseTime;
@@ -125,6 +133,7 @@ class SignalTradeBridge {
 
     const groups = new Map();
     for (const pos of trader.getOpenPositions()) {
+      if (ownedByLiveScanner(pos)) continue;
       const interval = positionInterval(pos);
       const key = `${pos.symbol}:${interval}`;
       const since = lastMarkedTime(pos);
