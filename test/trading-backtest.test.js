@@ -68,6 +68,21 @@ function onlyAtEntryBar(direction) {
   return ({ bars }) => (bars.length === WARMUP ? direction : null);
 }
 
+async function captureBacktestDirs(fn) {
+  const original = fs.mkdtempSync;
+  const dirs = [];
+  fs.mkdtempSync = function patchedMkdtempSync(prefix, ...args) {
+    const dir = original.call(fs, prefix, ...args);
+    if (String(prefix).includes("md-backtest-")) dirs.push(dir);
+    return dir;
+  };
+  try {
+    await fn(dirs);
+  } finally {
+    fs.mkdtempSync = original;
+  }
+}
+
 test("a run needs more candles than its warmup", async () => {
   const service = makeService();
   await assert.rejects(
@@ -88,33 +103,46 @@ test("a completed run reports metrics in the same shape as a live book", async (
   assert.equal(result.stats.startingBalance, config.accountSize);
 });
 
+test("a backtest reports the execution cost assumptions it used", async () => {
+  const service = new BacktestService({
+    config: makeTradingConfig({ takerFeeRate: 0.0006, slippageRate: 0.0002, fundingRate8h: 0.0001 }),
+  });
+
+  const result = await service.run({ symbol: "BTCUSDT", candles: risingCandles(120) });
+  assert.deepEqual(result.costs, {
+    takerFeeRate: 0.0006,
+    slippageRate: 0.0002,
+    fundingRate8h: 0.0001,
+  });
+});
+
 test("a backtest never touches the live books and leaves no temp ledger behind", async () => {
   const service = makeService();
-  const before = fs.readdirSync(os.tmpdir()).filter((f) => f.startsWith("md-backtest-")).length;
 
-  const result = await service.run({ symbol: "BTCUSDT", candles: risingCandles(200) });
-  assert.ok(result.stats);
-
-  const after = fs.readdirSync(os.tmpdir()).filter((f) => f.startsWith("md-backtest-")).length;
-  assert.equal(after, before);
+  await captureBacktestDirs(async (dirs) => {
+    const result = await service.run({ symbol: "BTCUSDT", candles: risingCandles(200) });
+    assert.ok(result.stats);
+    assert.ok(dirs.length > 0);
+    dirs.forEach((dir) => assert.equal(fs.existsSync(dir), false));
+  });
 });
 
 test("the temp ledger is cleaned up even when the run throws", async () => {
   const service = makeService();
-  const before = fs.readdirSync(os.tmpdir()).filter((f) => f.startsWith("md-backtest-")).length;
 
-  await assert.rejects(() =>
-    service.run({
-      symbol: "BTCUSDT",
-      candles: risingCandles(200),
-      strategy: () => {
-        throw new Error("strategy exploded");
-      },
-    }),
-  );
-
-  const after = fs.readdirSync(os.tmpdir()).filter((f) => f.startsWith("md-backtest-")).length;
-  assert.equal(after, before);
+  await captureBacktestDirs(async (dirs) => {
+    await assert.rejects(() =>
+      service.run({
+        symbol: "BTCUSDT",
+        candles: risingCandles(200),
+        strategy: () => {
+          throw new Error("strategy exploded");
+        },
+      }),
+    );
+    assert.ok(dirs.length > 0);
+    dirs.forEach((dir) => assert.equal(fs.existsSync(dir), false));
+  });
 });
 
 /* ── Lookahead ────────────────────────────────────────────── */

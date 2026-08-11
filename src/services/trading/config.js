@@ -69,6 +69,18 @@ function validate(config) {
   if (config.tradingMode !== "paper" && config.tradingMode !== "live") {
     throw new TradingConfigError(`TRADING_MODE must be 'paper' or 'live', got ${JSON.stringify(config.tradingMode)}`);
   }
+  for (const [key, value] of Object.entries({
+    takerFeeRate: config.takerFeeRate,
+    slippageRate: config.slippageRate,
+    fundingRate8h: config.fundingRate8h,
+  })) {
+    if (!Number.isFinite(value)) {
+      throw new TradingConfigError(`${key} must be finite`);
+    }
+  }
+  if (config.takerFeeRate < 0 || config.slippageRate < 0) {
+    throw new TradingConfigError("Trading cost rates cannot be negative");
+  }
   // Live trading needs every safety belt fastened before startup succeeds.
   if (config.tradingMode === "live" && !config.allowLiveTrading) {
     throw new TradingConfigError(
@@ -103,6 +115,13 @@ function loadTradingConfig(overrides = {}) {
     // ── Trade management ────────────────────────────────────────────────────
     tp1CloseFraction: envNumber("TP1_CLOSE_FRACTION", 0.5),
     moveStopToBreakevenAtTp1: envBool("MOVE_STOP_TO_BREAKEVEN_AT_TP1", true),
+
+    // ── Execution costs ─────────────────────────────────────────────────────
+    // Rates are decimal fractions: 0.0006 = 0.06%. Defaults keep legacy paper
+    // math unchanged until a deployment opts into realistic costs.
+    takerFeeRate: envNumber("BACKTEST_TAKER_FEE_RATE", 0),
+    slippageRate: envNumber("BACKTEST_SLIPPAGE_RATE", 0),
+    fundingRate8h: envNumber("BACKTEST_FUNDING_RATE_8H", 0),
 
     // ── Kill switches ───────────────────────────────────────────────────────
     dailyLossLimitPct: envNumber("DAILY_LOSS_LIMIT_PCT", 3),

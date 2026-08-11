@@ -204,6 +204,34 @@ test("a manual close exits the remainder at the given price", async () => {
   assert.equal(await trader.closePosition(pos.id, { exitPrice: 108 }), null);
 });
 
+test("execution costs are recorded on entry and exits", async () => {
+  const trader = makeTrader({ takerFeeRate: 0.001, slippageRate: 0.001, fundingRate8h: 0.0008 });
+  openLong(trader, { openedAt: 0 });
+
+  const [open] = trader.getOpenPositions();
+  assert.equal(open.entryPrice, 100.1);
+  assert.equal(open.costs.entryFee, 0.1);
+  assert.equal(trader.getAccount().balance, 9999.9);
+
+  await trader.updatePositions({ BTCUSDT: 116 }, { at: 8 * 60 * 60 * 1000 });
+  const [updated] = trader.getOpenPositions();
+  assert.equal(updated.exits[0].requestedPrice, 115);
+  assert.equal(updated.exits[0].price, 114.885);
+  assert.equal(updated.exits[0].fee, 0.06);
+  assert.equal(updated.exits[0].funding, 0.04);
+  assert.ok(updated.realizedPnl < 7.5);
+});
+
+test("closed trades use the simulated exit timestamp when provided", async () => {
+  const trader = makeTrader();
+  openLong(trader, { openedAt: 0 });
+
+  await trader.updatePositions({ BTCUSDT: 85 }, { at: 12345 });
+  const [closed] = trader.getHistory();
+  assert.equal(closed.closedAt, new Date(12345).toISOString());
+  assert.equal(closed.exits[0].at, new Date(12345).toISOString());
+});
+
 test("daily and weekly P&L reset when the UTC day rolls over", () => {
   const trader = makeTrader();
   const account = trader.getAccount();
