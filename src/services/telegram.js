@@ -140,7 +140,6 @@ function formatSignalAlert(transition, actions, dashboardUrl = "") {
   const decision = action && action.decision ? `Checklist: ${action.decision}` : null;
   const confidence = action && action.confidenceScore != null ? `Confidence: ${action.confidenceScore}` : null;
   const view = dashboardLink(dashboardUrl, "/signal-screener.html");
-  const readme = dashboardLink(dashboardUrl, "/alpha-team.html");
 
   return [
     `<b>SIGNAL</b> | <b>${escapeHtml(transition.symbol)}</b> ${escapeHtml(transition.interval)} | ${escapeHtml(pattern)}`,
@@ -150,7 +149,6 @@ function formatSignalAlert(transition, actions, dashboardUrl = "") {
     decision || confidence ? [decision, confidence].filter(Boolean).join(" | ") : null,
     `Verdict: ${escapeHtml(verdict)}`,
     view ? `Visit: ${escapeHtml(view)}` : null,
-    readme ? `Readme: ${escapeHtml(readme)}` : null,
   ].filter(Boolean).join("\n");
 }
 
@@ -323,7 +321,6 @@ class TelegramService {
   async postPatternAlerts(events) {
     if (!this.configured || !events.length) return;
     const view = dashboardLink(this._dashboardUrl, "/pattern-scanner.html");
-    const readme = dashboardLink(this._dashboardUrl, "/alpha-team.html");
     const rows = events.map((e) => {
       const biasEmoji = e.bias === "bullish" ? "🟢" : "🔴";
       if (e.kind === "breakout") {
@@ -334,7 +331,6 @@ class TelegramService {
           "Evidence: pattern moved from forming to breakout",
           "Verdict: watch for confirmation; act only after checklist/edge gate",
           view ? `Visit: ${escapeHtml(view)}` : null,
-          readme ? `Readme: ${escapeHtml(readme)}` : null,
         ].filter(Boolean).join("\n");
       }
       const bias = e.bias === "bullish" ? "bullish reversal watch" : "bearish reversal watch";
@@ -344,7 +340,6 @@ class TelegramService {
         "Evidence: fresh divergence state detected",
         "Verdict: watch for structure confirmation; no automatic action",
         view ? `Visit: ${escapeHtml(view)}` : null,
-        readme ? `Readme: ${escapeHtml(readme)}` : null,
       ].filter(Boolean).join("\n");
     });
     const header = "📈 <b>PATTERN SCANNER</b>\n\n";

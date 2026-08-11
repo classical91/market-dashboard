@@ -83,7 +83,7 @@ Most keys are optional. The app is designed to degrade to fallback data where po
 - `OPENAI_API_KEY` - enables report generation.
 - `REPORTER_MODEL` - OpenAI model for reporter generation, defaults to `gpt-5.4-mini`.
 - `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_IDS` - enable Telegram delivery.
-- `MARKET_DASHBOARD_URL` - public base URL used for Alpha Team `Visit:` and `Readme:` links.
+- `MARKET_DASHBOARD_URL` - public base URL used for Alpha Team `Visit:` links.
 - `ALPHA_TEAM_ACCESS_CODE` - optional access code for Alpha Team shared pages opened with `?view=alpha`.
 
 ### Market Overview
@@ -102,7 +102,7 @@ Most keys are optional. The app is designed to degrade to fallback data where po
 
 ### Signal Bot Telegram Alerts
 
-Signal Bot Telegram messages are formatted for Jason's Alpha Team group. They are intentionally high-signal ops updates: each signal includes tier, symbol/timeframe, pattern label, bias, trend regime, indicator evidence, Trading Lab verdict, concise risk framing, a `Visit:` link, and a `Readme:` link when `MARKET_DASHBOARD_URL` is configured. Pattern Scanner alerts use the same style for breakouts and fresh divergences, linking only to available dashboard pages. Shared links open in Alpha review mode (`?view=alpha`), where the requested page renders without the dashboard sidebar/tabs. When `ALPHA_TEAM_ACCESS_CODE` is configured, the shared page stays blurred behind an Alpha Team access prompt until the code is accepted. The Alpha Team readme lives at `/alpha-team.html?view=alpha`. Messages must stay free of secrets, private account details, account-mode wording, internal dry-run wording, and financial-advice framing. Unfinished setup sources should appear as blurred `BETA` modules inside the dashboard, not as direct group links.
+Signal Bot Telegram messages are formatted for Jason's Alpha Team group. They are intentionally high-signal ops updates: each signal includes tier, symbol/timeframe, pattern label, bias, trend regime, indicator evidence, Trading Lab verdict, concise risk framing, and a `Visit:` link when `MARKET_DASHBOARD_URL` is configured. Pattern Scanner alerts use the same style for breakouts and fresh divergences, linking only to available dashboard pages. Shared links open in Alpha review mode (`?view=alpha`), where the requested page renders without the dashboard sidebar/tabs. When `ALPHA_TEAM_ACCESS_CODE` is configured, the shared page stays blurred behind an Alpha Team access prompt until the code is accepted. Messages must stay free of secrets, private account details, account-mode wording, internal dry-run wording, and financial-advice framing. Unfinished setup sources should appear as blurred `BETA` modules inside the dashboard, not as direct group links.
 
 ### Live Scanner
 
