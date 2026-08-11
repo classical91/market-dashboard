@@ -276,6 +276,11 @@ inbound endpoint to authenticate.
 - **Degrades quietly.** An unreachable decision engine costs the setup its
   trend/macro points and evaluation continues; any bridge failure is caught so
   that a paper-trading fault never costs the deploy its Telegram alerts.
+- **Alpha Team format.** Telegram alerts are group-facing ops updates, not raw
+  bot logs. Screener transitions include tier, symbol/timeframe, pattern label,
+  bias, trend regime, indicator evidence, Trading Lab verdict, and paper-only
+  risk framing. Pattern Scanner breakouts/divergences use the same concise
+  watch/verdict structure.
 - **Auto-marking** runs first in each cycle, over *every* book — so hand-opened
   positions are managed too — letting stops and targets fire without the page
   open. It updates the ledger the kill switches read before that cycle's

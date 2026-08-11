@@ -47,6 +47,87 @@ function countWords(text) {
   return trimmed.split(/\s+/).filter(Boolean).length;
 }
 
+function formatNumber(value, digits = 2) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  return n.toLocaleString("en-US", { maximumFractionDigits: digits });
+}
+
+function formatPrice(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  const digits = n >= 100 ? 2 : n >= 1 ? 4 : 6;
+  return n.toLocaleString("en-US", { maximumFractionDigits: digits });
+}
+
+function patternLabel(transition) {
+  const direction = transition.to;
+  const trend = transition.trendRegime || "MIXED";
+  const indicators = transition.indicators || {};
+  const checks = direction === "LONG" ? indicators.bullishChecks : indicators.bearishChecks;
+  const rsiValue = Number(indicators.rsi);
+  const adxValue = Number(indicators.adx);
+  const strongTrend = Number.isFinite(adxValue) && adxValue >= 25;
+  const resetLong = direction === "LONG" && Number.isFinite(rsiValue) && rsiValue >= 50 && rsiValue <= 62;
+  const resetShort = direction === "SHORT" && Number.isFinite(rsiValue) && rsiValue <= 50 && rsiValue >= 38;
+
+  if ((trend === "TREND_UP" && resetLong) || (trend === "TREND_DOWN" && resetShort)) return "trend_pullback";
+  if (checks >= 5 && strongTrend) return "momentum_continuation";
+  if (indicators.aboveVwap === (direction === "LONG") && indicators.volumeAboveAverage) return "vwap_volume_break";
+  return direction === "LONG" ? "bullish_confluence" : direction === "SHORT" ? "bearish_confluence" : "signal_flip";
+}
+
+function evidenceLines(transition) {
+  const direction = transition.to;
+  const i = transition.indicators || {};
+  const rows = [];
+  const rsiValue = formatNumber(i.rsi, 1);
+  const adxValue = formatNumber(i.adx, 1);
+  const checks = direction === "LONG" ? i.bullishChecks : i.bearishChecks;
+
+  if (checks != null) rows.push(`${direction === "LONG" ? "Bullish" : "Bearish"} checks ${checks}/6`);
+  if (rsiValue) rows.push(`RSI ${rsiValue} ${direction === "LONG" ? "above" : "below"} 50`);
+  if (i.macdBullish != null) rows.push(`MACD ${i.macdBullish ? "bullish" : "bearish"}`);
+  if (i.aboveVwap != null) rows.push(`Price ${i.aboveVwap ? "above" : "below"} VWAP`);
+  if (i.ema20AboveEma50 != null) rows.push(`EMA20 ${i.ema20AboveEma50 ? "above" : "below"} EMA50`);
+  if (i.priceAboveEma200 != null) rows.push(`Price ${i.priceAboveEma200 ? "above" : "below"} EMA200`);
+  if (i.volumeAboveAverage != null) rows.push(`Volume ${i.volumeAboveAverage ? "above" : "not above"} average`);
+  if (adxValue) rows.push(`ADX ${adxValue}`);
+  return rows.slice(0, 5);
+}
+
+function actionForTransition(actions, transition) {
+  return (actions || []).find((action) => (
+    action
+    && action.symbol === transition.symbol
+    && action.interval === transition.interval
+    && action.direction === transition.to
+  )) || null;
+}
+
+function formatSignalAlert(transition, actions) {
+  const action = actionForTransition(actions, transition);
+  const pattern = patternLabel(transition);
+  const price = formatPrice(transition.price);
+  const score = transition.score != null ? `${transition.score}%` : "n/a";
+  const trend = transition.trendRegime || "MIXED";
+  const evidence = evidenceLines(transition).join("; ") || "Confluence flip";
+  const verdict = action
+    ? `${String(action.status || "checked").toUpperCase()}: ${action.reason || "Trading Lab reviewed"}`
+    : "WATCH: Trading Lab verdict pending";
+  const decision = action && action.decision ? `Checklist: ${action.decision}` : null;
+  const confidence = action && action.confidenceScore != null ? `Confidence: ${action.confidenceScore}` : null;
+
+  return [
+    `<b>SIGNAL</b> | <b>${escapeHtml(transition.symbol)}</b> ${escapeHtml(transition.interval)} | ${escapeHtml(pattern)} | paper only`,
+    `Bias: <b>${escapeHtml(transition.to)}</b>${price ? ` near ${escapeHtml(price)}` : ""} (${escapeHtml(score)})`,
+    `Regime: ${escapeHtml(trend)}`,
+    `Evidence: ${escapeHtml(evidence)}`,
+    decision || confidence ? [decision, confidence].filter(Boolean).join(" | ") : null,
+    `Verdict: ${escapeHtml(verdict)}`,
+  ].filter(Boolean).join("\n");
+}
+
 function truncateWords(text, maxWords) {
   const source = String(text || "");
   if (maxWords <= 0) return "";
@@ -200,15 +281,11 @@ class TelegramService {
    * scan can flip a dozen tokens at once and one message reads far better
    * than a burst of twelve.
    */
-  async postSignalAlerts(transitions) {
+  async postSignalAlerts(transitions, tradeActions = []) {
     if (!this.configured || !transitions.length) return;
-    const rows = transitions.map((t) => {
-      const emoji = { LONG: "🟢", SHORT: "🔴" }[t.to] || "⚪";
-      const score = t.score != null ? ` (${t.score}%)` : "";
-      return `${emoji} <b>${escapeHtml(t.symbol)}</b> · ${escapeHtml(t.interval)}: ${escapeHtml(t.from)} → <b>${escapeHtml(t.to)}</b>${score}`;
-    });
-    const header = "⚡ <b>SIGNAL SCREENER</b>\n\n";
-    await this._sendToAll(truncate(header + rows.join("\n"), MAX_MSG_LEN));
+    const rows = transitions.map((t) => formatSignalAlert(t, tradeActions));
+    const header = "⚡ <b>ALPHA TEAM SIGNALS</b>\n\n";
+    await this._sendToAll(truncate(header + rows.join("\n\n"), MAX_MSG_LEN));
   }
 
   /**
@@ -221,12 +298,24 @@ class TelegramService {
     const rows = events.map((e) => {
       const biasEmoji = e.bias === "bullish" ? "🟢" : "🔴";
       if (e.kind === "breakout") {
-        return `${biasEmoji} <b>${escapeHtml(e.symbol)}</b> · ${escapeHtml(e.interval)}: ${escapeHtml(e.name)} → <b>Breakout</b> (${e.score})`;
+        const bias = e.bias === "bullish" ? "LONG watch" : "SHORT watch";
+        return [
+          `${biasEmoji} <b>WATCH</b> | <b>${escapeHtml(e.symbol)}</b> ${escapeHtml(e.interval)} | ${escapeHtml(e.name)} breakout`,
+          `Bias: ${escapeHtml(bias)} (${escapeHtml(String(e.score ?? "n/a"))})`,
+          "Evidence: pattern moved from forming to breakout",
+          "Verdict: watch for confirmation; paper trade only after checklist/edge gate",
+        ].join("\n");
       }
-      return `${biasEmoji} <b>${escapeHtml(e.symbol)}</b> · ${escapeHtml(e.interval)}: <b>${escapeHtml(e.name)}</b> Divergence`;
+      const bias = e.bias === "bullish" ? "bullish reversal watch" : "bearish reversal watch";
+      return [
+        `${biasEmoji} <b>WATCH</b> | <b>${escapeHtml(e.symbol)}</b> ${escapeHtml(e.interval)} | ${escapeHtml(e.name)} divergence`,
+        `Bias: ${escapeHtml(bias)}`,
+        "Evidence: fresh divergence state detected",
+        "Verdict: watch for structure confirmation; no automatic live trade",
+      ].join("\n");
     });
     const header = "📈 <b>PATTERN SCANNER</b>\n\n";
-    await this._sendToAll(truncate(header + rows.join("\n"), MAX_MSG_LEN));
+    await this._sendToAll(truncate(header + rows.join("\n\n"), MAX_MSG_LEN));
   }
 
   /**
