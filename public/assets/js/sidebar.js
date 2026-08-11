@@ -8,12 +8,15 @@
   var workspace = [
     { href: "/terminal-suite.html", icon: "&#128421;", label: "Terminal Suite" },
     {
-      label: "Market Overview",
+      label: "Market Command",
       icon: "&#128202;",
       children: [
         { href: "/", icon: "&#127968;", label: "Top" },
         { href: "/#ticker", icon: "&#128200;", label: "Ticker" },
-        { href: "/#market-crypto-widgets", icon: "&#8383;", label: "Crypto Widgets" },
+        { href: "/#macro-regime", icon: "&#127919;", label: "Macro Regime" },
+        { href: "/#confluence", icon: "&#9878;&#65039;", label: "Confluence" },
+        { href: "/#strategy-engine", icon: "&#129514;", label: "Strategy Engine" },
+        { href: "/#cross-asset", icon: "&#128200;", label: "Cross-Asset" },
         { href: "/#calendars-tools", icon: "&#128197;", label: "Calendars & Tools" },
         { href: "/#kpiGrid", icon: "&#128202;", label: "Key Indicators" },
         { href: "/#market-pulse", icon: "&#128201;", label: "Market Pulse" },

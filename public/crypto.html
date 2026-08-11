@@ -20,6 +20,22 @@
       </div>
     </div>
 
+    <section class="crypto-widgets" aria-labelledby="cryptoWidgetsTitle">
+      <div class="crypto-widgets__bar">
+        <div>
+          <h2 class="crypto-widgets__title" id="cryptoWidgetsTitle">Crypto Market Widgets</h2>
+          <p class="crypto-widgets__subtitle">Read-only live snapshot for BTC, ETH, dominance, volume, and regime.</p>
+        </div>
+        <div class="crypto-widgets__actions">
+          <span class="crypto-feed-pill" id="cryptoWidgetsStatus">Loading</span>
+          <button class="crypto-refresh-btn" id="cryptoWidgetsRefresh" type="button">Refresh</button>
+        </div>
+      </div>
+      <div class="crypto-widgets__meta" id="cryptoWidgetsMeta">Fetching market data...</div>
+      <div class="crypto-widget-grid" id="cryptoWidgetsGrid" aria-live="polite"></div>
+      <div class="crypto-widget-alert" id="cryptoWidgetsAlert" hidden></div>
+    </section>
+
     <!-- INTERACTIVE DASHBOARDS -->
     <div class="section-header" data-section="interactive-dashboards">
       <span class="section-label">Interactive Dashboards</span>
@@ -323,6 +339,7 @@
 
 <script src="/assets/js/sidebar.js"></script>
 <script src="/assets/js/sections.js"></script>
+<script src="/assets/js/crypto.js"></script>
 <script>
   (function () {
     initSections('crypto_collapsed');

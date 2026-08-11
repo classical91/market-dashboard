@@ -88,7 +88,7 @@
       read: "Watch for price gravitating toward the “max pain” strike (the level causing the most option holders to lose money) in the days leading into a large expiry.",
       pages: [
         { label: "Traditional → Market Data", href: "/traditional.html#market-data" },
-        { label: "Market Overview → Calendars & Tools", href: "/#calendars-tools" },
+        { label: "Market Command → Calendars & Tools", href: "/#calendars-tools" },
       ],
     },
 
@@ -198,7 +198,7 @@
       read: "Extreme Fear readings have historically been decent contrarian buy zones; Extreme Greed readings have historically preceded pullbacks. It's a sentiment gauge, not a standalone timing signal.",
       pages: [
         { label: "Crypto Hub → Bitcoin Research", href: "/crypto.html#crypto-research" },
-        { label: "Market Overview → Calendars & Tools", href: "/#calendars-tools" },
+        { label: "Market Command → Calendars & Tools", href: "/#calendars-tools" },
       ],
     },
     {
@@ -258,7 +258,7 @@
       read: "Rate hikes (or hawkish guidance) are typically a headwind for crypto/equities by tightening liquidity; rate cuts (or dovish guidance) are typically supportive.",
       pages: [
         { label: "Traditional → Macro", href: "/traditional.html#macro" },
-        { label: "Market Overview → Calendars & Tools", href: "/#calendars-tools" },
+        { label: "Market Command → Calendars & Tools", href: "/#calendars-tools" },
       ],
     },
     {
@@ -1066,7 +1066,7 @@
       id: "news-macro-events", term: "News & Macro Events", category: "Market Fundamentals",
       def: "Economic reports, central bank decisions, and geopolitical developments that can trigger sudden, outsized price moves as the market reprices its expectations.",
       read: "Headlines become candles. Markets react to the surprise versus the forecast, not the raw number — know the calendar (CPI, FOMC, NFP, geopolitical shocks) so a release doesn't catch you mid-trade.",
-      pages: [{ label: "Market Overview → Calendars & Tools", href: "/#calendars-tools" }],
+      pages: [{ label: "Market Command → Calendars & Tools", href: "/#calendars-tools" }],
     },
     {
       id: "stock-market", term: "Stock Market", category: "Market Fundamentals",
