@@ -140,6 +140,13 @@ function clamp(value, min, max) {
 const smcV1 = {
   id: "smc_v1",
   name: "SMC v1",
+  version: "1.0.0",
+  // Backtest-only, deliberately. It has never run forward on a single live
+  // candle, so anything above `backtest` would be a claim the evidence does
+  // not support.
+  status: "backtest",
+  supportsBacktest: true,
+  supportsLiveScanner: false,
   description:
     "Conservative Smart Money Concepts approximation: higher-timeframe (or EMA) trend, break of structure on a confirmed swing, a displacement candle leaving a fair value gap, entered on the retest of that gap. Backtest only.",
   requiredWarmupBars: REQUIRED_WARMUP_BARS,

@@ -9,10 +9,18 @@
 //   {
 //     id: string                    // stable key used in APIs and ledgers
 //     name: string                  // human label
+//     version: string               // recorded on every experiment
 //     description: string
+//     status: string                // research lifecycle — see ./lifecycle.js
+//     supportsBacktest: boolean     // may be replayed by the backtester
+//     supportsLiveScanner: boolean  // may be run forward by the live scanner
 //     requiredWarmupBars: number    // bars needed before its first real signal
 //     evaluate(candles, index, context) -> signal
 //   }
+//
+// `liveEligible` is NOT a field a strategy sets. It is computed from status +
+// capability (./lifecycle.js), so being in the registry never implies being
+// ready to trade.
 //
 // `evaluate` is handed the full candle array plus the index of the bar being
 // decided, and must read nothing past that index — that contract is what keeps
@@ -38,20 +46,41 @@
 
 const { mindsetV1 } = require("./mindset-v1");
 const { smcV1 } = require("./smc-v1");
+const {
+  LIFECYCLE_STATUSES,
+  computeLiveEligible,
+  assertValidLifecycle,
+  describeStrategy,
+} = require("./lifecycle");
 
-const STRATEGIES = [mindsetV1, smcV1];
+// Validated at load: a strategy with a bad status or no version fails the
+// process at startup rather than producing unreproducible experiments later.
+const STRATEGIES = [mindsetV1, smcV1].map(assertValidLifecycle);
 
 const BY_ID = new Map(STRATEGIES.map((strategy) => [strategy.id, strategy]));
 
 const DEFAULT_STRATEGY_ID = "mindset_v1";
 
-function listStrategies() {
-  return STRATEGIES.map(({ id, name, description, requiredWarmupBars }) => ({
-    id,
-    name,
-    description,
-    requiredWarmupBars,
-  }));
+// Every registered strategy's metadata. Optional filters exist because the
+// two real questions callers ask are "what can I backtest?" and "what may the
+// live scanner run?", and answering those by hand at each call site is how
+// capability checks drift apart.
+function listStrategies({ supportsBacktest, supportsLiveScanner, status, liveEligible } = {}) {
+  return STRATEGIES.map(describeStrategy).filter(
+    (s) =>
+      (supportsBacktest === undefined || s.supportsBacktest === supportsBacktest) &&
+      (supportsLiveScanner === undefined || s.supportsLiveScanner === supportsLiveScanner) &&
+      (status === undefined || s.status === status) &&
+      (liveEligible === undefined || s.liveEligible === liveEligible),
+  );
+}
+
+// The metadata for one strategy, or null. Unlike getStrategy() this does not
+// throw — callers asking "what is this?" are usually not in a position to
+// turn a typo into a 400.
+function describe(id) {
+  const strategy = BY_ID.get(String(id || ""));
+  return strategy ? describeStrategy(strategy) : null;
 }
 
 function hasStrategy(id) {
@@ -75,7 +104,11 @@ function getStrategy(id) {
 module.exports = {
   STRATEGIES,
   DEFAULT_STRATEGY_ID,
+  LIFECYCLE_STATUSES,
   listStrategies,
+  describe,
+  describeStrategy,
+  computeLiveEligible,
   hasStrategy,
   getStrategy,
 };

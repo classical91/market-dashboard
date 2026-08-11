@@ -25,7 +25,13 @@ function requireFields(body, fields) {
   }
 }
 
-function createTradingLabRouter({ tradingLabService, backtestService, signalActionStore = null, requireAdmin }) {
+function createTradingLabRouter({
+  tradingLabService,
+  backtestService,
+  signalActionStore = null,
+  experimentStore = null,
+  requireAdmin,
+}) {
   const router = Router();
 
   // ── Reads ─────────────────────────────────────────────────────────────────
@@ -40,6 +46,37 @@ function createTradingLabRouter({ tradingLabService, backtestService, signalActi
   // and the UI needs it to populate the selector before any admin key exists.
   router.get("/strategies", (req, res) => {
     res.json({ default: DEFAULT_STRATEGY_ID, strategies: listStrategies() });
+  });
+
+  // ── Research history ──────────────────────────────────────────────────────
+  // Public like the other reads: an experiment is a record of a replay over
+  // public candles, spends nothing to serve, and reveals no position or key.
+  // Read-only by design — promotion decisions are not made over HTTP.
+
+  router.get("/experiments", (req, res) => {
+    if (!experimentStore) {
+      res.json({ total: 0, items: [], recording: false });
+      return;
+    }
+    const filters = {};
+    for (const key of ["strategy", "version", "symbol", "timeframe"]) {
+      const value = req.query[key];
+      if (typeof value === "string" && value !== "") filters[key] = value;
+    }
+    res.json({
+      ...experimentStore.list({ ...filters, limit: numberOr(req.query.limit, 100) }),
+      filters,
+      recording: true,
+    });
+  });
+
+  router.get("/experiments/:id", (req, res) => {
+    const experiment = experimentStore ? experimentStore.get(req.params.id) : null;
+    if (!experiment) {
+      res.status(404).json({ error: `No experiment with id ${req.params.id}` });
+      return;
+    }
+    res.json({ experiment });
   });
 
   router.get("/books", (req, res) => {
@@ -176,6 +213,10 @@ function createTradingLabRouter({ tradingLabService, backtestService, signalActi
           ? DEFAULT_STRATEGY_ID
           : String(body.strategy),
         options: body.options || {},
+        // Opt-in: an unrecorded run is the default so that exploring does not
+        // fill the research log with noise.
+        record: body.record === true || body.record === "true",
+        notes: typeof body.notes === "string" && body.notes ? body.notes.slice(0, 500) : null,
       }),
     );
   }));

@@ -47,6 +47,7 @@ const { StrategyEngineService } = require("./services/strategy-engine");
 const { SignalBotService } = require("./services/signal-bot");
 const { SignalTradeBridge } = require("./services/trading/signal-bridge");
 const { SignalActionStore } = require("./services/trading/signal-action-store");
+const { ExperimentStore } = require("./services/trading/experiment-store");
 const { LiveScannerService } = require("./services/trading/live-scanner");
 const { WatchlistService } = require("./services/watchlist");
 const { BotCommandsService } = require("./services/bot-commands");
@@ -128,6 +129,9 @@ function createApp() {
   const botCommandsService = new BotCommandsService({ dataDir });
   const patternTrackerService = new PatternTrackerService({ dataDir, fetchPrice: fetchBinancePrice });
   const signalActionStore = new SignalActionStore({ dataDir });
+  // Research history. Deliberately its own store under <dataDir>/research, so
+  // resetting a paper book can never disturb the record of what was tested.
+  const experimentStore = new ExperimentStore({ dataDir });
   const decisionEngineService = new DecisionEngineService({
     marketDataService,
     signalScreenerService,
@@ -146,7 +150,7 @@ function createApp() {
   // Backtests replay the same paper-trading engine over historical candles, so
   // a backtest and a forward paper run agree by construction. It reuses the
   // screener's cached klines rather than fetching its own.
-  const backtestService = new BacktestService({ signalScreenerService });
+  const backtestService = new BacktestService({ signalScreenerService, experimentStore });
   // Signal transitions are the replacement for the TradingView alert webhooks:
   // the bot already detects FLAT -> LONG/SHORT on closed candles, on a timer,
   // without a subscription. The bridge scores those through the Trading Lab —
@@ -248,7 +252,7 @@ function createApp() {
       traderclaw: config.traderclaw,
     }),
   );
-  app.use("/api/trading-lab", createTradingLabRouter({ tradingLabService, backtestService, signalActionStore, requireAdmin }));
+  app.use("/api/trading-lab", createTradingLabRouter({ tradingLabService, backtestService, signalActionStore, experimentStore, requireAdmin }));
   app.use("/api/live-scanner", createLiveScannerRouter({ liveScannerService, requireAdmin }));
   app.use("/api/watchlist", createWatchlistRouter({ watchlistService, requireAdmin }));
   app.use("/api/bot-commands", createBotCommandsRouter({ botCommandsService }));
