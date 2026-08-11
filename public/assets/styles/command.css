@@ -56,6 +56,27 @@ body {
   min-height: 100vh;
 }
 
+.alpha-review-mode .app {
+  display: block;
+}
+
+.alpha-review-mode .cmd-sidebar,
+.alpha-review-mode .sidebar,
+.alpha-review-mode .cmd-mobile-bar,
+.alpha-review-mode .mob-bar,
+.alpha-review-mode .cmd-drawer,
+.alpha-review-mode .mob-drawer,
+.alpha-review-mode .cmd-overlay,
+.alpha-review-mode .mob-overlay {
+  display: none !important;
+}
+
+.alpha-review-mode .cmd-main,
+.alpha-review-mode .main {
+  width: 100%;
+  min-height: 100vh;
+}
+
 /* ── Sidebar ──────────────────────────────────────────── */
 .cmd-sidebar {
   border-right: 1px solid var(--border);

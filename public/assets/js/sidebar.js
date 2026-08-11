@@ -5,6 +5,18 @@
     window.AppSettings.applyTheme(window.AppSettings.getTheme());
   }
 
+  function isAlphaReviewMode() {
+    try {
+      return new URLSearchParams(window.location.search || "").get("view") === "alpha";
+    } catch {
+      return false;
+    }
+  }
+
+  if (isAlphaReviewMode()) {
+    document.documentElement.classList.add("alpha-review-mode");
+  }
+
   var workspace = [
     { href: "/terminal-suite.html", icon: "&#128421;", label: "Terminal Suite" },
     {
@@ -216,14 +228,6 @@
     if (hash) return currentHash === hash;
 
     return true;
-  }
-
-  function isAlphaReviewMode() {
-    try {
-      return new URLSearchParams(window.location.search || "").get("view") === "alpha";
-    } catch {
-      return false;
-    }
   }
 
   function alphaReviewPath(href) {
