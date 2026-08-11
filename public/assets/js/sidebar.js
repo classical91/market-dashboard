@@ -8,11 +8,12 @@
   var workspace = [
     { href: "/terminal-suite.html", icon: "&#128421;", label: "Terminal Suite" },
     {
-      label: "Overview",
+      label: "Market Overview",
       icon: "&#128202;",
       children: [
         { href: "/", icon: "&#127968;", label: "Top" },
         { href: "/#ticker", icon: "&#128200;", label: "Ticker" },
+        { href: "/#market-crypto-widgets", icon: "&#8383;", label: "Crypto Widgets" },
         { href: "/#calendars-tools", icon: "&#128197;", label: "Calendars & Tools" },
         { href: "/#kpiGrid", icon: "&#128202;", label: "Key Indicators" },
         { href: "/#market-pulse", icon: "&#128201;", label: "Market Pulse" },

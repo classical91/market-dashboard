@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Market Command Dashboard</title>
+    <title>Market Overview</title>
     <link rel="stylesheet" href="/assets/styles/overview.css" />
     <link rel="stylesheet" href="/assets/styles/components.css" />
     <script src="/assets/js/settings.js"></script>
@@ -18,6 +18,12 @@
           <span id="sourceBadge" class="chip fallback" title="Data source status">● Loading…</span>
         </section>
 
+        <section class="ovh-hero" aria-labelledby="marketOverviewTitle">
+          <div class="ovh-hero-eyebrow">Market Command</div>
+          <h1 class="ovh-hero-title" id="marketOverviewTitle">Market Overview</h1>
+          <p class="ovh-hero-subtitle">Read-only live market dashboard for crypto, macro, news, risk, and watchlist context.</p>
+        </section>
+
         <div id="statusBanner" class="banner" role="status" aria-live="polite"></div>
 
         <section class="ticker" id="ticker" aria-label="Live ticker">
@@ -25,6 +31,22 @@
         </section>
 
         <!-- ── TradingView widget sections ─────── -->
+
+        <section class="crypto-widgets" id="market-crypto-widgets" aria-labelledby="cryptoWidgetsTitle">
+          <div class="crypto-widgets__bar">
+            <div>
+              <h2 class="crypto-widgets__title" id="cryptoWidgetsTitle">Crypto Market Widgets</h2>
+              <p class="crypto-widgets__subtitle">Read-only live snapshot for BTC, ETH, dominance, volume, and regime.</p>
+            </div>
+            <div class="crypto-widgets__actions">
+              <span class="crypto-feed-pill" id="cryptoWidgetsStatus">Loading</span>
+              <button class="crypto-refresh-btn" id="cryptoWidgetsRefresh" type="button">Refresh</button>
+            </div>
+          </div>
+          <div class="crypto-widgets__meta" id="cryptoWidgetsMeta">Fetching market data...</div>
+          <div class="crypto-widget-grid" id="cryptoWidgetsGrid" aria-live="polite"></div>
+          <div class="crypto-widget-alert" id="cryptoWidgetsAlert" hidden></div>
+        </section>
 
         <!-- MARKET OVERVIEW -->
         <div class="ovh-widget-panel ovh-mo-panel" id="ovh-market-overview">
@@ -483,12 +505,13 @@
           </div>
         </div>
 
-        <p class="footer-note">Market Command — live data via /api/overview + TradingView widgets</p>
+        <p class="footer-note">Market Overview - live data via /api/overview + TradingView widgets</p>
       </main>
     </div>
 
     <script src="/assets/js/ui.js"></script>
     <script src="/assets/js/sidebar.js"></script>
+    <script src="/assets/js/crypto.js"></script>
     <script src="/assets/js/overview.js"></script>
     <script src="/assets/js/tools.js"></script>
     <script src="/assets/js/sections.js"></script>
