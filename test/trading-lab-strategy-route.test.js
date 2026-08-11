@@ -129,6 +129,21 @@ test("comparison returns one row per strategy over the same symbol and interval"
   assert.deepEqual(body.results.map((r) => r.strategy).sort(), ["mindset_v1", "smc_v1"]);
 });
 
+// The Backtest and Strategy Comparison cards print the cost assumptions under
+// every result, so that a frictionless run cannot be mistaken for a realistic
+// one. That display has nothing to fall back on if the fields stop arriving.
+test("every result carries the cost assumptions the UI prints", async () => {
+  const run = await (await post("/api/trading-lab/backtest", { symbol: "BTCUSDT", interval: "15m" })).json();
+  const comparison = await (await post("/api/trading-lab/backtest/compare", { symbol: "BTCUSDT", interval: "15m" })).json();
+
+  for (const costs of [run.costs, ...comparison.results.map((r) => r.costs)]) {
+    assert.ok(costs, "a result without costs would render as if it had none");
+    for (const field of ["takerFeeRate", "slippageRate", "fundingRate8h"]) {
+      assert.equal(typeof costs[field], "number", `costs.${field} must be a number`);
+    }
+  }
+});
+
 test("comparison defaults to every registered strategy", async () => {
   const res = await post("/api/trading-lab/backtest/compare", { symbol: "BTCUSDT", interval: "15m" });
   assert.equal(res.status, 200);

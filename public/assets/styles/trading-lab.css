@@ -122,6 +122,17 @@
   margin-bottom: 10px;
 }
 
+/* The execution-cost assumptions a result was produced under. Given its own
+   weight because a frictionless run read as a realistic one is the single
+   easiest way to over-trust a backtest. */
+.tl-bt-costs {
+  margin-top: -4px;
+  padding: 6px 9px;
+  border-left: 2px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 0 6px 6px 0;
+}
+
 /* ── Metric groups ──────────────────────────────────────── */
 
 .tl-metric-group + .tl-metric-group { margin-top: 18px; }
