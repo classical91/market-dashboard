@@ -424,8 +424,10 @@ inbound endpoint to authenticate.
   risk framing. Pattern Scanner breakouts/divergences use the same concise
   watch/verdict structure. When `MARKET_DASHBOARD_URL` is configured, group
   alerts link only to available pages such as Signal Screener and Pattern
-  Scanner. Unfinished setup sources stay visible as blurred `BETA` dashboard
-  modules rather than direct group links.
+  Scanner. Those shared links open in Alpha review mode (`?view=alpha`), where
+  unrelated navigation is blurred and marked `BETA`. Unfinished setup sources
+  stay visible as blurred `BETA` dashboard modules rather than direct group
+  links.
 - **Auto-marking** runs first in each cycle, over *every* book — so hand-opened
   positions are managed too — letting stops and targets fire without the page
   open. It updates the ledger the kill switches read before that cycle's

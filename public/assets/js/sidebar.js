@@ -218,6 +218,42 @@
     return true;
   }
 
+  function isAlphaReviewMode() {
+    try {
+      return new URLSearchParams(window.location.search || "").get("view") === "alpha";
+    } catch {
+      return false;
+    }
+  }
+
+  function alphaReviewPath(href) {
+    if (!href || /^https?:\/\//.test(href)) return "";
+    return (href.split("#")[0] || "/").split("?")[0] || "/";
+  }
+
+  function isAlphaAvailable(href) {
+    var path = alphaReviewPath(href);
+    return path === "/signal-screener.html" || path === "/pattern-scanner.html";
+  }
+
+  function alphaHref(href) {
+    if (!isAlphaReviewMode() || !isAlphaAvailable(href)) return href;
+    var parts = href.split("#");
+    var path = parts[0].split("?")[0];
+    var hash = parts[1] ? "#" + parts[1] : "";
+    return path + "?view=alpha" + hash;
+  }
+
+  function betaNavItem(item, mode, subitem) {
+    var prefix = mode === "command" ? "cmd-" : "";
+    return (
+      '<span class="' + prefix + "nav-item " + (subitem ? prefix + "nav-subitem " : "") + prefix + 'nav-item--beta" aria-disabled="true">' +
+      '<span class="' + prefix + 'nav-icon" aria-hidden="true">' + item.icon + '</span>' +
+      '<span class="' + prefix + 'nav-text">' + item.label + '</span>' +
+      '<span class="' + prefix + 'nav-beta-pill">BETA</span></span>'
+    );
+  }
+
   function dropdownKey(item, mode) {
     return "sidebar_dropdown_" + mode + "_" + String(item.label || "")
       .toLowerCase()
@@ -240,6 +276,7 @@
 
   function navItem(item, mode) {
     var prefix = mode === "command" ? "cmd-" : "";
+    if (isAlphaReviewMode() && !isAlphaAvailable(item.href)) return betaNavItem(item, mode, false);
     var active = isActive(item.href);
     var external = /^https?:\/\//.test(item.href);
     var featuredClass = item.featured
@@ -248,9 +285,11 @@
     var icon = item.dot
       ? '<span class="' + prefix + 'nav-dot"></span>'
       : '<span class="' + prefix + 'nav-icon" aria-hidden="true">' + item.icon + "</span>";
+    var href = alphaHref(item.href);
     return (
-      '<a class="' + prefix + "nav-item" + featuredClass + (active ? " active" : "") + '" href="' + item.href +
-      '" data-nav-href="' + item.href + '"' + (external ? ' target="_blank" rel="noopener"' : "") +
+      '<a class="' + prefix + "nav-item" + featuredClass + (active ? " active" : "") + '" href="' + href +
+      '" data-nav-href="' + item.href + '"' + (href !== item.href ? ' data-alpha-href="' + href + '"' : "") +
+      (external ? ' target="_blank" rel="noopener"' : "") +
       (active ? ' aria-current="page"' : "") + ">" +
       icon + '<span class="' + prefix + 'nav-text">' + item.label + "</span></a>"
     );
@@ -258,11 +297,13 @@
 
   function subNavItem(item, mode) {
     var prefix = mode === "command" ? "cmd-" : "";
+    if (isAlphaReviewMode() && !isAlphaAvailable(item.href)) return betaNavItem(item, mode, true);
     var active = isActive(item.href);
     var external = /^https?:\/\//.test(item.href);
+    var href = alphaHref(item.href);
     return (
       '<a class="' + prefix + 'nav-item ' + prefix + 'nav-subitem' + (active ? " active" : "") +
-      '" href="' + item.href + '" data-nav-href="' + item.href + '"' +
+      '" href="' + href + '" data-nav-href="' + item.href + '"' +
       (external ? ' target="_blank" rel="noopener"' : "") +
       (active ? ' aria-current="page"' : "") +
       '><span class="' + prefix + 'nav-icon" aria-hidden="true">' +

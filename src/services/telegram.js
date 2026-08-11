@@ -124,7 +124,7 @@ function groupSafeStatus(status) {
 
 function dashboardLink(baseUrl, path) {
   if (!baseUrl) return null;
-  return `${String(baseUrl).replace(/\/+$/, "")}${path}`;
+  return `${String(baseUrl).replace(/\/+$/, "")}${path}?view=alpha`;
 }
 
 function formatSignalAlert(transition, actions, dashboardUrl = "") {
