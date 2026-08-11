@@ -59,6 +59,32 @@ test("overview exposes per-module health statuses", async () => {
   assert.equal(dxy.proxy, true);
 });
 
+test("crypto scope exposes global market snapshot totals", async () => {
+  const service = new OverviewService({
+    marketDataService: makeMarketDataStub({
+      getGlobalDominance: async () => ({
+        live: true,
+        source: "coingecko",
+        totalMcap: 2_700_000_000_000,
+        totalVolume: 122_000_000_000,
+        dominance: [
+          { symbol: "BTC", percent: 58.12 },
+          { symbol: "ETH", percent: 12.34 },
+        ],
+      }),
+    }),
+    onchainService: null,
+    cache: passthroughCache,
+    cacheTtlMs: 0,
+  });
+
+  const payload = await service.getOverview("1D");
+  assert.equal(payload.scopes.crypto.allocation.marketCapUsd, 2_700_000_000_000);
+  assert.equal(payload.scopes.crypto.allocation.volume24hUsd, 122_000_000_000);
+  assert.equal(payload.scopes.crypto.allocation.source, "coingecko");
+  assert.equal(payload.scopes.crypto.allocation.segments[0].label, "BTC");
+});
+
 test("onchain module reports paused during a Covalent cooldown", async () => {
   const service = new OverviewService({
     marketDataService: makeMarketDataStub(),

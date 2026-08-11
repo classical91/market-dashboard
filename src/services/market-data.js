@@ -171,7 +171,7 @@ class MarketDataService {
 
   async getGlobalDominance() {
     if (this.config.provider !== "coingecko") {
-      return { live: false, source: "fallback", dominance: defaultDominance() };
+      return { live: false, source: "fallback", dominance: defaultDominance(), ...defaultGlobalTotals() };
     }
     try {
       const data = await this.fetchJson(`${this.config.baseUrl}/global`);
@@ -187,7 +187,7 @@ class MarketDataService {
     } catch (error) {
       return this.staleOr(
         "global",
-        { live: false, source: "fallback", dominance: defaultDominance() },
+        { live: false, source: "fallback", dominance: defaultDominance(), ...defaultGlobalTotals() },
         error,
       );
     }
@@ -658,6 +658,13 @@ function defaultDominance() {
     { symbol: "BNB", percent: 3 },
     { symbol: "SOL", percent: 3 },
   ];
+}
+
+function defaultGlobalTotals() {
+  return {
+    totalMcap: 2_420_000_000_000,
+    totalVolume: 96_000_000_000,
+  };
 }
 
 function fallbackChartPoints(range) {

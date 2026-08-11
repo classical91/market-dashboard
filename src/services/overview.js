@@ -411,11 +411,23 @@ function buildAlerts({ crypto, macro, onchain }) {
 function buildAllocation(globalData) {
   const dominance = Array.isArray(globalData?.dominance) ? globalData.dominance.slice(0, 5) : [];
   if (!dominance.length) {
-    return { title: "Crypto Market Allocation", segments: [], live: false };
+    return {
+      title: "Crypto Market Allocation",
+      segments: [],
+      live: false,
+      marketCapUsd: Number(globalData?.totalMcap || 0),
+      volume24hUsd: Number(globalData?.totalVolume || 0),
+      source: globalData?.source || "fallback",
+      stale: Boolean(globalData?.stale),
+    };
   }
   return {
     title: "Crypto Market Allocation",
     subtitle: "Market cap dominance",
+    marketCapUsd: Number(globalData?.totalMcap || 0),
+    volume24hUsd: Number(globalData?.totalVolume || 0),
+    source: globalData?.source || "fallback",
+    stale: Boolean(globalData?.stale),
     segments: dominance.map((entry) => ({
       label: entry.symbol,
       percent: Number(entry.percent.toFixed(2)),
