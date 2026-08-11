@@ -418,6 +418,14 @@ inbound endpoint to authenticate.
 - **Degrades quietly.** An unreachable decision engine costs the setup its
   trend/macro points and evaluation continues; any bridge failure is caught so
   that a paper-trading fault never costs the deploy its Telegram alerts.
+- **Alpha Team format.** Telegram alerts are group-facing ops updates, not raw
+  bot logs. Screener transitions include tier, symbol/timeframe, pattern label,
+  bias, trend regime, indicator evidence, Trading Lab verdict, and concise
+  risk framing. Pattern Scanner breakouts/divergences use the same concise
+  watch/verdict structure. When `MARKET_DASHBOARD_URL` is configured, group
+  alerts link only to available pages such as Signal Screener and Pattern
+  Scanner. Unfinished setup sources stay visible as blurred `BETA` dashboard
+  modules rather than direct group links.
 - **Auto-marking** runs first in each cycle, over *every* book — so hand-opened
   positions are managed too — letting stops and targets fire without the page
   open. It updates the ledger the kill switches read before that cycle's
@@ -428,6 +436,7 @@ inbound endpoint to authenticate.
 | `SIGNAL_BOT_PAPER_TRADE_ENABLED` | `false` | Opt in, by exact value `true`, to opening paper positions. Otherwise log-only. |
 | `SIGNAL_BOT_BOOK` | `main` | Which book bridged trades land in. |
 | `SIGNAL_BOT_AUTO_MARK_ENABLED` | `true` | Mark open positions to market each interval. |
+| `MARKET_DASHBOARD_URL` | empty | Public dashboard origin for Alpha Team `View:` links. Alerts omit links when this is blank. |
 
 Auto-marking alone does not start the loop — it is a passive add-on to a cycle
 that is already happening. The loop runs when Telegram is configured or paper

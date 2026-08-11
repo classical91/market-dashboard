@@ -238,6 +238,7 @@ class SignalScreenerService {
     const isShort = bear >= minChecks && bear > bull;
     const signal = isLong ? "LONG" : isShort ? "SHORT" : "FLAT";
     const score = isLong ? Math.round((bull / 6) * 100) : isShort ? Math.round((bear / 6) * 100) : 50;
+    const trendRegime = trendBullish && htfBullish ? "TREND_UP" : !trendBullish && !htfBullish ? "TREND_DOWN" : "MIXED";
 
     return {
       signal,
@@ -245,6 +246,18 @@ class SignalScreenerService {
       rsi: Number(r.toFixed(1)),
       adx: adx[last] != null ? Number(adx[last].toFixed(1)) : null,
       price: closes[last],
+      trendRegime,
+      indicators: {
+        rsi: Number(r.toFixed(1)),
+        adx: adx[last] != null ? Number(adx[last].toFixed(1)) : null,
+        macdBullish,
+        aboveVwap,
+        volumeAboveAverage: volAbove,
+        ema20AboveEma50: trendBullish,
+        priceAboveEma200: htfBullish,
+        bullishChecks: bull,
+        bearishChecks: bear,
+      },
     };
   }
 

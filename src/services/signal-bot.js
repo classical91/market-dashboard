@@ -95,6 +95,8 @@ class SignalBotService {
           to: result.signal,
           score: result.score,
           price: result.price ?? null,
+          trendRegime: result.trendRegime || null,
+          indicators: result.indicators || null,
         });
       }
     }
@@ -187,17 +189,12 @@ class SignalBotService {
       const patternEvents = await this._scanPatterns(known, next);
 
       this._stateCache.set(STATE_KEY, next, STATE_TTL_MS);
-      if (screenerTransitions.length) await this._telegram.postSignalAlerts(screenerTransitions);
+      const tradeActions = await this._runBridge(screenerTransitions);
+      if (screenerTransitions.length) await this._telegram.postSignalAlerts(screenerTransitions, tradeActions);
       if (patternEvents.length) await this._telegram.postPatternAlerts(patternEvents);
       if (this._tracker) {
         await this._tracker.resolveDue().catch((err) => console.error("[SignalBot] resolveDue failed:", err.message));
       }
-
-      // Marking runs before the new transitions are considered: a stop or TP
-      // that just filled frees a position slot and updates the loss counters
-      // the checklist's kill switches read, so this cycle's entries are judged
-      // against the current ledger rather than a stale one.
-      const tradeActions = await this._runBridge(screenerTransitions);
 
       return { screenerTransitions, patternEvents, tradeActions };
     } finally {

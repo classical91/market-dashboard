@@ -98,6 +98,10 @@ Most keys are optional. The app is designed to degrade to fallback data where po
 - `MACRO_CALENDAR_URL` - optional JSON macro-calendar feed (`{time, title, impact, country}` rows).
 - `DECISION_CACHE_MS` - Decision Engine payload cache TTL, defaults to `120000`. The engine reuses the feeds above; adding a `US10Y` row via `MACRO_SYMBOLS` or `MACRO_DATA_URL` enriches its regime score and rotation board with live yields.
 
+### Signal Bot Telegram Alerts
+
+Signal Bot Telegram messages are formatted for Jason's Alpha Team group. They are intentionally high-signal ops updates: each signal includes tier, symbol/timeframe, pattern label, bias, trend regime, indicator evidence, Trading Lab verdict, concise risk framing, and a `View:` link when `MARKET_DASHBOARD_URL` is configured. Pattern Scanner alerts use the same style for breakouts and fresh divergences, linking only to available dashboard pages. Messages must stay free of secrets, private account details, account-mode wording, internal dry-run wording, and financial-advice framing. Unfinished setup sources should appear as blurred `BETA` modules inside the dashboard, not as direct group links.
+
 ### Live Scanner
 
 Generates its own BTC signals from Bitget USDT-perpetual candles instead of waiting on TradingView alert webhooks. Closed candles only, paper trades only, one open position per symbol, and one entry per symbol + direction + candle close time (persisted across restarts). Status is exposed at `GET /api/live-scanner/status` and rendered on `/trading-lab.html`.

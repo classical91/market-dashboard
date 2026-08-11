@@ -42,7 +42,13 @@ test("first scan baselines silently, a flip alerts once, and holding state stays
   const { bot, sent } = makeBot({
     signalsByCycle: [
       [{ symbol: "BTCUSDT", signal: "FLAT", score: 50 }],
-      [{ symbol: "BTCUSDT", signal: "LONG", score: 83 }],
+      [{
+        symbol: "BTCUSDT",
+        signal: "LONG",
+        score: 83,
+        trendRegime: "TREND_UP",
+        indicators: { rsi: 56.2, macdBullish: true, aboveVwap: true, bullishChecks: 5 },
+      }],
       [{ symbol: "BTCUSDT", signal: "LONG", score: 83 }],
     ],
   });
@@ -56,6 +62,8 @@ test("first scan baselines silently, a flip alerts once, and holding state stays
   assert.equal(second.screenerTransitions[0].from, "FLAT");
   assert.equal(second.screenerTransitions[0].to, "LONG");
   assert.equal(second.screenerTransitions[0].score, 83);
+  assert.equal(second.screenerTransitions[0].trendRegime, "TREND_UP");
+  assert.equal(second.screenerTransitions[0].indicators.rsi, 56.2);
   assert.equal(sent.length, 1, "transitions are batched into one send");
 
   const third = await bot.runOnce();
