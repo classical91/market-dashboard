@@ -95,6 +95,7 @@ test("signal alerts include Alpha Team pattern evidence and Trading Lab verdict"
     assert.match(text, /Regime: TREND_UP/);
     assert.match(text, /Bullish checks 5\/6/);
     assert.match(text, /Verdict: DRY-RUN/);
+    assert.doesNotMatch(text, /paper/i);
   } finally {
     global.fetch = originalFetch;
   }

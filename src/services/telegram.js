@@ -105,6 +105,14 @@ function actionForTransition(actions, transition) {
   )) || null;
 }
 
+function groupSafeReason(reason) {
+  return String(reason || "Trading Lab reviewed")
+    .replace(/\s*\(paper trading disabled\)/gi, "")
+    .replace(/\bpaper\s+trading\b/gi, "trading")
+    .replace(/\bpaper\s+trade\b/gi, "tracked setup")
+    .replace(/\bpaper\b/gi, "tracked");
+}
+
 function formatSignalAlert(transition, actions) {
   const action = actionForTransition(actions, transition);
   const pattern = patternLabel(transition);
@@ -113,13 +121,13 @@ function formatSignalAlert(transition, actions) {
   const trend = transition.trendRegime || "MIXED";
   const evidence = evidenceLines(transition).join("; ") || "Confluence flip";
   const verdict = action
-    ? `${String(action.status || "checked").toUpperCase()}: ${action.reason || "Trading Lab reviewed"}`
+    ? `${String(action.status || "checked").toUpperCase()}: ${groupSafeReason(action.reason)}`
     : "WATCH: Trading Lab verdict pending";
   const decision = action && action.decision ? `Checklist: ${action.decision}` : null;
   const confidence = action && action.confidenceScore != null ? `Confidence: ${action.confidenceScore}` : null;
 
   return [
-    `<b>SIGNAL</b> | <b>${escapeHtml(transition.symbol)}</b> ${escapeHtml(transition.interval)} | ${escapeHtml(pattern)} | paper only`,
+    `<b>SIGNAL</b> | <b>${escapeHtml(transition.symbol)}</b> ${escapeHtml(transition.interval)} | ${escapeHtml(pattern)}`,
     `Bias: <b>${escapeHtml(transition.to)}</b>${price ? ` near ${escapeHtml(price)}` : ""} (${escapeHtml(score)})`,
     `Regime: ${escapeHtml(trend)}`,
     `Evidence: ${escapeHtml(evidence)}`,
@@ -303,7 +311,7 @@ class TelegramService {
           `${biasEmoji} <b>WATCH</b> | <b>${escapeHtml(e.symbol)}</b> ${escapeHtml(e.interval)} | ${escapeHtml(e.name)} breakout`,
           `Bias: ${escapeHtml(bias)} (${escapeHtml(String(e.score ?? "n/a"))})`,
           "Evidence: pattern moved from forming to breakout",
-          "Verdict: watch for confirmation; paper trade only after checklist/edge gate",
+          "Verdict: watch for confirmation; act only after checklist/edge gate",
         ].join("\n");
       }
       const bias = e.bias === "bullish" ? "bullish reversal watch" : "bearish reversal watch";

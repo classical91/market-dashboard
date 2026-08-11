@@ -100,7 +100,7 @@ Most keys are optional. The app is designed to degrade to fallback data where po
 
 ### Signal Bot Telegram Alerts
 
-Signal Bot Telegram messages are formatted for Jason's Alpha Team group. They are intentionally high-signal ops updates: each signal includes tier, symbol/timeframe, pattern label, bias, trend regime, indicator evidence, Trading Lab verdict, and paper-only risk framing. Pattern Scanner alerts use the same style for breakouts and fresh divergences. Messages must stay free of secrets, private account details, and financial-advice framing.
+Signal Bot Telegram messages are formatted for Jason's Alpha Team group. They are intentionally high-signal ops updates: each signal includes tier, symbol/timeframe, pattern label, bias, trend regime, indicator evidence, Trading Lab verdict, and concise risk framing. Pattern Scanner alerts use the same style for breakouts and fresh divergences. Messages must stay free of secrets, private account details, and financial-advice framing.
 
 ### Live Scanner
 

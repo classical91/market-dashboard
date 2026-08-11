@@ -278,7 +278,7 @@ inbound endpoint to authenticate.
   that a paper-trading fault never costs the deploy its Telegram alerts.
 - **Alpha Team format.** Telegram alerts are group-facing ops updates, not raw
   bot logs. Screener transitions include tier, symbol/timeframe, pattern label,
-  bias, trend regime, indicator evidence, Trading Lab verdict, and paper-only
+  bias, trend regime, indicator evidence, Trading Lab verdict, and concise
   risk framing. Pattern Scanner breakouts/divergences use the same concise
   watch/verdict structure.
 - **Auto-marking** runs first in each cycle, over *every* book — so hand-opened
