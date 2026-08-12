@@ -16,6 +16,10 @@ function summarizeRun(result) {
   return {
     strategy: result.strategy,
     strategyName: result.strategyName,
+    status: result.status || "ok",
+    replayType: result.replayType || "candle",
+    dataStatus: result.dataStatus || (result.dataset && result.dataset.status) || "available",
+    dataset: result.dataset || null,
     symbol: result.symbol,
     interval: result.interval,
     bars: result.bars,

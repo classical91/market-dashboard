@@ -35,17 +35,19 @@ function wavyUptrend(count, { from = 0 } = {}) {
 
 /* ── Registry ─────────────────────────────────────────────── */
 
-test("the registry loads mindset_v1 and smc_v1", () => {
+test("the registry loads every Trading Lab strategy", () => {
   const ids = listStrategies().map((s) => s.id);
-  assert.deepEqual(ids.sort(), ["mindset_v1", "smc_v1"]);
+  assert.deepEqual(ids.sort(), ["mindset_v1", "shadow_bananagun_v1", "smc_v1"]);
   assert.equal(DEFAULT_STRATEGY_ID, "mindset_v1");
 
   for (const strategy of STRATEGIES) {
     assert.equal(typeof strategy.id, "string");
     assert.equal(typeof strategy.name, "string");
     assert.ok(strategy.description.length > 0);
-    assert.ok(strategy.requiredWarmupBars > 0);
-    assert.equal(typeof strategy.evaluate, "function");
+    assert.ok(strategy.requiredWarmupBars >= 0);
+    if (strategy.supportsBacktest) {
+      assert.equal(typeof strategy.evaluate, "function");
+    }
   }
 });
 

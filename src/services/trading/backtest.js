@@ -37,6 +37,11 @@ const { ema, macd } = require("../signal-screener");
 const { getStrategy, DEFAULT_STRATEGY_ID } = require("./strategies");
 const { summarizeRun, costSummary } = require("./run-summary");
 const { buildExperimentRecord } = require("./experiment-record");
+const {
+  STRATEGY_ID: BANANAGUN_STRATEGY_ID,
+  loadEventDataset,
+  replayBananaGunEvents,
+} = require("./bananagun-event-replay");
 
 // Bars needed before the first signal can be trusted: the slowest indicator
 // here is the MACD's 26-period slow EMA plus its 9-period signal line.
@@ -189,10 +194,11 @@ class BacktestService {
   // `experimentStore` is optional and only ever written to when a caller asks
   // for it: a run is research, and research is recorded on purpose, not as a
   // side effect of pressing a button.
-  constructor({ config = getTradingConfig(), signalScreenerService = null, experimentStore = null, logger = console } = {}) {
+  constructor({ config = getTradingConfig(), signalScreenerService = null, experimentStore = null, dataDir = null, logger = console } = {}) {
     this.config = config;
     this.signalScreenerService = signalScreenerService;
     this.experimentStore = experimentStore;
+    this.dataDir = dataDir;
     this._logger = logger;
   }
 
@@ -217,6 +223,12 @@ class BacktestService {
     warmupBars = MIN_WARMUP_BARS,
   }) {
     const resolved = resolveStrategy(strategy);
+    if (resolved.definition.supportsBacktest === false) {
+      throw Object.assign(
+        new Error(`Strategy "${resolved.definition.id}" cannot run on candles; use event replay data instead`),
+        { statusCode: 400, expose: true },
+      );
+    }
     // A strategy's own warmup requirement is a floor, not a suggestion:
     // signalling before its slowest input has settled is noise, not history.
     const warmup = Math.max(warmupBars, resolved.definition.requiredWarmupBars || 0);
@@ -419,6 +431,13 @@ class BacktestService {
     // strategy runs mindset_v1, the strategy the live scanner runs, rather
     // than run()'s own trend-breakout placeholder.
     const resolved = typeof strategy === "function" ? strategy : resolveStrategy(strategy).definition;
+    if (resolved && resolved.id === BANANAGUN_STRATEGY_ID) {
+      const dataset = loadEventDataset(this.dataDir, BANANAGUN_STRATEGY_ID);
+      const result = dataset.status === "available"
+        ? replayBananaGunEvents({ events: dataset.events, dataSource: dataset.path })
+        : replayBananaGunEvents({ events: [], dataSource: dataset.path });
+      return record && result.status === "ok" ? this.recordExperiment(result, { notes }) : result;
+    }
     const candles = await this.getCandles(symbol, interval);
     const result = await this.run({ symbol, interval, candles, options, strategy: resolved });
     return record ? this.recordExperiment(result, { notes }) : result;
@@ -453,11 +472,20 @@ class BacktestService {
     const ids = (Array.isArray(strategies) && strategies.length ? strategies : [DEFAULT_STRATEGY_ID]).map(
       (id) => getStrategy(id).id,
     );
-    const candles = await this.getCandles(symbol, interval);
+    const candleIds = ids.filter((id) => getStrategy(id).supportsBacktest !== false);
+    const candles = candleIds.length ? await this.getCandles(symbol, interval) : null;
 
     const rows = [];
     for (const id of ids) {
-      const result = await this.run({ symbol, interval, candles, options, strategy: id });
+      let result;
+      if (id === BANANAGUN_STRATEGY_ID) {
+        const dataset = loadEventDataset(this.dataDir, BANANAGUN_STRATEGY_ID);
+        result = dataset.status === "available"
+          ? replayBananaGunEvents({ events: dataset.events, dataSource: dataset.path })
+          : replayBananaGunEvents({ events: [], dataSource: dataset.path });
+      } else {
+        result = await this.run({ symbol, interval, candles, options, strategy: id });
+      }
       rows.push(summarizeRun(result));
     }
 

@@ -94,6 +94,9 @@ function assertValidLifecycle(strategy) {
   if (typeof strategy.supportsBacktest !== "boolean" || typeof strategy.supportsLiveScanner !== "boolean") {
     throw new Error(`${where} must declare supportsBacktest and supportsLiveScanner as booleans`);
   }
+  if (strategy.supportsEventReplay !== undefined && typeof strategy.supportsEventReplay !== "boolean") {
+    throw new Error(`${where} must declare supportsEventReplay as a boolean when present`);
+  }
   return strategy;
 }
 
@@ -107,10 +110,12 @@ function describeStrategy(strategy) {
     description: strategy.description,
     status: strategy.status,
     supportsBacktest: strategy.supportsBacktest,
+    supportsEventReplay: strategy.supportsEventReplay === true,
     supportsLiveScanner: strategy.supportsLiveScanner,
     scannerEligible: computeScannerEligible(strategy),
     realMoneyEligible: computeRealMoneyEligible(strategy),
     requiredWarmupBars: strategy.requiredWarmupBars,
+    datasetAvailability: strategy.datasetAvailability || null,
   };
 }
 

@@ -173,7 +173,7 @@ function createApp() {
   // Backtests replay the same paper-trading engine over historical candles, so
   // a backtest and a forward paper run agree by construction. It reuses the
   // screener's cached klines rather than fetching its own.
-  const backtestService = new BacktestService({ signalScreenerService, experimentStore });
+  const backtestService = new BacktestService({ signalScreenerService, experimentStore, dataDir });
   // Signal transitions are the replacement for the TradingView alert webhooks:
   // the bot already detects FLAT -> LONG/SHORT on closed candles, on a timer,
   // without a subscription. The bridge scores those through the Trading Lab —

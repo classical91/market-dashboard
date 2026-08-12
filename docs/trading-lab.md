@@ -154,6 +154,7 @@ execution model rather than on who guessed a better stop.
 | --- | --- | --- | --- |
 | `mindset_v1` | 1.0.0 | `forward-paper` | The live scanner's strategy — EMA20/EMA50 trend with an RSI band filter. Scanner eligible, **not** real-money eligible. The default. |
 | `smc_v1` | 1.0.0 | `backtest` | Backtest-only Smart Money Concepts approximation (below). Neither scanner nor real-money eligible. |
+| `shadow_bananagun_v1` | 1.0.0 | `experimental` | Banana Gun-style on-chain candidate replay. It is **event replay only**: historical point-in-time candidate and safety snapshots are required, and candle-only performance is refused. |
 
 ### Lifecycle
 
@@ -296,6 +297,27 @@ smc_v1 is deliberately **backtest-only**. `LIVE_SCANNER_STRATEGY` still resolves
 against the live scanner's own registry, which contains `mindset_v1` alone;
 promoting a strategy is a separate, explicit change.
 
+### shadow_bananagun_v1
+
+Banana Gun setups are not candle strategies. They depend on event-time inputs:
+candidate discovery time, contract safety data, liquidity, holder concentration,
+taxes, sellability, failed transactions and the later exit outcome. Replaying
+only OHLCV candles would invent both the entry universe and the safety gates.
+
+The Market Dashboard therefore exposes Banana Gun in the research catalogue and
+comparison table with `supportsEventReplay: true` and `supportsBacktest: false`.
+Production looks for point-in-time snapshots at:
+
+```
+<DATA_DIR>/trading-lab/event-replay/shadow_bananagun_v1/candidates.jsonl
+```
+
+When that dataset is absent or empty, `/api/trading-lab/backtest` and
+`/api/trading-lab/backtest/compare` return `status: "insufficient-data"` for
+`shadow_bananagun_v1` rather than fake candle performance. Tests use fixture
+events to keep the replay engine exercised until real historical snapshots
+exist.
+
 ### One intentional divergence
 
 `round.js` implements Python's half-to-even rounding rather than JS's
@@ -352,11 +374,11 @@ ledger is admin-gated via `x-admin-key`.
 | POST | `/api/trading-lab/positions` | admin | Evaluate, then open if every gate agrees. |
 | POST | `/api/trading-lab/positions/:id/close` | admin | Close the remainder manually. |
 | POST | `/api/trading-lab/mark` | admin | Mark to market; fires any stop/target reached. |
-| GET | `/api/trading-lab/strategies` | — | The strategy catalogue with lifecycle metadata (`version`, `status`, `supportsBacktest`, `supportsLiveScanner`, computed `scannerEligible` and `realMoneyEligible`) and the default id. Static, so the UI selector can render before a key is entered. |
+| GET | `/api/trading-lab/strategies` | — | The strategy catalogue with lifecycle metadata (`version`, `status`, `supportsBacktest`, `supportsEventReplay`, `supportsLiveScanner`, dataset availability, computed `scannerEligible` and `realMoneyEligible`) and the default id. Static, so the UI selector can render before a key is entered. |
 | GET | `/api/trading-lab/experiments?strategy=&version=&symbol=&timeframe=&limit=` | — | Research history, newest first. Read-only: there are no promotion mutations. |
 | GET | `/api/trading-lab/experiments/:id` | — | One experiment record, or 404. |
 | POST | `/api/trading-lab/backtest` | admin | Replay a symbol's candles. Body: `symbol`, `interval`, `strategy` (defaults to `mindset_v1`; an unknown id is a 400), `record` (opt-in experiment, returns `experimentId`), `notes`. Admin-gated despite being read-only: it replays hundreds of bars and pulls candles per call, so it should not be spinnable by anonymous visitors. Writes only to a temp ledger. |
-| POST | `/api/trading-lab/backtest/compare` | admin | Replay several strategies over **one** candle fetch and reduce each to the promotion numbers: bars, signals, closed trades, net P&L, expectancy R, profit factor, max drawdown, win rate, worst loss streak. Defaults to every registered strategy. |
+| POST | `/api/trading-lab/backtest/compare` | admin | Replay several strategies over **one** candle fetch for candle strategies and event datasets for event-replay strategies, then reduce each to the promotion numbers: bars/events, signals, closed trades, net P&L, expectancy R, profit factor, max drawdown, win rate, worst loss streak. Defaults to every registered strategy. |
 | POST | `/api/trading-lab/reset` | admin | Wipe a book back to its starting balance. |
 
 ## Migration status

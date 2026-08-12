@@ -91,13 +91,14 @@ test("the strategy catalogue is public, so the selector can render before any ke
 
   const body = await res.json();
   assert.equal(body.default, "mindset_v1");
-  assert.deepEqual(body.strategies.map((s) => s.id).sort(), ["mindset_v1", "smc_v1"]);
+  assert.deepEqual(body.strategies.map((s) => s.id).sort(), ["mindset_v1", "shadow_bananagun_v1", "smc_v1"]);
   for (const strategy of body.strategies) {
-    assert.ok(strategy.name && strategy.description && strategy.requiredWarmupBars > 0);
+    assert.ok(strategy.name && strategy.description && strategy.requiredWarmupBars >= 0);
     // Lifecycle metadata rides along, so a client never has to guess what a
     // strategy is cleared for.
     assert.ok(strategy.version && strategy.status);
     assert.equal(typeof strategy.supportsBacktest, "boolean");
+    assert.equal(typeof strategy.supportsEventReplay, "boolean");
     assert.equal(typeof strategy.supportsLiveScanner, "boolean");
     assert.equal(typeof strategy.scannerEligible, "boolean");
     assert.equal(strategy.realMoneyEligible, false, "nothing is real-money eligible");
@@ -218,6 +219,26 @@ test("comparison returns one row per strategy over the same symbol and interval"
   assert.deepEqual(body.results.map((r) => r.strategy).sort(), ["mindset_v1", "smc_v1"]);
 });
 
+test("Banana Gun is exposed as event replay and reports insufficient data instead of candle performance", async () => {
+  const catalogue = await (await fetch(`${base}/api/trading-lab/strategies`)).json();
+  const banana = catalogue.strategies.find((s) => s.id === "shadow_bananagun_v1");
+  assert.equal(banana.supportsBacktest, false);
+  assert.equal(banana.supportsEventReplay, true);
+  assert.equal(banana.datasetAvailability.productionStatus, "insufficient-data-until-snapshots-exist");
+
+  const run = await (
+    await post("/api/trading-lab/backtest", {
+      symbol: "BTCUSDT",
+      interval: "15m",
+      strategy: "shadow_bananagun_v1",
+    })
+  ).json();
+  assert.equal(run.status, "insufficient-data");
+  assert.equal(run.replayType, "event-replay");
+  assert.equal(run.trades.length, 0);
+  assert.match(run.dataset.reason, /No historical candidate events/);
+});
+
 // The Backtest and Strategy Comparison cards print the cost assumptions under
 // every result, so that a frictionless run cannot be mistaken for a realistic
 // one. That display has nothing to fall back on if the fields stop arriving.
@@ -227,7 +248,10 @@ test("every result carries the cost assumptions the UI prints", async () => {
 
   for (const costs of [run.costs, ...comparison.results.map((r) => r.costs)]) {
     assert.ok(costs, "a result without costs would render as if it had none");
-    for (const field of ["takerFeeRate", "slippageRate", "fundingRate8h"]) {
+    const candleCosts = ["takerFeeRate", "slippageRate", "fundingRate8h"];
+    const eventCosts = ["gasUsd", "slippagePct", "mevPenaltyPct", "failedTxPct", "failedTxGasUsd"];
+    const fields = costs.gasUsd === undefined ? candleCosts : eventCosts;
+    for (const field of fields) {
       assert.equal(typeof costs[field], "number", `costs.${field} must be a number`);
     }
   }
@@ -236,7 +260,9 @@ test("every result carries the cost assumptions the UI prints", async () => {
 test("comparison defaults to every registered strategy", async () => {
   const res = await post("/api/trading-lab/backtest/compare", { symbol: "BTCUSDT", interval: "15m" });
   assert.equal(res.status, 200);
-  assert.equal((await res.json()).results.length, 2);
+  const body = await res.json();
+  assert.equal(body.results.length, 3);
+  assert.ok(body.results.some((row) => row.strategy === "shadow_bananagun_v1" && row.status === "insufficient-data"));
 });
 
 test("running or comparing without an admin key is refused", async () => {

@@ -57,11 +57,11 @@ test("every registered strategy carries complete lifecycle metadata", () => {
       assert.equal(typeof s[field], "string", `${s.id}.${field} must be a string`);
       assert.ok(s[field].length > 0, `${s.id}.${field} must not be empty`);
     }
-    for (const field of ["supportsBacktest", "supportsLiveScanner", "scannerEligible", "realMoneyEligible"]) {
+    for (const field of ["supportsBacktest", "supportsEventReplay", "supportsLiveScanner", "scannerEligible", "realMoneyEligible"]) {
       assert.equal(typeof s[field], "boolean", `${s.id}.${field} must be a boolean`);
     }
     assert.ok(LIFECYCLE_STATUSES.includes(s.status), `${s.id} has an unknown status`);
-    assert.ok(s.requiredWarmupBars > 0);
+    assert.ok(s.requiredWarmupBars >= 0);
     // The old ambiguous field must not be served to any client.
     assert.equal(s.liveEligible, undefined);
   }

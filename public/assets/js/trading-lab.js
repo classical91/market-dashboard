@@ -432,6 +432,12 @@
 
   function costsLine(costs) {
     if (!costs) return "";
+    if (costs.gasUsd != null) {
+      return '<div class="tl-bt-meta tl-bt-costs">Event costs applied: gas $' + escapeHtml(costs.gasUsd) +
+        " &middot; slippage " + pct(costs.slippagePct) +
+        " &middot; MEV " + pct(costs.mevPenaltyPct) +
+        " &middot; failed tx " + pct(costs.failedTxPct) + "</div>";
+    }
     var free =
       !Number(costs.takerFeeRate) && !Number(costs.slippageRate) && !Number(costs.fundingRate8h);
     if (free) {
@@ -444,6 +450,18 @@
   }
 
   function renderBacktest(data) {
+    if (data.status === "insufficient-data") {
+      btResult.innerHTML =
+        '<div class="de-empty">Insufficient event-replay data for ' +
+        escapeHtml(data.strategyName || data.strategy) +
+        ". " +
+        escapeHtml((data.dataset && data.dataset.reason) || "Historical point-in-time candidate snapshots are not available.") +
+        "</div>" +
+        '<div class="tl-bt-meta">Dataset: ' +
+        escapeHtml((data.dataset && data.dataset.source) || data.dataSource || "not configured") +
+        " &middot; no candle-only performance was calculated</div>";
+      return;
+    }
     var s = data.stats;
     var m = s.riskMetrics || {};
     var tiles =
@@ -492,7 +510,8 @@
         btStrategy.innerHTML = strategies
           .map(function (s) {
             var selected = s.id === data.default ? " selected" : "";
-            return '<option value="' + escapeHtml(s.id) + '"' + selected + ">" + escapeHtml(s.name) + "</option>";
+            var suffix = s.supportsEventReplay ? " (event replay)" : "";
+            return '<option value="' + escapeHtml(s.id) + '"' + selected + ">" + escapeHtml(s.name + suffix) + "</option>";
           })
           .join("");
         renderStrategyNote();
@@ -509,7 +528,10 @@
   function renderStrategyNote() {
     var found = strategies.filter(function (s) { return s.id === selectedStrategy(); })[0];
     btStrategyNote.textContent = found
-      ? found.description + " Needs " + found.requiredWarmupBars + " warmup bars."
+      ? found.description +
+        (found.supportsEventReplay
+          ? " Dataset: " + ((found.datasetAvailability && found.datasetAvailability.productionStatus) || "event snapshots required") + "."
+          : " Needs " + found.requiredWarmupBars + " warmup bars.")
       : "";
   }
 
@@ -530,6 +552,7 @@
           "<tr>" +
           "<td>" + escapeHtml(r.strategyName || r.strategy) + "<br /><small>" + escapeHtml(r.strategy) + "</small></td>" +
           compareCell(r.bars + " <small>(" + r.warmupBars + " warmup)</small>") +
+          compareCell(r.status === "insufficient-data" ? "insufficient data" : escapeHtml(r.replayType || "candle")) +
           compareCell(r.signals) +
           compareCell(r.closedTrades) +
           compareCell(fmtUsd(r.netPnlUsd), pnlClass(r.netPnlUsd)) +
@@ -545,7 +568,7 @@
 
     btCompareResult.innerHTML =
       '<div class="de-table-wrap"><table class="de-table"><thead><tr>' +
-      "<th>Strategy</th><th>Bars</th><th>Signals</th><th>Closed</th><th>Net P&amp;L</th>" +
+      "<th>Strategy</th><th>Bars</th><th>Replay</th><th>Signals</th><th>Closed</th><th>Net P&amp;L</th>" +
       "<th>Expectancy</th><th>Profit factor</th><th>Max DD</th><th>Win rate</th><th>Worst streak</th>" +
       "</tr></thead><tbody>" + body + "</tbody></table></div>" +
       '<div class="tl-bt-meta">' + escapeHtml(data.symbol) + " " + escapeHtml(data.interval) +
