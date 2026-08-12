@@ -152,13 +152,6 @@
   padding: 20px 4px;
 }
 
-.yt-rss-placeholder {
-  font-size: 13px;
-  color: var(--muted);
-  line-height: 1.6;
-  padding: 4px 0 2px;
-}
-
 /* ── Channel RSS feed blocks ─────────────────────────────── */
 .yt-channel-feeds {
   display: flex;
@@ -192,13 +185,34 @@
   transform: translateY(-2px);
 }
 
+.yt-feed-card-live { border-color: rgba(255,99,99,0.45); }
+.yt-feed-card-live:hover { border-color: rgba(255,99,99,0.75); }
+.yt-feed-card-upcoming { border-color: rgba(77,163,255,0.35); }
+
 .yt-feed-thumb {
+  position: relative;
   width: 100%;
   aspect-ratio: 16 / 9;
   background-color: var(--surface2);
   background-size: cover;
   background-position: center;
 }
+
+.yt-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  border-radius: 6px;
+  padding: 3px 7px;
+  color: #fff;
+}
+.yt-badge-live { background: rgba(214,48,48,0.92); }
+.yt-badge-upcoming { background: rgba(30,84,148,0.92); }
+
+.yt-feed-detail { color: var(--dim); }
 
 .yt-feed-body { padding: 10px 12px 12px; }
 

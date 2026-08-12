@@ -39,7 +39,7 @@ const { createReporterRouter } = require("./routes/reporter");
 const { createTelegramRouter } = require("./routes/telegram");
 const { createYoutubeRouter } = require("./routes/youtube");
 const { createXFeedRouter } = require("./routes/x-feed");
-const { YOUTUBE_CHANNELS } = require("./config/youtube-channels");
+const { resolveYoutubeChannels } = require("./config/youtube-channels");
 const { X_ACCOUNTS } = require("./config/x-accounts");
 const { TOP_TOKENS } = require("./config/market-symbols");
 const { AIAnalysisService } = require("./services/ai-analysis");
@@ -70,7 +70,7 @@ const { OnchainService } = require("./services/onchain");
 const { OverviewService } = require("./services/overview");
 const { ReporterService } = require("./services/reporter");
 const { TelegramService } = require("./services/telegram");
-const { YouTubeFeedService } = require("./services/youtube");
+const { YouTubeIntelligenceService } = require("./services/youtube");
 const { XFeedService } = require("./services/x-feed");
 const { resolveDataDir } = require("./utils/data-dir");
 const { createRequireAdmin } = require("./middleware/admin-auth");
@@ -84,6 +84,9 @@ function createApp() {
   const xFeedCache = new PersistentReporterCache(path.join(dataDir, "x-feed-cache.json"));
   const aiAnalysisCache = new PersistentReporterCache(path.join(dataDir, "ai-analysis-cache.json"));
   const layoutAnalysisCache = new PersistentReporterCache(path.join(dataDir, "layout-analysis-cache.json"));
+  // Resolved YouTube channel IDs are persisted so the keyless RSS fallback
+  // still has an ID to work with after a restart.
+  const youtubeIdCache = new PersistentReporterCache(path.join(dataDir, "youtube-channel-ids.json"));
   const defillamaService = new DefiLlamaService(config.defillama);
   const etherscanService = new EtherscanService(config.etherscan);
   const covalentService = new CovalentService(config.covalent);
@@ -108,7 +111,18 @@ function createApp() {
     cache,
     cacheTtlMs: Number(process.env.OVERVIEW_CACHE_MS) || 60_000,
   });
-  const youtubeService = new YouTubeFeedService({ cache });
+  const youtubeChannels = resolveYoutubeChannels(config.youtube.channelIds);
+  const youtubeService = new YouTubeIntelligenceService({
+    cache,
+    idCache: youtubeIdCache,
+    apiKey: config.youtube.apiKey,
+    channels: youtubeChannels,
+    ttls: config.youtube.ttls,
+    maxVideosPerChannel: config.youtube.maxVideosPerChannel,
+    requestTimeoutMs: config.youtube.requestTimeoutMs,
+    quotaCooldownMs: config.youtube.quotaCooldownMs,
+    liveSearchEnabled: config.youtube.liveSearchEnabled,
+  });
   const xFeedService = new XFeedService({ cache: xFeedCache });
   const aiAnalysisService = new AIAnalysisService({
     cache: aiAnalysisCache,
@@ -300,7 +314,7 @@ function createApp() {
   app.use("/api/overview", createOverviewRouter({ overviewService }));
   app.use("/api/daily-report", createReporterRouter({ reporterService, telegramService, requireAdmin }));
   app.use("/api/telegram", createTelegramRouter({ telegramService, requireAdmin }));
-  app.use("/api/youtube", createYoutubeRouter({ youtubeService, channels: YOUTUBE_CHANNELS }));
+  app.use("/api/youtube", createYoutubeRouter({ youtubeService, channels: youtubeChannels }));
   app.use("/api/x", createXFeedRouter({ xFeedService, accounts: X_ACCOUNTS }));
 
   app.get("/", (req, res) => {

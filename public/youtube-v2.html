@@ -17,7 +17,7 @@
     <div class="cmd-page-header">
       <div>
         <div class="cmd-page-title">&#127916; YouTube Intelligence</div>
-        <div class="cmd-page-subtitle">Latest uploads from trusted channels, sorted by most recent release</div>
+        <div class="cmd-page-subtitle">Live streams, scheduled streams and latest uploads from trusted channels</div>
       </div>
     </div>
 
@@ -39,18 +39,37 @@
       </div>
     </div>
 
-    <!-- LATEST RSS UPLOADS -->
+    <!-- LIVE NOW -->
+    <div class="section-header" data-section="yt-live">
+      <span class="section-label">&#128308; Live Now</span>
+      <span class="section-chevron">&#9660;</span>
+    </div>
+    <div id="yt-live">
+      <div class="yt-channel-feeds" id="ytLiveFeeds">
+        <div class="yt-empty">Checking for live streams&hellip;</div>
+      </div>
+    </div>
+
+    <!-- UPCOMING -->
+    <div class="section-header" data-section="yt-upcoming">
+      <span class="section-label">&#128340; Upcoming</span>
+      <span class="section-chevron">&#9660;</span>
+    </div>
+    <div id="yt-upcoming">
+      <div class="yt-channel-feeds" id="ytUpcomingFeeds">
+        <div class="yt-empty">Checking for scheduled streams&hellip;</div>
+      </div>
+    </div>
+
+    <!-- LATEST UPLOADS -->
     <div class="section-header" data-section="yt-rss">
-      <span class="section-label">Latest RSS Uploads</span>
+      <span class="section-label">Latest Uploads</span>
       <span class="section-chevron">&#9660;</span>
     </div>
     <div id="yt-rss">
       <div class="yt-channel-feeds" id="ytChannelFeeds">
         <div class="yt-empty">Loading channel feeds&hellip;</div>
       </div>
-      <p class="yt-rss-placeholder">
-        Live-now / upcoming-stream detection needs the YouTube Data API (RSS only covers uploads &amp; replays) &mdash; a good next step once you have an API key.
-      </p>
     </div>
 
     <footer>YouTube Intelligence &mdash; <a href="/">Overview</a></footer>
