@@ -25,6 +25,114 @@
 
 /* ── Stat tiles ─────────────────────────────────────────── */
 
+.tl-account-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+  align-items: stretch;
+  margin-bottom: 16px;
+}
+
+.tl-account-card {
+  appearance: none;
+  width: 100%;
+  min-height: 318px;
+  display: grid;
+  grid-template-rows: 112px 1fr;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  text-align: left;
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.035);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.tl-account-card:hover,
+.tl-account-card.is-active {
+  border-color: rgba(77,163,255,0.45);
+  background: rgba(77,163,255,0.06);
+}
+
+.tl-account-card.is-active {
+  box-shadow: inset 0 0 0 1px rgba(77,163,255,0.18);
+}
+
+.tl-account-graph-wrap {
+  height: 112px;
+  padding: 14px 14px 8px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.01));
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+
+.tl-account-graph {
+  display: block;
+  width: 100%;
+  height: 84px;
+}
+
+.tl-account-graph line {
+  stroke: rgba(255,255,255,0.1);
+  stroke-width: 1;
+}
+
+.tl-account-body {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  gap: 12px;
+  padding: 14px;
+}
+
+.tl-account-head,
+.tl-account-equity,
+.tl-account-metric {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.tl-account-head span {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.tl-account-head small,
+.tl-account-equity span,
+.tl-account-metric span {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.tl-account-equity strong {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.tl-account-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 14px;
+  align-content: start;
+}
+
+.tl-account-metric {
+  min-width: 0;
+}
+
+.tl-account-metric strong {
+  min-width: 0;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .tl-stat-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -143,4 +251,14 @@
   text-transform: uppercase;
   color: var(--muted);
   margin-bottom: 8px;
+}
+
+@media (max-width: 720px) {
+  .tl-account-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tl-account-card {
+    min-height: 300px;
+  }
 }
