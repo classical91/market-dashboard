@@ -47,6 +47,8 @@
 const { mindsetV1 } = require("./mindset-v1");
 const { smcV1 } = require("./smc-v1");
 const { shadowBananagunV1 } = require("./shadow-bananagun-v1");
+const { donchianBreakoutV1 } = require("./donchian-breakout-v1");
+const { vwapReversionV1 } = require("./vwap-reversion-v1");
 const {
   LIFECYCLE_STATUSES,
   SCANNER_STATUSES,
@@ -58,7 +60,13 @@ const {
 
 // Validated at load: a strategy with a bad status or no version fails the
 // process at startup rather than producing unreproducible experiments later.
-const STRATEGIES = [mindsetV1, smcV1, shadowBananagunV1].map(assertValidLifecycle);
+const STRATEGIES = [
+  mindsetV1,
+  smcV1,
+  shadowBananagunV1,
+  donchianBreakoutV1,
+  vwapReversionV1,
+].map(assertValidLifecycle);
 
 const BY_ID = new Map(STRATEGIES.map((strategy) => [strategy.id, strategy]));
 

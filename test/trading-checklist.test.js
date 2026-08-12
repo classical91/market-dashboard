@@ -102,6 +102,43 @@ test("the regime gate forbids counter-trend entries and all entries in compressi
   );
 });
 
+test("a strategy that declares itself counter-trend waives the directional gate only", () => {
+  const state = perfectLongState({ regime: "TREND_DOWN" });
+
+  // Same setup, same state — the only difference is the declaration.
+  assert.equal(runChecklist(LONG, state, config).decision, "SKIP");
+
+  const waived = runChecklist({ ...LONG, allowCounterTrend: true }, state, config);
+  assert.notEqual(waived.decision, "SKIP");
+  assert.match(waived.reasons.join(" "), /counter-trend entry allowed by strategy declaration/);
+});
+
+test("a waived counter-trend entry is not handed the trend-alignment points", () => {
+  // dailyBias BEARISH against a long: the 30-point HTF block scores zero, so a
+  // waived trade has to clear the 50-point floor on its other merits. If this
+  // ever equals the with-trend score, the waiver has become a free pass.
+  const state = perfectLongState({ regime: "TREND_DOWN", dailyBias: "BEARISH" });
+  const waived = runChecklist({ ...LONG, allowCounterTrend: true }, state, config);
+
+  assert.equal(waived.confidenceScore, runChecklist(LONG, perfectLongState(), config).confidenceScore - 30);
+  assert.match(waived.reasons.join(" "), /trading against trend/);
+});
+
+test("the counter-trend waiver does not reach the kill switches or compression", () => {
+  const signal = { ...LONG, allowCounterTrend: true };
+
+  const killed = runChecklist(signal, perfectLongState({ regime: "TREND_DOWN", dailyLossPct: 3.5 }), config);
+  assert.equal(killed.decision, "SKIP");
+  assert.equal(killed.killSwitch, true);
+
+  const compressed = runChecklist(signal, perfectLongState({ regime: "LOW_COMPRESSION" }), config);
+  assert.equal(compressed.decision, "SKIP");
+  assert.match(compressed.reasons.join(" "), /no entries allowed/);
+
+  const capped = runChecklist(signal, perfectLongState({ regime: "TREND_DOWN", openPositions: 3 }), config);
+  assert.equal(capped.decision, "SKIP");
+});
+
 test("position and total-risk limits skip the setup", () => {
   assert.equal(runChecklist(LONG, perfectLongState({ openPositions: 3 }), config).decision, "SKIP");
   assert.equal(runChecklist(LONG, perfectLongState({ totalRiskPct: 4 }), config).decision, "SKIP");
