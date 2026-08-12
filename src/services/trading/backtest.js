@@ -293,6 +293,7 @@ class BacktestService {
             interval,
             strategyId: resolved.definition.id,
             signal,
+            allowCounterTrend: resolved.definition.tradesCounterTrend === true,
           });
           if (!outcome.opened) {
             skipped.push({
@@ -361,10 +362,26 @@ class BacktestService {
   // One candidate through the full gauntlet, entering at the signalling bar's
   // close. Mirrors TradingLabService.evaluate() but against the backtest's own
   // isolated ledger.
-  tryOpen({ trader, symbol, direction, context, interval, strategyId = DEFAULT_STRATEGY_ID, signal = null }) {
+  tryOpen({
+    trader,
+    symbol,
+    direction,
+    context,
+    interval,
+    strategyId = DEFAULT_STRATEGY_ID,
+    signal = null,
+    // Off unless the strategy definition declares it. A caller cannot turn it
+    // on for a strategy that did not ask for it, so the waiver stays a
+    // property of the strategy rather than of whoever ran the backtest.
+    allowCounterTrend = false,
+  }) {
     const signalSource = `backtest:${strategyId}:${interval}`;
     const state = marketState({ ...stateFromContext(context), ...trader.getRiskState() });
-    const checklist = runChecklist({ symbol, direction, price: context.close, atr: context.atr }, state, this.config);
+    const checklist = runChecklist(
+      { symbol, direction, price: context.close, atr: context.atr, allowCounterTrend },
+      state,
+      this.config,
+    );
 
     const account = trader.getAccount();
     const edge = assessEdge({

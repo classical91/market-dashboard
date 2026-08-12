@@ -8,6 +8,7 @@ const path = require("node:path");
 
 const { BacktestService, contextAtBar, trendBreakoutStrategy } = require("../src/services/trading/backtest");
 const { makeTradingConfig } = require("../src/services/trading/config");
+const { listStrategies } = require("../src/services/trading/strategies");
 
 const config = makeTradingConfig();
 
@@ -389,6 +390,49 @@ test("a trend strategy finds no edge in a driftless random walk", async () => {
     assert.ok(
       m.profitFactor === null || m.profitFactor < 1.5,
       `seed ${seed}: profit factor ${m.profitFactor} on a random walk suggests lookahead or an optimistic fill`,
+    );
+  }
+});
+
+// The same null test, applied to every registered candle strategy rather than
+// only the built-in default. A random walk has no edge in it for a trend
+// follower OR a mean reverter, so any strategy showing one is evidence about
+// the backtester, not about the strategy. New strategies are covered
+// automatically: this reads the registry rather than a hardcoded list.
+test("no registered strategy finds an edge in a driftless random walk", async () => {
+  const service = makeService();
+  const seeds = [7, 42, 1234, 4242, 99999];
+
+  // Pooled across seeds, not asserted per seed. The selective strategies close
+  // only a handful of trades per run, and at that sample size a single seed's
+  // expectancy is noise — an individually-thresholded test would fail on an
+  // unlucky seed and teach everyone to re-roll it until it passed, which is
+  // worse than no test. Pooling R-multiples is the same question asked of a
+  // sample big enough to answer it.
+  for (const meta of listStrategies({ supportsBacktest: true })) {
+    const rMultiples = [];
+    for (const seed of seeds) {
+      const result = await service.run({
+        symbol: "RNDUSDT",
+        candles: randomWalk(seed, { bars: 900 }),
+        strategy: meta.id,
+      });
+      for (const trade of result.trades) {
+        if (typeof trade.rMultiple === "number") rMultiples.push(trade.rMultiple);
+      }
+    }
+
+    // Too few trades to say anything. Reported rather than silently passed, so
+    // "no evidence" never reads as "passed the null test".
+    if (rMultiples.length < 10) {
+      console.log(`# ${meta.id}: only ${rMultiples.length} closed trades across ${seeds.length} random walks`);
+      continue;
+    }
+
+    const expectancy = rMultiples.reduce((sum, r) => sum + r, 0) / rMultiples.length;
+    assert.ok(
+      expectancy <= 0.15,
+      `${meta.id}: pooled expectancy ${expectancy.toFixed(3)}R over ${rMultiples.length} trades on driftless random walks — suggests lookahead or an optimistic fill`,
     );
   }
 });

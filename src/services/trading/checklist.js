@@ -172,11 +172,32 @@ function runChecklist(signal, rawState, config = getTradingConfig()) {
   if (state.regime === "LOW_COMPRESSION") {
     return skip(["Regime: LOW_COMPRESSION — no entries allowed"]);
   }
-  if (signal.direction === "LONG" && state.regime === "TREND_DOWN") {
-    return skip(["Regime: TREND_DOWN — longs forbidden"]);
-  }
-  if (signal.direction === "SHORT" && state.regime === "TREND_UP") {
-    return skip(["Regime: TREND_UP — shorts forbidden"]);
+  // The directional half of the gate is a trend-following house rule, and a
+  // mean-reversion strategy is counter-trend BY DEFINITION — so applying it
+  // unconditionally does not make reversion strategies safe, it makes them
+  // untestable: every signal is refused before it can become evidence. A
+  // strategy may therefore declare `allowCounterTrend`, which waives *only*
+  // these two directional checks.
+  //
+  // Everything else still applies: kill switches ran above, LOW_COMPRESSION
+  // still blocks, position and risk limits still bind, and the setup is still
+  // scored — including the 30-point trend-alignment component, which a
+  // counter-trend entry simply does not earn. A waived trade therefore has to
+  // clear the 50-point floor on its other merits rather than being handed a
+  // pass, and the waiver is recorded in `reasons` so no result is ambiguous
+  // about which rules it ran under.
+  const counterTrend =
+    (signal.direction === "LONG" && state.regime === "TREND_DOWN") ||
+    (signal.direction === "SHORT" && state.regime === "TREND_UP");
+  const waivedReasons = [];
+
+  if (counterTrend) {
+    if (!signal.allowCounterTrend) {
+      return skip([`Regime: ${state.regime} — ${signal.direction === "LONG" ? "longs" : "shorts"} forbidden`]);
+    }
+    waivedReasons.push(
+      `Regime: ${state.regime} — counter-trend entry allowed by strategy declaration (trend alignment scores 0)`,
+    );
   }
 
   // 3. Position limits.
@@ -196,7 +217,8 @@ function runChecklist(signal, rawState, config = getTradingConfig()) {
   }
 
   // 4. Score the setup.
-  const { score, reasons } = scoreSetup(signal, state, config);
+  const { score, reasons: scoreReasons } = scoreSetup(signal, state, config);
+  const reasons = [...waivedReasons, ...scoreReasons];
 
   if (signal.direction === "LONG" && state.bearMarket && score < 80) {
     reasons.unshift(`Bear market long blocked — need 80+ score, got ${score}`);

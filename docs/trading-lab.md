@@ -154,6 +154,8 @@ execution model rather than on who guessed a better stop.
 | --- | --- | --- | --- |
 | `mindset_v1` | 1.0.0 | `forward-paper` | The live scanner's strategy — EMA20/EMA50 trend with an RSI band filter. Scanner eligible, **not** real-money eligible. The default. |
 | `smc_v1` | 1.0.0 | `backtest` | Backtest-only Smart Money Concepts approximation (below). Neither scanner nor real-money eligible. |
+| `donchian_breakout_v1` | 1.0.0 | `backtest` | The unoptimised baseline (below): an N-bar channel break with an ATR stop. Exists to be the number other strategies must beat. |
+| `vwap_reversion_v1` | 1.0.0 | `backtest` | The counterweight (below): fades stretched moves back to anchored VWAP, in low-ADX regimes only. |
 | `shadow_bananagun_v1` | 1.0.0 | `experimental` | Banana Gun-style on-chain candidate replay. It is **event replay only**: historical point-in-time candidate and safety snapshots are required, and candle-only performance is refused. |
 
 ### Lifecycle
@@ -296,6 +298,96 @@ Anything short of all four is `FLAT` **with the reason it fell short**.
 smc_v1 is deliberately **backtest-only**. `LIVE_SCANNER_STRATEGY` still resolves
 against the live scanner's own registry, which contains `mindset_v1` alone;
 promoting a strategy is a separate, explicit change.
+
+### donchian_breakout_v1
+
+The deliberately dumb one. Every other candle strategy here is trying to be
+clever, which means none of them had a denominator: "is `mindset_v1` any good?"
+has no answer without something plain to compare it against. This is that
+something.
+
+1. **Channel.** Highest high / lowest low of the 20 bars *before* the decided
+   bar. Excluding the decided bar is the point — include it and the level
+   becomes partly a function of the break itself.
+2. **Break.** The bar must **close** beyond the level. A wick through is the
+   level holding, not breaking.
+3. **Freshness.** The previous bar must not have already closed beyond its own
+   channel. Without this the strategy re-signals every bar of a trend, and the
+   refusal log can no longer distinguish "no setup" from "same setup, still
+   true".
+4. **Trend filter.** Longs only above the SMA100, shorts only below. It is the
+   single concession to cleverness and can be turned off with
+   `useTrendFilter: false` to measure exactly what it is worth.
+
+Stops are 2× ATR, targets 3× the risk. There is deliberately no volume filter,
+no momentum confirmation and no regime gate: each would be another parameter to
+fit, and a baseline's value is inversely proportional to how tuned it is. For
+the same reason it reports no `confidence` — a baseline that ranked its own
+setups would be tuning itself.
+
+### vwap_reversion_v1
+
+The counterweight. `mindset_v1`, `smc_v1` and `donchian_breakout_v1` all buy
+strength and sell weakness, so they win and lose together and the comparison
+card ends up ranking three views of the same trade. This one is built to fail
+at different times.
+
+Mean reversion is the easiest thing in trading to fake a backtest of, so the
+rules are organised around the three ways it usually cheats:
+
+1. **Regime gate.** ADX must be **below** 22. Fading a trend is how a reversion
+   equity curve dies, so in a trending market the strategy declines to have an
+   opinion rather than taking the other side.
+2. **Stretch in ATR, not percent.** A fixed percentage band is a different
+   trade at different volatilities; 1.8× ATR from VWAP means the same thing in
+   every regime.
+3. **A stall, not a catch.** The close must have come back toward VWAP relative
+   to the previous close. Entering while the stretch is still widening is
+   catching a knife, and it is the biggest single source of flattering
+   reversion results.
+
+The target is VWAP itself — the thesis is complete when price has reverted, so
+there is nothing to hold for beyond it. The stop sits beyond the entry bar's
+extreme, which means **risk is often larger than reward**, so the setup is
+refused outright unless reward/risk clears 1.0. Without that floor the strategy
+would take a long series of small wins funded by rare large losses: excellent
+on a backtest summary, worth nothing.
+
+The strategy stays flat for the first few bars after each VWAP reset — on the
+first bar of a session, VWAP *is* that bar.
+
+#### The anchor is inferred, not configured
+
+The VWAP anchor defaults to `"auto"` and is chosen from the median candle
+spacing: a daily anchor when the interval gives at least 12 bars per session,
+monthly below that. This is not a nicety. On the lab's default 4h interval a
+daily anchor gives **six** bars per session, and after the minimum accumulation
+this strategy requires, essentially no bar is ever eligible — measured on five
+900-bar random walks, a daily anchor produced **0 signals** and a monthly one
+**189**. A hand-set parameter whose wrong value produces silence rather than an
+error is a parameter that should not be hand-set. `"day"` and `"month"` still
+force it, and the resolved anchor is reported in `indicators`.
+
+#### The counter-trend waiver
+
+The checklist's regime gate forbids longs in `TREND_DOWN` and shorts in
+`TREND_UP`. That is a trend-following house rule, and a reversion strategy is
+counter-trend *by definition* — so applying it unconditionally does not make
+reversion strategies safe, it makes them **untestable**: every signal is
+refused before it can become evidence. Before this was addressed,
+`vwap_reversion_v1` produced 12 valid signals on a sample run and closed zero
+trades.
+
+A strategy may therefore set `tradesCounterTrend: true`, which the backtester
+passes to the checklist as `allowCounterTrend`. It waives **only** those two
+directional checks. Kill switches, `LOW_COMPRESSION`, position caps and total
+risk limits all still bind, and the setup is still scored — including the
+30-point trend-alignment block, which a counter-trend entry simply does not
+earn. A waived trade clears the 50-point floor on its other merits or it does
+not trade, and the waiver is written into `reasons` so no result is ambiguous
+about which rules produced it. Callers cannot set the flag themselves: it is
+read from the strategy definition, so it stays a property of the strategy
+rather than of whoever ran the backtest.
 
 ### shadow_bananagun_v1
 

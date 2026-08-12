@@ -11,6 +11,8 @@ const {
   hasStrategy,
 } = require("../src/services/trading/strategies");
 const { smcV1 } = require("../src/services/trading/strategies/smc-v1");
+const { donchianBreakoutV1 } = require("../src/services/trading/strategies/donchian-breakout-v1");
+const { vwapReversionV1 } = require("../src/services/trading/strategies/vwap-reversion-v1");
 const { mindsetV1 } = require("../src/services/trading/strategies/mindset-v1");
 const { evaluateMindsetV1 } = require("../src/services/trading/live-scanner");
 const { BacktestService } = require("../src/services/trading/backtest");
@@ -37,7 +39,13 @@ function wavyUptrend(count, { from = 0 } = {}) {
 
 test("the registry loads every Trading Lab strategy", () => {
   const ids = listStrategies().map((s) => s.id);
-  assert.deepEqual(ids.sort(), ["mindset_v1", "shadow_bananagun_v1", "smc_v1"]);
+  assert.deepEqual(ids.sort(), [
+    "donchian_breakout_v1",
+    "mindset_v1",
+    "shadow_bananagun_v1",
+    "smc_v1",
+    "vwap_reversion_v1",
+  ]);
   assert.equal(DEFAULT_STRATEGY_ID, "mindset_v1");
 
   for (const strategy of STRATEGIES) {
@@ -318,4 +326,254 @@ test("comparing an unknown strategy fails before any candles are fetched", async
     (err) => err.statusCode === 400,
   );
   assert.equal(fetches, 0);
+});
+
+/* ── donchian_breakout_v1 ─────────────────────────────────── */
+
+// A quiet range, so the channel is well defined and nothing has broken it.
+function range(count, { from = 0, mid = 100, width = 1 } = {}) {
+  const bars = [];
+  for (let i = from; i < from + count; i += 1) {
+    const close = mid + Math.sin(i / 2) * width;
+    bars.push(bar(i, { open: close, high: close + width, low: close - width, close }));
+  }
+  return bars;
+}
+
+test("donchian_breakout_v1 returns FLAT on insufficient candles, and says how many it needs", () => {
+  const result = donchianBreakoutV1.evaluate(range(20), 19, {});
+  assert.equal(result.signal, "FLAT");
+  assert.equal(result.strategy, "donchian_breakout_v1");
+  assert.match(result.error, /Need at least \d+ closed candles/);
+});
+
+test("donchian_breakout_v1 stays FLAT inside the channel", () => {
+  const bars = range(200);
+  const result = donchianBreakoutV1.evaluate(bars, bars.length - 1, {});
+  assert.equal(result.signal, "FLAT");
+  assert.equal(result.indicators.brokeOut, false);
+  assert.ok(result.reasons.some((r) => /inside the channel/.test(r)));
+});
+
+// A long rise (so the SMA trend filter agrees) followed by a decisive close
+// above everything the channel has seen.
+function breakoutSeries({ breakTo = 160 } = {}) {
+  const bars = [];
+  for (let i = 0; i < 200; i += 1) {
+    const close = 100 + i * 0.15;
+    bars.push(bar(i, { open: close, high: close + 0.4, low: close - 0.4, close }));
+  }
+  bars.push(bar(200, { open: 130, high: breakTo + 1, low: 129, close: breakTo }));
+  return bars;
+}
+
+test("donchian_breakout_v1 goes LONG on a fresh close beyond the channel, with ATR stop geometry", () => {
+  const bars = breakoutSeries();
+  const result = donchianBreakoutV1.evaluate(bars, bars.length - 1, {});
+
+  assert.equal(result.signal, "LONG");
+  assert.equal(result.indicators.brokeOut, true);
+  assert.equal(result.indicators.fresh, true);
+  assert.ok(result.price > result.indicators.channelHigh);
+  assert.ok(result.stopHint < result.price, "stop sits below entry on a long");
+  assert.ok(result.targetHint > result.price, "target sits above entry on a long");
+
+  // Reward must be the configured multiple of the risk, or the baseline is not
+  // testing the geometry it claims to.
+  const risk = result.price - result.stopHint;
+  const reward = result.targetHint - result.price;
+  assert.ok(Math.abs(reward / risk - 3) < 1e-9);
+});
+
+test("donchian_breakout_v1 refuses a break that only wicked through the channel", () => {
+  const bars = breakoutSeries();
+  const last = bars[bars.length - 1];
+  // Same high, but the bar closes back inside: a test of the level, not a break.
+  bars[bars.length - 1] = bar(200, { open: 130, high: last.high, low: 129, close: 130 });
+
+  const result = donchianBreakoutV1.evaluate(bars, bars.length - 1, {});
+  assert.equal(result.signal, "FLAT");
+  assert.equal(result.indicators.brokeOut, false);
+});
+
+test("donchian_breakout_v1 signals once, not on every bar of the move that follows", () => {
+  const bars = breakoutSeries();
+  // A second bar that closes even higher — still beyond the channel, but the
+  // break already happened.
+  bars.push(bar(201, { open: 160, high: 166, low: 159, close: 165 }));
+
+  const result = donchianBreakoutV1.evaluate(bars, bars.length - 1, {});
+  assert.equal(result.signal, "FLAT");
+  assert.equal(result.indicators.brokeOut, true);
+  assert.equal(result.indicators.fresh, false);
+  assert.ok(result.reasons.some((r) => /continuation, not a fresh break/.test(r)));
+});
+
+test("donchian_breakout_v1 refuses a break against its trend filter, and takes it without one", () => {
+  // A long downtrend, then a pop above the recent channel: the break is real
+  // but price is still far below the SMA100.
+  const bars = [];
+  for (let i = 0; i < 200; i += 1) {
+    const close = 200 - i * 0.4;
+    bars.push(bar(i, { open: close, high: close + 0.4, low: close - 0.4, close }));
+  }
+  // Closes above the 20-bar channel high (128.4) while still far below the
+  // SMA100 (~139.9) — a real break that the trend filter should still refuse.
+  bars.push(bar(200, { open: 121, high: 132, low: 120, close: 131 }));
+
+  const filtered = donchianBreakoutV1.evaluate(bars, bars.length - 1, {});
+  assert.equal(filtered.signal, "FLAT");
+  assert.equal(filtered.indicators.brokeOut, true);
+  assert.ok(filtered.reasons.some((r) => /Counter-trend break refused/.test(r)));
+
+  const unfiltered = donchianBreakoutV1.evaluate(bars, bars.length - 1, {
+    options: { useTrendFilter: false },
+  });
+  assert.equal(unfiltered.signal, "LONG");
+});
+
+test("donchian_breakout_v1 reads only up to the decided bar", () => {
+  const bars = breakoutSeries();
+  const withFuture = donchianBreakoutV1.evaluate(
+    [...bars, bar(201, { open: 500, high: 600, low: 400, close: 550 })],
+    bars.length - 1,
+    {},
+  );
+  const withoutFuture = donchianBreakoutV1.evaluate(bars, bars.length - 1, {});
+  assert.deepEqual(withFuture, withoutFuture);
+});
+
+/* ── vwap_reversion_v1 ────────────────────────────────────── */
+
+// A quiet oscillation around a flat mean keeps ADX low and VWAP near price;
+// the caller then appends whatever stretch it wants to test.
+function quietRange(count) {
+  const bars = [];
+  for (let i = 0; i < count; i += 1) {
+    const close = 100 + Math.sin(i / 2) * 0.6;
+    bars.push(bar(i, { open: close, high: close + 0.5, low: close - 0.5, close, volume: 1000 }));
+  }
+  return bars;
+}
+
+test("vwap_reversion_v1 returns FLAT on insufficient candles, and says how many it needs", () => {
+  const result = vwapReversionV1.evaluate(quietRange(20), 19, {});
+  assert.equal(result.signal, "FLAT");
+  assert.equal(result.strategy, "vwap_reversion_v1");
+  assert.match(result.error, /Need at least \d+ closed candles/);
+});
+
+test("vwap_reversion_v1 stays FLAT when price sits near VWAP", () => {
+  const bars = quietRange(80);
+  const result = vwapReversionV1.evaluate(bars, bars.length - 1, {});
+  assert.equal(result.signal, "FLAT");
+  assert.ok(Math.abs(result.indicators.stretchAtr) < 1.8);
+  assert.ok(result.reasons.some((r) => /near fair value/.test(r)));
+});
+
+// Stretch far above VWAP, then a bar that closes lower: stretched and stalling.
+function stretchedAbove({ stall = true } = {}) {
+  // 120 bars of range, not 80: ADX needs enough quiet history to actually read
+  // as a range regime, and a shorter series leaves it sitting on the threshold
+  // where the test would be measuring the fixture rather than the strategy.
+  const bars = quietRange(120);
+  bars.push(bar(120, { open: 100, high: 104, low: 100, close: 103.5, volume: 100 }));
+  bars.push(
+    stall
+      ? bar(121, { open: 103.5, high: 104, low: 102.6, close: 102.8, volume: 100 })
+      : bar(121, { open: 103.5, high: 105.5, low: 103.4, close: 105.2, volume: 100 }),
+  );
+  return bars;
+}
+
+test("vwap_reversion_v1 goes SHORT on a stalled stretch above VWAP, targeting VWAP itself", () => {
+  const bars = stretchedAbove();
+  const result = vwapReversionV1.evaluate(bars, bars.length - 1, {});
+
+  assert.equal(result.signal, "SHORT");
+  assert.equal(result.indicators.regime, "RANGE");
+  assert.equal(result.indicators.stalled, true);
+  assert.ok(result.indicators.stretchAtr >= 1.8);
+  assert.equal(result.targetHint, result.indicators.vwap, "the target is the reversion, nothing beyond it");
+  assert.ok(result.stopHint > result.price, "stop sits above entry on a short");
+  assert.ok(result.indicators.rewardR >= 1);
+});
+
+test("vwap_reversion_v1 will not catch a stretch that is still extending", () => {
+  const bars = stretchedAbove({ stall: false });
+  const result = vwapReversionV1.evaluate(bars, bars.length - 1, {});
+  assert.equal(result.signal, "FLAT");
+  assert.equal(result.indicators.stalled, false);
+  assert.ok(result.reasons.some((r) => /still extending/.test(r)));
+});
+
+test("vwap_reversion_v1 stands down in a trending regime rather than fading it", () => {
+  const bars = stretchedAbove();
+  const result = vwapReversionV1.evaluate(bars, bars.length - 1, { options: { maxAdx: 0 } });
+  assert.equal(result.signal, "FLAT");
+  assert.equal(result.indicators.regime, "TREND");
+  assert.ok(result.reasons.some((r) => /stands down/.test(r)));
+});
+
+test("vwap_reversion_v1 refuses a correct read with unusable geometry", () => {
+  const bars = stretchedAbove();
+  // The setup is unchanged; only the reward/risk floor moves. A strategy that
+  // still traded here would be taking small wins funded by large losses.
+  const result = vwapReversionV1.evaluate(bars, bars.length - 1, { options: { minRewardR: 50 } });
+  assert.equal(result.signal, "FLAT");
+  assert.ok(result.reasons.some((r) => /wrong geometry/.test(r)));
+});
+
+test("vwap_reversion_v1 waits for VWAP to accumulate after a session reset", () => {
+  const bars = stretchedAbove();
+  const result = vwapReversionV1.evaluate(bars, bars.length - 1, { options: { minSessionBars: 500 } });
+  assert.equal(result.signal, "FLAT");
+  assert.ok(result.reasons.some((r) => /VWAP is not meaningful yet/.test(r)));
+});
+
+test("vwap_reversion_v1 picks its VWAP anchor from the candle spacing", () => {
+  // 15m bars: 96 per day, so a daily anchor accumulates plenty.
+  const intraday = vwapReversionV1.evaluate(stretchedAbove(), 121, {});
+  assert.equal(intraday.indicators.anchor, "day");
+
+  // The same shape on 4h bars: six bars per day is not a session, and a daily
+  // anchor there silently produces a strategy that never trades. Regression
+  // test for exactly that — it shipped dead on the lab's default interval.
+  const wide = stretchedAbove().map((b, i) => ({
+    ...b,
+    openTime: i * 14400000,
+    closeTime: (i + 1) * 14400000 - 1,
+  }));
+  const swing = vwapReversionV1.evaluate(wide, wide.length - 1, {});
+  assert.equal(swing.indicators.anchor, "month");
+
+  // An explicit anchor still wins over the inference.
+  assert.equal(
+    vwapReversionV1.evaluate(wide, wide.length - 1, { options: { anchor: "day" } }).indicators.anchor,
+    "day",
+  );
+});
+
+test("vwap_reversion_v1 reads only up to the decided bar", () => {
+  const bars = stretchedAbove();
+  const withFuture = vwapReversionV1.evaluate(
+    [...bars, bar(122, { open: 500, high: 600, low: 400, close: 550 })],
+    bars.length - 1,
+    {},
+  );
+  const withoutFuture = vwapReversionV1.evaluate(bars, bars.length - 1, {});
+  assert.deepEqual(withFuture, withoutFuture);
+});
+
+/* ── The two together ─────────────────────────────────────── */
+
+test("the trend baseline and the reversion strategy do not fire on the same bar", () => {
+  // Not a claim about correlation in general — a structural one. A fresh
+  // channel break IS the trending move vwap_reversion_v1 refuses to fade, so
+  // the two agreeing would mean one of the regime filters is not working.
+  const bars = breakoutSeries();
+  const breakout = donchianBreakoutV1.evaluate(bars, bars.length - 1, {});
+  const reversion = vwapReversionV1.evaluate(bars, bars.length - 1, {});
+  assert.equal(breakout.signal, "LONG");
+  assert.equal(reversion.signal, "FLAT");
 });
