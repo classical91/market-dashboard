@@ -92,21 +92,87 @@
     );
   }
 
-  function renderStats(book) {
-    var s = book.stats;
-    var m = s.riskMetrics || {};
-    statsEl.innerHTML =
-      statTile("Equity", "$" + Number(s.equity).toLocaleString(undefined, { maximumFractionDigits: 2 })) +
-      statTile("Net P&L", fmtUsd(s.realizedPnl), pnlClass(s.realizedPnl)) +
-      statTile("Unrealized", fmtUsd(s.unrealizedPnl), pnlClass(s.unrealizedPnl)) +
-      statTile("Win rate", s.totalTrades ? s.winRate + "%" : "—") +
-      statTile("Expectancy", m.closedTrades ? (m.expectancyR > 0 ? "+" : "") + m.expectancyR + "R" : "—", pnlClass(m.expectancyR)) +
-      // A null profit factor means wins and no losses yet, not "excellent".
-      statTile("Profit factor", m.profitFactor == null ? (m.closedTrades ? "∞" : "—") : m.profitFactor) +
-      statTile("Max drawdown", m.closedTrades ? m.maxDrawdownPct + "%" : "—") +
-      statTile("Trades", s.totalTrades + " closed / " + s.openPositions + " open") +
-      statTile("Daily P&L", fmtUsd(s.dailyPnl), pnlClass(s.dailyPnl)) +
-      statTile("Weekly P&L", fmtUsd(s.weeklyPnl), pnlClass(s.weeklyPnl));
+  function performanceSparkline(book, history) {
+    var stats = book.stats || {};
+    var starting = Number(stats.startingBalance) || 0;
+    var equity = Number(stats.equity);
+    var points = [{ at: "start", equity: starting }];
+    var running = starting;
+
+    (history || [])
+      .slice()
+      .reverse()
+      .forEach(function (trade) {
+        var pnl = Number(trade.pnl != null ? trade.pnl : trade.realizedPnl);
+        if (!isFinite(pnl)) return;
+        running += pnl;
+        points.push({ at: trade.closedAt || trade.closed_at || "", equity: running });
+      });
+
+    if (isFinite(equity) && (!points.length || points[points.length - 1].equity !== equity)) {
+      points.push({ at: "now", equity: equity });
+    }
+    if (points.length < 2) points.push({ at: "now", equity: starting });
+
+    var values = points.map(function (p) { return Number(p.equity) || 0; });
+    var min = Math.min.apply(null, values);
+    var max = Math.max.apply(null, values);
+    var span = max - min || Math.max(Math.abs(max), 1);
+    var width = 320;
+    var height = 84;
+    var poly = values
+      .map(function (value, i) {
+        var x = values.length === 1 ? width : (i / (values.length - 1)) * width;
+        var y = height - ((value - min) / span) * (height - 10) - 5;
+        return x.toFixed(1) + "," + y.toFixed(1);
+      })
+      .join(" ");
+    var up = values[values.length - 1] >= values[0];
+    return (
+      '<svg class="tl-account-graph" viewBox="0 0 ' + width + " " + height + '" preserveAspectRatio="none" ' +
+      'role="img" aria-label="' + escapeHtml(book.name || book.id) + ' account performance">' +
+      '<line x1="0" y1="' + (height - 5) + '" x2="' + width + '" y2="' + (height - 5) + '" />' +
+      '<polyline fill="none" stroke-width="3" points="' + poly + '" ' +
+      'stroke="' + (up ? "#00e676" : "#ff5252") + '" /></svg>'
+    );
+  }
+
+  function accountMetric(label, value, cls) {
+    return (
+      '<div class="tl-account-metric"><span>' + escapeHtml(label) + "</span>" +
+      '<strong class="' + (cls || "") + '">' + value + "</strong></div>"
+    );
+  }
+
+  function renderAccountCards(books, histories) {
+    var selected = currentBook();
+    statsEl.className = "tl-account-grid";
+    statsEl.innerHTML = (books || [])
+      .map(function (book) {
+        var s = book.stats || {};
+        var m = s.riskMetrics || {};
+        var history = histories && histories[book.id] ? histories[book.id] : [];
+        var active = book.id === selected ? " is-active" : "";
+        return (
+          '<button class="tl-account-card' + active + '" type="button" data-book="' + escapeHtml(book.id) + '">' +
+          '<div class="tl-account-graph-wrap">' + performanceSparkline(book, history) + "</div>" +
+          '<div class="tl-account-body">' +
+          '<div class="tl-account-head"><span>' + escapeHtml(book.name || book.id) + "</span>" +
+          '<small>' + escapeHtml(book.id) + "</small></div>" +
+          '<div class="tl-account-equity">' +
+          '<span>Equity</span><strong>' + "$" + Number(s.equity).toLocaleString(undefined, { maximumFractionDigits: 2 }) + "</strong>" +
+          "</div>" +
+          '<div class="tl-account-metrics">' +
+          accountMetric("Net P&L", fmtUsd(s.realizedPnl), pnlClass(s.realizedPnl)) +
+          accountMetric("Unrealized", fmtUsd(s.unrealizedPnl), pnlClass(s.unrealizedPnl)) +
+          accountMetric("Win rate", s.totalTrades ? s.winRate + "%" : "—") +
+          accountMetric("Expectancy", m.closedTrades ? (m.expectancyR > 0 ? "+" : "") + m.expectancyR + "R" : "—", pnlClass(m.expectancyR)) +
+          accountMetric("Trades", s.totalTrades + " closed / " + s.openPositions + " open") +
+          accountMetric("Daily", fmtUsd(s.dailyPnl), pnlClass(s.dailyPnl)) +
+          "</div></div></button>"
+        );
+      })
+      .join("");
   }
 
   function renderPositions(positions) {
@@ -332,8 +398,18 @@
       updatedEl.textContent = "Updated " + fmtTime(data.updatedAt);
 
       var book = data.books.filter(function (b) { return b.id === currentBook(); })[0] || data.books[0];
-      renderStats(book);
       renderPositions(book.openPositions);
+      return Promise.all(
+        data.books.map(function (b) {
+          return getJson("/api/trading-lab/history?book=" + encodeURIComponent(b.id) + "&limit=80")
+            .then(function (history) { return { book: b.id, items: history.items || [] }; })
+            .catch(function () { return { book: b.id, items: [] }; });
+        }),
+      ).then(function (historyRows) {
+        var histories = {};
+        historyRows.forEach(function (row) { histories[row.book] = row.items; });
+        renderAccountCards(data.books, histories);
+      });
     });
   }
 
@@ -622,6 +698,13 @@
   refreshBtn.addEventListener("click", refresh);
   bookSelect.addEventListener("change", refresh);
   intervalSelect.addEventListener("change", loadCandidates);
+
+  statsEl.addEventListener("click", function (event) {
+    var card = event.target.closest(".tl-account-card");
+    if (!card || !card.dataset.book || card.dataset.book === currentBook()) return;
+    bookSelect.value = card.dataset.book;
+    refresh();
+  });
 
   markBtn.addEventListener("click", function () {
     markBtn.disabled = true;
