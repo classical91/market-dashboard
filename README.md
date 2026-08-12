@@ -1,6 +1,6 @@
 # Market Dashboard
 
-Market Dashboard is a Node.js/Express market intelligence workspace. It serves static dashboard pages from `public/` and exposes API routes under `/api/*` for overview data, on-chain analytics, YouTube RSS feeds, Telegram/reporting workflows, and health checks.
+Market Dashboard is a Node.js/Express market intelligence workspace. It serves static dashboard pages from `public/` and exposes API routes under `/api/*` for overview data, on-chain analytics, YouTube channel intelligence, Telegram/reporting workflows, and health checks.
 
 The app is intentionally lightweight: no bundler, no frontend framework, and no TypeScript migration yet. Frontend behavior is vanilla JavaScript with shared UI helpers and CSS primitives.
 
@@ -24,7 +24,7 @@ The app is intentionally lightweight: no bundler, no frontend framework, and no 
 - `/ai-analysis.html` - TradingView chart snapshots with AI reads for crypto plus BTC-correlated macro tickers.
 - `/decision.html` - Decision Engine: multi-asset regime score (BTC, breadth, SPY, QQQ, DXY, VIX, gold, oil, optional US10Y), asset-class rotation board, setup-quality ranking layered over the signal screener, execution levels (trigger / invalidation / target / R:R with explicit "do not trade" reasons), and a trading journal that grades whether the engine's calls were right.
 - `/trading-lab.html` - Trading Lab: paper execution with real TP1/TP2 scale-outs, ATR risk sizing, kill switches, a historical edge gate that scores every Decision Engine plan against how setups like it have actually performed, and bar-replay backtesting over the same engine. See [docs/trading-lab.md](docs/trading-lab.md).
-- `/youtube-v2.html` - YouTube Intelligence RSS upload dashboard.
+- `/youtube-v2.html` - YouTube Intelligence: live streams, scheduled streams, and latest uploads from tracked channels.
 - `/indicators.html` - Trading and market glossary.
 - `/reporter.html` - Daily report generation workflow.
 
@@ -132,7 +132,32 @@ The **backtester** takes a strategy from its own registry (`GET /api/trading-lab
 - `ONCHAIN_COOLDOWN_CACHE_MS` - how long to serve the cached overview while Covalent cools down after a 402/429. During that window tracked-token flows fall back to Etherscan when `ETHERSCAN_API_KEY` is set.
 - `ONCHAIN_*` tuning values for lookbacks, page sizes, row counts, thresholds, and cache TTLs.
 
+### YouTube Intelligence
+
+`/youtube-v2.html` runs on a hybrid of the YouTube Data API v3 and YouTube's public RSS feeds. Per channel the service tries the API first (uploads plus live/upcoming state), falls back to RSS (uploads only, no key, but it needs a known `UC...` channel ID), and finally serves the last known good feed rather than blanking the page. It never scrapes `youtube.com/@handle` HTML — doing that is what used to break the page on Railway, where YouTube answers datacenter IPs with a consent interstitial instead of the channel document.
+
+- `YOUTUBE_API_KEY` - YouTube Data API v3 key, from Google Cloud Console (enable **YouTube Data API v3**, then Credentials → API key; restrict it to that one API). **Server-side only** — it is never sent to the browser and is redacted from logs. Blank means uploads-only, with no live/upcoming detection.
+- `YOUTUBE_CHANNEL_IDS` - optional handle → channel ID overrides, as JSON (`{"stockmoe":"UC..."}`) or `handle=UC...,handle=UC...`. Setting these saves an API call per handle and is what lets the RSS fallback work on a deploy with no key at all. Channel IDs can also be committed into `src/config/youtube-channels.js`.
+- `YOUTUBE_MAX_VIDEOS_PER_CHANNEL`, `YOUTUBE_REQUEST_TIMEOUT_MS`.
+- `YOUTUBE_CHANNEL_ID_CACHE_MS`, `YOUTUBE_CHANNEL_META_CACHE_MS`, `YOUTUBE_UPLOADS_CACHE_MS`, `YOUTUBE_LIVE_CACHE_MS` - server-side cache TTLs. These are what keep a refreshing dashboard off the API.
+- `YOUTUBE_QUOTA_COOLDOWN_MS` - how long to stop calling the API after it reports the daily quota is gone, so an exhausted key isn't re-hit on every refresh.
+- `YOUTUBE_LIVE_SEARCH_ENABLED`, `YOUTUBE_LIVE_SEARCH_CACHE_MS` - opt-in live discovery through `search.list`. Off by default and best left off (see quota below).
+
+**Quota.** The default YouTube Data API quota is 10,000 units/day. The request path uses only cheap endpoints: `channels.list` (1 unit, cached 24h), `playlistItems.list` (1 unit per channel, cached 10min), and a single batched `videos.list` (1 unit per 50 videos, cached 2min). Four channels therefore cost roughly 5 units per refresh cycle — a few thousand units a day even under constant refreshing. `search.list` costs **100 units per call** and is never used on the request path; enabling `YOUTUBE_LIVE_SEARCH_ENABLED` for four channels on a 30-minute TTL would cost ~19,000 units/day, so only turn it on with a raised quota.
+
+To resolve the configured handles to permanent channel IDs once:
+
+```bash
+YOUTUBE_API_KEY=... node scripts/resolve-youtube-channels.js
+```
+
+It prints both a `src/config/youtube-channels.js` snippet and a ready-to-paste `YOUTUBE_CHANNEL_IDS` value.
+
 See `.env.example` for the full list.
+
+### Railway Deployment
+
+Railway reads `railway.toml` (start command, `/api/health` healthcheck) and takes every value above from the service's **Variables** tab — there is no `.env` file in the deployed image. For YouTube Intelligence, set `YOUTUBE_API_KEY` there; optionally add `YOUTUBE_CHANNEL_IDS` so the RSS fallback keeps working if the key is ever removed or exhausted. Railway restarts the service on a variable change, which also clears the in-memory caches. `DATA_DIR` should point at the mounted volume (usually `/app/data`) so resolved channel IDs survive restarts.
 
 ## Project Structure
 
@@ -192,7 +217,7 @@ market-dashboard/
 - `/api/overview` still returns fallback data when market providers are missing or rate-limited.
 - On-chain overview degrades when Covalent is unavailable.
 - Wallet/token detail endpoints require valid provider keys and should return clear service errors when unavailable.
-- YouTube RSS feeds resolve channel IDs and return upload lists without requiring the YouTube Data API.
+- YouTube Intelligence prefers the YouTube Data API, falls back to RSS when the key is missing, rejected or out of quota, and serves the last known good feed when both are down. Live/upcoming detection needs the API key; without one the page shows uploads and says so.
 
 ## Roadmap
 

@@ -140,6 +140,31 @@ const config = {
     layouts: parseJsonArray(process.env.AI_ANALYSIS_LAYOUTS) || [],
     timeoutMs: parseNumber(process.env.LAYOUT_CAPTURE_TIMEOUT_MS, 25000),
   },
+  youtube: {
+    // YouTube Data API v3 key. Server-side only — it is never sent to the
+    // browser, and every request that carries it is redacted before logging.
+    // Without it the page still runs on RSS, but only for channels whose
+    // UC... ID is known (config or YOUTUBE_CHANNEL_IDS), and live/upcoming
+    // detection is unavailable.
+    apiKey: process.env.YOUTUBE_API_KEY || "",
+    // Optional handle -> UC... overrides. JSON or "handle=UC...,handle=UC...".
+    channelIds: process.env.YOUTUBE_CHANNEL_IDS || "",
+    maxVideosPerChannel: parseNumber(process.env.YOUTUBE_MAX_VIDEOS_PER_CHANNEL, 8),
+    requestTimeoutMs: parseNumber(process.env.YOUTUBE_REQUEST_TIMEOUT_MS, 10000),
+    // How long to stop calling the API after it reports the daily quota is
+    // gone, so an exhausted key isn't re-hit on every refresh.
+    quotaCooldownMs: parseNumber(process.env.YOUTUBE_QUOTA_COOLDOWN_MS, 30 * 60 * 1000),
+    ttls: {
+      channelId: parseNumber(process.env.YOUTUBE_CHANNEL_ID_CACHE_MS, 30 * 24 * 60 * 60 * 1000),
+      channelMeta: parseNumber(process.env.YOUTUBE_CHANNEL_META_CACHE_MS, 24 * 60 * 60 * 1000),
+      uploads: parseNumber(process.env.YOUTUBE_UPLOADS_CACHE_MS, 10 * 60 * 1000),
+      videoStatus: parseNumber(process.env.YOUTUBE_LIVE_CACHE_MS, 2 * 60 * 1000),
+      liveSearch: parseNumber(process.env.YOUTUBE_LIVE_SEARCH_CACHE_MS, 30 * 60 * 1000),
+    },
+    // search.list costs 100 units a call against a 10,000/day default quota,
+    // so it stays off unless explicitly switched on with a raised quota.
+    liveSearchEnabled: process.env.YOUTUBE_LIVE_SEARCH_ENABLED === "true",
+  },
   telegram: {
     botToken: process.env.TELEGRAM_BOT_TOKEN || "",
     chatIds: parseList(process.env.TELEGRAM_CHAT_IDS),
