@@ -849,6 +849,16 @@
     );
   }
 
+  // Why a strategy has no line. "insufficient data" and "ran but never traded"
+  // are completely different outcomes and must not look alike: one is a
+  // missing dataset, the other is a strategy that refused every setup it saw.
+  function facetReason(r) {
+    if (r.status === "insufficient-data") return "insufficient data";
+    if (!r.closedTrades && r.signals) return "signalled, no fills";
+    if (!r.closedTrades) return "no trades";
+    return "no curve";
+  }
+
   function renderComparison(data) {
     var rows = (data && data.results) || [];
     if (!rows.length) {
@@ -888,45 +898,55 @@
     //      line, labelled by name, coloured only by whether it made money.
     //
     // Every facet shares one scale, computed across all of them.
+    // EVERY strategy gets a facet, including the ones with nothing to draw.
+    // Dropping the curveless ones silently leaves this grid and the table
+    // below disagreeing about how many strategies ran, and a reader counting
+    // five and finding four has to go work out which one vanished. A facet
+    // that says "no curve, and here is why" answers that in place.
     var plotted = rows.filter(function (r) { return r.equityCurve && r.equityCurve.length > 1; });
-    var facets = "";
-    if (plotted.length) {
-      var lo = 0;
-      var hi = 0;
-      plotted.forEach(function (r) {
-        curvePct(r.equityCurve).forEach(function (v) {
-          lo = Math.min(lo, v);
-          hi = Math.max(hi, v);
-        });
+    var lo = 0;
+    var hi = 0;
+    plotted.forEach(function (r) {
+      curvePct(r.equityCurve).forEach(function (v) {
+        lo = Math.min(lo, v);
+        hi = Math.max(hi, v);
       });
-      var pad = (hi - lo || 1) * 0.08;
-      lo -= pad;
-      hi += pad;
-      var span = hi - lo || 1;
+    });
+    var pad = (hi - lo || 1) * 0.08;
+    lo -= pad;
+    hi += pad;
+    var span = hi - lo || 1;
 
-      facets =
-        '<div class="tl-facets">' +
-        plotted
-          .map(function (r) {
-            var pctReturn = r.netReturnPct;
-            return (
-              '<div class="tl-facet">' +
-              '<div class="tl-facet-head">' +
-              '<span class="tl-facet-name">' + escapeHtml(r.strategyName || r.strategy) + "</span>" +
-              '<span class="tl-facet-value ' + pnlClass(pctReturn) + '">' +
-              (pctReturn > 0 ? "+" : "") + escapeHtml(String(pctReturn)) + "%</span>" +
-              "</div>" +
-              miniEquity(r.equityCurve, lo, span) +
-              '<div class="tl-facet-foot">' + r.closedTrades + " trades &middot; " +
-              (r.closedTrades ? (r.expectancyR > 0 ? "+" : "") + escapeHtml(String(r.expectancyR)) + "R" : "no expectancy") +
-              "</div></div>"
-            );
-          })
-          .join("") +
-        "</div>" +
-        '<div class="tl-chart-axis"><span>shared scale ' + lo.toFixed(1) + "% to " + hi.toFixed(1) +
-        "%</span><span>% return from each run&#39;s own start</span></div>";
-    }
+    var facets =
+      '<div class="tl-facets">' +
+      rows
+        .map(function (r) {
+          var drawable = r.equityCurve && r.equityCurve.length > 1;
+          var pctReturn = r.netReturnPct;
+          return (
+            '<div class="tl-facet' + (drawable ? "" : " tl-facet--empty") + '">' +
+            '<div class="tl-facet-head">' +
+            '<span class="tl-facet-name">' + escapeHtml(r.strategyName || r.strategy) + "</span>" +
+            '<span class="tl-facet-value ' + (drawable ? pnlClass(pctReturn) : "tl-flat") + '">' +
+            (drawable ? (pctReturn > 0 ? "+" : "") + escapeHtml(String(pctReturn)) + "%" : "—") +
+            "</span></div>" +
+            (drawable
+              ? miniEquity(r.equityCurve, lo, span)
+              : '<div class="tl-mini tl-mini--empty">' + escapeHtml(facetReason(r)) + "</div>") +
+            '<div class="tl-facet-foot">' +
+            (drawable
+              ? r.closedTrades + " trades &middot; " +
+                (r.closedTrades ? (r.expectancyR > 0 ? "+" : "") + escapeHtml(String(r.expectancyR)) + "R" : "no expectancy")
+              : escapeHtml(r.replayType || "candle") + " replay") +
+            "</div></div>"
+          );
+        })
+        .join("") +
+      "</div>" +
+      (plotted.length
+        ? '<div class="tl-chart-axis"><span>shared scale ' + lo.toFixed(1) + "% to " + hi.toFixed(1) +
+          "%</span><span>% return from each run&#39;s own start</span></div>"
+        : "");
 
     btCompareResult.innerHTML =
       facets +
