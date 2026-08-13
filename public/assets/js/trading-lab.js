@@ -59,6 +59,15 @@
     return isNaN(d.getTime()) ? "—" : d.toLocaleString();
   }
 
+  // Date only. A chart axis on a phone has room for "1/1/2026" and not for
+  // "1/1/2026, 12:00:00 AM", and the time of day is noise on a run measured
+  // in months.
+  function fmtDay(iso) {
+    if (!iso) return "—";
+    var d = new Date(iso);
+    return isNaN(d.getTime()) ? "—" : d.toLocaleDateString();
+  }
+
   function showError(message) {
     notice.style.display = "block";
     notice.innerHTML = "&#9888;&#65039; " + escapeHtml(message);
@@ -472,30 +481,228 @@
 
   /* ── Backtest ──────────────────────────────────────────── */
 
-  // A compact inline equity curve. No chart library on this page, and one
-  // polyline says everything a sparkline needs to.
-  function equitySparkline(curve) {
-    if (!curve || curve.length < 2) return "";
-    var values = curve.map(function (p) { return p.equity; });
-    var min = Math.min.apply(null, values);
-    var max = Math.max.apply(null, values);
-    var span = max - min || 1;
-    var width = 600;
-    var height = 60;
-    var points = values
+  /* ── Charts ────────────────────────────────────────────────
+     No chart library on this page, so these are hand-built SVG.
+     Two rules hold across all of them, both for mobile's sake:
+
+     1. No text inside the SVG. A viewBox scaled down to a 340px phone
+        scales its type down with it, and 11px becomes 6px. Every label
+        is HTML beside the plot instead, so it stays at its own size and
+        the plot is free to squash.
+     2. The plot is drawn in its own viewBox units with
+        preserveAspectRatio="none", so it fills whatever width it is
+        given. Strokes carry vector-effect="non-scaling-stroke" so a
+        squashed plot does not also squash its line weight.
+     ──────────────────────────────────────────────────────── */
+
+  var CHART_W = 600;
+
+  // Series colour is semantic here, not categorical: these charts show
+  // profit and loss, and this page already reads green as up and coral as
+  // down everywhere else. Five overlaid strategy colours were tried first
+  // and abandoned — at this surface's lightness no five-hue set separates
+  // safely for colour-vision deficiency, which is why the comparison below
+  // is small multiples rather than one chart with five lines on it.
+  var UP = "#00e396";
+  var DOWN = "#ff4d6d";
+
+  function curveValues(curve) {
+    return curve.map(function (p) { return Number(p.equity); });
+  }
+
+  // Percent return from the run's own first point, which is what makes two
+  // strategies with different balances comparable on one scale.
+  function curvePct(curve) {
+    var values = curveValues(curve);
+    var base = values[0] || 1;
+    return values.map(function (v) { return ((v - base) / Math.abs(base)) * 100; });
+  }
+
+  function pointsFor(values, min, span, width, height) {
+    return values
       .map(function (v, i) {
-        var x = (i / (values.length - 1)) * width;
+        var x = values.length === 1 ? 0 : (i / (values.length - 1)) * width;
         var y = height - ((v - min) / span) * height;
         return x.toFixed(1) + "," + y.toFixed(1);
       })
       .join(" ");
-    var up = values[values.length - 1] >= values[0];
+  }
+
+  // The main equity chart: the curve, the peak-to-trough shading underneath
+  // it, and a baseline at break-even.
+  //
+  // The drawdown band is the point of the chart. Two runs can finish at the
+  // same equity having felt completely different on the way, and a bare line
+  // hides that — the shaded gap between the running peak and the curve is the
+  // pain the number at the end does not show.
+  function equityChart(curve, id) {
+    if (!curve || curve.length < 2) return '<div class="de-empty tl-chart-empty">No equity curve — this run closed no trades.</div>';
+
+    var values = curveValues(curve);
+    var height = 160;
+    var peaks = [];
+    var peak = -Infinity;
+    for (var i = 0; i < values.length; i += 1) {
+      peak = Math.max(peak, values[i]);
+      peaks.push(peak);
+    }
+
+    var base = values[0];
+    var all = values.concat(peaks).concat([base]);
+    var min = Math.min.apply(null, all);
+    var max = Math.max.apply(null, all);
+    var span = max - min || 1;
+    // A little headroom so the line never runs along the frame edge.
+    min -= span * 0.06;
+    max += span * 0.06;
+    span = max - min;
+
+    var linePts = pointsFor(values, min, span, CHART_W, height);
+    var peakPts = pointsFor(peaks, min, span, CHART_W, height);
+    // Closed band between the running peak and the equity line.
+    var band = peakPts + " " + linePts.split(" ").reverse().join(" ");
+    var baseY = (height - ((base - min) / span) * height).toFixed(1);
+    var up = values[values.length - 1] >= base;
+
     return (
-      '<svg class="tl-spark" viewBox="0 0 ' + width + " " + height + '" preserveAspectRatio="none" ' +
-      'role="img" aria-label="Equity curve">' +
-      '<polyline fill="none" stroke-width="2" points="' + points + '" ' +
-      'stroke="' + (up ? "#00e676" : "#ff5252") + '" /></svg>'
+      '<div class="tl-chart" data-chart="' + escapeHtml(id) + '">' +
+      '<svg class="tl-chart-plot" viewBox="0 0 ' + CHART_W + " " + height + '" preserveAspectRatio="none" ' +
+      'role="img" aria-label="Equity curve with drawdown from peak shaded">' +
+      '<polygon class="tl-chart-dd" points="' + band + '" />' +
+      '<line class="tl-chart-base" x1="0" y1="' + baseY + '" x2="' + CHART_W + '" y2="' + baseY + '" ' +
+      'vector-effect="non-scaling-stroke" />' +
+      '<polyline class="tl-chart-line" fill="none" points="' + linePts + '" ' +
+      'stroke="' + (up ? UP : DOWN) + '" vector-effect="non-scaling-stroke" />' +
+      '<line class="tl-chart-cursor" x1="0" y1="0" x2="0" y2="' + height + '" ' +
+      'vector-effect="non-scaling-stroke" style="display:none" />' +
+      "</svg>" +
+      "</div>"
     );
+  }
+
+  // A facet in the comparison grid. One line, no shading, no axis — it is
+  // read against its siblings, and `min`/`span` are passed in so every facet
+  // shares one scale. Facets on independent scales would make a 2% run and a
+  // 40% run look identical, which is the whole thing the grid exists to show.
+  function miniEquity(curve, min, span) {
+    if (!curve || curve.length < 2) return '<div class="tl-mini tl-mini--empty">no trades</div>';
+    var values = curvePct(curve);
+    var height = 44;
+    var pts = pointsFor(values, min, span, CHART_W, height);
+    var zeroY = (height - ((0 - min) / span) * height).toFixed(1);
+    var up = values[values.length - 1] >= 0;
+    return (
+      '<svg class="tl-mini" viewBox="0 0 ' + CHART_W + " " + height + '" preserveAspectRatio="none" ' +
+      'role="img" aria-label="Equity curve">' +
+      '<line class="tl-chart-base" x1="0" y1="' + zeroY + '" x2="' + CHART_W + '" y2="' + zeroY + '" ' +
+      'vector-effect="non-scaling-stroke" />' +
+      '<polyline fill="none" points="' + pts + '" stroke="' + (up ? UP : DOWN) + '" ' +
+      'stroke-width="2" vector-effect="non-scaling-stroke" /></svg>'
+    );
+  }
+
+  // R-multiple distribution.
+  //
+  // Expectancy is a mean, and a mean hides its own shape: +0.4R from many
+  // small wins and one catastrophic loss is a different strategy from +0.4R
+  // spread evenly, and only one of them survives a bad month. This is the
+  // chart that tells those apart, so it is worth the space even when the
+  // trade count is small.
+  function rMultipleChart(trades) {
+    var values = (trades || [])
+      .map(function (t) { return Number(t.rMultiple); })
+      .filter(function (v) { return isFinite(v); });
+    if (!values.length) return "";
+
+    var lo = Math.floor(Math.min.apply(null, values) * 2) / 2;
+    var hi = Math.ceil(Math.max.apply(null, values) * 2) / 2;
+    var step = 0.5;
+    var buckets = [];
+    for (var edge = lo; edge < hi; edge += step) {
+      var from = Math.round(edge * 2) / 2;
+      buckets.push({ from: from, to: from + step, count: 0 });
+    }
+    if (!buckets.length) buckets.push({ from: lo, to: lo + step, count: 0 });
+
+    values.forEach(function (v) {
+      var idx = Math.min(buckets.length - 1, Math.max(0, Math.floor((v - lo) / step)));
+      buckets[idx].count += 1;
+    });
+
+    var tallest = buckets.reduce(function (m, b) { return Math.max(m, b.count); }, 0) || 1;
+    var height = 90;
+    var gap = 2; // the 2px surface gap that keeps adjacent bars separate
+    var barW = CHART_W / buckets.length;
+    var bars = buckets
+      .map(function (b, i) {
+        if (!b.count) return "";
+        var h = (b.count / tallest) * height;
+        var x = i * barW + gap / 2;
+        return (
+          '<rect x="' + x.toFixed(1) + '" y="' + (height - h).toFixed(1) + '" ' +
+          'width="' + Math.max(1, barW - gap).toFixed(1) + '" height="' + h.toFixed(1) + '" ' +
+          'rx="2" fill="' + (b.from < 0 ? DOWN : UP) + '">' +
+          "<title>" + b.count + " trade(s) between " + b.from + "R and " + b.to + "R</title>" +
+          "</rect>"
+        );
+      })
+      .join("");
+
+    // Break-even is drawn INSIDE the plot rather than labelled beneath it.
+    // A "0" in the HTML label row would be positioned by the flex row, which
+    // puts it at the visual midpoint — and the midpoint of this axis is almost
+    // never zero. A line at the computed x cannot drift from the data.
+    var zeroX = (((0 - lo) / (hi - lo || 1)) * CHART_W).toFixed(1);
+
+    return (
+      '<div class="tl-chart-block">' +
+      '<div class="tl-chart-head"><span class="tl-chart-title">R-multiple distribution</span>' +
+      '<span class="tl-chart-note">' + values.length + " closed trade(s)</span></div>" +
+      '<svg class="tl-hist" viewBox="0 0 ' + CHART_W + " " + height + '" preserveAspectRatio="none" ' +
+      'role="img" aria-label="Distribution of trade results in R multiples">' + bars +
+      '<line class="tl-chart-base" x1="' + zeroX + '" y1="0" x2="' + zeroX + '" y2="' + height + '" ' +
+      'vector-effect="non-scaling-stroke" /></svg>' +
+      '<div class="tl-chart-axis"><span>' + lo + "R</span>" +
+      "<span>dashed line is break-even</span>" +
+      "<span>" + hi + "R</span></div>" +
+      "</div>"
+    );
+  }
+
+  // The crosshair. An HTML/SVG chart is interactive by default, and on a
+  // phone the readout IS the axis — there is no room for one otherwise.
+  // Pointer events cover mouse and touch in one path.
+  function attachCrosshair(root, curve) {
+    var wrap = root.querySelector(".tl-chart");
+    var readout = root.querySelector(".tl-chart-readout");
+    if (!wrap || !readout || !curve || curve.length < 2) return;
+    var cursor = wrap.querySelector(".tl-chart-cursor");
+    var idle = readout.innerHTML;
+
+    function move(event) {
+      var box = wrap.getBoundingClientRect();
+      if (!box.width) return;
+      var ratio = Math.min(1, Math.max(0, (event.clientX - box.left) / box.width));
+      var point = curve[Math.round(ratio * (curve.length - 1))];
+      if (!point) return;
+      cursor.setAttribute("x1", (ratio * CHART_W).toFixed(1));
+      cursor.setAttribute("x2", (ratio * CHART_W).toFixed(1));
+      cursor.style.display = "";
+      readout.innerHTML =
+        "<strong>" + escapeHtml(fmtUsd(point.equity)) + "</strong> equity &middot; " +
+        escapeHtml(fmtTime(point.at));
+      if (event.cancelable && event.pointerType === "touch") event.preventDefault();
+    }
+
+    function leave() {
+      cursor.style.display = "none";
+      readout.innerHTML = idle;
+    }
+
+    wrap.addEventListener("pointerdown", move);
+    wrap.addEventListener("pointermove", move);
+    wrap.addEventListener("pointerleave", leave);
+    wrap.addEventListener("pointercancel", leave);
   }
 
   // The backtester applies fees, slippage and funding inside the paper trader
@@ -556,9 +763,26 @@
         : [],
     );
 
+    var curve = data.equityCurve || [];
+    var endEquity = curve.length ? curve[curve.length - 1].equity : null;
+
     btResult.innerHTML =
       '<div class="tl-stat-grid">' + tiles + "</div>" +
-      equitySparkline(data.equityCurve) +
+      '<div class="tl-chart-block">' +
+      '<div class="tl-chart-head">' +
+      '<span class="tl-chart-title">Equity</span>' +
+      '<span class="tl-chart-note tl-chart-readout">' +
+      (endEquity == null
+        ? "no closed trades"
+        : "ended " + escapeHtml(fmtUsd(endEquity)) + " &middot; shaded band is drawdown from peak") +
+      "</span></div>" +
+      equityChart(curve, "bt-equity") +
+      (curve.length > 1
+        ? '<div class="tl-chart-axis"><span>' + escapeHtml(fmtDay(data.from)) +
+          "</span><span>" + escapeHtml(fmtDay(data.to)) + "</span></div>"
+        : "") +
+      "</div>" +
+      rMultipleChart(data.trades) +
       '<div class="tl-bt-meta">' +
       escapeHtml(data.strategyName || data.strategy || "—") +
       " (" + escapeHtml(data.strategy || "—") + ")" +
@@ -572,6 +796,8 @@
           caveats.map(function (c) { return "<div>" + escapeHtml(c) + "</div>"; }).join("") +
           "</div>"
         : "");
+
+    attachCrosshair(btResult, curve);
   }
 
   // The catalogue is public, so the selector fills in on page load whether or
@@ -611,8 +837,16 @@
       : "";
   }
 
-  function compareCell(value, className) {
-    return '<td class="' + (className || "") + '">' + value + "</td>";
+  // The label rides along on every cell so the table can restack itself as a
+  // list of labelled rows on a narrow screen. An eleven-column table on a
+  // phone is either a horizontal scroll nobody discovers or type too small to
+  // read, and this card is the one people will actually open on a phone.
+  function compareCell(value, className, label) {
+    return (
+      '<td class="' + (className || "") + '"' +
+      (label ? ' data-label="' + escapeHtml(label) + '"' : "") +
+      ">" + value + "</td>"
+    );
   }
 
   function renderComparison(data) {
@@ -626,24 +860,77 @@
       .map(function (r) {
         return (
           "<tr>" +
-          "<td>" + escapeHtml(r.strategyName || r.strategy) + "<br /><small>" + escapeHtml(r.strategy) + "</small></td>" +
-          compareCell(r.bars + " <small>(" + r.warmupBars + " warmup)</small>") +
-          compareCell(r.status === "insufficient-data" ? "insufficient data" : escapeHtml(r.replayType || "candle")) +
-          compareCell(r.signals) +
-          compareCell(r.closedTrades) +
-          compareCell(fmtUsd(r.netPnlUsd), pnlClass(r.netPnlUsd)) +
-          compareCell(r.closedTrades ? (r.expectancyR > 0 ? "+" : "") + r.expectancyR + "R" : "—", pnlClass(r.expectancyR)) +
-          compareCell(r.profitFactor == null ? (r.closedTrades ? "∞" : "—") : r.profitFactor) +
-          compareCell(r.closedTrades ? r.maxDrawdownPct + "%" : "—") +
-          compareCell(r.closedTrades ? r.winRate + "%" : "—") +
-          compareCell(r.worstLossStreak) +
+          '<td class="tl-compare-name">' + escapeHtml(r.strategyName || r.strategy) +
+          "<br /><small>" + escapeHtml(r.strategy) + "</small></td>" +
+          compareCell(r.bars + " <small>(" + r.warmupBars + " warmup)</small>", "", "Bars") +
+          compareCell(r.status === "insufficient-data" ? "insufficient data" : escapeHtml(r.replayType || "candle"), "", "Replay") +
+          compareCell(r.signals, "", "Signals") +
+          compareCell(r.closedTrades, "", "Closed") +
+          compareCell(fmtUsd(r.netPnlUsd), pnlClass(r.netPnlUsd), "Net P&L") +
+          compareCell(r.closedTrades ? (r.expectancyR > 0 ? "+" : "") + r.expectancyR + "R" : "—", pnlClass(r.expectancyR), "Expectancy") +
+          compareCell(r.profitFactor == null ? (r.closedTrades ? "∞" : "—") : r.profitFactor, "", "Profit factor") +
+          compareCell(r.closedTrades ? r.maxDrawdownPct + "%" : "—", "", "Max DD") +
+          compareCell(r.closedTrades ? r.winRate + "%" : "—", "", "Win rate") +
+          compareCell(r.worstLossStreak, "", "Worst streak") +
           "</tr>"
         );
       })
       .join("");
 
+    // Small multiples rather than five lines on one chart. Two reasons, and
+    // the second is the load-bearing one:
+    //
+    //   1. On a phone, five overlaid curves in a 340px-wide box is a scribble.
+    //   2. Telling five lines apart needs five colours that separate under
+    //      colour-vision deficiency at this surface's lightness, and no such
+    //      five-hue set exists here — the candidates collided at ΔE 2.1
+    //      (deutan). A grid needs no series colours at all: each facet is one
+    //      line, labelled by name, coloured only by whether it made money.
+    //
+    // Every facet shares one scale, computed across all of them.
+    var plotted = rows.filter(function (r) { return r.equityCurve && r.equityCurve.length > 1; });
+    var facets = "";
+    if (plotted.length) {
+      var lo = 0;
+      var hi = 0;
+      plotted.forEach(function (r) {
+        curvePct(r.equityCurve).forEach(function (v) {
+          lo = Math.min(lo, v);
+          hi = Math.max(hi, v);
+        });
+      });
+      var pad = (hi - lo || 1) * 0.08;
+      lo -= pad;
+      hi += pad;
+      var span = hi - lo || 1;
+
+      facets =
+        '<div class="tl-facets">' +
+        plotted
+          .map(function (r) {
+            var pctReturn = r.netReturnPct;
+            return (
+              '<div class="tl-facet">' +
+              '<div class="tl-facet-head">' +
+              '<span class="tl-facet-name">' + escapeHtml(r.strategyName || r.strategy) + "</span>" +
+              '<span class="tl-facet-value ' + pnlClass(pctReturn) + '">' +
+              (pctReturn > 0 ? "+" : "") + escapeHtml(String(pctReturn)) + "%</span>" +
+              "</div>" +
+              miniEquity(r.equityCurve, lo, span) +
+              '<div class="tl-facet-foot">' + r.closedTrades + " trades &middot; " +
+              (r.closedTrades ? (r.expectancyR > 0 ? "+" : "") + escapeHtml(String(r.expectancyR)) + "R" : "no expectancy") +
+              "</div></div>"
+            );
+          })
+          .join("") +
+        "</div>" +
+        '<div class="tl-chart-axis"><span>shared scale ' + lo.toFixed(1) + "% to " + hi.toFixed(1) +
+        "%</span><span>% return from each run&#39;s own start</span></div>";
+    }
+
     btCompareResult.innerHTML =
-      '<div class="de-table-wrap"><table class="de-table"><thead><tr>' +
+      facets +
+      '<div class="de-table-wrap"><table class="de-table tl-compare-table"><thead><tr>' +
       "<th>Strategy</th><th>Bars</th><th>Replay</th><th>Signals</th><th>Closed</th><th>Net P&amp;L</th>" +
       "<th>Expectancy</th><th>Profit factor</th><th>Max DD</th><th>Win rate</th><th>Worst streak</th>" +
       "</tr></thead><tbody>" + body + "</tbody></table></div>" +

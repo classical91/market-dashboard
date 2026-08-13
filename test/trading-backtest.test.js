@@ -6,8 +6,9 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
-const { BacktestService, contextAtBar, trendBreakoutStrategy } = require("../src/services/trading/backtest");
+const { BacktestService, contextAtBar, trendBreakoutStrategy, downsampleCurve } = require("../src/services/trading/backtest");
 const { makeTradingConfig } = require("../src/services/trading/config");
+const { summarizeRun } = require("../src/services/trading/run-summary");
 const { listStrategies } = require("../src/services/trading/strategies");
 
 const config = makeTradingConfig();
@@ -482,4 +483,89 @@ test("backtestSymbol pulls candles from the screener it was given", async () => 
   assert.equal(result.symbol, "ETHUSDT");
   assert.equal(result.interval, "1h");
   assert.equal(result.bars, 200);
+});
+
+/* ── Comparison payload: the chart series ─────────────────── */
+
+// A trending series with pullbacks, so both strategies actually trade.
+function trendingCandlesForCompare(count) {
+  const bars = [];
+  for (let i = 0; i < count; i += 1) {
+    const close = 100 + i * 0.2 + Math.sin(i / 9) * 4;
+    bars.push({
+      openTime: i * 900000,
+      closeTime: (i + 1) * 900000 - 1,
+      open: close - 0.2,
+      high: close + 1,
+      low: close - 1,
+      close,
+      volume: 1000 + (i % 7) * 100,
+    });
+  }
+  return bars;
+}
+
+test("downsampling a curve keeps both endpoints and caps the point count", () => {
+  const curve = [];
+  for (let i = 0; i < 1000; i += 1) curve.push({ at: i, equity: i });
+
+  const out = downsampleCurve(curve, 120);
+  assert.equal(out.length, 120);
+  // The endpoints are the two points a reader measures the run by, so they
+  // must survive exactly rather than being averaged into a neighbour.
+  assert.deepEqual(out[0], curve[0]);
+  assert.deepEqual(out[out.length - 1], curve[curve.length - 1]);
+  // Monotonic and in order — a shuffled or duplicated curve would draw a
+  // plausible-looking line that is not the run.
+  for (let i = 1; i < out.length; i += 1) assert.ok(out[i].at > out[i - 1].at);
+
+  // Short curves are passed through untouched rather than padded.
+  const short = curve.slice(0, 40);
+  assert.equal(downsampleCurve(short, 120), short);
+  assert.deepEqual(downsampleCurve(null, 120), []);
+});
+
+test("a comparison carries an equity curve per strategy for the charts", async () => {
+  const candles = trendingCandlesForCompare(400);
+  const service = new BacktestService({
+    config,
+    signalScreenerService: { getCandles: async () => candles },
+  });
+
+  const comparison = await service.compare({
+    symbol: "BTCUSDT",
+    interval: "15m",
+    strategies: ["mindset_v1", "donchian_breakout_v1"],
+  });
+
+  for (const row of comparison.results) {
+    assert.ok(Array.isArray(row.equityCurve), `${row.strategy} is missing its equity curve`);
+    assert.ok(row.equityCurve.length <= 120, "the curve must be thinned before it goes over the wire");
+    for (const point of row.equityCurve) {
+      assert.equal(typeof point.equity, "number");
+      assert.ok(point.at);
+      // Display payload only: nothing else from the full curve rides along.
+      assert.deepEqual(Object.keys(point).sort(), ["at", "equity"]);
+    }
+  }
+});
+
+test("the experiment record is unaffected by the chart series", () => {
+  // summarizeRun is what gets persisted, and a few thousand equity points per
+  // stored experiment is a different decision from drawing a chart. The curve
+  // is attached beside it in compare(), never inside it.
+  const summary = summarizeRun({
+    strategy: "x",
+    strategyName: "X",
+    symbol: "BTCUSDT",
+    interval: "4h",
+    bars: 10,
+    warmupBars: 1,
+    signals: [],
+    openAtEnd: [],
+    costs: {},
+    stats: { winRate: 0, riskMetrics: {} },
+    equityCurve: [{ at: 1, equity: 2, balance: 2, close: 3, openPositions: 0 }],
+  });
+  assert.equal(summary.equityCurve, undefined);
 });
