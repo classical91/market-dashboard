@@ -51,6 +51,25 @@ function last(values) {
   return values.length ? values[values.length - 1] : null;
 }
 
+// A comparison payload carries one equity curve per strategy so the UI can
+// draw them. At one point per bar that is several thousand points per
+// strategy for a chart a few hundred pixels wide, so the curve is thinned to
+// at most `maxPoints` before it goes over the wire.
+//
+// The thinning keeps the FIRST and LAST points exactly, because the endpoints
+// are the two the reader actually measures the run by, and steps evenly
+// between them. It is a display reduction only: every metric in the row beside
+// it was computed from the full curve.
+function downsampleCurve(curve, maxPoints = 120) {
+  if (!Array.isArray(curve) || curve.length <= maxPoints) return curve || [];
+  const step = (curve.length - 1) / (maxPoints - 1);
+  const out = [];
+  for (let i = 0; i < maxPoints; i += 1) {
+    out.push(curve[Math.round(i * step)]);
+  }
+  return out;
+}
+
 function mean(values) {
   return values.length ? values.reduce((sum, v) => sum + v, 0) / values.length : 0;
 }
@@ -503,7 +522,15 @@ class BacktestService {
       } else {
         result = await this.run({ symbol, interval, candles, options, strategy: id });
       }
-      rows.push(summarizeRun(result));
+      // The curve rides ALONGSIDE the summary, not inside it: summarizeRun is
+      // also what gets persisted as an experiment record, and a few thousand
+      // equity points per stored experiment is a different decision from
+      // drawing a chart. Keeping it out here leaves that record unchanged.
+      rows.push({
+        ...summarizeRun(result),
+        equityCurve: downsampleCurve(result.equityCurve).map((p) => ({ at: p.at, equity: p.equity })),
+        startingBalance: result.stats && result.stats.startingBalance != null ? result.stats.startingBalance : null,
+      });
     }
 
     return {
@@ -524,6 +551,7 @@ class BacktestService {
 
 module.exports = {
   BacktestService,
+  downsampleCurve,
   summarizeRun,
   resolveStrategy,
   trendBreakoutStrategy,
