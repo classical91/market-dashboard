@@ -19,6 +19,7 @@
   var btInterval = document.getElementById("tl-bt-interval");
   var btStrategy = document.getElementById("tl-bt-strategy");
   var btStrategyNote = document.getElementById("tl-bt-strategy-note");
+  var btMode = document.getElementById("tl-bt-mode");
   var btRunBtn = document.getElementById("tl-bt-run");
   var btCompareBtn = document.getElementById("tl-bt-compare");
   var btResult = document.getElementById("tl-bt-result");
@@ -101,12 +102,23 @@
     );
   }
 
-  function performanceSparkline(book, history) {
+  // `window` is one book's history slice: { items, openingBalance, truncated }.
+  //
+  // The curve starts at the balance BEFORE that slice, not at the account's
+  // original starting balance. Those are the same number only while the whole
+  // history fits in the requested window — past that (80 trades today),
+  // starting from the original balance redraws the account as if the earlier
+  // trades never happened, then jumps to current equity at the right-hand
+  // edge. The chart looked plausible and was wrong.
+  function performanceSparkline(book, window) {
     var stats = book.stats || {};
-    var starting = Number(stats.startingBalance) || 0;
+    var history = (window && window.items) || [];
+    var opening = window && isFinite(Number(window.openingBalance))
+      ? Number(window.openingBalance)
+      : Number(stats.startingBalance) || 0;
     var equity = Number(stats.equity);
-    var points = [{ at: "start", equity: starting }];
-    var running = starting;
+    var points = [{ at: "start", equity: opening }];
+    var running = opening;
 
     (history || [])
       .slice()
@@ -121,7 +133,7 @@
     if (isFinite(equity) && (!points.length || points[points.length - 1].equity !== equity)) {
       points.push({ at: "now", equity: equity });
     }
-    if (points.length < 2) points.push({ at: "now", equity: starting });
+    if (points.length < 2) points.push({ at: "now", equity: opening });
 
     var values = points.map(function (p) { return Number(p.equity) || 0; });
     var min = Math.min.apply(null, values);
@@ -160,11 +172,18 @@
       .map(function (book) {
         var s = book.stats || {};
         var m = s.riskMetrics || {};
-        var history = histories && histories[book.id] ? histories[book.id] : [];
+        var window = histories && histories[book.id] ? histories[book.id] : null;
         var active = book.id === selected ? " is-active" : "";
         return (
           '<button class="tl-account-card' + active + '" type="button" data-book="' + escapeHtml(book.id) + '">' +
-          '<div class="tl-account-graph-wrap">' + performanceSparkline(book, history) + "</div>" +
+          '<div class="tl-account-graph-wrap">' + performanceSparkline(book, window) +
+          // Say so when the curve is a window rather than the whole account.
+          // The line is accurate either way now, but "last 80 of 240 trades"
+          // and "the whole history" are different claims.
+          (window && window.truncated
+            ? '<div class="tl-account-window">last ' + window.items.length + " of " + window.total + " trades</div>"
+            : "") +
+          "</div>" +
           '<div class="tl-account-body">' +
           '<div class="tl-account-head"><span>' + escapeHtml(book.name || book.id) + "</span>" +
           '<small>' + escapeHtml(book.id) + "</small></div>" +
@@ -411,12 +430,23 @@
       return Promise.all(
         data.books.map(function (b) {
           return getJson("/api/trading-lab/history?book=" + encodeURIComponent(b.id) + "&limit=80")
-            .then(function (history) { return { book: b.id, items: history.items || [] }; })
+            .then(function (history) {
+              return {
+                book: b.id,
+                items: history.items || [],
+                // Where the curve for this window actually starts. Only equal
+                // to the account's starting balance while the whole history
+                // fits in the window.
+                openingBalance: history.openingBalance,
+                truncated: history.truncated === true,
+                total: history.total,
+              };
+            })
             .catch(function () { return { book: b.id, items: [] }; });
         }),
       ).then(function (historyRows) {
         var histories = {};
-        historyRows.forEach(function (row) { histories[row.book] = row.items; });
+        historyRows.forEach(function (row) { histories[row.book] = row; });
         renderAccountCards(data.books, histories);
       });
     });
@@ -732,6 +762,13 @@
       " · funding " + pct(costs.fundingRate8h) + " per 8h</div>";
   }
 
+  // Which exit rules produced the numbers. Shown on every result because it
+  // changes what they mean: shared execution compares ENTRY signals on one
+  // execution model, native runs each strategy's own stop and target.
+  function executionModeLabel(mode) {
+    return mode === "native" ? "native strategy exits" : "shared execution";
+  }
+
   function renderBacktest(data) {
     if (data.status === "insufficient-data") {
       btResult.innerHTML =
@@ -788,6 +825,7 @@
       " (" + escapeHtml(data.strategy || "—") + ")" +
       " · " + escapeHtml(data.symbol) + " " + escapeHtml(data.interval) +
       " · " + data.bars + " bars (" + data.warmupBars + " warmup)" +
+      " · " + escapeHtml(executionModeLabel(data.executionMode)) +
       " · " + fmtTime(data.from) + " → " + fmtTime(data.to) +
       "</div>" +
       costsLine(data.costs) +
@@ -871,7 +909,13 @@
         return (
           "<tr>" +
           '<td class="tl-compare-name">' + escapeHtml(r.strategyName || r.strategy) +
-          "<br /><small>" + escapeHtml(r.strategy) + "</small></td>" +
+          "<br /><small>" + escapeHtml(r.strategy) +
+          // A row that is not ranked says so where the reader is looking,
+          // rather than sitting silently in the order as if it had earned it.
+          (r.rankable === false
+            ? ' <span class="tl-tag">unranked: ' + escapeHtml(r.unrankedReason || "no trades") + "</span>"
+            : "") +
+          "</small></td>" +
           compareCell(r.bars + " <small>(" + r.warmupBars + " warmup)</small>", "", "Bars") +
           compareCell(r.status === "insufficient-data" ? "insufficient data" : escapeHtml(r.replayType || "candle"), "", "Replay") +
           compareCell(r.signals, "", "Signals") +
@@ -955,6 +999,7 @@
       "<th>Expectancy</th><th>Profit factor</th><th>Max DD</th><th>Win rate</th><th>Worst streak</th>" +
       "</tr></thead><tbody>" + body + "</tbody></table></div>" +
       '<div class="tl-bt-meta">' + escapeHtml(data.symbol) + " " + escapeHtml(data.interval) +
+      " · " + escapeHtml(executionModeLabel(data.executionMode)) +
       " · ranked by expectancy, then profit factor, then drawdown · " + fmtTime(data.ranAt) +
       " · backtest only, the live scanner is unaffected</div>" +
       costsLine(rows[0] && rows[0].costs);
@@ -974,6 +1019,7 @@
       symbol: symbol,
       interval: btInterval.value,
       strategies: strategies.map(function (s) { return s.id; }),
+      executionMode: btMode.value,
     })
       .then(renderComparison)
       .catch(function (err) {
@@ -994,6 +1040,7 @@
       symbol: symbol,
       interval: btInterval.value,
       strategy: selectedStrategy(),
+      executionMode: btMode.value,
     })
       .then(renderBacktest)
       .catch(function (err) {

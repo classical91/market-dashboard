@@ -146,9 +146,40 @@ ends at the decided bar. The signal it returns always carries `reasons[]` and
 `indicators{}`, so the UI can explain why a strategy fired *or* why it stayed
 flat, plus optional `confidence`, `stopHint` and `targetHint`.
 
-Stop and target hints are **recorded, not applied**: sizing and exits stay with
-`planTrade()` and the paper trader, so two strategies are compared on the same
-execution model rather than on who guessed a better stop.
+### Execution modes
+
+A strategy signal carries `stopHint` and `targetHint` — where the strategy
+itself says the trade should be stopped and taken. Which of those the backtest
+**uses** is a choice, because the two answer different questions:
+
+| `executionMode` | Stop and targets from | The question it answers |
+| --- | --- | --- |
+| `shared` (default) | `planTrade()` — 1.5×ATR stop, TP1 1.5R, TP2 2.5R | "Which strategy produces the best ENTRY signals, when every one of them uses the same execution?" |
+| `native` | The strategy's own `stopHint` / `targetHint` | "How does this strategy perform AS DESIGNED?" |
+
+Neither is the correct one, and the distinction is load-bearing.
+`vwap_reversion_v1` targeting VWAP is a different trade from
+`vwap_reversion_v1` targeting 2.5R; only `native` tests the former. But a
+comparison table under `native` is no longer apples-to-apples, because each row
+is using different exit rules — that is what `shared` is for. Conflating them
+is the mistake, which is why the mode is recorded on the result, on the
+experiment record, and on every individual trade's `meta`.
+
+Under `native` the position size is recomputed from the strategy's own stop
+distance so the **dollar risk per trade is identical to `shared`**. Without
+that, a mode comparison would be measuring position size rather than exit
+rules: a wider native stop buys a smaller position, not more risk.
+
+Two guards keep the mode honest:
+
+- A hint that is not a finite number, or that sits on the wrong side of the
+  entry (a long stop above it), is refused and the trade falls back to shared
+  levels. Opening it anyway would book an instant fill and call it a result.
+- Every fallback is **counted and reported**. `mindset_v1` publishes no hints
+  at all, so a `native` run of it is really a shared run — and a result
+  labelled `native` that quietly used `planTrade`'s levels throughout is the
+  single most misreadable outcome in this module. The run reports
+  `nativeFallbacks` and adds a caveat naming the strategy.
 
 | id | version | status | What it is |
 | --- | --- | --- | --- |
@@ -157,6 +188,39 @@ execution model rather than on who guessed a better stop.
 | `donchian_breakout_v1` | 1.0.0 | `backtest` | The unoptimised baseline (below): an N-bar channel break with an ATR stop. Exists to be the number other strategies must beat. |
 | `vwap_reversion_v1` | 1.0.0 | `backtest` | The counterweight (below): fades stretched moves back to anchored VWAP, in low-ADX regimes only. |
 | `shadow_bananagun_v1` | 1.0.0 | `experimental` | Banana Gun-style on-chain candidate replay. It is **event replay only**: historical point-in-time candidate and safety snapshots are required, and candle-only performance is refused. |
+
+### Strategy options and warmup
+
+Callers may override a strategy's parameters through the `options` body field.
+Two things follow, and neither used to hold:
+
+- **Options are validated before anything runs**, against the strategy that
+  will receive them, and a bad value is a 400 naming the parameter. Previously
+  `{"channelLength": 5000}` reached the arithmetic and surfaced as a 500.
+- **Warmup is computed from the effective options**, not from the defaults. A
+  strategy opts in with `warmupFor(options)`; `requiredWarmupBars` is only the
+  right answer for a run at defaults, and a 400-bar channel needs 402 bars
+  reserved rather than the default 102 — short of that, the channel loop reads
+  off the front of the array.
+
+Both are opt-in per strategy (`validateOptions`, `warmupFor`), so a strategy
+without them behaves exactly as before.
+
+### Ranking a comparison
+
+Rows are ordered by expectancy, then profit factor, then the smaller drawdown —
+but only rows with at least `minRankedTrades` closed trades are ranked at all.
+
+This matters because a null profit factor means two different things. "Wins
+and no losses" is genuinely infinite and should sort to the top; "no trades"
+has no profit factor because there is no evidence, and the old comparator
+substituted 999 for both — floating a strategy that never traded above every
+strategy that did. Unranked rows are kept, at the end, flagged with the reason:
+a strategy that ran and refused every setup is a finding, not an absence.
+
+The default threshold is 1, which only excludes strategies that never traded. A
+real statistical minimum is a promotion-policy decision and belongs with the
+rest of that policy, which does not exist yet.
 
 ### Lifecycle
 

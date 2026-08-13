@@ -31,6 +31,7 @@
 
 const { vwapSeries, adxSeries } = require("../../signal-screener");
 const { atr } = require("../../decision-engine");
+const { checkPositiveInt, checkPositiveNumber } = require("./option-checks");
 
 const VWAP_REVERSION_V1_DEFAULTS = {
   // "auto" picks the anchor from the candle spacing — see resolveAnchor().
@@ -119,6 +120,34 @@ function barsSinceAnchor(bars, anchor) {
   return count;
 }
 
+// Warmup under the options actually supplied. ADX needs roughly twice its
+// period to settle, and the session-bar minimum is a floor of its own.
+function warmupForOptions(options = {}) {
+  const merged = { ...VWAP_REVERSION_V1_DEFAULTS, ...options };
+  return Math.max(
+    REQUIRED_WARMUP_BARS,
+    (Number(merged.adxLen) || 0) * 3,
+    (Number(merged.atrLen) || 0) + 1,
+    Number(merged.minSessionBars) || 0,
+  );
+}
+
+function validateOptions(options = {}) {
+  if (options.anchor !== undefined && !["auto", "day", "month"].includes(options.anchor)) {
+    return 'anchor must be "auto", "day" or "month"';
+  }
+  return (
+    checkPositiveInt(options, "adxLen", { min: 2, max: 500 }) ||
+    checkPositiveInt(options, "atrLen", { min: 2, max: 500 }) ||
+    checkPositiveInt(options, "minSessionBars", { min: 1, max: 5000 }) ||
+    checkPositiveInt(options, "minBarsPerSession", { min: 1, max: 5000 }) ||
+    checkPositiveNumber(options, "maxAdx", { min: 0, max: 100 }) ||
+    checkPositiveNumber(options, "entryAtr", { min: 0, max: 100 }) ||
+    checkPositiveNumber(options, "stopBufferAtr", { min: 0, max: 100, exclusiveMin: false }) ||
+    checkPositiveNumber(options, "minRewardR", { min: 0, max: 100, exclusiveMin: false })
+  );
+}
+
 const vwapReversionV1 = {
   id: "vwap_reversion_v1",
   name: "VWAP Reversion v1",
@@ -139,18 +168,21 @@ const vwapReversionV1 = {
   description:
     "Fades moves stretched more than N×ATR from anchored VWAP back to VWAP, only in a low-ADX range regime, and only once the stretch has stopped extending. Refuses setups whose reward/risk does not clear a floor. Backtest only.",
   requiredWarmupBars: REQUIRED_WARMUP_BARS,
+  warmupFor: warmupForOptions,
+  validateOptions,
 
   evaluate(candles, index, context = {}) {
     const options = { ...VWAP_REVERSION_V1_DEFAULTS, ...(context.options || {}) };
+    const needed = warmupForOptions(context.options || {});
     // The lookahead barrier. VWAP and ADX are both computed over this slice
     // only, so neither can see a bar the live scanner would not have had.
     const bars = candles.slice(0, index + 1);
 
-    if (bars.length < REQUIRED_WARMUP_BARS) {
+    if (bars.length < needed) {
       return flat(
         [],
         {},
-        `Need at least ${REQUIRED_WARMUP_BARS} closed candles, have ${bars.length}`,
+        `Need at least ${needed} closed candles, have ${bars.length}`,
         bars.length ? bars[bars.length - 1].close : null,
       );
     }

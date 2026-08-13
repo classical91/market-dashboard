@@ -526,9 +526,23 @@ test("vwap_reversion_v1 refuses a correct read with unusable geometry", () => {
 
 test("vwap_reversion_v1 waits for VWAP to accumulate after a session reset", () => {
   const bars = stretchedAbove();
+  // 122 bars of 15m candles crosses one UTC midnight, so the last bar sits
+  // ~26 bars into its session. A threshold above that exercises the session
+  // refusal; a threshold above the bar count would trip the warmup floor
+  // first, which is a different — and also correct — refusal.
+  const result = vwapReversionV1.evaluate(bars, bars.length - 1, { options: { minSessionBars: 30 } });
+  assert.equal(result.signal, "FLAT");
+  assert.ok(result.indicators.sessionBars < 30);
+  assert.ok(result.reasons.some((r) => /VWAP is not meaningful yet/.test(r)));
+});
+
+test("an option that cannot be satisfied by the data is a warmup refusal, not a crash", () => {
+  const bars = stretchedAbove();
+  // You cannot be 500 bars into a session with 122 bars of history, so the
+  // warmup floor is what answers here.
   const result = vwapReversionV1.evaluate(bars, bars.length - 1, { options: { minSessionBars: 500 } });
   assert.equal(result.signal, "FLAT");
-  assert.ok(result.reasons.some((r) => /VWAP is not meaningful yet/.test(r)));
+  assert.match(result.error, /Need at least 500 closed candles/);
 });
 
 test("vwap_reversion_v1 picks its VWAP anchor from the candle spacing", () => {
