@@ -383,6 +383,17 @@
   justify-content: center;
   font-size: 10px;
   color: var(--dim);
+  /* A dashed well, so an empty facet reads as "nothing to draw here" rather
+     than as a chart that failed to load. */
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  margin: 4px 0 2px;
+}
+
+/* Recessive, but still present and still counted: a strategy that produced no
+   curve is part of the comparison result, not missing from it. */
+.tl-facet--empty {
+  opacity: 0.72;
 }
 
 .tl-facet-foot {
