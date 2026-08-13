@@ -103,6 +103,10 @@
           <option value="1D">1D</option>
         </select>
         <select class="aia-select" id="tl-bt-strategy" title="Which strategy to replay"></select>
+        <select class="aia-select" id="tl-bt-mode" title="Which exit rules the replay uses">
+          <option value="shared" selected>Shared execution</option>
+          <option value="native">Native strategy exits</option>
+        </select>
         <button class="aia-run-btn" type="button" id="tl-bt-run">Run backtest</button>
         <button class="aia-run-btn" type="button" id="tl-bt-compare" title="Run every strategy over the same symbol, interval and candles">Compare strategies</button>
       </div>

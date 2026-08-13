@@ -92,7 +92,30 @@ function createTradingLabRouter({
     const trader = tradingLabService.book(req.query.book);
     const limit = Math.min(Math.max(numberOr(req.query.limit, 100), 1), 1000);
     const history = trader.getHistory();
-    res.json({ book: trader.book, total: history.length, items: history.slice(-limit).reverse() });
+    const window = history.slice(-limit);
+    const before = history.slice(0, Math.max(0, history.length - window.length));
+
+    // The account balance as it stood BEFORE the returned window.
+    //
+    // Without this a client drawing an equity curve from `items` has to start
+    // somewhere, and the only figure it has is the account's original starting
+    // balance — which is only correct while the whole history fits in the
+    // window. Past that, the curve silently redraws every trade as if the
+    // earlier ones never happened. Returning the real opening balance makes a
+    // truncated window a WINDOW rather than a wrong picture of the whole run.
+    const openingBalance = before.reduce(
+      (balance, trade) => balance + (Number(trade.pnl != null ? trade.pnl : trade.realizedPnl) || 0),
+      Number(trader.getAccount().startingBalance) || 0,
+    );
+
+    res.json({
+      book: trader.book,
+      total: history.length,
+      returned: window.length,
+      truncated: before.length > 0,
+      openingBalance: Math.round(openingBalance * 100) / 100,
+      items: window.reverse(),
+    });
   });
 
   router.get("/signal-actions", (req, res) => {
@@ -213,6 +236,11 @@ function createTradingLabRouter({
           ? DEFAULT_STRATEGY_ID
           : String(body.strategy),
         options: body.options || {},
+        // "shared" (default) compares entry signals on one execution model;
+        // "native" runs each strategy's own stop and target. An unknown value
+        // is a 400 from the service rather than a silent fallback.
+        executionMode:
+          typeof body.executionMode === "string" && body.executionMode ? body.executionMode : "shared",
         // Opt-in: an unrecorded run is the default so that exploring does not
         // fill the research log with noise.
         record: body.record === true || body.record === "true",
@@ -240,6 +268,9 @@ function createTradingLabRouter({
         interval: typeof body.interval === "string" ? body.interval : "4h",
         strategies,
         options: body.options || {},
+        executionMode:
+          typeof body.executionMode === "string" && body.executionMode ? body.executionMode : "shared",
+        ...(body.minRankedTrades === undefined ? {} : { minRankedTrades: Number(body.minRankedTrades) }),
       }),
     );
   }));

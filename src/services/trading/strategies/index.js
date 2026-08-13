@@ -44,6 +44,7 @@
 // Registration is deliberately explicit rather than a directory scan: a
 // strategy reaching the live scanner should be a visible one-line diff.
 
+const { checkPositiveInt, checkPositiveNumber } = require("./option-checks");
 const { mindsetV1 } = require("./mindset-v1");
 const { smcV1 } = require("./smc-v1");
 const { shadowBananagunV1 } = require("./shadow-bananagun-v1");
@@ -134,6 +135,47 @@ function hasStrategy(id) {
   return BY_ID.has(String(id || ""));
 }
 
+/**
+ * The warmup a strategy needs UNDER THE OPTIONS IT IS ACTUALLY BEING RUN WITH.
+ *
+ * `requiredWarmupBars` is computed from a strategy's DEFAULTS, so it is only
+ * the right answer when nobody overrode anything. Callers can override — the
+ * backtest route passes `options` straight through from the request body — and
+ * a strategy asked for a 5000-bar channel while the runner still reserves the
+ * default 102 bars of warmup will read off the front of the array. That was a
+ * 500, not a 400, which is the wrong answer to a bad parameter.
+ *
+ * A strategy opts in by exporting `warmupFor(options)`. Without one, its
+ * static figure stands.
+ */
+function warmupFor(definition, options = {}) {
+  const declared = Number(definition.requiredWarmupBars) || 0;
+  if (typeof definition.warmupFor !== "function") return declared;
+  const dynamic = Number(definition.warmupFor(options || {}));
+  // The dynamic figure may exceed the declared one but never undercut it: a
+  // strategy cannot option its way below its own floor.
+  return Number.isFinite(dynamic) ? Math.max(declared, dynamic) : declared;
+}
+
+/**
+ * Validate caller-supplied options against the strategy that will receive
+ * them, throwing a 400 rather than letting a bad number reach the maths.
+ *
+ * A strategy opts in by exporting `validateOptions(options)`, which returns an
+ * error string or null. Strategies without one accept anything, exactly as
+ * before.
+ */
+function assertValidOptions(definition, options = {}) {
+  if (typeof definition.validateOptions !== "function") return;
+  const problem = definition.validateOptions(options || {});
+  if (problem) {
+    throw Object.assign(new Error(`Invalid options for "${definition.id}": ${problem}`), {
+      statusCode: 400,
+      expose: true,
+    });
+  }
+}
+
 // Throws a 400 rather than falling back to a default: silently backtesting a
 // different strategy than the one asked for would make the result a lie.
 function getStrategy(id) {
@@ -161,4 +203,8 @@ module.exports = {
   hasStrategy,
   getStrategy,
   getScannerStrategy,
+  warmupFor,
+  assertValidOptions,
+  checkPositiveInt,
+  checkPositiveNumber,
 };

@@ -485,3 +485,13 @@
     border-bottom: 1px solid var(--border);
   }
 }
+
+/* "last 80 of 240 trades" — shown only when the account curve is a window
+   rather than the whole history, because those are different claims. */
+.tl-account-window {
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-top: -6px;
+}

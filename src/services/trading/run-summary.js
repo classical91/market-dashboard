@@ -16,6 +16,11 @@ function summarizeRun(result) {
   return {
     strategy: result.strategy,
     strategyName: result.strategyName,
+    // Which exit rules produced these numbers. Two experiments recorded under
+    // different execution modes are not comparable, and without this the
+    // stored record cannot tell you which one it was.
+    executionMode: result.executionMode || "shared",
+    nativeFallbacks: result.nativeFallbacks || 0,
     status: result.status || "ok",
     replayType: result.replayType || "candle",
     dataStatus: result.dataStatus || (result.dataset && result.dataset.status) || "available",

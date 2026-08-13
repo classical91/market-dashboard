@@ -30,6 +30,7 @@
 // baseline is inversely proportional to how much it has been tuned.
 
 const { atr } = require("../../decision-engine");
+const { checkPositiveInt, checkPositiveNumber } = require("./option-checks");
 
 const DONCHIAN_BREAKOUT_V1_DEFAULTS = {
   channelLength: 20,
@@ -69,7 +70,13 @@ function flat(reasons, indicators = {}, error = null, price = null) {
 }
 
 // Highest high / lowest low over bars [from, to] inclusive.
+//
+// Returns null rather than reading off the front of the array when the window
+// does not fit. The warmup calculation should already guarantee it does, but a
+// channel silently computed from a shorter window than asked for is a wrong
+// answer presented as a right one, and this is the layer that can still tell.
 function channelOver(bars, from, to) {
+  if (from < 0 || to >= bars.length || to < from) return null;
   let high = -Infinity;
   let low = Infinity;
   for (let i = from; i <= to; i += 1) {
@@ -86,6 +93,31 @@ function sma(bars, length, endIndex) {
   return sum / length;
 }
 
+// The warmup this strategy needs under the options it is actually given.
+// `requiredWarmupBars` above is this same sum over the DEFAULTS, and is only
+// the right answer when nobody overrode anything — the channel and the trend
+// SMA are both caller-settable, and both move this number.
+function warmupForOptions(options = {}) {
+  const merged = { ...DONCHIAN_BREAKOUT_V1_DEFAULTS, ...options };
+  return (
+    Math.max(
+      merged.useTrendFilter === false ? 0 : Number(merged.trendLength) || 0,
+      Number(merged.channelLength) || 0,
+      Number(merged.atrLen) || 0,
+    ) + 2
+  );
+}
+
+function validateOptions(options = {}) {
+  return (
+    checkPositiveInt(options, "channelLength", { min: 2, max: 1000 }) ||
+    checkPositiveInt(options, "trendLength", { min: 2, max: 1000 }) ||
+    checkPositiveInt(options, "atrLen", { min: 2, max: 500 }) ||
+    checkPositiveNumber(options, "stopAtr", { min: 0, max: 50 }) ||
+    checkPositiveNumber(options, "rewardR", { min: 0, max: 50 })
+  );
+}
+
 const donchianBreakoutV1 = {
   id: "donchian_breakout_v1",
   name: "Donchian Breakout v1",
@@ -99,17 +131,22 @@ const donchianBreakoutV1 = {
   description:
     "An N-bar Donchian channel break with an ATR stop and a fixed reward multiple, optionally filtered by a long SMA. Intentionally unoptimised: the baseline every other strategy should have to beat. Backtest only.",
   requiredWarmupBars: REQUIRED_WARMUP_BARS,
+  // Both are read by the registry: the runner reserves warmupFor(options)
+  // bars instead of the static figure, and rejects bad options as a 400.
+  warmupFor: warmupForOptions,
+  validateOptions,
 
   evaluate(candles, index, context = {}) {
     const options = { ...DONCHIAN_BREAKOUT_V1_DEFAULTS, ...(context.options || {}) };
+    const needed = warmupForOptions(context.options || {});
     // The lookahead barrier: nothing past the decided bar is visible.
     const bars = candles.slice(0, index + 1);
 
-    if (bars.length < REQUIRED_WARMUP_BARS) {
+    if (bars.length < needed) {
       return flat(
         [],
         {},
-        `Need at least ${REQUIRED_WARMUP_BARS} closed candles, have ${bars.length}`,
+        `Need at least ${needed} closed candles, have ${bars.length}`,
         bars.length ? bars[bars.length - 1].close : null,
       );
     }
@@ -127,6 +164,9 @@ const donchianBreakoutV1 = {
     // back a bar, which is what makes the freshness check meaningful.
     const channel = channelOver(bars, last - options.channelLength, last - 1);
     const prior = channelOver(bars, last - options.channelLength - 1, last - 2);
+    if (!channel || !prior) {
+      return flat([], {}, `Not enough bars for a ${options.channelLength}-bar channel, have ${bars.length}`, price);
+    }
     const trendSma = options.useTrendFilter ? sma(bars, options.trendLength, last) : null;
 
     const indicators = {

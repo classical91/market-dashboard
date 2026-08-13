@@ -28,13 +28,18 @@ const path = require("path");
 const { getTradingConfig } = require("./config");
 const { runChecklist, marketState } = require("./checklist");
 const { assessEdge } = require("./edge-gate");
-const { planTrade } = require("./risk");
+const { planTrade, calculatePositionSize } = require("./risk");
 const { buildStrategyMetrics } = require("./metrics");
 const { PaperTradingService } = require("./paper-trader");
 const { replayOrder } = require("./replay-order");
 const { atr } = require("../decision-engine");
 const { ema, macd } = require("../signal-screener");
-const { getStrategy, DEFAULT_STRATEGY_ID } = require("./strategies");
+const {
+  getStrategy,
+  DEFAULT_STRATEGY_ID,
+  warmupFor: strategyWarmupFor,
+  assertValidOptions,
+} = require("./strategies");
 const { summarizeRun, costSummary } = require("./run-summary");
 const { buildExperimentRecord } = require("./experiment-record");
 const {
@@ -72,6 +77,112 @@ function downsampleCurve(curve, maxPoints = 120) {
 
 function mean(values) {
   return values.length ? values.reduce((sum, v) => sum + v, 0) / values.length : 0;
+}
+
+// ── Execution modes ─────────────────────────────────────────────────────────
+//
+// A strategy signal carries `stopHint` and `targetHint` — where the strategy
+// itself says the trade should be stopped and taken. Which of those the
+// backtest actually USES is now a choice, because the two answer different
+// questions and only one of them was previously available:
+//
+//   "shared"  Every strategy's stop and targets come from planTrade(): 1.5×ATR
+//             stop, TP1 at 1.5R, TP2 at 2.5R. The strategies differ only in
+//             WHERE THEY ENTER, so this compares entry signals on one common
+//             execution model. This is the original behaviour and stays the
+//             default.
+//
+//   "native"  The strategy's own stop and target are used. This is the
+//             strategy as designed — vwap_reversion_v1 targeting VWAP is a
+//             different trade from vwap_reversion_v1 targeting 2.5R, and only
+//             this mode tests the former.
+//
+// Neither is "the correct one". A comparison table under shared execution
+// ranks entry quality; the same table under native execution ranks whole
+// strategies and is no longer apples-to-apples, because each row is using
+// different exit rules. Both are legitimate; conflating them is not, which is
+// why the mode is recorded on the result and on every trade.
+const EXECUTION_MODES = Object.freeze(["shared", "native"]);
+
+function assertValidExecutionMode(mode) {
+  if (!EXECUTION_MODES.includes(mode)) {
+    throw Object.assign(
+      new Error(`Unknown executionMode "${mode}" (expected one of ${EXECUTION_MODES.join(", ")})`),
+      { statusCode: 400, expose: true },
+    );
+  }
+  return mode;
+}
+
+// Can this signal's own levels actually be traded?
+//
+// A hint is only usable if it is a finite number on the correct side of the
+// entry: a long stop below the entry, a long target above it. A strategy that
+// returns a stop on the wrong side has a bug, and opening the position anyway
+// would book an instant fill and call it a result.
+function nativeLevels({ direction, entryPrice, signal }) {
+  const stop = Number(signal && signal.stopHint);
+  const target = Number(signal && signal.targetHint);
+
+  if (!Number.isFinite(stop) || !Number.isFinite(target)) {
+    return { ok: false, reason: "strategy published no stop/target hints" };
+  }
+  const longWay = direction === "LONG";
+  if (longWay ? !(stop < entryPrice) : !(stop > entryPrice)) {
+    return { ok: false, reason: `stop hint ${stop} is on the wrong side of a ${direction} entry at ${entryPrice}` };
+  }
+  if (longWay ? !(target > entryPrice) : !(target < entryPrice)) {
+    return { ok: false, reason: `target hint ${target} is on the wrong side of a ${direction} entry at ${entryPrice}` };
+  }
+  return { ok: true, stop, target };
+}
+
+// Rank the comparison rows, and be explicit about which rows are ranked at all.
+//
+// A null profit factor means two completely different things, and the old
+// comparator treated them as one by substituting 999 for both:
+//
+//   * closedTrades > 0, no losses  — genuinely undefeated. Infinity is right.
+//   * closedTrades === 0           — the strategy never traded, or had no
+//                                    data. There is no profit factor because
+//                                    there is no evidence, and sorting that to
+//                                    the top put a strategy that did nothing
+//                                    above every strategy that actually
+//                                    traded.
+//
+// So rows below `minRankedTrades` closed trades are not ranked at all. They
+// are kept, in the result, at the end of the list, flagged `rankable: false`
+// with the reason — dropping them would hide a strategy that ran and refused
+// everything, which is itself a finding.
+function rankRows(rows, minRankedTrades = 1) {
+  const decorated = rows.map((row) => {
+    const trades = Number(row.closedTrades) || 0;
+    const rankable = row.status !== "insufficient-data" && trades >= minRankedTrades;
+    return {
+      ...row,
+      rankable,
+      unrankedReason: rankable
+        ? null
+        : row.status === "insufficient-data"
+          ? "insufficient data"
+          : `${trades} closed trade(s), needs ${minRankedTrades}`,
+    };
+  });
+
+  return decorated.sort((a, b) => {
+    // Unranked rows always sit below ranked ones, whatever their numbers say.
+    if (a.rankable !== b.rankable) return a.rankable ? -1 : 1;
+    if (!a.rankable && !b.rankable) return 0;
+
+    // Infinity only for a row that actually traded and never lost — which,
+    // among rankable rows, is what a null profit factor now means.
+    const pf = (row) => (row.profitFactor === null ? Infinity : row.profitFactor);
+    return (
+      b.expectancyR - a.expectancyR ||
+      pf(b) - pf(a) ||
+      a.maxDrawdownPct - b.maxDrawdownPct
+    );
+  });
 }
 
 // Market context as of the close of `bars[bars.length - 1]`, computed from
@@ -240,7 +351,9 @@ class BacktestService {
     strategy = trendBreakoutStrategy,
     options = {},
     warmupBars = MIN_WARMUP_BARS,
+    executionMode = "shared",
   }) {
+    assertValidExecutionMode(executionMode);
     const resolved = resolveStrategy(strategy);
     if (resolved.definition.supportsBacktest === false) {
       throw Object.assign(
@@ -248,9 +361,18 @@ class BacktestService {
         { statusCode: 400, expose: true },
       );
     }
+    // Caller options are validated BEFORE any bar is replayed, so a bad
+    // parameter comes back as a 400 naming the parameter rather than as
+    // whatever the arithmetic does with it several hundred bars later.
+    assertValidOptions(resolved.definition, options);
+
     // A strategy's own warmup requirement is a floor, not a suggestion:
     // signalling before its slowest input has settled is noise, not history.
-    const warmup = Math.max(warmupBars, resolved.definition.requiredWarmupBars || 0);
+    // The floor is computed from the options this run will actually use —
+    // `requiredWarmupBars` is only the answer for a run at defaults, and a
+    // strategy handed a longer lookback than that needs the extra bars
+    // reserved or it reads off the front of the array.
+    const warmup = Math.max(warmupBars, strategyWarmupFor(resolved.definition, options));
 
     const opts = {
       breakoutLookback: 20,
@@ -282,6 +404,10 @@ class BacktestService {
     const skipped = [];
     const signals = [];
     let mixedDirectionBars = 0;
+    // Trades that asked for native execution and could not get it, because the
+    // strategy published no usable levels. Counted so the result can say so
+    // rather than presenting a shared-execution run as a native one.
+    let nativeFallbacks = 0;
 
     try {
       for (let i = warmup; i < bars.length; i += 1) {
@@ -313,7 +439,11 @@ class BacktestService {
             strategyId: resolved.definition.id,
             signal,
             allowCounterTrend: resolved.definition.tradesCounterTrend === true,
+            executionMode,
           });
+          if (outcome.opened && executionMode === "native" && outcome.appliedMode !== "native") {
+            nativeFallbacks += 1;
+          }
           if (!outcome.opened) {
             skipped.push({
               at: bar.closeTime,
@@ -369,9 +499,21 @@ class BacktestService {
         // Surfaced rather than hidden: with long and short positions open on
         // the same symbol at once, one intra-bar ordering cannot be
         // pessimistic for both sides.
-        caveats: mixedDirectionBars
-          ? [`${mixedDirectionBars} bar(s) had both long and short positions open; intra-bar ordering favoured the longs' stop`]
-          : [],
+        executionMode,
+        nativeFallbacks,
+        caveats: [
+          ...(mixedDirectionBars
+            ? [`${mixedDirectionBars} bar(s) had both long and short positions open; intra-bar ordering favoured the longs' stop`]
+            : []),
+          // The single most misreadable outcome in this whole module: a run
+          // labelled "native" that silently used shared levels throughout.
+          ...(nativeFallbacks
+            ? [
+                `${nativeFallbacks} of these trades ran on SHARED execution despite executionMode=native: ` +
+                  `${resolved.definition.id} published no usable stop/target for them, so planTrade's levels were used instead`,
+              ]
+            : []),
+        ],
       };
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
@@ -393,6 +535,8 @@ class BacktestService {
     // on for a strategy that did not ask for it, so the waiver stays a
     // property of the strategy rather than of whoever ran the backtest.
     allowCounterTrend = false,
+    // "shared" (default) or "native" — see EXECUTION_MODES above.
+    executionMode = "shared",
   }) {
     const signalSource = `backtest:${strategyId}:${interval}`;
     const state = marketState({ ...stateFromContext(context), ...trader.getRiskState() });
@@ -428,45 +572,98 @@ class BacktestService {
     });
     if (!trade.ok) return { opened: false, reasons: [...reasons, trade.reason] };
 
+    // Under native execution the strategy's own levels replace planTrade's,
+    // and the size is recomputed from the new stop distance so the dollar risk
+    // per trade is IDENTICAL to shared mode. That matters: if native trades
+    // silently risked more, a mode comparison would be measuring position size
+    // rather than exit rules.
+    let levels = { stopLoss: trade.stopLoss, tp1: trade.tp1, tp2: trade.tp2, size: trade.size };
+    let appliedMode = "shared";
+
+    if (executionMode === "native") {
+      const native = nativeLevels({ direction, entryPrice: trade.entryPrice, signal });
+      if (native.ok) {
+        const size = calculatePositionSize({
+          entryPrice: trade.entryPrice,
+          stopLoss: native.stop,
+          accountSize: this.config.accountSize,
+          riskPct: this.config.maxRiskPerTrade,
+          sizeMultiplier,
+        });
+        if (size > 0) {
+          // One target, not two. The strategy named a single level, so TP1 and
+          // TP2 both sit there and the position closes fully when it is
+          // reached — inventing a second, further target the strategy never
+          // asked for would be this mode making up the exit it exists to test.
+          levels = { stopLoss: native.stop, tp1: native.target, tp2: native.target, size };
+          appliedMode = "native";
+          reasons.push(`Native execution: stop ${native.stop}, target ${native.target}`);
+        } else {
+          reasons.push("Native execution: stop distance produced a zero size — fell back to shared levels");
+        }
+      } else {
+        // Recorded, never silent. mindset_v1 publishes no hints at all, so a
+        // native run of it is really a shared run, and a caller who is not
+        // told that will read the result as something it is not.
+        reasons.push(`Native execution unavailable (${native.reason}) — fell back to shared levels`);
+      }
+    }
+
     try {
       trader.openPosition({
         symbol,
         direction,
-        size: trade.size,
+        size: levels.size,
         entryPrice: trade.entryPrice,
-        stopLoss: trade.stopLoss,
-        tp1: trade.tp1,
-        tp2: trade.tp2,
+        stopLoss: levels.stopLoss,
+        tp1: levels.tp1,
+        tp2: levels.tp2,
         riskUsd: trade.riskUsd,
         confidenceScore: checklist.confidenceScore,
         signalSource,
-        // Stop and target HINTS from the strategy are recorded, not applied:
-        // sizing and exits stay with planTrade and the paper trader so two
-        // strategies' results are compared on the same execution model.
+        // Under shared execution the strategy's hints are RECORDED, not
+        // applied — exits stay with planTrade so strategies are compared on
+        // one execution model. Under native execution they are what the
+        // position above is actually using. `executionMode` says which, on
+        // every trade, so a ledger is never ambiguous about it.
         meta: signal
           ? {
               strategy: strategyId,
               strategyConfidence: signal.confidence ?? null,
               stopHint: signal.stopHint ?? null,
               targetHint: signal.targetHint ?? null,
+              executionMode: appliedMode,
             }
-          : { strategy: strategyId },
+          : { strategy: strategyId, executionMode: appliedMode },
         openedAt: context.bar.closeTime,
       });
-      return { opened: true, reasons };
+      return { opened: true, reasons, appliedMode };
     } catch (err) {
       // The position cap is a legitimate outcome, not an error.
       return { opened: false, reasons: [...reasons, err.message] };
     }
   }
 
-  async backtestSymbol({ symbol, interval = "4h", options = {}, strategy, record = false, notes = null } = {}) {
+  async backtestSymbol({
+    symbol,
+    interval = "4h",
+    options = {},
+    strategy,
+    record = false,
+    notes = null,
+    executionMode = "shared",
+  } = {}) {
     // Resolve the strategy BEFORE fetching: a typo should come back as a 400
     // immediately, not as whatever the candle source happened to do first.
     // Resolving here also fixes the default: a symbol backtest with no
     // strategy runs mindset_v1, the strategy the live scanner runs, rather
     // than run()'s own trend-breakout placeholder.
     const resolved = typeof strategy === "function" ? strategy : resolveStrategy(strategy).definition;
+    // Options are checked here too, for the same reason the strategy is: a bad
+    // parameter should come back as a 400 before a candle fetch is spent on
+    // it, not after. run() validates again — it is also called directly.
+    assertValidExecutionMode(executionMode);
+    if (resolved && typeof resolved === "object") assertValidOptions(resolved, options);
     if (resolved && resolved.id === BANANAGUN_STRATEGY_ID) {
       const dataset = loadEventDataset(this.dataDir, BANANAGUN_STRATEGY_ID);
       const result = dataset.status === "available"
@@ -475,7 +672,7 @@ class BacktestService {
       return record && result.status === "ok" ? this.recordExperiment(result, { notes }) : result;
     }
     const candles = await this.getCandles(symbol, interval);
-    const result = await this.run({ symbol, interval, candles, options, strategy: resolved });
+    const result = await this.run({ symbol, interval, candles, options, strategy: resolved, executionMode });
     return record ? this.recordExperiment(result, { notes }) : result;
   }
 
@@ -504,10 +701,26 @@ class BacktestService {
   // handful of numbers that decide whether one is better than another. One
   // fetch, one candle set: a comparison where the strategies saw different
   // data would not be a comparison.
-  async compare({ symbol, interval = "4h", strategies = [DEFAULT_STRATEGY_ID], options = {} } = {}) {
+  async compare({
+    symbol,
+    interval = "4h",
+    strategies = [DEFAULT_STRATEGY_ID],
+    options = {},
+    executionMode = "shared",
+    // Rows below this many closed trades are reported but NOT ranked. The
+    // default of 1 only excludes strategies that never traded; a real
+    // statistical threshold is a promotion-policy decision and belongs with
+    // the rest of that policy, which does not exist yet.
+    minRankedTrades = 1,
+  } = {}) {
+    assertValidExecutionMode(executionMode);
     const ids = (Array.isArray(strategies) && strategies.length ? strategies : [DEFAULT_STRATEGY_ID]).map(
       (id) => getStrategy(id).id,
     );
+    // Every strategy's options are validated before the single candle fetch,
+    // so one bad parameter fails the comparison immediately rather than N-1
+    // runs into it.
+    ids.forEach((id) => assertValidOptions(getStrategy(id), options));
     const candleIds = ids.filter((id) => getStrategy(id).supportsBacktest !== false);
     const candles = candleIds.length ? await this.getCandles(symbol, interval) : null;
 
@@ -520,7 +733,7 @@ class BacktestService {
           ? replayBananaGunEvents({ events: dataset.events, dataSource: dataset.path })
           : replayBananaGunEvents({ events: [], dataSource: dataset.path });
       } else {
-        result = await this.run({ symbol, interval, candles, options, strategy: id });
+        result = await this.run({ symbol, interval, candles, options, strategy: id, executionMode });
       }
       // The curve rides ALONGSIDE the summary, not inside it: summarizeRun is
       // also what gets persisted as an experiment record, and a few thousand
@@ -536,15 +749,10 @@ class BacktestService {
     return {
       symbol,
       interval,
+      executionMode,
+      minRankedTrades,
       ranAt: new Date().toISOString(),
-      // Same ordering rule the strategy metrics table uses: expectancy first,
-      // then profit factor, then the smaller drawdown.
-      results: rows.sort(
-        (a, b) =>
-          b.expectancyR - a.expectancyR ||
-          (b.profitFactor === null ? 999 : b.profitFactor) - (a.profitFactor === null ? 999 : a.profitFactor) ||
-          a.maxDrawdownPct - b.maxDrawdownPct,
-      ),
+      results: rankRows(rows, minRankedTrades),
     };
   }
 }
@@ -552,6 +760,8 @@ class BacktestService {
 module.exports = {
   BacktestService,
   downsampleCurve,
+  rankRows,
+  EXECUTION_MODES,
   summarizeRun,
   resolveStrategy,
   trendBreakoutStrategy,

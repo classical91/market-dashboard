@@ -6,7 +6,13 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
-const { BacktestService, contextAtBar, trendBreakoutStrategy, downsampleCurve } = require("../src/services/trading/backtest");
+const {
+  BacktestService,
+  contextAtBar,
+  trendBreakoutStrategy,
+  downsampleCurve,
+  rankRows,
+} = require("../src/services/trading/backtest");
 const { makeTradingConfig } = require("../src/services/trading/config");
 const { summarizeRun } = require("../src/services/trading/run-summary");
 const { listStrategies } = require("../src/services/trading/strategies");
@@ -568,4 +574,278 @@ test("the experiment record is unaffected by the chart series", () => {
     equityCurve: [{ at: 1, equity: 2, balance: 2, close: 3, openPositions: 0 }],
   });
   assert.equal(summary.equityCurve, undefined);
+});
+
+/* ── Execution modes ──────────────────────────────────────── */
+
+// A strategy with levels far from anything planTrade would pick, so a result
+// produced under native execution cannot be confused with a shared one.
+function nativeLevelStrategy({ stopHint, targetHint, at = 80 } = {}) {
+  return {
+    id: "native_test",
+    name: "Native test",
+    version: "1.0.0",
+    status: "backtest",
+    supportsBacktest: true,
+    supportsLiveScanner: false,
+    description: "test",
+    requiredWarmupBars: 0,
+    evaluate(candles, index) {
+      const price = candles[index].close;
+      if (index !== at) {
+        return { signal: "FLAT", strategy: "native_test", price, error: null, reasons: [], indicators: {}, confidence: null, stopHint: null, targetHint: null };
+      }
+      return {
+        signal: "LONG",
+        strategy: "native_test",
+        price,
+        error: null,
+        reasons: [],
+        indicators: {},
+        confidence: null,
+        stopHint: typeof stopHint === "function" ? stopHint(price) : stopHint,
+        targetHint: typeof targetHint === "function" ? targetHint(price) : targetHint,
+      };
+    },
+  };
+}
+
+test("shared execution ignores the strategy's own levels — that is the point of it", async () => {
+  const service = makeService();
+  const strategy = nativeLevelStrategy({ stopHint: (p) => p * 0.5, targetHint: (p) => p * 1.5 });
+  const result = await service.run({ symbol: "BTCUSDT", candles: risingCandles(200), strategy });
+
+  const positions = [...result.trades, ...result.openAtEnd];
+  assert.equal(positions.length, 1);
+  assert.equal(result.executionMode, "shared");
+  // planTrade's levels, not the strategy's half-price stop.
+  assert.ok(positions[0].stopLoss > positions[0].entryPrice * 0.9);
+  // The hints are still recorded, so the run remains auditable.
+  assert.equal(positions[0].meta.stopHint, positions[0].entryPrice * 0.5);
+  assert.equal(positions[0].meta.executionMode, "shared");
+});
+
+test("native execution uses the strategy's own stop and target", async () => {
+  const service = makeService();
+  // The target is deliberately out of reach of this series. Once TP1 fires the
+  // paper trader moves the stop to breakeven, so a CLOSED position no longer
+  // reports the level it opened with — the only honest place to read the
+  // native stop is a position that never hit anything.
+  const strategy = nativeLevelStrategy({ stopHint: (p) => p * 0.5, targetHint: (p) => p * 5 });
+  const result = await service.run({
+    symbol: "BTCUSDT",
+    candles: risingCandles(200),
+    strategy,
+    executionMode: "native",
+  });
+
+  const positions = [...result.trades, ...result.openAtEnd];
+  assert.equal(positions.length, 1);
+  assert.equal(result.openAtEnd.length, 1, "the far target keeps this position open to the end");
+  assert.equal(result.executionMode, "native");
+  assert.equal(positions[0].stopLoss, positions[0].entryPrice * 0.5);
+  // One target, not two: the strategy named a single level, so the position
+  // closes fully there rather than at an invented further one.
+  assert.equal(positions[0].tp1, positions[0].entryPrice * 5);
+  assert.equal(positions[0].tp2, positions[0].entryPrice * 5);
+  assert.equal(positions[0].meta.executionMode, "native");
+});
+
+test("native execution keeps the dollar risk identical to shared execution", async () => {
+  // Otherwise a mode comparison would be measuring position size rather than
+  // exit rules: a wider native stop must buy a smaller position, not more risk.
+  const service = makeService();
+  const strategy = nativeLevelStrategy({ stopHint: (p) => p * 0.5, targetHint: (p) => p * 5 });
+
+  const shared = await service.run({ symbol: "BTCUSDT", candles: risingCandles(200), strategy });
+  const native = await service.run({
+    symbol: "BTCUSDT",
+    candles: risingCandles(200),
+    strategy,
+    executionMode: "native",
+  });
+
+  const s = [...shared.trades, ...shared.openAtEnd][0];
+  const n = [...native.trades, ...native.openAtEnd][0];
+  assert.equal(s.riskUsd, n.riskUsd);
+  // `size` is what REMAINS, and a position that closed has none left — the
+  // size these two were opened with is initialSize. The wider native stop must
+  // buy a smaller position, which is how identical risk is preserved.
+  assert.ok(
+    n.initialSize < s.initialSize,
+    `native size ${n.initialSize} should be smaller than shared ${s.initialSize}`,
+  );
+});
+
+test("a native run that cannot get native levels says so instead of pretending", async () => {
+  const service = makeService();
+  // mindset_v1 publishes no hints at all, so a "native" run of it is really a
+  // shared run. Silence here would be the most misreadable outcome in the
+  // module: a result labelled native that used planTrade's levels throughout.
+  const result = await service.run({
+    symbol: "BTCUSDT",
+    candles: trendingCandlesForCompare(400),
+    strategy: "mindset_v1",
+    executionMode: "native",
+  });
+
+  const positions = [...result.trades, ...result.openAtEnd];
+  assert.ok(positions.length > 0, "expected the trending series to open something");
+  assert.equal(result.nativeFallbacks, positions.length);
+  assert.ok(result.caveats.some((c) => /ran on SHARED execution despite executionMode=native/.test(c)));
+  positions.forEach((p) => assert.equal(p.meta.executionMode, "shared"));
+});
+
+test("a hint on the wrong side of the entry is refused, not traded", async () => {
+  const service = makeService();
+  // A long whose "stop" sits above the entry would fill instantly and book a
+  // result. It falls back to shared levels and is counted.
+  const strategy = nativeLevelStrategy({ stopHint: (p) => p * 1.2, targetHint: (p) => p * 5 });
+  const result = await service.run({
+    symbol: "BTCUSDT",
+    candles: risingCandles(200),
+    strategy,
+    executionMode: "native",
+  });
+
+  const positions = [...result.trades, ...result.openAtEnd];
+  assert.equal(result.nativeFallbacks, positions.length);
+  positions.forEach((p) => assert.equal(p.meta.executionMode, "shared"));
+  // The bad hint is still recorded — it is evidence about the strategy — but
+  // it was not traded: the position took planTrade's levels instead.
+  assert.ok(positions[0].meta.stopHint > positions[0].entryPrice, "the hint really was on the wrong side");
+  assert.notEqual(positions[0].meta.stopHint, positions[0].stopLoss);
+});
+
+test("an unknown execution mode is a 400, never a silent default", async () => {
+  const service = makeService();
+  await assert.rejects(
+    () => service.run({ symbol: "BTCUSDT", candles: risingCandles(200), executionMode: "sideways" }),
+    (err) => err.statusCode === 400 && /Unknown executionMode/.test(err.message),
+  );
+});
+
+test("the execution mode is recorded on the experiment summary", () => {
+  const summary = summarizeRun({
+    strategy: "x",
+    strategyName: "X",
+    symbol: "BTCUSDT",
+    interval: "4h",
+    bars: 10,
+    warmupBars: 1,
+    signals: [],
+    openAtEnd: [],
+    costs: {},
+    executionMode: "native",
+    nativeFallbacks: 2,
+    stats: { winRate: 0, riskMetrics: {} },
+  });
+  // Two experiments recorded under different modes are not comparable, so the
+  // record has to carry which one produced it.
+  assert.equal(summary.executionMode, "native");
+  assert.equal(summary.nativeFallbacks, 2);
+});
+
+/* ── Comparison ranking ───────────────────────────────────── */
+
+test("a strategy that never traded cannot outrank one that did", () => {
+  const rows = [
+    { strategy: "traded", closedTrades: 12, expectancyR: 0.4, profitFactor: 1.8, maxDrawdownPct: 9 },
+    // The old comparator substituted 999 for a null profit factor regardless
+    // of why it was null, which floated this row to the top of the table.
+    { strategy: "never_traded", closedTrades: 0, expectancyR: 0, profitFactor: null, maxDrawdownPct: 0 },
+    { strategy: "no_data", status: "insufficient-data", closedTrades: 0, expectancyR: 0, profitFactor: null, maxDrawdownPct: 0 },
+  ];
+
+  const ranked = rankRows(rows);
+  assert.equal(ranked[0].strategy, "traded");
+  assert.equal(ranked[0].rankable, true);
+  assert.equal(ranked[0].unrankedReason, null);
+
+  const unranked = ranked.slice(1);
+  unranked.forEach((row) => assert.equal(row.rankable, false));
+  // Kept rather than dropped: a strategy that ran and refused everything is a
+  // finding, not an absence.
+  assert.deepEqual(unranked.map((r) => r.strategy).sort(), ["never_traded", "no_data"]);
+  assert.match(ranked.find((r) => r.strategy === "no_data").unrankedReason, /insufficient data/);
+});
+
+test("an undefeated strategy still ranks above a merely profitable one", () => {
+  // The other meaning of a null profit factor: wins and no losses. That one IS
+  // infinity, and must not be lost in the fix for the zero-trade case.
+  const ranked = rankRows([
+    { strategy: "profitable", closedTrades: 10, expectancyR: 0.5, profitFactor: 2.2, maxDrawdownPct: 5 },
+    { strategy: "undefeated", closedTrades: 4, expectancyR: 0.5, profitFactor: null, maxDrawdownPct: 1 },
+  ]);
+  assert.equal(ranked[0].strategy, "undefeated");
+  assert.equal(ranked[0].rankable, true);
+});
+
+test("the minimum ranked trade count is enforceable", () => {
+  const ranked = rankRows(
+    [
+      { strategy: "thin", closedTrades: 3, expectancyR: 2, profitFactor: 9, maxDrawdownPct: 1 },
+      { strategy: "thick", closedTrades: 40, expectancyR: 0.2, profitFactor: 1.2, maxDrawdownPct: 8 },
+    ],
+    10,
+  );
+  // A spectacular three-trade sample is not evidence, and at a threshold of 10
+  // it does not get to sit at the top of the table.
+  assert.equal(ranked[0].strategy, "thick");
+  assert.equal(ranked[1].rankable, false);
+  assert.match(ranked[1].unrankedReason, /3 closed trade\(s\), needs 10/);
+});
+
+/* ── Strategy option validation and dynamic warmup ────────── */
+
+test("a bad strategy option is a 400 naming the option, not a 500", async () => {
+  const service = makeService();
+  await assert.rejects(
+    () =>
+      service.run({
+        symbol: "BTCUSDT",
+        candles: risingCandles(300),
+        strategy: "donchian_breakout_v1",
+        options: { channelLength: 0 },
+      }),
+    (err) => err.statusCode === 400 && /channelLength must be at least 2/.test(err.message),
+  );
+
+  await assert.rejects(
+    () =>
+      service.run({
+        symbol: "BTCUSDT",
+        candles: risingCandles(300),
+        strategy: "vwap_reversion_v1",
+        options: { anchor: "fortnight" },
+      }),
+    (err) => err.statusCode === 400 && /anchor must be/.test(err.message),
+  );
+});
+
+test("warmup is recalculated from the options actually supplied", async () => {
+  const service = makeService();
+  // A 400-bar channel needs far more than donchian's default 102-bar warmup.
+  // Before this, the run reserved 102 and the channel loop read off the front
+  // of the array — a TypeError surfacing as a 500.
+  const result = await service.run({
+    symbol: "BTCUSDT",
+    candles: risingCandles(700),
+    strategy: "donchian_breakout_v1",
+    options: { channelLength: 400 },
+  });
+  assert.ok(result.warmupBars >= 402, `expected the warmup to grow, got ${result.warmupBars}`);
+
+  // And when the data cannot cover it, the answer is a 400 about candles
+  // rather than a crash.
+  await assert.rejects(
+    () =>
+      service.run({
+        symbol: "BTCUSDT",
+        candles: risingCandles(300),
+        strategy: "donchian_breakout_v1",
+        options: { channelLength: 400 },
+      }),
+    (err) => err.statusCode === 400 && /Not enough candles/.test(err.message),
+  );
 });

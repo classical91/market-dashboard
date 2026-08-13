@@ -277,3 +277,90 @@ test("running or comparing without an admin key is refused", async () => {
     assert.equal(res.status, 401, `${path} must stay admin-gated`);
   }
 });
+
+/* ── History windowing ────────────────────────────────────── */
+
+test("a truncated history window reports the balance it starts from", async () => {
+  // 240 closed trades of +$10 each on a $10,000 account, requested 80 at a
+  // time. Before this, a client drawing the curve had only the ORIGINAL
+  // starting balance to begin from, so past trade 80 it redrew the account as
+  // if the earlier trades had never happened — a plausible-looking line that
+  // was wrong by $1,600 at the left-hand edge.
+  const history = [];
+  for (let i = 0; i < 240; i += 1) {
+    history.push({ id: `t${i}`, pnl: 10, closedAt: new Date(Date.UTC(2026, 0, 1) + i * 3600000).toISOString() });
+  }
+
+  const app = express();
+  app.use(express.json());
+  app.use(
+    "/api/trading-lab",
+    createTradingLabRouter({
+      tradingLabService: {
+        overview: async () => ({}),
+        listBooks: () => [],
+        book: () => ({
+          book: "main",
+          getHistory: () => history,
+          getAccount: () => ({ startingBalance: 10000 }),
+        }),
+      },
+      requireAdmin: createRequireAdmin({ adminKey: ADMIN_KEY }),
+    }),
+  );
+  const local = http.createServer(app);
+  await new Promise((resolve) => local.listen(0, resolve));
+  const localBase = `http://127.0.0.1:${local.address().port}`;
+
+  try {
+    const windowed = await (await fetch(`${localBase}/api/trading-lab/history?limit=80`)).json();
+    assert.equal(windowed.total, 240);
+    assert.equal(windowed.returned, 80);
+    assert.equal(windowed.truncated, true);
+    // 160 trades happened before this window, at +$10 each.
+    assert.equal(windowed.openingBalance, 11600);
+    // Opening balance plus the window's own P&L is the true current balance,
+    // which is the property that makes the drawn curve correct.
+    const windowPnl = windowed.items.reduce((sum, t) => sum + t.pnl, 0);
+    assert.equal(windowed.openingBalance + windowPnl, 10000 + 2400);
+
+    // A window that covers everything opens at the account's starting balance.
+    const whole = await (await fetch(`${localBase}/api/trading-lab/history?limit=1000`)).json();
+    assert.equal(whole.truncated, false);
+    assert.equal(whole.openingBalance, 10000);
+  } finally {
+    await new Promise((resolve) => local.close(resolve));
+  }
+});
+
+test("the backtest routes accept an execution mode and refuse an unknown one", async () => {
+  const native = await post("/api/trading-lab/backtest", {
+    symbol: "BTCUSDT",
+    interval: "15m",
+    strategy: "smc_v1",
+    executionMode: "native",
+  });
+  assert.equal(native.status, 200);
+  assert.equal((await native.json()).executionMode, "native");
+
+  // Defaulting silently to shared would make a caller's typo look like a
+  // native run that happened to match shared results.
+  const bogus = await post("/api/trading-lab/backtest", {
+    symbol: "BTCUSDT",
+    strategy: "smc_v1",
+    executionMode: "whatever",
+  });
+  assert.equal(bogus.status, 400);
+  assert.match((await bogus.json()).error, /Unknown executionMode/);
+});
+
+test("a bad strategy option is refused by the route as a 400", async () => {
+  const res = await post("/api/trading-lab/backtest", {
+    symbol: "BTCUSDT",
+    interval: "15m",
+    strategy: "donchian_breakout_v1",
+    options: { channelLength: 99999 },
+  });
+  assert.equal(res.status, 400);
+  assert.match((await res.json()).error, /channelLength must be at most/);
+});
