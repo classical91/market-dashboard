@@ -163,6 +163,8 @@ test("experiments are readable, filterable and individually fetchable", async ()
   assert.equal(one.experiment.id, created.experimentId);
   // The cost assumptions are part of the record, not of the run that made it.
   assert.ok(one.experiment.costs);
+  assert.equal(one.experiment.chart, undefined, "persisted records stay scalar-only");
+  assert.equal(one.experiment.equityCurve, undefined, "chart curves stay out of experiment records");
   assert.equal(one.experiment.strategyStatus, "forward-paper");
 });
 
@@ -223,6 +225,13 @@ test("comparison returns one row per strategy over the same symbol and interval"
   assert.equal(body.symbol, "BTCUSDT");
   assert.equal(body.results.length, 2);
   assert.deepEqual(body.results.map((r) => r.strategy).sort(), ["mindset_v1", "smc_v1"]);
+  for (const row of body.results) {
+    assert.ok(row.chart, "comparison rows carry bounded chart data");
+    assert.ok(row.chart.equityCurve.length > 1);
+    assert.ok(row.chart.equityCurve.length <= 160);
+    assert.equal(row.chart.drawdownCurve.length, row.chart.equityCurve.length);
+    assert.ok(Array.isArray(row.chart.rMultiples));
+  }
 });
 
 test("Banana Gun is exposed as event replay and reports insufficient data instead of candle performance", async () => {

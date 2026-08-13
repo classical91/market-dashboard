@@ -241,6 +241,166 @@
   border-radius: 0 6px 6px 0;
 }
 
+.tl-chart-block {
+  margin: 10px 0 14px;
+  padding: 12px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.025);
+}
+
+.tl-chart-head,
+.tl-chart-legend {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.tl-chart-head span {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.tl-chart-head small,
+.tl-chart-legend,
+.tl-chart-label {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--dim);
+  fill: var(--dim);
+}
+
+.tl-bt-chart {
+  display: block;
+  width: 100%;
+  height: 230px;
+}
+
+.tl-chart-grid {
+  stroke: rgba(255,255,255,0.1);
+  stroke-width: 1;
+}
+
+.tl-chart-line--equity { stroke: #5aa7ff; }
+.tl-chart-line--drawdown { stroke: #d6b33f; }
+
+.tl-chart-legend {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  margin: 10px 0 0;
+}
+
+.tl-chart-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tl-chart-legend i {
+  width: 12px;
+  height: 2px;
+  border-radius: 999px;
+}
+
+.tl-r-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 180px) 1fr;
+  gap: 12px;
+  align-items: end;
+  padding: 10px 0;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+.tl-r-row:first-of-type {
+  border-top: 0;
+}
+
+.tl-r-name {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.tl-r-bins {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(38px, 1fr));
+  gap: 8px;
+  align-items: end;
+}
+
+.tl-r-bin {
+  min-width: 0;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  color: var(--dim);
+  font-size: 10px;
+}
+
+.tl-r-bar {
+  width: 100%;
+  max-width: 28px;
+  min-height: 8px;
+  border-radius: 3px 3px 0 0;
+  opacity: 0.95;
+}
+
+.tl-r-bin small {
+  color: var(--soft);
+}
+
+.tl-compare-cards {
+  display: none;
+}
+
+.tl-compare-card {
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.025);
+  padding: 12px;
+}
+
+.tl-compare-card + .tl-compare-card {
+  margin-top: 10px;
+}
+
+.tl-compare-card-title,
+.tl-compare-card-grid div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.tl-compare-card-title span {
+  font-weight: 800;
+}
+
+.tl-compare-card-title small,
+.tl-compare-card-grid span {
+  color: var(--dim);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tl-compare-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 14px;
+  margin-top: 12px;
+}
+
+.tl-compare-card-grid strong {
+  min-width: 0;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* ── Metric groups ──────────────────────────────────────── */
 
 .tl-metric-group + .tl-metric-group { margin-top: 18px; }
@@ -260,5 +420,30 @@
 
   .tl-account-card {
     min-height: 300px;
+  }
+
+  .tl-bt-chart {
+    height: 190px;
+  }
+
+  .tl-r-row {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .tl-r-bins {
+    grid-template-columns: repeat(3, minmax(56px, 1fr));
+  }
+
+  .tl-compare-table {
+    display: none;
+  }
+
+  .tl-compare-cards {
+    display: block;
+  }
+
+  .tl-compare-card-grid {
+    grid-template-columns: 1fr;
   }
 }

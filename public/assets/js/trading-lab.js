@@ -498,6 +498,153 @@
     );
   }
 
+  var strategyPalette = ["#3a86ff", "#ffd166", "#f8f9fa", "#a78bfa", "#7f7f7f"];
+
+  function chartColor(index) {
+    return strategyPalette[index % strategyPalette.length];
+  }
+
+  function finitePoints(curve, key) {
+    return (curve || [])
+      .map(function (p, i) { return { i: i, at: p.at || "", value: Number(p[key]) }; })
+      .filter(function (p) { return isFinite(p.value); });
+  }
+
+  function chartPolyline(points, width, height, min, max, top, left) {
+    var span = max - min || Math.max(Math.abs(max), 1);
+    return points
+      .map(function (point, i) {
+        var x = left + (points.length === 1 ? 0 : (i / (points.length - 1)) * width);
+        var y = top + height - ((point.value - min) / span) * height;
+        return x.toFixed(1) + "," + y.toFixed(1);
+      })
+      .join(" ");
+  }
+
+  function drawdownPoints(curve) {
+    var peak = null;
+    return finitePoints(curve, "equity").map(function (point) {
+      peak = peak === null ? point.value : Math.max(peak, point.value);
+      return {
+        at: point.at,
+        value: peak > 0 ? Math.round(((point.value - peak) / peak) * 10000) / 100 : 0,
+      };
+    });
+  }
+
+  function renderEquityDrawdownChart(curve, label) {
+    var equity = finitePoints(curve, "equity");
+    if (equity.length < 2) return "";
+    var drawdown = drawdownPoints(curve);
+    var width = 640;
+    var equityHeight = 122;
+    var drawdownHeight = 54;
+    var minEquity = Math.min.apply(null, equity.map(function (p) { return p.value; }));
+    var maxEquity = Math.max.apply(null, equity.map(function (p) { return p.value; }));
+    var minDrawdown = Math.min.apply(null, drawdown.map(function (p) { return p.value; }).concat([0]));
+    var equityLine = chartPolyline(equity, width, equityHeight, minEquity, maxEquity, 18, 0);
+    var drawdownLine = chartPolyline(drawdown, width, drawdownHeight, minDrawdown, 0, 158, 0);
+    return (
+      '<div class="tl-chart-block">' +
+      '<div class="tl-chart-head"><span>Equity + drawdown</span><small>' + escapeHtml(label || "Backtest") + "</small></div>" +
+      '<svg class="tl-bt-chart" viewBox="0 0 ' + width + ' 230" preserveAspectRatio="none" role="img" aria-label="Equity and drawdown chart">' +
+      '<line class="tl-chart-grid" x1="0" y1="140" x2="' + width + '" y2="140" />' +
+      '<line class="tl-chart-grid" x1="0" y1="212" x2="' + width + '" y2="212" />' +
+      '<polyline class="tl-chart-line tl-chart-line--equity" fill="none" stroke-width="3" points="' + equityLine + '" />' +
+      '<polyline class="tl-chart-line tl-chart-line--drawdown" fill="none" stroke-width="2.5" points="' + drawdownLine + '" />' +
+      '<text class="tl-chart-label" x="0" y="12">Equity ' + fmtUsd(equity[equity.length - 1].value - equity[0].value) + '</text>' +
+      '<text class="tl-chart-label" x="0" y="154">Drawdown ' + minDrawdown.toFixed(2) + '%</text>' +
+      "</svg></div>"
+    );
+  }
+
+  function normalizedSeries(row) {
+    var curve = row.chart && row.chart.equityCurve;
+    var points = finitePoints(curve, "equity");
+    if (points.length < 2) return [];
+    var start = points[0].value || 1;
+    return points.map(function (p) {
+      return { at: p.at, value: ((p.value - start) / start) * 100 };
+    });
+  }
+
+  function renderComparisonOverlay(rows) {
+    var series = rows
+      .map(function (row, index) { return { row: row, index: index, points: normalizedSeries(row) }; })
+      .filter(function (item) { return item.points.length >= 2; });
+    if (!series.length) return '<div class="de-empty">No equity curves available for comparison.</div>';
+    var values = [];
+    series.forEach(function (item) {
+      item.points.forEach(function (p) { values.push(p.value); });
+    });
+    var min = Math.min.apply(null, values.concat([0]));
+    var max = Math.max.apply(null, values.concat([0]));
+    var width = 640;
+    var height = 210;
+    var lines = series.map(function (item) {
+      return '<polyline fill="none" stroke-width="2.5" points="' +
+        chartPolyline(item.points, width, height - 24, min, max, 14, 0) +
+        '" stroke="' + chartColor(item.index) + '" />';
+    }).join("");
+    var legend = series.map(function (item) {
+      return '<span><i style="background:' + chartColor(item.index) + '"></i>' +
+        escapeHtml(item.row.strategyName || item.row.strategy) + "</span>";
+    }).join("");
+    return (
+      '<div class="tl-chart-block">' +
+      '<div class="tl-chart-head"><span>Strategy equity overlay</span><small>Normalized return</small></div>' +
+      '<svg class="tl-bt-chart" viewBox="0 0 ' + width + " " + height + '" preserveAspectRatio="none" role="img" aria-label="Strategy equity comparison">' +
+      '<line class="tl-chart-grid" x1="0" y1="' + (height - 24) + '" x2="' + width + '" y2="' + (height - 24) + '" />' +
+      lines +
+      "</svg>" +
+      '<div class="tl-chart-legend">' + legend + "</div></div>"
+    );
+  }
+
+  function rBins(values) {
+    var bins = [
+      { label: "<-2", min: -Infinity, max: -2 },
+      { label: "-2/-1", min: -2, max: -1 },
+      { label: "-1/0", min: -1, max: 0 },
+      { label: "0/1", min: 0, max: 1 },
+      { label: "1/2", min: 1, max: 2 },
+      { label: ">2", min: 2, max: Infinity },
+    ];
+    return bins.map(function (bin) {
+      return {
+        label: bin.label,
+        count: values.filter(function (value) { return value >= bin.min && value < bin.max; }).length,
+      };
+    });
+  }
+
+  function renderRDistribution(rows) {
+    var withTrades = rows
+      .map(function (row, index) { return { row: row, index: index }; })
+      .filter(function (item) {
+        return item.row.chart && item.row.chart.rMultiples && item.row.chart.rMultiples.length;
+      });
+    if (!withTrades.length) return '<div class="de-empty">R-multiple distribution appears once strategies close trades.</div>';
+    var maxCount = 1;
+    var grouped = withTrades.map(function (item) {
+      var bins = rBins(item.row.chart.rMultiples.map(Number).filter(isFinite));
+      bins.forEach(function (bin) { maxCount = Math.max(maxCount, bin.count); });
+      return { row: item.row, index: item.index, bins: bins };
+    });
+    var rowsHtml = grouped.map(function (item) {
+      var binsHtml = item.bins.map(function (bin) {
+        var height = Math.max(8, Math.round((bin.count / maxCount) * 58));
+        return '<div class="tl-r-bin"><div class="tl-r-bar" style="height:' + height +
+          "px;background:" + chartColor(item.index) + '"></div><span>' +
+          escapeHtml(bin.label) + "</span><small>" + bin.count + "</small></div>";
+      }).join("");
+      return '<div class="tl-r-row"><div class="tl-r-name">' +
+        escapeHtml(item.row.strategyName || item.row.strategy) + "</div><div class=\"tl-r-bins\">" +
+        binsHtml + "</div></div>";
+    }).join("");
+    return '<div class="tl-chart-block"><div class="tl-chart-head"><span>R-multiple distribution</span><small>Closed trades</small></div>' + rowsHtml + "</div>";
+  }
+
   // The backtester applies fees, slippage and funding inside the paper trader
   // (see BACKTEST_* env vars). They default to zero, and a zero-cost run read
   // as a realistic one is exactly the mistake this line exists to prevent —
@@ -558,7 +705,7 @@
 
     btResult.innerHTML =
       '<div class="tl-stat-grid">' + tiles + "</div>" +
-      equitySparkline(data.equityCurve) +
+      renderEquityDrawdownChart(data.equityCurve, data.strategyName || data.strategy) +
       '<div class="tl-bt-meta">' +
       escapeHtml(data.strategyName || data.strategy || "—") +
       " (" + escapeHtml(data.strategy || "—") + ")" +
@@ -615,6 +762,31 @@
     return '<td class="' + (className || "") + '">' + value + "</td>";
   }
 
+  function comparisonCard(row) {
+    var fields = [
+      ["Bars", row.bars + " (" + row.warmupBars + " warmup)"],
+      ["Replay", row.status === "insufficient-data" ? "insufficient data" : escapeHtml(row.replayType || "candle")],
+      ["Signals", row.signals],
+      ["Closed", row.closedTrades],
+      ["Net P&L", fmtUsd(row.netPnlUsd), pnlClass(row.netPnlUsd)],
+      ["Expectancy", row.closedTrades ? (row.expectancyR > 0 ? "+" : "") + row.expectancyR + "R" : "â€”", pnlClass(row.expectancyR)],
+      ["Profit factor", row.profitFactor == null ? (row.closedTrades ? "âˆž" : "â€”") : row.profitFactor],
+      ["Max DD", row.closedTrades ? row.maxDrawdownPct + "%" : "â€”"],
+      ["Win rate", row.closedTrades ? row.winRate + "%" : "â€”"],
+      ["Worst streak", row.worstLossStreak],
+    ];
+    return (
+      '<article class="tl-compare-card">' +
+      '<div class="tl-compare-card-title"><span>' + escapeHtml(row.strategyName || row.strategy) + "</span><small>" +
+      escapeHtml(row.strategy) + "</small></div>" +
+      '<div class="tl-compare-card-grid">' +
+      fields.map(function (field) {
+        return '<div><span>' + escapeHtml(field[0]) + '</span><strong class="' + (field[2] || "") + '">' + field[1] + "</strong></div>";
+      }).join("") +
+      "</div></article>"
+    );
+  }
+
   function renderComparison(data) {
     var rows = (data && data.results) || [];
     if (!rows.length) {
@@ -643,10 +815,13 @@
       .join("");
 
     btCompareResult.innerHTML =
-      '<div class="de-table-wrap"><table class="de-table"><thead><tr>' +
+      renderComparisonOverlay(rows) +
+      renderRDistribution(rows) +
+      '<div class="de-table-wrap tl-compare-table"><table class="de-table"><thead><tr>' +
       "<th>Strategy</th><th>Bars</th><th>Replay</th><th>Signals</th><th>Closed</th><th>Net P&amp;L</th>" +
       "<th>Expectancy</th><th>Profit factor</th><th>Max DD</th><th>Win rate</th><th>Worst streak</th>" +
       "</tr></thead><tbody>" + body + "</tbody></table></div>" +
+      '<div class="tl-compare-cards">' + rows.map(comparisonCard).join("") + "</div>" +
       '<div class="tl-bt-meta">' + escapeHtml(data.symbol) + " " + escapeHtml(data.interval) +
       " · ranked by expectancy, then profit factor, then drawdown · " + fmtTime(data.ranAt) +
       " · backtest only, the live scanner is unaffected</div>" +

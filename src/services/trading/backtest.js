@@ -55,6 +55,38 @@ function mean(values) {
   return values.length ? values.reduce((sum, v) => sum + v, 0) / values.length : 0;
 }
 
+function downsampleRows(rows, limit = 160) {
+  if (!Array.isArray(rows) || rows.length <= limit) return rows || [];
+  const sampled = [];
+  const step = (rows.length - 1) / (limit - 1);
+  for (let i = 0; i < limit; i += 1) {
+    sampled.push(rows[Math.round(i * step)]);
+  }
+  return sampled;
+}
+
+function comparisonChartData(result) {
+  const equityCurve = downsampleRows(result.equityCurve || []).map((point) => ({
+    at: point.at,
+    equity: Number(point.equity),
+  })).filter((point) => Number.isFinite(point.equity));
+  const drawdownCurve = [];
+  let peak = null;
+  for (const point of equityCurve) {
+    peak = peak === null ? point.equity : Math.max(peak, point.equity);
+    const drawdownPct = peak > 0 ? ((point.equity - peak) / peak) * 100 : 0;
+    drawdownCurve.push({
+      at: point.at,
+      drawdownPct: Math.round(drawdownPct * 100) / 100,
+    });
+  }
+  const rMultiples = (result.trades || [])
+    .map((trade) => Number(trade.rMultiple))
+    .filter(Number.isFinite)
+    .slice(-240);
+  return { equityCurve, drawdownCurve, rMultiples };
+}
+
 // Market context as of the close of `bars[bars.length - 1]`, computed from
 // that bar and everything before it. Nothing later is in scope — this function
 // is the lookahead barrier.
@@ -503,7 +535,7 @@ class BacktestService {
       } else {
         result = await this.run({ symbol, interval, candles, options, strategy: id });
       }
-      rows.push(summarizeRun(result));
+      rows.push({ ...summarizeRun(result), chart: comparisonChartData(result) });
     }
 
     return {
