@@ -715,7 +715,6 @@
     return getJson(
       "/api/trading-lab/regime?symbol=" + encodeURIComponent((regimeSymbol.value || "BTCUSDT").toUpperCase()) +
         "&interval=" + encodeURIComponent(regimeInterval.value) +
-        "&strategyId=" + encodeURIComponent(currentStrategy()) +
         "&min_trades=" + encodeURIComponent(currentRegimeMinTrades()),
     )
       .then(renderRegime)

@@ -18,6 +18,7 @@ const { createRequireAdmin } = require("../src/middleware/admin-auth");
 const { BacktestService } = require("../src/services/trading/backtest");
 const { ExperimentStore } = require("../src/services/trading/experiment-store");
 const { makeTradingConfig } = require("../src/services/trading/config");
+const { TradingLabService } = require("../src/services/trading/trading-lab");
 
 const ADMIN_KEY = "strategy-route-test-key";
 
@@ -43,6 +44,33 @@ function candles(count = 400) {
 let server;
 let base;
 let experimentStore;
+let tradingLabService;
+
+function rangeCandles(count = 200) {
+  return Array.from({ length: count }, (_, i) => {
+    const close = 100 + Math.sin(i / 2) * 2;
+    return {
+      openTime: i * 3600000,
+      closeTime: (i + 1) * 3600000 - 1,
+      open: close,
+      high: close + 0.6,
+      low: close - 0.6,
+      close,
+      volume: 1000,
+    };
+  });
+}
+
+function regimeTrade(strategy, rMultiple) {
+  return {
+    status: "closed",
+    symbol: "BTCUSDT",
+    realizedPnl: rMultiple * 100,
+    rMultiple,
+    signalSource: "regime-route-test",
+    meta: { strategy, regime: "RANGE", regimeConfidence: 80 },
+  };
+}
 
 test.before(async () => {
   const app = express();
@@ -50,10 +78,14 @@ test.before(async () => {
   experimentStore = new ExperimentStore({
     dataDir: fs.mkdtempSync(pathMod.join(os.tmpdir(), "md-exp-route-")),
   });
+  tradingLabService = new TradingLabService({
+    dataDir: fs.mkdtempSync(pathMod.join(os.tmpdir(), "md-regime-route-")),
+    signalScreenerService: { getCandles: async () => rangeCandles() },
+  });
   app.use(
     "/api/trading-lab",
     createTradingLabRouter({
-      tradingLabService: { overview: async () => ({}), listBooks: () => [] },
+      tradingLabService,
       backtestService: new BacktestService({
         config: makeTradingConfig(),
         signalScreenerService: { getCandles: async () => candles() },
@@ -110,6 +142,32 @@ test("the strategy catalogue is public, so the selector can render before any ke
     assert.equal(strategy.realMoneyEligible, false, "nothing is real-money eligible");
     assert.equal(strategy.liveEligible, undefined, "the ambiguous field is gone");
   }
+});
+
+test("regime routing compares all accounts regardless of the selected strategy", async () => {
+  const donchian = tradingLabService.strategyLedger("donchian_breakout_v1");
+  const vwap = tradingLabService.strategyLedger("vwap_reversion_v1");
+  for (let i = 0; i < 5; i += 1) {
+    donchian.addToHistory(regimeTrade("donchian_breakout_v1", 0.5));
+    vwap.addToHistory(regimeTrade("vwap_reversion_v1", -0.4));
+  }
+
+  const selectedVwap = await (
+    await fetch(`${base}/api/trading-lab/regime?symbol=BTCUSDT&interval=1h&min_trades=5&strategyId=vwap_reversion_v1`)
+  ).json();
+  const selectedDonchian = await (
+    await fetch(`${base}/api/trading-lab/regime?symbol=BTCUSDT&interval=1h&min_trades=5&strategyId=donchian_breakout_v1`)
+  ).json();
+
+  assert.equal(selectedVwap.regime.regime, "RANGE");
+  assert.equal(selectedVwap.routing.preferred.strategy, "donchian_breakout_v1");
+  assert.equal(selectedDonchian.routing.preferred.strategy, "donchian_breakout_v1");
+  assert.deepEqual(selectedVwap.routing, selectedDonchian.routing, "card selection cannot change routing evidence");
+
+  const vwapMatrix = await (
+    await fetch(`${base}/api/trading-lab/regime-matrix?strategyId=vwap_reversion_v1&min_trades=5`)
+  ).json();
+  assert.deepEqual(vwapMatrix.rows.map((row) => row.strategy), ["vwap_reversion_v1"]);
 });
 
 /* ── Research history ─────────────────────────────────────── */

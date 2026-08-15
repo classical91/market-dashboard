@@ -487,8 +487,12 @@ class TradingLabService {
 
     const candles = await this.signalScreenerService.getCandles(symbol, interval);
     const read = classifyRegime(candles || []);
-    const matrix = this.regimeMatrix({ strategyId, book, minTrades });
-    const routing = routeRegime({ read, matrix });
+    // Routing answers a portfolio-wide research question: which registered
+    // strategy has evidence in THIS regime? The selected account is display
+    // context only. Feeding its isolated matrix to the router would make every
+    // other strategy look unproven and change the recommendation on card click.
+    const routingMatrix = this.aggregateRegimeMatrix({ minTrades });
+    const routing = routeRegime({ read, matrix: routingMatrix });
 
     return {
       symbol,
@@ -501,7 +505,8 @@ class TradingLabService {
     };
   }
 
-  // The strategy × regime evidence table for one book's recorded history.
+  // The strategy × regime evidence table for one selected account. This powers
+  // account-specific analysis and intentionally does not compare accounts.
   regimeMatrix({ strategyId = null, book = "main", minTrades = 20 } = {}) {
     const trader = strategyId ? this.strategyLedger(strategyId) : this.book(book);
     const account = trader.getAccount();
@@ -509,6 +514,25 @@ class TradingLabService {
       strategyId: strategyId || null,
       book: strategyId ? trader.book : book,
       ...buildRegimeMatrix(trader.getHistory(), account.startingBalance, { minTrades }),
+    };
+  }
+
+  // Advisory routing evidence across every registered strategy account. Each
+  // trade keeps its explicit strategy identity; histories are combined only
+  // for the comparison table and no account balance or risk state is shared.
+  aggregateRegimeMatrix({ minTrades = 20 } = {}) {
+    const history = [];
+
+    for (const account of listStrategyAccounts()) {
+      const ledger = this.strategyLedger(account.id);
+      history.push(...ledger.getHistory());
+    }
+
+    return {
+      scope: "all-strategy-accounts",
+      strategyId: null,
+      book: null,
+      ...buildRegimeMatrix(history, this.config.accountSize, { minTrades }),
     };
   }
 
