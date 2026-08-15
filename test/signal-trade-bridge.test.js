@@ -325,6 +325,25 @@ test("auto-marking falls back to ticker marking when candles throw", async () =>
   assert.equal(trader.getOpenPositions().length, 0);
 });
 
+test("Signal Bridge never marks a live-research-owned position", async () => {
+  const lab = makeLab({ priceFeed: async () => 90 });
+  const trader = lab.strategyLedger("mindset_v1");
+  trader.openPosition({
+    symbol: "BTCUSDT", direction: "LONG", size: 1, entryPrice: 100,
+    stopLoss: 95, tp1: 105, tp2: 110, riskUsd: 5,
+    signalSource: "live-research:1h", executionOwner: "live-research",
+  });
+  const { bridge } = makeBridge({
+    lab,
+    signalScreenerService: { async getCandles() { throw new Error("must not fetch"); } },
+  });
+
+  assert.deepEqual(await bridge.markOpenPositions(), []);
+  assert.equal(trader.getOpenPositions().length, 1);
+  assert.equal(trader.getHistory().length, 0);
+  assert.equal(trader.readAccount().realizedPnl, 0);
+});
+
 test("auto-marking can be switched off, and marks every strategy account when on", async () => {
   let price = 100;
   const lab = makeLab({ priceFeed: async () => price });

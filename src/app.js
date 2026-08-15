@@ -236,6 +236,10 @@ function createApp() {
     symbol: config.liveResearch.symbol,
     timeframe: config.liveResearch.timeframe,
     intervalMs: config.liveResearch.intervalMs,
+    reservedStrategyIds:
+      liveScannerService?.enabled && liveScannerService.paperTradeEnabled
+        ? [liveScannerService.strategy]
+        : [],
   });
   tradingLabService.attachLiveResearchService(liveResearchService);
 

@@ -290,11 +290,21 @@ class SignalScreenerService {
   // Raw candles for callers that need levels (swing highs/lows, ATR) rather
   // than the computed signal — cached separately so a decision-engine refresh
   // doesn't re-hit Binance for symbols the screener just pulled.
-  async getCandles(symbol, interval) {
+  async getCandles(symbol, interval, { force = false } = {}) {
     const binanceInterval = INTERVAL_MAP[interval];
     if (!binanceInterval) throw new Error(`Unsupported interval "${interval}"`);
     const key = `signal-screener:klines:${symbol}:${binanceInterval}`;
-    return this._cache.getOrLoad(key, this._cacheMs, () => this._fetchKlines(symbol, binanceInterval));
+    const load = async () => {
+      const candles = await this._fetchKlines(symbol, binanceInterval);
+      this._cache.set(key, candles, this._cacheMs);
+      return candles;
+    };
+    // A forced read ignores the cached raw kline snapshot, but still shares a
+    // concurrent refresh across all live-research runners. A zero-TTL refresh
+    // key is never retained after loading; the ordinary key receives the new
+    // finalized payload for other readers.
+    if (force) return this._cache.getOrLoad(`${key}:forced-refresh`, 0, load);
+    return this._cache.getOrLoad(key, this._cacheMs, load);
   }
 }
 

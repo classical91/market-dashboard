@@ -22,6 +22,7 @@
 // authenticated exchange path is reachable from here.
 
 const { isEntry, isExit, exitDirection } = require("./trade-intent");
+const { EXECUTION_OWNERS, ownedBy, ownerFromSignalSource } = require("./execution-owner");
 
 const DEFAULT_EXIT_REASON = "SCANNER_EXIT";
 
@@ -41,6 +42,7 @@ class TradeIntentHandler {
     this.paperTradeEnabled = Boolean(paperTradeEnabled);
     this.exitReason = String(exitReason || DEFAULT_EXIT_REASON);
     this.signalSource = String(signalSource);
+    this.executionOwner = ownerFromSignalSource(this.signalSource) || EXECUTION_OWNERS.LIVE_SCANNER;
     this._logger = logger;
   }
 
@@ -83,7 +85,7 @@ class TradeIntentHandler {
     const direction = exitDirection(intent);
     const open = trader
       .getOpenPositions()
-      .filter((p) => p.symbol === intent.symbol && p.direction === direction);
+      .filter((p) => p.symbol === intent.symbol && p.direction === direction && ownedBy(p, this.executionOwner));
 
     // Nothing to invalidate. Common and uninteresting: the strategy reports a
     // broken long thesis on every bar it is bearish, whether or not a long is
@@ -171,7 +173,12 @@ class TradeIntentHandler {
     }
 
     try {
-      const assessment = await this._lab.execute({ ...input, signalSource: this.signalSource });
+      const assessment = await this._lab.execute({
+        ...input,
+        signalSource: this.signalSource,
+        executionOwner: this.executionOwner,
+        openedAt: intent.candleTs || null,
+      });
       return {
         status: assessment.opened ? "opened" : "blocked",
         reason: assessment.opened ? `Opened ${assessment.opened.id}` : assessment.trade.reason,

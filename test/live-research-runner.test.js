@@ -204,6 +204,67 @@ test("a later candle continues SL/TP management before evaluating the next setup
   assert.ok(subject.status().activity.some((entry) => entry.message.includes("STOP_HIT")));
 });
 
+test("downtime catch-up manages missed bars but evaluates and enters only the newest close", async () => {
+  const lab = tempLab();
+  const cache = new MemoryStateCache();
+  let current = candles();
+  let live = false;
+  const evaluated = [];
+  const subject = runner({
+    lab,
+    cache,
+    source: { async getCandles(_symbol, _timeframe, options) {
+      assert.equal(options.force, true, "runner must bypass cached unfinished klines");
+      return current;
+    } },
+    evaluate: (bars, index) => {
+      evaluated.push(closeTimeAt(bars[index]));
+      return live ? signal("LONG") : signal("FLAT");
+    },
+  });
+
+  await subject.runOnce();
+  evaluated.length = 0;
+  live = true;
+  const missedOne = candle(131, { close: 101 });
+  const missedTwo = candle(132, { close: 102 });
+  const newest = candle(133, { close: 103 });
+  current = [...current, missedOne, missedTwo, newest];
+
+  await subject.runOnce();
+
+  assert.deepEqual(evaluated, [newest.closeTime], "missed bars must not be scored with present-time context");
+  const [position] = lab.strategyLedger("mindset_v1").getOpenPositions();
+  assert.ok(position);
+  assert.equal(position.openedAt, new Date(newest.closeTime).toISOString());
+  assert.equal(position.executionOwner, "live-research");
+  assert.equal(subject.status().activity.filter((entry) => entry.type === "catch-up").length, 2);
+});
+
+test("an opposing strategy signal does not add a live-only exit absent from backtesting", async () => {
+  const lab = tempLab();
+  const cache = new MemoryStateCache();
+  let current = candles();
+  let direction = "LONG";
+  const subject = runner({
+    lab,
+    cache,
+    source: { async getCandles() { return current; } },
+    evaluate: () => signal(direction),
+  });
+
+  await subject.runOnce();
+  const first = lab.strategyLedger("mindset_v1").getOpenPositions()[0];
+  direction = "SHORT";
+  current = [...current, candle(131, { open: 100, high: 101, low: 99, close: 100 })];
+  await subject.runOnce();
+
+  const [stillOpen] = lab.strategyLedger("mindset_v1").getOpenPositions();
+  assert.equal(stillOpen.id, first.id);
+  assert.equal(lab.strategyLedger("mindset_v1").getHistory().length, 0);
+  assert.ok(!subject.status().activity.some((entry) => entry.message.includes("STRATEGY_EXIT")));
+});
+
 test("one runner error does not stop another account", async () => {
   const lab = tempLab();
   const service = new LiveResearchService({
@@ -240,6 +301,20 @@ test("disabled live research reports an explicit paused state", () => {
   assert.equal(status.runnerStatus, "PAUSED");
   assert.equal(status.currentIntent.code, "LIVE_RESEARCH_PAUSED");
   assert.match(status.currentIntent.reason, /LIVE_RESEARCH_ENABLED=false/);
+});
+
+test("Live Scanner and Live Research cannot claim the same strategy-account writer", () => {
+  assert.throws(
+    () => new LiveResearchService({
+      tradingLabService: tempLab(),
+      candleSource: { async getCandles() { return candles(); } },
+      stateCache: new MemoryStateCache(),
+      enabled: true,
+      reservedStrategyIds: ["mindset_v1"],
+      logger: QUIET,
+    }),
+    /writer conflict.*mindset_v1.*Disable one writer/i,
+  );
 });
 
 test("BananaGun is event-data-only and never receives a candle runner", () => {

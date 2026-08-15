@@ -338,6 +338,59 @@ test("running or comparing without an admin key is refused", async () => {
 
 /* ── History windowing ────────────────────────────────────── */
 
+test("repeated account GETs are observational and cannot mark or close positions", async () => {
+  const readOnlyLab = new TradingLabService({
+    dataDir: fs.mkdtempSync(pathMod.join(os.tmpdir(), "md-read-only-get-")),
+    config: makeTradingConfig({ takerFeeRate: 0, slippageRate: 0, fundingRate8h: 0 }),
+    // If any GET reaches updatePositions(), this price crosses the stop and
+    // makes the mutation visible in positions, history, balance and P&L.
+    priceFeed: async () => 90,
+  });
+  const ledger = readOnlyLab.strategyLedger("mindset_v1");
+  ledger.openPosition({
+    symbol: "BTCUSDT", direction: "LONG", size: 1, entryPrice: 100,
+    stopLoss: 95, tp1: 105, tp2: 110, riskUsd: 5,
+    signalSource: "live-research:1h", executionOwner: "live-research",
+  });
+  const before = {
+    positions: ledger.getPositions(),
+    history: ledger.getHistory(),
+    account: ledger.readAccount(),
+  };
+
+  const app = express();
+  app.use(express.json());
+  app.use("/api/trading-lab", createTradingLabRouter({
+    tradingLabService: readOnlyLab,
+    requireAdmin: createRequireAdmin({ adminKey: ADMIN_KEY }),
+  }));
+  const local = http.createServer(app);
+  await new Promise((resolve) => local.listen(0, resolve));
+  const localBase = `http://127.0.0.1:${local.address().port}`;
+
+  try {
+    for (const endpoint of [
+      "/api/trading-lab",
+      "/api/trading-lab/strategy-accounts",
+      "/api/trading-lab/strategy-accounts/mindset_v1",
+    ]) {
+      assert.equal((await fetch(`${localBase}${endpoint}`)).status, 200);
+      assert.equal((await fetch(`${localBase}${endpoint}`)).status, 200);
+    }
+  } finally {
+    await new Promise((resolve) => local.close(resolve));
+  }
+
+  assert.deepEqual(ledger.getPositions(), before.positions);
+  assert.deepEqual(ledger.getHistory(), before.history);
+  const afterAccount = ledger.readAccount();
+  for (const field of ["balance", "realizedPnl", "dailyPnl", "weeklyPnl", "totalTrades", "wins", "losses"]) {
+    assert.equal(afterAccount[field], before.account[field], `${field} changed during a GET`);
+  }
+  assert.equal(ledger.getOpenPositions().length, 1);
+  assert.equal(ledger.getHistory().length, 0);
+});
+
 test("a truncated history window reports the balance it starts from", async () => {
   // 240 closed trades of +$10 each on a $10,000 account, requested 80 at a
   // time. Before this, a client drawing the curve had only the ORIGINAL

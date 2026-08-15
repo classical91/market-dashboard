@@ -14,6 +14,7 @@ const { dropUnclosedCandle } = require("../signal-screener");
 const { classifyRegime } = require("./regime");
 const { replayOrderForPositions } = require("./replay-order");
 const { listStrategies, getLiveResearchStrategy } = require("./strategies");
+const { EXECUTION_OWNERS, ownedBy } = require("./execution-owner");
 
 const STATE_TTL_MS = 100 * 365 * 24 * 60 * 60 * 1000;
 const ACTIVITY_CAP = 120;
@@ -282,7 +283,11 @@ class CandleLiveResearchRunner {
     state.lastAttemptedAt = nowIso();
     state.retryStatus = state.lastError ? "RETRYING" : "IDLE";
     try {
-      const candles = await this._candles.getCandles(this.symbol, this.timeframe);
+      // Raw Binance klines include the still-forming bar. A cached snapshot of
+      // that bar is not authoritative after its close timestamp passes, so a
+      // runner cycle always requests a coalesced forced refresh before deciding
+      // that a new close is final.
+      const candles = await this._candles.getCandles(this.symbol, this.timeframe, { force: true });
       const closed = dropUnclosedCandle(Array.isArray(candles) ? candles : []).sort(
         (a, b) => closeTime(a) - closeTime(b),
       );
@@ -307,9 +312,16 @@ class CandleLiveResearchRunner {
         return { status: "waiting", state: this._write(state) };
       }
 
-      for (const candle of pending) {
+      for (let pendingIndex = 0; pendingIndex < pending.length; pendingIndex += 1) {
+        const candle = pending[pendingIndex];
         const index = closed.indexOf(candle);
-        await this._processCandle(closed, index, candle, state);
+        // Missed bars are replayed only for an already-open position's SL/TP.
+        // Present-time decision context cannot be used to invent historical
+        // entries. Entry evaluation resumes on the newest freshly fetched
+        // confirmed close.
+        await this._processCandle(closed, index, candle, state, {
+          allowEntry: pendingIndex === pending.length - 1,
+        });
       }
       state.healthStatus = "RUNNING";
       state.lastError = null;
@@ -329,45 +341,61 @@ class CandleLiveResearchRunner {
     }
   }
 
-  async _processCandle(closed, index, candle, state) {
+  async _processCandle(closed, index, candle, state, { allowEntry = true } = {}) {
     const candleAt = isoAt(closeTime(candle) + 1);
     const trader = this._lab.strategyLedger(this.strategyId);
     const events = [];
 
     // Existing positions are managed before a new entry is considered, using
     // the same pessimistic intrabar ordering as backtests and the live scanner.
-    const before = trader.getOpenPositions().filter((p) => p.symbol === this.symbol);
+    const before = trader
+      .getOpenPositions()
+      .filter((p) => p.symbol === this.symbol && ownedBy(p, EXECUTION_OWNERS.LIVE_RESEARCH));
     if (before.length) {
       const ordering = replayOrderForPositions(before, candle);
       for (const price of ordering.prices) {
-        events.push(...(await trader.updatePositions({ [this.symbol]: price }, { only: [this.symbol], at: closeTime(candle) })));
+        events.push(...(await trader.updatePositions(
+          { [this.symbol]: price },
+          {
+            only: [this.symbol],
+            positionIds: before.map((position) => position.id),
+            at: closeTime(candle),
+          },
+        )));
       }
+    }
+
+    if (!allowEntry) {
+      const position = trader
+        .getOpenPositions()
+        .find((p) => p.symbol === this.symbol && ownedBy(p, EXECUTION_OWNERS.LIVE_RESEARCH)) || null;
+      state.lastProcessedCandle = {
+        openTime: Number(candle.openTime) || null,
+        closeTime: closeTime(candle),
+        closedAt: candleAt,
+        open: candle.open,
+        high: candle.high,
+        low: candle.low,
+        close: candle.close,
+      };
+      state.nextExpectedCandle = isoAt(closeTime(candle) + 1 + timeframeMs(this.timeframe));
+      state.runnerStatus = position ? "POSITION_OPEN" : "CATCHING_UP";
+      addActivities(state, [
+        activity("catch-up", `Missed ${this.timeframe} candle replayed for position management; entry skipped`, candleAt),
+        ...events.map((event) => activity("position-event", `${event.type} on ${this.symbol}`, candleAt, event)),
+      ]);
+      this._write(state);
+      return;
     }
 
     const evaluation = this.definition.evaluate(closed, index, {});
     let execution = null;
     let assessment = null;
 
-    // A strategy changing sides invalidates the opposing thesis. Mindset also
-    // publishes its underlying trend while its stretch filter can keep the
-    // entry signal FLAT, so that trend remains protective for exits.
-    const exitDirection = evaluation.signal === "LONG" || evaluation.indicators?.trend === "UP"
-      ? "SHORT"
-      : evaluation.signal === "SHORT" || evaluation.indicators?.trend === "DOWN"
-        ? "LONG"
-        : null;
-    if (exitDirection) {
-      const invalidated = trader
-        .getOpenPositions()
-        .filter((p) => p.symbol === this.symbol && p.direction === exitDirection);
-      for (const position of invalidated) {
-        const closedPosition = await trader.closePosition(position.id, {
-          reason: "STRATEGY_EXIT",
-          exitPrice: candle.close,
-        });
-        if (closedPosition) events.push({ type: "STRATEGY_EXIT", positionId: position.id, realized: closedPosition.realizedPnl });
-      }
-    }
+    // Deliberately no generic opposite-signal/trend close here. Historical
+    // backtests manage these strategy positions through their configured
+    // SL/TP contract only, so live research must test that exact same exit
+    // behavior instead of quietly adding a more active live-only rule.
 
     if (!evaluation.error && (evaluation.signal === "LONG" || evaluation.signal === "SHORT")) {
       const openOnSymbol = trader.getOpenPositions().some((p) => p.symbol === this.symbol);
@@ -397,6 +425,7 @@ class CandleLiveResearchRunner {
             regimeConfidence: regime.confidence,
             strategySignal: evaluation,
             signalSource: `live-research:${this.timeframe}`,
+            openedAt: closeTime(candle),
           });
           execution = assessment.opened
             ? { status: "opened", reason: `Opened ${assessment.opened.id}` }
@@ -407,7 +436,9 @@ class CandleLiveResearchRunner {
       }
     }
 
-    const open = trader.getOpenPositions().filter((p) => p.symbol === this.symbol);
+    const open = trader
+      .getOpenPositions()
+      .filter((p) => p.symbol === this.symbol && ownedBy(p, EXECUTION_OWNERS.LIVE_RESEARCH));
     const position = open[0] || null;
     const intent = currentIntent({ strategyId: this.strategyId, evaluation, assessment, execution, position });
     const read = strategySpecificRead(this.strategyId, evaluation);
@@ -478,6 +509,7 @@ class LiveResearchService {
     symbol = "BTCUSDT",
     timeframe = "1h",
     intervalMs = 60_000,
+    reservedStrategyIds = [],
     logger = console,
   } = {}) {
     this.enabled = Boolean(enabled);
@@ -487,9 +519,16 @@ class LiveResearchService {
     this._logger = logger;
     this._timer = null;
     this._running = false;
+    const reserved = new Set((reservedStrategyIds || []).map(String));
+    const eligible = listStrategies({ supportsBacktest: true }).filter((meta) => meta.liveResearchEligible);
+    const conflicts = this.enabled ? eligible.filter((meta) => reserved.has(meta.id)).map((meta) => meta.id) : [];
+    if (conflicts.length) {
+      throw new Error(
+        `Strategy-account writer conflict for ${conflicts.join(", ")}: Live Scanner and Live Research cannot share one experiment ledger. Disable one writer.`,
+      );
+    }
     this._runners = new Map(
-      listStrategies({ supportsBacktest: true })
-        .filter((meta) => meta.liveResearchEligible)
+      eligible
         .map((meta) => {
           const definition = getLiveResearchStrategy(meta.id);
           return [

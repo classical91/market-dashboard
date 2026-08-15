@@ -110,7 +110,7 @@ function createTradingLabRouter({
     // truncated window a WINDOW rather than a wrong picture of the whole run.
     const openingBalance = before.reduce(
       (balance, trade) => balance + (Number(trade.pnl != null ? trade.pnl : trade.realizedPnl) || 0),
-      Number(trader.getAccount().startingBalance) || 0,
+      Number((typeof trader.readAccount === "function" ? trader.readAccount() : trader.getAccount()).startingBalance) || 0,
     );
 
     res.json({

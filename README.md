@@ -131,6 +131,8 @@ Trading Lab continuously evaluates every candle-compatible registered strategy a
 - `LIVE_RESEARCH_TIMEFRAME` - defaults to `1h`.
 - `LIVE_RESEARCH_INTERVAL_MS` - polling cadence, defaults to `60000`. Only newly closed candles are evaluated and the last processed close is persisted across restarts.
 
+Strategy-account GETs are observational: they read the runner's last persisted mark and cannot trigger SL/TP or change P&L. The runner force-refreshes raw klines before accepting a new finalized close. After downtime it replays missed bars only to manage an existing position, evaluates entries only on the newest finalized bar, and uses the same SL/TP exit contract as the backtester. Position records carry an execution owner, so Signal Bot and Live Scanner cannot mark live-research trades. Startup also refuses a paper-trading Live Scanner and Live Research claiming the same strategy account; disable one writer rather than combining two experiments in one wallet.
+
 ### On-Chain
 
 - `DEFILLAMA_API_BASE_URL`, `DEFILLAMA_COINS_API_BASE_URL`, `DEFILLAMA_CHAIN`, `DEFILLAMA_COIN_CHAIN`.

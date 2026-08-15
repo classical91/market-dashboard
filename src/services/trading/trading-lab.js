@@ -28,6 +28,7 @@ const {
   acceptsLiveResearchTrades,
 } = require("./strategy-accounts");
 const { PaperTradingService, MemoryStorage } = require("./paper-trader");
+const { EXECUTION_OWNERS, ownerFromSignalSource } = require("./execution-owner");
 
 const LEGACY_BOOKS = [
   { id: "main", name: "Main", archived: true },
@@ -50,10 +51,12 @@ function archivedLedgerView(trader) {
     book: trader.book,
     archived: true,
     getAccount: (...args) => trader.getAccount(...args),
+    readAccount: (...args) => trader.readAccount(...args),
     getPositions: (...args) => trader.getPositions(...args),
     getOpenPositions: (...args) => trader.getOpenPositions(...args),
     getHistory: (...args) => trader.getHistory(...args),
     getStats: (...args) => trader.getStats(...args),
+    readStats: (...args) => trader.readStats(...args),
     getRiskState: (...args) => trader.getRiskState(...args),
     openPosition: archivedMutation(trader.book),
     closePosition: archivedMutation(trader.book),
@@ -232,6 +235,7 @@ class TradingLabService {
     strategy = null,
     strategyId = null,
     allowCounterTrend = false,
+    at = null,
   }) {
     // Resolved, not assumed: a scanner-eligible strategy is scored against its
     // OWN account's risk state and closed-trade history, which is the ledger
@@ -243,10 +247,10 @@ class TradingLabService {
     // Live account risk (open positions, loss streaks, daily/weekly drawdown)
     // always overrides whatever the caller passed — kill switches must read
     // the real ledger, not a hopeful payload.
-    const fullState = marketState({ ...state, ...trader.getRiskState() });
+    const fullState = marketState({ ...state, ...trader.getRiskState({ at }) });
 
     const checklist = runChecklist(signal, fullState, this.config);
-    const account = trader.getAccount();
+    const account = trader.getAccount({ at });
     const edge = assessEdge({
       history: trader.getHistory(),
       startingBalance: account.startingBalance,
@@ -315,6 +319,8 @@ class TradingLabService {
     regime = null,
     regimeConfidence = null,
     strategySignal = null,
+    executionOwner = null,
+    openedAt = null,
     executionScope = "forward-paper",
     ...input
   }) {
@@ -327,7 +333,7 @@ class TradingLabService {
       requireForward: !liveResearch,
       requireLiveResearch: liveResearch,
     });
-    const assessment = this.evaluate({ book, strategyId, ...input });
+    const assessment = this.evaluate({ book, strategyId, at: openedAt, ...input });
     if (!assessment.trade.ok) {
       return { ...assessment, opened: null };
     }
@@ -372,6 +378,9 @@ class TradingLabService {
       riskUsd: trade.riskUsd,
       confidenceScore: assessment.checklist.confidenceScore,
       signalSource,
+      executionOwner: liveResearch
+        ? EXECUTION_OWNERS.LIVE_RESEARCH
+        : executionOwner || ownerFromSignalSource(signalSource) || EXECUTION_OWNERS.TRADING_LAB,
       meta: {
         edgeDecision: assessment.edge.decision,
         sizeMultiplier: trade.sizeMultiplier,
@@ -395,6 +404,7 @@ class TradingLabService {
             ? null
             : Number(regimeConfidence),
       },
+      openedAt,
     });
 
     return { ...assessment, opened, ledger: trader.book };
@@ -410,7 +420,7 @@ class TradingLabService {
         const ledger = this.strategyLedgers.get(account.id);
         return {
           ...account,
-          stats: await ledger.getStats(),
+          stats: ledger.readStats(),
           openPositions: ledger.getOpenPositions(),
           liveResearch: this.liveResearchService ? this.liveResearchService.statusFor(account.id) : null,
         };
@@ -433,12 +443,12 @@ class TradingLabService {
     }
     const ledger = this.strategyLedger(account.id);
     const history = ledger.getHistory();
-    const startingBalance = ledger.getAccount().startingBalance;
+    const startingBalance = ledger.readAccount().startingBalance;
 
     return {
       ...account,
       updatedAt: new Date().toISOString(),
-      stats: await ledger.getStats(),
+      stats: ledger.readStats(),
       openPositions: ledger.getOpenPositions(),
       metrics: buildStrategyMetrics(history, startingBalance, minTrades),
       regimeMetrics: buildRegimeMatrix(history, startingBalance, { minTrades }),
@@ -525,7 +535,7 @@ class TradingLabService {
           id,
           name,
           archived,
-          stats: await trader.getStats(),
+          stats: trader.readStats(),
           totalTrades: trader.getHistory().length,
         };
       }),
@@ -593,7 +603,7 @@ class TradingLabService {
   // account-specific analysis and intentionally does not compare accounts.
   regimeMatrix({ strategyId = null, book = "main", minTrades = 20 } = {}) {
     const trader = strategyId ? this.strategyLedger(strategyId) : this.book(book);
-    const account = trader.getAccount();
+    const account = trader.readAccount();
     return {
       strategyId: strategyId || null,
       book: strategyId ? trader.book : book,
@@ -622,7 +632,7 @@ class TradingLabService {
 
   strategyMetrics({ strategyId = null, book = "main", minTrades = 1 } = {}) {
     const trader = strategyId ? this.strategyLedger(strategyId) : this.book(book);
-    const account = trader.getAccount();
+    const account = trader.readAccount();
     return {
       strategyId: strategyId || null,
       book: strategyId ? trader.book : book,

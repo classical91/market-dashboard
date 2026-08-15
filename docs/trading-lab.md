@@ -763,6 +763,25 @@ what it may run through `getScannerStrategy`, which checks lifecycle status.
 The separate live-research resolver checks candle compatibility only and cannot
 place exchange orders or set scanner/real-money eligibility.
 
+Live research also has a single-writer rule. Every persistent position records
+an `executionOwner` independently from its strategy identity. Only the live
+research runner may mark `live-research` positions; Signal Bot and Live Scanner
+skip them. If a paper-trading Live Scanner and Live Research are configured for
+the same strategy account, startup refuses the configuration instead of mixing
+two experiments in one wallet.
+
+Account and stats GETs use `readAccount()` / `readStats()`. Those snapshots do
+not fetch a price or run SL/TP, so opening the dashboard cannot change positions,
+history, balance or P&L. Mutation remains an explicit execution-loop action.
+
+Before accepting a newly closed Binance bar, the runner bypasses the raw-kline
+cache with a coalesced forced refresh. On restart, missed bars replay only the
+SL/TP contract for a position that was already open; they cannot create
+retroactive entries using present-time context. Entry evaluation resumes on
+the newest freshly finalized bar. Live research adds no generic trend-flip
+exit: like the historical backtester, positions leave through their configured
+SL/TP execution contract.
+
 ### One resolver, because the gauntlet must read what it writes
 
 `ledgerFor({ strategyId })` decides where a trade lives. A registered strategy
@@ -1194,12 +1213,13 @@ It has no registered strategy identity, so it cannot own persistent trades.
   rather than direct group links.
 - **Auto-marking** runs first in each cycle over every strategy account, while
   archived legacy ledgers remain untouched. Positions owned by the live scanner
-  are skipped because the scanner marks them on its own venue and timeframe.
+  or live-research runner are skipped because each execution loop marks its own
+  positions on its own venue and timeframe.
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `SIGNAL_BOT_PAPER_TRADE_ENABLED` | `false` | When `true`, log explicit attribution refusals; it does not authorize persistent execution. |
-| `SIGNAL_BOT_AUTO_MARK_ENABLED` | `true` | Mark registered strategy accounts each interval, excluding archived legacy ledgers and scanner-owned positions. |
+| `SIGNAL_BOT_AUTO_MARK_ENABLED` | `true` | Mark registered strategy accounts each interval, excluding archived legacy ledgers plus scanner- and live-research-owned positions. |
 | `MARKET_DASHBOARD_URL` | empty | Public dashboard origin for Alpha Team `Visit:` links. Alerts omit links when this is blank. |
 
 Auto-marking alone does not start the loop — it is a passive add-on to a cycle
