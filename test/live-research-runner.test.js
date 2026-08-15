@@ -311,21 +311,30 @@ test("an opposing strategy signal does not add a live-only exit absent from back
 
 test("one runner error does not stop another account", async () => {
   const lab = tempLab();
+  // One frozen candle set shared by every runner. Each call to candles()
+  // derives timestamps from Date.now(), so regenerating per cycle made the
+  // second cycle's "is there a new close?" answer depend on millisecond drift
+  // between the two runOnce() calls — a flake, not a test.
+  const rows = candles();
+  const source = { async getCandles() { return rows; } };
   const service = new LiveResearchService({
     tradingLabService: lab,
-    candleSource: { async getCandles() { return candles(); } },
+    candleSource: source,
     stateCache: new MemoryStateCache(),
     logger: QUIET,
   });
   service._runners.set("smc_v1", runner({
     id: "smc_v1",
     lab,
+    source,
     evaluate: () => { throw new Error("SMC test failure"); },
   }));
-  service._runners.set("mindset_v1", runner({ id: "mindset_v1", lab, evaluate: () => signal("FLAT") }));
+  service._runners.set("mindset_v1", runner({ id: "mindset_v1", lab, source, evaluate: () => signal("FLAT") }));
 
-  // Two cycles: the first baselines both accounts, the second evaluates.
+  // First cycle baselines both accounts; a genuinely new close then arrives,
+  // and the second cycle evaluates it.
   await service.runOnce();
+  rows.push(candle(130, { close: 100 }));
   const cycle = await service.runOnce();
   assert.equal(cycle.status, "complete");
   assert.equal(service.statusFor("smc_v1").healthStatus, "ERROR");
@@ -350,17 +359,25 @@ test("disabled live research reports an explicit paused state", () => {
 });
 
 test("Live Scanner and Live Research cannot claim the same strategy-account writer", () => {
-  assert.throws(
-    () => new LiveResearchService({
-      tradingLabService: tempLab(),
-      candleSource: { async getCandles() { return candles(); } },
-      stateCache: new MemoryStateCache(),
-      enabled: true,
-      reservedStrategyIds: ["mindset_v1"],
-      logger: QUIET,
-    }),
-    /writer conflict.*mindset_v1.*Disable one writer/i,
-  );
+  // The invariant is "one ledger, one writer" — and it is now enforced by
+  // EXCLUDING the reserved strategy rather than by throwing.
+  //
+  // Throwing enforced the same rule at ruinous cost: the constructor runs
+  // during createApp(), mindset_v1 is both scanner eligible and live-research
+  // eligible, so every deployment with ENABLE_LIVE_SCANNER=true failed to boot
+  // and restarted forever. The rule was right; taking the whole dashboard down
+  // to enforce it was not.
+  const service = new LiveResearchService({
+    tradingLabService: tempLab(),
+    candleSource: { async getCandles() { return candles(); } },
+    stateCache: new MemoryStateCache(),
+    enabled: true,
+    reservedStrategyIds: ["mindset_v1"],
+    logger: QUIET,
+  });
+
+  assert.equal(service.ownsStrategy("mindset_v1"), false, "Live Research must not claim the scanner's ledger");
+  assert.deepEqual(service.reservedByScanner, ["mindset_v1"]);
 });
 
 test("BananaGun is event-data-only and never receives a candle runner", () => {
@@ -528,4 +545,67 @@ test("reading an account never mutates it", async () => {
     before,
     "a page load changed the experiment",
   );
+});
+
+/* ── Writer conflicts must not take the app down ──────────── */
+
+test("a strategy the Live Scanner owns is excluded, not fatal", () => {
+  // This threw, and mindset_v1 is both scanner eligible and live-research
+  // eligible — so every deployment with ENABLE_LIVE_SCANNER=true failed to
+  // boot, health check included. A resolvable conflict in one subsystem must
+  // not stop the whole dashboard from starting.
+  const service = new LiveResearchService({
+    tradingLabService: tempLab(),
+    candleSource: { async getCandles() { return candles(); } },
+    stateCache: new MemoryStateCache(),
+    reservedStrategyIds: ["mindset_v1"],
+    logger: QUIET,
+  });
+
+  assert.deepEqual(service.reservedByScanner, ["mindset_v1"]);
+  assert.equal(service.ownsStrategy("mindset_v1"), false, "the scanner keeps sole ownership");
+  // Every other eligible strategy still collects live research.
+  for (const id of ["smc_v1", "donchian_breakout_v1", "vwap_reversion_v1"]) {
+    assert.equal(service.ownsStrategy(id), true, id);
+  }
+});
+
+test("a reserved strategy reports its real reason, not the event-replay one", () => {
+  const service = new LiveResearchService({
+    tradingLabService: tempLab(),
+    candleSource: { async getCandles() { return candles(); } },
+    stateCache: new MemoryStateCache(),
+    reservedStrategyIds: ["mindset_v1"],
+    logger: QUIET,
+  });
+
+  const status = service.statusFor("mindset_v1");
+  assert.equal(status.runnerStatus, "OWNED_BY_LIVE_SCANNER");
+  assert.match(status.currentIntent.summary, /Live Scanner writes this strategy's account/i);
+  // Saying "cannot be evaluated from OHLCV candles" would be false: it IS
+  // evaluated, by the other loop.
+  assert.doesNotMatch(status.currentIntent.summary, /cannot be evaluated/i);
+  assert.notEqual(status.healthStatus, "EVENT_REPLAY_ONLY");
+
+  // And the exclusion is visible at the top level rather than only per runner.
+  assert.deepEqual(service.status().reservedByScanner, ["mindset_v1"]);
+});
+
+test("a reserved strategy gets no live-research runner at all", async () => {
+  const lab = tempLab();
+  const service = new LiveResearchService({
+    tradingLabService: lab,
+    candleSource: { async getCandles() { return candles(); } },
+    stateCache: new MemoryStateCache(),
+    reservedStrategyIds: ["mindset_v1"],
+    logger: QUIET,
+  });
+
+  const cycle = await service.runOnce();
+  assert.equal(cycle.status, "complete");
+  assert.ok(
+    !cycle.results.some((row) => row.strategyId === "mindset_v1"),
+    "the reserved strategy must not be cycled by Live Research",
+  );
+  assert.equal(lab.strategyLedger("mindset_v1").getOpenPositions().length, 0);
 });
