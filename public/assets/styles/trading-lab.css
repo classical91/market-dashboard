@@ -495,3 +495,200 @@
   color: var(--dim);
   margin-top: -6px;
 }
+
+/* ── Market environment ─────────────────────────────────────
+   The regime read and its routing. Mobile first, like the rest of this
+   page: the header block and the fact list stack on a phone and sit side
+   by side once there is room. */
+
+.tl-regime-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 640px) {
+  .tl-regime-grid { grid-template-columns: minmax(200px, 260px) 1fr; }
+}
+
+/* The regime's own colour carries the label, the confidence and the action,
+   so the answer is legible before any number is read. */
+.tl-regime-head {
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  background: rgba(255,255,255,0.03);
+}
+
+.tl-regime-symbol {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.tl-regime-label {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  margin-top: 4px;
+}
+
+.tl-regime-conf {
+  font-size: 12px;
+  color: var(--soft);
+  margin-top: 2px;
+}
+
+.tl-regime-action {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-top: 8px;
+}
+
+.tl-regime--up         { border-left-color: var(--green);  }
+.tl-regime--up .tl-regime-label     { color: var(--green); }
+.tl-regime--down       { border-left-color: var(--coral);  }
+.tl-regime--down .tl-regime-label   { color: var(--coral); }
+.tl-regime--range      { border-left-color: var(--blue);   }
+.tl-regime--range .tl-regime-label  { color: var(--blue);  }
+.tl-regime--accum      { border-left-color: var(--teal);   }
+.tl-regime--accum .tl-regime-label  { color: var(--teal);  }
+.tl-regime--dist       { border-left-color: var(--purple); }
+.tl-regime--dist .tl-regime-label   { color: var(--purple); }
+.tl-regime--volatile   { border-left-color: var(--amber);  }
+.tl-regime--volatile .tl-regime-label { color: var(--amber); }
+.tl-regime--coiled     { border-left-color: var(--dim);    }
+.tl-regime--coiled .tl-regime-label { color: var(--soft);  }
+/* Transition and unknown are deliberately grey. A colour that reads as a
+   verdict would undo the point of a label that means "no verdict". */
+.tl-regime--transition { border-left-color: var(--muted);  }
+.tl-regime--transition .tl-regime-label { color: var(--muted); }
+.tl-regime--unknown    { border-left-color: var(--dim);    }
+.tl-regime--unknown .tl-regime-label { color: var(--dim);  }
+
+.tl-regime-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 2px 18px;
+  align-content: start;
+}
+
+.tl-regime-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  font-size: 12px;
+}
+
+.tl-regime-key { color: var(--dim); }
+.tl-regime-val { color: var(--text); font-weight: 600; text-align: right; }
+
+/* ── Routing ──────────────────────────────────────────────── */
+
+.tl-route {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: rgba(255,255,255,0.02);
+}
+
+/* The refusal case gets its own muted treatment rather than an alarming one:
+   declining to select a strategy is a correct outcome, not a failure. */
+.tl-route--held { border-style: dashed; }
+
+.tl-route-verdict {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.tl-route--held .tl-route-verdict {
+  color: var(--muted);
+  letter-spacing: 0.06em;
+}
+
+.tl-route-why {
+  font-size: 11px;
+  color: var(--soft);
+  margin-top: 4px;
+}
+
+.tl-route-line {
+  font-size: 11px;
+  color: var(--soft);
+  margin-top: 8px;
+}
+
+.tl-route-tag {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin-right: 6px;
+}
+
+.tl-route-tag--ok { color: var(--green); border-color: var(--green); }
+.tl-route-tag--no { color: var(--coral); border-color: var(--coral); }
+
+.tl-regime-reasons {
+  margin-top: 14px;
+}
+
+.tl-regime-reasons ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 11px;
+  color: var(--soft);
+}
+
+.tl-regime-reasons li { margin-bottom: 3px; }
+
+/* ── Regime matrix ────────────────────────────────────────── */
+
+.tl-regime-coverage {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+/* Mostly-untagged history is not a regime analysis, and the table says so
+   before it shows a single number. */
+.tl-regime-coverage--thin { color: var(--amber); }
+
+.tl-regime-table td { white-space: nowrap; }
+
+/* The trade count rides beside every expectancy figure. A cell is a per-regime
+   sample, which means it is small, and a bare +0.41R invites a decision the
+   sample size does not support. */
+.tl-cell-n {
+  display: inline-block;
+  font-size: 9px;
+  color: var(--dim);
+  margin-left: 5px;
+}
+
+/* Below the evidence threshold: shown, because a strategy having traded in a
+   regime is itself a fact, but dimmed so it cannot be read as a finding. */
+.tl-cell-thin { color: var(--dim); }
+.tl-cell-empty { color: var(--dim); }
+
+.tl-inline-label {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dim);
+  align-self: center;
+}

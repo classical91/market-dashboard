@@ -2,6 +2,9 @@
 
 const test = require("node:test");
 const assert = require("node:assert");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
 
 const {
   REGIMES,
@@ -16,6 +19,9 @@ const { buildRegimeMatrix, verdictFor, regimeKey } = require("../src/services/tr
 const { routeRegime } = require("../src/services/trading/regime-router");
 const { marketState } = require("../src/services/trading/checklist");
 const { buildStrategyMetrics } = require("../src/services/trading/metrics");
+const { BacktestService } = require("../src/services/trading/backtest");
+const { TradingLabService } = require("../src/services/trading/trading-lab");
+const { makeTradingConfig } = require("../src/services/trading/config");
 
 function bar(i, { close, high, low, volume = 1000 }) {
   return {
@@ -138,6 +144,21 @@ test("directionless chop reads as a range, not a trend", () => {
     `expected a range-family regime, got ${read.regime}`,
   );
   assert.notEqual(read.preferredMode, "TREND_FOLLOWING");
+});
+
+test("a range reports no trend, whichever way its moving averages happen to sit", () => {
+  // The fast EMA has to sit on one side of the slow one, and in a range which
+  // side that is carries no information. Reporting it as a direction next to a
+  // RANGE label would state a trend the engine just measured the absence of.
+  const read = classifyRegime(chop(200));
+  assert.equal(read.trend, "NEUTRAL");
+  assert.ok(["UP", "DOWN", "NEUTRAL"].includes(read.direction), "the raw EMA read is still available");
+  assert.ok(read.indicators.adx < REGIME_DEFAULTS.adxRangeMax);
+});
+
+test("a trend reports its direction as the trend", () => {
+  assert.equal(classifyRegime(uptrend(200)).trend, "UP");
+  assert.equal(classifyRegime(downtrend(200)).trend, "DOWN");
 });
 
 test("a volatility blowout outranks the trend read", () => {
@@ -415,6 +436,128 @@ test("with no recorded history nothing is preferred and nothing is blamed", () =
   assert.deepEqual(routing.suppressed, []);
   assert.ok(routing.unproven.length > 0);
   assert.match(routing.reasons[0], /no recorded trade history/);
+});
+
+/* ── End to end ───────────────────────────────────────────── */
+
+// A rising market that clears the checklist floor. The higher-timeframe read
+// is supplied because a candles-only run can only reach 60 of the 100 points
+// and mostly refuses to trade at all — which would make these tests assert
+// nothing.
+function tradeableCandles(count) {
+  const bars = [];
+  for (let i = 0; i < count; i += 1) {
+    const close = 100 + i * 0.8;
+    bars.push({
+      openTime: i * 14400000,
+      closeTime: (i + 1) * 14400000,
+      open: close - 0.4,
+      high: close + 0.6,
+      low: close - 0.8,
+      close,
+      volume: 1000 + (i % 5) * 200,
+    });
+  }
+  return bars;
+}
+
+test("a backtest tags every opened trade with the regime it was opened in", async () => {
+  const service = new BacktestService({ config: makeTradingConfig() });
+  const result = await service.run({
+    symbol: "BTCUSDT",
+    candles: tradeableCandles(300),
+    marketContext: { htfTrendUp: true },
+  });
+  assert.ok(result.trades.length > 0, "the run needs trades to say anything");
+
+  for (const trade of result.trades) {
+    assert.ok(trade.meta, "every trade carries meta");
+    assert.ok(
+      REGIMES.includes(trade.meta.regime),
+      `trade tagged ${trade.meta.regime}, which is not a regime`,
+    );
+    assert.ok(Number.isFinite(trade.meta.regimeConfidence));
+  }
+
+  // And the run reports the same trades broken out by environment.
+  assert.ok(result.regimeMetrics.rows.length > 0);
+  assert.equal(result.regimeMetrics.coverage.untagged, 0, "a fresh run tags everything");
+  assert.ok(Object.keys(result.regimeCounts).length > 0);
+});
+
+test("the regime tag is recorded but never consulted when deciding to open", async () => {
+  // The guarantee the whole design rests on. Handing tryOpen three completely
+  // different regime reads — including a TRANSITION, which the router treats
+  // as "trade nothing" — must produce the identical decision and the identical
+  // reasoning, differing only in what lands on the trade record.
+  const service = new BacktestService({ config: makeTradingConfig() });
+  const candles = tradeableCandles(300);
+  const { contextAtBar, buildContextSeries } = require("../src/services/trading/backtest");
+  const { PaperTradingService, MemoryStorage } = require("../src/services/trading/paper-trader");
+
+  const opts = { breakoutLookback: 20, trendFast: 21, trendSlow: 55, macdFast: 12, macdSlow: 26, macdSignal: 9 };
+  const context = contextAtBar(candles, opts, { index: 120, series: buildContextSeries(candles, opts) });
+
+  const outcomes = ["TREND_UP", "TRANSITION", null].map((regime) => {
+    const trader = new PaperTradingService({
+      book: "backtest",
+      config: makeTradingConfig(),
+      storage: new MemoryStorage(),
+      clock: candles[0].closeTime,
+    });
+    const outcome = service.tryOpen({
+      trader,
+      symbol: "BTCUSDT",
+      direction: "LONG",
+      context,
+      interval: "4h",
+      at: candles[120].closeTime,
+      marketContext: { htfTrendUp: true },
+      regimeRead: regime ? { regime, confidence: 90 } : null,
+    });
+    return { outcome, trade: trader.getOpenPositions()[0] || null };
+  });
+
+  assert.ok(outcomes[0].outcome.opened, "the setup opens at all");
+  for (const { outcome } of outcomes) {
+    assert.equal(outcome.opened, outcomes[0].outcome.opened, "the decision is identical");
+    assert.deepEqual(outcome.reasons, outcomes[0].outcome.reasons, "the reasoning is identical");
+    assert.equal(outcome.confidenceScore, outcomes[0].outcome.confidenceScore);
+  }
+
+  // Only the record differs, which is the whole point.
+  assert.equal(outcomes[0].trade.meta.regime, "TREND_UP");
+  assert.equal(outcomes[1].trade.meta.regime, "TRANSITION");
+  assert.equal(outcomes[2].trade.meta.regime, null, "an absent read leaves the trade untagged");
+});
+
+test("the service assembles a regime read and its routing from candles", async () => {
+  const candles = uptrend(200);
+  const lab = new TradingLabService({
+    dataDir: fs.mkdtempSync(path.join(os.tmpdir(), "regime-lab-")),
+    signalScreenerService: {
+      getCandles: async () => candles,
+    },
+  });
+
+  const payload = await lab.regime({ symbol: "BTCUSDT", interval: "1h" });
+
+  assert.equal(payload.symbol, "BTCUSDT");
+  assert.equal(payload.interval, "1h");
+  assert.equal(payload.candles, 200);
+  assert.equal(payload.regime.regime, "TREND_UP");
+  // No trade history in a fresh book, so nothing can be preferred yet — and
+  // nothing is suppressed either.
+  assert.equal(payload.routing.preferred, null);
+  assert.deepEqual(payload.routing.suppressed, []);
+  assert.equal(payload.routing.enforced, false);
+});
+
+test("the regime endpoints report a missing candle source rather than failing quietly", async () => {
+  const lab = new TradingLabService({
+    dataDir: fs.mkdtempSync(path.join(os.tmpdir(), "regime-lab-")),
+  });
+  await assert.rejects(() => lab.regime({ symbol: "BTCUSDT" }), (err) => err.statusCode === 503);
 });
 
 test("every considered strategy lands in exactly one bucket", () => {

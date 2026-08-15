@@ -301,6 +301,7 @@ function unknownRead(reason, at = null, options = {}) {
     confidence: 0,
     actionable: false,
     direction: "NEUTRAL",
+    trend: "NEUTRAL",
     bias: posture.bias,
     preferredMode: posture.mode,
     riskPosture: posture.risk,
@@ -514,7 +515,19 @@ function classifyAt(bars, index, { series = null, options = {} } = {}) {
     // LOW_COMPRESSION because those are size problems rather than direction
     // problems, and false for any read under the confidence floor.
     actionable,
+    // The raw EMA ordering. Kept because it is a measurement and callers may
+    // want it, but see `trend` before displaying it as one.
     direction,
+    /**
+     * The TREND, which is not the same thing as the EMA ordering.
+     *
+     * In a range the fast EMA still sits on one side of the slow one — it has
+     * to sit somewhere — and reporting that as "Direction: DOWN" beside a RANGE
+     * label states a trend the engine has just finished measuring the absence
+     * of. ADX below the range ceiling IS the finding that the ordering is
+     * noise, so outside a trend regime this reads NEUTRAL.
+     */
+    trend: regime === "TREND_UP" ? "UP" : regime === "TREND_DOWN" ? "DOWN" : "NEUTRAL",
     bias: posture.bias,
     preferredMode: posture.mode,
     riskPosture: posture.risk,
