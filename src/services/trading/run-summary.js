@@ -48,6 +48,10 @@ function summarizeRun(result) {
     winRate: result.stats.winRate,
     worstLossStreak: m.worstConsecutiveLosses,
     costs: result.costs,
+    // Which named friction assumption produced these numbers, or null for a
+    // deployment's own custom rates. Two rows priced differently are not
+    // comparable, and three loose decimals do not say so at a glance.
+    costScenario: result.costScenario || null,
   };
 }
 

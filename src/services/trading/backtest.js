@@ -22,7 +22,7 @@
 //   first whenever both were reachable. Results are pessimistic by design.
 
 const { getTradingConfig } = require("./config");
-const { runChecklist, marketState } = require("./checklist");
+const { runChecklist, marketState, SCORING_VERSION } = require("./checklist");
 const { assessEdge } = require("./edge-gate");
 const { planTrade, calculatePositionSize } = require("./risk");
 const { buildStrategyMetrics } = require("./metrics");
@@ -40,6 +40,7 @@ const {
   assertValidOptions,
 } = require("./strategies");
 const { summarizeRun, costSummary } = require("./run-summary");
+const { getCostScenario, identifyCostScenario, costCaveats } = require("./cost-scenarios");
 const { buildExperimentRecord } = require("./experiment-record");
 const {
   STRATEGY_ID: BANANAGUN_STRATEGY_ID,
@@ -149,6 +150,40 @@ function nativeLevels({ direction, entryPrice, signal }) {
  *   "mixed"            asked for native, some trades could and some could not
  *   "none"             no trade opened, so there is nothing to characterise
  */
+/**
+ * How much of the AVAILABLE evidence the trades in a run actually had behind
+ * them — two measurements, deliberately kept apart.
+ *
+ *   Operational score. The raw 0-100 checklist score and the 50/65/80 cuts.
+ *   This is production policy and is not touched here.
+ *
+ *   Evidence ratio. score / availablePoints. A candle backtest can only reach
+ *   60 of the 100 points (no macro feed, no funding feed, no daily read), so
+ *   its 50-point floor demands 83% of the evidence available to it while a
+ *   fully-fed live candidate needs 50% — and a candle strategy can never reach
+ *   HALF or FULL sizing at all. Comparing raw scores across those two worlds
+ *   compares different things.
+ *
+ * Recording both is what lets a promotion criterion be set FROM EVIDENCE later
+ * — testing whether 70%, 80% or 85% of available evidence actually predicts
+ * out-of-sample performance — rather than by mechanically rescaling 50/65/80
+ * into 30/39/48 and hoping.
+ */
+function summarizeEvidence(scored) {
+  if (!scored.length) {
+    return { trades: 0, meanScore: null, meanAvailablePoints: null, meanRatio: null, minRatio: null };
+  }
+  const ratios = scored.map((s) => s.score / s.available);
+  const round3 = (v) => Math.round(v * 1000) / 1000;
+  return {
+    trades: scored.length,
+    meanScore: round3(mean(scored.map((s) => s.score))),
+    meanAvailablePoints: round3(mean(scored.map((s) => s.available))),
+    meanRatio: round3(mean(ratios)),
+    minRatio: round3(Math.min(...ratios)),
+  };
+}
+
 function appliedExecution({ executionMode, nativeTrades = 0, sharedTrades = 0 }) {
   const opened = nativeTrades + sharedTrades;
   if (!opened) return "none";
@@ -526,8 +561,23 @@ class BacktestService {
     // recorded on the result, so a run that scored with macro context is never
     // mistaken for one that did not.
     marketContext = null,
+    // A named execution-cost assumption ("baseline", "stress", ...). Omitted
+    // means the deployment's own configured rates, which is what every caller
+    // got before scenarios existed.
+    costScenario = null,
   }) {
     assertValidExecutionMode(executionMode);
+    // Resolved before anything else so an unknown scenario is a 400 naming it
+    // rather than a run completed under the wrong friction.
+    const scenario = costScenario ? getCostScenario(costScenario) : null;
+    const runConfig = scenario
+      ? {
+          ...this.config,
+          takerFeeRate: scenario.takerFeeRate,
+          slippageRate: scenario.slippageRate,
+          fundingRate8h: scenario.fundingRate8h,
+        }
+      : this.config;
     const resolved = resolveStrategy(strategy);
     if (resolved.definition.supportsBacktest === false) {
       throw Object.assign(
@@ -583,7 +633,7 @@ class BacktestService {
     // from rolling this historical book over onto today's date.
     const trader = new PaperTradingService({
       book: "backtest",
-      config: this.config,
+      config: runConfig,
       storage: new MemoryStorage(),
       clock: bars[0].closeTime,
     });
@@ -607,6 +657,11 @@ class BacktestService {
     // applied one are different facts and a reader needs both.
     let nativeTrades = 0;
     let sharedTrades = 0;
+    // Raw checklist score and the points that were REACHABLE for each opened
+    // trade. The ratio between them is the research measure; the raw score
+    // stays the operational one. Keeping both means a promotion rule can be
+    // set from evidence later without re-running anything.
+    const scored = [];
 
     for (let i = warmup; i < bars.length; i += 1) {
       const bar = bars[i];
@@ -643,10 +698,14 @@ class BacktestService {
           executionMode,
           at: bar.closeTime,
           marketContext,
+          config: runConfig,
         });
         if (outcome.opened) {
           if (outcome.appliedMode === "native") nativeTrades += 1;
           else sharedTrades += 1;
+          if (outcome.confidenceScore != null && outcome.availablePoints) {
+            scored.push({ score: outcome.confidenceScore, available: outcome.availablePoints });
+          }
           if (executionMode === "native" && outcome.appliedMode !== "native") nativeFallbacks += 1;
         } else {
           skipped.push({
@@ -691,7 +750,11 @@ class BacktestService {
       from: bars[warmup].closeTime,
       to: bars[bars.length - 1].closeTime,
       options: opts,
-      costs: costSummary(this.config),
+      costs: costSummary(runConfig),
+      // Which named assumption produced these numbers, or null for a
+      // deployment's own custom rates. Recorded so a stored result says
+      // "baseline" rather than leaving a reader to compare three decimals.
+      costScenario: identifyCostScenario(costSummary(runConfig)),
       stats,
       metrics: buildStrategyMetrics(trader.getHistory(), account.startingBalance),
       trades: trader.getHistory(),
@@ -714,7 +777,15 @@ class BacktestService {
       // a real daily or funding feed is never confused with a candles-only one.
       // Empty means candles only, which is the default.
       marketContextFields: Object.keys(marketContext || {}).sort(),
+      // The rules these trades were selected under, and how much evidence was
+      // available to select them. See summarizeEvidence().
+      scoringVersion: SCORING_VERSION,
+      evidence: summarizeEvidence(scored),
       caveats: [
+        // A zero rate is an EXCLUDED cost, not a neutral one, and a run that
+        // excluded one has to say which — otherwise its expectancy quietly
+        // reads as though everything was accounted for.
+        ...costCaveats(costSummary(runConfig)),
         // Surfaced rather than hidden: with long and short positions open on
         // the same symbol at once, one intra-bar ordering cannot be
         // pessimistic for both sides.
@@ -756,7 +827,11 @@ class BacktestService {
     at = null,
     // Caller-supplied market context — see run(). Null means "candles only".
     marketContext = null,
+    // The config this run is using, which differs from the service's when a
+    // named cost scenario was requested.
+    config = null,
   }) {
+    const runConfig = config || this.config;
     const signalSource = `backtest:${strategyId}:${interval}`;
     const state = marketState({
       ...stateFromContext(context, marketContext),
@@ -765,7 +840,7 @@ class BacktestService {
     const checklist = runChecklist(
       { symbol, direction, price: context.close, atr: context.atr, allowCounterTrend },
       state,
-      this.config,
+      runConfig,
     );
 
     const account = trader.getAccount({ at });
@@ -775,7 +850,7 @@ class BacktestService {
       strategy: signalSource,
       symbol,
       score: checklist.confidenceScore,
-      config: this.config,
+      config: runConfig,
     });
 
     const sizeMultiplier = checklist.sizeMultiplier * edge.sizeMultiplier;
@@ -790,7 +865,7 @@ class BacktestService {
       entryPrice: context.close,
       atr: context.atr,
       sizeMultiplier,
-      config: this.config,
+      config: runConfig,
     });
     if (!trade.ok) return { opened: false, reasons: [...reasons, trade.reason] };
 
@@ -808,8 +883,8 @@ class BacktestService {
         const size = calculatePositionSize({
           entryPrice: trade.entryPrice,
           stopLoss: native.stop,
-          accountSize: this.config.accountSize,
-          riskPct: this.config.maxRiskPerTrade,
+          accountSize: runConfig.accountSize,
+          riskPct: runConfig.maxRiskPerTrade,
           sizeMultiplier,
         });
         if (size > 0) {
@@ -848,6 +923,10 @@ class BacktestService {
         // one execution model. Under native execution they are what the
         // position above is actually using. `executionMode` says which, on
         // every trade, so a ledger is never ambiguous about it.
+        // `availablePoints` rides beside the score because the score alone is
+        // not interpretable. 55 out of 100 and 55 out of 60 are different
+        // claims about how much of the evidence agreed, and only the second
+        // number says which one this was.
         meta: signal
           ? {
               strategy: strategyId,
@@ -855,11 +934,24 @@ class BacktestService {
               stopHint: signal.stopHint ?? null,
               targetHint: signal.targetHint ?? null,
               executionMode: appliedMode,
+              availablePoints: checklist.availablePoints ?? null,
+              scoringVersion: SCORING_VERSION,
             }
-          : { strategy: strategyId, executionMode: appliedMode },
+          : {
+              strategy: strategyId,
+              executionMode: appliedMode,
+              availablePoints: checklist.availablePoints ?? null,
+              scoringVersion: SCORING_VERSION,
+            },
         openedAt: at ?? context.bar.closeTime,
       });
-      return { opened: true, reasons, appliedMode };
+      return {
+        opened: true,
+        reasons,
+        appliedMode,
+        confidenceScore: checklist.confidenceScore,
+        availablePoints: checklist.availablePoints ?? null,
+      };
     } catch (err) {
       // The position cap is a legitimate outcome, not an error.
       return { opened: false, reasons: [...reasons, err.message] };
@@ -876,6 +968,8 @@ class BacktestService {
     executionMode = "shared",
     // See run(). Omitted means candles only.
     marketContext = null,
+    // See run(). Omitted means the deployment's own configured rates.
+    costScenario = null,
   } = {}) {
     // Resolve the strategy BEFORE fetching: a typo should come back as a 400
     // immediately, not as whatever the candle source happened to do first.
@@ -904,6 +998,7 @@ class BacktestService {
       strategy: resolved,
       executionMode,
       marketContext,
+      costScenario,
     });
     return record ? this.recordExperiment(result, { notes }) : result;
   }
@@ -943,6 +1038,9 @@ class BacktestService {
     // with macro context beside one scored without it would not be a
     // comparison.
     marketContext = null,
+    // Applied identically to every strategy too: rows priced under different
+    // friction would not be a comparison.
+    costScenario = null,
     // Rows below this many closed trades are reported but NOT ranked. The
     // default of 1 only excludes strategies that never traded; a real
     // statistical threshold is a promotion-policy decision and belongs with
@@ -977,6 +1075,7 @@ class BacktestService {
           strategy: id,
           executionMode,
           marketContext,
+          costScenario,
         });
       }
       // The curve rides ALONGSIDE the summary, not inside it: summarizeRun is
@@ -995,6 +1094,7 @@ class BacktestService {
       interval,
       executionMode,
       marketContextFields: Object.keys(marketContext || {}).sort(),
+      costScenario,
       minRankedTrades,
       ranAt: new Date().toISOString(),
       results: rankRows(rows, minRankedTrades),
@@ -1008,6 +1108,7 @@ module.exports = {
   rankRows,
   EXECUTION_MODES,
   appliedExecution,
+  summarizeEvidence,
   summarizeRun,
   resolveStrategy,
   trendBreakoutStrategy,

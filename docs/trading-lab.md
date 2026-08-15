@@ -83,6 +83,64 @@ quietly passing for a realistic one. Costs are charged per fill, so they weigh
 most on whichever strategy trades most often; that is a real difference between
 strategies, and it belongs in the comparison rather than outside it.
 
+### Cost scenarios
+
+Named friction assumptions, so an experiment records **which** assumption
+produced it rather than three loose decimals a reader has to interpret:
+
+| `costScenario` | Taker fee | Slippage | Funding |
+| --- | ---: | ---: | ---: |
+| `baseline` | 0.06% | 0.02% | excluded |
+| `stress` | 0.10% | 0.05% | excluded |
+| `frictionless` | 0 | 0 | 0 |
+
+`baseline` is the research default: a standard, undiscounted perp taker tier
+with modest slippage — conservative enough that a strategy has to survive
+realistic friction, without being so harsh that it discards strategies that
+would work in practice.
+
+`stress` is a **second run, not a stricter first one**. A strategy that looks
+good under `baseline` *and* survives `stress` is far stronger evidence than one
+tuned around cheap execution; starting at `stress` would reject strategies that
+are fine in reality.
+
+```js
+service.run({ symbol: "BTCUSDT", candles, costScenario: "baseline" });
+```
+
+Omitting `costScenario` uses the deployment's own configured rates, which is
+what every caller got before scenarios existed, and identifies as `null` — a
+custom assumption, honestly labelled rather than mislabelled as a named one.
+
+#### Funding is excluded, and says so
+
+A zero rate is an **excluded** cost, not a neutral one. Printing `funding 0%`
+beside two real rates reads as "funding was accounted for and came to nothing",
+which is the opposite of the truth: no funding feed is wired up, so charging a
+rate would mean inventing one. Every run therefore carries an explicit caveat
+naming each excluded cost, and the cards render it as a tag rather than a
+decimal.
+
+#### Two different things called "funding"
+
+| | What it is | Where it acts |
+| --- | --- | --- |
+| `BACKTEST_FUNDING_RATE_8H` / `costScenario.fundingRate8h` | An **execution cost** charged against P&L while a position is open | `fundingCost()` in the paper trader |
+| `marketContext.fundingRate` | **Market evidence** used for scoring | `scoreSetup()` and the funding kill switch |
+
+Setting the first makes P&L more realistic. It does **not** restore the
+checklist's +5 funding points — only a real current/historical funding feed
+does that. They share a word and nothing else.
+
+#### Configuring a deployment
+
+`BACKTEST_TAKER_FEE_RATE`, `BACKTEST_SLIPPAGE_RATE` and
+`BACKTEST_FUNDING_RATE_8H` are read by `PaperTradingService` for **every** book,
+forward paper included — the `BACKTEST_` prefix is historical. Changing them
+re-prices live paper accounting mid-flight, so it is a deployment decision, not
+a research one. Scenarios exist so a research run can be priced without
+touching it.
+
 Two things make a backtest lie, and both are addressed explicitly:
 
 - **Lookahead.** Indicators and signals at bar *i* are computed from bars
@@ -505,6 +563,63 @@ the forward path and the backtest path cannot drift apart.
 The promotion *policy* — how many closed trades, what expectancy, what profit
 factor and drawdown justify a status change — is deliberately not implemented
 yet, and neither is any endpoint that could change a status.
+
+### Two scores, kept apart
+
+The checklist produces one number and the Lab now records two:
+
+| | What it is | Who uses it |
+| --- | --- | --- |
+| **Operational score** | The raw 0-100 score and the 50/65/80 cuts | Production and forward paper. Unchanged. |
+| **Evidence ratio** | `score / availablePoints` | Research only. Recorded, not acted on. |
+
+They are kept apart on purpose. A candle backtest reaches 60 of 100 points, so
+its 50-point floor demands **83%** of the evidence available to it where a
+fully-fed live candidate needs 50% — and it can never reach `TAKE_HALF` (65) or
+`TAKE_FULL` (80) at all. Backtest trade selection is therefore deliberately
+more conservative than forward-paper selection, and **not directly equivalent
+to it**.
+
+The fix for that is not to rescale 50/65/80 into 30/39/48. It is to find out,
+from evidence, whether 70% or 80% or 85% of available evidence actually
+predicts out-of-sample performance, and set a backtest-specific promotion
+criterion from the answer. Recording the ratio now is what makes that study
+possible later without re-running anything.
+
+Every opened position carries its own `confidenceScore` and
+`meta.availablePoints`, so the run-level `evidence` aggregate can always be
+recomputed from the ledger rather than trusted.
+
+### Comparing experiments across rule changes
+
+An expectancy figure measures the rules that selected the trades behind it, so
+experiments from either side of a scoring change measure different things.
+`gitCommit` records which code ran, but a commit is far too fine-grained to
+group by — hundreds share one set of scoring rules. Two coarse versions answer
+the question a researcher actually has, which is *may I pool these?*
+
+| Field | Versions | Bump when |
+| --- | --- | --- |
+| `scoringVersion` | The scoring RULES | Major, whenever a change could move a candidate across a decision boundary |
+| `researchSchemaVersion` | The record SHAPE | A field is added or changed |
+
+`scoringVersion` is at **2.0.0**. 1.x is everything before the corrections
+above: same-timeframe EMA trend scored as higher-timeframe daily bias (up to
+30 points), and absent macro/funding scored as favourable observations (up to
+25, of which 20 was asymmetric between longs and shorts). Both changed which
+setups trade, so nothing scored under 1.x can be pooled with anything scored
+under 2.0.0.
+
+Records written before versioning existed carry no `scoringVersion` at all and
+are identified by its absence. They are **kept, not deleted** — destroying
+research because it is superseded destroys the record of what was believed and
+when. `store.list()` labels every row with `comparable` and a
+`comparabilityNote`, and a promotion check asks for `{ comparableOnly: true }`.
+The default stays inclusive so no existing reader silently loses rows.
+
+`marketContextFields` is recorded too: a run given a real daily or funding feed
+is not comparable with a candles-only one even when both scored under the same
+rules.
 
 ### Experiments
 

@@ -743,7 +743,7 @@
     return (Number(rate) * 100).toFixed(3).replace(/0+$/, "").replace(/\.$/, "") + "%";
   }
 
-  function costsLine(costs) {
+  function costsLine(costs, scenario) {
     if (!costs) return "";
     if (costs.gasUsd != null) {
       return '<div class="tl-bt-meta tl-bt-costs">Event costs applied: gas $' + escapeHtml(costs.gasUsd) +
@@ -757,9 +757,28 @@
       return '<div class="tl-bt-meta tl-bt-costs">&#9888;&#65039; Frictionless run: no fees, slippage or funding applied. ' +
         "Set BACKTEST_TAKER_FEE_RATE, BACKTEST_SLIPPAGE_RATE and BACKTEST_FUNDING_RATE_8H for realistic costs.</div>";
     }
-    return '<div class="tl-bt-meta tl-bt-costs">Costs applied: taker fee ' + pct(costs.takerFeeRate) +
-      " · slippage " + pct(costs.slippageRate) +
-      " · funding " + pct(costs.fundingRate8h) + " per 8h</div>";
+
+    // A zero rate is an EXCLUDED cost, not a neutral one. Printing "funding 0%"
+    // beside two real rates reads as "funding was accounted for and came to
+    // nothing", which is the opposite of the truth — no funding feed exists, so
+    // charging a rate would mean inventing one. Each excluded cost is named.
+    var excluded = [];
+    if (!Number(costs.takerFeeRate)) excluded.push("fees");
+    if (!Number(costs.slippageRate)) excluded.push("slippage");
+    if (!Number(costs.fundingRate8h)) excluded.push("funding");
+
+    var applied = [];
+    if (Number(costs.takerFeeRate)) applied.push("taker fee " + pct(costs.takerFeeRate));
+    if (Number(costs.slippageRate)) applied.push("slippage " + pct(costs.slippageRate));
+    if (Number(costs.fundingRate8h)) applied.push("funding " + pct(costs.fundingRate8h) + " per 8h");
+
+    return '<div class="tl-bt-meta tl-bt-costs">' +
+      (scenario ? escapeHtml(scenario) + ": " : "Costs applied: ") + applied.join(" · ") +
+      (excluded.length
+        ? ' <span class="tl-tag">&#9888;&#65039; ' + escapeHtml(excluded.join(" and ")) +
+          " NOT charged</span>"
+        : "") +
+      "</div>";
   }
 
   // Which exit rules produced the numbers. Shown on every result because it
@@ -872,7 +891,7 @@
         : "") +
       " · " + fmtTime(data.from) + " → " + fmtTime(data.to) +
       "</div>" +
-      costsLine(data.costs) +
+      costsLine(data.costs, data.costScenario) +
       (caveats.length
         ? '<div class="de-warnings" style="display:block">' +
           caveats.map(function (c) { return "<div>" + escapeHtml(c) + "</div>"; }).join("") +
@@ -1052,7 +1071,7 @@
       " · " + escapeHtml(executionModeLabel(data.executionMode)) +
       " · ranked by expectancy, then profit factor, then drawdown · " + fmtTime(data.ranAt) +
       " · backtest only, the live scanner is unaffected</div>" +
-      costsLine(rows[0] && rows[0].costs);
+      costsLine(rows[0] && rows[0].costs, data.costScenario || (rows[0] && rows[0].costScenario));
   }
 
   btStrategy.addEventListener("change", renderStrategyNote);
