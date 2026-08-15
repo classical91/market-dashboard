@@ -153,6 +153,18 @@ const smcV1 = {
   supportsLiveResearch: true,
   description:
     "Conservative Smart Money Concepts approximation: higher-timeframe (or EMA) trend, break of structure on a confirmed swing, a displacement candle leaving a fair value gap, entered on the retest of that gap. Backtest only.",
+  // One or two lines of plain English, shown directly on the strategy account
+  // card. Separate from `description` because that one is a full paragraph
+  // written for a researcher reading the registry, and a card has room for a
+  // sentence — the alternative was clipping the long text in the UI, which
+  // reliably cuts a qualifying clause and leaves a confident half-sentence
+  // that misdescribes the strategy.
+  //
+  // Lives here, beside the rules it summarises, so it is reviewed in the same
+  // diff as a change to what the strategy actually does. A description held in
+  // the dashboard instead would drift the moment the rules moved.
+  shortDescription:
+    "Market-structure strategy using trend, break of structure, fair-value gap and retest.",
   requiredWarmupBars: REQUIRED_WARMUP_BARS,
 
   describeRules() {

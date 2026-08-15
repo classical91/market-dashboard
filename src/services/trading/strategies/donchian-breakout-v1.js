@@ -131,6 +131,18 @@ const donchianBreakoutV1 = {
   supportsLiveResearch: true,
   description:
     "An N-bar Donchian channel break with an ATR stop and a fixed reward multiple, optionally filtered by a long SMA. Intentionally unoptimised: the baseline every other strategy should have to beat. Backtest only.",
+  // One or two lines of plain English, shown directly on the strategy account
+  // card. Separate from `description` because that one is a full paragraph
+  // written for a researcher reading the registry, and a card has room for a
+  // sentence — the alternative was clipping the long text in the UI, which
+  // reliably cuts a qualifying clause and leaves a confident half-sentence
+  // that misdescribes the strategy.
+  //
+  // Lives here, beside the rules it summarises, so it is reviewed in the same
+  // diff as a change to what the strategy actually does. A description held in
+  // the dashboard instead would drift the moment the rules moved.
+  shortDescription:
+    "Trend-following breakout strategy that waits for a confirmed close outside the recent price channel.",
   requiredWarmupBars: REQUIRED_WARMUP_BARS,
   // Both are read by the registry: the runner reserves warmupFor(options)
   // bars instead of the static figure, and rejects bad options as a 400.

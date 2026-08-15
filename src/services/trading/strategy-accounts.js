@@ -98,6 +98,11 @@ function listStrategyAccounts() {
     name: accountName(meta.name),
     status: meta.status,
     version: meta.version,
+    // The card-sized summary, straight from the registry. Never composed here:
+    // a description written in the dashboard would drift from the rules the
+    // moment a strategy changed.
+    shortDescription: meta.shortDescription,
+    description: meta.description,
     scannerEligible: meta.scannerEligible,
     realMoneyEligible: meta.realMoneyEligible,
     supportsBacktest: meta.supportsBacktest,
@@ -121,6 +126,11 @@ function describeStrategyAccount(strategyId) {
     name: accountName(meta.name),
     status: meta.status,
     version: meta.version,
+    // The card-sized summary, straight from the registry. Never composed here:
+    // a description written in the dashboard would drift from the rules the
+    // moment a strategy changed.
+    shortDescription: meta.shortDescription,
+    description: meta.description,
     scannerEligible: meta.scannerEligible,
     realMoneyEligible: meta.realMoneyEligible,
     supportsBacktest: meta.supportsBacktest,

@@ -17,6 +17,18 @@ const shadowBananagunV1 = {
   requiredWarmupBars: 0,
   description:
     "Point-in-time memecoin candidate replay with safety snapshots and conservative gas, slippage, MEV and failed-transaction costs. Event replay only; candle backtests are refused.",
+  // One or two lines of plain English, shown directly on the strategy account
+  // card. Separate from `description` because that one is a full paragraph
+  // written for a researcher reading the registry, and a card has room for a
+  // sentence — the alternative was clipping the long text in the UI, which
+  // reliably cuts a qualifying clause and leaves a confident half-sentence
+  // that misdescribes the strategy.
+  //
+  // Lives here, beside the rules it summarises, so it is reviewed in the same
+  // diff as a change to what the strategy actually does. A description held in
+  // the dashboard instead would drift the moment the rules moved.
+  shortDescription:
+    "Event-driven on-chain strategy using candidate, liquidity, safety and transaction-cost data. Not candle-based.",
   datasetAvailability: {
     mode: "event-replay",
     required:

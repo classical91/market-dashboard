@@ -27,6 +27,18 @@ const mindsetV1 = {
   version: "1.0.0",
   description:
     "EMA20/EMA50 trend direction with an RSI band filter that refuses to chase a stretched move. The strategy the live scanner runs.",
+  // One or two lines of plain English, shown directly on the strategy account
+  // card. Separate from `description` because that one is a full paragraph
+  // written for a researcher reading the registry, and a card has room for a
+  // sentence — the alternative was clipping the long text in the UI, which
+  // reliably cuts a qualifying clause and leaves a confident half-sentence
+  // that misdescribes the strategy.
+  //
+  // Lives here, beside the rules it summarises, so it is reviewed in the same
+  // diff as a change to what the strategy actually does. A description held in
+  // the dashboard instead would drift the moment the rules moved.
+  shortDescription:
+    "Trend-following momentum strategy using EMA20/EMA50 with an RSI stretch filter.",
   // Running against live market data with paper execution — exactly what the
   // live scanner does today. That makes it scanner eligible; it says nothing
   // about real money, and realMoneyEligible stays false.
