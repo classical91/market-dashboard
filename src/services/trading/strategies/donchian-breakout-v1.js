@@ -128,6 +128,7 @@ const donchianBreakoutV1 = {
   status: "backtest",
   supportsBacktest: true,
   supportsLiveScanner: false,
+  supportsLiveResearch: true,
   description:
     "An N-bar Donchian channel break with an ATR stop and a fixed reward multiple, optionally filtered by a long SMA. Intentionally unoptimised: the baseline every other strategy should have to beat. Backtest only.",
   requiredWarmupBars: REQUIRED_WARMUP_BARS,
@@ -135,6 +136,21 @@ const donchianBreakoutV1 = {
   // bars instead of the static figure, and rejects bad options as a 400.
   warmupFor: warmupForOptions,
   validateOptions,
+
+  describeRules() {
+    return {
+      purpose: "Trend-following breakout baseline",
+      looksFor: `A fresh confirmed close outside the prior ${DONCHIAN_BREAKOUT_V1_DEFAULTS.channelLength}-bar channel`,
+      longEntry: "Close above the prior channel high; the previous bar must not already be beyond it",
+      shortEntry: "Close below the prior channel low; the previous bar must not already be beyond it",
+      trendFilter: DONCHIAN_BREAKOUT_V1_DEFAULTS.useTrendFilter
+        ? `Price must agree with SMA${DONCHIAN_BREAKOUT_V1_DEFAULTS.trendLength}`
+        : "Disabled",
+      stop: `${DONCHIAN_BREAKOUT_V1_DEFAULTS.stopAtr} ATR from entry`,
+      target: `${DONCHIAN_BREAKOUT_V1_DEFAULTS.rewardR}R from entry`,
+      positionSizing: "Trading Lab checklist, edge gate and account-local risk limits",
+    };
+  },
 
   evaluate(candles, index, context = {}) {
     const options = { ...DONCHIAN_BREAKOUT_V1_DEFAULTS, ...(context.options || {}) };

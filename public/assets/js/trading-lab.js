@@ -15,6 +15,9 @@
   var scannerEl = document.getElementById("tl-scanner");
   var metricsEl = document.getElementById("tl-metrics");
   var strategyAccountsEl = document.getElementById("tl-strategy-accounts");
+  var activityShell = document.getElementById("tl-activity-shell");
+  var activityTitle = document.getElementById("tl-activity-title");
+  var activityContent = document.getElementById("tl-activity-content");
   var regimeEl = document.getElementById("tl-regime");
   var regimeMatrixEl = document.getElementById("tl-regime-matrix");
   var regimeSymbol = document.getElementById("tl-regime-symbol");
@@ -90,6 +93,19 @@
 
   function currentStrategy() {
     return selectedStrategyId || "mindset_v1";
+  }
+
+  function fmtAgo(iso) {
+    if (!iso) return "never";
+    var ms = Date.now() - new Date(iso).getTime();
+    if (!isFinite(ms)) return "unknown";
+    if (ms < 60000) return Math.max(0, Math.round(ms / 1000)) + " sec ago";
+    if (ms < 3600000) return Math.round(ms / 60000) + " min ago";
+    return Math.round(ms / 3600000) + " hr ago";
+  }
+
+  function statusLabel(value) {
+    return String(value || "UNKNOWN").replace(/_/g, " ");
   }
 
   function decisionClass(decision) {
@@ -181,15 +197,19 @@
      rather than being hidden. An empty account is information. */
 
   function accountStatusClass(account) {
-    if (account.active) return "tl-acct-status tl-acct-status--live";
-    if (account.mode === "event-replay") return "tl-acct-status tl-acct-status--replay";
+    var runner = account.liveResearch || {};
+    if (runner.healthStatus === "ERROR") return "tl-acct-status tl-acct-status--error";
+    if (runner.healthStatus === "EVENT_REPLAY_ONLY") return "tl-acct-status tl-acct-status--replay";
+    if (runner.enabled) return "tl-acct-status tl-acct-status--live";
     return "tl-acct-status tl-acct-status--idle";
   }
 
   function accountStatusDot(account) {
-    if (account.active) return "🟢";
-    if (account.mode === "event-replay") return "🟡";
-    return "⚪";
+    var runner = account.liveResearch || {};
+    if (runner.healthStatus === "ERROR") return "●";
+    if (runner.healthStatus === "EVENT_REPLAY_ONLY") return "◆";
+    if (runner.enabled) return "●";
+    return "○";
   }
 
   function renderStrategyAccounts(data) {
@@ -204,37 +224,37 @@
       .map(function (account) {
         var s = account.stats || {};
         var m = s.riskMetrics || {};
+        var runner = account.liveResearch || {};
+        var intent = runner.currentIntent || {};
         var traded = Number(s.totalTrades) > 0;
         var selected = account.id === currentStrategy() ? " is-active" : "";
+        var netPnl = Number(s.equity || 0) - Number(s.startingBalance || 0);
 
         return (
-          '<button class="tl-account-card tl-acct' + selected + (account.active ? " tl-acct--live" : "") +
-          '" type="button" data-strategy="' + escapeHtml(account.id) + '">' +
+          '<article class="tl-account-card tl-acct' + selected + (runner.enabled ? " tl-acct--live" : "") +
+          '" data-strategy="' + escapeHtml(account.id) + '" tabindex="0">' +
           '<div class="tl-account-body">' +
           '<div class="tl-account-head"><span>' + escapeHtml(account.name) + "</span>" +
-          "<small>" + escapeHtml(account.id) + "</small></div>" +
+          '<small class="tl-acct-research">Research: ' + escapeHtml(String(account.status || "unknown").toUpperCase()) + "</small></div>" +
           '<div class="' + accountStatusClass(account) + '">' +
-          accountStatusDot(account) + " " + escapeHtml(account.label) +
+          accountStatusDot(account) + " LIVE DEMO: " + escapeHtml(statusLabel(runner.runnerStatus || "PAUSED")) +
           "</div>" +
           '<div class="tl-account-equity"><span>Equity</span><strong>$' +
           Number(s.equity || 0).toLocaleString(undefined, { maximumFractionDigits: 2 }) +
           "</strong></div>" +
+          '<div class="tl-acct-intent"><span>Current intent</span><strong>' +
+          escapeHtml(intent.title || "Waiting for runner state") + "</strong></div>" +
           '<div class="tl-account-metrics">' +
-          accountMetric("Balance", "$" + Number(s.balance || s.startingBalance || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })) +
-          accountMetric("Net P&L", traded ? fmtUsd(s.realizedPnl) : "—", pnlClass(s.realizedPnl)) +
+          accountMetric("Net P&L", fmtUsd(netPnl), pnlClass(netPnl)) +
+          accountMetric("Signal", escapeHtml(runner.currentSignal || "FLAT")) +
           accountMetric("Win rate", traded ? s.winRate + "%" : "—") +
           accountMetric("Expectancy", m.closedTrades ? (m.expectancyR > 0 ? "+" : "") + m.expectancyR + "R" : "—", pnlClass(m.expectancyR)) +
-          accountMetric("Profit factor", m.closedTrades ? (m.profitFactor == null ? "∞" : m.profitFactor) : "—") +
-          accountMetric("Max DD", m.closedTrades ? m.maxDrawdownPct + "%" : "—") +
           accountMetric("Trades", (s.totalTrades || 0) + " closed / " + (s.openPositions || 0) + " open") +
           "</div>" +
-          // Says plainly why an account has no track record, so a $10,000
-          // balance never reads as "this strategy broke even".
-          (account.active
-            ? ""
-            : '<div class="tl-acct-why">No forward track record — lifecycle status <code>' +
-              escapeHtml(account.status) + "</code>. Promote it to forward-paper to start one.</div>") +
-          "</div></button>"
+          '<div class="tl-acct-updated">Updated ' + escapeHtml(fmtAgo(runner.lastSuccessfulEvaluationAt)) + "</div>" +
+          '<button class="tl-activity-btn" type="button" data-activity-strategy="' + escapeHtml(account.id) + '">' +
+          "What is it doing?</button>" +
+          "</div></article>"
         );
       })
       .join("");
@@ -650,6 +670,156 @@
         );
       })
       .join("");
+  }
+
+  /* ── Account Activity inspector ────────────────────────── */
+
+  function activityField(label, value, cls) {
+    return '<div class="tl-activity-field"><span>' + escapeHtml(label) + '</span><strong class="' +
+      (cls || "") + '">' + value + "</strong></div>";
+  }
+
+  function renderRules(rules) {
+    if (!rules) return '<div class="de-empty">No structured rule description is registered.</div>';
+    var rows = [
+      ["Purpose", rules.purpose], ["Looks for", rules.looksFor], ["Long entry", rules.longEntry],
+      ["Short entry", rules.shortEntry], ["Trend filter", rules.trendFilter], ["Stop", rules.stop],
+      ["Target", rules.target], ["Position sizing", rules.positionSizing],
+    ];
+    return '<dl class="tl-rule-list">' + rows.map(function (row) {
+      return "<dt>" + escapeHtml(row[0]) + "</dt><dd>" + escapeHtml(row[1] || "—") + "</dd>";
+    }).join("") + "</dl>";
+  }
+
+  function renderMarketRead(runner) {
+    var read = runner.marketRead || {};
+    var specific = runner.strategyRead || {};
+    var rows = Object.keys(specific).filter(function (key) { return specific[key] != null; });
+    return '<div class="tl-activity-grid">' +
+      activityField("Regime", escapeHtml(read.regime || "UNKNOWN")) +
+      activityField("Regime confidence", read.regimeConfidence == null ? "—" : escapeHtml(String(read.regimeConfidence)) + "%") +
+      activityField("Strategy signal", escapeHtml(runner.currentSignal || "FLAT")) +
+      activityField("Current price", fmtPrice(read.price)) +
+      rows.map(function (key) {
+        var value = specific[key];
+        return activityField(key.replace(/([A-Z])/g, " $1"), typeof value === "number" ? fmtPrice(value) : escapeHtml(String(value)));
+      }).join("") + "</div>";
+  }
+
+  function renderDecisionTrail(rows) {
+    if (!rows || !rows.length) return '<div class="de-empty">No decision has been processed yet.</div>';
+    return '<div class="tl-pipeline">' + rows.map(function (row, index) {
+      return '<div class="tl-pipeline-step' + (row.failed ? " is-failed" : "") + '">' +
+        '<span>' + escapeHtml(row.step) + '</span><strong>' + escapeHtml(row.status) + '</strong>' +
+        (row.detail ? '<small>' + escapeHtml(row.detail) + "</small>" : "") + "</div>" +
+        (index < rows.length - 1 ? '<div class="tl-pipeline-arrow">&#8595;</div>' : "");
+    }).join("") + "</div>";
+  }
+
+  function renderOpenPosition(position) {
+    var currentR = position.riskUsd
+      ? Number(position.unrealizedPnl || 0) / Number(position.riskUsd)
+      : null;
+    return '<div class="tl-position-detail">' +
+      '<div class="tl-position-title"><strong>' + escapeHtml(position.symbol) + " " + escapeHtml(position.direction) +
+      '</strong><span class="' + pnlClass(position.unrealizedPnl) + '">' + fmtUsd(position.unrealizedPnl) + "</span></div>" +
+      '<div class="tl-activity-grid">' +
+      activityField("Entry", fmtPrice(position.entryPrice)) +
+      activityField("Current", fmtPrice(position.currentPrice)) +
+      activityField("Stop", fmtPrice(position.stopLoss)) +
+      activityField("TP1", fmtPrice(position.tp1)) +
+      activityField("TP2", fmtPrice(position.tp2)) +
+      activityField("Risk", fmtUsd(position.riskUsd)) +
+      activityField("Current R", currentR == null ? "—" : (currentR > 0 ? "+" : "") + currentR.toFixed(2) + "R", pnlClass(currentR)) +
+      activityField("Opened", escapeHtml(fmtTime(position.openedAt))) +
+      activityField("Version", escapeHtml((position.meta && position.meta.strategyVersion) || "—")) +
+      activityField("Timeframe", escapeHtml((position.meta && position.meta.timeframe) || "—")) +
+      activityField("Entry regime", escapeHtml((position.meta && position.meta.regime) || "—")) +
+      activityField("Partial exits", escapeHtml(String((position.exits || []).length))) +
+      activityField("Breakeven", position.tp1Hit ? "ACTIVE" : "NOT YET") +
+      "</div></div>";
+  }
+
+  function renderTimeline(items) {
+    if (!items || !items.length) return '<div class="de-empty">No runner activity recorded yet.</div>';
+    return '<ol class="tl-activity-timeline">' + items.map(function (item) {
+      return '<li><time>' + escapeHtml(fmtTime(item.at)) + '</time><div><strong>' +
+        escapeHtml(statusLabel(item.type)) + '</strong><span>' + escapeHtml(item.message) + "</span></div></li>";
+    }).join("") + "</ol>";
+  }
+
+  function renderAccountActivity(detail) {
+    var runner = detail.liveResearch || {};
+    var intent = runner.currentIntent || {};
+    var s = detail.stats || {};
+    var m = s.riskMetrics || {};
+    var netPnl = Number(s.equity || 0) - Number(s.startingBalance || 0);
+    activityTitle.textContent = detail.name || detail.id;
+    activityContent.innerHTML =
+      '<section class="tl-activity-hero">' +
+      '<div class="' + accountStatusClass(detail) + '">' + accountStatusDot(detail) + " " +
+      escapeHtml(statusLabel(runner.runnerStatus || "PAUSED")) + "</div>" +
+      '<div class="tl-activity-meta">Research: <strong>' + escapeHtml(String(detail.status || "unknown").toUpperCase()) +
+      '</strong> &middot; Live demo: <strong>' + escapeHtml(statusLabel(runner.healthStatus || "PAUSED")) + "</strong></div>" +
+      '<div class="tl-activity-grid">' +
+      activityField("Watching", escapeHtml((runner.symbol || "—") + (runner.timeframe ? " · " + runner.timeframe : ""))) +
+      activityField("Last candle", escapeHtml(fmtTime(runner.lastProcessedCandle && runner.lastProcessedCandle.closedAt))) +
+      activityField("Next expected", escapeHtml(fmtTime(runner.nextExpectedCandle))) +
+      activityField("Last successful", escapeHtml(fmtTime(runner.lastSuccessfulEvaluationAt))) +
+      "</div></section>" +
+
+      '<section class="tl-intent-callout"><div class="tl-kicker">Current intent</div><h3>' +
+      escapeHtml(intent.title || "WAITING FOR RUNNER STATE") + '</h3><p>' + escapeHtml(intent.summary || "—") +
+      '</p><div class="tl-intent-reason"><strong>Reason</strong><span>' + escapeHtml(intent.reason || "—") +
+      '</span></div><div class="tl-intent-reason"><strong>Next action</strong><span>' +
+      escapeHtml(intent.nextAction || "—") + "</span></div></section>" +
+
+      '<section><h3>Market Read</h3>' + renderMarketRead(runner) + "</section>" +
+      '<section><h3>Decision Pipeline</h3>' + renderDecisionTrail(runner.decisionTrail) + "</section>" +
+      '<section><h3>Demo Wallet</h3><div class="tl-activity-grid">' +
+      activityField("Starting balance", "$" + Number(s.startingBalance || 0).toLocaleString()) +
+      activityField("Current balance", "$" + Number(s.balance || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })) +
+      activityField("Equity", "$" + Number(s.equity || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })) +
+      activityField("Realized P&L", fmtUsd(s.realizedPnl), pnlClass(s.realizedPnl)) +
+      activityField("Unrealized P&L", fmtUsd(s.unrealizedPnl), pnlClass(s.unrealizedPnl)) +
+      activityField("Net P&L", fmtUsd(netPnl), pnlClass(netPnl)) +
+      activityField("Closed trades", escapeHtml(String(s.totalTrades || 0))) +
+      activityField("Open trades", escapeHtml(String(s.openPositions || 0))) +
+      activityField("Win rate", s.totalTrades ? escapeHtml(String(s.winRate)) + "%" : "—") +
+      activityField("Expectancy", m.closedTrades ? escapeHtml(String(m.expectancyR)) + "R" : "—", pnlClass(m.expectancyR)) +
+      activityField("Profit factor", m.closedTrades ? escapeHtml(String(m.profitFactor == null ? "∞" : m.profitFactor)) : "—") +
+      activityField("Max drawdown", m.closedTrades ? escapeHtml(String(m.maxDrawdownPct)) + "%" : "—") +
+      "</div></section>" +
+      ((detail.history || []).length
+        ? '<section><h3>Equity Curve</h3><div class="tl-account-graph-wrap">' + performanceSparkline(detail, { items: detail.history, openingBalance: s.startingBalance }) + "</div></section>"
+        : "") +
+      '<section><h3>Open Position</h3>' +
+      ((detail.openPositions || []).length ? detail.openPositions.map(renderOpenPosition).join("") : '<div class="de-empty">No open position.</div>') +
+      "</section>" +
+      '<details class="tl-rules"><summary>How this strategy trades</summary>' + renderRules(detail.rules) + "</details>" +
+      '<section><h3>Recent Activity</h3>' + renderTimeline(runner.activity) + "</section>" +
+      (runner.lastError
+        ? '<section class="tl-runner-error"><h3>Runner Error</h3><p>' + escapeHtml(runner.lastError) +
+          "</p><small>Retry: " + escapeHtml(statusLabel(runner.retryStatus)) + "</small></section>"
+        : "");
+  }
+
+  function openAccountActivity(strategyId) {
+    selectedStrategyId = strategyId;
+    activityShell.hidden = false;
+    document.body.classList.add("tl-activity-open");
+    activityTitle.textContent = strategyId;
+    activityContent.innerHTML = '<div class="de-empty">Loading account activity&hellip;</div>';
+    return getJson("/api/trading-lab/strategy-accounts/" + encodeURIComponent(strategyId) + "?limit=100&min_trades=1")
+      .then(renderAccountActivity)
+      .catch(function (err) {
+        activityContent.innerHTML = '<div class="de-empty">Could not load account activity: ' + escapeHtml(err.message) + "</div>";
+      });
+  }
+
+  function closeAccountActivity() {
+    activityShell.hidden = true;
+    document.body.classList.remove("tl-activity-open");
   }
 
   /* ── Loading ───────────────────────────────────────────── */
@@ -1404,10 +1574,32 @@
   intervalSelect.addEventListener("change", loadCandidates);
 
   strategyAccountsEl.addEventListener("click", function (event) {
+    var activityButton = event.target.closest("[data-activity-strategy]");
+    if (activityButton) {
+      openAccountActivity(activityButton.dataset.activityStrategy);
+      return;
+    }
     var card = event.target.closest("[data-strategy]");
     if (!card || !card.dataset.strategy || card.dataset.strategy === currentStrategy()) return;
     selectedStrategyId = card.dataset.strategy;
     refresh();
+  });
+
+  strategyAccountsEl.addEventListener("keydown", function (event) {
+    var card = event.target.closest("[data-strategy]");
+    if (!card || (event.key !== "Enter" && event.key !== " ")) return;
+    event.preventDefault();
+    selectedStrategyId = card.dataset.strategy;
+    refresh();
+  });
+
+  if (activityShell) {
+    activityShell.addEventListener("click", function (event) {
+      if (event.target.closest("[data-close-activity]")) closeAccountActivity();
+    });
+  }
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && activityShell && !activityShell.hidden) closeAccountActivity();
   });
 
   markBtn.addEventListener("click", function () {
@@ -1443,4 +1635,8 @@
 
   loadStrategies();
   refresh();
+  window.setInterval(function () {
+    loadOverview().catch(function () {});
+    if (activityShell && !activityShell.hidden) openAccountActivity(currentStrategy());
+  }, 30000);
 })();

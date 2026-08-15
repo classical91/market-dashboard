@@ -165,6 +165,11 @@ function createTradingLabRouter({
     );
   }));
 
+  router.get("/live-research", (req, res) => {
+    const service = tradingLabService.liveResearchService;
+    res.json(service ? service.status() : { enabled: false, running: false, runners: [] });
+  });
+
   // ── Regime ────────────────────────────────────────────────────────────────
 
   // "What environment are we in, and what does our own history say belongs in

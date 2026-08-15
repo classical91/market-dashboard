@@ -29,9 +29,10 @@
 //
 // ── An account is not a permission ──────────────────────────────────────────
 //
-// Every registered strategy gets an account, including the four that may not
-// trade forward. Those accounts exist, sit at their starting balance, and
-// display why they are inactive. Nothing here consults or confers eligibility:
+// Every registered strategy gets an account, including strategies that may not
+// run in the promoted scanner. A separate live-research capability may collect
+// simulated evidence there without changing lifecycle status. Nothing here
+// confers scanner or real-money eligibility:
 // the live scanner still resolves what it may run through
 // strategies/index.js#getScannerStrategy, which checks lifecycle status and is
 // never handed anything from this module. An account is a place to put results,
@@ -53,8 +54,8 @@ function ledgerKey(strategyId) {
 }
 
 /**
- * Why an account is or is not accumulating a forward track record, in the terms
- * the dashboard shows.
+ * Scanner/promotion mode retained for compatibility and safety checks. The
+ * dashboard renders this separately from the live demo runner state.
  *
  * `active` is taken from `scannerEligible`, which lifecycle.js computes from
  * status *and* capability — it is never read off the strategy itself, so an
@@ -101,6 +102,9 @@ function listStrategyAccounts() {
     realMoneyEligible: meta.realMoneyEligible,
     supportsBacktest: meta.supportsBacktest,
     supportsEventReplay: meta.supportsEventReplay,
+    supportsLiveResearch: meta.supportsLiveResearch,
+    liveResearchEligible: meta.liveResearchEligible,
+    rules: meta.rules,
     ledgerKey: ledgerKey(meta.id),
     ...accountMode(meta),
   }));
@@ -121,6 +125,9 @@ function describeStrategyAccount(strategyId) {
     realMoneyEligible: meta.realMoneyEligible,
     supportsBacktest: meta.supportsBacktest,
     supportsEventReplay: meta.supportsEventReplay,
+    supportsLiveResearch: meta.supportsLiveResearch,
+    liveResearchEligible: meta.liveResearchEligible,
+    rules: meta.rules,
     ledgerKey: ledgerKey(meta.id),
     ...accountMode(meta),
   };
@@ -141,6 +148,14 @@ function acceptsForwardTrades(strategyId) {
   return Boolean(account && account.active);
 }
 
+// Separate from acceptsForwardTrades(): this answers whether an isolated demo
+// account may collect live simulated evidence, not whether the strategy has
+// been promoted into the production scanner lifecycle.
+function acceptsLiveResearchTrades(strategyId) {
+  const account = describeStrategyAccount(strategyId);
+  return Boolean(account && account.liveResearchEligible);
+}
+
 module.exports = {
   ACCOUNT_NAMESPACE,
   ledgerKey,
@@ -148,4 +163,5 @@ module.exports = {
   listStrategyAccounts,
   describeStrategyAccount,
   acceptsForwardTrades,
+  acceptsLiveResearchTrades,
 };

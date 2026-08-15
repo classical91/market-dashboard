@@ -16,12 +16,17 @@
 const { getTradingConfig } = require("./config");
 const { runChecklist, marketState } = require("./checklist");
 const { assessEdge } = require("./edge-gate");
-const { planTrade } = require("./risk");
+const { planTrade, calculatePositionSize } = require("./risk");
 const { buildStrategyMetrics } = require("./metrics");
 const { classifyRegime } = require("./regime");
 const { buildRegimeMatrix } = require("./regime-metrics");
 const { routeRegime } = require("./regime-router");
-const { listStrategyAccounts, describeStrategyAccount, acceptsForwardTrades } = require("./strategy-accounts");
+const {
+  listStrategyAccounts,
+  describeStrategyAccount,
+  acceptsForwardTrades,
+  acceptsLiveResearchTrades,
+} = require("./strategy-accounts");
 const { PaperTradingService, MemoryStorage } = require("./paper-trader");
 
 const LEGACY_BOOKS = [
@@ -104,6 +109,7 @@ class TradingLabService {
     this.config = config;
     this.decisionEngineService = decisionEngineService;
     this.signalScreenerService = signalScreenerService;
+    this.liveResearchService = null;
     this._legacyLedgers = new Map(
       LEGACY_BOOKS.map((book) => [
         book.id,
@@ -115,8 +121,8 @@ class TradingLabService {
     );
     // One isolated ledger per registered strategy, derived from the registry so
     // a sixth strategy needs no second list updating. Every strategy gets one,
-    // including the four that may not trade forward — those simply stay at
-    // their starting balance. See ./strategy-accounts.
+    // including strategies that may collect live demo evidence without being
+    // promoted into the scanner lifecycle. See ./strategy-accounts.
     this.strategyLedgers = new Map(
       listStrategyAccounts().map((account) => [
         account.id,
@@ -132,6 +138,11 @@ class TradingLabService {
       priceFeed,
       storage: new MemoryStorage(),
     });
+  }
+
+  attachLiveResearchService(service) {
+    this.liveResearchService = service || null;
+    return this;
   }
 
   // ── Ledger resolution ─────────────────────────────────────────────────────
@@ -150,7 +161,12 @@ class TradingLabService {
    * back to a legacy ledger. Unattributed evaluation may use the process-local
    * analysis ledger; persistent execution may not.
    */
-  ledgerFor({ strategyId = null, allowUnattributed = false, requireForward = false } = {}) {
+  ledgerFor({
+    strategyId = null,
+    allowUnattributed = false,
+    requireForward = false,
+    requireLiveResearch = false,
+  } = {}) {
     if (strategyId) {
       const account = describeStrategyAccount(strategyId);
       if (!account || !this.strategyLedgers.has(account.id)) {
@@ -162,6 +178,12 @@ class TradingLabService {
       if (requireForward && !acceptsForwardTrades(account.id)) {
         throw Object.assign(
           new Error(`Strategy "${account.id}" is ${account.label.toLowerCase()} and cannot forward-paper trade`),
+          { statusCode: 409, expose: true },
+        );
+      }
+      if (requireLiveResearch && !acceptsLiveResearchTrades(account.id)) {
+        throw Object.assign(
+          new Error(`Strategy "${account.id}" is not compatible with candle live research`),
           { statusCode: 409, expose: true },
         );
       }
@@ -200,13 +222,23 @@ class TradingLabService {
   // Run a candidate trade through the full gauntlet without opening anything.
   // Every stage's reasoning is returned so the UI can show *why* a setup was
   // sized down or refused, not just the verdict.
-  evaluate({ book = "main", symbol, direction, entryPrice, atr = null, state = {}, strategy = null, strategyId = null }) {
+  evaluate({
+    book = "main",
+    symbol,
+    direction,
+    entryPrice,
+    atr = null,
+    state = {},
+    strategy = null,
+    strategyId = null,
+    allowCounterTrend = false,
+  }) {
     // Resolved, not assumed: a scanner-eligible strategy is scored against its
     // OWN account's risk state and closed-trade history, which is the ledger
     // execute() will write to. Kill switches and the edge gate must read the
     // book they are protecting.
     const trader = this.ledgerFor({ strategyId, allowUnattributed: true });
-    const signal = { symbol, direction, price: entryPrice, atr };
+    const signal = { symbol, direction, price: entryPrice, atr, allowCounterTrend };
 
     // Live account risk (open positions, loss streaks, daily/weekly drawdown)
     // always overrides whatever the caller passed — kill switches must read
@@ -262,7 +294,19 @@ class TradingLabService {
    * the persistent ledger ended up with no strategy identity at all: the caller
    * knew it, spent it on the edge gate, and dropped it before the write.
    */
-  async execute({
+  async execute(input) {
+    return this._executePersistent({ ...input, executionScope: "forward-paper" });
+  }
+
+  // The live demo research boundary. It is deliberately not the scanner
+  // boundary above: lifecycle status is evidence/promotion, while this method
+  // is allowed only for candle-compatible isolated demo accounts. Nothing
+  // outside the in-process runner calls it and no HTTP route exposes it.
+  async executeLiveResearch(input) {
+    return this._executePersistent({ ...input, executionScope: "live-research" });
+  }
+
+  async _executePersistent({
     book = "main",
     signalSource = "manual",
     strategyId = null,
@@ -270,12 +314,19 @@ class TradingLabService {
     timeframe = null,
     regime = null,
     regimeConfidence = null,
+    strategySignal = null,
+    executionScope = "forward-paper",
     ...input
   }) {
     // Resolve permission before doing any scoring. A registered but ineligible
     // strategy is refused; a missing identity is refused; neither can fall back
     // to Main/Shadow/Alts.
-    const trader = this.ledgerFor({ strategyId, requireForward: true });
+    const liveResearch = executionScope === "live-research";
+    const trader = this.ledgerFor({
+      strategyId,
+      requireForward: !liveResearch,
+      requireLiveResearch: liveResearch,
+    });
     const assessment = this.evaluate({ book, strategyId, ...input });
     if (!assessment.trade.ok) {
       return { ...assessment, opened: null };
@@ -283,7 +334,33 @@ class TradingLabService {
 
     // The same resolution evaluate() just used, so the position opens in the
     // ledger whose limits were checked.
-    const { trade } = assessment;
+    let trade = { ...assessment.trade };
+    let appliedExecution = "shared";
+
+    // Candle strategies may publish structural stop/target hints. Live
+    // research uses them when they are geometrically valid and recomputes size
+    // so dollar risk stays identical; otherwise the shared ATR plan remains in
+    // force and the fallback is explicit in the decision trail.
+    if (liveResearch && strategySignal) {
+      const stop = Number(strategySignal.stopHint);
+      const target = Number(strategySignal.targetHint);
+      const long = trade.direction === "LONG";
+      const validStop = Number.isFinite(stop) && (long ? stop < trade.entryPrice : stop > trade.entryPrice);
+      const validTarget = Number.isFinite(target) && (long ? target > trade.entryPrice : target < trade.entryPrice);
+      if (validStop && validTarget) {
+        const size = calculatePositionSize({
+          entryPrice: trade.entryPrice,
+          stopLoss: stop,
+          accountSize: this.config.accountSize,
+          riskPct: this.config.maxRiskPerTrade,
+          sizeMultiplier: trade.sizeMultiplier,
+        });
+        if (size > 0) {
+          trade = { ...trade, size, stopLoss: stop, tp1: target, tp2: target };
+          appliedExecution = "native";
+        }
+      }
+    }
     const opened = trader.openPosition({
       symbol: trade.symbol,
       direction: trade.direction,
@@ -298,6 +375,11 @@ class TradingLabService {
       meta: {
         edgeDecision: assessment.edge.decision,
         sizeMultiplier: trade.sizeMultiplier,
+        executionScope,
+        executionMode: appliedExecution,
+        strategyConfidence: strategySignal ? strategySignal.confidence ?? null : null,
+        stopHint: strategySignal ? strategySignal.stopHint ?? null : null,
+        targetHint: strategySignal ? strategySignal.targetHint ?? null : null,
         // Null rather than a guess when the caller did not supply one. A trade
         // with no strategy identity is UNATTRIBUTED and must report as such —
         // the signal bot bridge has no registry strategy at all, and inventing
@@ -320,8 +402,8 @@ class TradingLabService {
 
   // ── Strategy accounts ─────────────────────────────────────────────────────
 
-  // Every registered strategy's account, with the equity and lifecycle facts
-  // the dashboard needs to show why an inactive one is inactive.
+  // Every registered strategy's account, with lifecycle and independent live
+  // demo runner state side by side.
   async strategyAccounts() {
     const accounts = await Promise.all(
       listStrategyAccounts().map(async (account) => {
@@ -330,6 +412,7 @@ class TradingLabService {
           ...account,
           stats: await ledger.getStats(),
           openPositions: ledger.getOpenPositions(),
+          liveResearch: this.liveResearchService ? this.liveResearchService.statusFor(account.id) : null,
         };
       }),
     );
@@ -361,6 +444,7 @@ class TradingLabService {
       regimeMetrics: buildRegimeMatrix(history, startingBalance, { minTrades }),
       history: history.slice(-limit).reverse(),
       totalTrades: history.length,
+      liveResearch: this.liveResearchService ? this.liveResearchService.statusFor(account.id) : null,
     };
   }
 

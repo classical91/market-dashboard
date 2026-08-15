@@ -57,6 +57,7 @@ const { SignalTradeBridge } = require("./services/trading/signal-bridge");
 const { SignalActionStore } = require("./services/trading/signal-action-store");
 const { ExperimentStore } = require("./services/trading/experiment-store");
 const { LiveScannerService } = require("./services/trading/live-scanner");
+const { LiveResearchService } = require("./services/trading/live-research-runner");
 const { WatchlistService } = require("./services/watchlist");
 const { BotCommandsService } = require("./services/bot-commands");
 const { PatternTrackerService } = require("./services/pattern-tracker");
@@ -227,6 +228,17 @@ function createApp() {
     console.warn(`[LiveScanner] Not configured: ${err.message}`);
   }
 
+  const liveResearchService = new LiveResearchService({
+    tradingLabService,
+    candleSource: signalScreenerService,
+    stateCache: new PersistentReporterCache(path.join(dataDir, "live-research-state.json")),
+    enabled: config.liveResearch.enabled,
+    symbol: config.liveResearch.symbol,
+    timeframe: config.liveResearch.timeframe,
+    intervalMs: config.liveResearch.intervalMs,
+  });
+  tradingLabService.attachLiveResearchService(liveResearchService);
+
   const requireAdmin = createRequireAdmin({ adminKey: config.admin.apiKey });
   const siteAuth = createSiteAuth({
     adminKey: config.admin.apiKey,
@@ -343,6 +355,7 @@ function createApp() {
   // used by tests and the build check, which must not leave timers running.
   app.locals.signalBot = signalBotService;
   app.locals.liveScanner = liveScannerService;
+  app.locals.liveResearch = liveResearchService;
 
   return app;
 }

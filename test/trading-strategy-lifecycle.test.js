@@ -92,6 +92,17 @@ test("nothing is real-money eligible", () => {
   assert.deepEqual(listStrategies({ realMoneyEligible: true }), []);
 });
 
+test("live demo research capability is independent of lifecycle promotion", () => {
+  const byId = new Map(listStrategies().map((strategy) => [strategy.id, strategy]));
+  for (const id of ["mindset_v1", "smc_v1", "donchian_breakout_v1", "vwap_reversion_v1"]) {
+    assert.equal(byId.get(id).liveResearchEligible, true, id);
+    assert.ok(byId.get(id).rules && byId.get(id).rules.positionSizing, `${id} has no structured rules`);
+  }
+  assert.equal(byId.get("smc_v1").status, "backtest");
+  assert.equal(byId.get("smc_v1").scannerEligible, false);
+  assert.equal(byId.get("shadow_bananagun_v1").liveResearchEligible, false);
+});
+
 test("scanner eligibility needs capability AND a status that permits it", () => {
   const base = {
     id: "x",

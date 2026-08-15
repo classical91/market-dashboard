@@ -32,3 +32,22 @@ test("Trading Lab UI removes unattributed persistent trade actions", () => {
   assert.match(html, /unattributed, non-persistent analysis context/i);
   assert.match(js, /Research only/);
 });
+
+test("strategy cards separate research status from live demo state and expose Account Activity", () => {
+  const html = read("public/trading-lab.html");
+  const js = read("public/assets/js/trading-lab.js");
+  const css = read("public/assets/styles/trading-lab.css");
+
+  assert.match(html, /Research status and live demo state are separate/i);
+  assert.match(html, /id="tl-activity-shell"/);
+  assert.match(js, /Research: /);
+  assert.match(js, /LIVE DEMO: /);
+  assert.match(js, /What is it doing\?/);
+  assert.match(js, /Current intent/i);
+  assert.match(js, /Decision Pipeline/i);
+  assert.match(js, /How this strategy trades/i);
+  assert.match(js, /Recent Activity/i);
+  assert.match(js, /setInterval/);
+  assert.match(css, /tl-activity-panel/);
+  assert.match(css, /prefers-reduced-motion/);
+});

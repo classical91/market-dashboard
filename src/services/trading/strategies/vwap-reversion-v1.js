@@ -156,6 +156,7 @@ const vwapReversionV1 = {
   status: "backtest",
   supportsBacktest: true,
   supportsLiveScanner: false,
+  supportsLiveResearch: true,
   // A reversion strategy is counter-trend by definition, and the Trading Lab
   // checklist's regime gate is a trend-following house rule that refuses
   // counter-trend entries outright. Without this declaration every signal this
@@ -170,6 +171,19 @@ const vwapReversionV1 = {
   requiredWarmupBars: REQUIRED_WARMUP_BARS,
   warmupFor: warmupForOptions,
   validateOptions,
+
+  describeRules() {
+    return {
+      purpose: "Range-regime mean reversion",
+      looksFor: `Price at least ${VWAP_REVERSION_V1_DEFAULTS.entryAtr} ATR from anchored VWAP, below ADX ${VWAP_REVERSION_V1_DEFAULTS.maxAdx}, after the stretch stalls`,
+      longEntry: "Downside stretch below VWAP that has stopped extending",
+      shortEntry: "Upside stretch above VWAP that has stopped extending",
+      trendFilter: `Range only: ADX must remain below ${VWAP_REVERSION_V1_DEFAULTS.maxAdx}`,
+      stop: `${VWAP_REVERSION_V1_DEFAULTS.stopBufferAtr} ATR beyond the signal bar extreme`,
+      target: "Anchored VWAP",
+      positionSizing: "Trading Lab checklist, edge gate and account-local risk limits; counter-trend declaration waives only the directional regime gate",
+    };
+  },
 
   evaluate(candles, index, context = {}) {
     const options = { ...VWAP_REVERSION_V1_DEFAULTS, ...(context.options || {}) };

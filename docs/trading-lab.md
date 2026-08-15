@@ -34,6 +34,7 @@ follows, and records what happened so the next answer is better informed.
 | `paper_trader.py` | `src/services/trading/paper-trader.js` | TP1/TP2 scale-outs, breakeven stop, gap-aware stop fills, daily/weekly rollover. |
 | — | `src/services/trading/backtest.js` | New: bar replay over the same paper-trading engine. |
 | — | `src/services/trading/strategy-accounts.js` | New: one isolated paper ledger per registered strategy, derived from the registry. |
+| — | `src/services/trading/live-research-runner.js` | Continuous closed-candle demo research, one failure-isolated runner and persisted intent state per compatible strategy. |
 | — | `src/services/trading/regime.js` | New: the market regime engine. Measures the environment; decides nothing. |
 | — | `src/services/trading/regime-metrics.js` | New: the strategy × regime evidence table. |
 | — | `src/services/trading/regime-router.js` | New: advisory strategy selection from that evidence. |
@@ -457,13 +458,13 @@ cards repeat it, and the single-run card prints the applied value beside the
 requested one. `nativeTrades` and `sharedTrades` ride on the payload for
 callers that want the counts. `nativeFallbacks` is unchanged.
 
-| id | version | status | What it is |
-| --- | --- | --- | --- |
-| `mindset_v1` | 1.0.0 | `forward-paper` | The live scanner's strategy — EMA20/EMA50 trend with an RSI band filter. Scanner eligible, **not** real-money eligible. The default. |
-| `smc_v1` | 1.0.0 | `backtest` | Backtest-only Smart Money Concepts approximation (below). Neither scanner nor real-money eligible. |
-| `donchian_breakout_v1` | 1.0.0 | `backtest` | The unoptimised baseline (below): an N-bar channel break with an ATR stop. Exists to be the number other strategies must beat. |
-| `vwap_reversion_v1` | 1.0.0 | `backtest` | The counterweight (below): fades stretched moves back to anchored VWAP, in low-ADX regimes only. |
-| `shadow_bananagun_v1` | 1.0.0 | `experimental` | Banana Gun-style on-chain candidate replay. It is **event replay only**: historical point-in-time candidate and safety snapshots are required, and candle-only performance is refused. |
+| id | version | research status | live demo research | What it is |
+| --- | --- | --- | --- | --- |
+| `mindset_v1` | 1.0.0 | `forward-paper` | candle runner | The live scanner's strategy — EMA20/EMA50 trend with an RSI band filter. Scanner eligible, **not** real-money eligible. The default. |
+| `smc_v1` | 1.0.0 | `backtest` | candle runner | Mechanical Smart Money Concepts approximation. Live demo evidence collection does not promote it. |
+| `donchian_breakout_v1` | 1.0.0 | `backtest` | candle runner | The unoptimised N-bar breakout baseline. Live demo evidence collection does not promote it. |
+| `vwap_reversion_v1` | 1.0.0 | `backtest` | candle runner | The low-ADX mean-reversion counterweight. Live demo evidence collection does not promote it. |
+| `shadow_bananagun_v1` | 1.0.0 | `experimental` | event data required | Banana Gun-style on-chain candidate replay. Historical/live point-in-time candidate and safety snapshots are required; candle execution is refused. |
 
 ### Strategy options and warmup
 
@@ -512,14 +513,15 @@ makes nothing happen; it records what has actually been demonstrated.
 | `real-money-eligible` | Has completed validation and could *potentially* be approved for real-money execution later. |
 | `retired` | No longer active. Kept to reproduce old experiments. |
 
-#### "Live scanner" ≠ "real money"
+#### Research status, live demo research and real money are separate
 
 These are different questions and the codebase keeps them apart, because the
 word "live" answers both and therefore neither:
 
-| computed field | The question it answers | Today |
+| computed field/state | The question it answers | Today |
 | --- | --- | --- |
 | `scannerEligible` | May the **live scanner** run this forward, on live candles, against a **paper** ledger? | `true` for `mindset_v1` |
+| `liveResearchEligible` | May an isolated demo account collect simulated evidence from newly closed candles, without promotion? | `true` for Mindset, SMC, Donchian and VWAP |
 | `realMoneyEligible` | Has this completed validation such that real-money execution could later be approved? | `false` for everything |
 
 A strategy being scanner eligible says **nothing** about real money — that is
@@ -530,8 +532,17 @@ a real order; no code path in this repository can.
 ```js
 scannerEligible   = supportsLiveScanner === true &&
                     ["forward-paper", "real-money-eligible"].includes(status)
+liveResearchEligible = supportsLiveResearch === true && supportsBacktest === true
 realMoneyEligible = status === "real-money-eligible"
 ```
+
+`liveResearchEligible` is a capability, not a promotion claim. Its runner calls
+the registered strategy's existing `evaluate()` contract on fully closed
+candles, persists the last processed close for restart de-duplication, and may
+write only to that strategy's demo ledger through `executeLiveResearch()`.
+`getScannerStrategy()` and ordinary `execute()` keep their lifecycle checks,
+so a `backtest` strategy collecting live demo evidence is still rejected by the
+production scanner path.
 
 Note what is missing from the scanner list: `validated`. Passing the historical
 criteria earns a strategy the right to *be promoted* to `forward-paper`; it is
@@ -735,29 +746,30 @@ trades it does not contain one.
 account with no second list to update — a test asserts the derivation rather than
 trusting it.
 
-Every registered strategy gets an account, including the four that may not trade
-forward. Those sit at their starting balance and display why:
+Every registered strategy gets an account. The cards show two independent
+states: research lifecycle and live demo runner intent.
 
-| Strategy | Status | Account |
+| Strategy | Research status | Live demo |
 | --- | --- | --- |
-| `mindset_v1` | forward-paper | 🟢 Forward Paper |
-| `smc_v1`, `donchian_breakout_v1`, `vwap_reversion_v1` | backtest | ⚪ Backtest Only |
-| `shadow_bananagun_v1` | experimental | 🟡 Event Replay Only |
+| `mindset_v1` | forward-paper | closed-candle runner |
+| `smc_v1`, `donchian_breakout_v1`, `vwap_reversion_v1` | backtest | closed-candle runner |
+| `shadow_bananagun_v1` | experimental | event replay only / waiting for live event data |
 
 BananaGun gets its own label because it cannot even be replayed on candles
 (`supportsBacktest: false`) — "backtest only" would overstate what it can do.
 
-An account confers nothing. The live scanner still resolves what it may run
-through `getScannerStrategy`, which checks lifecycle status and is never handed
-anything from `strategy-accounts.js`. A test asserts every inactive account is
-non-eligible *and* refuses forward trades.
+An account and a running demo confer nothing. The live scanner still resolves
+what it may run through `getScannerStrategy`, which checks lifecycle status.
+The separate live-research resolver checks candle compatibility only and cannot
+place exchange orders or set scanner/real-money eligibility.
 
 ### One resolver, because the gauntlet must read what it writes
 
 `ledgerFor({ strategyId })` decides where a trade lives. A registered strategy
-always resolves to its own account. Forward execution additionally requires a
-lifecycle status that permits forward paper trading; ineligible and unattributed
-execution is refused rather than redirected to Main, Shadow SMC or Alts.
+always resolves to its own account. Forward scanner execution requires a
+lifecycle status that permits forward paper trading; live research execution
+requires the separate candle capability. Both refuse ineligible or unattributed
+execution rather than redirecting it to Main, Shadow SMC or Alts.
 
 There is exactly one of these on purpose. `evaluate()` reads risk state and
 closed-trade history to run kill switches and the edge gate; `execute()` opens the
@@ -780,7 +792,9 @@ isolated by accident, with the separator carrying the guarantee deleted.
 * `GET /api/trading-lab/strategy-accounts` — every account with equity and
   lifecycle state.
 * `GET /api/trading-lab/strategy-accounts/:id` — one account's metrics, regime
-  breakdown, open positions and history, from its own isolated ledger.
+  breakdown, open positions, history, structured current intent, decision trail,
+  rules and activity timeline from its own isolated ledger/runner.
+* `GET /api/trading-lab/live-research` — health and state for every demo runner.
 * `GET /api/trading-lab/books` — archived legacy ledger descriptors for
   compatibility and historical reads only.
 
@@ -1091,6 +1105,7 @@ ledger is admin-gated via `x-admin-key`.
 | GET | `/api/trading-lab/books` | — | Archived Main / Shadow SMC / Alts descriptors. Read-only compatibility. |
 | GET | `/api/trading-lab/strategy-accounts` | — | All isolated strategy accounts with lifecycle and equity state. |
 | GET | `/api/trading-lab/strategy-accounts/:id` | — | One account's positions, history, metrics and isolated regime table. |
+| GET | `/api/trading-lab/live-research` | — | All live demo runner health, candle progress, structured intent and retry state. |
 | GET | `/api/trading-lab/positions?strategyId=` | — | Positions for one strategy account. `book=` remains a legacy read alias. |
 | GET | `/api/trading-lab/history?strategyId=&limit=` | — | One strategy account's closed trades, newest first. `book=` remains a legacy read alias. |
 | GET | `/api/trading-lab/metrics?strategyId=&min_trades=` | — | One strategy account's grouped expectancy leaderboards. |
@@ -1101,7 +1116,7 @@ ledger is admin-gated via `x-admin-key`.
 | POST | `/api/trading-lab/positions` | admin | Evaluate, then open in the supplied lifecycle-eligible `strategyId`; unattributed execution is refused. |
 | POST | `/api/trading-lab/positions/:id/close` | admin | Close the remainder in the supplied strategy account. |
 | POST | `/api/trading-lab/mark` | admin | Mark one supplied strategy account to market; fires any stop/target reached. |
-| GET | `/api/trading-lab/strategies` | — | The strategy catalogue with lifecycle metadata (`version`, `status`, `supportsBacktest`, `supportsEventReplay`, `supportsLiveScanner`, dataset availability, computed `scannerEligible` and `realMoneyEligible`) and the default id. Static, so the UI selector can render before a key is entered. |
+| GET | `/api/trading-lab/strategies` | — | The strategy catalogue with lifecycle metadata, live-research capability, structured rules, dataset availability, and computed `scannerEligible`, `liveResearchEligible` and `realMoneyEligible`. |
 | GET | `/api/trading-lab/experiments?strategy=&version=&symbol=&timeframe=&limit=` | — | Research history, newest first. Read-only: there are no promotion mutations. |
 | GET | `/api/trading-lab/experiments/:id` | — | One experiment record, or 404. |
 | POST | `/api/trading-lab/backtest` | admin | Replay a symbol's candles. Body: `symbol`, `interval`, `strategy` (defaults to `mindset_v1`; an unknown id is a 400), `record` (opt-in experiment, returns `experimentId`), `notes`. Admin-gated despite being read-only: it replays hundreds of bars and pulls candles per call, so it should not be spinnable by anonymous visitors. Writes only to a temp ledger. |

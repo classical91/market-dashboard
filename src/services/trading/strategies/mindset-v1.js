@@ -33,7 +33,21 @@ const mindsetV1 = {
   status: "forward-paper",
   supportsBacktest: true,
   supportsLiveScanner: true,
+  supportsLiveResearch: true,
   requiredWarmupBars: REQUIRED_WARMUP_BARS,
+
+  describeRules() {
+    return {
+      purpose: "Trend-following momentum with a stretch filter",
+      looksFor: `EMA${MINDSET_V1_DEFAULTS.fastLen}/EMA${MINDSET_V1_DEFAULTS.slowLen} trend agreement with RSI inside the permitted entry band`,
+      longEntry: "Fast EMA above slow EMA while RSI is not overextended",
+      shortEntry: "Fast EMA below slow EMA while RSI is not overextended",
+      trendFilter: `EMA${MINDSET_V1_DEFAULTS.fastLen} versus EMA${MINDSET_V1_DEFAULTS.slowLen}`,
+      stop: "Shared Trading Lab ATR stop (this strategy publishes no structural stop)",
+      target: "Shared Trading Lab R-multiple targets",
+      positionSizing: "Trading Lab checklist, edge gate and account-local risk limits",
+    };
+  },
 
   evaluate(candles, index, context = {}) {
     // The lookahead barrier: the strategy sees the decided bar and everything
