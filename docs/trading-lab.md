@@ -83,6 +83,64 @@ quietly passing for a realistic one. Costs are charged per fill, so they weigh
 most on whichever strategy trades most often; that is a real difference between
 strategies, and it belongs in the comparison rather than outside it.
 
+### Cost scenarios
+
+Named friction assumptions, so an experiment records **which** assumption
+produced it rather than three loose decimals a reader has to interpret:
+
+| `costScenario` | Taker fee | Slippage | Funding |
+| --- | ---: | ---: | ---: |
+| `baseline` | 0.06% | 0.02% | excluded |
+| `stress` | 0.10% | 0.05% | excluded |
+| `frictionless` | 0 | 0 | 0 |
+
+`baseline` is the research default: a standard, undiscounted perp taker tier
+with modest slippage — conservative enough that a strategy has to survive
+realistic friction, without being so harsh that it discards strategies that
+would work in practice.
+
+`stress` is a **second run, not a stricter first one**. A strategy that looks
+good under `baseline` *and* survives `stress` is far stronger evidence than one
+tuned around cheap execution; starting at `stress` would reject strategies that
+are fine in reality.
+
+```js
+service.run({ symbol: "BTCUSDT", candles, costScenario: "baseline" });
+```
+
+Omitting `costScenario` uses the deployment's own configured rates, which is
+what every caller got before scenarios existed, and identifies as `null` — a
+custom assumption, honestly labelled rather than mislabelled as a named one.
+
+#### Funding is excluded, and says so
+
+A zero rate is an **excluded** cost, not a neutral one. Printing `funding 0%`
+beside two real rates reads as "funding was accounted for and came to nothing",
+which is the opposite of the truth: no funding feed is wired up, so charging a
+rate would mean inventing one. Every run therefore carries an explicit caveat
+naming each excluded cost, and the cards render it as a tag rather than a
+decimal.
+
+#### Two different things called "funding"
+
+| | What it is | Where it acts |
+| --- | --- | --- |
+| `BACKTEST_FUNDING_RATE_8H` / `costScenario.fundingRate8h` | An **execution cost** charged against P&L while a position is open | `fundingCost()` in the paper trader |
+| `marketContext.fundingRate` | **Market evidence** used for scoring | `scoreSetup()` and the funding kill switch |
+
+Setting the first makes P&L more realistic. It does **not** restore the
+checklist's +5 funding points — only a real current/historical funding feed
+does that. They share a word and nothing else.
+
+#### Configuring a deployment
+
+`BACKTEST_TAKER_FEE_RATE`, `BACKTEST_SLIPPAGE_RATE` and
+`BACKTEST_FUNDING_RATE_8H` are read by `PaperTradingService` for **every** book,
+forward paper included — the `BACKTEST_` prefix is historical. Changing them
+re-prices live paper accounting mid-flight, so it is a deployment decision, not
+a research one. Scenarios exist so a research run can be priced without
+touching it.
+
 Two things make a backtest lie, and both are addressed explicitly:
 
 - **Lookahead.** Indicators and signals at bar *i* are computed from bars

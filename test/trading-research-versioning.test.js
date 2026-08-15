@@ -221,3 +221,109 @@ test("the experiment record carries the evidence and the context it was given", 
   // fed run on the strength of a matching scoringVersion alone.
   assert.deepEqual(bare.marketContextFields, []);
 });
+
+/* ── Cost scenarios ───────────────────────────────────────── */
+
+const {
+  SCENARIOS,
+  getCostScenario,
+  identifyCostScenario,
+  costCaveats,
+} = require("../src/services/trading/cost-scenarios");
+
+test("the baseline scenario is the reviewed standard taker tier", () => {
+  // Pinned, because the whole baseline experiment set is measured under these
+  // and changing them silently would invalidate every stored comparison.
+  assert.equal(SCENARIOS.baseline.takerFeeRate, 0.0006); // 0.06%
+  assert.equal(SCENARIOS.baseline.slippageRate, 0.0002); // 0.02%
+  assert.equal(SCENARIOS.baseline.fundingRate8h, 0);
+
+  // The stress test is a SECOND run, not a stricter first one.
+  assert.equal(SCENARIOS.stress.takerFeeRate, 0.001); // 0.10%
+  assert.equal(SCENARIOS.stress.slippageRate, 0.0005); // 0.05%
+});
+
+test("an unknown cost scenario is a 400 naming it, not a silent default", () => {
+  assert.throws(
+    () => getCostScenario("cheap"),
+    (err) => err.statusCode === 400 && /Unknown cost scenario "cheap"/.test(err.message),
+  );
+});
+
+test("a run charges the scenario it was given and records which one", async () => {
+  const service = new BacktestService({ config: makeTradingConfig() });
+  const candles = choppyCandles(400);
+  const strategy = ({ bars }) => (bars.length % 3 === 0 ? "LONG" : null);
+
+  const baseline = await service.run({
+    symbol: "BTCUSDT", candles, warmupBars: 60, strategy, marketContext: FED_LONG, costScenario: "baseline",
+  });
+  const stress = await service.run({
+    symbol: "BTCUSDT", candles, warmupBars: 60, strategy, marketContext: FED_LONG, costScenario: "stress",
+  });
+
+  assert.equal(baseline.costScenario, "baseline");
+  assert.deepEqual(baseline.costs, { takerFeeRate: 0.0006, slippageRate: 0.0002, fundingRate8h: 0 });
+  assert.equal(stress.costScenario, "stress");
+
+  // The costs are actually charged, not merely reported: identical candles and
+  // an identical strategy under heavier friction must do worse.
+  assert.ok(
+    stress.stats.realizedPnl < baseline.stats.realizedPnl,
+    `stress ${stress.stats.realizedPnl} should be worse than baseline ${baseline.stats.realizedPnl}`,
+  );
+});
+
+test("a zero cost is reported as EXCLUDED, never as a cost that came to nothing", () => {
+  // The distinction the label exists for. No funding feed is wired up, so a
+  // zero funding rate means "not charged", not "charged and negligible", and a
+  // run that quietly printed `funding 0%` beside two real rates would read as
+  // the second.
+  const notes = costCaveats(SCENARIOS.baseline);
+  assert.equal(notes.length, 1);
+  assert.match(notes[0], /Funding was NOT charged/);
+  assert.match(notes[0], /no funding feed is wired up/);
+
+  // Fees and slippage ARE charged under baseline, so they earn no caveat.
+  assert.ok(!notes.some((n) => /fees were NOT/i.test(n)));
+
+  // And a fully frictionless run gets the blunt version instead of three.
+  const free = costCaveats(SCENARIOS.frictionless);
+  assert.equal(free.length, 1);
+  assert.match(free[0], /not evidence of a tradeable edge/);
+});
+
+test("a run carries the excluded-cost caveat into its own caveats", async () => {
+  const service = new BacktestService({ config: makeTradingConfig() });
+  const result = await service.run({
+    symbol: "BTCUSDT",
+    candles: choppyCandles(400),
+    warmupBars: 60,
+    strategy: ({ bars }) => (bars.length % 3 === 0 ? "LONG" : null),
+    marketContext: FED_LONG,
+    costScenario: "baseline",
+  });
+  assert.ok(result.caveats.some((c) => /Funding was NOT charged/.test(c)));
+});
+
+test("custom deployment rates identify as no named scenario, honestly", () => {
+  assert.equal(identifyCostScenario({ takerFeeRate: 0.0006, slippageRate: 0.0002, fundingRate8h: 0 }), "baseline");
+  assert.equal(identifyCostScenario({ takerFeeRate: 0.0007, slippageRate: 0.0002, fundingRate8h: 0 }), null);
+  assert.equal(identifyCostScenario(null), null);
+});
+
+test("the experiment record carries the cost scenario it was priced under", async () => {
+  const service = new BacktestService({ config: makeTradingConfig() });
+  const result = await service.run({
+    symbol: "BTCUSDT",
+    candles: choppyCandles(400),
+    warmupBars: 60,
+    strategy: ({ bars }) => (bars.length % 3 === 0 ? "LONG" : null),
+    marketContext: FED_LONG,
+    costScenario: "stress",
+  });
+
+  const record = buildExperimentRecord(result);
+  assert.equal(record.costScenario, "stress");
+  assert.equal(record.costs.takerFeeRate, 0.001);
+});

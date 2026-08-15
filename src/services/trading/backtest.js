@@ -40,6 +40,7 @@ const {
   assertValidOptions,
 } = require("./strategies");
 const { summarizeRun, costSummary } = require("./run-summary");
+const { getCostScenario, identifyCostScenario, costCaveats } = require("./cost-scenarios");
 const { buildExperimentRecord } = require("./experiment-record");
 const {
   STRATEGY_ID: BANANAGUN_STRATEGY_ID,
@@ -560,8 +561,23 @@ class BacktestService {
     // recorded on the result, so a run that scored with macro context is never
     // mistaken for one that did not.
     marketContext = null,
+    // A named execution-cost assumption ("baseline", "stress", ...). Omitted
+    // means the deployment's own configured rates, which is what every caller
+    // got before scenarios existed.
+    costScenario = null,
   }) {
     assertValidExecutionMode(executionMode);
+    // Resolved before anything else so an unknown scenario is a 400 naming it
+    // rather than a run completed under the wrong friction.
+    const scenario = costScenario ? getCostScenario(costScenario) : null;
+    const runConfig = scenario
+      ? {
+          ...this.config,
+          takerFeeRate: scenario.takerFeeRate,
+          slippageRate: scenario.slippageRate,
+          fundingRate8h: scenario.fundingRate8h,
+        }
+      : this.config;
     const resolved = resolveStrategy(strategy);
     if (resolved.definition.supportsBacktest === false) {
       throw Object.assign(
@@ -617,7 +633,7 @@ class BacktestService {
     // from rolling this historical book over onto today's date.
     const trader = new PaperTradingService({
       book: "backtest",
-      config: this.config,
+      config: runConfig,
       storage: new MemoryStorage(),
       clock: bars[0].closeTime,
     });
@@ -682,6 +698,7 @@ class BacktestService {
           executionMode,
           at: bar.closeTime,
           marketContext,
+          config: runConfig,
         });
         if (outcome.opened) {
           if (outcome.appliedMode === "native") nativeTrades += 1;
@@ -733,7 +750,11 @@ class BacktestService {
       from: bars[warmup].closeTime,
       to: bars[bars.length - 1].closeTime,
       options: opts,
-      costs: costSummary(this.config),
+      costs: costSummary(runConfig),
+      // Which named assumption produced these numbers, or null for a
+      // deployment's own custom rates. Recorded so a stored result says
+      // "baseline" rather than leaving a reader to compare three decimals.
+      costScenario: identifyCostScenario(costSummary(runConfig)),
       stats,
       metrics: buildStrategyMetrics(trader.getHistory(), account.startingBalance),
       trades: trader.getHistory(),
@@ -761,6 +782,10 @@ class BacktestService {
       scoringVersion: SCORING_VERSION,
       evidence: summarizeEvidence(scored),
       caveats: [
+        // A zero rate is an EXCLUDED cost, not a neutral one, and a run that
+        // excluded one has to say which — otherwise its expectancy quietly
+        // reads as though everything was accounted for.
+        ...costCaveats(costSummary(runConfig)),
         // Surfaced rather than hidden: with long and short positions open on
         // the same symbol at once, one intra-bar ordering cannot be
         // pessimistic for both sides.
@@ -802,7 +827,11 @@ class BacktestService {
     at = null,
     // Caller-supplied market context — see run(). Null means "candles only".
     marketContext = null,
+    // The config this run is using, which differs from the service's when a
+    // named cost scenario was requested.
+    config = null,
   }) {
+    const runConfig = config || this.config;
     const signalSource = `backtest:${strategyId}:${interval}`;
     const state = marketState({
       ...stateFromContext(context, marketContext),
@@ -811,7 +840,7 @@ class BacktestService {
     const checklist = runChecklist(
       { symbol, direction, price: context.close, atr: context.atr, allowCounterTrend },
       state,
-      this.config,
+      runConfig,
     );
 
     const account = trader.getAccount({ at });
@@ -821,7 +850,7 @@ class BacktestService {
       strategy: signalSource,
       symbol,
       score: checklist.confidenceScore,
-      config: this.config,
+      config: runConfig,
     });
 
     const sizeMultiplier = checklist.sizeMultiplier * edge.sizeMultiplier;
@@ -836,7 +865,7 @@ class BacktestService {
       entryPrice: context.close,
       atr: context.atr,
       sizeMultiplier,
-      config: this.config,
+      config: runConfig,
     });
     if (!trade.ok) return { opened: false, reasons: [...reasons, trade.reason] };
 
@@ -854,8 +883,8 @@ class BacktestService {
         const size = calculatePositionSize({
           entryPrice: trade.entryPrice,
           stopLoss: native.stop,
-          accountSize: this.config.accountSize,
-          riskPct: this.config.maxRiskPerTrade,
+          accountSize: runConfig.accountSize,
+          riskPct: runConfig.maxRiskPerTrade,
           sizeMultiplier,
         });
         if (size > 0) {
@@ -939,6 +968,8 @@ class BacktestService {
     executionMode = "shared",
     // See run(). Omitted means candles only.
     marketContext = null,
+    // See run(). Omitted means the deployment's own configured rates.
+    costScenario = null,
   } = {}) {
     // Resolve the strategy BEFORE fetching: a typo should come back as a 400
     // immediately, not as whatever the candle source happened to do first.
@@ -967,6 +998,7 @@ class BacktestService {
       strategy: resolved,
       executionMode,
       marketContext,
+      costScenario,
     });
     return record ? this.recordExperiment(result, { notes }) : result;
   }
@@ -1006,6 +1038,9 @@ class BacktestService {
     // with macro context beside one scored without it would not be a
     // comparison.
     marketContext = null,
+    // Applied identically to every strategy too: rows priced under different
+    // friction would not be a comparison.
+    costScenario = null,
     // Rows below this many closed trades are reported but NOT ranked. The
     // default of 1 only excludes strategies that never traded; a real
     // statistical threshold is a promotion-policy decision and belongs with
@@ -1040,6 +1075,7 @@ class BacktestService {
           strategy: id,
           executionMode,
           marketContext,
+          costScenario,
         });
       }
       // The curve rides ALONGSIDE the summary, not inside it: summarizeRun is
@@ -1058,6 +1094,7 @@ class BacktestService {
       interval,
       executionMode,
       marketContextFields: Object.keys(marketContext || {}).sort(),
+      costScenario,
       minRankedTrades,
       ranAt: new Date().toISOString(),
       results: rankRows(rows, minRankedTrades),

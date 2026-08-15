@@ -136,6 +136,7 @@ function buildExperimentRecord(result, meta = {}) {
     // different experiment.
     options: result.options || {},
     costs: summary.costs || null,
+    costScenario: summary.costScenario || null,
     // What market context the run was given beyond the candles. A run scored
     // with a real daily or funding feed is not comparable with a candles-only
     // one, and this is how a stored record says which it was.
