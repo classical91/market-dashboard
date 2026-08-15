@@ -769,6 +769,44 @@
     return mode === "native" ? "native strategy exits" : "shared execution";
   }
 
+  // What a row ACTUALLY ran on, which is a different question from what the
+  // comparison asked for. A strategy that publishes no stop/target hints falls
+  // back to shared levels trade by trade, so a row inside a run headed "native
+  // strategy exits" can be a shared-execution result from top to bottom. The
+  // header is not the place to find that out; the row is.
+  function appliedExecutionLabel(applied) {
+    if (applied === "native") return "Native";
+    if (applied === "shared-fallback") return "Shared fallback";
+    if (applied === "mixed") return "Mixed";
+    if (applied === "none") return "—";
+    return "Shared";
+  }
+
+  // Only the states a reader could misread need calling out. "Shared" under a
+  // shared run and "Native" under a native one are the expected cases.
+  function appliedExecutionTitle(r) {
+    if (r.executionApplied === "shared-fallback") {
+      return "Requested native, but " + (r.strategy || "this strategy") +
+        " published no usable stop/target — every trade used shared levels";
+    }
+    if (r.executionApplied === "mixed") {
+      return r.nativeTrades + " trade(s) used the strategy's own levels, " +
+        r.sharedTrades + " fell back to shared levels";
+    }
+    return "";
+  }
+
+  function appliedExecutionCell(r) {
+    var label = appliedExecutionLabel(r.executionApplied);
+    var warn = r.executionApplied === "shared-fallback" || r.executionApplied === "mixed";
+    var title = appliedExecutionTitle(r);
+    return (
+      (warn ? '<span class="tl-tag" title="' + escapeHtml(title) + '">' : "<span>") +
+      escapeHtml(label) +
+      "</span>"
+    );
+  }
+
   function renderBacktest(data) {
     if (data.status === "insufficient-data") {
       btResult.innerHTML =
@@ -826,6 +864,12 @@
       " · " + escapeHtml(data.symbol) + " " + escapeHtml(data.interval) +
       " · " + data.bars + " bars (" + data.warmupBars + " warmup)" +
       " · " + escapeHtml(executionModeLabel(data.executionMode)) +
+      // Requested mode above, applied execution here — they differ whenever a
+      // strategy publishes no usable levels, and the difference is the whole
+      // meaning of the numbers on this card.
+      (data.executionApplied && data.executionApplied !== "none"
+        ? " (applied: " + escapeHtml(appliedExecutionLabel(data.executionApplied)) + ")"
+        : "") +
       " · " + fmtTime(data.from) + " → " + fmtTime(data.to) +
       "</div>" +
       costsLine(data.costs) +
@@ -916,6 +960,7 @@
             ? ' <span class="tl-tag">unranked: ' + escapeHtml(r.unrankedReason || "no trades") + "</span>"
             : "") +
           "</small></td>" +
+          compareCell(appliedExecutionCell(r), "", "Execution") +
           compareCell(r.bars + " <small>(" + r.warmupBars + " warmup)</small>", "", "Bars") +
           compareCell(r.status === "insufficient-data" ? "insufficient data" : escapeHtml(r.replayType || "candle"), "", "Replay") +
           compareCell(r.signals, "", "Signals") +
@@ -982,6 +1027,11 @@
               ? r.closedTrades + " trades &middot; " +
                 (r.closedTrades ? (r.expectancyR > 0 ? "+" : "") + escapeHtml(String(r.expectancyR)) + "R" : "no expectancy")
               : escapeHtml(r.replayType || "candle") + " replay") +
+            // The facets are what most readers scan first, so the applied
+            // execution rides here too rather than only in the table below.
+            (r.executionApplied && r.executionApplied !== "none"
+              ? " &middot; " + escapeHtml(appliedExecutionLabel(r.executionApplied))
+              : "") +
             "</div></div>"
           );
         })
@@ -995,7 +1045,7 @@
     btCompareResult.innerHTML =
       facets +
       '<div class="de-table-wrap"><table class="de-table tl-compare-table"><thead><tr>' +
-      "<th>Strategy</th><th>Bars</th><th>Replay</th><th>Signals</th><th>Closed</th><th>Net P&amp;L</th>" +
+      "<th>Strategy</th><th>Execution</th><th>Bars</th><th>Replay</th><th>Signals</th><th>Closed</th><th>Net P&amp;L</th>" +
       "<th>Expectancy</th><th>Profit factor</th><th>Max DD</th><th>Win rate</th><th>Worst streak</th>" +
       "</tr></thead><tbody>" + body + "</tbody></table></div>" +
       '<div class="tl-bt-meta">' + escapeHtml(data.symbol) + " " + escapeHtml(data.interval) +

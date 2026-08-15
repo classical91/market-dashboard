@@ -9,10 +9,14 @@ const path = require("node:path");
 const {
   BacktestService,
   contextAtBar,
+  buildContextSeries,
+  atrSeries,
+  appliedExecution,
   trendBreakoutStrategy,
   downsampleCurve,
   rankRows,
 } = require("../src/services/trading/backtest");
+const { atr } = require("../src/services/decision-engine");
 const { makeTradingConfig } = require("../src/services/trading/config");
 const { summarizeRun } = require("../src/services/trading/run-summary");
 const { listStrategies } = require("../src/services/trading/strategies");
@@ -76,18 +80,28 @@ function onlyAtEntryBar(direction) {
   return ({ bars }) => (bars.length === WARMUP ? direction : null);
 }
 
-async function captureBacktestDirs(fn) {
-  const original = fs.mkdtempSync;
-  const dirs = [];
-  fs.mkdtempSync = function patchedMkdtempSync(prefix, ...args) {
-    const dir = original.call(fs, prefix, ...args);
-    if (String(prefix).includes("md-backtest-")) dirs.push(dir);
-    return dir;
+// Record every filesystem write attempted while `fn` runs. A backtest must
+// make none: its ledger is in memory, which is both the isolation guarantee
+// (it cannot reach the live books if it cannot write at all) and the
+// performance one.
+async function captureWrites(fn) {
+  const originals = {
+    writeFileSync: fs.writeFileSync,
+    mkdirSync: fs.mkdirSync,
+    mkdtempSync: fs.mkdtempSync,
+    renameSync: fs.renameSync,
   };
+  const writes = [];
+  for (const name of Object.keys(originals)) {
+    fs[name] = function patched(target, ...args) {
+      writes.push(`${name}:${target}`);
+      return originals[name].call(fs, target, ...args);
+    };
+  }
   try {
-    await fn(dirs);
+    await fn(writes);
   } finally {
-    fs.mkdtempSync = original;
+    Object.assign(fs, originals);
   }
 }
 
@@ -124,21 +138,25 @@ test("a backtest reports the execution cost assumptions it used", async () => {
   });
 });
 
-test("a backtest never touches the live books and leaves no temp ledger behind", async () => {
+test("a backtest never touches the live books, and writes nothing at all", async () => {
   const service = makeService();
 
-  await captureBacktestDirs(async (dirs) => {
+  await captureWrites(async (writes) => {
     const result = await service.run({ symbol: "BTCUSDT", candles: risingCandles(200) });
     assert.ok(result.stats);
-    assert.ok(dirs.length > 0);
-    dirs.forEach((dir) => assert.equal(fs.existsSync(dir), false));
+    assert.ok(result.trades.length >= 0);
+    // Not "cleans up after itself" — never creates anything to clean up. The
+    // run's ledger is a MemoryStorage, so there is no temp directory, no
+    // window in which a crash could strand one, and no path by which a
+    // backtest could address a live book's files.
+    assert.deepEqual(writes, []);
   });
 });
 
-test("the temp ledger is cleaned up even when the run throws", async () => {
+test("a run that throws still leaves nothing on disk", async () => {
   const service = makeService();
 
-  await captureBacktestDirs(async (dirs) => {
+  await captureWrites(async (writes) => {
     await assert.rejects(() =>
       service.run({
         symbol: "BTCUSDT",
@@ -148,8 +166,7 @@ test("the temp ledger is cleaned up even when the run throws", async () => {
         },
       }),
     );
-    assert.ok(dirs.length > 0);
-    dirs.forEach((dir) => assert.equal(fs.existsSync(dir), false));
+    assert.deepEqual(writes, []);
   });
 });
 
@@ -182,13 +199,44 @@ test("context at a bar is unaffected by anything after it", () => {
   const candles = risingCandles(120);
   const options = { trendFast: 21, trendSlow: 55, macdFast: 12, macdSlow: 26, macdSignal: 9 };
 
+  // Bar 80 as computed by a caller who has ONLY the first 80 bars.
   const truncated = contextAtBar(candles.slice(0, 80), options);
-  // Same 80 bars, but with 40 more appended afterwards — the extra bars must
-  // not change what was knowable at bar 80.
-  const withFuture = contextAtBar(candles.slice(0, 80), options);
+
+  // Bar 80 as computed from the full 120-bar array via the precomputed series
+  // the runner uses. The extra 40 bars exist, are in the same array, and have
+  // already been walked by every series — and must still not change a single
+  // value that was knowable at bar 80.
+  const series = buildContextSeries(candles, options);
+  const withFuture = contextAtBar(candles, options, { index: 79, series });
 
   assert.deepEqual(truncated, withFuture);
   assert.equal(truncated.close, candles[79].close);
+
+  // And a future that is not merely more of the same: a violent spike after
+  // bar 80 would move any indicator that leaked backwards.
+  const spiked = candles.slice(0, 120).map((bar, i) =>
+    i >= 80 ? { ...bar, high: bar.high * 5, low: bar.low / 5, close: bar.close * 3 } : bar,
+  );
+  const afterSpike = contextAtBar(spiked, options, {
+    index: 79,
+    series: buildContextSeries(spiked, options),
+  });
+  assert.deepEqual(afterSpike, truncated);
+});
+
+test("the ATR series equals a prefix recomputation at every bar", () => {
+  // The optimisation that makes the runner linear rests entirely on this
+  // equality, so it is asserted directly rather than inferred.
+  const candles = risingCandles(200).map((bar, i) => ({
+    ...bar,
+    high: bar.high + (i % 7) * 0.3,
+    low: bar.low - (i % 5) * 0.4,
+  }));
+  const series = atrSeries(candles, 14);
+
+  for (let i = 0; i < candles.length; i += 1) {
+    assert.equal(series[i], atr(candles.slice(0, i + 1), 14), `ATR mismatch at bar ${i}`);
+  }
 });
 
 test("entries fill at the signalling bar's close, never at a later price", async () => {
@@ -243,7 +291,16 @@ test("a short's adverse extreme is the high, and it is tested first", async () =
   const candles = makeCandles(WARMUP + 1, (i) => {
     if (i < WARMUP) {
       const close = 110 - i * 0.1;
-      return { open: close, high: close + 0.5, low: close - 0.5, close, volume: 1000 };
+      // Volume on the SIGNALLING bar (the last warmup bar, where this test's
+      // strategy fires), not decoration. Shorts score lower than longs through
+      // the checklist's macro block — a non-bear market withholds credit from
+      // them — and since the daily-bias block stopped paying same-timeframe
+      // trend as higher-timeframe confirmation, a with-trend short no longer
+      // clears the 50-point floor on the strength of the trend alone. This bar
+      // earns the full volume block instead, so the test goes on measuring
+      // what it is about — which intra-bar extreme is tested first — rather
+      // than whether a setup happens to be sized at all.
+      return { open: close, high: close + 0.5, low: close - 0.5, close, volume: i === WARMUP - 1 ? 2000 : 1000 };
     }
     return { open: 104, high: 120, low: 90, close: 95, volume: 1000 };
   });
@@ -460,15 +517,18 @@ test("the default strategy only fires on a breakout of the PRIOR range", () => {
   const options = { breakoutLookback: 20, trendFast: 21, trendSlow: 55 };
 
   // Inside the prior range with no trend read — nothing to do.
-  assert.equal(trendBreakoutStrategy({ bars, context: { trendUp: null, close: 100 }, options }), null);
+  assert.equal(trendBreakoutStrategy({ bars, context: { timeframeTrendUp: null, close: 100 }, options }), null);
   // Above the prior high, but the trend is down — the rule does not fade.
-  assert.equal(trendBreakoutStrategy({ bars, context: { trendUp: false, close: 110 }, options }), null);
+  assert.equal(trendBreakoutStrategy({ bars, context: { timeframeTrendUp: false, close: 110 }, options }), null);
   // Above the prior high with an up trend.
-  assert.equal(trendBreakoutStrategy({ bars, context: { trendUp: true, close: 110 }, options }), "LONG");
+  assert.equal(trendBreakoutStrategy({ bars, context: { timeframeTrendUp: true, close: 110 }, options }), "LONG");
   // Below the prior low with a down trend.
-  assert.equal(trendBreakoutStrategy({ bars, context: { trendUp: false, close: 90 }, options }), "SHORT");
+  assert.equal(trendBreakoutStrategy({ bars, context: { timeframeTrendUp: false, close: 90 }, options }), "SHORT");
   // Matching the prior high exactly is not a break of it.
-  assert.equal(trendBreakoutStrategy({ bars, context: { trendUp: true, close: 101 }, options }), null);
+  assert.equal(trendBreakoutStrategy({ bars, context: { timeframeTrendUp: true, close: 101 }, options }), null);
+  // It reads the timeframe's own trend and nothing else: a higher-timeframe
+  // field is not a substitute for the one this rule is defined on.
+  assert.equal(trendBreakoutStrategy({ bars, context: { htfTrendUp: true, close: 110 }, options }), null);
 });
 
 test("backtestSymbol reports clearly when no candle source is wired up", async () => {

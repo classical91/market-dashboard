@@ -17,6 +17,16 @@
 //
 // A `book` names an isolated set of positions/history/account — Main, Shadow
 // and Alts are books, not separate services.
+//
+// Two things this service is deliberately parameterised over, because a
+// historical replay needs both to differ from a forward paper run while every
+// line of accounting and fill logic stays identical:
+//
+//   Storage. Where the ledger lives — on disk for a real book, in memory for a
+//   backtest. See the adapters below.
+//
+//   Time. When "now" is. A forward book books a trade at wall-clock time; a
+//   replay books it at the timestamp of the candle being replayed. See `clock`.
 
 const fs = require("fs");
 const path = require("path");
@@ -29,6 +39,92 @@ const { resolveDataDir } = require("../../utils/data-dir");
 // Sizes below this are treated as fully closed — float residue from a
 // fractional scale-out must not leave a dust position open forever.
 const DUST_SIZE = 1e-9;
+
+// ── Storage adapters ────────────────────────────────────────────────────────
+//
+// The ledger is read and rewritten several times per replayed bar — positions
+// on every mark-to-market, the account on every credit, the whole history on
+// every edge-gate check. On disk that is fine at forward-paper rates (a handful
+// of writes a minute) and ruinous at backtest rates (tens of thousands of
+// synchronous reads and writes per run).
+//
+// So storage is an adapter, and a backtest passes the in-memory one. What it is
+// NOT is a second execution engine: fills, scale-outs, fees and accounting all
+// still run through the code below, which is the whole reason a backtest and a
+// forward run agree.
+
+class FileStorage {
+  constructor(dir) {
+    this.dir = dir;
+  }
+
+  read(file, fallback) {
+    try {
+      const content = fs.readFileSync(file, "utf8").trim();
+      if (!content) return fallback;
+      return JSON.parse(content);
+    } catch {
+      // Missing or corrupted file — fall back and let the next save fix it.
+      return fallback;
+    }
+  }
+
+  write(file, data) {
+    fs.mkdirSync(this.dir, { recursive: true });
+    const tmp = `${file}.tmp`;
+    // Write-then-rename so a crash mid-write cannot leave a half-written
+    // ledger behind.
+    fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
+    fs.renameSync(tmp, file);
+  }
+}
+
+// A deep copy with JSON's semantics, which is what a round trip through
+// FileStorage is: plain objects and arrays are rebuilt, primitives are carried
+// over, and keys whose value is `undefined` are DROPPED — JSON.stringify omits
+// them, so an in-memory book that kept them would diverge from an on-disk one
+// at exactly the spread-and-backfill in getAccount(), where an explicit
+// `undefined` overrides a default and a missing key does not.
+//
+// Hand-rolled because this is the hot path of every backtest and the built-ins
+// are not close: over a realistic 120-trade history, structuredClone costs
+// about 2.3× this and a JSON.parse(JSON.stringify()) round trip about 4.8×.
+function cloneJson(value) {
+  if (value === null || typeof value !== "object") return value;
+  if (Array.isArray(value)) {
+    const out = new Array(value.length);
+    for (let i = 0; i < value.length; i += 1) out[i] = cloneJson(value[i]);
+    return out;
+  }
+  const out = {};
+  for (const key of Object.keys(value)) {
+    const v = value[key];
+    if (v === undefined) continue;
+    out[key] = v === null || typeof v !== "object" ? v : cloneJson(v);
+  }
+  return out;
+}
+
+// Reads hand back a DEEP COPY, exactly as a round trip through the filesystem
+// would, and writes snapshot what they were given. That is not an optimisation
+// left on the table, it is the point: callers mutate what they read and save it
+// back, and handing two callers the same object would give the in-memory book
+// different aliasing behaviour from the on-disk one. The adapters have to be
+// interchangeable or a backtest is no longer evidence about the live engine.
+class MemoryStorage {
+  constructor() {
+    this.entries = new Map();
+  }
+
+  read(key, fallback) {
+    if (!this.entries.has(key)) return fallback;
+    return cloneJson(this.entries.get(key));
+  }
+
+  write(key, data) {
+    this.entries.set(key, cloneJson(data));
+  }
+}
 
 function nowIso() {
   return new Date().toISOString();
@@ -63,7 +159,19 @@ function isoWeek(date = new Date()) {
 }
 
 class PaperTradingService {
-  constructor({ dataDir = resolveDataDir(), book = "main", config = getTradingConfig(), priceFeed = null } = {}) {
+  constructor({
+    dataDir = resolveDataDir(),
+    book = "main",
+    config = getTradingConfig(),
+    priceFeed = null,
+    // Defaults to the filesystem. A backtest passes `new MemoryStorage()`.
+    storage = null,
+    // The service's idea of "now". `null` means wall-clock time, which is what
+    // every forward paper book uses. A replay sets this to the timestamp of the
+    // bar being replayed so daily/weekly rollover, kill-switch cool-offs and
+    // funding all happen on historical time.
+    clock = null,
+  } = {}) {
     this.book = String(book).replace(/[^a-z0-9_-]/gi, "").toLowerCase() || "main";
     this.config = config;
     this.priceFeed = priceFeed;
@@ -71,34 +179,54 @@ class PaperTradingService {
     this.positionsFile = path.join(this.dir, "positions.json");
     this.accountFile = path.join(this.dir, "account.json");
     this.historyFile = path.join(this.dir, "history.json");
+    this.storage = storage || new FileStorage(this.dir);
+    this.clock = clock;
+  }
+
+  // ── Time ──────────────────────────────────────────────────────────────────
+
+  /**
+   * Resolve the instant an accounting event happened at, in priority order:
+   * the explicit `at` the caller passed, then the service clock, then the wall
+   * clock.
+   *
+   * The service clock exists as a backstop rather than as the interface. Every
+   * accounting entry point below takes an explicit `at`, and a replay passes it
+   * — but this class is read and written from a dozen places, and a single call
+   * site that forgets would silently roll a historical book over onto today's
+   * date and zero the loss buckets it was supposed to be enforcing. A missed
+   * `at` under a set clock is merely redundant; a missed `at` without one is a
+   * wrong number nobody sees.
+   */
+  now(at = null) {
+    if (at !== undefined && at !== null) return isoFrom(at);
+    if (this.clock !== null && this.clock !== undefined) return isoFrom(this.clock);
+    return nowIso();
+  }
+
+  // Move simulated time. Called once per replayed bar; a no-op for forward
+  // books, which never touch it.
+  setClock(at) {
+    this.clock = at === undefined ? null : at;
+    return this.clock;
   }
 
   // ── Storage ───────────────────────────────────────────────────────────────
 
-  load(file, fallback) {
-    try {
-      const content = fs.readFileSync(file, "utf8").trim();
-      if (!content) return fallback;
-      return JSON.parse(content);
-    } catch {
-      // Missing or corrupted file — fall back and let the next save fix it.
-      return fallback;
-    }
+  load(key, fallback) {
+    return this.storage.read(key, fallback);
   }
 
-  save(file, data) {
-    fs.mkdirSync(this.dir, { recursive: true });
-    const tmp = `${file}.tmp`;
-    // Write-then-rename so a crash mid-write cannot leave a half-written
-    // ledger behind.
-    fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
-    fs.renameSync(tmp, file);
+  save(key, data) {
+    this.storage.write(key, data);
   }
 
   // ── Account ───────────────────────────────────────────────────────────────
 
-  newAccount() {
+  newAccount({ at = null } = {}) {
     const balance = this.config.accountSize;
+    const created = this.now(at);
+    const when = new Date(created);
     return {
       book: this.book,
       balance,
@@ -106,28 +234,62 @@ class PaperTradingService {
       realizedPnl: 0,
       dailyPnl: 0,
       weeklyPnl: 0,
-      dailyDate: utcDay(),
-      weekStart: isoWeek(),
+      dailyDate: utcDay(when),
+      weekStart: isoWeek(when),
       totalTrades: 0,
       wins: 0,
       losses: 0,
       consecutiveLosses: 0,
-      created: nowIso(),
-      lastUpdated: nowIso(),
+      created,
+      lastUpdated: created,
     };
   }
 
-  // Zero the daily/weekly P&L buckets when the UTC day or ISO week has turned
-  // over. Without this a loss from weeks ago keeps feeding today's kill
-  // switches. Returns true when anything was reset.
-  applyRollover(account) {
+  /**
+   * Zero the daily/weekly P&L buckets when the UTC day or ISO week has turned
+   * over, as of `at`. Without this a loss from weeks ago keeps feeding today's
+   * kill switches — and in a replay, "weeks ago" is measured in replayed time,
+   * not in how long ago the backtest was started.
+   *
+   * The consecutive-loss breaker cools off here too. See the comment on the
+   * cool-off block below for why that is a rollover concern and not a
+   * per-trade one.
+   *
+   * Returns true when anything was reset.
+   */
+  applyRollover(account, at = null) {
     let changed = false;
-    const day = utcDay();
-    const week = isoWeek();
+    const when = new Date(this.now(at));
+    const day = utcDay(when);
+    const week = isoWeek(when);
 
     if (account.dailyDate !== day) {
       account.dailyPnl = 0;
       account.dailyDate = day;
+
+      // ── Consecutive-loss cool-off ───────────────────────────────────────
+      //
+      // Without this the breaker is an ABSORBING STATE. It blocks new entries
+      // once the streak hits the limit, and the streak is only cleared by a
+      // winning trade — which can only come from a trade that is no longer
+      // allowed to open. Forward, that means a paper book quietly stops
+      // trading forever after three losses; in a replay it means every bar
+      // after the third loss is refused and the run's headline numbers
+      // describe the first few days of the sample rather than the sample.
+      //
+      // So the breaker is a COOLING-OFF PERIOD, not a permanent halt: it
+      // blocks for the rest of the session it fired in, and the streak is
+      // cleared at the next UTC day boundary. Set CONSECUTIVE_LOSS_COOLOFF
+      // ="never" to restore the absorbing behaviour deliberately — the point
+      // is that whichever one is in force is a stated policy rather than an
+      // accident of which code path ran.
+      if (
+        this.config.consecutiveLossCooloff === "next-day" &&
+        account.consecutiveLosses >= this.config.maxConsecutiveLosses
+      ) {
+        account.consecutiveLosses = 0;
+        account.lastCooloffDate = day;
+      }
       changed = true;
     }
     if (account.weekStart !== week) {
@@ -138,22 +300,22 @@ class PaperTradingService {
     return changed;
   }
 
-  getAccount() {
+  getAccount({ at = null } = {}) {
     const stored = this.load(this.accountFile, null);
     if (!stored) {
-      const account = this.newAccount();
+      const account = this.newAccount({ at });
       this.save(this.accountFile, account);
       return account;
     }
 
     // Backfill fields added after the account file was first written.
-    const account = { ...this.newAccount(), ...stored };
-    if (this.applyRollover(account)) this.saveAccount(account);
+    const account = { ...this.newAccount({ at }), ...stored };
+    if (this.applyRollover(account, at)) this.saveAccount(account, { at });
     return account;
   }
 
-  saveAccount(account) {
-    account.lastUpdated = nowIso();
+  saveAccount(account, { at = null } = {}) {
+    account.lastUpdated = this.now(at);
     this.save(this.accountFile, account);
     return account;
   }
@@ -228,7 +390,9 @@ class PaperTradingService {
 
     const filledEntryPrice = this.slippageAdjustedPrice(direction, entryPrice, "entry");
     const entryFee = this.executionFee(filledEntryPrice, size);
-    if (entryFee) this.creditAccount(-entryFee);
+    // The fee lands on the day the position OPENED, which in a replay is the
+    // candle's day rather than today.
+    if (entryFee) this.creditAccount(-entryFee, { at: openedAt });
 
     const position = {
       id: `PT${Date.now()}${Math.floor(Math.random() * 1000)}`,
@@ -260,7 +424,7 @@ class PaperTradingService {
       signalSource,
       meta,
       status: "open",
-      openedAt: isoFrom(openedAt),
+      openedAt: this.now(openedAt),
       closedAt: null,
       closeReason: null,
     };
@@ -300,13 +464,15 @@ class PaperTradingService {
   }
 
   // Apply realized P&L to the account, rolling the daily/weekly buckets first.
-  creditAccount(pnl) {
-    const account = this.getAccount();
+  // `at` is when the P&L was realized — a candle close during a replay — and it
+  // decides which day and which week the money lands in.
+  creditAccount(pnl, { at = null } = {}) {
+    const account = this.getAccount({ at });
     account.balance = round(account.balance + pnl);
     account.realizedPnl = round(account.realizedPnl + pnl);
     account.dailyPnl = round(account.dailyPnl + pnl);
     account.weeklyPnl = round(account.weeklyPnl + pnl);
-    return this.saveAccount(account);
+    return this.saveAccount(account, { at });
   }
 
   // Realize P&L on `size` units and bank it. Does not decide whether the
@@ -315,7 +481,7 @@ class PaperTradingService {
     const fillPrice = this.slippageAdjustedPrice(pos.direction, exitPrice, "exit");
     const grossPnl = round(PaperTradingService.pnlFor(pos, fillPrice, size));
     const exitFee = this.executionFee(fillPrice, size);
-    const funding = this.fundingCost(pos, size, at || nowIso());
+    const funding = this.fundingCost(pos, size, this.now(at));
     const pnl = round(grossPnl - exitFee - funding);
     pos.remainingSize = Math.max(0, round(pos.remainingSize - size, 10));
     pos.size = pos.remainingSize;
@@ -333,9 +499,9 @@ class PaperTradingService {
       fee: exitFee,
       funding,
       pnl,
-      at: isoFrom(at),
+      at: this.now(at),
     });
-    this.creditAccount(pnl);
+    this.creditAccount(pnl, { at });
     return pnl;
   }
 
@@ -359,7 +525,7 @@ class PaperTradingService {
     pos.remainingSize = 0;
     pos.size = 0;
     pos.unrealizedPnl = 0;
-    pos.closedAt = isoFrom(opts.at);
+    pos.closedAt = this.now(opts.at);
     pos.closeReason = reason;
     pos.exitPrice = pos.exits.length ? pos.exits[pos.exits.length - 1].price : exitPrice;
     pos.requestedExitPrice = exitPrice;
@@ -367,7 +533,7 @@ class PaperTradingService {
 
     // Win/loss is counted once per trade, on total realized P&L across every
     // exit — not once per partial fill.
-    const account = this.getAccount();
+    const account = this.getAccount({ at: opts.at });
     account.totalTrades += 1;
     if (totalPnl > 0) {
       account.wins += 1;
@@ -375,8 +541,11 @@ class PaperTradingService {
     } else {
       account.losses += 1;
       account.consecutiveLosses += 1;
+      // Stamped so a blocked book can say WHEN the streak was reached, which
+      // is what decides whether the cool-off has expired.
+      account.lastLossDate = utcDay(new Date(this.now(opts.at)));
     }
-    this.saveAccount(account);
+    this.saveAccount(account, { at: opts.at });
 
     this.addToHistory({ ...pos, pnl: totalPnl, rMultiple });
     return pos;
@@ -474,16 +643,16 @@ class PaperTradingService {
     const price = exitPrice || (await this.resolvePrice(pos.symbol || "BTCUSDT", null));
     if (!price || price <= 0) return null;
 
-    this.finalizePosition(pos, price, reason, { at: nowIso() });
+    this.finalizePosition(pos, price, reason, { at: this.now() });
     this.savePositions(positions);
     return pos;
   }
 
   // ── Stats ─────────────────────────────────────────────────────────────────
 
-  async getStats() {
-    await this.updatePositions();
-    const account = this.getAccount();
+  async getStats({ at = null } = {}) {
+    await this.updatePositions(null, { at });
+    const account = this.getAccount({ at });
     const history = this.getHistory();
     const open = this.getOpenPositions();
 
@@ -522,8 +691,11 @@ class PaperTradingService {
 
   // Percentages the checklist's kill switches read. Losses are reported as
   // positive numbers because the limits are expressed as "max loss".
-  getRiskState() {
-    const account = this.getAccount();
+  // `at` matters as much here as it does on the credit side: this is what the
+  // checklist's kill switches read, so asking for the risk state without a
+  // replay timestamp would test a historical candidate against today's buckets.
+  getRiskState({ at = null } = {}) {
+    const account = this.getAccount({ at });
     const open = this.getOpenPositions();
     const starting = account.startingBalance || 1;
     const openRisk = open.reduce((sum, p) => sum + (Number(p.riskUsd) || 0), 0);
@@ -537,8 +709,8 @@ class PaperTradingService {
     };
   }
 
-  reset() {
-    const account = this.newAccount();
+  reset({ at = null } = {}) {
+    const account = this.newAccount({ at });
     this.savePositions([]);
     this.save(this.historyFile, []);
     this.save(this.accountFile, account);
@@ -546,4 +718,4 @@ class PaperTradingService {
   }
 }
 
-module.exports = { PaperTradingService, DUST_SIZE };
+module.exports = { PaperTradingService, FileStorage, MemoryStorage, DUST_SIZE, utcDay, isoWeek };

@@ -105,11 +105,49 @@ Other honesty properties, each with a test:
 - A position still open when the candles run out is **reported, not
   force-closed**. Force-closing would invent an exit the strategy never
   signalled and pollute expectancy.
-- Backtests run against a **throwaway ledger in a temp directory**, deleted in
-  a `finally`. The live books are never touched, and the run's edge gate sees
-  only the trades that run produced.
+- Backtests run against a **throwaway in-memory ledger**. The live books are
+  never touched, and the run's edge gate sees only the trades that run
+  produced. A test asserts the run performs *zero* filesystem writes, which is
+  a stronger claim than the temp directory it replaced: there is nothing to
+  clean up and no window in which a crash could strand a ledger.
 - Refused candidates are recorded with the reasons they were refused, so a
   strategy that never trades is distinguishable from one with no signals.
+
+### Replay time
+
+A backtest's account is kept on **replayed time, not wall-clock time**. This
+matters more than it sounds. The daily and weekly loss limits, and the
+consecutive-loss breaker, all read buckets that reset on a UTC day and an ISO
+week — and those buckets used to roll over according to the date the backtest
+was *run*. A run replaying six months of candles therefore accumulated every
+loss in the sample into one day and one week, tripped `DAILY_LOSS_LIMIT` within
+a few trades, and refused everything after it. Its headline numbers described
+the first days of the sample and its skip rate described nothing at all.
+
+`PaperTradingService` is now parameterised over time. Every accounting entry
+point — `getAccount`, `applyRollover`, `creditAccount`, `getRiskState`,
+`getStats`, `reset` — takes an optional `at`, and the backtester passes the
+closing timestamp of the bar being replayed. Forward paper trading passes
+nothing and keeps wall-clock behaviour exactly as before.
+
+The service also accepts a `clock`, which the backtester sets once per bar. It
+is a backstop rather than the interface: a call site that forgets its `at` under
+a set clock is merely redundant, whereas the same omission without one silently
+rolls a historical book onto today's date.
+
+### Storage adapters
+
+`PaperTradingService` is parameterised over storage the same way. `FileStorage`
+(the default) is the on-disk ledger every forward book uses; `MemoryStorage` is
+what a backtest gets. Reads hand back a deep copy with JSON's semantics —
+including dropping `undefined` values, as a round trip through the filesystem
+would — so the two adapters are interchangeable rather than merely similar. A
+test runs the same sequence of fills through both and asserts identical
+accounts, histories and metrics.
+
+This is a storage choice only. There is deliberately **no second fill engine**:
+the same `PaperTradingService` executes both a backtest and a forward run,
+which is the entire reason a backtest is evidence about forward paper trading.
 
 The load-bearing test is `a trend strategy finds no edge in a driftless random
 walk`: across four seeds, the built-in trend-breakout strategy must not show
@@ -119,6 +157,68 @@ edge, the backtester has developed a lookahead or an optimistic fill — far
 likelier than the strategy having become good. A companion test on a strongly
 trending series checks the opposite failure: that the pessimistic fills have
 not simply made *every* strategy lose.
+
+### Higher-timeframe context is not the tested timeframe
+
+A candle backtest has **one** timeframe of data. It therefore does not have a
+higher-timeframe trend read, and the context it builds says so rather than
+substituting one.
+
+The context object carries two separately named facts:
+
+| Field | What it is |
+| --- | --- |
+| `timeframeTrendUp` | The EMA trend of the timeframe being tested |
+| `htfTrendUp` | A genuine higher-timeframe read, or `null` when there is none |
+
+These used to be a single field called `trendUp`, filled in from the tested
+timeframe's own EMA cross, and two consumers downstream read it as
+higher-timeframe context and paid for it:
+
+- **`smc_v1`** treated a supplied `trendUp` as higher-timeframe confirmation,
+  reported `trendSource: "context"`, and added **+10 confidence**. It now reads
+  `htfTrendUp` only, so a candle backtest falls through to its own EMA read and
+  earns nothing for agreeing with itself. A caller with real higher-timeframe
+  data supplies `htfTrendUp` and gets the original behaviour.
+- **The checklist's daily-bias block**, worth **30 of 100 points** and labelled
+  "HTF: Daily bias", was scored from that same EMA cross. It is now `NEUTRAL`
+  unless a genuine `htfTrendUp` is supplied.
+
+`NEUTRAL` is a deliberate research fallback, not a neutral-sounding zero: the
+checklist already has a defined "no opinion" branch worth **+15**, and using it
+distinguishes "we do not know the daily trend" from a fabricated answer.
+
+The consequence is real and is the point. Fifteen points is the difference
+between a setup scoring 65 (`TAKE_HALF`) and 50 (`TAKE_QUARTER`), or between 50
+and `SKIP`. Backtests run before this change credited every with-trend
+candidate with a higher-timeframe alignment nobody had established, and traded
+more, and larger, than the evidence supported. Expect fewer setups to clear the
+floor; that is the corrected number, not a regression.
+
+`regime` still follows the tested timeframe. That one is coherent — a 4h
+strategy refusing 4h counter-trend entries is a rule about the chart it trades.
+
+### The consecutive-loss breaker
+
+`MAX_CONSECUTIVE_LOSSES` (default 3) blocks new entries once a streak reaches
+it. What it *means* after that is now a stated policy rather than an accident:
+
+| `CONSECUTIVE_LOSS_COOLOFF` | Behaviour |
+| --- | --- |
+| `next-day` (default) | A cooling-off period. Entries stay blocked for the rest of the UTC day the streak completed on; the streak clears at the next day boundary. |
+| `never` | The streak clears only on a winning trade. |
+
+`never` was the old behaviour, by omission, and it is an **absorbing state**: no
+trade can open, so no trade can win, so the streak never clears. Forward, a
+paper book quietly stops trading forever after three losses. In a replay, every
+bar after the third loss is refused, and the run's headline numbers describe
+however many bars it took to lose three times rather than the sample requested.
+
+The cool-off clears only a streak that has actually reached the limit — two
+losses either side of a day boundary still add up to two, so the limit stays
+reachable across days. A winning trade still clears the streak immediately,
+under either policy. `never` remains available because it is defensible for
+real money; it is simply no longer the default nobody chose.
 
 ## Strategies
 
@@ -180,6 +280,31 @@ Two guards keep the mode honest:
   labelled `native` that quietly used `planTrade`'s levels throughout is the
   single most misreadable outcome in this module. The run reports
   `nativeFallbacks` and adds a caveat naming the strategy.
+
+#### Requested mode vs applied execution
+
+`executionMode` is what was **asked for**. `executionApplied` is what the run
+actually **used**, and they are different facts:
+
+| `executionApplied` | Meaning |
+| --- | --- |
+| `shared` | Shared execution was requested and used |
+| `native` | Native requested; every trade used the strategy's own levels |
+| `shared-fallback` | Native requested; **no** trade could use native levels |
+| `mixed` | Native requested; some trades could and some fell back |
+| `none` | No trade opened, so there is nothing to characterise |
+
+They come apart in the case a reader is least equipped to notice: a comparison
+run with `executionMode=native` containing a row for a strategy that publishes
+no hints. Its trades fall back one by one, the run completes, and the row sits
+under a header reading "native strategy exits" while describing a
+shared-execution result. Every number is correct and the sentence above it is
+not.
+
+So the comparison table carries an **Execution** column per row, the facet
+cards repeat it, and the single-run card prints the applied value beside the
+requested one. `nativeTrades` and `sharedTrades` ride on the payload for
+callers that want the counts. `nativeFallbacks` is unchanged.
 
 | id | version | status | What it is |
 | --- | --- | --- | --- |
@@ -346,8 +471,11 @@ Not "SMC done properly" — discretionary SMC reads liquidity, sessions and
 inducement, none of which is here. It takes the four ideas that *can* be
 written as replayable rules and requires all four to agree:
 
-1. **Trend alignment.** Higher-timeframe context when the caller supplies one,
-   otherwise EMA21/EMA50 on the traded chart. No counter-trend fades.
+1. **Trend alignment.** Genuine higher-timeframe context when the caller
+   supplies `htfTrendUp`, otherwise EMA21/EMA50 on the traded chart. No
+   counter-trend fades. A candle backtest supplies no `htfTrendUp`, so it takes
+   the EMA path and does not collect the +10 higher-timeframe confidence bonus
+   — see "Higher-timeframe context is not the tested timeframe" above.
 2. **Break of structure.** A *close* beyond the most recent confirmed fractal
    swing. Pivots are only used once bars have closed on both sides of them, so
    there is no edge-of-chart pivot to peek at.

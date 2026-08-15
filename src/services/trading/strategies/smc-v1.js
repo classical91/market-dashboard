@@ -8,9 +8,10 @@
 // rules a backtester can replay without lookahead, and require all four to
 // agree before it will signal:
 //
-//   1. Trend alignment. Higher-timeframe context when the caller supplies it,
-//      otherwise an EMA21/EMA50 read of the chart being traded. Longs only in
-//      an up trend, shorts only in a down trend — no counter-trend fades.
+//   1. Trend alignment. Genuine higher-timeframe context when the caller
+//      supplies `context.htfTrendUp`, otherwise an EMA21/EMA50 read of the
+//      chart being traded. Longs only in an up trend, shorts only in a down
+//      trend — no counter-trend fades.
 //   2. Market structure. Swing highs and lows from confirmed fractals, and a
 //      break of structure: a close beyond the most recent confirmed swing.
 //   3. Displacement. The break has to be delivered by a candle with real range
@@ -182,9 +183,18 @@ const smcV1 = {
     // Higher-timeframe context wins when the caller has one; the EMA read is
     // the fallback, not the preference. Which one was used is reported, so a
     // result is never ambiguous about what trend it traded with.
+    //
+    // The field is `htfTrendUp`, and ONLY `htfTrendUp`. It used to read
+    // `context.trendUp`, which the candle backtester filled in from an EMA
+    // read of the very timeframe being tested — so "higher-timeframe context"
+    // was the same chart under another name, the trend source reported
+    // "context" when there was none, and the confidence bonus below was paid
+    // for information the strategy already had. A caller with genuine
+    // higher-timeframe data supplies `htfTrendUp` and gets the old behaviour;
+    // a caller without it now correctly falls through to the EMA read.
     const htfTrendUp =
-      context.trendUp === true ? true : context.trendUp === false ? false : null;
-    const trendSource = htfTrendUp === null ? "ema" : "context";
+      context.htfTrendUp === true ? true : context.htfTrendUp === false ? false : null;
+    const trendSource = htfTrendUp === null ? "ema" : "htf";
     const trendUp = htfTrendUp === null ? emaFast > emaSlow : htfTrendUp;
     const trend = emaFast === emaSlow && htfTrendUp === null ? "FLAT" : trendUp ? "UP" : "DOWN";
 
@@ -204,7 +214,7 @@ const smcV1 = {
     };
 
     const reasons = [
-      `Trend ${trend} from ${trendSource === "context" ? "higher-timeframe context" : `EMA${options.trendFast}/EMA${options.trendSlow}`}` +
+      `Trend ${trend} from ${trendSource === "htf" ? "higher-timeframe context" : `EMA${options.trendFast}/EMA${options.trendSlow} on the traded timeframe`}` +
         ` (EMA${options.trendFast} ${emaFast.toFixed(2)} vs EMA${options.trendSlow} ${emaSlow.toFixed(2)})`,
     ];
 
@@ -309,7 +319,9 @@ const smcV1 = {
     // is what actually sizes the trade; this only ranks smc_v1's own setups
     // against each other by how clean the structure was.
     let confidence = 50;
-    if (trendSource === "context") confidence += 10;
+    // Paid for GENUINE higher-timeframe agreement only. A same-timeframe EMA
+    // read is not extra information about the trade, so it earns nothing.
+    if (trendSource === "htf") confidence += 10;
     if (bosAge <= 5) confidence += 10;
     if (fvgAge <= 5) confidence += 10;
     if (atrValue > 0 && fvg.range >= 2 * options.displacementAtr * atrValue) confidence += 10;

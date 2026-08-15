@@ -25,8 +25,17 @@
 // `evaluate` is handed the full candle array plus the index of the bar being
 // decided, and must read nothing past that index — that contract is what keeps
 // backtests honest. `context` carries what the caller knows and the strategy
-// cannot compute for itself: `options` overrides, and `trendUp` for a
-// higher-timeframe trend read when one is available.
+// cannot compute for itself:
+//
+//   options            caller overrides for the strategy's own parameters
+//   htfTrendUp         a HIGHER-timeframe trend read — true/false, or null when
+//                      the caller has no such feed. Never the trend of the
+//                      timeframe being evaluated: a strategy can compute that
+//                      one itself, and passing it here would let a strategy pay
+//                      for "confirmation" from the chart it is already reading.
+//   timeframeTrendUp   the trend of the evaluated timeframe, for strategies
+//                      that would otherwise recompute it
+//   close / atr        the deciding bar's close and ATR
 //
 // The signal it returns:
 //

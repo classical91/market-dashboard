@@ -21,16 +21,12 @@
 //   favourable one, then close — which makes the paper trader fire the stop
 //   first whenever both were reachable. Results are pessimistic by design.
 
-const fs = require("fs");
-const os = require("os");
-const path = require("path");
-
 const { getTradingConfig } = require("./config");
 const { runChecklist, marketState } = require("./checklist");
 const { assessEdge } = require("./edge-gate");
 const { planTrade, calculatePositionSize } = require("./risk");
 const { buildStrategyMetrics } = require("./metrics");
-const { PaperTradingService } = require("./paper-trader");
+const { PaperTradingService, MemoryStorage } = require("./paper-trader");
 const { replayOrder } = require("./replay-order");
 const { atr } = require("../decision-engine");
 const { ema, macd } = require("../signal-screener");
@@ -137,6 +133,31 @@ function nativeLevels({ direction, entryPrice, signal }) {
   return { ok: true, stop, target };
 }
 
+/**
+ * What execution a run ACTUALLY ran on, as opposed to what it was asked for.
+ *
+ * These come apart, silently, in exactly the case a reader is least equipped to
+ * notice: a comparison requested with executionMode=native, where one row is a
+ * strategy that publishes no stop or target hints at all. mindset_v1 is that
+ * strategy today. Its trades fall back to planTrade's shared levels one by one,
+ * the run completes, and the row sits under a header saying "native strategy
+ * exits" describing a shared-execution run. Every number in it is correct and
+ * the sentence above it is not.
+ *
+ *   "shared"           the run asked for shared execution and got it
+ *   "native"           asked for native, every trade used the strategy's levels
+ *   "shared-fallback"  asked for native, NO trade could use them
+ *   "mixed"            asked for native, some trades could and some could not
+ *   "none"             no trade opened, so there is nothing to characterise
+ */
+function appliedExecution({ executionMode, nativeTrades = 0, sharedTrades = 0 }) {
+  const opened = nativeTrades + sharedTrades;
+  if (!opened) return "none";
+  if (executionMode !== "native") return "shared";
+  if (nativeTrades && sharedTrades) return "mixed";
+  return nativeTrades ? "native" : "shared-fallback";
+}
+
 // Rank the comparison rows, and be explicit about which rows are ranked at all.
 //
 // A null profit factor means two completely different things, and the old
@@ -185,38 +206,117 @@ function rankRows(rows, minRankedTrades = 1) {
   });
 }
 
-// Market context as of the close of `bars[bars.length - 1]`, computed from
-// that bar and everything before it. Nothing later is in scope — this function
-// is the lookahead barrier.
-function contextAtBar(bars, config) {
-  const closes = bars.map((b) => b.close);
-  const volumes = bars.map((b) => b.volume);
-  const close = last(closes);
+// Wilder ATR as a SERIES: `out[i]` is exactly what `atr(bars.slice(0, i + 1),
+// length)` returns, to the last bit.
+//
+// That equality is the only reason this is safe. Wilder smoothing is a
+// recurrence over true ranges — each value depends on the one before it and on
+// nothing after — so the value at bar i is identical whether it was reached by
+// walking forward once across the whole array or by re-walking a prefix that
+// ends at i. Recomputing the prefix was O(n) work per bar; this is O(n) once.
+// No future bar enters any out[i], which is what makes the optimisation a
+// change of cost and not a change of results.
+function atrSeries(bars, length = 14) {
+  const out = new Array(bars.length).fill(null);
+  if (bars.length < length + 1) return out;
 
-  const atrValue = atr(bars, 14);
+  // trs[j] is the true range of bar j + 1, matching atr()'s own indexing.
+  const trs = new Array(bars.length - 1);
+  for (let i = 1; i < bars.length; i += 1) {
+    const prevClose = bars[i - 1].close;
+    trs[i - 1] = Math.max(
+      bars[i].high - bars[i].low,
+      Math.abs(bars[i].high - prevClose),
+      Math.abs(bars[i].low - prevClose),
+    );
+  }
+
+  // Seeded with the simple mean of the first `length` true ranges, summed in
+  // the same order as atr() sums them so the floating-point result matches.
+  let value = 0;
+  for (let i = 0; i < length; i += 1) value += trs[i];
+  value /= length;
+  out[length] = value;
+
+  for (let i = length; i < trs.length; i += 1) {
+    value = (value * (length - 1) + trs[i]) / length;
+    out[i + 1] = value;
+  }
+  return out;
+}
+
+/**
+ * Every indicator series a run needs, computed once over the whole candle set.
+ *
+ * EMA, MACD and ATR are all recurrences seeded from a fixed-length prefix, so
+ * series[i] depends only on bars 0..i. Computing them once forward and reading
+ * index i is therefore identical to recomputing them from bars.slice(0, i + 1),
+ * which is what this module used to do on every single bar — and what made a
+ * 2000-bar run quadratic in the number of bars.
+ *
+ * The lookahead barrier has NOT moved. It is still "index i may read series
+ * index i and no higher", and the regression test that feeds two candle sets
+ * with different futures and identical pasts still asserts the same context.
+ */
+function buildContextSeries(bars, config) {
+  const closes = bars.map((b) => b.close);
+  const { macdLine, signalLine } = macd(closes, config.macdFast, config.macdSlow, config.macdSignal);
+  return {
+    closes,
+    emaFast: ema(closes, config.trendFast),
+    emaSlow: ema(closes, config.trendSlow),
+    macdLine,
+    signalLine,
+    atr: atrSeries(bars, 14),
+  };
+}
+
+/**
+ * Market context as of the close of `bars[index]`, computed from that bar and
+ * everything before it. Nothing later is in scope — this function is the
+ * lookahead barrier.
+ *
+ * `series` is the precomputed output of buildContextSeries over the SAME bars
+ * array; omit it and one is built for the bars given, which is what a caller
+ * holding only a prefix wants.
+ */
+function contextAtBar(bars, config, { index = bars.length - 1, series = null } = {}) {
+  const s = series || buildContextSeries(bars, config);
+  const len = index + 1;
+  const close = s.closes[index];
+
+  const atrValue = s.atr[index];
   // ATR relative to its own recent average, which is what the checklist's
   // volatility rules are expressed in.
   const atrHistory = [];
-  for (let i = Math.max(15, bars.length - 20); i < bars.length; i += 1) {
-    const value = atr(bars.slice(0, i + 1), 14);
+  for (let i = Math.max(15, len - 20); i < len; i += 1) {
+    const value = s.atr[i];
     if (value != null) atrHistory.push(value);
   }
   const atrRatio = atrValue && atrHistory.length ? atrValue / mean(atrHistory) : 1;
 
-  const volumeAvg = mean(volumes.slice(-20));
-  const volumeRatio = volumeAvg > 0 ? last(volumes) / volumeAvg : 1;
+  // Summed over the window directly rather than differenced out of a running
+  // total: a prefix-sum difference is the same number in exact arithmetic and
+  // not always the same float, and this feeds threshold comparisons.
+  let volumeSum = 0;
+  let volumeCount = 0;
+  for (let i = Math.max(0, len - 20); i < len; i += 1) {
+    volumeSum += bars[i].volume;
+    volumeCount += 1;
+  }
+  const volumeAvg = volumeCount ? volumeSum / volumeCount : 0;
+  const volumeRatio = volumeAvg > 0 ? bars[index].volume / volumeAvg : 1;
 
-  const { macdLine, signalLine } = macd(closes, config.macdFast, config.macdSlow, config.macdSignal);
-  const macdValue = last(macdLine);
-  const macdSignalValue = last(signalLine);
+  const macdValue = s.macdLine[index];
+  const macdSignalValue = s.signalLine[index];
   const macdBullish =
     macdValue != null && macdSignalValue != null ? macdValue > macdSignalValue : null;
 
-  const fast = last(ema(closes, config.trendFast));
-  const slow = last(ema(closes, config.trendSlow));
+  const fast = s.emaFast[index];
+  const slow = s.emaSlow[index];
 
   return {
-    bar: bars[bars.length - 1],
+    bar: bars[index],
     close,
     atr: atrValue,
     atrRatio,
@@ -224,7 +324,21 @@ function contextAtBar(bars, config) {
     macdBullish,
     emaFast: fast,
     emaSlow: slow,
-    trendUp: fast != null && slow != null ? fast > slow : null,
+    // The trend of THE TIMEFRAME BEING TESTED, and named as such.
+    //
+    // This used to be called `trendUp`, and downstream that name did real
+    // damage: smc_v1 read it as higher-timeframe context and paid a confidence
+    // bonus for it, and the checklist scored it as "HTF: Daily bias" for up to
+    // 30 of the 100 points that decide SKIP / QUARTER / HALF / FULL. It is
+    // neither. It is an EMA cross on the same candles the strategy is already
+    // looking at, and calling it higher-timeframe confirmation is a strategy
+    // being paid for agreeing with itself.
+    timeframeTrendUp: fast != null && slow != null ? fast > slow : null,
+    // Genuine higher-timeframe context. A candle backtest has one timeframe of
+    // data and therefore does not have this, so it is null and the things that
+    // depend on it fall back explicitly rather than being fed a substitute. A
+    // caller that really does have a daily read sets it.
+    htfTrendUp: null,
   };
 }
 
@@ -234,7 +348,10 @@ function contextAtBar(bars, config) {
 // not this rule. Pass your own `strategy` to replace it.
 function trendBreakoutStrategy({ bars, context, options }) {
   const lookback = options.breakoutLookback;
-  if (bars.length < lookback + 2 || context.trendUp === null) return null;
+  // Same-timeframe trend, explicitly — this rule has never had, and does not
+  // claim, a higher-timeframe view.
+  const trendUp = context.timeframeTrendUp;
+  if (bars.length < lookback + 2 || trendUp === null || trendUp === undefined) return null;
 
   // The window excludes the current bar: breaking a range you are part of is
   // not a breakout.
@@ -242,8 +359,8 @@ function trendBreakoutStrategy({ bars, context, options }) {
   const priorHigh = Math.max(...prior.map((b) => b.high));
   const priorLow = Math.min(...prior.map((b) => b.low));
 
-  if (context.trendUp && context.close > priorHigh) return "LONG";
-  if (!context.trendUp && context.close < priorLow) return "SHORT";
+  if (trendUp && context.close > priorHigh) return "LONG";
+  if (!trendUp && context.close < priorLow) return "SHORT";
   return null;
 }
 
@@ -266,8 +383,11 @@ function resolveStrategy(strategy) {
         description: "Inline strategy function supplied by the caller",
         requiredWarmupBars: 0,
       },
-      evaluate: ({ bars, context, options, symbol }) => {
-        const direction = strategy({ bars, context, options, symbol });
+      evaluate: ({ bars, index, context, options, symbol }) => {
+        // The legacy convention takes bars ALREADY truncated at the decided
+        // bar, so this one is sliced for it. Registry strategies take the full
+        // array plus an index and do their own slicing.
+        const direction = strategy({ bars: bars.slice(0, index + 1), context, options, symbol });
         return {
           signal: direction === "LONG" || direction === "SHORT" ? direction : "FLAT",
           strategy: "custom",
@@ -290,26 +410,51 @@ function resolveStrategy(strategy) {
 
   return {
     definition,
-    evaluate: ({ bars, context, options, symbol }) =>
-      // `bars` is already truncated at the decided bar, so a strategy that
-      // ignored its `index` argument still could not see the future.
-      definition.evaluate(bars, bars.length - 1, {
+    evaluate: ({ bars, index, context, options, symbol }) =>
+      definition.evaluate(bars, index, {
         options,
         symbol,
-        trendUp: context.trendUp,
+        // Two separate facts under two separate names. `htfTrendUp` is null in
+        // a candle backtest because there is no higher-timeframe feed here;
+        // handing a strategy the tested timeframe's own trend under that name
+        // is how smc_v1 came to award itself a higher-timeframe confidence
+        // bonus for reading the chart it was already reading.
+        htfTrendUp: context.htfTrendUp,
+        timeframeTrendUp: context.timeframeTrendUp,
         close: context.close,
         atr: context.atr,
       }),
   };
 }
 
-// The market state the checklist scores. Regime and bias come from the same
-// trend read the strategy uses, so a backtest is internally consistent even
-// though it has no live macro feed to draw on.
+/**
+ * The market state the checklist scores.
+ *
+ * `regime` is the tested timeframe's own trend, which is what it has always
+ * been and what the regime gate is written against — a 4h strategy refusing 4h
+ * counter-trend entries is a coherent rule.
+ *
+ * `dailyBias` is NOT. It is the checklist's higher-timeframe block, worth 30 of
+ * 100 points and scored under the label "HTF: Daily bias", and it used to be
+ * filled in from the same EMA cross as `regime` — the tested timeframe wearing
+ * a daily hat. On a 4h backtest that meant every with-trend candidate collected
+ * the full higher-timeframe credit for information it already had, which is
+ * enough on its own to move a setup from SKIP (under 50) to TAKE_QUARTER, or
+ * from HALF to FULL.
+ *
+ * A candle backtest has one timeframe of data, so the honest value is NEUTRAL
+ * unless a caller supplies a real `htfTrendUp`. NEUTRAL scores +15 rather than
+ * +30 or +0: the checklist already has a defined "no opinion" branch, and using
+ * it is the difference between "we don't know the daily trend" and a fabricated
+ * answer. Supplying genuine higher-timeframe data restores the full-credit
+ * path, which is the case the 30 points were designed for.
+ */
 function stateFromContext(context) {
+  const htf = context.htfTrendUp;
   return marketState({
-    regime: context.trendUp === null ? "RANGE" : context.trendUp ? "TREND_UP" : "TREND_DOWN",
-    dailyBias: context.trendUp === null ? "NEUTRAL" : context.trendUp ? "BULLISH" : "BEARISH",
+    regime:
+      context.timeframeTrendUp === null ? "RANGE" : context.timeframeTrendUp ? "TREND_UP" : "TREND_DOWN",
+    dailyBias: htf === null || htf === undefined ? "NEUTRAL" : htf ? "BULLISH" : "BEARISH",
     macdBullish: context.macdBullish,
     atrRatio: context.atrRatio,
     volumeRatio: context.volumeRatio,
@@ -394,11 +539,31 @@ class BacktestService {
       );
     }
 
-    // A throwaway ledger in a temp directory. A backtest must never touch the
-    // live books, and it must not inherit their history either — the edge gate
-    // has to see only the trades this run produced.
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "md-backtest-"));
-    const trader = new PaperTradingService({ dataDir: dir, book: "backtest", config: this.config });
+    // A throwaway in-memory ledger. A backtest must never touch the live
+    // books, and it must not inherit their history either — the edge gate has
+    // to see only the trades this run produced.
+    //
+    // In memory rather than in a temp directory, and that is a storage choice
+    // only: this is still the production PaperTradingService, running the same
+    // fills, the same scale-outs and the same accounting the live books run.
+    // The ledger is read and rewritten several times per bar, so on disk a
+    // 2000-bar run spent most of its time in readFileSync and rename.
+    //
+    // The clock is set per bar below. Every accounting call also passes its own
+    // `at`; the clock is the backstop that keeps a call site nobody remembered
+    // from rolling this historical book over onto today's date.
+    const trader = new PaperTradingService({
+      book: "backtest",
+      config: this.config,
+      storage: new MemoryStorage(),
+      clock: bars[0].closeTime,
+    });
+
+    // Indicators for the whole run, computed once. See buildContextSeries:
+    // each series is a forward recurrence, so reading index i is identical to
+    // recomputing that indicator from bars 0..i, which is what this loop used
+    // to do on every bar.
+    const series = buildContextSeries(bars, opts);
 
     const equityCurve = [];
     const skipped = [];
@@ -408,116 +573,130 @@ class BacktestService {
     // strategy published no usable levels. Counted so the result can say so
     // rather than presenting a shared-execution run as a native one.
     let nativeFallbacks = 0;
+    // Opened trades by the execution actually applied to them, which is what
+    // `executionApplied` below is derived from. The requested mode and the
+    // applied one are different facts and a reader needs both.
+    let nativeTrades = 0;
+    let sharedTrades = 0;
 
-    try {
-      for (let i = warmup; i < bars.length; i += 1) {
-        const history = bars.slice(0, i + 1);
-        const bar = bars[i];
+    for (let i = warmup; i < bars.length; i += 1) {
+      const bar = bars[i];
+      // Simulated now, for the whole of this bar's processing.
+      trader.setClock(bar.closeTime);
 
-        // 1. Replay this bar against open positions BEFORE considering a new
-        // entry, so a position opened last bar gets its stop and targets
-        // tested on this one.
-        const ordering = replayOrder(trader, bar);
-        if (ordering.mixed) mixedDirectionBars += 1;
-        for (const price of ordering.prices) {
-          await trader.updatePositions({ [symbol]: price }, { at: bar.closeTime });
-        }
-
-        // 2. Ask the strategy about the bar that just closed.
-        const context = contextAtBar(history, opts);
-        const signal = resolved.evaluate({ bars: history, context, options: opts, symbol });
-        const direction = signal.signal;
-
-        if (direction === "LONG" || direction === "SHORT") {
-          signals.push({ at: bar.closeTime, signal: direction, price: signal.price ?? context.close, reasons: signal.reasons || [], indicators: signal.indicators || {}, confidence: signal.confidence ?? null });
-          const outcome = this.tryOpen({
-            trader,
-            symbol,
-            direction,
-            context,
-            interval,
-            strategyId: resolved.definition.id,
-            signal,
-            allowCounterTrend: resolved.definition.tradesCounterTrend === true,
-            executionMode,
-          });
-          if (outcome.opened && executionMode === "native" && outcome.appliedMode !== "native") {
-            nativeFallbacks += 1;
-          }
-          if (!outcome.opened) {
-            skipped.push({
-              at: bar.closeTime,
-              direction,
-              // The strategy's own reasoning first, then the gauntlet's — a
-              // refused candidate should say what fired it as well as what
-              // stopped it.
-              reasons: [...(signal.reasons || []), ...outcome.reasons],
-            });
-          }
-        }
-
-        const account = trader.getAccount();
-        const unrealized = trader
-          .getOpenPositions()
-          .reduce((sum, p) => sum + (Number(p.unrealizedPnl) || 0), 0);
-        equityCurve.push({
-          at: bar.closeTime,
-          close: bar.close,
-          balance: account.balance,
-          equity: Math.round((account.balance + unrealized) * 100) / 100,
-          openPositions: trader.getOpenPositions().length,
-        });
+      // 1. Replay this bar against open positions BEFORE considering a new
+      // entry, so a position opened last bar gets its stop and targets
+      // tested on this one.
+      const ordering = replayOrder(trader, bar);
+      if (ordering.mixed) mixedDirectionBars += 1;
+      for (const price of ordering.prices) {
+        await trader.updatePositions({ [symbol]: price }, { at: bar.closeTime });
       }
 
-      // Any position still open at the end is marked at the final close but
-      // left open — force-closing it would invent an exit the strategy never
-      // signalled, and counting it as a closed trade would pollute expectancy.
-      const openAtEnd = trader.getOpenPositions();
-      const stats = await trader.getStats();
-      const account = trader.getAccount();
+      // 2. Ask the strategy about the bar that just closed. `bars` is the full
+      // array and `i` is the barrier: a registry strategy slices to `index`
+      // itself, and the no-lookahead regression tests hold it to that.
+      const context = contextAtBar(bars, opts, { index: i, series });
+      const signal = resolved.evaluate({ bars, index: i, context, options: opts, symbol });
+      const direction = signal.signal;
 
-      return {
-        symbol,
-        interval,
-        strategy: resolved.definition.id,
-        strategyName: resolved.definition.name,
-        bars: bars.length,
-        warmupBars: warmup,
-        from: bars[warmup].closeTime,
-        to: bars[bars.length - 1].closeTime,
-        options: opts,
-        costs: costSummary(this.config),
-        stats,
-        metrics: buildStrategyMetrics(trader.getHistory(), account.startingBalance),
-        trades: trader.getHistory(),
-        openAtEnd,
-        skipped,
-        // Every entry signal the strategy produced, whether or not the
-        // gauntlet let it through, with the reasons it fired.
-        signals,
-        equityCurve,
+      if (direction === "LONG" || direction === "SHORT") {
+        signals.push({ at: bar.closeTime, signal: direction, price: signal.price ?? context.close, reasons: signal.reasons || [], indicators: signal.indicators || {}, confidence: signal.confidence ?? null });
+        const outcome = this.tryOpen({
+          trader,
+          symbol,
+          direction,
+          context,
+          interval,
+          strategyId: resolved.definition.id,
+          signal,
+          allowCounterTrend: resolved.definition.tradesCounterTrend === true,
+          executionMode,
+          at: bar.closeTime,
+        });
+        if (outcome.opened) {
+          if (outcome.appliedMode === "native") nativeTrades += 1;
+          else sharedTrades += 1;
+          if (executionMode === "native" && outcome.appliedMode !== "native") nativeFallbacks += 1;
+        } else {
+          skipped.push({
+            at: bar.closeTime,
+            direction,
+            // The strategy's own reasoning first, then the gauntlet's — a
+            // refused candidate should say what fired it as well as what
+            // stopped it.
+            reasons: [...(signal.reasons || []), ...outcome.reasons],
+          });
+        }
+      }
+
+      const account = trader.getAccount({ at: bar.closeTime });
+      const open = trader.getOpenPositions();
+      const unrealized = open.reduce((sum, p) => sum + (Number(p.unrealizedPnl) || 0), 0);
+      equityCurve.push({
+        at: bar.closeTime,
+        close: bar.close,
+        balance: account.balance,
+        equity: Math.round((account.balance + unrealized) * 100) / 100,
+        openPositions: open.length,
+      });
+    }
+
+    // Any position still open at the end is marked at the final close but
+    // left open — force-closing it would invent an exit the strategy never
+    // signalled, and counting it as a closed trade would pollute expectancy.
+    const finalAt = bars[bars.length - 1].closeTime;
+    const openAtEnd = trader.getOpenPositions();
+    const stats = await trader.getStats({ at: finalAt });
+    const account = trader.getAccount({ at: finalAt });
+    const executionApplied = appliedExecution({ executionMode, nativeTrades, sharedTrades });
+
+    return {
+      symbol,
+      interval,
+      strategy: resolved.definition.id,
+      strategyName: resolved.definition.name,
+      bars: bars.length,
+      warmupBars: warmup,
+      from: bars[warmup].closeTime,
+      to: bars[bars.length - 1].closeTime,
+      options: opts,
+      costs: costSummary(this.config),
+      stats,
+      metrics: buildStrategyMetrics(trader.getHistory(), account.startingBalance),
+      trades: trader.getHistory(),
+      openAtEnd,
+      skipped,
+      // Every entry signal the strategy produced, whether or not the
+      // gauntlet let it through, with the reasons it fired.
+      signals,
+      equityCurve,
+      // What was ASKED FOR.
+      executionMode,
+      // What was actually APPLIED, which is not the same question — see
+      // appliedExecution(). A run requested as native whose strategy publishes
+      // no levels is a shared run, and the row has to say so.
+      executionApplied,
+      nativeTrades,
+      sharedTrades,
+      nativeFallbacks,
+      caveats: [
         // Surfaced rather than hidden: with long and short positions open on
         // the same symbol at once, one intra-bar ordering cannot be
         // pessimistic for both sides.
-        executionMode,
-        nativeFallbacks,
-        caveats: [
-          ...(mixedDirectionBars
-            ? [`${mixedDirectionBars} bar(s) had both long and short positions open; intra-bar ordering favoured the longs' stop`]
-            : []),
-          // The single most misreadable outcome in this whole module: a run
-          // labelled "native" that silently used shared levels throughout.
-          ...(nativeFallbacks
-            ? [
-                `${nativeFallbacks} of these trades ran on SHARED execution despite executionMode=native: ` +
-                  `${resolved.definition.id} published no usable stop/target for them, so planTrade's levels were used instead`,
-              ]
-            : []),
-        ],
-      };
-    } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
+        ...(mixedDirectionBars
+          ? [`${mixedDirectionBars} bar(s) had both long and short positions open; intra-bar ordering favoured the longs' stop`]
+          : []),
+        // The single most misreadable outcome in this whole module: a run
+        // labelled "native" that silently used shared levels throughout.
+        ...(nativeFallbacks
+          ? [
+              `${nativeFallbacks} of these trades ran on SHARED execution despite executionMode=native: ` +
+                `${resolved.definition.id} published no usable stop/target for them, so planTrade's levels were used instead`,
+            ]
+          : []),
+      ],
+    };
   }
 
   // One candidate through the full gauntlet, entering at the signalling bar's
@@ -537,16 +716,20 @@ class BacktestService {
     allowCounterTrend = false,
     // "shared" (default) or "native" — see EXECUTION_MODES above.
     executionMode = "shared",
+    // The replayed instant this candidate is being evaluated at. It decides
+    // which day's and which week's loss buckets the kill switches below read,
+    // so a historical candidate is tested against historical risk state.
+    at = null,
   }) {
     const signalSource = `backtest:${strategyId}:${interval}`;
-    const state = marketState({ ...stateFromContext(context), ...trader.getRiskState() });
+    const state = marketState({ ...stateFromContext(context), ...trader.getRiskState({ at }) });
     const checklist = runChecklist(
       { symbol, direction, price: context.close, atr: context.atr, allowCounterTrend },
       state,
       this.config,
     );
 
-    const account = trader.getAccount();
+    const account = trader.getAccount({ at });
     const edge = assessEdge({
       history: trader.getHistory(),
       startingBalance: account.startingBalance,
@@ -635,7 +818,7 @@ class BacktestService {
               executionMode: appliedMode,
             }
           : { strategy: strategyId, executionMode: appliedMode },
-        openedAt: context.bar.closeTime,
+        openedAt: at ?? context.bar.closeTime,
       });
       return { opened: true, reasons, appliedMode };
     } catch (err) {
@@ -762,10 +945,13 @@ module.exports = {
   downsampleCurve,
   rankRows,
   EXECUTION_MODES,
+  appliedExecution,
   summarizeRun,
   resolveStrategy,
   trendBreakoutStrategy,
   contextAtBar,
+  buildContextSeries,
+  atrSeries,
   stateFromContext,
   MIN_WARMUP_BARS,
 };
