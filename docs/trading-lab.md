@@ -198,6 +198,95 @@ floor; that is the corrected number, not a regression.
 `regime` still follows the tested timeframe. That one is coherent — a 4h
 strategy refusing 4h counter-trend entries is a rule about the chart it trades.
 
+### Unavailable data is unavailable, not favourable
+
+`marketState()` fills anything the caller omits with `null`, and **null never
+earns points**. That sentence used to be a comment above defaults that did the
+opposite:
+
+| Field | Old default | Read literally |
+| --- | --- | --- |
+| `usdtDominanceSignal` | `"NEUTRAL"` | "dominance is flat" |
+| `btcDominanceRising` | `false` | "BTC dominance is not rising" |
+| `bearMarket` | `false` | "this is not a bear market" |
+| `fundingRate` | `0` | "funding is flat" |
+
+Those are **observations**, and for a LONG all four are favourable. A long
+candidate with no macro feed at all collected the macro block's full **+20**
+plus the funding block's **+5**. A short under identical no-data conditions
+collected **+0** macro, because the same defaults read as unfavourable for it.
+
+A candle backtest has none of these feeds, so it scored every long 25 points
+above the evidence and put longs and shorts **20 points apart** — long 57
+(`TAKE_QUARTER`) against short 37 (`SKIP`) on identical, entirely absent data.
+A backtest that systematically prefers one direction because of what it does
+*not* know cannot be used to judge a strategy.
+
+The macro block is now scored over the inputs that were actually measured, with
+the same 2.5-of-3 and 2-of-3 thresholds expressed as a fraction of what was
+available. With all three present it is arithmetically identical to before — a
+sweep of all 46,656 fully-specified states produces byte-identical decisions,
+scores and size multipliers. Only the absent-data case changes.
+
+A measured `NEUTRAL` or a measured `0` still scores. "We looked and it is flat"
+is evidence; "we never looked" is not.
+
+#### The calibration consequence
+
+Removing invented credit does not make the thresholds right, it makes the
+shortfall visible. Every checklist result now carries `availablePoints`:
+
+| Run | Reachable | Floor |
+| --- | ---: | ---: |
+| Fully-fed live candidate | 100 | 50 |
+| Candle backtest (no macro, funding or daily read) | 60 | 50 |
+
+A candle backtest must therefore clear **83% of the evidence available to it**
+where a fully-fed live candidate clears 50%. That is a real mis-calibration, it
+is now measurable rather than hidden, and **it has deliberately not been
+"fixed"** — normalising the thresholds against `availablePoints` would make the
+live scanner materially more aggressive, and setting thresholds is exactly the
+promotion-policy decision that does not exist yet.
+
+#### Supplying context you actually have
+
+`run()`, `backtestSymbol()` and `compare()` take an optional `marketContext`:
+
+```js
+service.run({
+  symbol: "BTCUSDT",
+  candles,
+  marketContext: {
+    htfTrendUp: true,           // a real daily read
+    usdtDominanceSignal: "RISK_ON",
+    btcDominanceRising: false,
+    bearMarket: false,
+    fundingRate: 0.0001,        // a real funding history
+  },
+});
+```
+
+Omitted fields stay unmeasured. This is **not** a knob for making a backtest
+trade more — it is the only way to give a run evidence it genuinely has instead
+of letting the checklist invent it. Whatever is supplied is recorded on the
+result as `marketContextFields`, so a run scored with macro context is never
+mistaken for a candles-only one. In a comparison it is applied identically to
+every row, because a row scored with macro context beside one scored without it
+would not be a comparison.
+
+#### What this changed outside the lab
+
+Two forward-path behaviours follow from the same fix, both deliberate:
+
+- **A decision-engine outage no longer trades.** `stateForInterval` returns an
+  empty state when the engine is unreachable; that state used to score a long
+  at 57 and open positions on invented macro. It now scores too low to trade. A
+  bot that keeps buying precisely when it has lost sight of the market is not
+  degrading gracefully, it is degrading silently.
+- **Live candidates lose the funding block's 5 points**, because no funding
+  feed is wired up. A candidate that scored 67 (`TAKE_HALF`) now scores 62
+  (`TAKE_QUARTER`). Wiring a real funding feed restores it.
+
 ### The consecutive-loss breaker
 
 `MAX_CONSECUTIVE_LOSSES` (default 3) blocks new entries once a streak reaches

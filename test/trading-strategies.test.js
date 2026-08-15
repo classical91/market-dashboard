@@ -272,6 +272,16 @@ test("trades carry the strategy id, so history and metrics can be grouped by it"
     interval: "15m",
     candles: trendingCandles(400),
     strategy: "mindset_v1",
+    // This test is about how a trade is LABELLED, not about whether a
+    // candles-only setup clears the checklist's floor, so it supplies the
+    // higher-timeframe and macro context a real caller would have.
+    marketContext: {
+      htfTrendUp: true,
+      usdtDominanceSignal: "RISK_ON",
+      btcDominanceRising: false,
+      bearMarket: false,
+      fundingRate: 0,
+    },
   });
 
   const positions = [...result.trades, ...result.openAtEnd];

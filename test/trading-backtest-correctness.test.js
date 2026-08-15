@@ -30,9 +30,26 @@ const {
 } = require("../src/services/trading/backtest");
 const { PaperTradingService, MemoryStorage } = require("../src/services/trading/paper-trader");
 const { makeTradingConfig } = require("../src/services/trading/config");
-const { scoreSetup, marketState } = require("../src/services/trading/checklist");
+const {
+  scoreSetup,
+  marketState,
+  runChecklist,
+  runKillSwitches,
+} = require("../src/services/trading/checklist");
 
 const DAY_MS = 86400000;
+
+// Market context a caller has once a higher-timeframe and funding feed exist.
+// Supplied by the fixtures below that are exercising the BREAKER and the
+// EXECUTION MODES, neither of which is about whether the checklist sizes a
+// candles-only setup — that restriction has its own tests further down.
+const FED_LONG = Object.freeze({
+  htfTrendUp: true,
+  usdtDominanceSignal: "RISK_ON",
+  btcDominanceRising: false,
+  bearMarket: false,
+  fundingRate: 0,
+});
 
 function makeTrader(configOverrides = {}, opts = {}) {
   return new PaperTradingService({
@@ -240,7 +257,13 @@ test("a replay is not absorbed by the consecutive-loss breaker", async () => {
     const service = new BacktestService({
       config: makeTradingConfig({ consecutiveLossCooloff: cooloff }),
     });
-    const result = await service.run({ symbol: "BTCUSDT", candles, warmupBars: 60, strategy });
+    const result = await service.run({
+      symbol: "BTCUSDT",
+      candles,
+      warmupBars: 60,
+      strategy,
+      marketContext: FED_LONG,
+    });
     const trippedAt = result.skipped.findIndex((s) =>
       s.reasons.some((r) => r.includes("CONSECUTIVE_LOSSES")),
     );
@@ -346,6 +369,111 @@ test("a candle backtest cannot collect the checklist's full HTF credit", () => {
   assert.ok(withHtf.reasons.includes("HTF: Daily bias BULLISH (+30)"));
 });
 
+/* ── Unavailable macro/funding is unavailable, not favourable ───── */
+
+test("absent macro data scores the same for a long and a short", () => {
+  const config = makeTradingConfig();
+  // Exactly what a candle backtest supplies: regime, bias, MACD, ATR, volume.
+  // No dominance feed, no bear-market read, no funding history.
+  const state = marketState(
+    stateFromContext({ timeframeTrendUp: true, htfTrendUp: null, macdBullish: null, atrRatio: 1, volumeRatio: 1 }),
+  );
+
+  const long = scoreSetup({ direction: "LONG" }, state, config);
+  const short = scoreSetup({ direction: "SHORT" }, state, config);
+
+  // The bug: the macro defaults were OBSERVATIONS, not absences. "Dominance
+  // flat, BTC dominance not rising, not a bear market" is a favourable reading
+  // for a long and an unfavourable one for a short, so a long collected +20
+  // and a short +0 — twenty points of directional bias produced entirely by
+  // the absence of data. With SKIP at 50, that gap alone decided whether a
+  // setup traded: long 57 (TAKE_QUARTER) against short 37 (SKIP).
+  assert.equal(long.score, short.score);
+  assert.ok(long.reasons.includes("Macro: no data (+0)"));
+  assert.ok(short.reasons.includes("Macro: no data (+0)"));
+  assert.ok(long.reasons.includes("Funding: no data (+0)"));
+});
+
+test("a measured neutral still scores; only an absent one does not", () => {
+  const config = makeTradingConfig();
+  const measured = marketState({
+    usdtDominanceSignal: "NEUTRAL",
+    btcDominanceRising: false,
+    bearMarket: false,
+    fundingRate: 0,
+  });
+  const absent = marketState({});
+
+  const withData = scoreSetup({ direction: "LONG" }, measured, config);
+  const without = scoreSetup({ direction: "LONG" }, absent, config);
+
+  // "We looked, and funding is flat" is evidence. "We never looked" is not.
+  // Collapsing the two is what produced the bias above.
+  assert.ok(withData.reasons.some((r) => r.startsWith("Macro: All green")));
+  assert.ok(withData.reasons.includes("Funding: Neutral (+5)"));
+  assert.equal(withData.score - without.score, 25);
+});
+
+test("the funding kill switch cannot fire, or decline to fire, on data nobody has", () => {
+  const config = makeTradingConfig();
+  // A measured breach still kills.
+  assert.match(runKillSwitches(marketState({ fundingRate: 0.002 }), config), /FUNDING_BLOCK/);
+  // An absent rate is not a breach and is not a pass — there is simply no
+  // funding evidence, and the other switches are unaffected.
+  assert.equal(runKillSwitches(marketState({}), config), "");
+});
+
+test("a checklist result says how many points were actually reachable", () => {
+  const config = makeTradingConfig();
+  const candlesOnly = marketState(
+    stateFromContext({ timeframeTrendUp: true, htfTrendUp: null, macdBullish: true, atrRatio: 1, volumeRatio: 1 }),
+  );
+  const result = runChecklist({ symbol: "BTCUSDT", direction: "LONG", price: 100, atr: 1 }, candlesOnly, config);
+
+  // 15 daily bias (NEUTRAL) + 0 macro + 20 triggers + 15 volume + 10
+  // volatility + 0 funding. A candle backtest is scored against 60, not 100,
+  // while the SKIP floor stays at 50 — so it has to clear 83% of the evidence
+  // available to it where a fully-fed live candidate clears 50%. That is a
+  // calibration question for the promotion framework, and reporting it is how
+  // it stops being invisible.
+  assert.equal(result.availablePoints, 60);
+  assert.ok(result.confidenceScore <= result.availablePoints);
+
+  const fullyFed = marketState({
+    dailyBias: "BULLISH",
+    usdtDominanceSignal: "RISK_ON",
+    btcDominanceRising: false,
+    bearMarket: false,
+    fundingRate: 0,
+    macdBullish: true,
+    stochSignal: "OVERSOLD_CROSS",
+  });
+  assert.equal(
+    runChecklist({ symbol: "BTCUSDT", direction: "LONG", price: 100, atr: 1 }, fullyFed, config).availablePoints,
+    100,
+  );
+});
+
+test("supplied market context is recorded on the run, so a fed run is never mistaken for a bare one", async () => {
+  const service = new BacktestService({ config: makeTradingConfig() });
+  const candles = choppyCandles(400);
+  const strategy = ({ bars }) => (bars.length % 3 === 0 ? "LONG" : null);
+
+  const bare = await service.run({ symbol: "BTCUSDT", candles, warmupBars: 60, strategy });
+  const fed = await service.run({ symbol: "BTCUSDT", candles, warmupBars: 60, strategy, marketContext: FED_LONG });
+
+  assert.deepEqual(bare.marketContextFields, []);
+  assert.deepEqual(fed.marketContextFields, [
+    "bearMarket",
+    "btcDominanceRising",
+    "fundingRate",
+    "htfTrendUp",
+    "usdtDominanceSignal",
+  ]);
+  // And it is not cosmetic: the fed run has evidence the bare one does not.
+  assert.ok(fed.trades.length > bare.trades.length);
+});
+
 /* ── Phase 4: applied execution ───────────────────────────── */
 
 test("appliedExecution separates what was asked for from what was used", () => {
@@ -366,6 +494,7 @@ test("a native run of a strategy with no hints reports shared fallback", async (
     candles,
     warmupBars: 60,
     executionMode: "native",
+    marketContext: FED_LONG,
     // Stands in for mindset_v1: signals, publishes no levels.
     strategy: ({ bars }) => (bars.length % 3 === 0 ? "LONG" : null),
   });
@@ -387,6 +516,7 @@ test("a native run of a strategy with valid hints reports native", async () => {
     candles,
     warmupBars: 60,
     executionMode: "native",
+    marketContext: FED_LONG,
     strategy: hintingStrategy(() => true),
   });
 
@@ -406,6 +536,7 @@ test("a strategy whose hints are only sometimes usable reports mixed", async () 
     candles,
     warmupBars: 60,
     executionMode: "native",
+    marketContext: FED_LONG,
     // Every other signal publishes no levels, so half the fills fall back.
     strategy: hintingStrategy(() => (n += 1) % 2 === 0),
   });
@@ -424,6 +555,7 @@ test("shared mode still reports shared, whatever hints a strategy publishes", as
     candles,
     warmupBars: 60,
     strategy: hintingStrategy(() => true),
+    marketContext: FED_LONG,
   });
 
   assert.ok(result.trades.length > 0);
@@ -442,6 +574,7 @@ test("a comparison carries applied execution onto every row", async () => {
     symbol: "BTCUSDT",
     strategies: ["mindset_v1", "donchian_breakout_v1"],
     executionMode: "native",
+    marketContext: FED_LONG,
   });
 
   // The header says "native" because that is what was requested. Each row says
@@ -553,4 +686,123 @@ test("the memory adapter drops undefined values, as a JSON round trip would", ()
   const storage = new MemoryStorage();
   storage.write("k", { present: 1, absent: undefined });
   assert.deepEqual(Object.keys(storage.read("k", null)), ["present"]);
+});
+
+/* ── Lookahead: every strategy, not just the ones we remembered ─── */
+
+// Candles with enough structure that each registered strategy can actually
+// reach a decision: a wavy uptrend with volume, swing points and real ranges.
+function structuredCandles(count, seed = 11) {
+  let s = seed >>> 0;
+  const rnd = () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+  const bars = [];
+  for (let i = 0; i < count; i += 1) {
+    const close = 100 + i * 0.25 + Math.sin(i / 4) * 3 + Math.sin(i / 17) * 6;
+    const wick = 0.4 + rnd();
+    bars.push({
+      openTime: i * 900000,
+      closeTime: (i + 1) * 900000 - 1,
+      open: close - 0.2,
+      high: close + wick,
+      low: close - wick,
+      close,
+      volume: 800 + rnd() * 900,
+    });
+  }
+  return bars;
+}
+
+test("no registered strategy can see past the bar it is deciding", async () => {
+  // The runner used to enforce this structurally: it handed each strategy an
+  // array truncated at the decided bar, so future candles were not merely
+  // ignored, they were absent. Precomputing the indicator series changed that
+  // — strategies now receive the FULL array plus an index and are trusted to
+  // respect it.
+  //
+  // Every strategy in the registry today does (each slices to 0..index as its
+  // first move). This test exists so that the next one has to as well: it is
+  // registry-driven, so a Strategy v2 added later is covered the moment it is
+  // registered, without anyone remembering to write this test again.
+  const { STRATEGIES } = require("../src/services/trading/strategies");
+  const candles = structuredCandles(400);
+  const backtestable = STRATEGIES.filter((s) => s.supportsBacktest !== false);
+  assert.ok(backtestable.length >= 4, "expected the registry to have candle strategies to check");
+
+  // A future that could not be mistaken for noise: every bar after the
+  // decision point is tripled, inverted through its own range and given a
+  // hundredfold volume. Any indicator, swing scan, channel or VWAP that reads
+  // even one bar too far will move.
+  function wreckFuture(bars, from) {
+    return bars.map((b, i) =>
+      i <= from
+        ? b
+        : {
+            ...b,
+            open: b.open * 3,
+            high: b.high * 3 + 500,
+            low: b.low / 3 - 500,
+            close: b.close * 3,
+            volume: b.volume * 100,
+          },
+    );
+  }
+
+  for (const strategy of backtestable) {
+    // Several decision points, including one immediately after warmup where
+    // the strategy has the least history and is most likely to over-reach.
+    const warmup = Math.max(Number(strategy.requiredWarmupBars) || 0, 130);
+    for (const index of [warmup, Math.floor((warmup + 399) / 2), 398]) {
+      if (index >= candles.length) continue;
+
+      const clean = strategy.evaluate(candles, index, {});
+      const wrecked = strategy.evaluate(wreckFuture(candles, index), index, {});
+
+      assert.deepEqual(
+        wrecked,
+        clean,
+        `${strategy.id} produced a different signal at bar ${index} when only LATER bars changed — it is reading past its index`,
+      );
+    }
+  }
+});
+
+test("the future-invariance check would actually catch a peeking strategy", async () => {
+  // A test that can only pass is not a test. This is the same comparison run
+  // against a strategy that deliberately reads one bar too far, to prove the
+  // assertion above has teeth.
+  const candles = structuredCandles(400);
+  // The realistic version of this bug, and the one the refactor made possible:
+  // a strategy that computes an indicator over `bars` instead of over
+  // `bars.slice(0, index + 1)`. It looks completely ordinary.
+  const peeker = {
+    id: "peeker_v0",
+    evaluate(bars, index) {
+      const closes = bars.map((b) => b.close); // <- the whole array, not the prefix
+      const average = closes.reduce((a, b) => a + b, 0) / closes.length;
+      return {
+        signal: bars[index].close > average ? "LONG" : "FLAT",
+        strategy: "peeker_v0",
+        price: bars[index].close,
+        error: null,
+        reasons: [],
+        indicators: { average },
+        confidence: null,
+        stopHint: null,
+        targetHint: null,
+      };
+    },
+  };
+
+  const wrecked = candles.map((b, i) =>
+    i <= 200 ? b : { ...b, open: b.open * 3, high: b.high * 3 + 500, low: b.low / 3 - 500, close: b.close * 3, volume: b.volume * 100 },
+  );
+
+  assert.notDeepEqual(
+    peeker.evaluate(wrecked, 200, {}),
+    peeker.evaluate(candles, 200, {}),
+    "the invariance check failed to notice a strategy reading bars[index + 1]",
+  );
 });

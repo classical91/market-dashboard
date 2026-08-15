@@ -69,11 +69,26 @@ function memoryCache() {
   };
 }
 
-function makeLab(configOverrides = {}) {
+// A bullish decision-engine reading, which is what production has behind the
+// scanner. These tests are about scanner MECHANICS — claiming a candle,
+// surviving a restart, not stacking positions — so the lab needs a market
+// state that actually scores, not the empty one a missing engine produces.
+//
+// That empty state used to score a long at 57 and open positions anyway,
+// because the checklist's macro defaults read as favourable observations. Now
+// an absent feed scores as absent, so a scanner with no decision engine
+// correctly refuses to trade — see the dedicated test for that below.
+const BULLISH_DECISION = {
+  regime: { score: 70, label: "Trending", modifiers: [] },
+  newsRisk: { level: "low" },
+};
+
+function makeLab(configOverrides = {}, { decision = BULLISH_DECISION } = {}) {
   return new TradingLabService({
     dataDir: fs.mkdtempSync(path.join(os.tmpdir(), "md-scanner-")),
     config: makeTradingConfig(configOverrides),
     priceFeed: null,
+    decisionEngineService: decision ? { getDecision: async () => decision } : null,
   });
 }
 
