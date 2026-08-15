@@ -212,9 +212,22 @@
     return "○";
   }
 
+  // Which accounts an autonomous loop is currently running, so the toolbar can
+  // disable Mark to market for them. Derived from the same payload the cards
+  // render, not from a second source that could disagree.
+  var autonomousAccounts = {};
+
   function renderStrategyAccounts(data) {
     if (!strategyAccountsEl) return;
     var accounts = (data && data.accounts) || [];
+    autonomousAccounts = {};
+    accounts.forEach(function (account) {
+      var runner = account.liveResearch || {};
+      var live = runner.enabled && runner.runnerStatus && runner.runnerStatus !== "PAUSED";
+      var holdsAutonomous = (account.openPositions || []).some(autonomousOwner);
+      if (live || holdsAutonomous) autonomousAccounts[account.id] = true;
+    });
+    syncAutonomousControls();
     if (!accounts.length) {
       strategyAccountsEl.innerHTML = '<div class="de-empty">No strategies registered.</div>';
       return;
@@ -249,6 +262,12 @@
           '<div class="tl-account-equity"><span>Equity</span><strong>$' +
           Number(s.equity || 0).toLocaleString(undefined, { maximumFractionDigits: 2 }) +
           "</strong></div>" +
+          (autonomousAccounts[account.id]
+            ? '<div class="tl-autonomous-banner">LIVE DEMO — AUTONOMOUS<small>Managed by ' +
+              escapeHtml(ownerLabel(
+                ((account.openPositions || []).map(autonomousOwner).find(Boolean)) || "live-research",
+              )) + " · the dashboard observes this experiment and cannot alter it</small></div>"
+            : "") +
           '<div class="tl-acct-intent"><span>Current intent</span><strong>' +
           escapeHtml(intent.title || "Waiting for runner state") + "</strong></div>" +
           '<div class="tl-account-metrics">' +
@@ -288,6 +307,18 @@
       "</tbody></table></div>";
   }
 
+  // Positions an autonomous loop manages. The dashboard observes these; it does
+  // not participate in them, so the controls that would alter a running
+  // experiment are removed rather than left to fail against the API guard.
+  function autonomousOwner(position) {
+    var owner = (position && (position.executionOwner || (position.meta && position.meta.executionOwner))) || "";
+    return owner === "live-research" || owner === "live-scanner" ? owner : null;
+  }
+
+  function ownerLabel(owner) {
+    return owner === "live-research" ? "Live Research" : "Live Scanner";
+  }
+
   function renderPositions(positions) {
     var open = (positions || []).filter(function (p) { return p.status === "open"; });
     if (!open.length) {
@@ -308,7 +339,15 @@
           "<td>" + fmtPrice(p.tp2) + "</td>" +
           '<td class="' + pnlClass(p.realizedPnl) + '">' + fmtUsd(p.realizedPnl) + "</td>" +
           '<td class="' + pnlClass(p.unrealizedPnl) + '">' + fmtUsd(p.unrealizedPnl) + "</td>" +
-          '<td><button class="tl-close-btn" type="button" data-id="' + escapeHtml(p.id) + '">Close</button></td>' +
+          "<td>" +
+          (autonomousOwner(p)
+            // No manual close: its own loop owns the stop, the target and the
+            // strategy exit, and a hand-picked exit price would be booked as a
+            // strategy result.
+            ? '<span class="tl-autonomous-tag" title="Managed by ' + escapeHtml(ownerLabel(autonomousOwner(p))) +
+              '. Manual close is disabled so the demo account stays a clean experiment.">AUTONOMOUS</span>'
+            : '<button class="tl-close-btn" type="button" data-id="' + escapeHtml(p.id) + '">Close</button>') +
+          "</td>" +
           "</tr>"
         );
       })
@@ -1609,7 +1648,21 @@
     if (event.key === "Escape" && activityShell && !activityShell.hidden) closeAccountActivity();
   });
 
+  // Mark to market fires stops and targets. On an autonomous account that would
+  // let a page load decide an exit price, so the control is disabled rather
+  // than left to bounce off the API guard.
+  function syncAutonomousControls() {
+    if (!markBtn) return;
+    var locked = Boolean(autonomousAccounts[currentStrategy()]);
+    markBtn.disabled = locked;
+    markBtn.title = locked
+      ? "Disabled: this account is an autonomous live demo experiment and marks its own positions on each closed candle."
+      : "Mark open positions to market and fire any stop or target reached";
+    markBtn.classList.toggle("is-locked", locked);
+  }
+
   markBtn.addEventListener("click", function () {
+    if (markBtn.disabled) return;
     markBtn.disabled = true;
     postAdmin("/api/trading-lab/mark", { strategyId: currentStrategy() })
       .then(function (data) {
@@ -1625,7 +1678,7 @@
         return refresh();
       })
       .catch(function (err) { showError(err.message); })
-      .then(function () { markBtn.disabled = false; });
+      .then(function () { markBtn.disabled = false; syncAutonomousControls(); });
   });
 
   positionsTbody.addEventListener("click", function (event) {

@@ -133,3 +133,35 @@ test("the card clamp cannot clip a valid description", () => {
     assert.ok(account.shortDescription.length <= 140, account.id);
   }
 });
+
+test("the dashboard observes autonomous experiments and cannot alter them", () => {
+  const js = read("public/assets/js/trading-lab.js");
+  const css = read("public/assets/styles/trading-lab.css");
+
+  // A runner-owned position gets a tag, not a Close button.
+  assert.match(js, /autonomousOwner/);
+  assert.match(js, /tl-autonomous-tag/);
+  assert.match(css, /\.tl-autonomous-tag/);
+
+  // Mark to market is disabled for an autonomous account rather than left to
+  // bounce off the API guard.
+  assert.match(js, /syncAutonomousControls/);
+  assert.match(js, /markBtn\.disabled = locked/);
+  assert.match(js, /LIVE DEMO — AUTONOMOUS/);
+  assert.match(css, /\.tl-autonomous-banner/);
+});
+
+test("everything needed to inspect an autonomous account stays visible", () => {
+  const html = read("public/trading-lab.html");
+  const js = read("public/assets/js/trading-lab.js");
+
+  // Locking the controls must not have removed the observation surface.
+  assert.match(js, /Current intent/i);
+  assert.match(js, /Decision Pipeline/i);
+  assert.match(js, /How this strategy trades/i);
+  assert.match(js, /Recent Activity/i);
+  assert.match(js, /account\.shortDescription/);
+  assert.match(js, /What is it doing\?/);
+  assert.match(js, /Equity/);
+  assert.match(html, /id="tl-activity-shell"/);
+});

@@ -239,6 +239,11 @@ class CandleLiveResearchRunner {
       lastEvaluationAt: null,
       lastProcessedCandle: null,
       nextExpectedCandle: null,
+      // Where this experiment started. Every trade in the ledger must come from
+      // a candle that closed after this one; the baseline itself is never
+      // evaluated for an entry.
+      baselineCandle: null,
+      baselineAt: null,
       currentSignal: "FLAT",
       currentIntent: {
         code: "WAITING",
@@ -276,6 +281,12 @@ class CandleLiveResearchRunner {
     return { ...this._read(), scanning: this._running };
   }
 
+  // Drop persisted state entirely, so the next cycle re-baselines. Used by an
+  // experiment reset; never called on a normal cycle.
+  clearState() {
+    if (this._stateCache) this._stateCache.set(this.stateKey, this._initialState(), STATE_TTL_MS);
+  }
+
   async runOnce() {
     if (this._running) return { status: "busy", state: this.status() };
     this._running = true;
@@ -302,9 +313,27 @@ class CandleLiveResearchRunner {
       }
 
       const prior = Number(state.lastProcessedCandle && state.lastProcessedCandle.closeTime) || 0;
-      // First boot establishes the experiment at the latest confirmed close;
-      // it does not silently turn the current 500-bar fetch into a backtest.
-      const pending = prior ? closed.filter((bar) => closeTime(bar) > prior) : [closed[closed.length - 1]];
+
+      // ── First start: establish a baseline, do not trade it ────────────────
+      //
+      // The latest already-closed candle closed BEFORE this experiment existed.
+      // Evaluating it for an entry would open a position from information the
+      // experiment was not running to receive — a one-bar backtest booked into
+      // a live demo ledger, indistinguishable afterwards from a real result.
+      //
+      // App starts 12:47, latest finalized 1h candle closed 12:00:
+      //   12:00  baseline only, never evaluated for entry
+      //   13:00  the first candle this experiment can act on
+      //
+      // Position management is the exception and runs below: if a live-research
+      // position already exists while runner state is missing or corrupt, its
+      // stop and target must still be honoured. That path can only CLOSE what
+      // is already open; it can never invent a retroactive entry.
+      if (!prior) {
+        return { status: "baseline", state: this._write(await this._establishBaseline(closed, state)) };
+      }
+
+      const pending = closed.filter((bar) => closeTime(bar) > prior);
       if (!pending.length) {
         state.healthStatus = "RUNNING";
         state.runnerStatus = "WAITING_FOR_NEXT_CANDLE";
@@ -339,6 +368,97 @@ class CandleLiveResearchRunner {
     } finally {
       this._running = false;
     }
+  }
+
+  /**
+   * Mark where this experiment starts, without trading the candle that marks it.
+   *
+   * Called on the first cycle that has no `lastProcessedCandle` — a genuine
+   * first start, or a restart after the runner's state was lost. Both are
+   * handled the same way for entries: the baseline candle is recorded and never
+   * evaluated, so the first tradeable candle is one that closes afterwards.
+   *
+   * The two cases differ in one respect. If a live-research position is already
+   * open, state loss must not orphan it: its stop and target are honoured
+   * against the baseline candle before the baseline is written. That is
+   * position MANAGEMENT — it can close an existing position and cannot open
+   * one — so it preserves the safety property without inventing history.
+   */
+  async _establishBaseline(closed, state) {
+    const candle = closed[closed.length - 1];
+    const candleAt = isoAt(closeTime(candle) + 1);
+    const trader = this._lab.strategyLedger(this.strategyId);
+    const events = [];
+
+    const orphaned = trader
+      .getOpenPositions()
+      .filter((p) => p.symbol === this.symbol && ownedBy(p, EXECUTION_OWNERS.LIVE_RESEARCH));
+
+    if (orphaned.length) {
+      // Same pessimistic intrabar ordering the runner and the backtester use:
+      // when a bar could have hit both the stop and the target, the stop wins.
+      const ordering = replayOrderForPositions(orphaned, candle);
+      for (const price of ordering.prices) {
+        events.push(...(await trader.updatePositions(
+          { [this.symbol]: price },
+          { only: [this.symbol], positionIds: orphaned.map((position) => position.id), at: closeTime(candle) },
+        )));
+      }
+    }
+
+    const stillOpen = trader
+      .getOpenPositions()
+      .find((p) => p.symbol === this.symbol && ownedBy(p, EXECUTION_OWNERS.LIVE_RESEARCH)) || null;
+
+    state.lastProcessedCandle = {
+      openTime: Number(candle.openTime) || null,
+      closeTime: closeTime(candle),
+      closedAt: candleAt,
+      open: candle.open,
+      high: candle.high,
+      low: candle.low,
+      close: candle.close,
+    };
+    state.nextExpectedCandle = isoAt(closeTime(candle) + 1 + timeframeMs(this.timeframe));
+    // Recorded so the dashboard can say when the experiment started and prove
+    // that every result came from a candle after it.
+    state.baselineCandle = { ...state.lastProcessedCandle };
+    state.baselineAt = nowIso();
+    state.healthStatus = "RUNNING";
+    state.runnerStatus = stillOpen ? "POSITION_OPEN" : "WAITING_FOR_NEXT_CANDLE";
+    state.retryStatus = "IDLE";
+    state.lastError = null;
+    state.currentSignal = "FLAT";
+    state.setupState = "NOT_EVALUATED";
+    state.currentIntent = {
+      code: "BASELINE_ESTABLISHED",
+      title: "WAITING FOR NEXT CANDLE",
+      summary: `Experiment baseline set at the ${this.timeframe} candle closing ${candleAt}.`,
+      reason:
+        "The latest candle closed before this experiment started, so it is a baseline only and is never traded.",
+      nextAction: `Evaluate the next ${this.timeframe} candle to close`,
+      signal: "FLAT",
+      currentPrice: Number(candle.close) || null,
+      intendedTrade: false,
+    };
+
+    addActivities(state, [
+      activity(
+        "baseline",
+        `Experiment baseline established at the ${this.timeframe} candle closing ${candleAt}; it is not evaluated for entry`,
+        candleAt,
+      ),
+      ...(orphaned.length
+        ? [activity(
+            "recovery",
+            `Runner state was missing with ${orphaned.length} open position(s); stops and targets were honoured without creating any entry`,
+            candleAt,
+          )]
+        : []),
+      ...events.map((event) => activity("position-event", `${event.type} on ${this.symbol}`, candleAt, event)),
+    ]);
+
+    return state;
   }
 
   async _processCandle(closed, index, candle, state, { allowEntry = true } = {}) {
@@ -587,6 +707,30 @@ class LiveResearchService {
     } finally {
       this._running = false;
     }
+  }
+
+  // Does this service actually run the given strategy? Distinct from
+  // eligibility: a strategy can be eligible while the loop is disabled, and a
+  // disabled loop owns no experiment.
+  ownsStrategy(strategyId) {
+    return this.enabled && this._runners.has(String(strategyId));
+  }
+
+  /**
+   * Restart one experiment: clear the runner's state so the next cycle
+   * establishes a fresh baseline from the latest finalized candle.
+   *
+   * Paired with a ledger reset by TradingLabService so the two cannot disagree.
+   * Clearing state — rather than writing a new baseline here — is what makes the
+   * restart safe: the next cycle takes the baseline path, which by construction
+   * records a candle without evaluating it, so a reset can never be followed by
+   * an immediate trade on a candle that closed before the reset.
+   */
+  resetExperiment(strategyId) {
+    const runner = this._runners.get(String(strategyId));
+    if (!runner) return false;
+    runner.clearState();
+    return true;
   }
 
   statusFor(strategyId) {
