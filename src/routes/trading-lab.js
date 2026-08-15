@@ -138,6 +138,26 @@ function createTradingLabRouter({
     );
   });
 
+  // ── Strategy accounts ─────────────────────────────────────────────────────
+  //
+  // One isolated ledger per registered strategy: "does THIS strategy make
+  // money?", as opposed to the books above, which answer "what happened in this
+  // collection of activity?". An account existing confers nothing — four of the
+  // five may not trade forward and say so.
+
+  router.get("/strategy-accounts", asyncRoute(async (req, res) => {
+    res.json(await tradingLabService.strategyAccounts());
+  }));
+
+  router.get("/strategy-accounts/:id", asyncRoute(async (req, res) => {
+    res.json(
+      await tradingLabService.strategyAccount(req.params.id, {
+        minTrades: Math.max(numberOr(req.query.min_trades, 1), 1),
+        limit: Math.min(Math.max(numberOr(req.query.limit, 100), 1), 1000),
+      }),
+    );
+  }));
+
   // ── Regime ────────────────────────────────────────────────────────────────
 
   // "What environment are we in, and what does our own history say belongs in

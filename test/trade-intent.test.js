@@ -63,6 +63,14 @@ const BULLISH_DECISION = {
   newsRisk: { level: "low" },
 };
 
+// The scanner runs mindset_v1, which is forward-paper and therefore keeps its
+// own strategy account. Its positions live there, not in the portfolio book —
+// so these tests resolve the ledger the same way the handler does rather than
+// hard-coding a book name.
+function scannerLedger(lab) {
+  return lab.ledgerFor({ book: "main", strategyId: "mindset_v1" });
+}
+
 function makeLab(configOverrides = {}) {
   return new TradingLabService({
     dataDir: fs.mkdtempSync(path.join(os.tmpdir(), "md-intent-")),
@@ -198,7 +206,7 @@ test("an entry intent passes through checklist, edge gate and risk sizing", asyn
 
   // Every gate produced its own verdict, and the position's levels came from
   // the risk engine rather than the strategy.
-  const position = lab.book("main").getOpenPositions()[0];
+  const position = scannerLedger(lab).getOpenPositions()[0];
   assert.ok(position.confidenceScore > 0);
   assert.ok(position.stopLoss > 0 && position.tp1 > 0 && position.tp2 > 0);
   assert.ok(position.size > 0 && position.riskUsd > 0);
@@ -209,7 +217,7 @@ test("an entry the checklist skips opens nothing", async () => {
   // A breached daily-loss kill switch makes runChecklist return SKIP before any
   // score is computed, so nothing can be opened however good the setup looks.
   const lab = makeLab();
-  const trader = lab.book("main");
+  const trader = scannerLedger(lab);
   const account = trader.getAccount();
   account.dailyPnl = -account.startingBalance; // far past DAILY_LOSS_LIMIT_PCT
   trader.save(trader.accountFile, account);
@@ -229,7 +237,7 @@ test("an exit closes the position even with every entry gate slammed shut", asyn
   const { scanner } = makeScanner({ rows: candleRows(UP), lab });
   assert.equal((await scanner.runOnce()).status, "opened");
 
-  const trader = lab.book("main");
+  const trader = scannerLedger(lab);
   assert.equal(trader.getOpenPositions().length, 1);
 
   // Breach the daily loss limit *after* the position is open. The checklist
@@ -256,7 +264,7 @@ test("the handler never consults checklist or edge gate for an exit", async () =
   const lab = makeLab();
   const { scanner } = makeScanner({ rows: candleRows(UP), lab });
   await scanner.runOnce();
-  assert.equal(lab.book("main").getOpenPositions().length, 1);
+  assert.equal(scannerLedger(lab).getOpenPositions().length, 1);
 
   // Any gate consultation would go through evaluate(); an exit must not.
   lab.evaluate = () => {
@@ -272,12 +280,12 @@ test("the handler never consults checklist or edge gate for an exit", async () =
   );
 
   assert.equal(outcome.status, "exited");
-  assert.equal(lab.book("main").getOpenPositions().length, 0);
+  assert.equal(scannerLedger(lab).getOpenPositions().length, 0);
 });
 
 test("an exit closes only the side whose thesis broke", async () => {
   const lab = makeLab();
-  const trader = lab.book("main");
+  const trader = scannerLedger(lab);
   trader.openPosition({
     symbol: "BTCUSDT.P", direction: "LONG", size: 1, entryPrice: 100,
     stopLoss: 95, tp1: 110, tp2: 120, riskUsd: 100,

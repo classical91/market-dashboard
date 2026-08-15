@@ -21,6 +21,7 @@ const { buildStrategyMetrics } = require("./metrics");
 const { classifyRegime } = require("./regime");
 const { buildRegimeMatrix } = require("./regime-metrics");
 const { routeRegime } = require("./regime-router");
+const { listStrategyAccounts, describeStrategyAccount, acceptsForwardTrades } = require("./strategy-accounts");
 const { PaperTradingService } = require("./paper-trader");
 
 const BOOKS = [
@@ -79,6 +80,50 @@ class TradingLabService {
         new PaperTradingService({ dataDir, book: book.id, config, priceFeed }),
       ]),
     );
+    // One isolated ledger per registered strategy, derived from the registry so
+    // a sixth strategy needs no second list updating. Every strategy gets one,
+    // including the four that may not trade forward — those simply stay at
+    // their starting balance. See ./strategy-accounts.
+    this.strategyLedgers = new Map(
+      listStrategyAccounts().map((account) => [
+        account.id,
+        new PaperTradingService({ dataDir, book: account.ledgerKey, config, priceFeed }),
+      ]),
+    );
+  }
+
+  // ── Ledger resolution ─────────────────────────────────────────────────────
+
+  /**
+   * Which ledger a trade belongs to.
+   *
+   * There is exactly one of these because the gauntlet must READ and WRITE the
+   * same ledger. evaluate() reads risk state and closed-trade history to run
+   * kill switches and the edge gate; execute() opens the position. If those
+   * resolved differently — scoring against Main's loss limits while writing to
+   * a strategy account — the kill switches would be guarding the wrong book,
+   * which is a safety failure rather than a reporting one.
+   *
+   * A scanner-eligible strategy's forward trades go to its own account, so
+   * attribution is unambiguous. Everything else goes to the portfolio book:
+   * manual trades, decision-engine candidates, and the signal-bot bridge, which
+   * has no registry strategy at all and therefore cannot have a strategy
+   * account.
+   */
+  ledgerFor({ book = "main", strategyId = null } = {}) {
+    if (strategyId && acceptsForwardTrades(strategyId) && this.strategyLedgers.has(strategyId)) {
+      return this.strategyLedgers.get(strategyId);
+    }
+    return this.book(book);
+  }
+
+  // The ledger for one strategy account, whether or not it may trade forward.
+  strategyLedger(id) {
+    const ledger = this.strategyLedgers.get(String(id || ""));
+    if (!ledger) {
+      throw Object.assign(new Error(`Unknown strategy account: ${id}`), { statusCode: 404, expose: true });
+    }
+    return ledger;
   }
 
   listBooks() {
@@ -98,8 +143,12 @@ class TradingLabService {
   // Run a candidate trade through the full gauntlet without opening anything.
   // Every stage's reasoning is returned so the UI can show *why* a setup was
   // sized down or refused, not just the verdict.
-  evaluate({ book = "main", symbol, direction, entryPrice, atr = null, state = {}, strategy = null }) {
-    const trader = this.book(book);
+  evaluate({ book = "main", symbol, direction, entryPrice, atr = null, state = {}, strategy = null, strategyId = null }) {
+    // Resolved, not assumed: a scanner-eligible strategy is scored against its
+    // OWN account's risk state and closed-trade history, which is the ledger
+    // execute() will write to. Kill switches and the edge gate must read the
+    // book they are protecting.
+    const trader = this.ledgerFor({ book, strategyId });
     const signal = { symbol, direction, price: entryPrice, atr };
 
     // Live account risk (open positions, loss streaks, daily/weekly drawdown)
@@ -166,12 +215,14 @@ class TradingLabService {
     regimeConfidence = null,
     ...input
   }) {
-    const assessment = this.evaluate({ book, ...input });
+    const assessment = this.evaluate({ book, strategyId, ...input });
     if (!assessment.trade.ok) {
       return { ...assessment, opened: null };
     }
 
-    const trader = this.book(book);
+    // The same resolution evaluate() just used, so the position opens in the
+    // ledger whose limits were checked.
+    const trader = this.ledgerFor({ book, strategyId });
     const { trade } = assessment;
     const opened = trader.openPosition({
       symbol: trade.symbol,
@@ -204,7 +255,53 @@ class TradingLabService {
       },
     });
 
-    return { ...assessment, opened };
+    return { ...assessment, opened, ledger: trader.book };
+  }
+
+  // ── Strategy accounts ─────────────────────────────────────────────────────
+
+  // Every registered strategy's account, with the equity and lifecycle facts
+  // the dashboard needs to show why an inactive one is inactive.
+  async strategyAccounts() {
+    const accounts = await Promise.all(
+      listStrategyAccounts().map(async (account) => {
+        const ledger = this.strategyLedgers.get(account.id);
+        return {
+          ...account,
+          stats: await ledger.getStats(),
+          openPositions: ledger.getOpenPositions(),
+        };
+      }),
+    );
+
+    return {
+      updatedAt: new Date().toISOString(),
+      mode: this.config.liveEnabled ? "live" : "paper",
+      accounts,
+    };
+  }
+
+  // One strategy account in full: metrics, regime breakdown and history, all
+  // computed from that account's own isolated ledger.
+  async strategyAccount(id, { minTrades = 1, limit = 100 } = {}) {
+    const account = describeStrategyAccount(id);
+    if (!account) {
+      throw Object.assign(new Error(`Unknown strategy account: ${id}`), { statusCode: 404, expose: true });
+    }
+    const ledger = this.strategyLedger(account.id);
+    const history = ledger.getHistory();
+    const startingBalance = ledger.getAccount().startingBalance;
+
+    return {
+      ...account,
+      updatedAt: new Date().toISOString(),
+      stats: await ledger.getStats(),
+      openPositions: ledger.getOpenPositions(),
+      metrics: buildStrategyMetrics(history, startingBalance, minTrades),
+      regimeMetrics: buildRegimeMatrix(history, startingBalance, { minTrades }),
+      history: history.slice(-limit).reverse(),
+      totalTrades: history.length,
+    };
   }
 
   // ── Decision engine bridge ────────────────────────────────────────────────
