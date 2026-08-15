@@ -330,3 +330,104 @@ test("regime evidence attributes trades to the strategy, not the book", async ()
   assert.ok(row, "the row is keyed by strategy identity, not by signalSource");
   assert.equal(row.cells.TREND_UP.closedTrades, 1);
 });
+
+/* ── Card descriptions come from strategy metadata ────────── */
+
+test("every strategy declares a card-sized description", () => {
+  for (const account of listStrategyAccounts()) {
+    assert.ok(
+      account.shortDescription && account.shortDescription.trim().length,
+      `${account.id} has no shortDescription for its card`,
+    );
+    // Bounded in metadata rather than clipped in the UI: a clipped sentence
+    // loses its qualifying clause and confidently misdescribes the strategy.
+    assert.ok(
+      account.shortDescription.length <= 140,
+      `${account.id} shortDescription is ${account.shortDescription.length} chars, too long for a card`,
+    );
+  }
+});
+
+test("the card description is the registry's, not a second copy", () => {
+  // The failure this guards: a description written in the dashboard that drifts
+  // from the rules the moment a strategy changes.
+  const registry = new Map(listStrategies().map((s) => [s.id, s.shortDescription]));
+  for (const account of listStrategyAccounts()) {
+    assert.equal(
+      account.shortDescription,
+      registry.get(account.id),
+      `${account.id} card text does not match its registry metadata`,
+    );
+  }
+
+  const ui = fs.readFileSync(
+    path.join(__dirname, "..", "public", "assets", "js", "trading-lab.js"),
+    "utf8",
+  );
+  for (const account of listStrategyAccounts()) {
+    assert.ok(
+      !ui.includes(account.shortDescription),
+      `${account.id} description is hard-coded in the dashboard instead of read from metadata`,
+    );
+  }
+});
+
+test("a strategy without its own shortDescription still renders something true", () => {
+  // The fallback is in the metadata layer, so the UI never has to decide what
+  // to show for a strategy that forgot one.
+  const { describeStrategy } = require("../src/services/trading/strategies");
+  const described = describeStrategy({
+    id: "no_short_v1",
+    name: "No Short v1",
+    version: "1.0.0",
+    description: "A full paragraph written for a researcher reading the registry.",
+    status: "backtest",
+    supportsBacktest: true,
+    supportsLiveScanner: false,
+  });
+  assert.equal(described.shortDescription, described.description);
+});
+
+test("a malformed shortDescription fails at load rather than on a card", () => {
+  const { assertValidLifecycle } = require("../src/services/trading/strategies/lifecycle");
+  const base = {
+    id: "bad_v1", name: "Bad v1", version: "1.0.0", description: "d",
+    status: "backtest", supportsBacktest: true, supportsLiveScanner: false,
+  };
+  assert.throws(() => assertValidLifecycle({ ...base, shortDescription: "   " }), /non-empty string/);
+  assert.throws(() => assertValidLifecycle({ ...base, shortDescription: 42 }), /non-empty string/);
+  assert.throws(() => assertValidLifecycle({ ...base, shortDescription: "x".repeat(141) }), /under 140/);
+});
+
+test("BananaGun's card says it is event-driven on-chain, not candle-based", () => {
+  // The one strategy a reader could most easily mistake for a candle strategy,
+  // because every other account on the page is one.
+  const account = describeStrategyAccount("shadow_bananagun_v1");
+  const text = account.shortDescription.toLowerCase();
+
+  assert.match(text, /event-driven|event/, "must say it is event-driven");
+  assert.match(text, /on-chain/, "must say it is on-chain");
+  assert.match(text, /not candle-based/, "must say plainly that it is not candle-based");
+});
+
+test("each description names the kind of strategy it is", () => {
+  const expected = {
+    mindset_v1: /trend-following/i,
+    smc_v1: /market-structure/i,
+    donchian_breakout_v1: /breakout/i,
+    vwap_reversion_v1: /mean-reversion/i,
+    shadow_bananagun_v1: /event-driven/i,
+  };
+  for (const [id, pattern] of Object.entries(expected)) {
+    assert.match(describeStrategyAccount(id).shortDescription, pattern, id);
+  }
+});
+
+test("the static description is a different field from the live intent", () => {
+  // Current intent changes between refreshes; the description does not. If the
+  // card ever sourced both from one field, one of the two would be wrong.
+  const account = describeStrategyAccount("donchian_breakout_v1");
+  assert.ok(account.shortDescription);
+  assert.equal(account.currentIntent, undefined, "intent is runner state, not account metadata");
+  assert.notEqual(account.shortDescription, account.description, "the card text is the short form");
+});

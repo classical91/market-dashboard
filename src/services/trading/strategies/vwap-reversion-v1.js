@@ -168,6 +168,18 @@ const vwapReversionV1 = {
   tradesCounterTrend: true,
   description:
     "Fades moves stretched more than N×ATR from anchored VWAP back to VWAP, only in a low-ADX range regime, and only once the stretch has stopped extending. Refuses setups whose reward/risk does not clear a floor. Backtest only.",
+  // One or two lines of plain English, shown directly on the strategy account
+  // card. Separate from `description` because that one is a full paragraph
+  // written for a researcher reading the registry, and a card has room for a
+  // sentence — the alternative was clipping the long text in the UI, which
+  // reliably cuts a qualifying clause and leaves a confident half-sentence
+  // that misdescribes the strategy.
+  //
+  // Lives here, beside the rules it summarises, so it is reviewed in the same
+  // diff as a change to what the strategy actually does. A description held in
+  // the dashboard instead would drift the moment the rules moved.
+  shortDescription:
+    "Mean-reversion strategy looking for stretched moves away from VWAP in range conditions.",
   requiredWarmupBars: REQUIRED_WARMUP_BARS,
   warmupFor: warmupForOptions,
   validateOptions,

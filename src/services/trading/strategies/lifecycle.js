@@ -101,6 +101,22 @@ function assertValidLifecycle(strategy) {
   if (typeof strategy.supportsBacktest !== "boolean" || typeof strategy.supportsLiveScanner !== "boolean") {
     throw new Error(`${where} must declare supportsBacktest and supportsLiveScanner as booleans`);
   }
+  // Validated at load like everything else here: a shortDescription that is
+  // not a usable string would reach a card as "[object Object]" or an empty
+  // line, and a dashboard is a bad place to discover a metadata typo.
+  if (strategy.shortDescription !== undefined) {
+    if (typeof strategy.shortDescription !== "string" || !strategy.shortDescription.trim()) {
+      throw new Error(`${where} must declare shortDescription as a non-empty string when present`);
+    }
+    // A card has room for one or two lines. This is a metadata bound rather
+    // than a rendering one so the limit is enforced where the text is written
+    // — the UI never silently clips a value it was handed.
+    if (strategy.shortDescription.length > 140) {
+      throw new Error(
+        `${where} has a ${strategy.shortDescription.length}-character shortDescription; keep it under 140 so it fits a card in one or two lines`,
+      );
+    }
+  }
   if (strategy.supportsLiveResearch !== undefined && typeof strategy.supportsLiveResearch !== "boolean") {
     throw new Error(`${where} must declare supportsLiveResearch as a boolean when present`);
   }
@@ -118,6 +134,11 @@ function describeStrategy(strategy) {
     name: strategy.name,
     version: strategy.version,
     description: strategy.description,
+    // The card-sized summary. Falls back to the full description rather than
+    // being null, so a caller never has to decide what to show when a strategy
+    // has not declared one — and so a new strategy that forgets it renders
+    // something correct-but-long instead of an empty card.
+    shortDescription: strategy.shortDescription || strategy.description,
     status: strategy.status,
     supportsBacktest: strategy.supportsBacktest,
     supportsEventReplay: strategy.supportsEventReplay === true,

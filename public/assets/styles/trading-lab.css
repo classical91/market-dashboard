@@ -1058,3 +1058,26 @@
 .tl-legacy-history > #tl-legacy-books {
   margin-bottom: 14px;
 }
+
+/* The plain-English summary of what a strategy IS, shown under its name.
+   Distinct from the Current intent row, which is what it is doing now. */
+.tl-acct-desc {
+  margin: -4px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--soft);
+  /* A safety net, not the mechanism: shortDescription is bounded to 140
+     characters in strategy metadata, which is three lines at this width, so a
+     valid value never reaches this limit. It exists only so a future value
+     that slips past the metadata bound cannot grow a card without limit.
+
+     Clamped at three rather than two on purpose. Two clipped BananaGun's
+     "Not candle-based." and Donchian's "price channel." — the qualifying
+     clause is the last thing on the line and the first thing lost, which
+     turns a correct description into a confident half-sentence. Cards are
+     stretch-aligned in the grid, so a row stays level either way. */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

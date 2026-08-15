@@ -236,6 +236,13 @@
           '<div class="tl-account-body">' +
           '<div class="tl-account-head"><span>' + escapeHtml(account.name) + "</span>" +
           '<small class="tl-acct-research">Research: ' + escapeHtml(String(account.status || "unknown").toUpperCase()) + "</small></div>" +
+          // What the strategy IS, straight from registry metadata. Distinct
+          // from Current intent below, which is what it is doing right now:
+          // this line does not change between refreshes, and that difference
+          // is the point of showing both.
+          (account.shortDescription
+            ? '<p class="tl-acct-desc">' + escapeHtml(account.shortDescription) + "</p>"
+            : "") +
           '<div class="' + accountStatusClass(account) + '">' +
           accountStatusDot(account) + " LIVE DEMO: " + escapeHtml(statusLabel(runner.runnerStatus || "PAUSED")) +
           "</div>" +
