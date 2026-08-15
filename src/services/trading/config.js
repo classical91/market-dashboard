@@ -66,6 +66,11 @@ function validate(config) {
   if (config.tp2RMultiple <= config.tp1RMultiple) {
     throw new TradingConfigError("TP2_R_MULTIPLE must be greater than TP1_R_MULTIPLE");
   }
+  if (!["next-day", "never"].includes(config.consecutiveLossCooloff)) {
+    throw new TradingConfigError(
+      `CONSECUTIVE_LOSS_COOLOFF must be 'next-day' or 'never', got ${JSON.stringify(config.consecutiveLossCooloff)}`,
+    );
+  }
   if (config.tradingMode !== "paper" && config.tradingMode !== "live") {
     throw new TradingConfigError(`TRADING_MODE must be 'paper' or 'live', got ${JSON.stringify(config.tradingMode)}`);
   }
@@ -127,6 +132,21 @@ function loadTradingConfig(overrides = {}) {
     dailyLossLimitPct: envNumber("DAILY_LOSS_LIMIT_PCT", 3),
     weeklyLossLimitPct: envNumber("WEEKLY_LOSS_LIMIT_PCT", 6),
     maxConsecutiveLosses: envInt("MAX_CONSECUTIVE_LOSSES", 3),
+    // What the consecutive-loss breaker MEANS once it has fired.
+    //
+    //   "next-day"  (default) A cooling-off period: entries are blocked for
+    //               the rest of the UTC day the streak completed on, and the
+    //               streak clears at the next day boundary.
+    //   "never"     The streak clears only on a winning trade.
+    //
+    // "never" is an absorbing state, and deliberately so if you choose it: no
+    // trade can open, so no trade can win, so the streak never clears and the
+    // book is halted permanently. That is a defensible policy for real money
+    // and a useless one for research, where it silently truncates a replay to
+    // however many bars it took to lose three times. Naming the policy is the
+    // point — the old behaviour was "never" by omission rather than by
+    // decision.
+    consecutiveLossCooloff: String(envString("CONSECUTIVE_LOSS_COOLOFF", "next-day")).trim().toLowerCase(),
     maxAtrRatio: envNumber("MAX_ATR_RATIO", 3),
     fundingKillAbs: envNumber("FUNDING_KILL_ABS", 0.001),
     fundingNeutralAbs: envNumber("FUNDING_NEUTRAL_ABS", 0.0005),

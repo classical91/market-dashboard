@@ -162,10 +162,42 @@ test("smc_v1 will not take the trade against the trend", () => {
   const { bars } = bullishSmcSetup();
   // Same structure, but the caller's higher-timeframe context says down. The
   // strategy takes the context over its own EMAs and refuses the long.
-  const result = smcV1.evaluate(bars, bars.length - 1, { trendUp: false });
+  const result = smcV1.evaluate(bars, bars.length - 1, { htfTrendUp: false });
   assert.equal(result.signal, "FLAT");
   assert.equal(result.indicators.trend, "DOWN");
-  assert.equal(result.indicators.trendSource, "context");
+  assert.equal(result.indicators.trendSource, "htf");
+});
+
+test("smc_v1 ignores a same-timeframe trend offered as higher-timeframe context", () => {
+  const { bars } = bullishSmcSetup();
+
+  // `timeframeTrendUp` is the trend of the chart smc_v1 is already reading. It
+  // is not higher-timeframe information and must not be treated as any, so a
+  // false value here cannot veto the long the way `htfTrendUp: false` does
+  // above — the strategy falls through to its own EMA read.
+  const offered = smcV1.evaluate(bars, bars.length - 1, { timeframeTrendUp: false });
+  const bare = smcV1.evaluate(bars, bars.length - 1, {});
+
+  assert.equal(offered.indicators.trendSource, "ema");
+  assert.equal(offered.signal, bare.signal);
+  assert.equal(offered.confidence, bare.confidence);
+});
+
+test("smc_v1 pays its higher-timeframe confidence bonus only for genuine HTF data", () => {
+  const { bars } = bullishSmcSetup();
+
+  const withoutHtf = smcV1.evaluate(bars, bars.length - 1, {});
+  const withHtf = smcV1.evaluate(bars, bars.length - 1, { htfTrendUp: true });
+
+  assert.equal(withoutHtf.signal, "LONG");
+  assert.equal(withHtf.signal, "LONG");
+  // The +10 is a payment for information from OUTSIDE the traded timeframe. It
+  // used to be collected on a candle backtest, where the backtester filled in
+  // `trendUp` from an EMA cross of the very same candles — the strategy being
+  // paid for agreeing with itself.
+  assert.equal(withoutHtf.indicators.trendSource, "ema");
+  assert.equal(withHtf.indicators.trendSource, "htf");
+  assert.equal(withHtf.confidence - withoutHtf.confidence, 10);
 });
 
 test("smc_v1 does not enter on the displacement candle or the bar that completes the gap", () => {

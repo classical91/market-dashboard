@@ -20,6 +20,14 @@ function summarizeRun(result) {
     // different execution modes are not comparable, and without this the
     // stored record cannot tell you which one it was.
     executionMode: result.executionMode || "shared",
+    // What the run ASKED for is above; what it actually ran on is here. A
+    // comparison requested as native can contain rows that never used a native
+    // level, because the strategy publishes none — reading such a row under a
+    // "native strategy exits" header, with nothing in the row to contradict it,
+    // is the specific misreading these three fields exist to prevent.
+    executionApplied: result.executionApplied || (result.executionMode === "native" ? "none" : "shared"),
+    nativeTrades: result.nativeTrades || 0,
+    sharedTrades: result.sharedTrades || 0,
     nativeFallbacks: result.nativeFallbacks || 0,
     status: result.status || "ok",
     replayType: result.replayType || "candle",
