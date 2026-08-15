@@ -28,7 +28,10 @@ const { planTrade, calculatePositionSize } = require("./risk");
 const { buildStrategyMetrics } = require("./metrics");
 const { PaperTradingService, MemoryStorage } = require("./paper-trader");
 const { replayOrder } = require("./replay-order");
-const { atr } = require("../decision-engine");
+// No `atr` import: this module computes ATR as a prefix-consistent SERIES (see
+// atrSeries below) rather than calling decision-engine's per-prefix atr() once
+// per bar. The two agree bar for bar, and a test asserts exactly that against
+// the original — which is where the import still belongs.
 const { ema, macd } = require("../signal-screener");
 const {
   getStrategy,
@@ -47,10 +50,6 @@ const {
 // Bars needed before the first signal can be trusted: the slowest indicator
 // here is the MACD's 26-period slow EMA plus its 9-period signal line.
 const MIN_WARMUP_BARS = 60;
-
-function last(values) {
-  return values.length ? values[values.length - 1] : null;
-}
 
 // A comparison payload carries one equity curve per strategy so the UI can
 // draw them. At one point per bar that is several thousand points per
