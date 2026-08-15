@@ -18,6 +18,9 @@ const { runChecklist, marketState } = require("./checklist");
 const { assessEdge } = require("./edge-gate");
 const { planTrade } = require("./risk");
 const { buildStrategyMetrics } = require("./metrics");
+const { classifyRegime } = require("./regime");
+const { buildRegimeMatrix } = require("./regime-metrics");
+const { routeRegime } = require("./regime-router");
 const { PaperTradingService } = require("./paper-trader");
 
 const BOOKS = [
@@ -57,9 +60,19 @@ function marketStateFromDecision(decision, extra = {}) {
 }
 
 class TradingLabService {
-  constructor({ dataDir, config = getTradingConfig(), priceFeed = null, decisionEngineService = null } = {}) {
+  constructor({
+    dataDir,
+    config = getTradingConfig(),
+    priceFeed = null,
+    decisionEngineService = null,
+    // The candle source the regime engine reads. Optional: without it the
+    // regime endpoints return 503 rather than the rest of the lab failing to
+    // start, which is the same posture the backtester takes.
+    signalScreenerService = null,
+  } = {}) {
     this.config = config;
     this.decisionEngineService = decisionEngineService;
+    this.signalScreenerService = signalScreenerService;
     this.books = new Map(
       BOOKS.map((book) => [
         book.id,
@@ -247,6 +260,51 @@ class TradingLabService {
         tp2RMultiple: this.config.tp2RMultiple,
       },
       books,
+    };
+  }
+
+  // ── Regime ────────────────────────────────────────────────────────────────
+
+  /**
+   * What environment is this symbol in, and — separately — what does the
+   * recorded evidence say belongs in it?
+   *
+   * The two halves are deliberately computed independently and returned side by
+   * side. The regime read is a measurement of the market; the routing is a
+   * reading of our own trade history. Collapsing them into one verdict would
+   * hide which of the two a surprising answer came from.
+   */
+  async regime({ symbol, interval = "1h", book = "main", minTrades = 20 } = {}) {
+    if (!this.signalScreenerService) {
+      throw Object.assign(new Error("No candle source configured for regime detection"), {
+        statusCode: 503,
+        expose: true,
+      });
+    }
+
+    const candles = await this.signalScreenerService.getCandles(symbol, interval);
+    const read = classifyRegime(candles || []);
+    const matrix = this.regimeMatrix({ book, minTrades });
+    const routing = routeRegime({ read, matrix });
+
+    return {
+      symbol,
+      interval,
+      book,
+      updatedAt: new Date().toISOString(),
+      candles: (candles || []).length,
+      regime: read,
+      routing,
+    };
+  }
+
+  // The strategy × regime evidence table for one book's recorded history.
+  regimeMatrix({ book = "main", minTrades = 20 } = {}) {
+    const trader = this.book(book);
+    const account = trader.getAccount();
+    return {
+      book,
+      ...buildRegimeMatrix(trader.getHistory(), account.startingBalance, { minTrades }),
     };
   }
 

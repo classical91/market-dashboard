@@ -138,6 +138,36 @@ function createTradingLabRouter({
     );
   });
 
+  // ── Regime ────────────────────────────────────────────────────────────────
+
+  // "What environment are we in, and what does our own history say belongs in
+  // it?" Public like the other reads: it replays no ledger and spends nothing
+  // beyond the screener's already-cached candles.
+  //
+  // The routing half of the response is ADVISORY. Nothing in the scanner reads
+  // it — see services/trading/regime-router.js.
+  router.get("/regime", asyncRoute(async (req, res) => {
+    res.json(
+      await tradingLabService.regime({
+        symbol: String(req.query.symbol || "BTCUSDT").toUpperCase(),
+        interval: typeof req.query.interval === "string" && req.query.interval ? req.query.interval : "1h",
+        book: req.query.book,
+        minTrades: Math.max(numberOr(req.query.min_trades, 20), 1),
+      }),
+    );
+  }));
+
+  // The strategy × regime table on its own, for the Trading Lab's research
+  // view. No candles are fetched — this is a read of recorded history.
+  router.get("/regime-matrix", (req, res) => {
+    res.json(
+      tradingLabService.regimeMatrix({
+        book: req.query.book,
+        minTrades: Math.max(numberOr(req.query.min_trades, 20), 1),
+      }),
+    );
+  });
+
   // The bridge that makes the Decision Engine's plans answer "did setups like
   // this actually pay?" — evaluation only, nothing is opened.
   router.get("/decision-candidates", asyncRoute(async (req, res) => {

@@ -169,6 +169,9 @@ function createApp() {
     dataDir,
     priceFeed: fetchBinancePrice,
     decisionEngineService,
+    // The regime engine reads the screener's cached klines rather than fetching
+    // its own, same as the backtester.
+    signalScreenerService,
   });
   // Backtests replay the same paper-trading engine over historical candles, so
   // a backtest and a forward paper run agree by construction. It reuses the
