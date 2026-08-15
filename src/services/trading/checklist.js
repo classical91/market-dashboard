@@ -8,15 +8,39 @@
 
 const { getTradingConfig } = require("./config");
 
-// Market conditions the checklist reasons over. Anything the caller leaves out
-// keeps the neutral default, which never awards points on its own.
+// Market conditions the checklist reasons over.
+//
+// Anything the caller leaves out is UNKNOWN — `null` — and unknown never earns
+// points. That sentence used to be a comment rather than a fact, and the gap
+// between the two was a systematic bias:
+//
+//   usdtDominanceSignal defaulted to "NEUTRAL", btcDominanceRising to false,
+//   bearMarket to false. Read literally those say "dominance is flat, BTC
+//   dominance is not rising, and this is not a bear market" — three
+//   OBSERVATIONS, and for a LONG all three are favourable. A long candidate
+//   with no macro feed at all therefore collected the macro block's full +20.
+//   A short under identical no-data conditions collected +0, because the same
+//   three defaults read as unfavourable for it. Twenty points of directional
+//   bias, produced entirely by the absence of data.
+//
+//   fundingRate defaulted to 0, which reads as "funding is neutral" and paid
+//   +5 to both directions for a feed nobody had.
+//
+// A candle backtest has none of these feeds, so it was scoring every long 25
+// points above the evidence and every short 5 above — and 20 points apart from
+// each other. With SKIP at 50 and TAKE_QUARTER at 50-64, that gap alone decides
+// whether a setup trades.
+//
+// `null` now means "not measured" and is scored as such. A caller with a real
+// feed passes the real value and scores exactly as before.
 function marketState(overrides = {}) {
   return {
     regime: "UNKNOWN", // TREND_UP | TREND_DOWN | RANGE | VOLATILE_EXPANSION | LOW_COMPRESSION
     dailyBias: "NEUTRAL", // BULLISH | BEARISH | NEUTRAL
-    usdtDominanceSignal: "NEUTRAL", // RISK_ON | RISK_OFF | NEUTRAL
-    btcDominanceRising: false,
-    bearMarket: false,
+    // null = not measured. "NEUTRAL" is a real observation and scores as one.
+    usdtDominanceSignal: null, // RISK_ON | RISK_OFF | NEUTRAL | null
+    btcDominanceRising: null, // true | false | null
+    bearMarket: null, // true | false | null
     dxyBullish: false,
     newsBlackout: false,
     openPositions: 0,
@@ -24,13 +48,17 @@ function marketState(overrides = {}) {
     dailyLossPct: 0,
     weeklyLossPct: 0,
     consecutiveLosses: 0,
-    fundingRate: 0, // 8h funding rate as a fraction
+    fundingRate: null, // 8h funding rate as a fraction, or null when unmeasured
     atrRatio: 1, // current ATR / 20-period ATR average
     volumeRatio: 1, // current volume / 20-period MA
     macdBullish: null,
     stochSignal: null, // OVERSOLD_CROSS | OVERBOUGHT_CROSS | NEUTRAL
     ...overrides,
   };
+}
+
+function known(value) {
+  return value !== null && value !== undefined;
 }
 
 function runKillSwitches(state, config = getTradingConfig()) {
@@ -50,8 +78,10 @@ function runKillSwitches(state, config = getTradingConfig()) {
     return `VOLATILITY_SPIKE: ATR is ${state.atrRatio.toFixed(1)}x average`;
   }
   // Symmetric by design: crowded shorts paying longs are as much a warning as
-  // the reverse, so the magnitude of funding matters, not its sign.
-  if (Math.abs(state.fundingRate) > config.fundingKillAbs) {
+  // the reverse, so the magnitude of funding matters, not its sign. An
+  // unmeasured rate cannot breach a limit — a kill switch that fires, or
+  // declines to fire, on data nobody has is not a safety control.
+  if (known(state.fundingRate) && Math.abs(state.fundingRate) > config.fundingKillAbs) {
     const rate = (state.fundingRate * 100).toFixed(3);
     return `FUNDING_BLOCK: Rate ${state.fundingRate >= 0 ? "+" : ""}${rate}% (max ±${(config.fundingKillAbs * 100).toFixed(2)}%)`;
   }
@@ -77,24 +107,48 @@ function scoreSetup(signal, state, config = getTradingConfig()) {
   }
 
   // ── 2. Macro filter (20 pts) ────────────────────────────────────────────
+  //
+  // Scored over the inputs that were actually MEASURED. Each known input
+  // contributes to both the numerator and the denominator; an unmeasured one
+  // contributes to neither, so absent data can neither help nor hurt a
+  // direction. With all three present this is arithmetically identical to the
+  // original — the thresholds are the same 2.5-of-3 and 2-of-3, expressed as a
+  // fraction of what was available rather than of an assumed three.
   let macroGreen = 0;
-  const wantedDominanceSignal = long ? "RISK_ON" : "RISK_OFF";
-  if (state.usdtDominanceSignal === wantedDominanceSignal) macroGreen += 1;
-  else if (state.usdtDominanceSignal === "NEUTRAL") macroGreen += 0.5;
+  let macroKnown = 0;
 
-  if (long ? !state.btcDominanceRising : state.btcDominanceRising) macroGreen += 1;
-  else macroGreen += 0.5;
+  if (known(state.usdtDominanceSignal)) {
+    macroKnown += 1;
+    const wantedDominanceSignal = long ? "RISK_ON" : "RISK_OFF";
+    if (state.usdtDominanceSignal === wantedDominanceSignal) macroGreen += 1;
+    else if (state.usdtDominanceSignal === "NEUTRAL") macroGreen += 0.5;
+  }
 
-  if (long ? !state.bearMarket : state.bearMarket) macroGreen += 1;
+  if (known(state.btcDominanceRising)) {
+    macroKnown += 1;
+    macroGreen += (long ? !state.btcDominanceRising : state.btcDominanceRising) ? 1 : 0.5;
+  }
 
-  if (macroGreen >= 2.5) {
-    score += 20;
-    reasons.push("Macro: All green (+20)");
-  } else if (macroGreen >= 2) {
-    score += 10;
-    reasons.push(`Macro: Partial (${macroGreen}/3 green) (+10)`);
+  if (known(state.bearMarket)) {
+    macroKnown += 1;
+    if (long ? !state.bearMarket : state.bearMarket) macroGreen += 1;
+  }
+
+  if (macroKnown === 0) {
+    // No macro feed at all. Absent evidence is not evidence FOR the trade, and
+    // crucially it is not evidence for one direction over the other.
+    reasons.push("Macro: no data (+0)");
   } else {
-    reasons.push(`Macro: Weak (${macroGreen}/3 green) (+0)`);
+    const scale = macroKnown / 3;
+    if (macroGreen >= 2.5 * scale) {
+      score += 20;
+      reasons.push(`Macro: All green (${macroGreen}/${macroKnown} measured) (+20)`);
+    } else if (macroGreen >= 2 * scale) {
+      score += 10;
+      reasons.push(`Macro: Partial (${macroGreen}/${macroKnown} measured) (+10)`);
+    } else {
+      reasons.push(`Macro: Weak (${macroGreen}/${macroKnown} measured) (+0)`);
+    }
   }
 
   // ── 3. Entry triggers (20 pts) ──────────────────────────────────────────
@@ -144,7 +198,12 @@ function scoreSetup(signal, state, config = getTradingConfig()) {
   }
 
   // ── 6. Funding / sentiment (5 pts) ──────────────────────────────────────
-  if (Math.abs(state.fundingRate) <= config.fundingNeutralAbs) {
+  // A rate of 0 is an observation ("funding is flat") and earns the points.
+  // No rate at all is not, and does not — this block used to default to 0 and
+  // pay every candidate for a feed nobody had.
+  if (!known(state.fundingRate)) {
+    reasons.push("Funding: no data (+0)");
+  } else if (Math.abs(state.fundingRate) <= config.fundingNeutralAbs) {
     score += 5;
     reasons.push("Funding: Neutral (+5)");
   } else {
@@ -152,7 +211,25 @@ function scoreSetup(signal, state, config = getTradingConfig()) {
     reasons.push(`Funding: ${state.fundingRate >= 0 ? "+" : ""}${rate}% — crowded (+0)`);
   }
 
-  return { score, reasons };
+  // The ceiling this candidate could actually have reached. With no macro
+  // feed, no funding feed and no higher-timeframe read, 45 of the 100 points
+  // are unavailable before the setup is looked at — so a score of 55 out of an
+  // available 60 and a score of 55 out of 100 mean very different things, and
+  // the decision thresholds below were written for the second. Reporting it
+  // makes the distortion visible rather than silent; recalibrating the
+  // thresholds for partial-evidence runs is a promotion-policy decision and
+  // belongs with the rest of that policy, which does not exist yet.
+  const availablePoints =
+    // A NEUTRAL daily bias caps this block at +15 whichever way the trade
+    // faces — there is no direction that earns the other 15 from it.
+    (state.dailyBias === "NEUTRAL" ? 15 : 30) +
+    (macroKnown === 0 ? 0 : 20) +
+    (haveTriggerData ? 20 : config.missingIndicatorPoints) +
+    15 + // volume, always measured
+    10 + // volatility, always measured
+    (known(state.fundingRate) ? 5 : 0);
+
+  return { score, reasons, availablePoints };
 }
 
 function skip(reasons, score = 0, extra = {}) {
@@ -209,7 +286,11 @@ function runChecklist(signal, rawState, config = getTradingConfig()) {
   }
 
   const warnings = [];
-  if (signal.direction === "LONG" && state.bearMarket) {
+  // `=== true` throughout: an unknown bear-market state must not read as
+  // "not a bear market" and waive the gate, nor as "bear market" and impose
+  // it. Unknown means the gate has nothing to act on, which is what a missing
+  // `false` did by accident and now does on purpose.
+  if (signal.direction === "LONG" && state.bearMarket === true) {
     warnings.push("Bear market: Long requires 80+ score");
   }
   if (state.dxyBullish) {
@@ -217,10 +298,10 @@ function runChecklist(signal, rawState, config = getTradingConfig()) {
   }
 
   // 4. Score the setup.
-  const { score, reasons: scoreReasons } = scoreSetup(signal, state, config);
+  const { score, reasons: scoreReasons, availablePoints } = scoreSetup(signal, state, config);
   const reasons = [...waivedReasons, ...scoreReasons];
 
-  if (signal.direction === "LONG" && state.bearMarket && score < 80) {
+  if (signal.direction === "LONG" && state.bearMarket === true && score < 80) {
     reasons.unshift(`Bear market long blocked — need 80+ score, got ${score}`);
     return { ...skip(reasons, score), warnings };
   }
@@ -250,6 +331,10 @@ function runChecklist(signal, rawState, config = getTradingConfig()) {
   return {
     decision,
     confidenceScore: score,
+    // Out of how many points were actually reachable given the feeds present.
+    // 100 when everything is measured; 60 for a candle backtest with no macro,
+    // no funding and no higher-timeframe read.
+    availablePoints,
     sizeMultiplier: multiplier,
     reasons,
     warnings,

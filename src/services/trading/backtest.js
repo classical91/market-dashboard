@@ -448,19 +448,38 @@ function resolveStrategy(strategy) {
  * answer. Supplying genuine higher-timeframe data restores the full-credit
  * path, which is the case the 30 points were designed for.
  */
-function stateFromContext(context) {
-  const htf = context.htfTrendUp;
+function stateFromContext(context, marketContext = null) {
+  const mc = marketContext || {};
+  // A caller-supplied higher-timeframe read wins over the context's own (which
+  // is null for a candle backtest, by design).
+  const htf = mc.htfTrendUp !== undefined ? mc.htfTrendUp : context.htfTrendUp;
+  // Only fields the caller ACTUALLY SUPPLIED are passed through. Anything
+  // omitted stays unset, and the checklist scores it as unmeasured rather than
+  // as a favourable observation.
+  const supplied = {};
+  for (const key of ["usdtDominanceSignal", "btcDominanceRising", "bearMarket", "fundingRate"]) {
+    if (mc[key] !== undefined) supplied[key] = mc[key];
+  }
   return marketState({
     regime:
       context.timeframeTrendUp === null ? "RANGE" : context.timeframeTrendUp ? "TREND_UP" : "TREND_DOWN",
     dailyBias: htf === null || htf === undefined ? "NEUTRAL" : htf ? "BULLISH" : "BEARISH",
+    ...supplied,
     macdBullish: context.macdBullish,
     atrRatio: context.atrRatio,
     volumeRatio: context.volumeRatio,
-    // No macro or calendar feed exists for a historical bar, so these keep
-    // their neutral defaults rather than being invented. That costs a
-    // candidate the macro block's full credit, which is the honest outcome:
-    // absent evidence is not evidence.
+    // No macro, funding or calendar feed exists for a historical bar, so
+    // those are left UNSET and the checklist scores them as unmeasured. That
+    // costs a candidate the macro block's 20 points and the funding block's 5,
+    // which is the honest outcome: absent evidence is not evidence.
+    //
+    // It used to cost a LONG nothing at all. The old defaults — dominance
+    // "NEUTRAL", btcDominanceRising false, bearMarket false, fundingRate 0 —
+    // read as favourable observations for a long and unfavourable ones for a
+    // short, so a candle backtest handed every long +25 and every short +5 for
+    // data neither of them had, and put the two 20 points apart. A backtest
+    // that systematically prefers one direction because of what it does NOT
+    // know cannot be used to judge a strategy.
   });
 }
 
@@ -496,6 +515,17 @@ class BacktestService {
     options = {},
     warmupBars = MIN_WARMUP_BARS,
     executionMode = "shared",
+    // Market context the CALLER has and the candles do not: a higher-timeframe
+    // trend read, macro dominance, bear-market state, funding. Omitted fields
+    // stay unmeasured and score nothing, which is the honest default for a
+    // plain candle replay.
+    //
+    // This is not a knob for making a backtest trade more. It is the only way
+    // a run can be given evidence it genuinely has — a daily feed, a funding
+    // history — instead of the checklist inventing it. Whatever is supplied is
+    // recorded on the result, so a run that scored with macro context is never
+    // mistaken for one that did not.
+    marketContext = null,
   }) {
     assertValidExecutionMode(executionMode);
     const resolved = resolveStrategy(strategy);
@@ -612,6 +642,7 @@ class BacktestService {
           allowCounterTrend: resolved.definition.tradesCounterTrend === true,
           executionMode,
           at: bar.closeTime,
+          marketContext,
         });
         if (outcome.opened) {
           if (outcome.appliedMode === "native") nativeTrades += 1;
@@ -679,6 +710,10 @@ class BacktestService {
       nativeTrades,
       sharedTrades,
       nativeFallbacks,
+      // Which context fields the caller actually supplied, so a run scored with
+      // a real daily or funding feed is never confused with a candles-only one.
+      // Empty means candles only, which is the default.
+      marketContextFields: Object.keys(marketContext || {}).sort(),
       caveats: [
         // Surfaced rather than hidden: with long and short positions open on
         // the same symbol at once, one intra-bar ordering cannot be
@@ -719,9 +754,14 @@ class BacktestService {
     // which day's and which week's loss buckets the kill switches below read,
     // so a historical candidate is tested against historical risk state.
     at = null,
+    // Caller-supplied market context — see run(). Null means "candles only".
+    marketContext = null,
   }) {
     const signalSource = `backtest:${strategyId}:${interval}`;
-    const state = marketState({ ...stateFromContext(context), ...trader.getRiskState({ at }) });
+    const state = marketState({
+      ...stateFromContext(context, marketContext),
+      ...trader.getRiskState({ at }),
+    });
     const checklist = runChecklist(
       { symbol, direction, price: context.close, atr: context.atr, allowCounterTrend },
       state,
@@ -834,6 +874,8 @@ class BacktestService {
     record = false,
     notes = null,
     executionMode = "shared",
+    // See run(). Omitted means candles only.
+    marketContext = null,
   } = {}) {
     // Resolve the strategy BEFORE fetching: a typo should come back as a 400
     // immediately, not as whatever the candle source happened to do first.
@@ -854,7 +896,15 @@ class BacktestService {
       return record && result.status === "ok" ? this.recordExperiment(result, { notes }) : result;
     }
     const candles = await this.getCandles(symbol, interval);
-    const result = await this.run({ symbol, interval, candles, options, strategy: resolved, executionMode });
+    const result = await this.run({
+      symbol,
+      interval,
+      candles,
+      options,
+      strategy: resolved,
+      executionMode,
+      marketContext,
+    });
     return record ? this.recordExperiment(result, { notes }) : result;
   }
 
@@ -889,6 +939,10 @@ class BacktestService {
     strategies = [DEFAULT_STRATEGY_ID],
     options = {},
     executionMode = "shared",
+    // Applied identically to every strategy in the comparison — a row scored
+    // with macro context beside one scored without it would not be a
+    // comparison.
+    marketContext = null,
     // Rows below this many closed trades are reported but NOT ranked. The
     // default of 1 only excludes strategies that never traded; a real
     // statistical threshold is a promotion-policy decision and belongs with
@@ -915,7 +969,15 @@ class BacktestService {
           ? replayBananaGunEvents({ events: dataset.events, dataSource: dataset.path })
           : replayBananaGunEvents({ events: [], dataSource: dataset.path });
       } else {
-        result = await this.run({ symbol, interval, candles, options, strategy: id, executionMode });
+        result = await this.run({
+          symbol,
+          interval,
+          candles,
+          options,
+          strategy: id,
+          executionMode,
+          marketContext,
+        });
       }
       // The curve rides ALONGSIDE the summary, not inside it: summarizeRun is
       // also what gets persisted as an experiment record, and a few thousand
@@ -932,6 +994,7 @@ class BacktestService {
       symbol,
       interval,
       executionMode,
+      marketContextFields: Object.keys(marketContext || {}).sort(),
       minRankedTrades,
       ranAt: new Date().toISOString(),
       results: rankRows(rows, minRankedTrades),

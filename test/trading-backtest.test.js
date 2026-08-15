@@ -56,6 +56,32 @@ function risingCandles(count) {
   });
 }
 
+// Market context a caller genuinely has once a higher-timeframe and funding
+// feed are wired up. Fixtures below that are testing FILL MECHANICS — which
+// intra-bar extreme fires first, whether an entry fills at the signalling
+// close, whether native levels are applied — supply it so the checklist has
+// real evidence to score and the setup is actually sized.
+//
+// Without it a candle-only run has just 60 of the checklist's 100 points
+// reachable (no macro, no funding, no daily bias) against an unchanged
+// 50-point floor, so almost nothing trades. That restriction is correct and is
+// asserted on its own further down; it just makes it a poor harness for
+// testing whether a stop fills at the right price.
+const FED_LONG = Object.freeze({
+  htfTrendUp: true,
+  usdtDominanceSignal: "RISK_ON",
+  btcDominanceRising: false,
+  bearMarket: false,
+  fundingRate: 0,
+});
+const FED_SHORT = Object.freeze({
+  htfTrendUp: false,
+  usdtDominanceSignal: "RISK_OFF",
+  btcDominanceRising: true,
+  bearMarket: true,
+  fundingRate: 0,
+});
+
 // 61 gently rising warmup bars followed by one caller-shaped bar. The rise is
 // slow enough that the breakout rule stays quiet (so only the test's own
 // strategy opens anything) but steady enough that the trend filter reads
@@ -254,6 +280,7 @@ test("entries fill at the signalling bar's close, never at a later price", async
       }
       return null;
     },
+    marketContext: FED_LONG,
   });
 
   const opened = [...result.trades, ...result.openAtEnd];
@@ -274,6 +301,7 @@ test("when a bar contains both the stop and the target, the stop wins", async ()
     candles,
     warmupBars: WARMUP - 1,
     strategy: onlyAtEntryBar("LONG"),
+    marketContext: FED_LONG,
   });
 
   assert.equal(result.trades.length, 1);
@@ -310,6 +338,7 @@ test("a short's adverse extreme is the high, and it is tested first", async () =
     candles,
     warmupBars: WARMUP - 1,
     strategy: onlyAtEntryBar("SHORT"),
+    marketContext: FED_SHORT,
   });
 
   assert.equal(result.trades.length, 1);
@@ -329,6 +358,7 @@ test("a clean winning bar still books the win", async () => {
     candles,
     warmupBars: WARMUP - 1,
     strategy: onlyAtEntryBar("LONG"),
+    marketContext: FED_LONG,
   });
 
   assert.equal(result.trades.length, 1);
@@ -356,6 +386,7 @@ test("open positions are marked before a new entry is considered", async () => {
     candles,
     warmupBars: WARMUP - 1,
     strategy: onlyAtEntryBar("LONG"),
+    marketContext: FED_LONG,
   });
 
   assert.equal(result.trades.length, 1);
@@ -375,6 +406,7 @@ test("a position still open at the end is reported, not force-closed into the st
     candles,
     warmupBars: WARMUP - 1,
     strategy: onlyAtEntryBar("LONG"),
+    marketContext: FED_LONG,
   });
 
   assert.equal(result.openAtEnd.length, 1);
@@ -441,11 +473,22 @@ function randomWalk(seed, { bars: barCount = 600, drift = 0 } = {}) {
 
 test("a trend strategy finds no edge in a driftless random walk", async () => {
   const service = makeService();
+  // Fed context, and not for convenience: this is the suite's load-bearing
+  // test, and a null test that opens no trades asserts nothing at all. Without
+  // a scored setup the loop below would `continue` past every seed and pass in
+  // silence — the exact failure mode a lookahead regression would hide behind.
+  // The `traded` counter makes that unfalsifiable rather than implicit.
+  let traded = 0;
 
   for (const seed of [7, 42, 1234, 99999]) {
-    const result = await service.run({ symbol: "RNDUSDT", candles: randomWalk(seed) });
+    const result = await service.run({
+      symbol: "RNDUSDT",
+      candles: randomWalk(seed),
+      marketContext: FED_LONG,
+    });
     const m = result.stats.riskMetrics;
     if (!m.closedTrades) continue;
+    traded += m.closedTrades;
 
     assert.ok(
       m.expectancyR <= 0.15,
@@ -456,6 +499,8 @@ test("a trend strategy finds no edge in a driftless random walk", async () => {
       `seed ${seed}: profit factor ${m.profitFactor} on a random walk suggests lookahead or an optimistic fill`,
     );
   }
+
+  assert.ok(traded > 0, "no seed opened a trade — this null test proved nothing");
 });
 
 // The same null test, applied to every registered candle strategy rather than
@@ -505,7 +550,11 @@ test("a strongly trending series is where a trend strategy is allowed to win", a
   const service = makeService();
   // The same generator with real drift — proof the pessimistic fills have not
   // simply made every strategy lose, which would be its own kind of wrong.
-  const result = await service.run({ symbol: "TRNUSDT", candles: randomWalk(42, { drift: 0.004 }) });
+  const result = await service.run({
+    symbol: "TRNUSDT",
+    candles: randomWalk(42, { drift: 0.004 }),
+    marketContext: FED_LONG,
+  });
   assert.ok(result.stats.riskMetrics.closedTrades > 0);
   assert.ok(result.stats.riskMetrics.expectancyR > 0);
 });
@@ -673,7 +722,12 @@ function nativeLevelStrategy({ stopHint, targetHint, at = 80 } = {}) {
 test("shared execution ignores the strategy's own levels — that is the point of it", async () => {
   const service = makeService();
   const strategy = nativeLevelStrategy({ stopHint: (p) => p * 0.5, targetHint: (p) => p * 1.5 });
-  const result = await service.run({ symbol: "BTCUSDT", candles: risingCandles(200), strategy });
+  const result = await service.run({
+    symbol: "BTCUSDT",
+    candles: risingCandles(200),
+    strategy,
+    marketContext: FED_LONG,
+  });
 
   const positions = [...result.trades, ...result.openAtEnd];
   assert.equal(positions.length, 1);
@@ -697,6 +751,7 @@ test("native execution uses the strategy's own stop and target", async () => {
     candles: risingCandles(200),
     strategy,
     executionMode: "native",
+    marketContext: FED_LONG,
   });
 
   const positions = [...result.trades, ...result.openAtEnd];
@@ -717,12 +772,18 @@ test("native execution keeps the dollar risk identical to shared execution", asy
   const service = makeService();
   const strategy = nativeLevelStrategy({ stopHint: (p) => p * 0.5, targetHint: (p) => p * 5 });
 
-  const shared = await service.run({ symbol: "BTCUSDT", candles: risingCandles(200), strategy });
+  const shared = await service.run({
+    symbol: "BTCUSDT",
+    candles: risingCandles(200),
+    strategy,
+    marketContext: FED_LONG,
+  });
   const native = await service.run({
     symbol: "BTCUSDT",
     candles: risingCandles(200),
     strategy,
     executionMode: "native",
+    marketContext: FED_LONG,
   });
 
   const s = [...shared.trades, ...shared.openAtEnd][0];
@@ -747,6 +808,7 @@ test("a native run that cannot get native levels says so instead of pretending",
     candles: trendingCandlesForCompare(400),
     strategy: "mindset_v1",
     executionMode: "native",
+    marketContext: FED_LONG,
   });
 
   const positions = [...result.trades, ...result.openAtEnd];
@@ -766,6 +828,7 @@ test("a hint on the wrong side of the entry is refused, not traded", async () =>
     candles: risingCandles(200),
     strategy,
     executionMode: "native",
+    marketContext: FED_LONG,
   });
 
   const positions = [...result.trades, ...result.openAtEnd];

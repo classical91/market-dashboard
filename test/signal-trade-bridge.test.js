@@ -27,7 +27,22 @@ function flatCandles(close = 100, count = 60) {
   }));
 }
 
-function makeLab({ configOverrides = {}, priceFeed = null, decisionEngineService = null } = {}) {
+// The decision-engine reading production runs behind the bridge. Tests here
+// are about BRIDGE behaviour — dry run, dedupe, position caps, auto-marking —
+// so the lab needs a market state that scores. An absent feed now scores as
+// absent rather than as a favourable observation, so a lab with no engine
+// refuses every entry; tests that want that refusal pass their own engine (or
+// none) explicitly.
+const BULLISH_DECISION = {
+  regime: { score: 70, label: "Trending", modifiers: [] },
+  newsRisk: { level: "low" },
+};
+
+function makeLab({
+  configOverrides = {},
+  priceFeed = null,
+  decisionEngineService = { getDecision: async () => BULLISH_DECISION },
+} = {}) {
   return new TradingLabService({
     dataDir: fs.mkdtempSync(path.join(os.tmpdir(), "md-bridge-")),
     config: makeTradingConfig(configOverrides),
@@ -82,7 +97,7 @@ test("dry run is the default: transitions are scored but nothing is opened", asy
   assert.equal(actions[0].opened, null);
   // The reasoning still has to be produced — the point of the dry run is the
   // decision trail, not silence.
-  assert.equal(actions[0].decision, "TAKE_QUARTER");
+  assert.equal(actions[0].decision, "TAKE_HALF");
   assert.ok(actions[0].confidenceScore > 0);
   assert.equal(lab.book("main").getOpenPositions().length, 0, "dry run must not touch the ledger");
 });
@@ -386,7 +401,7 @@ test("a candle failure for one symbol does not disturb another symbol's replay",
   assert.equal(btc[0].currentPrice, 100, "and was never marked at the other symbol's ticker price");
 });
 
-test("an unreachable decision engine degrades to a neutral state instead of failing", async () => {
+test("an unreachable decision engine degrades gracefully — and refuses to trade blind", async () => {
   const lab = makeLab({
     decisionEngineService: {
       async getDecision() { throw new Error("Binance klines HTTP 403"); },
@@ -395,7 +410,25 @@ test("an unreachable decision engine degrades to a neutral state instead of fail
   const { bridge } = makeBridge({ lab, paperTradeEnabled: true });
 
   const [action] = await bridge.handleTransitions([transition()]);
-  assert.equal(action.status, "opened", "a missing macro read must not block evaluation entirely");
+
+  // Degrading gracefully means the pipeline keeps running and keeps
+  // explaining itself: no throw, an action, a decision, a reason.
+  assert.ok(action, "an outage must not take the bridge down with it");
+  assert.equal(action.decision, "SKIP");
+  assert.ok(action.reason, "a refusal has to say why");
+
+  // It does NOT mean trading anyway. With the macro feed down every macro
+  // input is unmeasured, and unmeasured no longer reads as favourable — so the
+  // setup cannot reach the 50-point floor and nothing opens.
+  //
+  // This assertion is the reverse of what it used to be, deliberately. The old
+  // behaviour was that an outage still opened positions, because the
+  // checklist's macro defaults ("dominance flat, not a bear market") scored a
+  // long at 57 out of thin air. A bot that keeps trading longs precisely when
+  // it has lost sight of the market is not degrading gracefully, it is
+  // degrading silently.
+  assert.notEqual(action.status, "opened");
+  assert.equal(lab.book("main").getOpenPositions().length, 0);
 });
 
 test("candle failures fall back to the configured ATR assumption", async () => {

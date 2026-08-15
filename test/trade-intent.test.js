@@ -53,11 +53,22 @@ function memoryCache() {
   return { get: (k) => (map.has(k) ? map.get(k) : null), set: (k, v) => map.set(k, v) };
 }
 
+// The decision-engine reading production runs behind the intent handler. These
+// tests are about the ENTRY/EXIT boundary, not about scoring, so the lab needs
+// a market state that actually scores — an absent feed now scores as absent
+// rather than as a favourable observation, so an engineless lab refuses
+// entries outright.
+const BULLISH_DECISION = {
+  regime: { score: 70, label: "Trending", modifiers: [] },
+  newsRisk: { level: "low" },
+};
+
 function makeLab(configOverrides = {}) {
   return new TradingLabService({
     dataDir: fs.mkdtempSync(path.join(os.tmpdir(), "md-intent-")),
     config: makeTradingConfig(configOverrides),
     priceFeed: null,
+    decisionEngineService: { getDecision: async () => BULLISH_DECISION },
   });
 }
 
