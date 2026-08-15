@@ -13,6 +13,7 @@ const shadowBananagunV1 = {
   supportsBacktest: false,
   supportsEventReplay: true,
   supportsLiveScanner: false,
+  supportsLiveResearch: false,
   requiredWarmupBars: 0,
   description:
     "Point-in-time memecoin candidate replay with safety snapshots and conservative gas, slippage, MEV and failed-transaction costs. Event replay only; candle backtests are refused.",
@@ -21,6 +22,18 @@ const shadowBananagunV1 = {
     required:
       "Historical JSON/JSONL candidate snapshots under data/trading-lab/event-replay/shadow_bananagun_v1/candidates.jsonl",
     productionStatus: "insufficient-data-until-snapshots-exist",
+  },
+  describeRules() {
+    return {
+      purpose: "Point-in-time on-chain candidate and safety event replay",
+      looksFor: "Candidate, liquidity, safety, gas, slippage, MEV and failed-transaction snapshots",
+      longEntry: "Unavailable until a live on-chain candidate and safety feed exists",
+      shortEntry: "Not applicable",
+      trendFilter: "Not candle based",
+      stop: "Defined by the event-replay contract, not OHLCV candles",
+      target: "Defined by the event-replay contract, not OHLCV candles",
+      positionSizing: "Unavailable for live demo until the required event feed exists",
+    };
   },
 };
 

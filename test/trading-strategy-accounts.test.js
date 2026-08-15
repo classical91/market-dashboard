@@ -11,6 +11,7 @@ const {
   listStrategyAccounts,
   describeStrategyAccount,
   acceptsForwardTrades,
+  acceptsLiveResearchTrades,
   ledgerKey,
 } = require("../src/services/trading/strategy-accounts");
 const { listStrategies } = require("../src/services/trading/strategies");
@@ -255,6 +256,18 @@ test("the three legacy ledgers stay readable, unattributed and read-only", async
   ]) {
     assert.throws(mutate, /archived and read-only/);
   }
+});
+
+test("live research may run in an isolated account without promoting it", () => {
+  for (const id of ["smc_v1", "donchian_breakout_v1", "vwap_reversion_v1"]) {
+    const account = describeStrategyAccount(id);
+    assert.equal(account.status, "backtest");
+    assert.equal(account.scannerEligible, false);
+    assert.equal(acceptsForwardTrades(id), false);
+    assert.equal(account.liveResearchEligible, true);
+    assert.equal(acceptsLiveResearchTrades(id), true);
+  }
+  assert.equal(acceptsLiveResearchTrades("shadow_bananagun_v1"), false);
 });
 
 test("a trade with no strategy attribution is refused and touches no legacy ledger", async () => {

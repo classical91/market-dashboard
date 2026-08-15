@@ -81,6 +81,37 @@ test("dropUnclosedCandle removes only a still-open last candle", () => {
   assert.equal(dropUnclosedCandle([], now).length, 0, "empty input stays empty");
 });
 
+test("a forced candle read replaces a cached unfinished kline with one fresh finalized payload", async () => {
+  const closeTime = Date.now() - 1;
+  let fetches = 0;
+  let close = 100;
+  const originalFetch = global.fetch;
+  global.fetch = async () => {
+    fetches += 1;
+    return {
+      ok: true,
+      json: async () => [[closeTime - 3_599_999, "100", "105", "95", String(close), "1000", closeTime]],
+    };
+  };
+  try {
+    const service = new SignalScreenerService({ cache: new MemoryCache(), cacheMs: 300_000 });
+    assert.equal((await service.getCandles("BTCUSDT", "1h"))[0].close, 100);
+
+    close = 103;
+    assert.equal((await service.getCandles("BTCUSDT", "1h"))[0].close, 100, "ordinary read stays cached");
+    const [freshA, freshB] = await Promise.all([
+      service.getCandles("BTCUSDT", "1h", { force: true }),
+      service.getCandles("BTCUSDT", "1h", { force: true }),
+    ]);
+
+    assert.equal(freshA[0].close, 103);
+    assert.equal(freshB[0].close, 103);
+    assert.equal(fetches, 2, "concurrent runner refreshes coalesce into one Binance request");
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
 test("a wild still-open candle cannot flip the signal, but is shown as the live price", async () => {
   const rows = [];
   for (let i = 0; i < 500; i++) {

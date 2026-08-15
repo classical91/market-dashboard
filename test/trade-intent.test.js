@@ -211,6 +211,7 @@ test("an entry intent passes through checklist, edge gate and risk sizing", asyn
   assert.ok(position.stopLoss > 0 && position.tp1 > 0 && position.tp2 > 0);
   assert.ok(position.size > 0 && position.riskUsd > 0);
   assert.equal(position.meta.edgeDecision !== undefined, true);
+  assert.equal(position.executionOwner, "live-scanner");
 });
 
 test("an entry the checklist skips opens nothing", async () => {
@@ -281,6 +282,26 @@ test("the handler never consults checklist or edge gate for an exit", async () =
 
   assert.equal(outcome.status, "exited");
   assert.equal(scannerLedger(lab).getOpenPositions().length, 0);
+});
+
+test("a scanner exit cannot close a live-research-owned position in the same strategy account", async () => {
+  const lab = makeLab();
+  const trader = scannerLedger(lab);
+  trader.openPosition({
+    symbol: "BTCUSDT.P", direction: "LONG", size: 1, entryPrice: 100,
+    stopLoss: 95, tp1: 110, tp2: 120, riskUsd: 5,
+    signalSource: "live-research:1h", executionOwner: "live-research",
+  });
+  const handler = new TradeIntentHandler({ tradingLabService: lab, signalSource: "live-scanner:15m", logger: QUIET });
+
+  const outcome = await handler.handle(buildTradeIntent({
+    signal: "EXIT_LONG", symbol: "BTCUSDT.P", price: 90, tf: "15m",
+    strategy: "mindset_v1", candleTs: new Date().toISOString(),
+  }));
+
+  assert.equal(outcome.status, "noop");
+  assert.equal(trader.getOpenPositions().length, 1);
+  assert.equal(trader.getHistory().length, 0);
 });
 
 test("an exit closes only the side whose thesis broke", async () => {

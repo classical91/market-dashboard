@@ -23,4 +23,5 @@ app.listen(config.port, () => {
   } else {
     console.log("[LiveScanner] Not configured — check LIVE_SCANNER_* settings");
   }
+  if (app.locals.liveResearch) app.locals.liveResearch.start();
 });

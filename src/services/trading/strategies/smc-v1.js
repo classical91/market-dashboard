@@ -150,9 +150,23 @@ const smcV1 = {
   status: "backtest",
   supportsBacktest: true,
   supportsLiveScanner: false,
+  supportsLiveResearch: true,
   description:
     "Conservative Smart Money Concepts approximation: higher-timeframe (or EMA) trend, break of structure on a confirmed swing, a displacement candle leaving a fair value gap, entered on the retest of that gap. Backtest only.",
   requiredWarmupBars: REQUIRED_WARMUP_BARS,
+
+  describeRules() {
+    return {
+      purpose: "Mechanical market-structure continuation research",
+      looksFor: "Trend alignment, a confirmed break of structure, displacement with a fair value gap, then a retest",
+      longEntry: "Bullish trend plus bullish BOS and displaced FVG retest",
+      shortEntry: "Bearish trend plus bearish BOS and displaced FVG retest",
+      trendFilter: `EMA${SMC_V1_DEFAULTS.trendFast}/EMA${SMC_V1_DEFAULTS.trendSlow}, unless genuine higher-timeframe context is supplied`,
+      stop: `${SMC_V1_DEFAULTS.stopBufferAtr} ATR beyond the far side of the retested gap`,
+      target: `Next opposing structure, otherwise ${SMC_V1_DEFAULTS.fallbackRewardR}R`,
+      positionSizing: "Trading Lab checklist, edge gate and account-local risk limits",
+    };
+  },
 
   evaluate(candles, index, context = {}) {
     const options = { ...SMC_V1_DEFAULTS, ...(context.options || {}) };

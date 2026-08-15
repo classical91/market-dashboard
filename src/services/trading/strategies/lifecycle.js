@@ -68,6 +68,13 @@ function computeScannerEligible(strategy) {
   return strategy.supportsLiveScanner === true && SCANNER_STATUSES.includes(strategy.status);
 }
 
+// Live demo research is evidence collection, not promotion. A candle strategy
+// may opt into the isolated paper runner while its lifecycle remains
+// `backtest`; this capability is never consulted by the production scanner.
+function computeLiveResearchEligible(strategy) {
+  return strategy.supportsLiveResearch === true && strategy.supportsBacktest === true;
+}
+
 // Real-money eligibility is a lifecycle claim only. It is deliberately NOT
 // conditioned on supportsLiveScanner: whether the scanner can run something is
 // a different question from whether its evidence would justify real money.
@@ -94,6 +101,9 @@ function assertValidLifecycle(strategy) {
   if (typeof strategy.supportsBacktest !== "boolean" || typeof strategy.supportsLiveScanner !== "boolean") {
     throw new Error(`${where} must declare supportsBacktest and supportsLiveScanner as booleans`);
   }
+  if (strategy.supportsLiveResearch !== undefined && typeof strategy.supportsLiveResearch !== "boolean") {
+    throw new Error(`${where} must declare supportsLiveResearch as a boolean when present`);
+  }
   if (strategy.supportsEventReplay !== undefined && typeof strategy.supportsEventReplay !== "boolean") {
     throw new Error(`${where} must declare supportsEventReplay as a boolean when present`);
   }
@@ -112,10 +122,13 @@ function describeStrategy(strategy) {
     supportsBacktest: strategy.supportsBacktest,
     supportsEventReplay: strategy.supportsEventReplay === true,
     supportsLiveScanner: strategy.supportsLiveScanner,
+    supportsLiveResearch: strategy.supportsLiveResearch === true,
+    liveResearchEligible: computeLiveResearchEligible(strategy),
     scannerEligible: computeScannerEligible(strategy),
     realMoneyEligible: computeRealMoneyEligible(strategy),
     requiredWarmupBars: strategy.requiredWarmupBars,
     datasetAvailability: strategy.datasetAvailability || null,
+    rules: typeof strategy.describeRules === "function" ? strategy.describeRules() : null,
   };
 }
 
@@ -123,6 +136,7 @@ module.exports = {
   LIFECYCLE_STATUSES,
   SCANNER_STATUSES,
   computeScannerEligible,
+  computeLiveResearchEligible,
   computeRealMoneyEligible,
   assertValidLifecycle,
   describeStrategy,

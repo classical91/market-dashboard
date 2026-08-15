@@ -122,6 +122,17 @@ The **backtester** takes a strategy from its own registry (`GET /api/trading-lab
 - `LIVE_SCANNER_BOOK` - Trading Lab book scanner trades land in, defaults to `main`.
 - `LIVE_SCANNER_PAPER_TRADE_ENABLED` - defaults to `true` once the scanner is enabled; set `false` for an observe-only run that scores and logs signals but opens nothing.
 
+### Live Strategy Research Accounts
+
+Trading Lab continuously evaluates every candle-compatible registered strategy against newly closed candles and writes simulated results only to that strategy's isolated `$10,000` demo ledger. This runner is an evidence-collection capability, not a lifecycle promotion: a strategy can remain `backtest` while its live demo runner says `RUNNING`. It never changes `scannerEligible`, `forward-paper`, or `realMoneyEligible`, never routes through an exchange adapter, and never mutates historical backtest ledgers. BananaGun stays event-replay only until live point-in-time candidate and safety snapshots exist.
+
+- `LIVE_RESEARCH_ENABLED` - defaults to `true`; set `false` to pause all live demo research runners.
+- `LIVE_RESEARCH_SYMBOL` - defaults to `BTCUSDT`.
+- `LIVE_RESEARCH_TIMEFRAME` - defaults to `1h`.
+- `LIVE_RESEARCH_INTERVAL_MS` - polling cadence, defaults to `60000`. Only newly closed candles are evaluated and the last processed close is persisted across restarts.
+
+Strategy-account GETs are observational: they read the runner's last persisted mark and cannot trigger SL/TP or change P&L. The runner force-refreshes raw klines before accepting a new finalized close. After downtime it replays missed bars only to manage an existing position, evaluates entries only on the newest finalized bar, and uses the same SL/TP exit contract as the backtester. Position records carry an execution owner, so Signal Bot and Live Scanner cannot mark live-research trades. Startup also refuses a paper-trading Live Scanner and Live Research claiming the same strategy account; disable one writer rather than combining two experiments in one wallet.
+
 ### On-Chain
 
 - `DEFILLAMA_API_BASE_URL`, `DEFILLAMA_COINS_API_BASE_URL`, `DEFILLAMA_CHAIN`, `DEFILLAMA_COIN_CHAIN`.

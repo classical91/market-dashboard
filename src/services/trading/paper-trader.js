@@ -314,6 +314,17 @@ class PaperTradingService {
     return account;
   }
 
+  // A read-only account snapshot. It applies rollover semantics to the copy it
+  // returns so callers see today's buckets, but never persists backfills,
+  // rollovers, or a newly initialized account. Dashboard GETs use this path;
+  // execution paths continue to use getAccount().
+  readAccount({ at = null } = {}) {
+    const stored = this.load(this.accountFile, null);
+    const account = { ...this.newAccount({ at }), ...(stored || {}) };
+    this.applyRollover(account, at);
+    return account;
+  }
+
   saveAccount(account, { at = null } = {}) {
     account.lastUpdated = this.now(at);
     this.save(this.accountFile, account);
@@ -370,6 +381,7 @@ class PaperTradingService {
     riskUsd,
     confidenceScore = null,
     signalSource = "manual",
+    executionOwner = null,
     meta = {},
     openedAt = null,
   }) {
@@ -422,6 +434,7 @@ class PaperTradingService {
       exits: [],
       confidenceScore,
       signalSource,
+      executionOwner: executionOwner ? String(executionOwner) : null,
       meta,
       status: "open",
       openedAt: this.now(openedAt),
@@ -587,14 +600,16 @@ class PaperTradingService {
   // replaying one symbol's candles must not drag every *other* open symbol
   // along at the live ticker, which would both fill them at a price from the
   // wrong moment and re-hit the ticker endpoint once per replayed price.
-  async updatePositions(prices = null, { only = null, at = null } = {}) {
+  async updatePositions(prices = null, { only = null, positionIds = null, at = null } = {}) {
     const positions = this.getPositions();
     const events = [];
     const cache = {};
     const wanted = only ? new Set(only) : null;
+    const owned = positionIds ? new Set(positionIds) : null;
 
     for (const pos of positions) {
       if (pos.status !== "open") continue;
+      if (owned && !owned.has(pos.id)) continue;
 
       const symbol = pos.symbol || "BTCUSDT";
       if (wanted && !wanted.has(symbol)) continue;
@@ -650,9 +665,8 @@ class PaperTradingService {
 
   // ── Stats ─────────────────────────────────────────────────────────────────
 
-  async getStats({ at = null } = {}) {
-    await this.updatePositions(null, { at });
-    const account = this.getAccount({ at });
+  readStats({ at = null } = {}) {
+    const account = this.readAccount({ at });
     const history = this.getHistory();
     const open = this.getOpenPositions();
 
@@ -687,6 +701,14 @@ class PaperTradingService {
       openPositions: open.length,
       riskMetrics: calculateTradeMetrics(history, account.startingBalance),
     };
+  }
+
+  // Explicit execution-time stats: mark first, then take the same snapshot the
+  // observational path uses. Callers must opt into mutation by choosing this
+  // method instead of readStats().
+  async getStats({ at = null } = {}) {
+    await this.updatePositions(null, { at });
+    return this.readStats({ at });
   }
 
   // Percentages the checklist's kill switches read. Losses are reported as

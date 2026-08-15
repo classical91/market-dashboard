@@ -63,6 +63,7 @@ const {
   LIFECYCLE_STATUSES,
   SCANNER_STATUSES,
   computeScannerEligible,
+  computeLiveResearchEligible,
   computeRealMoneyEligible,
   assertValidLifecycle,
   describeStrategy,
@@ -128,6 +129,21 @@ function getScannerStrategy(id) {
       `Strategy "${key}" is not scanner eligible: status ${meta.status} does not permit forward-paper operation ` +
         `(needs one of ${SCANNER_STATUSES.join(", ")})`,
     );
+  }
+  return strategy;
+}
+
+// Resolve a strategy for the live DEMO research runner. Lifecycle status is
+// intentionally absent from this check: running an isolated simulated account
+// collects evidence and does not promote the strategy or make it scanner
+// eligible.
+function getLiveResearchStrategy(id) {
+  const key = String(id || "");
+  const strategy = BY_ID.get(key);
+  if (!strategy) throw new Error(`Unknown strategy "${key}" (registered: ${[...BY_ID.keys()].join(", ")})`);
+  const meta = describeStrategy(strategy);
+  if (!meta.liveResearchEligible || typeof strategy.evaluate !== "function") {
+    throw new Error(`Strategy "${key}" is not compatible with candle live research`);
   }
   return strategy;
 }
@@ -208,10 +224,12 @@ module.exports = {
   describe,
   describeStrategy,
   computeScannerEligible,
+  computeLiveResearchEligible,
   computeRealMoneyEligible,
   hasStrategy,
   getStrategy,
   getScannerStrategy,
+  getLiveResearchStrategy,
   warmupFor,
   assertValidOptions,
   checkPositiveInt,

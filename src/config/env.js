@@ -206,6 +206,14 @@ const config = {
     // way the ledger is paper — no live-order code is reachable from here.
     paperTradeEnabled: process.env.LIVE_SCANNER_PAPER_TRADE_ENABLED !== "false",
   },
+  liveResearch: {
+    // Evidence collection for every candle-compatible strategy account. This
+    // is independent of lifecycle promotion and remains paper-only.
+    enabled: process.env.LIVE_RESEARCH_ENABLED !== "false",
+    symbol: process.env.LIVE_RESEARCH_SYMBOL || "BTCUSDT",
+    timeframe: process.env.LIVE_RESEARCH_TIMEFRAME || "1h",
+    intervalMs: parseNumber(process.env.LIVE_RESEARCH_INTERVAL_MS, 60 * 1000),
+  },
   traderclaw: {
     baseUrl: String(process.env.TRADERCLAW_BASE_URL || "").replace(/\/+$/, ""),
     requestTimeoutMs: parseNumber(process.env.TRADERCLAW_REQUEST_TIMEOUT_MS, 8000),

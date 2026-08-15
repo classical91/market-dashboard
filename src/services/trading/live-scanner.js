@@ -36,6 +36,7 @@ const { dropUnclosedCandle } = require("../signal-screener");
 const { evaluateMindsetV1, MINDSET_V1_DEFAULTS, atrSeries } = require("./strategies/mindset-v1-rules");
 const { getScannerStrategy } = require("./strategies");
 const { replayOrderForPositions } = require("./replay-order");
+const { EXECUTION_OWNERS, ownedBy } = require("./execution-owner");
 const { buildTradeIntent, isExit, ENTRY_SIGNALS } = require("./trade-intent");
 const { classifyRegime } = require("./regime");
 const { TradeIntentHandler } = require("./intent-handler");
@@ -498,7 +499,9 @@ class LiveScannerService {
     } catch {
       return [];
     }
-    const open = trader.getOpenPositions().filter((p) => p.symbol === this.symbol);
+    const open = trader
+      .getOpenPositions()
+      .filter((p) => p.symbol === this.symbol && ownedBy(p, EXECUTION_OWNERS.LIVE_SCANNER));
     if (!open.length) return [];
 
     const bars = closed.filter((c) => c.closeTime > since);
@@ -506,13 +509,18 @@ class LiveScannerService {
 
     const events = [];
     for (const bar of bars) {
-      const positions = trader.getOpenPositions().filter((p) => p.symbol === this.symbol);
+      const positions = trader
+        .getOpenPositions()
+        .filter((p) => p.symbol === this.symbol && ownedBy(p, EXECUTION_OWNERS.LIVE_SCANNER));
       if (!positions.length) break;
       // Same intrabar ordering the backtester and the signal bridge use, so a
       // forward paper run and a replay agree on which of SL/TP fired first.
       const { prices } = replayOrderForPositions(positions, bar);
       for (const price of prices) {
-        events.push(...(await trader.updatePositions({ [this.symbol]: price }, { only: [this.symbol] })));
+        events.push(...(await trader.updatePositions(
+          { [this.symbol]: price },
+          { only: [this.symbol], positionIds: positions.map((position) => position.id) },
+        )));
       }
     }
     for (const event of events) {

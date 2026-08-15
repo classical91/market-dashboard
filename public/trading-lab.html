@@ -26,14 +26,29 @@
 
     <div class="tl-concepts">
       <div><strong>Strategy account</strong> — the isolated performance of one strategy, with its own balance and history.</div>
+      <div><strong>Live demo research</strong> — continuous simulated evidence collection. It does not promote a strategy or make it scanner-eligible.</div>
       <div><strong>Legacy paper history</strong> — the retired Main, Shadow SMC and Alts ledgers. They remain readable and receive no new trades.</div>
       <div><strong>Backtest</strong> — a historical replay. It runs on a disposable ledger and never changes a persistent balance.</div>
     </div>
 
     <div class="de-card">
       <div class="de-card-title">Strategy Paper Accounts</div>
-      <div class="de-card-note">Five active demo accounts, derived from the strategy registry and initialized from the same paper balance. An account existing is not permission to trade: only a strategy promoted to <strong>forward&#8209;paper</strong> can add forward trades.</div>
+      <div class="de-card-note">Five isolated demo accounts, each initialized from the same paper balance. Research status and live demo state are separate: a backtest-status strategy can collect live simulated evidence without gaining scanner or real-money eligibility.</div>
       <div class="tl-account-grid" id="tl-strategy-accounts"><div class="de-empty">Loading&hellip;</div></div>
+    </div>
+
+    <div class="tl-activity-shell" id="tl-activity-shell" hidden>
+      <button class="tl-activity-backdrop" type="button" data-close-activity aria-label="Close Account Activity"></button>
+      <aside class="tl-activity-panel" role="dialog" aria-modal="true" aria-labelledby="tl-activity-title">
+        <div class="tl-activity-panel-head">
+          <div>
+            <div class="tl-kicker">Account Activity</div>
+            <h2 id="tl-activity-title">Strategy</h2>
+          </div>
+          <button class="tl-activity-close" type="button" data-close-activity aria-label="Close">&times;</button>
+        </div>
+        <div id="tl-activity-content"><div class="de-empty">Loading account activity&hellip;</div></div>
+      </aside>
     </div>
 
     <div class="de-toolbar">

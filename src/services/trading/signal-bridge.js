@@ -24,6 +24,7 @@ const { atr } = require("../decision-engine");
 const { dropUnclosedCandle } = require("../signal-screener");
 const { replayOrderForPositions } = require("./replay-order");
 const { listStrategyAccounts } = require("./strategy-accounts");
+const { signalBridgeMayManage } = require("./execution-owner");
 
 const ENTRY_TRANSITIONS = new Set(["LONG", "SHORT"]);
 const DEFAULT_MARK_INTERVAL = "4h";
@@ -40,14 +41,6 @@ function positionInterval(pos) {
   const source = String((pos && pos.signalSource) || "");
   const match = source.match(/^signal-bot:(.+)$/);
   return match ? match[1] : DEFAULT_MARK_INTERVAL;
-}
-
-// Positions opened by the live scanner are marked by the live scanner, on its
-// own venue and timeframe. Marking them here would price a Bitget perpetual
-// (BTCUSDT.P) off the Binance spot klines this bridge reads, on the wrong
-// interval — so they are left to their owner.
-function ownedByLiveScanner(pos) {
-  return String((pos && pos.signalSource) || "").startsWith("live-scanner:");
 }
 
 function lastMarkedTime(pos) {
@@ -111,7 +104,7 @@ class SignalTradeBridge {
     const marks = [];
     for (const { id } of listStrategyAccounts()) {
       const trader = this._lab.strategyLedger(id);
-      if (!trader.getOpenPositions().length) continue;
+      if (!trader.getOpenPositions().some(signalBridgeMayManage)) continue;
       try {
         const events = await this._markBookWithCandles(trader);
         for (const event of events) {
@@ -126,13 +119,14 @@ class SignalTradeBridge {
   }
 
   async _markBookWithCandles(trader) {
+    const bridgePositions = trader.getOpenPositions().filter(signalBridgeMayManage);
+    if (!bridgePositions.length) return [];
     if (!this._screener || typeof this._screener.getCandles !== "function") {
-      return trader.updatePositions();
+      return trader.updatePositions(null, { positionIds: bridgePositions.map((position) => position.id) });
     }
 
     const groups = new Map();
-    for (const pos of trader.getOpenPositions()) {
-      if (ownedByLiveScanner(pos)) continue;
+    for (const pos of bridgePositions) {
       const interval = positionInterval(pos);
       const key = `${pos.symbol}:${interval}`;
       const since = lastMarkedTime(pos);
@@ -141,6 +135,7 @@ class SignalTradeBridge {
         symbol: pos.symbol,
         interval,
         since: existing ? Math.min(existing.since, since) : since,
+        positionIds: [...(existing?.positionIds || []), pos.id],
       });
     }
 
@@ -157,9 +152,10 @@ class SignalTradeBridge {
   // events that replay produced.
   async _markGroup(trader, group) {
     const only = [group.symbol];
+    const positionIds = group.positionIds;
     const tickerFallback = (message) => {
       this._logger.warn?.(`[SignalBridge] ${message} for ${group.symbol} ${group.interval}`);
-      return trader.updatePositions(null, { only });
+      return trader.updatePositions(null, { only, positionIds });
     };
 
     let candles;
@@ -183,22 +179,25 @@ class SignalTradeBridge {
 
     const events = [];
     for (const candle of closed) {
-      const symbolPositions = trader.getOpenPositions().filter((p) => p.symbol === group.symbol);
+      const symbolPositions = trader
+        .getOpenPositions()
+        .filter((p) => p.symbol === group.symbol && positionIds.includes(p.id));
       if (!symbolPositions.length) break;
       const ordering = replayOrderForPositions(symbolPositions, candle);
       for (const price of ordering.prices) {
-        events.push(...(await trader.updatePositions({ [group.symbol]: price }, { only })));
+        events.push(...(await trader.updatePositions({ [group.symbol]: price }, { only, positionIds })));
       }
-      this._stampLastMarked(trader, group.symbol, group.interval, candleCloseTime(candle));
+      this._stampLastMarked(trader, group.symbol, group.interval, candleCloseTime(candle), positionIds);
     }
     return events;
   }
 
-  _stampLastMarked(trader, symbol, interval, closeTime) {
+  _stampLastMarked(trader, symbol, interval, closeTime, positionIds) {
     const positions = trader.getPositions();
+    const owned = new Set(positionIds);
     let changed = false;
     for (const pos of positions) {
-      if (pos.status !== "open" || pos.symbol !== symbol || positionInterval(pos) !== interval) continue;
+      if (pos.status !== "open" || pos.symbol !== symbol || !owned.has(pos.id) || positionInterval(pos) !== interval) continue;
       pos.meta = { ...(pos.meta || {}), signalBridgeLastMarkedCloseTime: closeTime };
       changed = true;
     }
