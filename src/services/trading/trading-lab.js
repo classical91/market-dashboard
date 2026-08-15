@@ -28,7 +28,7 @@ const {
   acceptsLiveResearchTrades,
 } = require("./strategy-accounts");
 const { PaperTradingService, MemoryStorage } = require("./paper-trader");
-const { EXECUTION_OWNERS, ownerFromSignalSource } = require("./execution-owner");
+const { EXECUTION_OWNERS, ownerFromSignalSource, positionOwner } = require("./execution-owner");
 
 const LEGACY_BOOKS = [
   { id: "main", name: "Main", archived: true },
@@ -146,6 +146,98 @@ class TradingLabService {
   attachLiveResearchService(service) {
     this.liveResearchService = service || null;
     return this;
+  }
+
+  // ── Experiment ownership ──────────────────────────────────────────────────
+
+  /**
+   * The autonomous loop that owns this strategy account, or null.
+   *
+   * A live demo account is a claim: "$10,000 became $10,x, and every trade came
+   * from this strategy's own runner reacting to candles that closed after the
+   * experiment started". That claim survives only if exactly one writer touches
+   * the ledger, so this is the question every manual mutation has to ask first.
+   *
+   * Read from the attached service rather than from lifecycle metadata: a
+   * strategy can be live-research ELIGIBLE while the loop is disabled, and a
+   * disabled loop owns nothing. Eligibility is permission; ownership is fact.
+   */
+  autonomousOwnerOf(strategyId) {
+    const service = this.liveResearchService;
+    if (!service || !service.enabled || typeof service.ownsStrategy !== "function") return null;
+    return service.ownsStrategy(strategyId) ? EXECUTION_OWNERS.LIVE_RESEARCH : null;
+  }
+
+  /**
+   * Positions in this account that an autonomous loop is managing.
+   *
+   * Ownership is read off the POSITION, not off the account: an account can
+   * hold a runner-owned position and a manual one at once — a manual trade
+   * opened before the runner was enabled, say — and only the first is
+   * protected. Refusing to mark the whole account because of one runner-owned
+   * position would be as wrong as marking the runner's position because the
+   * account also holds a manual one.
+   */
+  autonomousPositionsIn(strategyId) {
+    return this.strategyLedger(strategyId)
+      .getOpenPositions()
+      .filter((position) => {
+        const owner = positionOwner(position);
+        return owner === EXECUTION_OWNERS.LIVE_RESEARCH || owner === EXECUTION_OWNERS.LIVE_SCANNER;
+      });
+  }
+
+  /**
+   * Restart one demo experiment: ledger and runner together, or not at all.
+   *
+   * Resetting only the ledger is the failure this replaces. It leaves a fresh
+   * $10,000 account whose runner still holds `lastProcessedCandle` from the old
+   * experiment, so the two disagree about what has happened — and the runner
+   * resumes mid-stream rather than starting a new experiment.
+   *
+   * The runner's state is cleared rather than re-baselined here, which is what
+   * makes the ordering safe: the next cycle takes the baseline path, records the
+   * latest finalized candle WITHOUT evaluating it, and only trades a candle
+   * closing after the reset. A reset can therefore never be followed by a trade
+   * on a candle that closed before it.
+   */
+  async resetExperiment(strategyId) {
+    const account = describeStrategyAccount(strategyId);
+    if (!account) {
+      throw Object.assign(new Error(`Unknown strategy account: ${strategyId}`), { statusCode: 404, expose: true });
+    }
+    const ledger = this.strategyLedger(account.id);
+    const service = this.liveResearchService;
+    const autonomous = Boolean(this.autonomousOwnerOf(account.id));
+
+    // Refused rather than half-done when the runner cannot be restarted with
+    // the ledger: a reset that clears the balance and leaves the runner
+    // mid-experiment produces exactly the disagreement this method exists to
+    // prevent.
+    if (autonomous && (!service || typeof service.resetExperiment !== "function")) {
+      throw Object.assign(
+        new Error(
+          `${account.id} is running an autonomous live demo experiment and its runner state cannot be restarted, so a reset would leave the ledger and the runner disagreeing. Stop Live Research before resetting.`,
+        ),
+        { statusCode: 409, expose: true },
+      );
+    }
+
+    const reset = ledger.reset();
+    const runnerReset = autonomous ? service.resetExperiment(account.id) : false;
+
+    return {
+      strategyId: account.id,
+      book: ledger.book,
+      account: reset,
+      // Stated so a caller can tell a full experiment restart from a plain
+      // ledger reset of an idle account.
+      runnerReset,
+      autonomous,
+      baseline: runnerReset
+        ? "Runner state cleared; the next finalized candle becomes the new baseline and is not traded."
+        : "No autonomous runner owns this account.",
+    };
   }
 
   // ── Ledger resolution ─────────────────────────────────────────────────────

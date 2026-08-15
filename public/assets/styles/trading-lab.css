@@ -1081,3 +1081,49 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+/* ── Autonomous demo accounts ───────────────────────────────
+   The dashboard observes these experiments and cannot alter them. Everything
+   remains visible; only the controls that would write are removed. */
+
+.tl-autonomous-banner {
+  margin: 2px 0 -2px;
+  padding: 7px 9px;
+  border-left: 2px solid var(--green);
+  border-radius: 0 6px 6px 0;
+  background: var(--green-bg);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--green);
+}
+
+.tl-autonomous-banner small {
+  display: block;
+  margin-top: 3px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--soft);
+}
+
+/* Replaces the Close button on a runner-owned row. A tag rather than a
+   disabled button: a greyed-out control invites clicking and implies the
+   action exists, when the point is that this position has one owner. */
+.tl-autonomous-tag {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--green);
+  border: 1px solid rgba(0,227,150,0.4);
+  background: var(--green-bg);
+  white-space: nowrap;
+}
+
+.aia-run-btn.is-locked {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

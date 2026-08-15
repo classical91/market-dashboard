@@ -94,6 +94,16 @@ function runner({ id = "mindset_v1", evaluate, source, cache, lab } = {}) {
   });
 }
 
+// A live demo experiment begins with a BASELINE: the first cycle records the
+// latest already-closed candle without evaluating it, because that candle
+// closed before the experiment existed. Tests that want an entry therefore
+// establish the baseline first and then deliver a genuinely new close.
+async function startExperiment(subject) {
+  const result = await subject.runOnce();
+  assert.equal(result.status, "baseline", "the first cycle must be a baseline, not a trade");
+  return result;
+}
+
 test("only a fully closed candle can produce live-research execution", async () => {
   const lab = tempLab();
   const future = candle(250, { openTime: Date.now(), closeTime: Date.now() + 3_600_000, close: 100 });
@@ -121,6 +131,9 @@ test("a newly closed candle is evaluated once and persists structured intent", a
     evaluate: () => { evaluations += 1; return signal("LONG"); },
   });
 
+  await startExperiment(subject);
+  assert.equal(evaluations, 0, "the baseline candle must never be evaluated for entry");
+  rows.push(candle(131, { close: 100 }));
   await subject.runOnce();
   await subject.runOnce();
 
@@ -142,6 +155,10 @@ test("restart state prevents duplicate evaluation and duplicate execution", asyn
   let evaluations = 0;
   const evaluate = () => { evaluations += 1; return signal("LONG"); };
 
+  await startExperiment(runner({ lab, cache, source, evaluate }));
+  rows.push(candle(131, { close: 100 }));
+  // A restart reads the persisted baseline and processes the new close once;
+  // a second restart must not re-execute a candle already processed.
   await runner({ lab, cache, source, evaluate }).runOnce();
   await runner({ lab, cache, source, evaluate }).runOnce();
 
@@ -151,8 +168,15 @@ test("restart state prevents duplicate evaluation and duplicate execution", asyn
 
 test("backtest-status strategies may collect live research without gaining scanner permission", async () => {
   const lab = tempLab();
-  const subject = runner({ id: "donchian_breakout_v1", lab, evaluate: () => signal("LONG") });
+  const rows = candles();
+  const subject = runner({
+    id: "donchian_breakout_v1", lab,
+    source: { async getCandles() { return rows; } },
+    evaluate: () => signal("LONG"),
+  });
 
+  await startExperiment(subject);
+  rows.push(candle(131, { close: 100 }));
   const result = await subject.runOnce();
   assert.equal(result.status, "processed");
   assert.equal(lab.strategyLedger("donchian_breakout_v1").getOpenPositions().length, 1);
@@ -171,10 +195,14 @@ test("backtest-status strategies may collect live research without gaining scann
 
 test("each runner reads risk and writes trades only in its own account", async () => {
   const lab = tempLab();
-  await Promise.all([
-    runner({ id: "mindset_v1", lab, evaluate: () => signal("LONG") }).runOnce(),
-    runner({ id: "smc_v1", lab, evaluate: () => signal("LONG") }).runOnce(),
-  ]);
+  const rows = candles();
+  const source = { async getCandles() { return rows; } };
+  const mindset = runner({ id: "mindset_v1", lab, source, evaluate: () => signal("LONG") });
+  const smc = runner({ id: "smc_v1", lab, source, evaluate: () => signal("LONG") });
+
+  await Promise.all([startExperiment(mindset), startExperiment(smc)]);
+  rows.push(candle(131, { close: 100 }));
+  await Promise.all([mindset.runOnce(), smc.runOnce()]);
 
   assert.equal(lab.strategyLedger("mindset_v1").getOpenPositions().length, 1);
   assert.equal(lab.strategyLedger("smc_v1").getOpenPositions().length, 1);
@@ -188,15 +216,28 @@ test("a later candle continues SL/TP management before evaluating the next setup
   const rows = candles();
   let current = rows;
   const firstCloseTime = rows.at(-1).closeTime;
+  // The bar immediately after the baseline — the first this experiment may act
+  // on. Built once and its close time read from it: candle() derives timestamps
+  // from Date.now(), so calling it twice produces two different bars.
+  const entryBar = candle(130, { open: 100, high: 101, low: 99, close: 100 });
+  const entryCloseTime = entryBar.closeTime;
   const subject = runner({
     lab,
     cache,
     source: { async getCandles() { return current; } },
-    evaluate: (_bars, index) => closeTimeAt(_bars[index]) === firstCloseTime ? signal("LONG") : signal("FLAT", 90, { indicators: { atr: 2, trend: "FLAT" } }),
+    // LONG on the first close after the baseline, FLAT on every later one.
+    evaluate: (_bars, index) => closeTimeAt(_bars[index]) === entryCloseTime
+      ? signal("LONG")
+      : signal("FLAT", 90, { indicators: { atr: 2, trend: "FLAT" } }),
   });
 
+  await startExperiment(subject);
+  // The entry candle has to close AFTER the baseline, so it is appended rather
+  // than being the baseline itself.
+  current = [...rows, entryBar];
   await subject.runOnce();
-  current = [...rows, candle(131, { open: 100, high: 101, low: 90, close: 90 })];
+  assert.equal(lab.strategyLedger("mindset_v1").getOpenPositions().length, 1, "entry taken on the new close");
+  current = [...current, candle(131, { open: 100, high: 101, low: 90, close: 90 })];
   await subject.runOnce();
 
   assert.equal(lab.strategyLedger("mindset_v1").getOpenPositions().length, 0);
@@ -253,10 +294,13 @@ test("an opposing strategy signal does not add a live-only exit absent from back
     evaluate: () => signal(direction),
   });
 
+  await startExperiment(subject);
+  current = [...current, candle(131, { open: 100, high: 101, low: 99, close: 100 })];
   await subject.runOnce();
   const first = lab.strategyLedger("mindset_v1").getOpenPositions()[0];
+  assert.ok(first, "a position must exist before an opposing signal can be tested");
   direction = "SHORT";
-  current = [...current, candle(131, { open: 100, high: 101, low: 99, close: 100 })];
+  current = [...current, candle(132, { open: 100, high: 101, low: 99, close: 100 })];
   await subject.runOnce();
 
   const [stillOpen] = lab.strategyLedger("mindset_v1").getOpenPositions();
@@ -280,6 +324,8 @@ test("one runner error does not stop another account", async () => {
   }));
   service._runners.set("mindset_v1", runner({ id: "mindset_v1", lab, evaluate: () => signal("FLAT") }));
 
+  // Two cycles: the first baselines both accounts, the second evaluates.
+  await service.runOnce();
   const cycle = await service.runOnce();
   assert.equal(cycle.status, "complete");
   assert.equal(service.statusFor("smc_v1").healthStatus, "ERROR");
@@ -334,3 +380,152 @@ test("BananaGun is event-data-only and never receives a candle runner", () => {
 function closeTimeAt(row) {
   return Number(row && row.closeTime) || 0;
 }
+
+/* ── Experiment integrity ─────────────────────────────────── */
+
+test("first startup establishes a baseline and cannot open a position", async () => {
+  const lab = tempLab();
+  const cache = new MemoryStateCache();
+  let evaluated = 0;
+  const subject = runner({
+    lab,
+    cache,
+    // A signal that would trade every single candle, so nothing but the
+    // baseline rule can be what keeps the ledger empty.
+    evaluate: () => { evaluated += 1; return signal("LONG"); },
+  });
+
+  const result = await subject.runOnce();
+  const status = subject.status();
+
+  assert.equal(result.status, "baseline");
+  assert.equal(evaluated, 0, "the baseline candle must not be evaluated for entry");
+  assert.equal(lab.strategyLedger("mindset_v1").getOpenPositions().length, 0);
+  assert.equal(lab.strategyLedger("mindset_v1").getHistory().length, 0);
+
+  // The baseline is recorded, so the next cycle knows where the experiment began.
+  assert.ok(status.lastProcessedCandle.closeTime > 0);
+  assert.ok(status.baselineCandle.closeTime > 0);
+  assert.equal(status.baselineCandle.closeTime, status.lastProcessedCandle.closeTime);
+  assert.ok(status.baselineAt);
+  assert.equal(status.runnerStatus, "WAITING_FOR_NEXT_CANDLE");
+  assert.equal(status.currentIntent.code, "BASELINE_ESTABLISHED");
+  assert.ok(status.activity.some((entry) => entry.type === "baseline"));
+});
+
+test("the first candle to close after the baseline can produce an entry", async () => {
+  const lab = tempLab();
+  const cache = new MemoryStateCache();
+  const rows = candles();
+  const subject = runner({ lab, cache, source: { async getCandles() { return rows; } }, evaluate: () => signal("LONG") });
+
+  await startExperiment(subject);
+  assert.equal(lab.strategyLedger("mindset_v1").getOpenPositions().length, 0);
+
+  const fresh = candle(130, { close: 100 });
+  rows.push(fresh);
+  await subject.runOnce();
+
+  const [position] = lab.strategyLedger("mindset_v1").getOpenPositions();
+  assert.ok(position, "a candle closing after the baseline is tradeable");
+  assert.equal(position.executionOwner, "live-research");
+  // Opened at the new candle's close, not at the baseline's.
+  assert.equal(position.openedAt, new Date(fresh.closeTime).toISOString());
+});
+
+test("state loss with an open position manages it without inventing an entry", async () => {
+  const lab = tempLab();
+  const cache = new MemoryStateCache();
+  const rows = candles();
+  const source = { async getCandles() { return rows; } };
+  const subject = runner({ lab, cache, source, evaluate: () => signal("LONG") });
+
+  await startExperiment(subject);
+  rows.push(candle(130, { close: 100 }));
+  await subject.runOnce();
+  const opened = lab.strategyLedger("mindset_v1").getOpenPositions();
+  assert.equal(opened.length, 1);
+
+  // Runner state is lost; the ledger still holds the live-research position.
+  cache.map.clear();
+  const recovered = runner({ lab, cache, source, evaluate: () => signal("LONG") });
+  // A bar that takes out the stop, so recovery has real work to do.
+  rows.push(candle(131, { open: 100, high: 101, low: 80, close: 80 }));
+  const result = await recovered.runOnce();
+
+  assert.equal(result.status, "baseline", "recovery re-baselines rather than replaying history");
+  const ledger = lab.strategyLedger("mindset_v1");
+  // The stop was honoured — the position was not orphaned.
+  assert.equal(ledger.getOpenPositions().length, 0);
+  assert.equal(ledger.getHistory().length, 1, "exactly the one pre-existing trade, closed");
+  const status = recovered.status();
+  assert.ok(status.activity.some((entry) => entry.type === "recovery"));
+  assert.ok(status.baselineCandle.closeTime > 0);
+});
+
+test("a reset restarts the experiment so no old candle can be traded", async () => {
+  const lab = tempLab();
+  const cache = new MemoryStateCache();
+  const rows = candles();
+  const source = { async getCandles() { return rows; } };
+  const subject = runner({ lab, cache, source, evaluate: () => signal("LONG") });
+
+  await startExperiment(subject);
+  rows.push(candle(130, { close: 100 }));
+  await subject.runOnce();
+  assert.equal(lab.strategyLedger("mindset_v1").getOpenPositions().length, 1);
+
+  const service = new LiveResearchService({
+    tradingLabService: lab,
+    candleSource: source,
+    stateCache: cache,
+    logger: QUIET,
+  });
+  service._runners.set("mindset_v1", subject);
+  lab.attachLiveResearchService(service);
+
+  const reset = await lab.resetExperiment("mindset_v1");
+  assert.equal(reset.runnerReset, true, "the runner restarts with the ledger");
+  assert.equal(reset.account.balance, reset.account.startingBalance);
+  assert.equal(lab.strategyLedger("mindset_v1").getOpenPositions().length, 0);
+  assert.equal(lab.strategyLedger("mindset_v1").getHistory().length, 0);
+
+  // The very next cycle must re-baseline, not trade the candle it already saw.
+  const after = await subject.runOnce();
+  assert.equal(after.status, "baseline");
+  assert.equal(lab.strategyLedger("mindset_v1").getOpenPositions().length, 0);
+});
+
+test("reading an account never mutates it", async () => {
+  const lab = tempLab();
+  const cache = new MemoryStateCache();
+  const rows = candles();
+  const subject = runner({ lab, cache, source: { async getCandles() { return rows; } }, evaluate: () => signal("LONG") });
+
+  await startExperiment(subject);
+  rows.push(candle(130, { close: 100 }));
+  await subject.runOnce();
+
+  const ledger = lab.strategyLedger("mindset_v1");
+  const before = JSON.stringify({
+    positions: ledger.getOpenPositions(),
+    history: ledger.getHistory(),
+    account: ledger.getAccount(),
+  });
+
+  // What a dashboard refresh does: read the account, the detail, the status.
+  await lab.strategyAccounts();
+  await lab.strategyAccount("mindset_v1");
+  subject.status();
+  await lab.strategyAccounts();
+
+  assert.equal(
+    JSON.stringify({
+      positions: ledger.getOpenPositions(),
+      history: ledger.getHistory(),
+      account: ledger.getAccount(),
+    }),
+    before,
+    "a page load changed the experiment",
+  );
+});

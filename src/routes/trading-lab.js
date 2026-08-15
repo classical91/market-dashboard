@@ -3,6 +3,7 @@
 const { Router } = require("express");
 
 const { listStrategies, DEFAULT_STRATEGY_ID } = require("../services/trading/strategies");
+const { positionOwner } = require("../services/trading/execution-owner");
 
 function asyncRoute(handler) {
   return (req, res, next) => {
@@ -28,6 +29,23 @@ function requireFields(body, fields) {
 function readLedger(tradingLabService, values = {}) {
   const strategyId = values.strategyId || values.strategy;
   return strategyId ? tradingLabService.strategyLedger(strategyId) : tradingLabService.book(values.book);
+}
+
+// An autonomous demo account is an experiment, and an experiment with two
+// writers is not an experiment. These helpers are the single place a manual
+// route asks "may I touch this?", so a new admin route cannot quietly acquire
+// the ability to alter a running result.
+function refuseAutonomous(res, { owner, what, detail }) {
+  const managedBy = owner === "live-research" ? "Live Research" : "Live Scanner";
+  res.status(409).json({
+    error: `Position is managed by ${managedBy}. ${what} is disabled to preserve demo-account experiment integrity.`,
+    owner,
+    managedBy,
+    // Said out loud rather than silently ignored: a caller that believes it
+    // marked the book and did not would misread every number afterwards.
+    refused: true,
+    ...(detail ? { detail } : {}),
+  });
 }
 
 function createTradingLabRouter({
@@ -245,6 +263,23 @@ function createTradingLabRouter({
   router.post("/positions", requireAdmin, asyncRoute(async (req, res) => {
     const body = req.body || {};
     requireFields(body, ["strategyId", "symbol", "direction", "entryPrice"]);
+
+    // ONE DEMO ACCOUNT -> ONE EXPERIMENT -> ONE EXECUTION OWNER.
+    // A hand-placed trade in a running experiment's ledger is indistinguishable
+    // from a strategy result once it closes, so it is refused rather than
+    // written somewhere else — silently redirecting it would just move the
+    // contamination to another account.
+    const autonomousOwner = tradingLabService.autonomousOwnerOf(body.strategyId);
+    if (autonomousOwner) {
+      refuseAutonomous(res, {
+        owner: autonomousOwner,
+        what: "Manual trade entry",
+        detail:
+          `${body.strategyId} is running an autonomous live demo experiment. A manual trade would be recorded in the same $10,000 ledger and become indistinguishable from a strategy result.`,
+      });
+      return;
+    }
+
     const result = await tradingLabService.execute({
       strategyId: String(body.strategyId),
       symbol: String(body.symbol),
@@ -266,6 +301,22 @@ function createTradingLabRouter({
     const body = req.body || {};
     requireFields(body, ["strategyId"]);
     const trader = tradingLabService.strategyLedger(body.strategyId);
+
+    // A manual close writes an exit the strategy never chose, and the resulting
+    // R-multiple is then attributed to the strategy. There is deliberately no
+    // override: discretionary intervention should be a separate, explicit
+    // feature that permanently records the experiment as having been altered.
+    const target = trader.getOpenPositions().find((p) => p.id === req.params.id);
+    const owner = target ? positionOwner(target) : null;
+    if (owner === "live-research" || owner === "live-scanner") {
+      refuseAutonomous(res, {
+        owner,
+        what: "Manual closing",
+        detail: "Its own loop manages this position's stop, target and strategy exit.",
+      });
+      return;
+    }
+
     const closed = await trader.closePosition(req.params.id, {
       reason: body.reason || "MANUAL",
       exitPrice: body.exitPrice ? Number(body.exitPrice) : null,
@@ -283,6 +334,21 @@ function createTradingLabRouter({
     const body = req.body || {};
     requireFields(body, ["strategyId"]);
     const trader = tradingLabService.strategyLedger(body.strategyId);
+
+    // Marking fires stops and targets. Doing that on a runner-owned position
+    // means a human page load decides an exit price, and the account stops
+    // being a record of what the strategy did. The runner marks its own
+    // positions on every closed candle, so nothing is lost by refusing.
+    const autonomous = tradingLabService.autonomousPositionsIn(body.strategyId);
+    if (autonomous.length) {
+      refuseAutonomous(res, {
+        owner: positionOwner(autonomous[0]),
+        what: "Manual marking",
+        detail: `${autonomous.length} open position(s) are managed by their own loop and are marked on each closed candle.`,
+      });
+      return;
+    }
+
     const events = await trader.updatePositions(body.prices || null);
     res.json({ strategyId: body.strategyId, book: trader.book, events, stats: await trader.getStats() });
   }));
@@ -348,12 +414,18 @@ function createTradingLabRouter({
     );
   }));
 
-  router.post("/reset", requireAdmin, (req, res) => {
+  // An atomic restart of the whole experiment, not just of the ledger.
+  //
+  // Resetting the balance while the runner keeps its lastProcessedCandle would
+  // leave the two disagreeing: a fresh $10,000 account whose runner believes it
+  // is mid-experiment. Clearing runner state too means the next cycle takes the
+  // baseline path, so the first tradeable candle is one closing AFTER the
+  // reset — a reset can never be followed by a trade on an old candle.
+  router.post("/reset", requireAdmin, asyncRoute(async (req, res) => {
     const body = req.body || {};
     requireFields(body, ["strategyId"]);
-    const trader = tradingLabService.strategyLedger(body.strategyId);
-    res.json({ strategyId: body.strategyId, book: trader.book, account: trader.reset() });
-  });
+    res.json(await tradingLabService.resetExperiment(body.strategyId));
+  }));
 
   return router;
 }
