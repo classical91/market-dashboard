@@ -641,14 +641,37 @@ class LiveResearchService {
     this._running = false;
     const reserved = new Set((reservedStrategyIds || []).map(String));
     const eligible = listStrategies({ supportsBacktest: true }).filter((meta) => meta.liveResearchEligible);
-    const conflicts = this.enabled ? eligible.filter((meta) => reserved.has(meta.id)).map((meta) => meta.id) : [];
-    if (conflicts.length) {
-      throw new Error(
-        `Strategy-account writer conflict for ${conflicts.join(", ")}: Live Scanner and Live Research cannot share one experiment ledger. Disable one writer.`,
+
+    /**
+     * A strategy the Live Scanner is already writing gets no Live Research
+     * runner. One experiment, one execution owner — the same rule the manual
+     * routes enforce, applied at startup.
+     *
+     * This USED TO THROW, which took the entire dashboard down: mindset_v1 is
+     * both scanner eligible and live-research eligible, so every deployment
+     * with ENABLE_LIVE_SCANNER=true failed to boot, health check included, and
+     * restarted forever. A resolvable conflict in one subsystem must not stop
+     * the regime engine, the backtester and every unrelated panel from loading.
+     *
+     * Resolving it in the scanner's favour is what `reservedStrategyIds` was
+     * always for — the name says the scanner has reserved that ledger. The
+     * other eligible strategies still collect live research, and the exclusion
+     * is reported in status() rather than being silent, because "mindset is not
+     * collecting live evidence" is a fact a reader has to be able to see.
+     */
+    this.reservedByScanner = this.enabled
+      ? eligible.filter((meta) => reserved.has(meta.id)).map((meta) => meta.id)
+      : [];
+    if (this.reservedByScanner.length) {
+      this._logger.warn?.(
+        `[LiveResearch] ${this.reservedByScanner.join(", ")} is written by the Live Scanner, so it collects no live research here. ` +
+          "One ledger has one execution owner.",
       );
     }
+
     this._runners = new Map(
       eligible
+        .filter((meta) => !this.reservedByScanner.includes(meta.id))
         .map((meta) => {
           const definition = getLiveResearchStrategy(meta.id);
           return [
@@ -763,6 +786,44 @@ class LiveResearchService {
         ...runnerStatus,
       };
     }
+    // Reserved by the Live Scanner, which owns that ledger. Reported on its own
+    // terms: falling through to the event-replay branch below would tell a
+    // reader mindset_v1 "cannot be evaluated from OHLCV candles", which is
+    // false — it is evaluated, by the other loop.
+    if (this.reservedByScanner.includes(String(strategyId))) {
+      return {
+        enabled: false,
+        loopRunning: Boolean(this._timer),
+        strategyId: String(strategyId),
+        symbol: this.symbol,
+        timeframe: this.timeframe,
+        healthStatus: "OWNED_BY_LIVE_SCANNER",
+        runnerStatus: "OWNED_BY_LIVE_SCANNER",
+        currentSignal: "FLAT",
+        currentIntent: {
+          code: "OWNED_BY_LIVE_SCANNER",
+          title: "MANAGED BY LIVE SCANNER",
+          summary: "The Live Scanner writes this strategy's account, so Live Research does not.",
+          reason: "One experiment ledger has one execution owner.",
+          nextAction: "Watch this account through the Live Scanner",
+          signal: "FLAT",
+          currentPrice: null,
+          intendedTrade: false,
+        },
+        setupState: "NOT_EVALUATED",
+        blockers: ["The Live Scanner already owns this strategy account"],
+        indicators: {},
+        decisionTrail: [],
+        activity: [],
+        lastProcessedCandle: null,
+        nextExpectedCandle: null,
+        lastAttemptedAt: null,
+        lastSuccessfulEvaluationAt: null,
+        lastError: null,
+        retryStatus: "NOT_APPLICABLE",
+      };
+    }
+
     return {
       enabled: false,
       loopRunning: Boolean(this._timer),
@@ -804,6 +865,9 @@ class LiveResearchService {
       symbol: this.symbol,
       timeframe: this.timeframe,
       intervalMs: this.intervalMs,
+      // Visible rather than silent: "mindset is not collecting live research"
+      // is a fact a reader has to be able to see.
+      reservedByScanner: this.reservedByScanner.slice(),
       runners: listStrategies().map((meta) => this.statusFor(meta.id)),
     };
   }
