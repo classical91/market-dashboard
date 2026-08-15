@@ -8,6 +8,32 @@
 
 const { getTradingConfig } = require("./config");
 
+/**
+ * The version of the SCORING RULES themselves — what earns points, what a
+ * missing input is worth, and where the SKIP / QUARTER / HALF / FULL cuts sit.
+ *
+ * Every stored experiment records this, because an expectancy figure is only
+ * meaningful against the rules that selected the trades behind it. Git commit
+ * already tells you which code ran, but a commit is far too fine-grained to
+ * group by: hundreds of commits share one set of scoring rules, and a
+ * researcher pooling experiments needs one field that answers "were these
+ * judged the same way?".
+ *
+ * Bump the MAJOR component whenever a change could move a candidate across a
+ * decision boundary — that makes older experiments non-comparable, not merely
+ * older. Bump MINOR for additive reporting that cannot change a decision.
+ *
+ *   1.x.x  Original TraderClaw-derived rules.
+ *   2.0.0  Absent evidence stopped earning points. Same-timeframe EMA trend is
+ *          no longer scored as higher-timeframe daily bias (was worth up to
+ *          30), and unmeasured macro and funding no longer score as favourable
+ *          observations (was worth up to 25, and up to 20 of it asymmetric
+ *          between longs and shorts). Both change which setups trade, so
+ *          nothing scored under 1.x can be pooled with anything scored under
+ *          this.
+ */
+const SCORING_VERSION = "2.0.0";
+
 // Market conditions the checklist reasons over.
 //
 // Anything the caller leaves out is UNKNOWN — `null` — and unknown never earns
@@ -343,4 +369,4 @@ function runChecklist(signal, rawState, config = getTradingConfig()) {
   };
 }
 
-module.exports = { marketState, runKillSwitches, scoreSetup, runChecklist };
+module.exports = { marketState, runKillSwitches, scoreSetup, runChecklist, SCORING_VERSION };

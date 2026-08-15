@@ -22,7 +22,7 @@
 //   first whenever both were reachable. Results are pessimistic by design.
 
 const { getTradingConfig } = require("./config");
-const { runChecklist, marketState } = require("./checklist");
+const { runChecklist, marketState, SCORING_VERSION } = require("./checklist");
 const { assessEdge } = require("./edge-gate");
 const { planTrade, calculatePositionSize } = require("./risk");
 const { buildStrategyMetrics } = require("./metrics");
@@ -149,6 +149,40 @@ function nativeLevels({ direction, entryPrice, signal }) {
  *   "mixed"            asked for native, some trades could and some could not
  *   "none"             no trade opened, so there is nothing to characterise
  */
+/**
+ * How much of the AVAILABLE evidence the trades in a run actually had behind
+ * them — two measurements, deliberately kept apart.
+ *
+ *   Operational score. The raw 0-100 checklist score and the 50/65/80 cuts.
+ *   This is production policy and is not touched here.
+ *
+ *   Evidence ratio. score / availablePoints. A candle backtest can only reach
+ *   60 of the 100 points (no macro feed, no funding feed, no daily read), so
+ *   its 50-point floor demands 83% of the evidence available to it while a
+ *   fully-fed live candidate needs 50% — and a candle strategy can never reach
+ *   HALF or FULL sizing at all. Comparing raw scores across those two worlds
+ *   compares different things.
+ *
+ * Recording both is what lets a promotion criterion be set FROM EVIDENCE later
+ * — testing whether 70%, 80% or 85% of available evidence actually predicts
+ * out-of-sample performance — rather than by mechanically rescaling 50/65/80
+ * into 30/39/48 and hoping.
+ */
+function summarizeEvidence(scored) {
+  if (!scored.length) {
+    return { trades: 0, meanScore: null, meanAvailablePoints: null, meanRatio: null, minRatio: null };
+  }
+  const ratios = scored.map((s) => s.score / s.available);
+  const round3 = (v) => Math.round(v * 1000) / 1000;
+  return {
+    trades: scored.length,
+    meanScore: round3(mean(scored.map((s) => s.score))),
+    meanAvailablePoints: round3(mean(scored.map((s) => s.available))),
+    meanRatio: round3(mean(ratios)),
+    minRatio: round3(Math.min(...ratios)),
+  };
+}
+
 function appliedExecution({ executionMode, nativeTrades = 0, sharedTrades = 0 }) {
   const opened = nativeTrades + sharedTrades;
   if (!opened) return "none";
@@ -607,6 +641,11 @@ class BacktestService {
     // applied one are different facts and a reader needs both.
     let nativeTrades = 0;
     let sharedTrades = 0;
+    // Raw checklist score and the points that were REACHABLE for each opened
+    // trade. The ratio between them is the research measure; the raw score
+    // stays the operational one. Keeping both means a promotion rule can be
+    // set from evidence later without re-running anything.
+    const scored = [];
 
     for (let i = warmup; i < bars.length; i += 1) {
       const bar = bars[i];
@@ -647,6 +686,9 @@ class BacktestService {
         if (outcome.opened) {
           if (outcome.appliedMode === "native") nativeTrades += 1;
           else sharedTrades += 1;
+          if (outcome.confidenceScore != null && outcome.availablePoints) {
+            scored.push({ score: outcome.confidenceScore, available: outcome.availablePoints });
+          }
           if (executionMode === "native" && outcome.appliedMode !== "native") nativeFallbacks += 1;
         } else {
           skipped.push({
@@ -714,6 +756,10 @@ class BacktestService {
       // a real daily or funding feed is never confused with a candles-only one.
       // Empty means candles only, which is the default.
       marketContextFields: Object.keys(marketContext || {}).sort(),
+      // The rules these trades were selected under, and how much evidence was
+      // available to select them. See summarizeEvidence().
+      scoringVersion: SCORING_VERSION,
+      evidence: summarizeEvidence(scored),
       caveats: [
         // Surfaced rather than hidden: with long and short positions open on
         // the same symbol at once, one intra-bar ordering cannot be
@@ -848,6 +894,10 @@ class BacktestService {
         // one execution model. Under native execution they are what the
         // position above is actually using. `executionMode` says which, on
         // every trade, so a ledger is never ambiguous about it.
+        // `availablePoints` rides beside the score because the score alone is
+        // not interpretable. 55 out of 100 and 55 out of 60 are different
+        // claims about how much of the evidence agreed, and only the second
+        // number says which one this was.
         meta: signal
           ? {
               strategy: strategyId,
@@ -855,11 +905,24 @@ class BacktestService {
               stopHint: signal.stopHint ?? null,
               targetHint: signal.targetHint ?? null,
               executionMode: appliedMode,
+              availablePoints: checklist.availablePoints ?? null,
+              scoringVersion: SCORING_VERSION,
             }
-          : { strategy: strategyId, executionMode: appliedMode },
+          : {
+              strategy: strategyId,
+              executionMode: appliedMode,
+              availablePoints: checklist.availablePoints ?? null,
+              scoringVersion: SCORING_VERSION,
+            },
         openedAt: at ?? context.bar.closeTime,
       });
-      return { opened: true, reasons, appliedMode };
+      return {
+        opened: true,
+        reasons,
+        appliedMode,
+        confidenceScore: checklist.confidenceScore,
+        availablePoints: checklist.availablePoints ?? null,
+      };
     } catch (err) {
       // The position cap is a legitimate outcome, not an error.
       return { opened: false, reasons: [...reasons, err.message] };
@@ -1008,6 +1071,7 @@ module.exports = {
   rankRows,
   EXECUTION_MODES,
   appliedExecution,
+  summarizeEvidence,
   summarizeRun,
   resolveStrategy,
   trendBreakoutStrategy,

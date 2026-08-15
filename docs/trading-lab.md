@@ -506,6 +506,63 @@ The promotion *policy* — how many closed trades, what expectancy, what profit
 factor and drawdown justify a status change — is deliberately not implemented
 yet, and neither is any endpoint that could change a status.
 
+### Two scores, kept apart
+
+The checklist produces one number and the Lab now records two:
+
+| | What it is | Who uses it |
+| --- | --- | --- |
+| **Operational score** | The raw 0-100 score and the 50/65/80 cuts | Production and forward paper. Unchanged. |
+| **Evidence ratio** | `score / availablePoints` | Research only. Recorded, not acted on. |
+
+They are kept apart on purpose. A candle backtest reaches 60 of 100 points, so
+its 50-point floor demands **83%** of the evidence available to it where a
+fully-fed live candidate needs 50% — and it can never reach `TAKE_HALF` (65) or
+`TAKE_FULL` (80) at all. Backtest trade selection is therefore deliberately
+more conservative than forward-paper selection, and **not directly equivalent
+to it**.
+
+The fix for that is not to rescale 50/65/80 into 30/39/48. It is to find out,
+from evidence, whether 70% or 80% or 85% of available evidence actually
+predicts out-of-sample performance, and set a backtest-specific promotion
+criterion from the answer. Recording the ratio now is what makes that study
+possible later without re-running anything.
+
+Every opened position carries its own `confidenceScore` and
+`meta.availablePoints`, so the run-level `evidence` aggregate can always be
+recomputed from the ledger rather than trusted.
+
+### Comparing experiments across rule changes
+
+An expectancy figure measures the rules that selected the trades behind it, so
+experiments from either side of a scoring change measure different things.
+`gitCommit` records which code ran, but a commit is far too fine-grained to
+group by — hundreds share one set of scoring rules. Two coarse versions answer
+the question a researcher actually has, which is *may I pool these?*
+
+| Field | Versions | Bump when |
+| --- | --- | --- |
+| `scoringVersion` | The scoring RULES | Major, whenever a change could move a candidate across a decision boundary |
+| `researchSchemaVersion` | The record SHAPE | A field is added or changed |
+
+`scoringVersion` is at **2.0.0**. 1.x is everything before the corrections
+above: same-timeframe EMA trend scored as higher-timeframe daily bias (up to
+30 points), and absent macro/funding scored as favourable observations (up to
+25, of which 20 was asymmetric between longs and shorts). Both changed which
+setups trade, so nothing scored under 1.x can be pooled with anything scored
+under 2.0.0.
+
+Records written before versioning existed carry no `scoringVersion` at all and
+are identified by its absence. They are **kept, not deleted** — destroying
+research because it is superseded destroys the record of what was believed and
+when. `store.list()` labels every row with `comparable` and a
+`comparabilityNote`, and a promotion check asks for `{ comparableOnly: true }`.
+The default stays inclusive so no existing reader silently loses rows.
+
+`marketContextFields` is recorded too: a run given a real daily or funding feed
+is not comparable with a candles-only one even when both scored under the same
+rules.
+
 ### Experiments
 
 A backtest is ephemeral; an **experiment** is the record that it happened.

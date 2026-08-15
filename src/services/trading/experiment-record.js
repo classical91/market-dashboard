@@ -15,6 +15,20 @@ const { execFileSync } = require("child_process");
 
 const { summarizeRun } = require("./run-summary");
 const { describe } = require("./strategies");
+const { SCORING_VERSION } = require("./checklist");
+
+/**
+ * The version of the RECORD SHAPE — what fields an experiment carries.
+ *
+ * Distinct from `scoringVersion`, which versions the rules that selected the
+ * trades. A reader can gain a field without any trade being chosen
+ * differently, and trades can be chosen differently without the shape moving.
+ * Pooling experiments needs the second; parsing them needs the first.
+ *
+ *   1  Pre-versioning records. Identifiable only by the ABSENCE of this field.
+ *   2  Adds researchSchemaVersion, scoringVersion and evidence.
+ */
+const RESEARCH_SCHEMA_VERSION = 2;
 
 let cachedCommit;
 
@@ -79,6 +93,15 @@ function buildExperimentRecord(result, meta = {}) {
     source: meta.source || "backtest",
     notes: meta.notes || null,
 
+    // ── Comparability ─────────────────────────────────────────────────────
+    //
+    // gitCommit below says which code ran, but a commit is far too
+    // fine-grained to group by — hundreds of them share one set of scoring
+    // rules. These two answer the question a researcher actually has, which is
+    // "may I pool these experiments?".
+    researchSchemaVersion: RESEARCH_SCHEMA_VERSION,
+    scoringVersion: result.scoringVersion || SCORING_VERSION,
+
     // What ran
     strategy: summary.strategy,
     strategyName: summary.strategyName,
@@ -113,7 +136,21 @@ function buildExperimentRecord(result, meta = {}) {
     // different experiment.
     options: result.options || {},
     costs: summary.costs || null,
+    // What market context the run was given beyond the candles. A run scored
+    // with a real daily or funding feed is not comparable with a candles-only
+    // one, and this is how a stored record says which it was.
+    marketContextFields: result.marketContextFields || [],
+
+    // Raw checklist score and the points reachable for the trades that opened.
+    // The operational decision stays the raw score; this is the research
+    // measurement beside it. See summarizeEvidence() in backtest.js.
+    evidence: result.evidence || null,
   };
 }
 
-module.exports = { buildExperimentRecord, resolveGitCommit, newExperimentId };
+module.exports = {
+  buildExperimentRecord,
+  resolveGitCommit,
+  newExperimentId,
+  RESEARCH_SCHEMA_VERSION,
+};

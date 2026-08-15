@@ -25,6 +25,35 @@ const fs = require("fs");
 const path = require("path");
 
 const { resolveDataDir } = require("../../utils/data-dir");
+const { SCORING_VERSION } = require("./checklist");
+
+/**
+ * Is this record comparable with experiments produced by the CURRENT rules?
+ *
+ * Records written before scoring was versioned carry no `scoringVersion` at
+ * all, and they were selected under rules that have since changed twice in
+ * ways that move candidates across decision boundaries — same-timeframe trend
+ * scored as daily bias, and absent macro/funding scored as favourable. Their
+ * expectancy figures are real measurements of rules that no longer exist.
+ *
+ * They are kept, deliberately. Deleting research because it is superseded
+ * destroys the record of what was believed and when. They are simply not
+ * poolable with current experiments, and this is the one place that decides
+ * so — nothing else has to remember the history.
+ */
+function isComparable(entry, scoringVersion = SCORING_VERSION) {
+  return Boolean(entry) && entry.scoringVersion === scoringVersion;
+}
+
+// Why a record cannot be pooled with current ones, in words, so a UI or a
+// promotion check can say something better than "excluded".
+function comparabilityNote(entry, scoringVersion = SCORING_VERSION) {
+  if (isComparable(entry, scoringVersion)) return null;
+  if (!entry || !entry.scoringVersion) {
+    return `recorded before scoring was versioned (pre-${scoringVersion}) — not comparable`;
+  }
+  return `scored under rules ${entry.scoringVersion}, current is ${scoringVersion} — not comparable`;
+}
 
 // Newest-first, and bounded. A research log that grows without limit
 // eventually makes every read slower for data nobody looks at; the cap is
@@ -100,17 +129,32 @@ class ExperimentStore {
    * Symbol and timeframe are compared case-insensitively because "btcusdt"
    * and "BTCUSDT" are the same experiment.
    */
-  list({ strategy, version, symbol, timeframe, limit = 100 } = {}) {
+  list({ strategy, version, symbol, timeframe, limit = 100, comparableOnly = false } = {}) {
     const eq = (a, b) => String(a || "").toLowerCase() === String(b || "").toLowerCase();
     const rows = this._read().filter(
       (entry) =>
         (strategy === undefined || entry.strategy === strategy) &&
         (version === undefined || entry.strategyVersion === version) &&
         (symbol === undefined || eq(entry.symbol, symbol)) &&
-        (timeframe === undefined || eq(entry.timeframe, timeframe)),
+        (timeframe === undefined || eq(entry.timeframe, timeframe)) &&
+        (!comparableOnly || isComparable(entry)),
     );
     const capped = Math.min(Math.max(Number(limit) || 100, 1), this.cap);
-    return { total: rows.length, items: rows.slice(0, capped) };
+    // Every returned row is labelled, whether or not the caller filtered.
+    // `comparableOnly` defaults to false so no existing reader silently loses
+    // rows; a promotion check asks for true, and a browser sees both with the
+    // legacy ones marked rather than quietly missing.
+    const items = rows.slice(0, capped).map((entry) => ({
+      ...entry,
+      comparable: isComparable(entry),
+      comparabilityNote: comparabilityNote(entry),
+    }));
+    return {
+      total: rows.length,
+      items,
+      scoringVersion: SCORING_VERSION,
+      comparableTotal: rows.filter((entry) => isComparable(entry)).length,
+    };
   }
 
   count() {
@@ -118,4 +162,4 @@ class ExperimentStore {
   }
 }
 
-module.exports = { ExperimentStore, DEFAULT_CAP };
+module.exports = { ExperimentStore, DEFAULT_CAP, isComparable, comparabilityNote };
