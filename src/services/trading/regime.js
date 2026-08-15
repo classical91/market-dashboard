@@ -137,6 +137,28 @@ const REGIME_DEFAULTS = Object.freeze({
   minConfidence: 55,
 });
 
+/**
+ * The regime a TRADE was opened in, as recorded on the trade.
+ *
+ * This is the single reader for that tag, and it lives here — beside the
+ * vocabulary it validates against — because there are two groupings that ask
+ * the question (metrics.js's `regime` dimension and regime-metrics.js's
+ * matrix) and they must not answer it differently. They did: one validated the
+ * label against REGIMES and the other took whatever string was on the record,
+ * so a trade tagged with an unrecognised label counted as UNTAGGED in the
+ * matrix while opening its own bogus group in the metrics leaderboard.
+ *
+ * An unrecognised label is UNTAGGED rather than a group of its own. A tag this
+ * code cannot interpret is not evidence about an environment, and giving it a
+ * row would present it as though it were.
+ */
+function regimeOfTrade(trade) {
+  const tagged =
+    (trade && trade.meta && trade.meta.regime) || (trade && trade.regimeAtEntry) || null;
+  const label = tagged ? String(tagged) : null;
+  return label && REGIMES.includes(label) ? label : "UNTAGGED";
+}
+
 function clamp01(value) {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(1, value));
@@ -576,5 +598,6 @@ module.exports = {
   classifyAt,
   buildRegimeSeries,
   toChecklistRegime,
+  regimeOfTrade,
   warmupFor,
 };

@@ -38,11 +38,27 @@ const { verdictFor } = require("./regime-metrics");
 // factor, then sample size. Same order metrics.js ranks by, for the same
 // reason — an edge that is larger, more consistent and better evidenced beats
 // one that is only larger.
-function compareCandidates(a, b) {
+//
+// A null profit factor means "traded and never lost", which sorts as Infinity.
+// Two of those against each other is not exotic — a regime where two strategies
+// have both been undefeated is exactly the case a router is asked to break —
+// and `Infinity - Infinity` is NaN, which a comparator treats as "equal" only
+// by accident and leaves the winner to sort stability rather than to the tie
+// break below. Compared rather than subtracted so the fall-through to sample
+// size actually happens: between two undefeated strategies, the one with more
+// trades behind it is the better-evidenced answer.
+function comparePf(a, b) {
   const pf = (c) => (c.cell && c.cell.profitFactor === null ? Infinity : (c.cell && c.cell.profitFactor) || 0);
+  const x = pf(b);
+  const y = pf(a);
+  if (x === y) return 0;
+  return x > y ? 1 : -1;
+}
+
+function compareCandidates(a, b) {
   return (
     (b.expectancyR ?? 0) - (a.expectancyR ?? 0) ||
-    pf(b) - pf(a) ||
+    comparePf(a, b) ||
     ((b.cell && b.cell.closedTrades) || 0) - ((a.cell && a.cell.closedTrades) || 0)
   );
 }
@@ -102,9 +118,13 @@ function routeRegime({ read, matrix, strategies = null } = {}) {
     advisory: true,
     enforced: false,
     preferred: null,
+    // All four buckets are always present, on every path, so a consumer can
+    // read `.held.length` without first checking which path produced the
+    // response. The no-history path used to omit `held` entirely.
     eligible: [],
     suppressed: [],
     unproven: [],
+    held: [],
     evidence: {
       minTrades: matrix ? matrix.minTrades : null,
       coverage: matrix ? matrix.coverage : null,

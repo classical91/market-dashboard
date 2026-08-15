@@ -345,6 +345,21 @@ test("never having traded in a regime is INSUFFICIENT, not UNFAVOURABLE", () => 
   assert.equal(verdictFor(matrix, "vwap", "TREND_DOWN").verdict, "INSUFFICIENT");
 });
 
+test("both groupings read a regime tag the same way", () => {
+  // These are two different call sites asking one question, and when each had
+  // its own reader they disagreed: the matrix filed an unrecognised label under
+  // UNTAGGED while the metrics leaderboard opened a group named after it.
+  const bogus = trade({ strategy: "vwap", regime: null, r: 0.1 });
+  bogus.meta = { regime: "MOON_PHASE" };
+
+  assert.equal(regimeKey(bogus), "UNTAGGED");
+  assert.deepEqual(
+    buildStrategyMetrics([bogus], 10000).groups.regime.map((r) => r.key),
+    ["UNTAGGED"],
+    "an uninterpretable tag must not become a row of its own",
+  );
+});
+
 test("the standard metrics grouping gained a regime dimension", () => {
   const history = [
     trade({ strategy: "vwap", regime: "RANGE", r: 0.4 }),
@@ -413,6 +428,50 @@ test("the same evidence routes the other way in a trend", () => {
   const routing = routeRegime({ read, matrix, strategies: ["vwap_reversion_v1", "donchian_breakout_v1"] });
   assert.equal(routing.preferred.strategy, "donchian_breakout_v1");
   assert.deepEqual(routing.suppressed.map((c) => c.strategy), ["vwap_reversion_v1"]);
+});
+
+test("two undefeated strategies are ranked by evidence, not by sort luck", () => {
+  // Both have zero losses, so both have a null (infinite) profit factor, and
+  // both average the same R. Subtracting the two infinities gives NaN, which a
+  // comparator silently treats as "equal" — leaving the winner to sort
+  // stability instead of to the sample-size tie break.
+  const history = [];
+  for (let i = 0; i < 25; i += 1) {
+    history.push(trade({ strategy: "smc_v1", regime: "RANGE", r: 0.5 }));
+  }
+  for (let i = 0; i < 40; i += 1) {
+    history.push(trade({ strategy: "vwap_reversion_v1", regime: "RANGE", r: 0.5 }));
+  }
+
+  const matrix = buildRegimeMatrix(history, 10000, { minTrades: 20 });
+  const read = { regime: "RANGE", confidence: 82, actionable: true, action: "WAIT", reasons: [], options: REGIME_DEFAULTS };
+  const routing = routeRegime({ read, matrix, strategies: ["smc_v1", "vwap_reversion_v1"] });
+
+  assert.equal(routing.eligible[0].cell.profitFactor, null, "both cells are undefeated");
+  assert.equal(routing.eligible[1].cell.profitFactor, null);
+  assert.equal(
+    routing.preferred.strategy,
+    "vwap_reversion_v1",
+    "the better-evidenced of two undefeated strategies wins",
+  );
+  assert.equal(routing.preferred.trades, 40);
+});
+
+test("every routing path returns the same four buckets", () => {
+  const read = { regime: "RANGE", confidence: 82, actionable: true, action: "WAIT", reasons: [], options: REGIME_DEFAULTS };
+  const held = { regime: "TRANSITION", confidence: 70, actionable: false, reasons: [], options: REGIME_DEFAULTS };
+
+  const paths = [
+    routeRegime({ read: held, matrix: buildRegimeMatrix([], 10000, {}) }),
+    routeRegime({ read, matrix: buildRegimeMatrix([], 10000, {}) }),
+    routeRegime({ read, matrix: matrixFor({ vwap_reversion_v1: { RANGE: { r: 0.4, count: 30 } } }) }),
+  ];
+
+  for (const routing of paths) {
+    for (const bucket of ["eligible", "suppressed", "unproven", "held"]) {
+      assert.ok(Array.isArray(routing[bucket]), `${bucket} is always an array`);
+    }
+  }
 });
 
 test("routing is advisory and never claims scanner eligibility", () => {

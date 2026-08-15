@@ -7,6 +7,7 @@
 // portfolio equity, not in the strategy edge calculation.
 
 const { round } = require("./round");
+const { regimeOfTrade } = require("./regime");
 
 function num(value, fallback = 0) {
   const n = Number(value);
@@ -102,21 +103,15 @@ function symbolKey(trade) {
   return String(trade.symbol || "unknown");
 }
 
-// The environment a trade was opened in, for trades that recorded one.
-// Untagged trades group under "UNTAGGED" rather than being dropped or folded
-// into a real regime — history predating regime tagging is untagged, and
-// quietly filing it under RANGE would manufacture evidence. Kept in step with
-// ./regime-metrics#regimeKey, which is where the richer table reads it from.
-function regimeDimension(trade) {
-  const tagged = (trade.meta && trade.meta.regime) || trade.regimeAtEntry || null;
-  return tagged ? String(tagged) : "UNTAGGED";
-}
-
 const DIMENSIONS = {
   strategy: strategyKey,
   symbol: symbolKey,
   scoreBucket: (trade) => scoreBucket(trade.confidenceScore ?? trade.score),
-  regime: regimeDimension,
+  // The environment a trade was opened in. Read through the shared
+  // regimeOfTrade() rather than a local copy: this grouping and the strategy ×
+  // regime matrix must agree on what a tag means, and when each had its own
+  // reader they disagreed about unrecognised labels.
+  regime: regimeOfTrade,
 };
 
 // Ranking order matches TraderClaw: expectancy first, then profit factor,
