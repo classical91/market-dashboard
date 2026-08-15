@@ -122,7 +122,19 @@ class TradeIntentHandler {
         volumeRatio: observations.volumeRatio,
         macdBullish: observations.macdBullish,
       },
+      // The edge gate's grouping key. A display string, and deliberately not
+      // the attribution — see the explicit fields below.
       strategy: `live:${intent.strategy}:${intent.tf}`,
+      // Attribution, carried through to the trade record. Until this existed a
+      // forward-paper trade landed with `signalSource: "live-scanner:15m"` and
+      // nothing else: the strategy that produced it was known here, used as an
+      // edge-gate key, and then dropped. Every strategy-level number the lab
+      // reported about forward trades was really a number about a timeframe.
+      strategyId: intent.strategy,
+      strategyVersion: intent.strategyVersion || null,
+      timeframe: intent.tf,
+      regime: intent.regime || null,
+      regimeConfidence: intent.regimeConfidence ?? null,
     };
 
     // Dry run: score it through the full pipeline, log the verdict, open

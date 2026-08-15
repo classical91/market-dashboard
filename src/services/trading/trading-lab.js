@@ -142,7 +142,30 @@ class TradingLabService {
   }
 
   // Evaluate, then open the paper position when every gate agrees.
-  async execute({ book = "main", signalSource = "manual", ...input }) {
+  /**
+   * Evaluate, then open the paper position when every gate agrees.
+   *
+   * `strategyId` and friends are ATTRIBUTION, not inputs to any decision. They
+   * are recorded on the trade and read by nothing in the gauntlet — the same
+   * property the backtester's regime tag has, and for the same reason: a
+   * strategy × regime table is only evidence about a strategy if the tag played
+   * no part in selecting the trades it summarises.
+   *
+   * They are separate from `strategy`, which is the edge gate's grouping key
+   * and is a display string ("live:mindset_v1:15m"). Conflating the two is how
+   * the persistent ledger ended up with no strategy identity at all: the caller
+   * knew it, spent it on the edge gate, and dropped it before the write.
+   */
+  async execute({
+    book = "main",
+    signalSource = "manual",
+    strategyId = null,
+    strategyVersion = null,
+    timeframe = null,
+    regime = null,
+    regimeConfidence = null,
+    ...input
+  }) {
     const assessment = this.evaluate({ book, ...input });
     if (!assessment.trade.ok) {
       return { ...assessment, opened: null };
@@ -161,7 +184,24 @@ class TradingLabService {
       riskUsd: trade.riskUsd,
       confidenceScore: assessment.checklist.confidenceScore,
       signalSource,
-      meta: { edgeDecision: assessment.edge.decision, sizeMultiplier: trade.sizeMultiplier },
+      meta: {
+        edgeDecision: assessment.edge.decision,
+        sizeMultiplier: trade.sizeMultiplier,
+        // Null rather than a guess when the caller did not supply one. A trade
+        // with no strategy identity is UNATTRIBUTED and must report as such —
+        // the signal bot bridge has no registry strategy at all, and inventing
+        // one for it would put fabricated rows in the strategy leaderboard.
+        strategy: strategyId ? String(strategyId) : null,
+        strategyVersion: strategyVersion ? String(strategyVersion) : null,
+        timeframe: timeframe ? String(timeframe) : null,
+        regime: regime ? String(regime) : null,
+        // Unmeasured stays null: `Number(null)` is 0 and finite, so coercing
+        // first would record "no regime read" as "measured, zero confidence".
+        regimeConfidence:
+          regimeConfidence === null || regimeConfidence === undefined || !Number.isFinite(Number(regimeConfidence))
+            ? null
+            : Number(regimeConfidence),
+      },
     });
 
     return { ...assessment, opened };

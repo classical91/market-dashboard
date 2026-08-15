@@ -95,16 +95,30 @@ function intentsFrom(rows) {
 
 test("a scanner intent has exactly the raw-intent shape", () => {
   const [, entry] = intentsFrom(candleRows(UP));
+  // `strategyVersion`, `regime` and `regimeConfidence` are attribution and
+  // observation respectively — identity of the rules that fired, and the
+  // environment they fired in. Neither is a sizing, level or scoring decision,
+  // which is what this shape guard exists to keep out.
   assert.deepEqual(Object.keys(entry).sort(), [
-    "candleTs", "indicators", "price", "signal", "source", "strategy", "symbol", "tf",
+    "candleTs", "indicators", "price", "regime", "regimeConfidence",
+    "signal", "source", "strategy", "strategyVersion", "symbol", "tf",
   ]);
   assert.equal(entry.signal, "LONG");
   assert.equal(entry.symbol, "BTCUSDT.P");
   assert.equal(entry.tf, "15m");
   assert.equal(entry.source, "live_scanner");
   assert.equal(entry.strategy, "mindset_v1");
+  assert.equal(entry.strategyVersion, "1.0.0");
   assert.ok(entry.price > 0);
   assert.ok(!Number.isNaN(Date.parse(entry.candleTs)));
+});
+
+test("an intent built without candles carries a null regime rather than a guess", () => {
+  // intentsFor() is given the closed candles by the scanner; a caller that has
+  // none must not produce a fabricated environment tag.
+  const [, entry] = intentsFrom(candleRows(UP));
+  assert.equal(entry.regime, null);
+  assert.equal(entry.regimeConfidence, null);
 });
 
 test("no scanner intent carries a sizing, level or scoring field", () => {

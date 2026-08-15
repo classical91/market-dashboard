@@ -276,15 +276,21 @@ test("the new labels map to RANGE rather than to a blocking regime", () => {
 
 /* ── The evidence table ───────────────────────────────────── */
 
+// A closed trade as the lab now records one: the strategy identity lives in
+// `meta.strategy`, which is what the regime table groups by. `signalSource`
+// stays a source-and-timeframe label and is deliberately NOT attribution.
 function trade({ strategy, regime, r, confidence = 70 }) {
   return {
     status: "closed",
-    signalSource: strategy,
+    signalSource: `live-scanner:15m`,
     symbol: "BTCUSDT",
     realizedPnl: r * 100,
     rMultiple: r,
     confidenceScore: confidence,
-    meta: regime ? { regime, regimeConfidence: confidence } : {},
+    meta: {
+      strategy,
+      ...(regime ? { regime, regimeConfidence: confidence } : {}),
+    },
   };
 }
 

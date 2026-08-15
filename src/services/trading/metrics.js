@@ -95,8 +95,34 @@ function scoreBucket(score) {
   return `${low}-${Math.min(low + 9, 100)}`;
 }
 
+/**
+ * The edge gate's INDEX, not a report.
+ *
+ * This is keyed by `signalSource` because edge-gate.js looks a group up by the
+ * exact `strategy` string its caller passed — "live:mindset_v1:15m",
+ * "backtest:mindset_v1:4h", "decision:4h". Repointing this at the strategy
+ * identity would stop those lookups matching, and the gate would silently fall
+ * through to symbol-level or account-level evidence: a change to how positions
+ * are SIZED, dressed up as a reporting improvement.
+ *
+ * For "which strategy earned this?", use the `strategyId` dimension below.
+ */
 function strategyKey(trade) {
   return String(trade.signalSource || trade.strategy || trade.source || "unknown");
+}
+
+/**
+ * The strategy that actually produced the trade, from its recorded attribution.
+ *
+ * Deliberately never inferred from `signalSource`: that string is a source-and-
+ * timeframe label whose format was never a contract, and for forward trades it
+ * was "live-scanner:15m" — a timeframe, carrying no strategy at all. A record
+ * without explicit attribution is UNATTRIBUTED and says so, rather than being
+ * retro-assigned to whichever strategy looks likely.
+ */
+function strategyIdKey(trade) {
+  const attributed = (trade.meta && trade.meta.strategy) || trade.strategyId || null;
+  return attributed ? String(attributed) : "UNATTRIBUTED";
 }
 
 function symbolKey(trade) {
@@ -105,6 +131,7 @@ function symbolKey(trade) {
 
 const DIMENSIONS = {
   strategy: strategyKey,
+  strategyId: strategyIdKey,
   symbol: symbolKey,
   scoreBucket: (trade) => scoreBucket(trade.confidenceScore ?? trade.score),
   // The environment a trade was opened in. Read through the shared
@@ -156,4 +183,4 @@ function buildStrategyMetrics(history, startingBalance, minTrades = 1) {
   };
 }
 
-module.exports = { calculateTradeMetrics, buildStrategyMetrics, scoreBucket, round };
+module.exports = { calculateTradeMetrics, buildStrategyMetrics, scoreBucket, strategyIdKey, round };

@@ -91,9 +91,19 @@ function buildTradeIntent(input = {}) {
     price,
     tf,
     strategy,
+    // The strategy's own version, carried so a trade can be attributed to the
+    // exact rules that produced it. Identity, not a decision.
+    strategyVersion = null,
     candleTs,
     source = "live_scanner",
     indicators = null,
+    // The environment the signal fired in. An OBSERVATION about the market,
+    // which is what an intent is allowed to carry — it is measured from the
+    // same closed candles the strategy read, and nothing downstream gates on
+    // it. It rides here so the trade record can be attributed to a regime
+    // without the handler re-deriving one from candles it does not have.
+    regime = null,
+    regimeConfidence = null,
   } = input;
 
   if (!SIGNALS.has(signal)) {
@@ -121,8 +131,17 @@ function buildTradeIntent(input = {}) {
     tf: String(tf),
     source: String(source),
     strategy: String(strategy),
+    strategyVersion: strategyVersion === null || strategyVersion === undefined ? null : String(strategyVersion),
     candleTs: String(candleTs),
     indicators: observations,
+    regime: regime === null || regime === undefined ? null : String(regime),
+    // Unmeasured stays null. `Number(null)` is 0 and 0 is finite, so coercing
+    // first would turn "no regime read" into "measured, zero confidence" —
+    // the same absent-reads-as-observation bug the checklist was fixed for.
+    regimeConfidence:
+      regimeConfidence === null || regimeConfidence === undefined || !Number.isFinite(Number(regimeConfidence))
+        ? null
+        : Number(regimeConfidence),
   };
 
   return Object.freeze(intent);

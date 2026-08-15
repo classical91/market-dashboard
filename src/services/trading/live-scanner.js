@@ -37,6 +37,7 @@ const { evaluateMindsetV1, MINDSET_V1_DEFAULTS, atrSeries } = require("./strateg
 const { getScannerStrategy } = require("./strategies");
 const { replayOrderForPositions } = require("./replay-order");
 const { buildTradeIntent, isExit, ENTRY_SIGNALS } = require("./trade-intent");
+const { classifyRegime } = require("./regime");
 const { TradeIntentHandler } = require("./intent-handler");
 
 const BITGET_CANDLES_URL = "https://api.bitget.com/api/v2/mix/market/candles";
@@ -392,7 +393,7 @@ class LiveScannerService {
 
     if (evaluation.error) return { status: "not-ready", reason: evaluation.error, markEvents };
 
-    const intents = this.intentsFor(evaluation, candle);
+    const intents = this.intentsFor(evaluation, candle, closed);
     const actions = [];
     const statuses = [];
 
@@ -452,15 +453,28 @@ class LiveScannerService {
    * down: close the long, then consider the short). They are returned in that
    * order so the position slot is freed before the entry is judged.
    */
-  intentsFor(evaluation, candle) {
+  intentsFor(evaluation, candle, closed = null) {
+    // The environment this signal fired in, measured from the SAME closed
+    // candles the strategy just read — so the tag on the resulting trade
+    // describes the bar that produced it rather than whatever the market looks
+    // like by the time the handler runs.
+    //
+    // Recorded only. Nothing in the scanner or the Trading Lab gates on it, and
+    // the regime router stays advisory; this exists so a forward-paper trade is
+    // attributable to a regime the way a backtested one already is.
+    const regimeRead = Array.isArray(closed) && closed.length ? classifyRegime(closed) : null;
+
     const common = {
       symbol: this.symbol,
       price: candle.close,
       tf: this.timeframe,
       source: "live_scanner",
       strategy: this.strategy,
+      strategyVersion: this._strategyVersion,
       candleTs: new Date(candle.closeTime + 1).toISOString(),
       indicators: evaluation.indicators,
+      regime: regimeRead ? regimeRead.regime : null,
+      regimeConfidence: regimeRead ? regimeRead.confidence : null,
     };
 
     const intents = [];
