@@ -692,3 +692,95 @@
   color: var(--dim);
   align-self: center;
 }
+
+/* ── Strategy accounts vs portfolio books ───────────────────
+   The two are visually distinct on purpose. A book card and a strategy
+   card answering different questions while looking identical is the
+   confusion this whole section exists to remove. */
+
+.tl-concepts {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: rgba(255,255,255,0.02);
+  font-size: 11px;
+  color: var(--soft);
+}
+
+.tl-concepts strong { color: var(--text); }
+
+.tl-section-label {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin: 4px 0 8px;
+}
+
+/* A strategy account is a panel, not a button — unlike a book card it does
+   not select anything, so it must not look clickable.
+   It also has no equity chart yet, so it must NOT inherit the book card's
+   fixed 112px chart row: that row exists to hold a sparkline, and an empty
+   one pushed every account's body into the wrong grid track. */
+.tl-acct {
+  display: block;
+  min-height: 0;
+  grid-template-rows: 1fr;
+  text-align: left;
+  cursor: default;
+  border-left: 3px solid var(--dim);
+}
+
+.tl-acct:hover {
+  border-color: rgba(255,255,255,0.09);
+  border-left-color: var(--dim);
+  background: rgba(255,255,255,0.035);
+}
+
+.tl-acct--live:hover { border-left-color: var(--green); }
+
+/* One metric per row. Two columns truncated "+0.138R" to "+0...." and
+   "64 closed / 0 open" to "64 close..." — a number clipped to its first
+   character is worse than no number. */
+.tl-acct .tl-account-metrics {
+  grid-template-columns: 1fr;
+  gap: 6px 0;
+}
+
+.tl-acct .tl-account-metric strong {
+  font-size: 12px;
+  text-align: right;
+}
+
+.tl-acct--live { border-left-color: var(--green); }
+
+.tl-acct-status {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin: 6px 0 10px;
+}
+
+.tl-acct-status--live   { color: var(--green); }
+.tl-acct-status--replay { color: var(--amber); }
+.tl-acct-status--idle   { color: var(--muted); }
+
+/* Why a $10,000 balance is $10,000. Without this an untraded account reads
+   as a strategy that broke even. */
+.tl-acct-why {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--dim);
+}
+
+.tl-acct-why code {
+  font-size: 10px;
+  color: var(--soft);
+}

@@ -56,10 +56,29 @@ class TradeIntentHandler {
     return { status: "ignored", reason: `Unroutable intent signal "${intent && intent.signal}"` };
   }
 
+  /**
+   * Where this intent's positions live.
+   *
+   * Delegated to the Trading Lab so there is one answer to the question. A
+   * scanner-eligible strategy's forward trades go to its own strategy account;
+   * anything else goes to the configured portfolio book.
+   */
+  _ledgerFor(intent) {
+    const strategyId = intent && intent.strategy ? intent.strategy : null;
+    if (typeof this._lab.ledgerFor === "function") {
+      return this._lab.ledgerFor({ book: this.book, strategyId });
+    }
+    return this._lab.book(this.book);
+  }
+
   // ── Exits: no gates ───────────────────────────────────────────────────────
 
   async _handleExit(intent) {
-    const trader = this._lab.book(this.book);
+    // The ledger this strategy's trades actually live in. A scanner-eligible
+    // strategy writes to its own account, so an exit has to look for the
+    // position there — searching the portfolio book would find nothing and
+    // silently leave the position open.
+    const trader = this._ledgerFor(intent);
     const direction = exitDirection(intent);
     const open = trader
       .getOpenPositions()
@@ -97,7 +116,9 @@ class TradeIntentHandler {
   // ── Entries: every gate ───────────────────────────────────────────────────
 
   async _handleEntry(intent) {
-    const trader = this._lab.book(this.book);
+    // Same ledger the entry will be written to, so "one position per symbol"
+    // counts the positions that actually exist for this strategy.
+    const trader = this._ledgerFor(intent);
 
     // One position per symbol, whoever opened it.
     if (trader.getOpenPositions().some((p) => p.symbol === intent.symbol)) {
@@ -122,7 +143,19 @@ class TradeIntentHandler {
         volumeRatio: observations.volumeRatio,
         macdBullish: observations.macdBullish,
       },
+      // The edge gate's grouping key. A display string, and deliberately not
+      // the attribution — see the explicit fields below.
       strategy: `live:${intent.strategy}:${intent.tf}`,
+      // Attribution, carried through to the trade record. Until this existed a
+      // forward-paper trade landed with `signalSource: "live-scanner:15m"` and
+      // nothing else: the strategy that produced it was known here, used as an
+      // edge-gate key, and then dropped. Every strategy-level number the lab
+      // reported about forward trades was really a number about a timeframe.
+      strategyId: intent.strategy,
+      strategyVersion: intent.strategyVersion || null,
+      timeframe: intent.tf,
+      regime: intent.regime || null,
+      regimeConfidence: intent.regimeConfidence ?? null,
     };
 
     // Dry run: score it through the full pipeline, log the verdict, open

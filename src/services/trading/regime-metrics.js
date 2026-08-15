@@ -29,7 +29,7 @@
 //
 // Nothing here decides anything either. See ./regime-router.js.
 
-const { calculateTradeMetrics } = require("./metrics");
+const { calculateTradeMetrics, strategyIdKey } = require("./metrics");
 const { REGIMES, regimeOfTrade } = require("./regime");
 
 // Where a trade records the regime it was OPENED in. Re-exported under the name
@@ -38,9 +38,20 @@ const { REGIMES, regimeOfTrade } = require("./regime");
 // `regime` dimension cannot drift on what a tag means.
 const regimeKey = regimeOfTrade;
 
-function strategyKey(trade) {
-  return String((trade && (trade.signalSource || trade.strategy || trade.source)) || "unknown");
-}
+/**
+ * Rows are keyed by STRATEGY IDENTITY, not by signal source.
+ *
+ * This table answers "does Donchian work in TREND_UP?", and that question is
+ * about a strategy rather than about whichever book or timeframe happened to
+ * receive the trade. Keying it on `signalSource` split one strategy across
+ * every timeframe it ran on ("backtest:donchian_breakout_v1:4h" and ":1h" were
+ * two unrelated rows) and, for forward trades, keyed it on a timeframe with no
+ * strategy in it at all.
+ *
+ * Records with no attribution group under UNATTRIBUTED rather than being
+ * guessed at — see strategyIdKey.
+ */
+const strategyKey = strategyIdKey;
 
 // The confidence the regime read had when the trade was opened, if it was
 // recorded. Averaged per cell so a reader can tell a cell built from decisive

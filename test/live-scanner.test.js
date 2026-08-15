@@ -83,6 +83,14 @@ const BULLISH_DECISION = {
   newsRisk: { level: "low" },
 };
 
+// The scanner runs mindset_v1, which is forward-paper and therefore keeps its
+// own strategy account. Its positions live there, not in the portfolio book —
+// so these tests resolve the ledger the same way the handler does rather than
+// hard-coding a book name.
+function scannerLedger(lab) {
+  return lab.ledgerFor({ book: "main", strategyId: "mindset_v1" });
+}
+
 function makeLab(configOverrides = {}, { decision = BULLISH_DECISION } = {}) {
   return new TradingLabService({
     dataDir: fs.mkdtempSync(path.join(os.tmpdir(), "md-scanner-")),
@@ -253,7 +261,7 @@ test("a LONG signal opens exactly one paper position through the Trading Lab", a
   const result = await scanner.runOnce();
 
   assert.equal(result.status, "opened");
-  const open = lab.book("main").getOpenPositions();
+  const open = scannerLedger(lab).getOpenPositions();
   assert.equal(open.length, 1);
   assert.equal(open[0].symbol, "BTCUSDT.P");
   assert.equal(open[0].direction, "LONG");
@@ -271,7 +279,7 @@ test("a FLAT reading opens nothing", async () => {
   const { scanner, lab } = makeScanner({ rows: candleRows(RAMP) });
 
   assert.equal((await scanner.runOnce()).status, "flat");
-  assert.equal(lab.book("main").getOpenPositions().length, 0);
+  assert.equal(scannerLedger(lab).getOpenPositions().length, 0);
 });
 
 // ── Duplicate prevention ────────────────────────────────────────────────────
@@ -288,7 +296,7 @@ test("re-scanning the same candle does not open a second position", async () => 
   // The 60s loop re-reads the same closed bar until the next one closes.
   assert.equal(second.status, "already-evaluated");
   assert.equal(third.status, "already-evaluated");
-  assert.equal(lab.book("main").getOpenPositions().length, 1);
+  assert.equal(scannerLedger(lab).getOpenPositions().length, 1);
 });
 
 test("the candle claim survives a restart", async () => {
@@ -301,7 +309,7 @@ test("the candle claim survives a restart", async () => {
 
   // Close the position so the one-per-symbol rule cannot be what blocks the
   // second entry — the persisted candle claim has to be doing the work.
-  const trader = lab.book("main");
+  const trader = scannerLedger(lab);
   await trader.closePosition(trader.getOpenPositions()[0].id, { reason: "MANUAL", exitPrice: 500 });
   assert.equal(trader.getOpenPositions().length, 0);
 
@@ -329,7 +337,7 @@ test("a new candle with a position already open is skipped, not stacked", async 
 
   assert.equal(result.status, "skipped");
   assert.match(result.action.reason, /Position already open on BTCUSDT\.P/);
-  assert.equal(lab.book("main").getOpenPositions().length, 1);
+  assert.equal(scannerLedger(lab).getOpenPositions().length, 1);
 });
 
 test("concurrent scans cannot both act on the same candle", async () => {
@@ -338,7 +346,7 @@ test("concurrent scans cannot both act on the same candle", async () => {
   const [a, b] = await Promise.all([scanner.runOnce(), scanner.runOnce()]);
 
   assert.ok([a.status, b.status].includes("busy"));
-  assert.equal(lab.book("main").getOpenPositions().length, 1);
+  assert.equal(scannerLedger(lab).getOpenPositions().length, 1);
 });
 
 // ── Dry run / disabled ──────────────────────────────────────────────────────
@@ -391,7 +399,7 @@ test("paper trading off scores the signal but opens nothing", async () => {
   const result = await scanner.runOnce();
 
   assert.equal(result.status, "dry-run");
-  assert.equal(lab.book("main").getOpenPositions().length, 0);
+  assert.equal(scannerLedger(lab).getOpenPositions().length, 0);
   // The decision trail still exists even though nothing was opened.
   assert.ok(result.action.confidenceScore > 0);
   assert.equal(result.action.reason, "Would open (paper trading disabled)");
@@ -438,7 +446,7 @@ test("the scanner recovers on the next tick after an outage", async () => {
   fail = false;
   assert.equal((await scanner.runOnce()).status, "opened");
   assert.equal(scanner.status().lastError, null);
-  assert.equal(lab.book("main").getOpenPositions().length, 1);
+  assert.equal(scannerLedger(lab).getOpenPositions().length, 1);
 });
 
 test("a bad timeframe fails at construction rather than at the first scan", () => {
@@ -452,7 +460,7 @@ test("a trend flip against an open position closes it", async () => {
   const lab = makeLab();
   const { scanner } = makeScanner({ rows: candleRows(UP), lab });
   assert.equal((await scanner.runOnce()).status, "opened");
-  assert.equal(lab.book("main").getOpenPositions().length, 1);
+  assert.equal(scannerLedger(lab).getOpenPositions().length, 1);
 
   // Same symbol, now in a downtrend.
   scanner._fetch = async () => ({ ok: true, status: 200, json: async () => payload(candleRows(DOWN)) });
@@ -461,8 +469,8 @@ test("a trend flip against an open position closes it", async () => {
 
   assert.equal(result.status, "exited");
   assert.equal(result.action.direction, "EXIT_LONG");
-  assert.equal(lab.book("main").getOpenPositions().length, 0);
-  const history = lab.book("main").getHistory();
+  assert.equal(scannerLedger(lab).getOpenPositions().length, 0);
+  const history = scannerLedger(lab).getHistory();
   assert.equal(history[history.length - 1].closeReason, "SCANNER_EXIT");
 });
 

@@ -14,6 +14,7 @@
   var signalActionsTbody = document.getElementById("tl-signal-actions-tbody");
   var scannerEl = document.getElementById("tl-scanner");
   var metricsEl = document.getElementById("tl-metrics");
+  var strategyAccountsEl = document.getElementById("tl-strategy-accounts");
   var regimeEl = document.getElementById("tl-regime");
   var regimeMatrixEl = document.getElementById("tl-regime-matrix");
   var regimeSymbol = document.getElementById("tl-regime-symbol");
@@ -204,6 +205,69 @@
           accountMetric("Trades", s.totalTrades + " closed / " + s.openPositions + " open") +
           accountMetric("Daily", fmtUsd(s.dailyPnl), pnlClass(s.dailyPnl)) +
           "</div></div></button>"
+        );
+      })
+      .join("");
+  }
+
+  /* ── Strategy paper accounts ───────────────────────────────
+     The primary area, and visually distinct from the book cards below it,
+     because the two answer different questions. Every registered strategy
+     appears — including the four that may not trade forward, which show why
+     rather than being hidden. An empty account is information. */
+
+  function accountStatusClass(account) {
+    if (account.active) return "tl-acct-status tl-acct-status--live";
+    if (account.mode === "event-replay") return "tl-acct-status tl-acct-status--replay";
+    return "tl-acct-status tl-acct-status--idle";
+  }
+
+  function accountStatusDot(account) {
+    if (account.active) return "🟢";
+    if (account.mode === "event-replay") return "🟡";
+    return "⚪";
+  }
+
+  function renderStrategyAccounts(data) {
+    if (!strategyAccountsEl) return;
+    var accounts = (data && data.accounts) || [];
+    if (!accounts.length) {
+      strategyAccountsEl.innerHTML = '<div class="de-empty">No strategies registered.</div>';
+      return;
+    }
+
+    strategyAccountsEl.innerHTML = accounts
+      .map(function (account) {
+        var s = account.stats || {};
+        var m = s.riskMetrics || {};
+        var traded = Number(s.totalTrades) > 0;
+
+        return (
+          '<div class="tl-account-card tl-acct' + (account.active ? " tl-acct--live" : "") + '">' +
+          '<div class="tl-account-body">' +
+          '<div class="tl-account-head"><span>' + escapeHtml(account.name) + "</span>" +
+          "<small>" + escapeHtml(account.id) + "</small></div>" +
+          '<div class="' + accountStatusClass(account) + '">' +
+          accountStatusDot(account) + " " + escapeHtml(account.label) +
+          "</div>" +
+          '<div class="tl-account-equity"><span>Equity</span><strong>$' +
+          Number(s.equity || 0).toLocaleString(undefined, { maximumFractionDigits: 2 }) +
+          "</strong></div>" +
+          '<div class="tl-account-metrics">' +
+          accountMetric("Net P&L", traded ? fmtUsd(s.realizedPnl) : "—", pnlClass(s.realizedPnl)) +
+          accountMetric("Win rate", traded ? s.winRate + "%" : "—") +
+          accountMetric("Expectancy", m.closedTrades ? (m.expectancyR > 0 ? "+" : "") + m.expectancyR + "R" : "—", pnlClass(m.expectancyR)) +
+          accountMetric("Profit factor", m.closedTrades ? (m.profitFactor == null ? "∞" : m.profitFactor) : "—") +
+          accountMetric("Max DD", m.closedTrades ? m.maxDrawdownPct + "%" : "—") +
+          accountMetric("Trades", (s.totalTrades || 0) + " closed / " + (s.openPositions || 0) + " open") +
+          "</div>" +
+          // Says plainly why an account has no track record, so a $10,000
+          // balance never reads as "this strategy broke even".
+          (account.active
+            ? ""
+            : '<div class="tl-acct-why">No forward track record — lifecycle status <code>' +
+              escapeHtml(account.status) + "</code>. Promote it to forward-paper to start one.</div>") +
+          "</div></div>"
         );
       })
       .join("");
@@ -680,6 +744,16 @@
   // The regime read needs candles, so it is the one panel here that can be slow
   // or unavailable (503 when no candle source is configured). It loads on its
   // own and reports its own failure rather than blanking the page around it.
+  function loadStrategyAccounts() {
+    if (!strategyAccountsEl) return Promise.resolve();
+    return getJson("/api/trading-lab/strategy-accounts")
+      .then(renderStrategyAccounts)
+      .catch(function (err) {
+        strategyAccountsEl.innerHTML =
+          '<div class="de-empty">Could not read strategy accounts: ' + escapeHtml(err.message) + "</div>";
+      });
+  }
+
   function loadRegime() {
     if (!regimeEl) return Promise.resolve();
     regimeEl.innerHTML = '<div class="de-empty">Reading the market environment&hellip;</div>';
@@ -726,6 +800,7 @@
     clearError();
     refreshBtn.disabled = true;
     return loadOverview()
+      .then(loadStrategyAccounts)
       .then(loadBookDetail)
       .then(loadCandidates)
       .then(loadRegimeMatrix)
