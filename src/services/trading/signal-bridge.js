@@ -10,13 +10,11 @@
 //
 // Two deliberate safety properties:
 //
-//   1. Nothing opens unless SIGNAL_BOT_PAPER_TRADE_ENABLED is explicitly true.
-//      The default is a dry run: every transition is still scored through the
-//      full checklist -> edge gate -> risk sizing pipeline and logged, so the
-//      decision trail exists before anything is allowed to act on it.
-//   2. Even when enabled it opens *paper* positions only, through the same
-//      TradingLabService.execute() path the dashboard uses. There is no live
-//      order code reachable from here.
+//   1. The default is a dry run: every transition is scored through the full
+//      checklist -> edge gate -> risk sizing pipeline and logged.
+//   2. Signal Bot has no registered strategy identity. Enabling its paper flag
+//      records an explicit attribution refusal instead of mutating a persistent
+//      strategy ledger. There is no live order code reachable from here.
 //
 // It also marks open paper positions to market on every bot interval, so stops
 // and take-profits resolve on a schedule rather than only when someone loads
@@ -25,6 +23,7 @@
 const { atr } = require("../decision-engine");
 const { dropUnclosedCandle } = require("../signal-screener");
 const { replayOrderForPositions } = require("./replay-order");
+const { listStrategyAccounts } = require("./strategy-accounts");
 
 const ENTRY_TRANSITIONS = new Set(["LONG", "SHORT"]);
 const DEFAULT_MARK_INTERVAL = "4h";
@@ -104,21 +103,21 @@ class SignalTradeBridge {
     }
   }
 
-  // Mark every book to market so SL/TP fire on the bot's schedule. All books,
-  // not just the configured one — positions opened by hand from the dashboard
-  // deserve the same unattended management as bridged ones.
+  // Mark every strategy account to market so SL/TP fire on schedule. Archived
+  // legacy ledgers are intentionally excluded: they are historical evidence,
+  // not active accounts.
   async markOpenPositions() {
     if (!this.autoMarkEnabled || !this._lab) return [];
     const marks = [];
-    for (const { id } of this._lab.listBooks()) {
-      const trader = this._lab.book(id);
+    for (const { id } of listStrategyAccounts()) {
+      const trader = this._lab.strategyLedger(id);
       if (!trader.getOpenPositions().length) continue;
       try {
         const events = await this._markBookWithCandles(trader);
         for (const event of events) {
           this._logger.log(`[SignalBridge] ${id}: ${event.type} on ${event.symbol} (${event.realized})`);
         }
-        marks.push({ book: id, events });
+        marks.push({ strategyId: id, events });
       } catch (err) {
         this._logger.error(`[SignalBridge] Marking ${id} failed: ${err.message}`);
       }
@@ -232,14 +231,6 @@ class SignalTradeBridge {
         continue;
       }
 
-      // Duplicate protection, re-read per transition: the same symbol can flip
-      // on 4h and 1D in one cycle, and the first open must block the second.
-      const trader = this._lab.book(this.book);
-      if (trader.getOpenPositions().some((p) => p.symbol === symbol)) {
-        actions.push(this._record({ transition, status: "skipped", reason: `Position already open on ${symbol}` }));
-        continue;
-      }
-
       if (!states.has(interval)) states.set(interval, await this._lab.stateForInterval(interval));
       const input = {
         book: this.book,
@@ -251,9 +242,13 @@ class SignalTradeBridge {
         strategy: `signal-bot:${interval}`,
       };
 
+      // The Signal Bot has no registered strategy identity. It can still be
+      // scored in the process-local analysis ledger, but it may never be
+      // persisted into a strategy account or an archived legacy ledger.
+      const assessment = this._lab.evaluate(input);
+
       // Dry run (the default): score it, log the verdict, open nothing.
       if (!this.paperTradeEnabled) {
-        const assessment = this._lab.evaluate(input);
         actions.push(
           this._record({
             transition,
@@ -265,22 +260,14 @@ class SignalTradeBridge {
         continue;
       }
 
-      try {
-        const assessment = await this._lab.execute({ ...input, signalSource: `signal-bot:${interval}` });
-        actions.push(
-          this._record({
-            transition,
-            status: assessment.opened ? "opened" : "blocked",
-            reason: assessment.opened ? `Opened ${assessment.opened.id}` : assessment.trade.reason,
-            assessment,
-            opened: assessment.opened || null,
-          }),
-        );
-      } catch (err) {
-        // Position and risk limits surface as thrown 4xx errors from the paper
-        // trader — a refusal to trade, not a bot failure.
-        actions.push(this._record({ transition, status: "blocked", reason: err.message }));
-      }
+      actions.push(
+        this._record({
+          transition,
+          status: "blocked",
+          reason: "Signal Bot has no registered strategy identity; persistent execution refused",
+          assessment,
+        }),
+      );
     }
 
     return actions;
@@ -292,7 +279,7 @@ class SignalTradeBridge {
       symbol: transition.symbol,
       interval: transition.interval,
       direction: transition.to,
-      book: this.book,
+      book: "UNATTRIBUTED",
       status,
       reason,
       entryPrice: Number(transition.price) || null,

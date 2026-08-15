@@ -84,7 +84,7 @@ test("each account reports why it is or is not forward enabled", () => {
   }
 
   // Cannot even be replayed on candles, so "backtest only" would overstate it.
-  assert.equal(byId.get("shadow_bananagun_v1").label, "Event Replay Only");
+  assert.equal(byId.get("shadow_bananagun_v1").label, "Experimental · Event Replay Only");
   assert.equal(byId.get("shadow_bananagun_v1").active, false);
 });
 
@@ -112,15 +112,14 @@ test("a forward-paper strategy's trades go to its own ledger", async () => {
   assert.equal(lab.book("main").getOpenPositions().length, 0, "and not into the portfolio book");
 });
 
-test("a backtest-only strategy's account stays empty", async () => {
+test("a backtest-only strategy is refused instead of falling back to legacy", async () => {
   const lab = tempLab();
-  // Even if something contrived to execute one, it must not land in an account
-  // for a strategy that has not been promoted.
-  const result = await lab.execute(entry({ strategyId: "vwap_reversion_v1" }));
-
-  assert.ok(result.opened);
-  assert.equal(result.ledger, "main", "falls back to the portfolio book");
+  await assert.rejects(
+    () => lab.execute(entry({ strategyId: "vwap_reversion_v1" })),
+    (err) => err.statusCode === 409 && /cannot forward-paper trade/.test(err.message),
+  );
   assert.equal(lab.strategyLedger("vwap_reversion_v1").getOpenPositions().length, 0);
+  assert.equal(lab.book("main").getOpenPositions().length, 0);
 });
 
 test("a Donchian trade cannot alter VWAP equity or history", async () => {
@@ -233,29 +232,39 @@ test("a backtest leaves every persistent ledger untouched", async () => {
 
 /* ── Books survive ────────────────────────────────────────── */
 
-test("the three portfolio books are unchanged and still readable", async () => {
-  const lab = tempLab();
+test("the three legacy ledgers stay readable, unattributed and read-only", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "legacy-readonly-"));
+  const shadowDir = path.join(dir, "trading-lab", "shadow");
+  fs.mkdirSync(shadowDir, { recursive: true });
+  fs.writeFileSync(path.join(shadowDir, "history.json"), JSON.stringify([
+    { id: "old-1", symbol: "BTCUSDT", realizedPnl: 25, signalSource: "legacy-import" },
+  ]));
+  const lab = new TradingLabService({ dataDir: dir });
   assert.deepEqual(lab.listBooks().map((b) => b.id), ["main", "shadow", "alts"]);
+  assert.ok(lab.listBooks().every((b) => b.archived === true));
 
-  // Legacy histories must stay readable: a trade written before attribution
-  // existed has no strategy and must not be guessed at.
   const shadow = lab.book("shadow");
-  shadow.openPosition({
-    symbol: "BTCUSDT", direction: "LONG", size: 1, entryPrice: 100,
-    stopLoss: 95, tp1: 110, tp2: 120, riskUsd: 50,
-    signalSource: "legacy-import",
-  });
-  assert.equal(shadow.getOpenPositions().length, 1);
-  assert.equal(shadow.getOpenPositions()[0].meta.strategy, undefined);
+  assert.equal(shadow.getHistory().length, 1);
+  assert.equal(shadow.getHistory()[0].meta, undefined, "unknown attribution stays unknown");
+  for (const mutate of [
+    () => shadow.openPosition({}),
+    () => shadow.closePosition("old-1"),
+    () => shadow.updatePositions(),
+    () => shadow.addToHistory({}),
+    () => shadow.reset(),
+  ]) {
+    assert.throws(mutate, /archived and read-only/);
+  }
 });
 
-test("a trade with no strategy attribution stays in the portfolio book", async () => {
+test("a trade with no strategy attribution is refused and touches no legacy ledger", async () => {
   const lab = tempLab();
-  // The signal-bot bridge has no registry strategy at all.
-  const result = await lab.execute(entry({ signalSource: "signal-bot:4h" }));
-  assert.ok(result.opened);
-  assert.equal(result.ledger, "main");
-  assert.equal(result.opened.meta.strategy, null, "not guessed");
+  await assert.rejects(
+    () => lab.execute(entry({ signalSource: "signal-bot:4h" })),
+    /requires a registered strategy identity/,
+  );
+  assert.equal(lab.book("main").getHistory().length, 0);
+  assert.equal(lab.book("main").getOpenPositions().length, 0);
 });
 
 /* ── Reporting ────────────────────────────────────────────── */
@@ -266,6 +275,11 @@ test("the accounts overview reports equity and lifecycle for all five", async ()
 
   assert.equal(overview.accounts.length, 5);
   assert.equal(overview.mode, "paper");
+  assert.equal(
+    new Set(overview.accounts.map((account) => account.stats.startingBalance)).size,
+    1,
+    "all five accounts must begin with the same fair starting balance",
+  );
   for (const account of overview.accounts) {
     assert.ok(account.stats, `${account.id} has no stats`);
     assert.equal(account.stats.balance, account.stats.startingBalance);

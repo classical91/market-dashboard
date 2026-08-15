@@ -720,9 +720,8 @@
   margin: 4px 0 8px;
 }
 
-/* A strategy account is a panel, not a button — unlike a book card it does
-   not select anything, so it must not look clickable.
-   It also has no equity chart yet, so it must NOT inherit the book card's
+/* Strategy accounts are the primary selectable ledgers. They have no equity
+   chart yet, so they must NOT inherit the old book card's
    fixed 112px chart row: that row exists to hold a sparkline, and an empty
    one pushed every account's body into the wrong grid track. */
 .tl-acct {
@@ -730,17 +729,21 @@
   min-height: 0;
   grid-template-rows: 1fr;
   text-align: left;
-  cursor: default;
+  cursor: pointer;
   border-left: 3px solid var(--dim);
 }
 
 .tl-acct:hover {
-  border-color: rgba(255,255,255,0.09);
-  border-left-color: var(--dim);
-  background: rgba(255,255,255,0.035);
+  border-color: rgba(77,163,255,0.45);
+  background: rgba(77,163,255,0.06);
 }
 
 .tl-acct--live:hover { border-left-color: var(--green); }
+
+.tl-acct.is-active {
+  border-color: rgba(77,163,255,0.65);
+  box-shadow: inset 0 0 0 1px rgba(77,163,255,0.24);
+}
 
 /* One metric per row. Two columns truncated "+0.138R" to "+0...." and
    "64 closed / 0 open" to "64 close..." — a number clipped to its first
@@ -783,4 +786,36 @@
 .tl-acct-why code {
   font-size: 10px;
   color: var(--soft);
+}
+
+.tl-legacy-history {
+  padding: 0;
+}
+
+.tl-legacy-history > summary {
+  cursor: pointer;
+  padding: 12px 14px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.tl-legacy-history[open] > summary {
+  border-bottom: 1px solid var(--border);
+}
+
+.tl-legacy-history > .de-card-note,
+.tl-legacy-history > #tl-legacy-books {
+  margin-left: 14px;
+  margin-right: 14px;
+}
+
+.tl-legacy-history > .de-card-note {
+  margin-top: 12px;
+}
+
+.tl-legacy-history > #tl-legacy-books {
+  margin-bottom: 14px;
 }

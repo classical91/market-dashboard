@@ -40,7 +40,7 @@ follows, and records what happened so the next answer is better informed.
 | — | `src/services/trading/strategies/` | New: the strategy registry, its research lifecycle metadata, and the shared mindset_v1 rules the scanner and backtester both run. |
 | — | `src/services/trading/experiment-record.js` | New: turns a finished run into a research record. Pure. |
 | — | `src/services/trading/experiment-store.js` | New: where experiments are persisted. The seam a database would replace. |
-| `shadow_trader.py`, `alts_trader.py` | *books* in `trading-lab.js` | Main / Shadow / Alts are named books over one engine rather than three near-duplicate services. They are PORTFOLIO books — per-strategy performance lives in strategy accounts, see below. |
+| `shadow_trader.py`, `alts_trader.py` | archived ledgers in `trading-lab.js` | Main / Shadow SMC / Alts remain readable as unattributed legacy history, but are read-only and receive no new positions, marks, closes or resets. |
 | `app.py`, `dashboard.py`, Flask routes | `src/routes/trading-lab.js`, `public/trading-lab.html` | Retired; Market Dashboard's Express + vanilla JS replaces them. |
 
 ### Behaviour deliberately preserved
@@ -167,8 +167,8 @@ Other honesty properties, each with a test:
 - A position still open when the candles run out is **reported, not
   force-closed**. Force-closing would invent an exit the strategy never
   signalled and pollute expectancy.
-- Backtests run against a **throwaway in-memory ledger**. The live books are
-  never touched, and the run's edge gate sees only the trades that run
+- Backtests run against a **throwaway in-memory ledger**. Persistent strategy
+  accounts and archived legacy ledgers are never touched, and the run's edge gate sees only the trades that run
   produced. A test asserts the run performs *zero* filesystem writes, which is
   a stronger claim than the temp directory it replaced: there is nothing to
   clean up and no window in which a crash could strand a ledger.
@@ -673,23 +673,25 @@ Two separations are deliberate:
   `record` / `get` / `list` / `count`. Moving this to SQLite or Postgres later
   is a swap of one file, not a rewrite of the backtester.
 
-## Strategy accounts and portfolio books
+## Strategy accounts and archived legacy ledgers
 
-Two questions that look like one:
+Two data surfaces that must not be confused:
 
 ```text
-Strategy account   How does ONE strategy perform, in isolation?
-Portfolio book     How does a COLLECTION of activity perform together?
+Strategy account       Active isolated paper state for ONE registered strategy.
+Legacy paper history   Read-only evidence from the retired Main / Shadow SMC / Alts ledgers.
 ```
 
-Only the second existed. The three books — Main, Shadow SMC, Alts — are a port
+Originally only the second existed. The three books — Main, Shadow SMC, Alts — are a port
 of TraderClaw's three Python bot services (`shadow_trader.py`, `alts_trader.py`),
 so one of them is *named after a strategy* while containing whatever happened to
 be written to it. That is where the confusion starts, and it is why the top
 dropdown looked like a strategy selector.
 
-Both concepts are now first-class. Books are unchanged: same IDs, same ledgers,
-same `SIGNAL_BOT_BOOK` / `LIVE_SCANNER_BOOK` defaults.
+Strategy accounts replace those books as the active execution and reporting
+surface. The old IDs and historical files are preserved exactly as recorded,
+with unknown attribution left unknown, but the service exposes them through a
+read-only facade. No execution path may fall back to them.
 
 ### Attribution comes first
 
@@ -752,9 +754,10 @@ non-eligible *and* refuses forward trades.
 
 ### One resolver, because the gauntlet must read what it writes
 
-`ledgerFor({ book, strategyId })` decides where a trade lives: a scanner-eligible
-strategy's forward trades go to its own account, everything else to the portfolio
-book.
+`ledgerFor({ strategyId })` decides where a trade lives. A registered strategy
+always resolves to its own account. Forward execution additionally requires a
+lifecycle status that permits forward paper trading; ineligible and unattributed
+execution is refused rather than redirected to Main, Shadow SMC or Alts.
 
 There is exactly one of these on purpose. `evaluate()` reads risk state and
 closed-trade history to run kill switches and the edge gate; `execute()` opens the
@@ -764,7 +767,7 @@ book. That is a safety failure, not a reporting one. A test fills a strategy
 account to its position cap and asserts the cap binds while Main sits empty.
 
 The intent handler resolves the same way for exits and for its
-one-position-per-symbol check: searching the portfolio book for a position held in
+one-position-per-symbol check: searching a legacy ledger for a position held in
 a strategy account would silently leave it open.
 
 Ledgers are namespaced `strategy-<id>`. A prefix rather than a nested path,
@@ -778,6 +781,8 @@ isolated by accident, with the separator carrying the guarantee deleted.
   lifecycle state.
 * `GET /api/trading-lab/strategy-accounts/:id` — one account's metrics, regime
   breakdown, open positions and history, from its own isolated ledger.
+* `GET /api/trading-lab/books` — archived legacy ledger descriptors for
+  compatibility and historical reads only.
 
 ## Market regime
 
@@ -874,6 +879,13 @@ carries `enforced: false`, and every candidate carries its own
 `scannerEligible`, so `Preferred: VWAP Reversion v1` never reads as "it is
 running" — that strategy is `backtest` status and the card says so.
 
+The evidence scope is deliberately different from the selected account view.
+Each account's Regime Analysis is built only from that account's history, but
+the advisory router combines the histories of **all strategy accounts** before
+comparing strategies. Selecting VWAP or Donchian in the UI therefore changes
+the account detail, never the market recommendation. Legacy ledgers are not
+included because their historical trades have no trustworthy strategy identity.
+
 A non-actionable read (`TRANSITION`, `UNKNOWN`, anything under the confidence
 floor, or an environment where size rather than direction is the problem)
 selects nothing at all and reports every candidate as *held* — not suppressed,
@@ -881,12 +893,11 @@ because nothing about those strategies failed.
 
 ### Endpoints
 
-* `GET /api/trading-lab/regime?symbol=&interval=&book=&min_trades=` — the read
-  and its routing, returned side by side and computed independently, so a
-  surprising answer says whether it came from the market or from our own
-  history.
-* `GET /api/trading-lab/regime-matrix?book=&min_trades=` — the table alone, no
-  candles fetched.
+* `GET /api/trading-lab/regime?symbol=&interval=&strategyId=&min_trades=` — the
+  market read and aggregate cross-strategy routing, returned side by side. The
+  optional strategy id is display context and cannot change routing evidence.
+* `GET /api/trading-lab/regime-matrix?strategyId=&min_trades=` — one selected
+  strategy account's isolated table, with no candles fetched.
 
 Backtest runs also return `regimeMetrics` (the same table over that run's
 trades) and `regimeCounts` (which environments the run's signals occurred in — a
@@ -1076,22 +1087,26 @@ ledger is admin-gated via `x-admin-key`.
 
 | Method | Path | Auth | Purpose |
 | --- | --- | --- | --- |
-| GET | `/api/trading-lab` | — | Overview: mode, config, per-book stats and open positions. |
-| GET | `/api/trading-lab/books` | — | Available books. |
-| GET | `/api/trading-lab/positions?book=` | — | All positions for a book. |
-| GET | `/api/trading-lab/history?book=&limit=` | — | Closed trades, newest first. |
-| GET | `/api/trading-lab/metrics?book=&min_trades=` | — | Grouped expectancy leaderboards. |
-| GET | `/api/trading-lab/decision-candidates?interval=&book=` | — | Every Decision Engine plan scored through the Lab. |
+| GET | `/api/trading-lab` | — | Overview: five strategy accounts plus archived legacy summaries. |
+| GET | `/api/trading-lab/books` | — | Archived Main / Shadow SMC / Alts descriptors. Read-only compatibility. |
+| GET | `/api/trading-lab/strategy-accounts` | — | All isolated strategy accounts with lifecycle and equity state. |
+| GET | `/api/trading-lab/strategy-accounts/:id` | — | One account's positions, history, metrics and isolated regime table. |
+| GET | `/api/trading-lab/positions?strategyId=` | — | Positions for one strategy account. `book=` remains a legacy read alias. |
+| GET | `/api/trading-lab/history?strategyId=&limit=` | — | One strategy account's closed trades, newest first. `book=` remains a legacy read alias. |
+| GET | `/api/trading-lab/metrics?strategyId=&min_trades=` | — | One strategy account's grouped expectancy leaderboards. |
+| GET | `/api/trading-lab/regime?symbol=&interval=&strategyId=&min_trades=` | — | Market read plus aggregate cross-strategy advisory routing. |
+| GET | `/api/trading-lab/regime-matrix?strategyId=&min_trades=` | — | Isolated regime evidence for one selected account. |
+| GET | `/api/trading-lab/decision-candidates?interval=` | — | Decision Engine plans scored in a process-local unattributed analysis ledger. Opens nothing. |
 | POST | `/api/trading-lab/evaluate` | — | Dry run a hypothetical trade. Opens nothing. |
-| POST | `/api/trading-lab/positions` | admin | Evaluate, then open if every gate agrees. |
-| POST | `/api/trading-lab/positions/:id/close` | admin | Close the remainder manually. |
-| POST | `/api/trading-lab/mark` | admin | Mark to market; fires any stop/target reached. |
+| POST | `/api/trading-lab/positions` | admin | Evaluate, then open in the supplied lifecycle-eligible `strategyId`; unattributed execution is refused. |
+| POST | `/api/trading-lab/positions/:id/close` | admin | Close the remainder in the supplied strategy account. |
+| POST | `/api/trading-lab/mark` | admin | Mark one supplied strategy account to market; fires any stop/target reached. |
 | GET | `/api/trading-lab/strategies` | — | The strategy catalogue with lifecycle metadata (`version`, `status`, `supportsBacktest`, `supportsEventReplay`, `supportsLiveScanner`, dataset availability, computed `scannerEligible` and `realMoneyEligible`) and the default id. Static, so the UI selector can render before a key is entered. |
 | GET | `/api/trading-lab/experiments?strategy=&version=&symbol=&timeframe=&limit=` | — | Research history, newest first. Read-only: there are no promotion mutations. |
 | GET | `/api/trading-lab/experiments/:id` | — | One experiment record, or 404. |
 | POST | `/api/trading-lab/backtest` | admin | Replay a symbol's candles. Body: `symbol`, `interval`, `strategy` (defaults to `mindset_v1`; an unknown id is a 400), `record` (opt-in experiment, returns `experimentId`), `notes`. Admin-gated despite being read-only: it replays hundreds of bars and pulls candles per call, so it should not be spinnable by anonymous visitors. Writes only to a temp ledger. |
 | POST | `/api/trading-lab/backtest/compare` | admin | Replay several strategies over **one** candle fetch for candle strategies and event datasets for event-replay strategies, then reduce each to the promotion numbers: bars/events, signals, closed trades, net P&L, expectancy R, profit factor, max drawdown, win rate, worst loss streak. Defaults to every registered strategy. |
-| POST | `/api/trading-lab/reset` | admin | Wipe a book back to its starting balance. |
+| POST | `/api/trading-lab/reset` | admin | Reset one supplied strategy account. Archived legacy ledgers cannot be reset. |
 
 ## Migration status
 
@@ -1102,7 +1117,7 @@ Done:
 3. Risk sizing and SL/TP logic integrated.
 4. Expectancy, drawdown, win rate, profit factor and R-multiple analytics.
 5. Decision Engine connected to the paper trader.
-6. Main / Shadow / Alts modelled as named books.
+6. Five isolated accounts derived from the strategy registry; Main / Shadow SMC / Alts retained as archived, read-only legacy history.
 7. Parity check against the Python engines passing.
 8. Backtesting — bar replay over the same paper-trading engine.
 9. Signal-bot bridge — signal transitions feed the Lab, replacing TradingView
@@ -1126,25 +1141,23 @@ TradingView alert webhooks are **not** the signal source. The subscription that
 produced them is gone, so alert delivery is not something to build on, and
 `signal_handler.py` / `security.py` are deliberately not ported.
 
-The Signal Bot supplies entries instead. It already re-scans the confluence
-screener on a timer and detects transitions on *closed* candles, which is the
-same "on bar close" semantics the alerts had, with no subscription and no
-inbound endpoint to authenticate.
+The Signal Bot supplies research observations and alerts instead. It re-scans
+the confluence screener on a timer and detects transitions on *closed* candles,
+which preserves the old "on bar close" semantics without an inbound webhook.
+It has no registered strategy identity, so it cannot own persistent trades.
 
-    SignalBot (FLAT -> LONG/SHORT)  ->  SignalTradeBridge  ->  TradingLab.execute()
+    SignalBot (FLAT -> LONG/SHORT)  ->  SignalTradeBridge  ->  TradingLab.evaluate()
 
 `src/services/trading/signal-bridge.js`, wired into the bot's interval loop:
 
 - **Dry run by default.** Every entry transition is scored through the whole
-  checklist -> edge gate -> risk sizing pipeline and logged with its verdict,
-  but nothing is opened until `SIGNAL_BOT_PAPER_TRADE_ENABLED=true`. The
-  decision trail exists before anything is allowed to act on it.
-- **Paper only.** It goes through `TradingLabService.execute()`, the same path
-  the dashboard uses. No live-order code is reachable from the bridge, and it
-  never touches `TRADING_MODE` / `ALLOW_LIVE_TRADING`.
-- **Entries only, once each.** Only `FLAT -> LONG/SHORT` opens anything; flips
-  and exits do not. A symbol with a position already open in the target book is
-  skipped, including when it transitions on two timeframes in one scan.
+  checklist -> edge gate -> risk sizing pipeline in a process-local,
+  unattributed analysis ledger and logged with its verdict.
+- **No persistent fallback.** If `SIGNAL_BOT_PAPER_TRADE_ENABLED=true`, the
+  bridge records an explicit attribution refusal. It does not invent a strategy
+  identity and cannot write to a strategy account or archived legacy ledger.
+- **Entry observations only.** Only `FLAT -> LONG/SHORT` transitions are
+  evaluated. Flips and exits are not persistent execution instructions.
 - **Entry price is the signal's price**, carried on the transition rather than
   re-fetched, so the fill matches the bar the signal confirmed on. ATR comes
   from the screener's cached klines; if those fail, sizing falls back to
@@ -1164,16 +1177,14 @@ inbound endpoint to authenticate.
   an Alpha Team access prompt until the code is accepted.
   Unfinished setup sources stay visible as blurred `BETA` dashboard modules
   rather than direct group links.
-- **Auto-marking** runs first in each cycle, over *every* book — so hand-opened
-  positions are managed too — letting stops and targets fire without the page
-  open. It updates the ledger the kill switches read before that cycle's
-  entries are judged.
+- **Auto-marking** runs first in each cycle over every strategy account, while
+  archived legacy ledgers remain untouched. Positions owned by the live scanner
+  are skipped because the scanner marks them on its own venue and timeframe.
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `SIGNAL_BOT_PAPER_TRADE_ENABLED` | `false` | Opt in, by exact value `true`, to opening paper positions. Otherwise log-only. |
-| `SIGNAL_BOT_BOOK` | `main` | Which book bridged trades land in. |
-| `SIGNAL_BOT_AUTO_MARK_ENABLED` | `true` | Mark open positions to market each interval. |
+| `SIGNAL_BOT_PAPER_TRADE_ENABLED` | `false` | When `true`, log explicit attribution refusals; it does not authorize persistent execution. |
+| `SIGNAL_BOT_AUTO_MARK_ENABLED` | `true` | Mark registered strategy accounts each interval, excluding archived legacy ledgers and scanner-owned positions. |
 | `MARKET_DASHBOARD_URL` | empty | Public dashboard origin for Alpha Team `Visit:` links. Alerts omit links when this is blank. |
 
 Auto-marking alone does not start the loop — it is a passive add-on to a cycle
@@ -1194,7 +1205,7 @@ Bot timeframe because all three of its inputs differ:
 
 - **Venue.** It reads Bitget USDT-perpetuals, so `BTCUSDT.P` is a real
   instrument here instead of being proxied by its spot pair. The `.P` name is
-  kept in the ledger so scanner trades never merge with the bot's spot ones.
+  kept in the strategy account as the instrument actually evaluated.
 - **Cadence.** A 60s poll on a 15m bar acts on a close within a minute, rather
   than up to a full bar later.
 - **De-dupe contract.** The Signal Bot de-dupes on *state change*
@@ -1252,7 +1263,7 @@ thesis should be actionable on the bar it breaks, and re-emitting an exit for
 an already-closed position is a no-op the handler absorbs.
 
 Exit intents are emitted from the strategy reading alone, without consulting
-the book — `intentsFor()` is a pure function of the candles. One bar can
+the account — `intentsFor()` is a pure function of the candles. One bar can
 therefore produce both an exit and an entry (trend flipped down: close the
 long, then consider the short), returned in that order so the position slot is
 freed before the entry is judged. The cycle reports the most consequential
@@ -1279,8 +1290,11 @@ as an error the next tick retries rather than a crash.
 | `LIVE_SCANNER_STRATEGY` | `mindset_v1` | Strategy switch. |
 | `LIVE_SCANNER_INTERVAL_MS` | `60000` | Poll cadence. |
 | `LIVE_SCANNER_CONTEXT_INTERVAL` | `4h` | Higher timeframe for regime/daily bias. |
-| `LIVE_SCANNER_BOOK` | `main` | Which book scanner trades land in. |
 | `LIVE_SCANNER_PAPER_TRADE_ENABLED` | `true` | Set `false` to score and log without opening. |
+
+The old `SIGNAL_BOT_BOOK` and `LIVE_SCANNER_BOOK` settings no longer select a
+persistent ledger. Registered strategy identity determines the ledger; missing
+or ineligible identity is refused rather than routed to a legacy book.
 
 Positions carrying a `live-scanner:` signal source are skipped by the Signal
 Bot bridge's auto-marking: the scanner marks them itself, on its own venue and

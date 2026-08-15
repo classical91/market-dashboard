@@ -3,7 +3,7 @@
 // Strategy paper accounts — one isolated persistent ledger per registered
 // strategy, so "does this strategy make money?" is a question with an answer.
 //
-// ── Why this is separate from books ─────────────────────────────────────────
+// ── Why this replaces active books ──────────────────────────────────────────
 //
 // The lab has three persistent books — Main, Shadow SMC, Alts — and they are a
 // port of TraderClaw's three Python bot services, not a portfolio design. One
@@ -11,16 +11,13 @@
 // a book looks like it answers "how is SMC doing?" and actually answers "what
 // happened in the ledger the shadow_trader bot used to write to".
 //
-// The two questions are genuinely different and both worth asking:
+// The strategy ledgers are now the only active persistent paper accounts:
 //
 //   Strategy account  How does ONE strategy perform, in isolation, with its own
 //                     starting balance, its own risk state and its own history?
-//   Portfolio book    How does a COLLECTION of activity perform together? The
-//                     signal-bot bridge has no registry strategy at all, so its
-//                     trades can only ever be book-level activity.
-//
-// So books are kept, unchanged and un-renamed, and accounts are added beside
-// them.
+// The old books remain readable as archived history, but no execution path may
+// write to them. A signal without a registered strategy identity is therefore
+// analysis-only rather than being assigned to a made-up owner.
 //
 // ── Derived, never listed by hand ───────────────────────────────────────────
 //
@@ -71,12 +68,20 @@ function accountMode(meta) {
   // even be replayed on candles is further from trading than one that can, and
   // the label should say which.
   if (meta.supportsEventReplay && !meta.supportsBacktest) {
-    return { active: false, mode: "event-replay", label: "Event Replay Only" };
+    return { active: false, mode: "event-replay", label: "Experimental · Event Replay Only" };
   }
   if (meta.supportsBacktest) {
     return { active: false, mode: "backtest", label: "Backtest Only" };
   }
   return { active: false, mode: meta.status, label: "Not Forward Enabled" };
+}
+
+function accountName(name) {
+  return String(name || "")
+    .replace(/\s+v\d+(?:\.\d+)*$/i, "")
+    .replace(/^Shadow Banana Gun$/i, "BananaGun")
+    .replace(/^Donchian Breakout$/i, "Donchian")
+    .replace(/^VWAP Reversion$/i, "VWAP");
 }
 
 /**
@@ -89,7 +94,7 @@ function accountMode(meta) {
 function listStrategyAccounts() {
   return listStrategies().map((meta) => ({
     id: meta.id,
-    name: meta.name,
+    name: accountName(meta.name),
     status: meta.status,
     version: meta.version,
     scannerEligible: meta.scannerEligible,
@@ -109,7 +114,7 @@ function describeStrategyAccount(strategyId) {
   if (!meta) return null;
   return {
     id: meta.id,
-    name: meta.name,
+    name: accountName(meta.name),
     status: meta.status,
     version: meta.version,
     scannerEligible: meta.scannerEligible,

@@ -491,7 +491,10 @@ class LiveScannerService {
     if (!this._lab) return [];
     let trader;
     try {
-      trader = this._lab.book(this.book);
+      // Entries and exits already resolve by strategy identity. Marking must
+      // read that same ledger or the scanner will open in Mindset and look for
+      // stops/targets in archived Main.
+      trader = this._lab.ledgerFor({ strategyId: this.strategy, requireForward: true });
     } catch {
       return [];
     }

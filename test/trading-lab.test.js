@@ -31,6 +31,7 @@ const GOOD_LONG_STATE = {
 
 function candidate(overrides = {}) {
   return {
+    strategyId: "mindset_v1",
     symbol: "BTCUSDT",
     direction: "LONG",
     entryPrice: 1000,
@@ -55,19 +56,19 @@ test("the checklist and edge multipliers compound", () => {
   const lab = makeLab();
   // Neutral bias and one dead trigger take the checklist to half size; a long
   // record of thin-but-positive trades takes the edge gate to REDUCE.
-  const trader = lab.book("main");
+  const trader = lab.strategyLedger("mindset_v1");
   const history = [];
   for (let i = 0; i < 30; i += 1) {
     history.push({
       status: "closed",
       realizedPnl: i % 2 === 0 ? 100 : -90,
       rMultiple: i % 2 === 0 ? 1 : -0.9,
-      signalSource: "main:LONG",
+      signalSource: "mindset_v1:LONG",
       symbol: "BTCUSDT",
       confidenceScore: 70,
     });
   }
-  trader.save(trader.historyFile, history);
+  history.forEach((trade) => trader.addToHistory(trade));
 
   const result = lab.evaluate(candidate({ state: { ...GOOD_LONG_STATE, dailyBias: "NEUTRAL", stochSignal: "NEUTRAL" } }));
   assert.equal(result.checklist.sizeMultiplier, 0.5);
@@ -78,18 +79,15 @@ test("the checklist and edge multipliers compound", () => {
 
 test("an edge-gate block overrides a perfect checklist score", () => {
   const lab = makeLab();
-  const trader = lab.book("main");
-  trader.save(
-    trader.historyFile,
-    Array.from({ length: 25 }, () => ({
+  const trader = lab.strategyLedger("mindset_v1");
+  Array.from({ length: 25 }, () => ({
       status: "closed",
       realizedPnl: -100,
       rMultiple: -1,
-      signalSource: "main:LONG",
+      signalSource: "mindset_v1:LONG",
       symbol: "BTCUSDT",
       confidenceScore: 100,
-    })),
-  );
+    })).forEach((trade) => trader.addToHistory(trade));
 
   const result = lab.evaluate(candidate());
   assert.equal(result.checklist.decision, "TAKE_FULL");
@@ -100,7 +98,7 @@ test("an edge-gate block overrides a perfect checklist score", () => {
 
 test("live account risk overrides whatever state the caller passed", async () => {
   const lab = makeLab();
-  const trader = lab.book("main");
+  const trader = lab.strategyLedger("mindset_v1");
   // Three real losses in a row — a caller claiming a clean slate cannot trade
   // through the consecutive-loss kill switch.
   for (let i = 0; i < 3; i += 1) {
@@ -125,14 +123,14 @@ test("execute opens the position that evaluate planned", async () => {
   assert.equal(result.opened.stopLoss, 850);
   assert.equal(result.opened.signalSource, "decision-engine");
   assert.equal(result.opened.confidenceScore, result.checklist.confidenceScore);
-  assert.equal(lab.book("main").getOpenPositions().length, 1);
+  assert.equal(lab.strategyLedger("mindset_v1").getOpenPositions().length, 1);
 });
 
 test("execute opens nothing when the gates refuse", async () => {
   const lab = makeLab();
   const result = await lab.execute(candidate({ state: { ...GOOD_LONG_STATE, regime: "TREND_DOWN" } }));
   assert.equal(result.opened, null);
-  assert.equal(lab.book("main").getOpenPositions().length, 0);
+  assert.equal(lab.strategyLedger("mindset_v1").getOpenPositions().length, 0);
 });
 
 test("books are addressable by name and unknown books 404", () => {
@@ -142,18 +140,21 @@ test("books are addressable by name and unknown books 404", () => {
   assert.throws(() => lab.book("nope"), (err) => err.statusCode === 404);
 });
 
-test("trading in one book leaves the others untouched", async () => {
+test("trading in one strategy account leaves the others untouched", async () => {
   const lab = makeLab();
-  await lab.execute({ ...candidate(), book: "shadow" });
-  assert.equal(lab.book("shadow").getOpenPositions().length, 1);
+  await lab.execute(candidate());
+  assert.equal(lab.strategyLedger("mindset_v1").getOpenPositions().length, 1);
+  assert.equal(lab.strategyLedger("smc_v1").getOpenPositions().length, 0);
   assert.equal(lab.book("main").getOpenPositions().length, 0);
 });
 
-test("overview reports every book and never claims live mode by default", async () => {
+test("overview reports strategy accounts and archived legacy ledgers", async () => {
   const lab = makeLab();
   const overview = await lab.overview();
   assert.equal(overview.mode, "paper");
+  assert.equal(overview.accounts.length, 5);
   assert.deepEqual(overview.books.map((b) => b.id), ["main", "shadow", "alts"]);
+  assert.ok(overview.books.every((b) => b.archived === true));
   assert.equal(overview.config.accountSize, 10000);
 });
 
@@ -230,16 +231,16 @@ test("a missing regime degrades to neutral instead of throwing", () => {
   assert.equal(state.dailyBias, "NEUTRAL");
 });
 
-test("strategyMetrics reports grouped edge for a book", async () => {
+test("strategyMetrics reports grouped edge for a strategy account", async () => {
   const lab = makeLab();
-  const trader = lab.book("main");
-  trader.save(trader.historyFile, [
+  const trader = lab.strategyLedger("mindset_v1");
+  [
     { status: "closed", realizedPnl: 200, rMultiple: 2, signalSource: "decision:4h", symbol: "BTCUSDT", confidenceScore: 85 },
     { status: "closed", realizedPnl: -100, rMultiple: -1, signalSource: "decision:4h", symbol: "ETHUSDT", confidenceScore: 62 },
-  ]);
+  ].forEach((trade) => trader.addToHistory(trade));
 
-  const metrics = lab.strategyMetrics({ book: "main" });
-  assert.equal(metrics.book, "main");
+  const metrics = lab.strategyMetrics({ strategyId: "mindset_v1" });
+  assert.equal(metrics.strategyId, "mindset_v1");
   assert.equal(metrics.summary.closedTrades, 2);
   assert.equal(metrics.summary.expectancyR, 0.5);
   assert.deepEqual(metrics.groups.symbol.map((r) => r.key), ["BTCUSDT", "ETHUSDT"]);

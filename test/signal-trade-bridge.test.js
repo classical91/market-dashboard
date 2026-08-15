@@ -10,6 +10,7 @@ const { SignalTradeBridge } = require("../src/services/trading/signal-bridge");
 const { SignalActionStore } = require("../src/services/trading/signal-action-store");
 const { TradingLabService } = require("../src/services/trading/trading-lab");
 const { makeTradingConfig } = require("../src/services/trading/config");
+const { listStrategyAccounts } = require("../src/services/trading/strategy-accounts");
 
 const QUIET = { log() {}, warn() {}, error() {} };
 
@@ -28,7 +29,7 @@ function flatCandles(close = 100, count = 60) {
 }
 
 // The decision-engine reading production runs behind the bridge. Tests here
-// are about BRIDGE behaviour — dry run, dedupe, position caps, auto-marking —
+// are about BRIDGE behaviour — dry run, attribution refusal, and auto-marking —
 // so the lab needs a market state that scores. An absent feed now scores as
 // absent rather than as a favourable observation, so a lab with no engine
 // refuses every entry; tests that want that refusal pass their own engine (or
@@ -99,7 +100,10 @@ test("dry run is the default: transitions are scored but nothing is opened", asy
   // decision trail, not silence.
   assert.equal(actions[0].decision, "TAKE_HALF");
   assert.ok(actions[0].confidenceScore > 0);
-  assert.equal(lab.book("main").getOpenPositions().length, 0, "dry run must not touch the ledger");
+  assert.ok(
+    listStrategyAccounts().every((account) => lab.strategyLedger(account.id).getOpenPositions().length === 0),
+    "dry run must not touch a persistent strategy ledger",
+  );
 });
 
 test("signal bridge actions persist newest-first with every outcome status", async () => {
@@ -120,7 +124,7 @@ test("signal bridge actions persist newest-first with every outcome status", asy
   await bridge.handleTransitions([transition({ symbol: "LINKUSDT" })]);
 
   const actions = signalActionStore.recent(10);
-  assert.deepEqual(new Set(actions.map((a) => a.status)), new Set(["dry-run", "opened", "skipped", "blocked"]));
+  assert.deepEqual(new Set(actions.map((a) => a.status)), new Set(["dry-run", "skipped", "blocked"]));
   assert.ok(actions.every((a) => a.timestamp), "each persisted action has a timestamp");
   assert.ok(actions.every((a) => a.entryPrice === null || a.entryPrice > 0), "entry price is persisted when known");
   assert.equal(actions[0].status, "blocked", "newest entries are returned first");
@@ -161,24 +165,18 @@ test("only FLAT -> LONG/SHORT transitions are considered", async () => {
   assert.deepEqual(actions, [], "exits and flips are not entries");
 });
 
-test("when enabled, an allowed setup opens a sized paper position", async () => {
+test("when enabled, an allowed unattributed setup is refused without persistent mutation", async () => {
   const { bridge, lab } = makeBridge({ paperTradeEnabled: true });
 
   const [action] = await bridge.handleTransitions([transition()]);
 
-  assert.equal(action.status, "opened");
-  assert.ok(action.opened, "an opened position is returned");
-
-  const open = lab.book("main").getOpenPositions();
-  assert.equal(open.length, 1);
-  assert.equal(open[0].symbol, "BTCUSDT");
-  assert.equal(open[0].direction, "LONG");
-  assert.equal(open[0].entryPrice, 100, "entry is the price the signal confirmed at");
-  assert.equal(open[0].signalSource, "signal-bot:4h");
-  // ATR 1 × SL_ATR_MULTIPLE 1.5 below a $100 entry — sizing came from the
-  // candles, not from the ATR_FALLBACK_PCT guess.
-  assert.equal(open[0].stopLoss, 98.5);
-  assert.ok(open[0].size > 0);
+  assert.equal(action.status, "blocked");
+  assert.equal(action.book, "UNATTRIBUTED");
+  assert.match(action.reason, /no registered strategy identity/i);
+  assert.ok(listStrategyAccounts().every(
+    (account) => lab.strategyLedger(account.id).getOpenPositions().length === 0,
+  ));
+  assert.equal(lab.book("main").getOpenPositions().length, 0);
 });
 
 test("a blocked setup is recorded with its reason and opens nothing", async () => {
@@ -197,11 +195,11 @@ test("a blocked setup is recorded with its reason and opens nothing", async () =
 
   assert.equal(action.status, "blocked");
   assert.equal(action.decision, "SKIP");
-  assert.match(action.reason, /Checklist skipped/);
+  assert.match(action.reason, /no registered strategy identity/i);
   assert.equal(lab.book("main").getOpenPositions().length, 0);
 });
 
-test("a symbol already open is not doubled up, even within one cycle", async () => {
+test("every unattributed transition is refused, even within one cycle", async () => {
   const { bridge, lab } = makeBridge({ paperTradeEnabled: true });
 
   // Same symbol flipping on both watched timeframes in the same scan.
@@ -210,15 +208,14 @@ test("a symbol already open is not doubled up, even within one cycle", async () 
     transition({ interval: "1D" }),
   ]);
 
-  assert.equal(actions[0].status, "opened");
-  assert.equal(actions[1].status, "skipped");
-  assert.match(actions[1].reason, /already open/);
-  assert.equal(lab.book("main").getOpenPositions().length, 1);
+  assert.ok(actions.every((action) => action.status === "blocked"));
+  assert.ok(actions.every((action) => /no registered strategy identity/i.test(action.reason)));
+  assert.equal(lab.book("main").getOpenPositions().length, 0);
 
   // And again on the next cycle, while the position is still open.
   const [later] = await bridge.handleTransitions([transition()]);
-  assert.equal(later.status, "skipped");
-  assert.equal(lab.book("main").getOpenPositions().length, 1);
+  assert.equal(later.status, "blocked");
+  assert.equal(lab.book("main").getOpenPositions().length, 0);
 });
 
 test("a transition without a price is skipped rather than sized off a guess", async () => {
@@ -231,7 +228,7 @@ test("a transition without a price is skipped rather than sized off a guess", as
   assert.equal(lab.book("main").getOpenPositions().length, 0);
 });
 
-test("the max-open-positions refusal is reported, not thrown", async () => {
+test("unattributed refusal is reported, not thrown", async () => {
   const lab = makeLab({ configOverrides: { maxOpenPositions: 1 } });
   const { bridge } = makeBridge({ lab, paperTradeEnabled: true });
 
@@ -239,31 +236,35 @@ test("the max-open-positions refusal is reported, not thrown", async () => {
   const [second] = await bridge.handleTransitions([transition({ symbol: "ETHUSDT" })]);
 
   assert.equal(second.status, "blocked");
-  assert.equal(lab.book("main").getOpenPositions().length, 1);
+  assert.match(second.reason, /no registered strategy identity/i);
+  assert.equal(lab.book("main").getOpenPositions().length, 0);
 });
 
 test("auto-marking resolves take-profits on the bot's interval, with no page open", async () => {
   let price = 100;
   const lab = makeLab({ priceFeed: async () => price });
+  const trader = lab.strategyLedger("mindset_v1");
+  trader.openPosition({
+    symbol: "BTCUSDT", direction: "LONG", size: 1, entryPrice: 100,
+    stopLoss: 98.5, tp1: 102.25, tp2: 103.75, riskUsd: 1.5, signalSource: "signal-bot:4h",
+  });
   const { bridge } = makeBridge({ lab, paperTradeEnabled: true });
-
-  await bridge.handleTransitions([transition()]);
-  const position = lab.book("main").getOpenPositions()[0];
+  const position = trader.getOpenPositions()[0];
 
   // TP2 sits at 2.5R above a $1.50 stop distance. Delivered as a closed bar,
   // so this exercises the replay path the bot actually runs — backdated, since
   // only bars that closed after the entry are replayed.
   price = position.tp2 + 1;
-  setOpenedAt(lab.book("main"), new Date(Date.now() - 86_400_000).toISOString());
+  setOpenedAt(trader, new Date(Date.now() - 86_400_000).toISOString());
   bridge._screener = { async getCandles() { return [closedCandle({ high: position.tp2 + 1 })]; } };
   const marks = await bridge.markOpenPositions();
 
   assert.equal(marks.length, 1);
-  assert.equal(marks[0].book, "main");
+  assert.equal(marks[0].strategyId, "mindset_v1");
   assert.deepEqual(marks[0].events.map((e) => e.type), ["TP1_HIT", "TP2_HIT"]);
-  assert.equal(lab.book("main").getOpenPositions().length, 0, "the position closed itself");
+  assert.equal(trader.getOpenPositions().length, 0, "the position closed itself");
 
-  const [closed] = lab.book("main").getHistory();
+  const [closed] = trader.getHistory();
   assert.equal(closed.closeReason, "TP2");
   assert.ok(closed.pnl > 0);
 });
@@ -271,18 +272,19 @@ test("auto-marking resolves take-profits on the bot's interval, with no page ope
 test("candle replay marks a LONG stop even when the candle closes back above it", async () => {
   const candle = closedCandle({ open: 100, low: 94, high: 108, close: 101 });
   const lab = makeLab();
-  lab.book("main").openPosition({
+  const trader = lab.strategyLedger("mindset_v1");
+  trader.openPosition({
     symbol: "BTCUSDT", direction: "LONG", size: 1, entryPrice: 100,
     stopLoss: 95, tp1: 110, tp2: 120, riskUsd: 5, signalSource: "signal-bot:4h",
   });
-  setOpenedAt(lab.book("main"), new Date(candle.closeTime - 3600000).toISOString());
+  setOpenedAt(trader, new Date(candle.closeTime - 3600000).toISOString());
   const { bridge } = makeBridge({ lab, candles: [candle] });
 
   const marks = await bridge.markOpenPositions();
 
   assert.deepEqual(marks[0].events.map((e) => e.type), ["STOP_HIT"]);
-  assert.equal(lab.book("main").getOpenPositions().length, 0);
-  const [closed] = lab.book("main").getHistory();
+  assert.equal(trader.getOpenPositions().length, 0);
+  const [closed] = trader.getHistory();
   assert.equal(closed.closeReason, "STOP_LOSS");
   assert.equal(closed.exitPrice, 94);
 });
@@ -290,23 +292,25 @@ test("candle replay marks a LONG stop even when the candle closes back above it"
 test("candle replay fills TP1 and TP2 in order on the same bar", async () => {
   const candle = closedCandle({ open: 100, low: 99, high: 112, close: 111 });
   const lab = makeLab();
-  lab.book("main").openPosition({
+  const trader = lab.strategyLedger("mindset_v1");
+  trader.openPosition({
     symbol: "BTCUSDT", direction: "LONG", size: 1, entryPrice: 100,
     stopLoss: 95, tp1: 105, tp2: 110, riskUsd: 5, signalSource: "signal-bot:4h",
   });
-  setOpenedAt(lab.book("main"), new Date(candle.closeTime - 3600000).toISOString());
+  setOpenedAt(trader, new Date(candle.closeTime - 3600000).toISOString());
   const { bridge } = makeBridge({ lab, candles: [candle] });
 
   const marks = await bridge.markOpenPositions();
 
   assert.deepEqual(marks[0].events.map((e) => e.type), ["TP1_HIT", "TP2_HIT"]);
-  const [closed] = lab.book("main").getHistory();
+  const [closed] = trader.getHistory();
   assert.equal(closed.closeReason, "TP2");
 });
 
 test("auto-marking falls back to ticker marking when candles throw", async () => {
   const lab = makeLab({ priceFeed: async () => 94 });
-  lab.book("main").openPosition({
+  const trader = lab.strategyLedger("mindset_v1");
+  trader.openPosition({
     symbol: "BTCUSDT", direction: "LONG", size: 1, entryPrice: 100,
     stopLoss: 95, tp1: 105, tp2: 110, riskUsd: 5, signalSource: "signal-bot:4h",
   });
@@ -318,29 +322,32 @@ test("auto-marking falls back to ticker marking when candles throw", async () =>
   const marks = await bridge.markOpenPositions();
 
   assert.deepEqual(marks[0].events.map((e) => e.type), ["STOP_HIT"]);
-  assert.equal(lab.book("main").getOpenPositions().length, 0);
+  assert.equal(trader.getOpenPositions().length, 0);
 });
 
-test("auto-marking can be switched off, and marks every book when on", async () => {
+test("auto-marking can be switched off, and marks every strategy account when on", async () => {
   let price = 100;
   const lab = makeLab({ priceFeed: async () => price });
   const { bridge } = makeBridge({ lab, paperTradeEnabled: true, autoMarkEnabled: false });
-
-  await bridge.handleTransitions([transition()]);
-  const position = lab.book("main").getOpenPositions()[0];
+  const mindset = lab.strategyLedger("mindset_v1");
+  mindset.openPosition({
+    symbol: "BTCUSDT", direction: "LONG", size: 1, entryPrice: 100,
+    stopLoss: 98.5, tp1: 102.25, tp2: 103.75, riskUsd: 1.5, signalSource: "signal-bot:4h",
+  });
+  const position = mindset.getOpenPositions()[0];
   price = position.tp2 + 1;
 
   assert.deepEqual(await bridge.markOpenPositions(), []);
-  assert.equal(lab.book("main").getOpenPositions().length, 1, "nothing is marked while disabled");
+  assert.equal(mindset.getOpenPositions().length, 1, "nothing is marked while disabled");
 
-  // A hand-opened position in another book is managed too, once marking is on.
-  lab.book("shadow").openPosition({
+  // A seeded position in another strategy account is managed too once marking is on.
+  lab.strategyLedger("smc_v1").openPosition({
     symbol: "ETHUSDT", direction: "LONG", size: 1, entryPrice: 100,
-    stopLoss: 98.5, tp1: 102.25, tp2: 103.75, riskUsd: 25,
+    stopLoss: 98.5, tp1: 102.25, tp2: 103.75, riskUsd: 25, signalSource: "signal-bot:4h",
   });
   bridge.autoMarkEnabled = true;
   const marks = await bridge.markOpenPositions();
-  assert.deepEqual(marks.map((m) => m.book).sort(), ["main", "shadow"]);
+  assert.deepEqual(marks.map((m) => m.strategyId).sort(), ["mindset_v1", "smc_v1"]);
 });
 
 test("replaying one symbol's bars never marks another symbol", async () => {
@@ -348,7 +355,7 @@ test("replaying one symbol's bars never marks another symbol", async () => {
   // A ticker far below ETH's stop: if ETH is ever marked against it rather
   // than its own bars, it stops out at the wrong price and the wrong moment.
   const lab = makeLab({ priceFeed: async () => { feedCalls += 1; return 50; } });
-  const trader = lab.book("main");
+  const trader = lab.strategyLedger("mindset_v1");
   for (const symbol of ["BTCUSDT", "ETHUSDT"]) {
     trader.openPosition({
       symbol, direction: "LONG", size: 1, entryPrice: 100,
@@ -369,7 +376,7 @@ test("replaying one symbol's bars never marks another symbol", async () => {
 
 test("a candle failure for one symbol does not disturb another symbol's replay", async () => {
   const lab = makeLab({ priceFeed: async () => 104 });
-  const trader = lab.book("main");
+  const trader = lab.strategyLedger("mindset_v1");
   for (const symbol of ["BTCUSDT", "ETHUSDT"]) {
     trader.openPosition({
       symbol, direction: "LONG", size: 1, entryPrice: 100,
@@ -431,16 +438,18 @@ test("an unreachable decision engine degrades gracefully — and refuses to trad
   assert.equal(lab.book("main").getOpenPositions().length, 0);
 });
 
-test("candle failures fall back to the configured ATR assumption", async () => {
+test("candle failures still produce a safe attribution refusal", async () => {
   const { bridge, lab } = makeBridge({
     paperTradeEnabled: true,
     signalScreenerService: { async getCandles() { throw new Error("Binance klines HTTP 500"); } },
   });
 
   const [action] = await bridge.handleTransitions([transition()]);
-  assert.equal(action.status, "opened");
-  // ATR_FALLBACK_PCT 1% of 100 = 1.0, × SL_ATR_MULTIPLE 1.5.
-  assert.equal(lab.book("main").getOpenPositions()[0].stopLoss, 98.5);
+  assert.equal(action.status, "blocked");
+  assert.match(action.reason, /no registered strategy identity/i);
+  assert.ok(listStrategyAccounts().every(
+    (account) => lab.strategyLedger(account.id).getOpenPositions().length === 0,
+  ));
 });
 
 test("the bridge only justifies its own schedule when paper trading is enabled", () => {

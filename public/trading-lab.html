@@ -26,19 +26,18 @@
 
     <div class="tl-concepts">
       <div><strong>Strategy account</strong> — the isolated performance of one strategy, with its own balance and history.</div>
-      <div><strong>Portfolio book</strong> — the performance of a collection of account activity, including trades no single strategy owns.</div>
+      <div><strong>Legacy paper history</strong> — the retired Main, Shadow SMC and Alts ledgers. They remain readable and receive no new trades.</div>
       <div><strong>Backtest</strong> — a historical replay. It runs on a disposable ledger and never changes a persistent balance.</div>
     </div>
 
     <div class="de-card">
       <div class="de-card-title">Strategy Paper Accounts</div>
-      <div class="de-card-note">One isolated persistent ledger per registered strategy &mdash; &ldquo;does <em>this</em> strategy make money?&rdquo;. An account existing is not permission to trade: only a strategy promoted to <strong>forward&#8209;paper</strong> builds a track record here, and the rest sit at their starting balance showing why they are inactive.</div>
+      <div class="de-card-note">Five active demo accounts, derived from the strategy registry and initialized from the same paper balance. An account existing is not permission to trade: only a strategy promoted to <strong>forward&#8209;paper</strong> can add forward trades.</div>
       <div class="tl-account-grid" id="tl-strategy-accounts"><div class="de-empty">Loading&hellip;</div></div>
     </div>
 
     <div class="de-toolbar">
-      <label class="tl-inline-label" for="tl-book">Portfolio book</label>
-      <select class="aia-select" id="tl-book"></select>
+      <span class="tl-inline-label" id="tl-selected-account">Mindset</span>
       <select class="aia-select" id="tl-interval">
         <option value="1h">1h</option>
         <option value="4h" selected>4h</option>
@@ -50,8 +49,11 @@
       <span class="de-updated" id="tl-updated"></span>
     </div>
 
-    <div class="tl-section-label">Portfolio books &mdash; account activity, not one strategy</div>
-    <div class="tl-stat-grid" id="tl-stats"></div>
+    <details class="de-card tl-legacy-history">
+      <summary>Legacy Paper History</summary>
+      <div class="de-card-note">Archived reference only. Main, Shadow SMC and Alts are read-only and receive no new positions, marks, closes or resets.</div>
+      <div id="tl-legacy-books"><div class="de-empty">Loading&hellip;</div></div>
+    </details>
 
     <div class="de-card">
       <div class="de-card-title">Market Environment</div>
@@ -86,13 +88,13 @@
 
     <div class="de-card">
       <div class="de-card-title">Decision Engine Candidates</div>
-      <div class="de-card-note">Every execution plan the Decision Engine produced, run through the checklist and the historical edge gate at the plan's own trigger price.</div>
+      <div class="de-card-note">Every execution plan the Decision Engine produced, scored in an unattributed, non-persistent analysis context. These plans cannot be written into a strategy account without trustworthy strategy identity.</div>
       <div class="de-table-wrap">
         <table class="de-table">
           <thead>
             <tr>
               <th>Symbol</th><th>Signal</th><th>Setup</th><th>Checklist</th><th>Edge</th>
-              <th>Size</th><th>Entry</th><th>Stop</th><th>TP1</th><th>TP2</th><th>Risk</th><th></th>
+              <th>Size</th><th>Entry</th><th>Stop</th><th>TP1</th><th>TP2</th><th>Risk</th><th>Execution</th>
             </tr>
           </thead>
           <tbody id="tl-candidates-tbody"></tbody>
@@ -108,13 +110,13 @@
 
     <div class="de-card">
       <div class="de-card-title">Signal Bot Would-Have-Traded</div>
-      <div class="de-card-note">Recent Signal Bot bridge decisions. Dry-run remains the default unless SIGNAL_BOT_PAPER_TRADE_ENABLED=true.</div>
+      <div class="de-card-note">Recent Signal Bot bridge decisions. Dry-run is the default; enabling its paper flag records an attribution refusal because Signal Bot has no registered strategy identity.</div>
       <div class="de-table-wrap">
         <table class="de-table">
           <thead>
             <tr>
               <th>Time</th><th>Symbol</th><th>TF</th><th>Dir</th><th>Status</th>
-              <th>Book</th><th>Entry</th><th>Score</th><th>Size</th><th>Reason</th>
+              <th>Destination</th><th>Entry</th><th>Score</th><th>Size</th><th>Reason</th>
             </tr>
           </thead>
           <tbody id="tl-signal-actions-tbody"></tbody>

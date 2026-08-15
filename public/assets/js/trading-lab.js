@@ -4,11 +4,11 @@
   var notice = document.getElementById("tl-notice");
   var updatedEl = document.getElementById("tl-updated");
   var modeEl = document.getElementById("tl-mode");
-  var bookSelect = document.getElementById("tl-book");
+  var selectedAccountEl = document.getElementById("tl-selected-account");
   var intervalSelect = document.getElementById("tl-interval");
   var refreshBtn = document.getElementById("tl-refresh-btn");
   var markBtn = document.getElementById("tl-mark-btn");
-  var statsEl = document.getElementById("tl-stats");
+  var legacyBooksEl = document.getElementById("tl-legacy-books");
   var positionsTbody = document.getElementById("tl-positions-tbody");
   var candidatesTbody = document.getElementById("tl-candidates-tbody");
   var signalActionsTbody = document.getElementById("tl-signal-actions-tbody");
@@ -32,6 +32,8 @@
   var btResult = document.getElementById("tl-bt-result");
   var btCompareResult = document.getElementById("tl-bt-compare-result");
   var strategies = [];
+  var strategyAccounts = [];
+  var selectedStrategyId = "mindset_v1";
 
   function escapeHtml(str) {
     return String(str == null ? "" : str).replace(/[&<>"']/g, function (ch) {
@@ -86,8 +88,8 @@
     notice.textContent = "";
   }
 
-  function currentBook() {
-    return bookSelect.value || "main";
+  function currentStrategy() {
+    return selectedStrategyId || "mindset_v1";
   }
 
   function decisionClass(decision) {
@@ -172,44 +174,6 @@
     );
   }
 
-  function renderAccountCards(books, histories) {
-    var selected = currentBook();
-    statsEl.className = "tl-account-grid";
-    statsEl.innerHTML = (books || [])
-      .map(function (book) {
-        var s = book.stats || {};
-        var m = s.riskMetrics || {};
-        var window = histories && histories[book.id] ? histories[book.id] : null;
-        var active = book.id === selected ? " is-active" : "";
-        return (
-          '<button class="tl-account-card' + active + '" type="button" data-book="' + escapeHtml(book.id) + '">' +
-          '<div class="tl-account-graph-wrap">' + performanceSparkline(book, window) +
-          // Say so when the curve is a window rather than the whole account.
-          // The line is accurate either way now, but "last 80 of 240 trades"
-          // and "the whole history" are different claims.
-          (window && window.truncated
-            ? '<div class="tl-account-window">last ' + window.items.length + " of " + window.total + " trades</div>"
-            : "") +
-          "</div>" +
-          '<div class="tl-account-body">' +
-          '<div class="tl-account-head"><span>' + escapeHtml(book.name || book.id) + "</span>" +
-          '<small>' + escapeHtml(book.id) + "</small></div>" +
-          '<div class="tl-account-equity">' +
-          '<span>Equity</span><strong>' + "$" + Number(s.equity).toLocaleString(undefined, { maximumFractionDigits: 2 }) + "</strong>" +
-          "</div>" +
-          '<div class="tl-account-metrics">' +
-          accountMetric("Net P&L", fmtUsd(s.realizedPnl), pnlClass(s.realizedPnl)) +
-          accountMetric("Unrealized", fmtUsd(s.unrealizedPnl), pnlClass(s.unrealizedPnl)) +
-          accountMetric("Win rate", s.totalTrades ? s.winRate + "%" : "—") +
-          accountMetric("Expectancy", m.closedTrades ? (m.expectancyR > 0 ? "+" : "") + m.expectancyR + "R" : "—", pnlClass(m.expectancyR)) +
-          accountMetric("Trades", s.totalTrades + " closed / " + s.openPositions + " open") +
-          accountMetric("Daily", fmtUsd(s.dailyPnl), pnlClass(s.dailyPnl)) +
-          "</div></div></button>"
-        );
-      })
-      .join("");
-  }
-
   /* ── Strategy paper accounts ───────────────────────────────
      The primary area, and visually distinct from the book cards below it,
      because the two answer different questions. Every registered strategy
@@ -241,9 +205,11 @@
         var s = account.stats || {};
         var m = s.riskMetrics || {};
         var traded = Number(s.totalTrades) > 0;
+        var selected = account.id === currentStrategy() ? " is-active" : "";
 
         return (
-          '<div class="tl-account-card tl-acct' + (account.active ? " tl-acct--live" : "") + '">' +
+          '<button class="tl-account-card tl-acct' + selected + (account.active ? " tl-acct--live" : "") +
+          '" type="button" data-strategy="' + escapeHtml(account.id) + '">' +
           '<div class="tl-account-body">' +
           '<div class="tl-account-head"><span>' + escapeHtml(account.name) + "</span>" +
           "<small>" + escapeHtml(account.id) + "</small></div>" +
@@ -254,6 +220,7 @@
           Number(s.equity || 0).toLocaleString(undefined, { maximumFractionDigits: 2 }) +
           "</strong></div>" +
           '<div class="tl-account-metrics">' +
+          accountMetric("Balance", "$" + Number(s.balance || s.startingBalance || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })) +
           accountMetric("Net P&L", traded ? fmtUsd(s.realizedPnl) : "—", pnlClass(s.realizedPnl)) +
           accountMetric("Win rate", traded ? s.winRate + "%" : "—") +
           accountMetric("Expectancy", m.closedTrades ? (m.expectancyR > 0 ? "+" : "") + m.expectancyR + "R" : "—", pnlClass(m.expectancyR)) +
@@ -267,10 +234,31 @@
             ? ""
             : '<div class="tl-acct-why">No forward track record — lifecycle status <code>' +
               escapeHtml(account.status) + "</code>. Promote it to forward-paper to start one.</div>") +
-          "</div></div>"
+          "</div></button>"
         );
       })
       .join("");
+  }
+
+  function renderLegacyBooks(books) {
+    if (!legacyBooksEl) return;
+    if (!books || !books.length) {
+      legacyBooksEl.innerHTML = '<div class="de-empty">No legacy ledgers found.</div>';
+      return;
+    }
+    legacyBooksEl.innerHTML =
+      '<div class="de-table-wrap"><table class="de-table"><thead><tr>' +
+      '<th>Ledger</th><th>Status</th><th>Closed trades</th><th>Historical balance</th><th>P&amp;L</th>' +
+      '</tr></thead><tbody>' +
+      books.map(function (book) {
+        var s = book.stats || {};
+        return "<tr><td>" + escapeHtml(book.name) + "</td>" +
+          '<td><span class="tl-tag">Archived · read only</span></td>' +
+          "<td>" + Number(book.totalTrades || s.totalTrades || 0) + "</td>" +
+          "<td>$" + Number(s.balance || s.startingBalance || 0).toLocaleString(undefined, { maximumFractionDigits: 2 }) + "</td>" +
+          '<td class="' + pnlClass(s.realizedPnl) + '">' + fmtUsd(s.realizedPnl) + "</td></tr>";
+      }).join("") +
+      "</tbody></table></div>";
   }
 
   function renderPositions(positions) {
@@ -309,7 +297,6 @@
     candidatesTbody.innerHTML = rows
       .map(function (row) {
         var t = row.trade || {};
-        var canOpen = t.ok === true;
         return (
           '<tr title="' + reasonsTitle(row.reasons) + '">' +
           "<td>" + escapeHtml(row.symbol) + "</td>" +
@@ -323,14 +310,7 @@
           "<td>" + fmtPrice(t.tp1) + "</td>" +
           "<td>" + fmtPrice(t.tp2) + "</td>" +
           "<td>" + (t.riskUsd == null ? "—" : "$" + t.riskUsd) + "</td>" +
-          "<td>" +
-          (canOpen
-            ? '<button class="tl-open-btn" type="button" data-symbol="' + escapeHtml(row.symbol) +
-              '" data-direction="' + escapeHtml(row.signal) +
-              '" data-entry="' + escapeHtml(String(t.entryPrice)) +
-              '" data-atr="' + escapeHtml(String((row.plan && row.plan.atr) || "")) + '">Paper trade</button>'
-            : "—") +
-          "</td></tr>"
+          '<td><span class="tl-tag" title="No registered strategy identity">Research only</span></td></tr>'
         );
       })
       .join("");
@@ -683,49 +663,34 @@
 
   function loadOverview() {
     return getJson("/api/trading-lab").then(function (data) {
-      if (!bookSelect.options.length) {
-        bookSelect.innerHTML = data.books
-          .map(function (b) { return '<option value="' + escapeHtml(b.id) + '">' + escapeHtml(b.name) + "</option>"; })
-          .join("");
+      strategyAccounts = data.accounts || [];
+      if (!strategyAccounts.some(function (account) { return account.id === currentStrategy(); })) {
+        selectedStrategyId = strategyAccounts.length ? strategyAccounts[0].id : "mindset_v1";
       }
       modeEl.textContent = data.mode === "live" ? "LIVE" : "PAPER";
       modeEl.className = "tl-mode " + (data.mode === "live" ? "tl-mode--live" : "tl-mode--paper");
       updatedEl.textContent = "Updated " + fmtTime(data.updatedAt);
-
-      var book = data.books.filter(function (b) { return b.id === currentBook(); })[0] || data.books[0];
-      renderPositions(book.openPositions);
-      return Promise.all(
-        data.books.map(function (b) {
-          return getJson("/api/trading-lab/history?book=" + encodeURIComponent(b.id) + "&limit=80")
-            .then(function (history) {
-              return {
-                book: b.id,
-                items: history.items || [],
-                // Where the curve for this window actually starts. Only equal
-                // to the account's starting balance while the whole history
-                // fits in the window.
-                openingBalance: history.openingBalance,
-                truncated: history.truncated === true,
-                total: history.total,
-              };
-            })
-            .catch(function () { return { book: b.id, items: [] }; });
-        }),
-      ).then(function (historyRows) {
-        var histories = {};
-        historyRows.forEach(function (row) { histories[row.book] = row; });
-        renderAccountCards(data.books, histories);
-      });
+      renderStrategyAccounts({ accounts: strategyAccounts });
+      renderLegacyBooks(data.legacyBooks || data.books || []);
+      var selected = strategyAccounts.filter(function (account) { return account.id === currentStrategy(); })[0];
+      if (selectedAccountEl) selectedAccountEl.textContent = selected ? selected.name : currentStrategy();
     });
   }
 
-  function loadBookDetail() {
-    var book = encodeURIComponent(currentBook());
+  function loadStrategyDetail() {
+    var strategyId = encodeURIComponent(currentStrategy());
     return Promise.all([
-      getJson("/api/trading-lab/metrics?book=" + book).then(renderMetrics),
-      getJson("/api/trading-lab/history?book=" + book + "&limit=50").then(function (d) { renderHistory(d.items); }),
+      getJson(
+        "/api/trading-lab/strategy-accounts/" + strategyId +
+          "?limit=50&min_trades=" + encodeURIComponent(currentRegimeMinTrades()),
+      ).then(function (detail) {
+        renderPositions(detail.openPositions);
+        renderMetrics(detail.metrics);
+        renderHistory(detail.history);
+        renderRegimeMatrix(detail.regimeMetrics);
+      }),
       getJson("/api/trading-lab/signal-actions?limit=25").then(renderSignalActions),
-      // The scanner panel is independent of the book: a failure to read it
+      // The scanner panel is independent of the selected strategy: a failure to read it
       // must not blank the metrics and history alongside it.
       getJson("/api/live-scanner/status")
         .then(renderScanner)
@@ -744,23 +709,12 @@
   // The regime read needs candles, so it is the one panel here that can be slow
   // or unavailable (503 when no candle source is configured). It loads on its
   // own and reports its own failure rather than blanking the page around it.
-  function loadStrategyAccounts() {
-    if (!strategyAccountsEl) return Promise.resolve();
-    return getJson("/api/trading-lab/strategy-accounts")
-      .then(renderStrategyAccounts)
-      .catch(function (err) {
-        strategyAccountsEl.innerHTML =
-          '<div class="de-empty">Could not read strategy accounts: ' + escapeHtml(err.message) + "</div>";
-      });
-  }
-
   function loadRegime() {
     if (!regimeEl) return Promise.resolve();
     regimeEl.innerHTML = '<div class="de-empty">Reading the market environment&hellip;</div>';
     return getJson(
       "/api/trading-lab/regime?symbol=" + encodeURIComponent((regimeSymbol.value || "BTCUSDT").toUpperCase()) +
         "&interval=" + encodeURIComponent(regimeInterval.value) +
-        "&book=" + encodeURIComponent(currentBook()) +
         "&min_trades=" + encodeURIComponent(currentRegimeMinTrades()),
     )
       .then(renderRegime)
@@ -772,7 +726,7 @@
   function loadRegimeMatrix() {
     if (!regimeMatrixEl) return Promise.resolve();
     return getJson(
-      "/api/trading-lab/regime-matrix?book=" + encodeURIComponent(currentBook()) +
+      "/api/trading-lab/regime-matrix?strategyId=" + encodeURIComponent(currentStrategy()) +
         "&min_trades=" + encodeURIComponent(currentRegimeMinTrades()),
     )
       .then(renderRegimeMatrix)
@@ -786,8 +740,7 @@
     candidatesTbody.innerHTML = '<tr><td colspan="12" class="de-empty">Scoring Decision Engine plans&hellip;</td></tr>';
     return getJson(
       "/api/trading-lab/decision-candidates?interval=" +
-        encodeURIComponent(intervalSelect.value) +
-        "&book=" + encodeURIComponent(currentBook()),
+        encodeURIComponent(intervalSelect.value),
     )
       .then(renderCandidates)
       .catch(function (err) {
@@ -800,10 +753,8 @@
     clearError();
     refreshBtn.disabled = true;
     return loadOverview()
-      .then(loadStrategyAccounts)
-      .then(loadBookDetail)
+      .then(loadStrategyDetail)
       .then(loadCandidates)
-      .then(loadRegimeMatrix)
       .then(loadRegime)
       .catch(function (err) { showError(err.message); })
       .then(function () { refreshBtn.disabled = false; });
@@ -1444,25 +1395,24 @@
   // changing it reloads both rather than leaving the two disagreeing.
   if (regimeMin) {
     regimeMin.addEventListener("change", function () {
-      loadRegimeMatrix();
+      loadStrategyDetail();
       loadRegime();
     });
   }
 
   refreshBtn.addEventListener("click", refresh);
-  bookSelect.addEventListener("change", refresh);
   intervalSelect.addEventListener("change", loadCandidates);
 
-  statsEl.addEventListener("click", function (event) {
-    var card = event.target.closest(".tl-account-card");
-    if (!card || !card.dataset.book || card.dataset.book === currentBook()) return;
-    bookSelect.value = card.dataset.book;
+  strategyAccountsEl.addEventListener("click", function (event) {
+    var card = event.target.closest("[data-strategy]");
+    if (!card || !card.dataset.strategy || card.dataset.strategy === currentStrategy()) return;
+    selectedStrategyId = card.dataset.strategy;
     refresh();
   });
 
   markBtn.addEventListener("click", function () {
     markBtn.disabled = true;
-    postAdmin("/api/trading-lab/mark", { book: currentBook() })
+    postAdmin("/api/trading-lab/mark", { strategyId: currentStrategy() })
       .then(function (data) {
         if (data.events && data.events.length) {
           clearError();
@@ -1484,29 +1434,10 @@
     if (!btn) return;
     btn.disabled = true;
     postAdmin("/api/trading-lab/positions/" + encodeURIComponent(btn.dataset.id) + "/close", {
-      book: currentBook(),
+      strategyId: currentStrategy(),
       reason: "MANUAL",
     })
       .then(refresh)
-      .catch(function (err) { showError(err.message); btn.disabled = false; });
-  });
-
-  candidatesTbody.addEventListener("click", function (event) {
-    var btn = event.target.closest(".tl-open-btn");
-    if (!btn) return;
-    btn.disabled = true;
-    postAdmin("/api/trading-lab/positions", {
-      book: currentBook(),
-      symbol: btn.dataset.symbol,
-      direction: btn.dataset.direction,
-      entryPrice: Number(btn.dataset.entry),
-      atr: btn.dataset.atr ? Number(btn.dataset.atr) : null,
-      signalSource: "decision-engine",
-    })
-      .then(function (data) {
-        if (!data.opened) showError("Not opened: " + (data.reasons || []).join(" · "));
-        return refresh();
-      })
       .catch(function (err) { showError(err.message); btn.disabled = false; });
   });
 
