@@ -33,13 +33,14 @@ follows, and records what happened so the next answer is better informed.
 | `executor.py` (sizing half) | `src/services/trading/risk.js` | ATR sizing and stop/target geometry. Order placement deliberately excluded. |
 | `paper_trader.py` | `src/services/trading/paper-trader.js` | TP1/TP2 scale-outs, breakeven stop, gap-aware stop fills, daily/weekly rollover. |
 | — | `src/services/trading/backtest.js` | New: bar replay over the same paper-trading engine. |
+| — | `src/services/trading/strategy-accounts.js` | New: one isolated paper ledger per registered strategy, derived from the registry. |
 | — | `src/services/trading/regime.js` | New: the market regime engine. Measures the environment; decides nothing. |
 | — | `src/services/trading/regime-metrics.js` | New: the strategy × regime evidence table. |
 | — | `src/services/trading/regime-router.js` | New: advisory strategy selection from that evidence. |
 | — | `src/services/trading/strategies/` | New: the strategy registry, its research lifecycle metadata, and the shared mindset_v1 rules the scanner and backtester both run. |
 | — | `src/services/trading/experiment-record.js` | New: turns a finished run into a research record. Pure. |
 | — | `src/services/trading/experiment-store.js` | New: where experiments are persisted. The seam a database would replace. |
-| `shadow_trader.py`, `alts_trader.py` | *books* in `trading-lab.js` | Main / Shadow / Alts are named books over one engine rather than three near-duplicate services. |
+| `shadow_trader.py`, `alts_trader.py` | *books* in `trading-lab.js` | Main / Shadow / Alts are named books over one engine rather than three near-duplicate services. They are PORTFOLIO books — per-strategy performance lives in strategy accounts, see below. |
 | `app.py`, `dashboard.py`, Flask routes | `src/routes/trading-lab.js`, `public/trading-lab.html` | Retired; Market Dashboard's Express + vanilla JS replaces them. |
 
 ### Behaviour deliberately preserved
@@ -671,6 +672,112 @@ Two separations are deliberate:
 * **Behind an interface.** Routes and the backtester speak only
   `record` / `get` / `list` / `count`. Moving this to SQLite or Postgres later
   is a swap of one file, not a rewrite of the backtester.
+
+## Strategy accounts and portfolio books
+
+Two questions that look like one:
+
+```text
+Strategy account   How does ONE strategy perform, in isolation?
+Portfolio book     How does a COLLECTION of activity perform together?
+```
+
+Only the second existed. The three books — Main, Shadow SMC, Alts — are a port
+of TraderClaw's three Python bot services (`shadow_trader.py`, `alts_trader.py`),
+so one of them is *named after a strategy* while containing whatever happened to
+be written to it. That is where the confusion starts, and it is why the top
+dropdown looked like a strategy selector.
+
+Both concepts are now first-class. Books are unchanged: same IDs, same ledgers,
+same `SIGNAL_BOT_BOOK` / `LIVE_SCANNER_BOOK` defaults.
+
+### Attribution comes first
+
+A strategy account is meaningless if trades cannot be attributed, and until
+recently they could not be. `intent-handler` knew which strategy fired, spent it
+as an edge-gate key, and dropped it — so a forward-paper trade landed as:
+
+```text
+signalSource : live-scanner:15m        <- a timeframe, not a strategy
+meta         : { edgeDecision, sizeMultiplier }
+```
+
+Every strategy-level figure about forward trades was really a figure about a
+timeframe, and the regime matrix on a live book read 100% `UNTAGGED` because the
+regime work tagged backtests only.
+
+`execute()` now records `strategy`, `strategyVersion`, `timeframe`, `regime` and
+`regimeConfidence`. Like the backtester's regime tag, **nothing in the gauntlet
+reads them** — a strategy × regime table is only evidence about a strategy if the
+tag played no part in selecting the trades it summarises.
+
+### Two keys, deliberately not one
+
+| Dimension | Keyed by | Used for |
+| --- | --- | --- |
+| `strategy` | `signalSource` | **The edge gate's index.** `edge-gate.js` finds a group by the exact string its caller passed (`live:mindset_v1:15m`). |
+| `strategyId` | recorded attribution | "Which strategy earned this?" — what the regime table groups by. |
+
+`strategy` looks like a report and is actually a lookup index. Repointing it at
+strategy identity would stop those lookups matching, dropping the edge gate to
+symbol-level or account-level evidence — a change to how positions are **sized**,
+disguised as a reporting improvement.
+
+Records without explicit attribution are `UNATTRIBUTED`. `signalSource` is never
+parsed to recover a strategy: its format was never a contract, and for forward
+trades it does not contain one.
+
+### Accounts are derived, and are not permissions
+
+`listStrategyAccounts()` reads the strategy registry, so a sixth strategy gets an
+account with no second list to update — a test asserts the derivation rather than
+trusting it.
+
+Every registered strategy gets an account, including the four that may not trade
+forward. Those sit at their starting balance and display why:
+
+| Strategy | Status | Account |
+| --- | --- | --- |
+| `mindset_v1` | forward-paper | 🟢 Forward Paper |
+| `smc_v1`, `donchian_breakout_v1`, `vwap_reversion_v1` | backtest | ⚪ Backtest Only |
+| `shadow_bananagun_v1` | experimental | 🟡 Event Replay Only |
+
+BananaGun gets its own label because it cannot even be replayed on candles
+(`supportsBacktest: false`) — "backtest only" would overstate what it can do.
+
+An account confers nothing. The live scanner still resolves what it may run
+through `getScannerStrategy`, which checks lifecycle status and is never handed
+anything from `strategy-accounts.js`. A test asserts every inactive account is
+non-eligible *and* refuses forward trades.
+
+### One resolver, because the gauntlet must read what it writes
+
+`ledgerFor({ book, strategyId })` decides where a trade lives: a scanner-eligible
+strategy's forward trades go to its own account, everything else to the portfolio
+book.
+
+There is exactly one of these on purpose. `evaluate()` reads risk state and
+closed-trade history to run kill switches and the edge gate; `execute()` opens the
+position. If those resolved differently — scoring against Main's loss limits while
+writing to a strategy account — the kill switches would be guarding the wrong
+book. That is a safety failure, not a reporting one. A test fills a strategy
+account to its position cap and asserts the cap binds while Main sits empty.
+
+The intent handler resolves the same way for exits and for its
+one-position-per-symbol check: searching the portfolio book for a position held in
+a strategy account would silently leave it open.
+
+Ledgers are namespaced `strategy-<id>`. A prefix rather than a nested path,
+because `PaperTradingService` sanitises its book name to `[a-z0-9_-]` and
+`strategies/mindset_v1` would silently flatten to `strategiesmindset_v1` —
+isolated by accident, with the separator carrying the guarantee deleted.
+
+### Endpoints
+
+* `GET /api/trading-lab/strategy-accounts` — every account with equity and
+  lifecycle state.
+* `GET /api/trading-lab/strategy-accounts/:id` — one account's metrics, regime
+  breakdown, open positions and history, from its own isolated ledger.
 
 ## Market regime
 
