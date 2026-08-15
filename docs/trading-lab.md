@@ -33,6 +33,9 @@ follows, and records what happened so the next answer is better informed.
 | `executor.py` (sizing half) | `src/services/trading/risk.js` | ATR sizing and stop/target geometry. Order placement deliberately excluded. |
 | `paper_trader.py` | `src/services/trading/paper-trader.js` | TP1/TP2 scale-outs, breakeven stop, gap-aware stop fills, daily/weekly rollover. |
 | — | `src/services/trading/backtest.js` | New: bar replay over the same paper-trading engine. |
+| — | `src/services/trading/regime.js` | New: the market regime engine. Measures the environment; decides nothing. |
+| — | `src/services/trading/regime-metrics.js` | New: the strategy × regime evidence table. |
+| — | `src/services/trading/regime-router.js` | New: advisory strategy selection from that evidence. |
 | — | `src/services/trading/strategies/` | New: the strategy registry, its research lifecycle metadata, and the shared mindset_v1 rules the scanner and backtester both run. |
 | — | `src/services/trading/experiment-record.js` | New: turns a finished run into a research record. Pure. |
 | — | `src/services/trading/experiment-store.js` | New: where experiments are persisted. The seam a database would replace. |
@@ -668,6 +671,120 @@ Two separations are deliberate:
 * **Behind an interface.** Routes and the backtester speak only
   `record` / `get` / `list` / `count`. Moving this to SQLite or Postgres later
   is a swap of one file, not a rewrite of the backtester.
+
+## Market regime
+
+`market data → regime → setup → …` was in the pipeline diagram before anything
+implemented the second box. Regime-shaped behaviour existed — the checklist's
+counter-trend gate, `vwap_reversion_v1` standing down above ADX 22, the decision
+engine's `Choppy` / `Volatile` labels translated in `trading-lab.js` — but as
+three vocabularies with three sets of thresholds and no shared answer.
+
+`regime.js` is the shared answer. It reads candles and returns a structured
+read: the label, the confidence behind it, the measurements it rests on, and the
+mode of trading the environment favours.
+
+### The vocabulary
+
+The five labels the checklist already reasoned over, plus three that name
+situations the old vocabulary got **wrong** rather than merely left unnamed:
+
+| Label | Meaning |
+| --- | --- |
+| `TREND_UP` / `TREND_DOWN` | ADX has established a trend *and* the moving averages agree on the side. |
+| `RANGE` | No trend worth naming. |
+| `ACCUMULATION` / `DISTRIBUTION` | A quiet range with real volume in it, worked from one edge of its own structure with higher lows (or lower highs). Previously both were `RANGE`, which is true and useless. |
+| `VOLATILE_EXPANSION` | ATR well above its own average. A size problem, not a direction problem. |
+| `LOW_COMPRESSION` | Coiled. The checklist already refuses entries here. |
+| `TRANSITION` | Trend strength has left the range zone but has not established a trend. |
+| `UNKNOWN` | Not enough data. Distinct from `TRANSITION`: `UNKNOWN` is our ignorance, `TRANSITION` is the market's. |
+
+`TRANSITION` is the most valuable addition. Without it, bars between characters
+are forced into `RANGE` or `TREND` and traded as though they were one — and a
+router with no way to say "I don't know" flips between strategies precisely
+while the market is changing, which is when its recommendations are least
+reliable. The gap between `adxRangeMax` (20) and `adxTrendMin` (25) is not
+slack; it is that zone, and it exists on purpose.
+
+### Trend is not the EMA ordering
+
+In a range the fast EMA still sits on one side of the slow one — it has to sit
+somewhere. Reporting that as a direction beside a `RANGE` label would state a
+trend the engine has just finished measuring the absence of, so the read carries
+both: `direction` is the raw EMA ordering, and `trend` is `NEUTRAL` outside a
+trend regime. The dashboard shows `trend`.
+
+### Measurement first, routing second, gating not at all
+
+The engine **decides nothing**, and this is the load-bearing property rather
+than an unfinished edge:
+
+* The checklist's `state.regime` still comes from the same EMA-cross read it
+  always did. Feeding the richer labels in would change which setups trade —
+  `ACCUMULATION` is not `TREND_DOWN`, so the counter-trend gate would stop
+  firing on bars where it fires today — and that is a change to
+  `SCORING_VERSION` semantics, not an improvement to reporting. Every stored
+  experiment would become non-comparable, in exchange for a hypothesis nobody
+  has measured yet. `toChecklistRegime()` exists for the day that changes.
+* Trades **record** the regime they were opened in (`meta.regime`,
+  `meta.regimeConfidence`) and nothing in the gauntlet consults the tag. That is
+  what makes the resulting table evidence about the *strategy* rather than
+  evidence about a filter that was just added. A test hands `tryOpen` three
+  different reads — including a `TRANSITION` — and asserts the decision and the
+  reasoning are byte-identical, differing only in what lands on the record.
+
+Reads are prefix-safe: `classifyAt(bars, i)` equals `classifyRegime` over bars
+`0..i`, held by a test that feeds two candle sets with identical pasts and
+different futures.
+
+### The evidence table
+
+`regime-metrics.js` breaks each strategy's expectancy out by the environment its
+trades were opened in. Pooling hides the useful fact: a strategy making +0.4R in
+ranges and losing -0.3R in trends shows up in `metrics.js` as a mediocre +0.05R,
+and that it *has a regime it belongs in* is averaged away.
+
+Two honesty rules, because a per-regime cell is a small sample:
+
+1. Cells below `minTrades` are marked `sufficient: false` rather than dropped.
+   Dropping them would hide that the strategy traded there at all; showing them
+   unmarked would invite a decision built on nineteen trades.
+2. Untagged trades are counted and reported separately, never pooled into a
+   regime. History predating regime tagging is untagged, and folding it into
+   `RANGE` would manufacture evidence.
+
+`verdictFor()` is three-valued for the same reason. `INSUFFICIENT` is not
+`UNFAVOURABLE`: a strategy that has never traded in a regime has not failed
+there, and merging the two would suppress every new strategy.
+
+### The router is advisory, structurally
+
+`regime-router.js` turns a read plus that evidence into `preferred` / `eligible`
+/ `suppressed` / `unproven`. It cannot promote anything: the live scanner
+resolves what it may run through `getScannerStrategy`, which checks lifecycle
+status independently and is never handed a routing result. Every response
+carries `enforced: false`, and every candidate carries its own
+`scannerEligible`, so `Preferred: VWAP Reversion v1` never reads as "it is
+running" — that strategy is `backtest` status and the card says so.
+
+A non-actionable read (`TRANSITION`, `UNKNOWN`, anything under the confidence
+floor, or an environment where size rather than direction is the problem)
+selects nothing at all and reports every candidate as *held* — not suppressed,
+because nothing about those strategies failed.
+
+### Endpoints
+
+* `GET /api/trading-lab/regime?symbol=&interval=&book=&min_trades=` — the read
+  and its routing, returned side by side and computed independently, so a
+  surprising answer says whether it came from the market or from our own
+  history.
+* `GET /api/trading-lab/regime-matrix?book=&min_trades=` — the table alone, no
+  candles fetched.
+
+Backtest runs also return `regimeMetrics` (the same table over that run's
+trades) and `regimeCounts` (which environments the run's signals occurred in — a
+strategy that only ever fired in one regime has not been tested against the
+others, and that is a fact about the *run*).
 
 ### smc_v1
 

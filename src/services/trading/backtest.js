@@ -28,10 +28,13 @@ const { planTrade, calculatePositionSize } = require("./risk");
 const { buildStrategyMetrics } = require("./metrics");
 const { PaperTradingService, MemoryStorage } = require("./paper-trader");
 const { replayOrder } = require("./replay-order");
-// No `atr` import: this module computes ATR as a prefix-consistent SERIES (see
-// atrSeries below) rather than calling decision-engine's per-prefix atr() once
-// per bar. The two agree bar for bar, and a test asserts exactly that against
-// the original — which is where the import still belongs.
+// No `atr` import: this module uses ATR as a prefix-consistent SERIES (see
+// ./series) rather than calling decision-engine's per-prefix atr() once per
+// bar. The two agree bar for bar, and a test asserts exactly that against the
+// original — which is where the import still belongs.
+const { atrSeries } = require("./series");
+const { classifyAt, buildRegimeSeries } = require("./regime");
+const { buildRegimeMatrix } = require("./regime-metrics");
 const { ema, macd } = require("../signal-screener");
 const {
   getStrategy,
@@ -238,45 +241,6 @@ function rankRows(rows, minRankedTrades = 1) {
       a.maxDrawdownPct - b.maxDrawdownPct
     );
   });
-}
-
-// Wilder ATR as a SERIES: `out[i]` is exactly what `atr(bars.slice(0, i + 1),
-// length)` returns, to the last bit.
-//
-// That equality is the only reason this is safe. Wilder smoothing is a
-// recurrence over true ranges — each value depends on the one before it and on
-// nothing after — so the value at bar i is identical whether it was reached by
-// walking forward once across the whole array or by re-walking a prefix that
-// ends at i. Recomputing the prefix was O(n) work per bar; this is O(n) once.
-// No future bar enters any out[i], which is what makes the optimisation a
-// change of cost and not a change of results.
-function atrSeries(bars, length = 14) {
-  const out = new Array(bars.length).fill(null);
-  if (bars.length < length + 1) return out;
-
-  // trs[j] is the true range of bar j + 1, matching atr()'s own indexing.
-  const trs = new Array(bars.length - 1);
-  for (let i = 1; i < bars.length; i += 1) {
-    const prevClose = bars[i - 1].close;
-    trs[i - 1] = Math.max(
-      bars[i].high - bars[i].low,
-      Math.abs(bars[i].high - prevClose),
-      Math.abs(bars[i].low - prevClose),
-    );
-  }
-
-  // Seeded with the simple mean of the first `length` true ranges, summed in
-  // the same order as atr() sums them so the floating-point result matches.
-  let value = 0;
-  for (let i = 0; i < length; i += 1) value += trs[i];
-  value /= length;
-  out[length] = value;
-
-  for (let i = length; i < trs.length; i += 1) {
-    value = (value * (length - 1) + trs[i]) / length;
-    out[i + 1] = value;
-  }
-  return out;
 }
 
 /**
@@ -643,6 +607,15 @@ class BacktestService {
     // recomputing that indicator from bars 0..i, which is what this loop used
     // to do on every bar.
     const series = buildContextSeries(bars, opts);
+    // Regime indicators for the whole run, computed once for the same reason
+    // and under the same prefix-safety argument as the context series above.
+    // The engine keeps its own periods rather than borrowing this run's
+    // strategy options: a regime read has to mean the same thing across every
+    // run, or the strategy × regime table pools incomparable labels.
+    const regimeSeries = buildRegimeSeries(bars);
+    // How many opened signals fell in each regime, summarised onto the result
+    // so a run can say what environments it actually met.
+    const regimeCounts = {};
 
     const equityCurve = [];
     const skipped = [];
@@ -685,7 +658,14 @@ class BacktestService {
       const direction = signal.signal;
 
       if (direction === "LONG" || direction === "SHORT") {
-        signals.push({ at: bar.closeTime, signal: direction, price: signal.price ?? context.close, reasons: signal.reasons || [], indicators: signal.indicators || {}, confidence: signal.confidence ?? null });
+        // The environment as of this bar's close, computed from bars 0..i only.
+        // Only computed when a signal actually fires, because it is recorded on
+        // trades rather than consulted on every bar.
+        const regimeRead = classifyAt(bars, i, { series: regimeSeries });
+        if (regimeRead.regime !== "UNKNOWN") {
+          regimeCounts[regimeRead.regime] = (regimeCounts[regimeRead.regime] || 0) + 1;
+        }
+        signals.push({ at: bar.closeTime, signal: direction, price: signal.price ?? context.close, reasons: signal.reasons || [], indicators: signal.indicators || {}, confidence: signal.confidence ?? null, regime: regimeRead.regime, regimeConfidence: regimeRead.confidence });
         const outcome = this.tryOpen({
           trader,
           symbol,
@@ -699,6 +679,7 @@ class BacktestService {
           at: bar.closeTime,
           marketContext,
           config: runConfig,
+          regimeRead,
         });
         if (outcome.opened) {
           if (outcome.appliedMode === "native") nativeTrades += 1;
@@ -757,6 +738,18 @@ class BacktestService {
       costScenario: identifyCostScenario(costSummary(runConfig)),
       stats,
       metrics: buildStrategyMetrics(trader.getHistory(), account.startingBalance),
+      // The same trades broken out by the environment each was opened in.
+      //
+      // `minTrades: 1` here reports every cell rather than hiding the thin
+      // ones, because a single run is where a reader most needs to see that a
+      // regime was met four times. The `sufficient` flag on each cell is what
+      // says whether it is evidence; a promotion decision should be reading the
+      // pooled matrix across many runs, not this one.
+      regimeMetrics: buildRegimeMatrix(trader.getHistory(), account.startingBalance, { minTrades: 1 }),
+      // Which environments this run's opened signals actually occurred in. A
+      // strategy that only ever fired in one regime has not been tested against
+      // the others, and that is a fact about the RUN rather than the strategy.
+      regimeCounts,
       trades: trader.getHistory(),
       openAtEnd,
       skipped,
@@ -830,6 +823,9 @@ class BacktestService {
     // The config this run is using, which differs from the service's when a
     // named cost scenario was requested.
     config = null,
+    // The regime read for the deciding bar, from ./regime. Recorded on the
+    // trade and used for nothing else — see the meta block below.
+    regimeRead = null,
   }) {
     const runConfig = config || this.config;
     const signalSource = `backtest:${strategyId}:${interval}`;
@@ -927,22 +923,32 @@ class BacktestService {
         // not interpretable. 55 out of 100 and 55 out of 60 are different
         // claims about how much of the evidence agreed, and only the second
         // number says which one this was.
-        meta: signal
-          ? {
-              strategy: strategyId,
-              strategyConfidence: signal.confidence ?? null,
-              stopHint: signal.stopHint ?? null,
-              targetHint: signal.targetHint ?? null,
-              executionMode: appliedMode,
-              availablePoints: checklist.availablePoints ?? null,
-              scoringVersion: SCORING_VERSION,
-            }
-          : {
-              strategy: strategyId,
-              executionMode: appliedMode,
-              availablePoints: checklist.availablePoints ?? null,
-              scoringVersion: SCORING_VERSION,
-            },
+        meta: {
+          strategy: strategyId,
+          ...(signal
+            ? {
+                strategyConfidence: signal.confidence ?? null,
+                stopHint: signal.stopHint ?? null,
+                targetHint: signal.targetHint ?? null,
+              }
+            : {}),
+          executionMode: appliedMode,
+          availablePoints: checklist.availablePoints ?? null,
+          scoringVersion: SCORING_VERSION,
+          // The environment this trade was OPENED in, recorded so the strategy
+          // × regime table can be built from history rather than re-derived.
+          //
+          // Recorded, not acted on: the checklist above scored this candidate
+          // from its own trend read exactly as it always has, and nothing in
+          // the gauntlet consulted these two fields. That is what makes the
+          // resulting table evidence about the strategy rather than evidence
+          // about a filter we just added.
+          //
+          // Null when no regime read was supplied, which keeps the trade
+          // honestly UNTAGGED instead of defaulting it into a bucket.
+          regime: regimeRead ? regimeRead.regime : null,
+          regimeConfidence: regimeRead ? regimeRead.confidence : null,
+        },
         openedAt: at ?? context.bar.closeTime,
       });
       return {

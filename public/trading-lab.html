@@ -40,6 +40,22 @@
     <div class="tl-stat-grid" id="tl-stats"></div>
 
     <div class="de-card">
+      <div class="de-card-title">Market Environment</div>
+      <div class="de-card-note">What environment the market is in, measured from candles, and what the Lab's own recorded trades say belongs in it. The strategy recommendation is <strong>advisory</strong> &mdash; the live scanner decides what it may run from strategy lifecycle status alone, and nothing here feeds that decision.</div>
+      <div class="de-toolbar">
+        <input class="aia-select tl-input" id="tl-regime-symbol" type="text" value="BTCUSDT" placeholder="Symbol" />
+        <select class="aia-select" id="tl-regime-interval">
+          <option value="15m">15m</option>
+          <option value="1h" selected>1h</option>
+          <option value="4h">4h</option>
+          <option value="1D">1D</option>
+        </select>
+        <button class="aia-run-btn" type="button" id="tl-regime-btn">Read regime</button>
+      </div>
+      <div id="tl-regime"><div class="de-empty">Loading&hellip;</div></div>
+    </div>
+
+    <div class="de-card">
       <div class="de-card-title">Open Positions</div>
       <div class="de-table-wrap">
         <table class="de-table">
@@ -118,6 +134,21 @@
       <div class="de-card-title">Strategy Comparison</div>
       <div class="de-card-note">Every registered strategy replayed over the same symbol, interval and candles. Backtest only &mdash; nothing here changes what the live scanner runs.</div>
       <div id="tl-bt-compare-result"><div class="de-empty">No comparison run yet.</div></div>
+    </div>
+
+    <div class="de-card">
+      <div class="de-card-title">Regime Analysis</div>
+      <div class="de-card-note">Every strategy's expectancy broken out by the environment each trade was <em>opened</em> in &mdash; the table that turns &ldquo;VWAP works in ranges&rdquo; from a belief into a measurement. Cells below the evidence threshold are shown but marked thin, and trades recorded before regime tagging existed are counted as untagged rather than folded into a regime.</div>
+      <div class="de-toolbar">
+        <label class="tl-inline-label" for="tl-regime-min">Evidence threshold</label>
+        <select class="aia-select" id="tl-regime-min">
+          <option value="10">10 trades</option>
+          <option value="20" selected>20 trades</option>
+          <option value="30">30 trades</option>
+          <option value="50">50 trades</option>
+        </select>
+      </div>
+      <div id="tl-regime-matrix"><div class="de-empty">Loading&hellip;</div></div>
     </div>
 
     <div class="de-card">

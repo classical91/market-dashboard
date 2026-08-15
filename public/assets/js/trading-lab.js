@@ -14,6 +14,12 @@
   var signalActionsTbody = document.getElementById("tl-signal-actions-tbody");
   var scannerEl = document.getElementById("tl-scanner");
   var metricsEl = document.getElementById("tl-metrics");
+  var regimeEl = document.getElementById("tl-regime");
+  var regimeMatrixEl = document.getElementById("tl-regime-matrix");
+  var regimeSymbol = document.getElementById("tl-regime-symbol");
+  var regimeInterval = document.getElementById("tl-regime-interval");
+  var regimeBtn = document.getElementById("tl-regime-btn");
+  var regimeMin = document.getElementById("tl-regime-min");
   var historyTbody = document.getElementById("tl-history-tbody");
   var btSymbol = document.getElementById("tl-bt-symbol");
   var btInterval = document.getElementById("tl-bt-interval");
@@ -377,6 +383,203 @@
     metricsEl.innerHTML = html || '<div class="de-empty">No closed trades yet — metrics appear once trades finish.</div>';
   }
 
+  /* ── Market environment ────────────────────────────────────
+     Two panels, deliberately kept apart. The read is a measurement of the
+     market; the routing is a reading of our own trade history. A surprising
+     answer should say which of the two it came from. */
+
+  // Each regime gets one colour, used everywhere it appears so a label reads
+  // the same in the environment card and in the matrix below it.
+  function regimeClass(regime) {
+    switch (regime) {
+      case "TREND_UP": return "tl-regime--up";
+      case "TREND_DOWN": return "tl-regime--down";
+      case "ACCUMULATION": return "tl-regime--accum";
+      case "DISTRIBUTION": return "tl-regime--dist";
+      case "VOLATILE_EXPANSION": return "tl-regime--volatile";
+      case "LOW_COMPRESSION": return "tl-regime--coiled";
+      case "TRANSITION": return "tl-regime--transition";
+      case "RANGE": return "tl-regime--range";
+      default: return "tl-regime--unknown";
+    }
+  }
+
+  function prettyLabel(value) {
+    return String(value == null ? "—" : value).replace(/_/g, " ");
+  }
+
+  function regimeRow(label, value, cls) {
+    return (
+      '<div class="tl-regime-row"><span class="tl-regime-key">' + escapeHtml(label) + "</span>" +
+      '<span class="tl-regime-val ' + (cls || "") + '">' + escapeHtml(value) + "</span></div>"
+    );
+  }
+
+  function renderRouting(routing) {
+    if (!routing) return "";
+
+    // The refusal case. Every candidate is held, none blamed — nothing about
+    // these strategies failed, the environment is simply unreadable.
+    if (!routing.actionable) {
+      return (
+        '<div class="tl-route tl-route--held">' +
+        '<div class="tl-route-verdict">NO STRATEGY SELECTED</div>' +
+        '<div class="tl-route-why">' + escapeHtml(routing.reasons[0] || "") + "</div>" +
+        (routing.held && routing.held.length
+          ? '<div class="tl-route-line"><span class="tl-route-tag">Held</span> ' +
+            routing.held.map(function (h) { return escapeHtml(h.name); }).join(", ") + "</div>"
+          : "") +
+        "</div>"
+      );
+    }
+
+    var parts = ['<div class="tl-route">'];
+
+    if (routing.preferred) {
+      parts.push(
+        '<div class="tl-route-verdict">Preferred: ' + escapeHtml(routing.preferred.name) +
+          (routing.preferred.scannerEligible ? "" : ' <span class="tl-tag">research only</span>') +
+          "</div>",
+        '<div class="tl-route-why">' + escapeHtml(routing.preferred.reason) + "</div>",
+      );
+    } else {
+      parts.push('<div class="tl-route-verdict">No strategy has measured favourably here yet</div>');
+    }
+
+    var others = routing.eligible.slice(1);
+    if (others.length) {
+      parts.push(
+        '<div class="tl-route-line"><span class="tl-route-tag tl-route-tag--ok">Eligible</span> ' +
+          others.map(function (c) { return escapeHtml(c.name); }).join(", ") + "</div>",
+      );
+    }
+    if (routing.suppressed.length) {
+      parts.push(
+        '<div class="tl-route-line"><span class="tl-route-tag tl-route-tag--no">Suppressed</span> ' +
+          routing.suppressed
+            .map(function (c) { return escapeHtml(c.name) + " (" + escapeHtml(c.reason) + ")"; })
+            .join(", ") + "</div>",
+      );
+    }
+    // Unproven is kept visually distinct from suppressed: never having traded
+    // in a regime is not the same as having lost money there.
+    if (routing.unproven.length) {
+      parts.push(
+        '<div class="tl-route-line"><span class="tl-route-tag">Unproven here</span> ' +
+          routing.unproven.map(function (c) { return escapeHtml(c.name); }).join(", ") + "</div>",
+      );
+    }
+
+    parts.push("</div>");
+    return parts.join("");
+  }
+
+  function renderRegime(data) {
+    if (!regimeEl) return;
+    var read = data && data.regime;
+    if (!read) {
+      regimeEl.innerHTML = '<div class="de-empty">No regime read available.</div>';
+      return;
+    }
+
+    var ind = read.indicators || {};
+    var head =
+      '<div class="tl-regime-head ' + regimeClass(read.regime) + '">' +
+      '<div class="tl-regime-symbol">' + escapeHtml(data.symbol) + " &middot; " + escapeHtml(data.interval) + "</div>" +
+      '<div class="tl-regime-label">' + escapeHtml(prettyLabel(read.regime)) + "</div>" +
+      '<div class="tl-regime-conf">' + read.confidence + "% confidence</div>" +
+      '<div class="tl-regime-action">' + escapeHtml(read.action) + "</div>" +
+      "</div>";
+
+    var facts =
+      '<div class="tl-regime-facts">' +
+      // `trend`, not `direction`: outside a trend regime the EMA ordering is
+      // noise the engine has already measured as such — see regime.js.
+      regimeRow("Trend", prettyLabel(read.trend),
+        read.trend === "UP" ? "tl-up" : read.trend === "DOWN" ? "tl-down" : "tl-flat") +
+      regimeRow("ADX", ind.adx == null ? "—" : String(ind.adx)) +
+      regimeRow("Volatility", prettyLabel(read.volatility) + (ind.atrRatio == null ? "" : " (" + ind.atrRatio + "× ATR)")) +
+      regimeRow("Volume", prettyLabel(read.volumeState) + (ind.volumeRatio == null ? "" : " (" + ind.volumeRatio + "×)")) +
+      regimeRow("Structure", read.structure ? prettyLabel(read.structure.label) : "—") +
+      regimeRow("Preferred mode", prettyLabel(read.preferredMode)) +
+      regimeRow("Risk", prettyLabel(read.riskPosture),
+        read.riskPosture === "NONE" ? "tl-down" : read.riskPosture === "REDUCED" ? "tl-flat" : "tl-up") +
+      "</div>";
+
+    var why =
+      '<div class="tl-regime-reasons"><div class="tl-metric-title">Why</div><ul>' +
+      (read.reasons || []).map(function (r) { return "<li>" + escapeHtml(r) + "</li>"; }).join("") +
+      "</ul></div>";
+
+    regimeEl.innerHTML =
+      '<div class="tl-regime-grid">' + head + facts + "</div>" + renderRouting(data.routing) + why;
+  }
+
+  function renderRegimeMatrix(data) {
+    if (!regimeMatrixEl) return;
+    var rows = (data && data.rows) || [];
+    if (!rows.length) {
+      regimeMatrixEl.innerHTML =
+        '<div class="de-empty">No closed trades yet — the regime table fills in as trades finish.</div>';
+      return;
+    }
+
+    var regimes = data.regimes || [];
+    var cov = data.coverage || {};
+    // Coverage first, deliberately. A table built from mostly-untagged history
+    // is not a regime analysis, and that should be visible at a glance rather
+    // than inferred by summing the cells.
+    var coverage =
+      '<div class="tl-regime-coverage' + (cov.taggedPct < 50 ? " tl-regime-coverage--thin" : "") + '">' +
+      escapeHtml(
+        cov.tagged + " of " + cov.trades + " closed trades carry a regime tag (" + cov.taggedPct + "%)" +
+          (cov.untagged ? " — untagged trades predate regime tagging and are shown in their own column" : ""),
+      ) +
+      "</div>";
+
+    var header =
+      "<tr><th>Strategy</th><th>All</th>" +
+      regimes.map(function (r) { return "<th>" + escapeHtml(prettyLabel(r)) + "</th>"; }).join("") +
+      "</tr>";
+
+    var body = rows
+      .map(function (row) {
+        var cells = regimes
+          .map(function (regime) {
+            var cell = row.cells[regime];
+            if (!cell) return '<td class="tl-cell-empty">—</td>';
+            var cls = cell.sufficient ? pnlClass(cell.expectancyR) : "tl-cell-thin";
+            return (
+              '<td class="' + cls + '" title="' +
+              escapeHtml(
+                cell.closedTrades + " trades, PF " + (cell.profitFactor == null ? "∞" : cell.profitFactor) +
+                  (cell.sufficient ? "" : " — below the evidence threshold"),
+              ) + '">' +
+              (cell.expectancyR > 0 ? "+" : "") + cell.expectancyR + "R" +
+              '<span class="tl-cell-n">' + cell.closedTrades + "</span>" +
+              "</td>"
+            );
+          })
+          .join("");
+
+        return (
+          "<tr><td>" + escapeHtml(row.strategy) + "</td>" +
+          '<td class="' + pnlClass(row.summary.expectancyR) + '">' +
+          (row.summary.expectancyR > 0 ? "+" : "") + row.summary.expectancyR + "R" +
+          '<span class="tl-cell-n">' + row.summary.closedTrades + "</span></td>" +
+          cells + "</tr>"
+        );
+      })
+      .join("");
+
+    regimeMatrixEl.innerHTML =
+      coverage +
+      '<div class="de-table-wrap"><table class="de-table tl-regime-table"><thead>' +
+      header + "</thead><tbody>" + body + "</tbody></table></div>" +
+      '<div class="de-card-note">Each cell is expectancy in R with its trade count. Dimmed cells are below the ' +
+      escapeHtml(String(data.minTrades)) + '-trade evidence threshold — visible so a thin sample is never mistaken for a finding.</div>';
+  }
+
   function renderHistory(items) {
     if (!items || !items.length) {
       historyTbody.innerHTML = '<tr><td colspan="10" class="de-empty">No closed trades yet.</td></tr>';
@@ -470,6 +673,41 @@
     ]);
   }
 
+  function currentRegimeMinTrades() {
+    return (regimeMin && regimeMin.value) || "20";
+  }
+
+  // The regime read needs candles, so it is the one panel here that can be slow
+  // or unavailable (503 when no candle source is configured). It loads on its
+  // own and reports its own failure rather than blanking the page around it.
+  function loadRegime() {
+    if (!regimeEl) return Promise.resolve();
+    regimeEl.innerHTML = '<div class="de-empty">Reading the market environment&hellip;</div>';
+    return getJson(
+      "/api/trading-lab/regime?symbol=" + encodeURIComponent((regimeSymbol.value || "BTCUSDT").toUpperCase()) +
+        "&interval=" + encodeURIComponent(regimeInterval.value) +
+        "&book=" + encodeURIComponent(currentBook()) +
+        "&min_trades=" + encodeURIComponent(currentRegimeMinTrades()),
+    )
+      .then(renderRegime)
+      .catch(function (err) {
+        regimeEl.innerHTML = '<div class="de-empty">Could not read the regime: ' + escapeHtml(err.message) + "</div>";
+      });
+  }
+
+  function loadRegimeMatrix() {
+    if (!regimeMatrixEl) return Promise.resolve();
+    return getJson(
+      "/api/trading-lab/regime-matrix?book=" + encodeURIComponent(currentBook()) +
+        "&min_trades=" + encodeURIComponent(currentRegimeMinTrades()),
+    )
+      .then(renderRegimeMatrix)
+      .catch(function (err) {
+        regimeMatrixEl.innerHTML =
+          '<div class="de-empty">Could not read the regime table: ' + escapeHtml(err.message) + "</div>";
+      });
+  }
+
   function loadCandidates() {
     candidatesTbody.innerHTML = '<tr><td colspan="12" class="de-empty">Scoring Decision Engine plans&hellip;</td></tr>';
     return getJson(
@@ -490,6 +728,8 @@
     return loadOverview()
       .then(loadBookDetail)
       .then(loadCandidates)
+      .then(loadRegimeMatrix)
+      .then(loadRegime)
       .catch(function (err) { showError(err.message); })
       .then(function () { refreshBtn.disabled = false; });
   }
@@ -1117,6 +1357,22 @@
       })
       .then(function () { btRunBtn.disabled = false; });
   });
+
+  if (regimeBtn) regimeBtn.addEventListener("click", loadRegime);
+  if (regimeInterval) regimeInterval.addEventListener("change", loadRegime);
+  if (regimeSymbol) {
+    regimeSymbol.addEventListener("keydown", function (event) {
+      if (event.key === "Enter") loadRegime();
+    });
+  }
+  // The threshold decides which cells count as evidence in both panels, so
+  // changing it reloads both rather than leaving the two disagreeing.
+  if (regimeMin) {
+    regimeMin.addEventListener("change", function () {
+      loadRegimeMatrix();
+      loadRegime();
+    });
+  }
 
   refreshBtn.addEventListener("click", refresh);
   bookSelect.addEventListener("change", refresh);
