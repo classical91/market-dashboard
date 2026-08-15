@@ -30,17 +30,13 @@
 // Nothing here decides anything either. See ./regime-router.js.
 
 const { calculateTradeMetrics } = require("./metrics");
-const { REGIMES } = require("./regime");
+const { REGIMES, regimeOfTrade } = require("./regime");
 
-// Where a trade records the regime it was OPENED in. `meta.regime` is where the
-// backtester and paper trader write it; the top-level field is accepted so a
-// caller with a flatter record shape is not forced to nest it.
-function regimeKey(trade) {
-  const tagged =
-    (trade && trade.meta && trade.meta.regime) || (trade && trade.regimeAtEntry) || null;
-  const label = tagged ? String(tagged) : null;
-  return label && REGIMES.includes(label) ? label : "UNTAGGED";
-}
+// Where a trade records the regime it was OPENED in. Re-exported under the name
+// this module's callers already use; the implementation lives in ./regime
+// beside the vocabulary it validates against, so this table and metrics.js's
+// `regime` dimension cannot drift on what a tag means.
+const regimeKey = regimeOfTrade;
 
 function strategyKey(trade) {
   return String((trade && (trade.signalSource || trade.strategy || trade.source)) || "unknown");
