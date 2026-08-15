@@ -25,6 +25,11 @@ function requireFields(body, fields) {
   }
 }
 
+function readLedger(tradingLabService, values = {}) {
+  const strategyId = values.strategyId || values.strategy;
+  return strategyId ? tradingLabService.strategyLedger(strategyId) : tradingLabService.book(values.book);
+}
+
 function createTradingLabRouter({
   tradingLabService,
   backtestService,
@@ -84,12 +89,12 @@ function createTradingLabRouter({
   });
 
   router.get("/positions", (req, res) => {
-    const trader = tradingLabService.book(req.query.book);
-    res.json({ book: trader.book, positions: trader.getPositions() });
+    const trader = readLedger(tradingLabService, req.query);
+    res.json({ book: trader.book, strategyId: req.query.strategyId || null, positions: trader.getPositions() });
   });
 
   router.get("/history", (req, res) => {
-    const trader = tradingLabService.book(req.query.book);
+    const trader = readLedger(tradingLabService, req.query);
     const limit = Math.min(Math.max(numberOr(req.query.limit, 100), 1), 1000);
     const history = trader.getHistory();
     const window = history.slice(-limit);
@@ -110,6 +115,7 @@ function createTradingLabRouter({
 
     res.json({
       book: trader.book,
+      strategyId: req.query.strategyId || null,
       total: history.length,
       returned: window.length,
       truncated: before.length > 0,
@@ -132,6 +138,7 @@ function createTradingLabRouter({
   router.get("/metrics", (req, res) => {
     res.json(
       tradingLabService.strategyMetrics({
+        strategyId: req.query.strategyId || null,
         book: req.query.book,
         minTrades: Math.max(numberOr(req.query.min_trades, 1), 1),
       }),
@@ -141,9 +148,9 @@ function createTradingLabRouter({
   // ── Strategy accounts ─────────────────────────────────────────────────────
   //
   // One isolated ledger per registered strategy: "does THIS strategy make
-  // money?", as opposed to the books above, which answer "what happened in this
-  // collection of activity?". An account existing confers nothing — four of the
-  // five may not trade forward and say so.
+  // money?". The legacy book endpoints above remain read-only compatibility
+  // views. An account existing confers nothing — four of the five may not trade
+  // forward and say so.
 
   router.get("/strategy-accounts", asyncRoute(async (req, res) => {
     res.json(await tradingLabService.strategyAccounts());
@@ -171,6 +178,7 @@ function createTradingLabRouter({
       await tradingLabService.regime({
         symbol: String(req.query.symbol || "BTCUSDT").toUpperCase(),
         interval: typeof req.query.interval === "string" && req.query.interval ? req.query.interval : "1h",
+        strategyId: req.query.strategyId || null,
         book: req.query.book,
         minTrades: Math.max(numberOr(req.query.min_trades, 20), 1),
       }),
@@ -182,6 +190,7 @@ function createTradingLabRouter({
   router.get("/regime-matrix", (req, res) => {
     res.json(
       tradingLabService.regimeMatrix({
+        strategyId: req.query.strategyId || null,
         book: req.query.book,
         minTrades: Math.max(numberOr(req.query.min_trades, 20), 1),
       }),
@@ -216,6 +225,7 @@ function createTradingLabRouter({
           atr: body.atr === undefined ? null : Number(body.atr),
           state: body.state || {},
           strategy: body.strategy || null,
+          strategyId: body.strategyId || null,
         }),
       );
     } catch (err) {
@@ -229,9 +239,9 @@ function createTradingLabRouter({
 
   router.post("/positions", requireAdmin, asyncRoute(async (req, res) => {
     const body = req.body || {};
-    requireFields(body, ["symbol", "direction", "entryPrice"]);
+    requireFields(body, ["strategyId", "symbol", "direction", "entryPrice"]);
     const result = await tradingLabService.execute({
-      book: body.book,
+      strategyId: String(body.strategyId),
       symbol: String(body.symbol),
       direction: String(body.direction).toUpperCase(),
       entryPrice: Number(body.entryPrice),
@@ -239,15 +249,21 @@ function createTradingLabRouter({
       state: body.state || {},
       strategy: body.strategy || null,
       signalSource: body.signalSource || "manual",
+      strategyVersion: body.strategyVersion || null,
+      timeframe: body.timeframe || null,
+      regime: body.regime || null,
+      regimeConfidence: body.regimeConfidence ?? null,
     });
     res.status(result.opened ? 201 : 200).json(result);
   }));
 
   router.post("/positions/:id/close", requireAdmin, asyncRoute(async (req, res) => {
-    const trader = tradingLabService.book((req.body || {}).book || req.query.book);
+    const body = req.body || {};
+    requireFields(body, ["strategyId"]);
+    const trader = tradingLabService.strategyLedger(body.strategyId);
     const closed = await trader.closePosition(req.params.id, {
-      reason: (req.body || {}).reason || "MANUAL",
-      exitPrice: (req.body || {}).exitPrice ? Number(req.body.exitPrice) : null,
+      reason: body.reason || "MANUAL",
+      exitPrice: body.exitPrice ? Number(body.exitPrice) : null,
     });
     if (!closed) {
       res.status(404).json({ error: "Open position not found, or no price available to close it" });
@@ -259,9 +275,11 @@ function createTradingLabRouter({
   // Mark open positions to market and fire any stop/target the new price
   // reaches. Called by the UI on refresh and by the interval loop.
   router.post("/mark", requireAdmin, asyncRoute(async (req, res) => {
-    const trader = tradingLabService.book((req.body || {}).book || req.query.book);
-    const events = await trader.updatePositions((req.body || {}).prices || null);
-    res.json({ book: trader.book, events, stats: await trader.getStats() });
+    const body = req.body || {};
+    requireFields(body, ["strategyId"]);
+    const trader = tradingLabService.strategyLedger(body.strategyId);
+    const events = await trader.updatePositions(body.prices || null);
+    res.json({ strategyId: body.strategyId, book: trader.book, events, stats: await trader.getStats() });
   }));
 
   // Admin-gated despite being read-only: unlike the other reads it replays
@@ -326,8 +344,10 @@ function createTradingLabRouter({
   }));
 
   router.post("/reset", requireAdmin, (req, res) => {
-    const trader = tradingLabService.book((req.body || {}).book || req.query.book);
-    res.json({ book: trader.book, account: trader.reset() });
+    const body = req.body || {};
+    requireFields(body, ["strategyId"]);
+    const trader = tradingLabService.strategyLedger(body.strategyId);
+    res.json({ strategyId: body.strategyId, book: trader.book, account: trader.reset() });
   });
 
   return router;

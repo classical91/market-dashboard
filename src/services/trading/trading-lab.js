@@ -22,13 +22,43 @@ const { classifyRegime } = require("./regime");
 const { buildRegimeMatrix } = require("./regime-metrics");
 const { routeRegime } = require("./regime-router");
 const { listStrategyAccounts, describeStrategyAccount, acceptsForwardTrades } = require("./strategy-accounts");
-const { PaperTradingService } = require("./paper-trader");
+const { PaperTradingService, MemoryStorage } = require("./paper-trader");
 
-const BOOKS = [
-  { id: "main", name: "Main" },
-  { id: "shadow", name: "Shadow SMC" },
-  { id: "alts", name: "Alts" },
+const LEGACY_BOOKS = [
+  { id: "main", name: "Main", archived: true },
+  { id: "shadow", name: "Shadow SMC", archived: true },
+  { id: "alts", name: "Alts", archived: true },
 ];
+const BOOKS = LEGACY_BOOKS;
+
+function archivedMutation(book) {
+  return () => {
+    throw Object.assign(new Error(`Legacy ledger "${book}" is archived and read-only`), {
+      statusCode: 409,
+      expose: true,
+    });
+  };
+}
+
+function archivedLedgerView(trader) {
+  return Object.freeze({
+    book: trader.book,
+    archived: true,
+    getAccount: (...args) => trader.getAccount(...args),
+    getPositions: (...args) => trader.getPositions(...args),
+    getOpenPositions: (...args) => trader.getOpenPositions(...args),
+    getHistory: (...args) => trader.getHistory(...args),
+    getStats: (...args) => trader.getStats(...args),
+    getRiskState: (...args) => trader.getRiskState(...args),
+    openPosition: archivedMutation(trader.book),
+    closePosition: archivedMutation(trader.book),
+    updatePositions: archivedMutation(trader.book),
+    addToHistory: archivedMutation(trader.book),
+    reset: archivedMutation(trader.book),
+    savePositions: archivedMutation(trader.book),
+    saveAccount: archivedMutation(trader.book),
+  });
+}
 
 // The decision engine speaks in regime labels and scores; the checklist speaks
 // in trend regimes and daily bias. This is the only place the two vocabularies
@@ -74,11 +104,14 @@ class TradingLabService {
     this.config = config;
     this.decisionEngineService = decisionEngineService;
     this.signalScreenerService = signalScreenerService;
-    this.books = new Map(
-      BOOKS.map((book) => [
+    this._legacyLedgers = new Map(
+      LEGACY_BOOKS.map((book) => [
         book.id,
         new PaperTradingService({ dataDir, book: book.id, config, priceFeed }),
       ]),
+    );
+    this.books = new Map(
+      [...this._legacyLedgers].map(([id, ledger]) => [id, archivedLedgerView(ledger)]),
     );
     // One isolated ledger per registered strategy, derived from the registry so
     // a sixth strategy needs no second list updating. Every strategy gets one,
@@ -90,6 +123,15 @@ class TradingLabService {
         new PaperTradingService({ dataDir, book: account.ledgerKey, config, priceFeed }),
       ]),
     );
+    // Unattributed/manual/Decision Engine/Signal Bot evaluation remains useful,
+    // but it must not create a sixth persistent account or fall back to Main.
+    // This ledger is process-local and can only be used by evaluate().
+    this.unattributedEvaluationLedger = new PaperTradingService({
+      book: "unattributed-evaluation",
+      config,
+      priceFeed,
+      storage: new MemoryStorage(),
+    });
   }
 
   // ── Ledger resolution ─────────────────────────────────────────────────────
@@ -104,17 +146,32 @@ class TradingLabService {
    * a strategy account — the kill switches would be guarding the wrong book,
    * which is a safety failure rather than a reporting one.
    *
-   * A scanner-eligible strategy's forward trades go to its own account, so
-   * attribution is unambiguous. Everything else goes to the portfolio book:
-   * manual trades, decision-engine candidates, and the signal-bot bridge, which
-   * has no registry strategy at all and therefore cannot have a strategy
-   * account.
+   * Registered strategies always resolve to their own account. They never fall
+   * back to a legacy ledger. Unattributed evaluation may use the process-local
+   * analysis ledger; persistent execution may not.
    */
-  ledgerFor({ book = "main", strategyId = null } = {}) {
-    if (strategyId && acceptsForwardTrades(strategyId) && this.strategyLedgers.has(strategyId)) {
-      return this.strategyLedgers.get(strategyId);
+  ledgerFor({ strategyId = null, allowUnattributed = false, requireForward = false } = {}) {
+    if (strategyId) {
+      const account = describeStrategyAccount(strategyId);
+      if (!account || !this.strategyLedgers.has(account.id)) {
+        throw Object.assign(new Error(`Unknown registered strategy: ${strategyId}`), {
+          statusCode: 400,
+          expose: true,
+        });
+      }
+      if (requireForward && !acceptsForwardTrades(account.id)) {
+        throw Object.assign(
+          new Error(`Strategy "${account.id}" is ${account.label.toLowerCase()} and cannot forward-paper trade`),
+          { statusCode: 409, expose: true },
+        );
+      }
+      return this.strategyLedgers.get(account.id);
     }
-    return this.book(book);
+    if (allowUnattributed) return this.unattributedEvaluationLedger;
+    throw Object.assign(new Error("Forward-paper execution requires a registered strategy identity"), {
+      statusCode: 400,
+      expose: true,
+    });
   }
 
   // The ledger for one strategy account, whether or not it may trade forward.
@@ -127,7 +184,7 @@ class TradingLabService {
   }
 
   listBooks() {
-    return BOOKS.map((book) => ({ ...book }));
+    return LEGACY_BOOKS.map((book) => ({ ...book }));
   }
 
   book(id) {
@@ -148,7 +205,7 @@ class TradingLabService {
     // OWN account's risk state and closed-trade history, which is the ledger
     // execute() will write to. Kill switches and the edge gate must read the
     // book they are protecting.
-    const trader = this.ledgerFor({ book, strategyId });
+    const trader = this.ledgerFor({ strategyId, allowUnattributed: true });
     const signal = { symbol, direction, price: entryPrice, atr };
 
     // Live account risk (open positions, loss streaks, daily/weekly drawdown)
@@ -161,7 +218,7 @@ class TradingLabService {
     const edge = assessEdge({
       history: trader.getHistory(),
       startingBalance: account.startingBalance,
-      strategy: strategy || `${book}:${direction}`,
+      strategy: strategy || `${strategyId || "UNATTRIBUTED"}:${direction}`,
       symbol,
       score: checklist.confidenceScore,
       config: this.config,
@@ -215,6 +272,10 @@ class TradingLabService {
     regimeConfidence = null,
     ...input
   }) {
+    // Resolve permission before doing any scoring. A registered but ineligible
+    // strategy is refused; a missing identity is refused; neither can fall back
+    // to Main/Shadow/Alts.
+    const trader = this.ledgerFor({ strategyId, requireForward: true });
     const assessment = this.evaluate({ book, strategyId, ...input });
     if (!assessment.trade.ok) {
       return { ...assessment, opened: null };
@@ -222,7 +283,6 @@ class TradingLabService {
 
     // The same resolution evaluate() just used, so the position opens in the
     // ledger whose limits were checked.
-    const trader = this.ledgerFor({ book, strategyId });
     const { trade } = assessment;
     const opened = trader.openPosition({
       symbol: trade.symbol,
@@ -373,14 +433,16 @@ class TradingLabService {
   // ── Reporting ─────────────────────────────────────────────────────────────
 
   async overview() {
-    const books = await Promise.all(
-      BOOKS.map(async ({ id, name }) => {
+    const strategy = await this.strategyAccounts();
+    const legacyBooks = await Promise.all(
+      LEGACY_BOOKS.map(async ({ id, name, archived }) => {
         const trader = this.book(id);
         return {
           id,
           name,
+          archived,
           stats: await trader.getStats(),
-          openPositions: trader.getOpenPositions(),
+          totalTrades: trader.getHistory().length,
         };
       }),
     );
@@ -396,7 +458,11 @@ class TradingLabService {
         tp1RMultiple: this.config.tp1RMultiple,
         tp2RMultiple: this.config.tp2RMultiple,
       },
-      books,
+      accounts: strategy.accounts,
+      legacyBooks,
+      // Compatibility alias for older read-only clients. Every item is marked
+      // archived and mutation routes no longer accept a legacy book.
+      books: legacyBooks,
     };
   }
 
@@ -411,7 +477,7 @@ class TradingLabService {
    * reading of our own trade history. Collapsing them into one verdict would
    * hide which of the two a surprising answer came from.
    */
-  async regime({ symbol, interval = "1h", book = "main", minTrades = 20 } = {}) {
+  async regime({ symbol, interval = "1h", strategyId = null, book = "main", minTrades = 20 } = {}) {
     if (!this.signalScreenerService) {
       throw Object.assign(new Error("No candle source configured for regime detection"), {
         statusCode: 503,
@@ -421,13 +487,13 @@ class TradingLabService {
 
     const candles = await this.signalScreenerService.getCandles(symbol, interval);
     const read = classifyRegime(candles || []);
-    const matrix = this.regimeMatrix({ book, minTrades });
+    const matrix = this.regimeMatrix({ strategyId, book, minTrades });
     const routing = routeRegime({ read, matrix });
 
     return {
       symbol,
       interval,
-      book,
+      strategyId: strategyId || null,
       updatedAt: new Date().toISOString(),
       candles: (candles || []).length,
       regime: read,
@@ -436,23 +502,25 @@ class TradingLabService {
   }
 
   // The strategy × regime evidence table for one book's recorded history.
-  regimeMatrix({ book = "main", minTrades = 20 } = {}) {
-    const trader = this.book(book);
+  regimeMatrix({ strategyId = null, book = "main", minTrades = 20 } = {}) {
+    const trader = strategyId ? this.strategyLedger(strategyId) : this.book(book);
     const account = trader.getAccount();
     return {
-      book,
+      strategyId: strategyId || null,
+      book: strategyId ? trader.book : book,
       ...buildRegimeMatrix(trader.getHistory(), account.startingBalance, { minTrades }),
     };
   }
 
-  strategyMetrics({ book = "main", minTrades = 1 } = {}) {
-    const trader = this.book(book);
+  strategyMetrics({ strategyId = null, book = "main", minTrades = 1 } = {}) {
+    const trader = strategyId ? this.strategyLedger(strategyId) : this.book(book);
     const account = trader.getAccount();
     return {
-      book,
+      strategyId: strategyId || null,
+      book: strategyId ? trader.book : book,
       ...buildStrategyMetrics(trader.getHistory(), account.startingBalance, minTrades),
     };
   }
 }
 
-module.exports = { TradingLabService, marketStateFromDecision, BOOKS };
+module.exports = { TradingLabService, marketStateFromDecision, BOOKS, LEGACY_BOOKS };

@@ -60,15 +60,16 @@ class TradeIntentHandler {
    * Where this intent's positions live.
    *
    * Delegated to the Trading Lab so there is one answer to the question. A
-   * scanner-eligible strategy's forward trades go to its own strategy account;
-   * anything else goes to the configured portfolio book.
+   * A registered strategy always resolves to its own account. The Trading Lab
+   * refuses ineligible or unattributed persistent execution instead of falling
+   * back to an archived legacy ledger.
    */
   _ledgerFor(intent) {
     const strategyId = intent && intent.strategy ? intent.strategy : null;
     if (typeof this._lab.ledgerFor === "function") {
-      return this._lab.ledgerFor({ book: this.book, strategyId });
+      return this._lab.ledgerFor({ strategyId });
     }
-    return this._lab.book(this.book);
+    return this._lab.strategyLedger(strategyId);
   }
 
   // ── Exits: no gates ───────────────────────────────────────────────────────
