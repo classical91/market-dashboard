@@ -15,6 +15,16 @@ const { classifyRegime } = require("./regime");
 const { replayOrderForPositions } = require("./replay-order");
 const { listStrategies, getLiveResearchStrategy } = require("./strategies");
 const { EXECUTION_OWNERS, ownedBy } = require("./execution-owner");
+const { TOP_TOKENS } = require("../../config/market-symbols");
+
+// The market universe a demo account watches by default. Twenty liquid pairs:
+// enough that a selective strategy meets its setup somewhere, without turning
+// one cycle into a hundred candle fetches.
+const DEFAULT_DEMO_SYMBOLS = TOP_TOKENS.slice(0, 20);
+
+function runnerKey(strategyId, symbol, timeframe) {
+  return `${strategyId}|${String(symbol).toUpperCase()}|${timeframe}`;
+}
 const { contextAtBar } = require("./backtest");
 const { getTradingConfig } = require("./config");
 
@@ -58,6 +68,22 @@ function displayStatus(value) {
 
 function timeframeMs(timeframe) {
   return TIMEFRAME_MS[String(timeframe || "").toLowerCase()] || 3_600_000;
+}
+
+// The six numbers every demo account reports. Kept as one shape so a runner, a
+// strategy account and the whole subsystem all sum the same fields.
+const EMPTY_COUNTERS = Object.freeze({
+  candlesProcessed: 0,
+  signalsGenerated: 0,
+  tradesExecuted: 0,
+  signalsBlockedByRisk: 0,
+  executionErrors: 0,
+});
+
+function addCounters(into, from) {
+  const out = { ...into };
+  for (const key of Object.keys(EMPTY_COUNTERS)) out[key] = (out[key] || 0) + (Number(from?.[key]) || 0);
+  return out;
 }
 
 function activity(type, message, at = nowIso(), data = null) {
@@ -276,13 +302,25 @@ class CandleLiveResearchRunner {
       lastError: null,
       lastErrorAt: null,
       retryStatus: "IDLE",
+      // The most recent valid strategy signal the account could not take.
+      lastRefusedSignal: null,
+      // Lifetime counters for this runner. Their whole purpose is to make "zero
+      // trades" readable: an account showing candles processed but no signals is
+      // a strategy that has not met its conditions, while an account showing no
+      // candles at all is a dead runner, and those two are indistinguishable
+      // from the trade count alone.
+      counters: { ...EMPTY_COUNTERS },
       activity: [],
     };
   }
 
   _read() {
     const stored = this._stateCache ? this._stateCache.get(this.stateKey) : null;
-    return { ...this._initialState(), ...(stored && typeof stored === "object" ? stored : {}) };
+    const state = { ...this._initialState(), ...(stored && typeof stored === "object" ? stored : {}) };
+    // State persisted before counters existed has none; a missing counter must
+    // read as zero rather than undefined, or the status panel prints NaN.
+    state.counters = { ...EMPTY_COUNTERS, ...(state.counters || {}) };
+    return state;
   }
 
   _write(state) {
@@ -375,6 +413,7 @@ class CandleLiveResearchRunner {
       state.lastError = err.message;
       state.lastErrorAt = nowIso();
       state.retryStatus = "WAITING_TO_RETRY";
+      state.counters = addCounters(state.counters, { executionErrors: 1 });
       addActivities(state, [activity("error", `Runner error: ${err.message}`)]);
       this._logger.error?.(`[LiveResearch] ${this.strategyId} failed: ${err.message}`);
       return { status: "error", reason: err.message, state: this._write(state) };
@@ -513,6 +552,7 @@ class CandleLiveResearchRunner {
       };
       state.nextExpectedCandle = isoAt(closeTime(candle) + 1 + timeframeMs(this.timeframe));
       state.runnerStatus = position ? "POSITION_OPEN" : "CATCHING_UP";
+      state.counters = addCounters(state.counters, { candlesProcessed: 1 });
       addActivities(state, [
         activity("catch-up", `Missed ${this.timeframe} candle replayed for position management; entry skipped`, candleAt),
         ...events.map((event) => activity("position-event", `${event.type} on ${this.symbol}`, candleAt, event)),
@@ -588,7 +628,15 @@ class CandleLiveResearchRunner {
           });
           execution = assessment.opened
             ? { status: "opened", reason: `Opened ${assessment.opened.id}` }
-            : { status: "blocked", reason: assessment.trade.reason };
+            : {
+                status: "blocked",
+                // A valid strategy signal the ACCOUNT could not take is a
+                // different fact from a setup that was never good enough, and
+                // the safety code says which of the account's own limits bit.
+                reason: assessment.accountSafety?.reason || assessment.trade.reason,
+                code: assessment.accountSafety?.code || null,
+                refusedValidSignal: assessment.refusedValidSignal === true,
+              };
         } catch (err) {
           // A thrown error is a FAULT, not a risk decision. Reporting it as
           // "blocked" told the dashboard the strategy had been refused on its
@@ -599,6 +647,31 @@ class CandleLiveResearchRunner {
           this._logger.error?.(`[LiveResearch] ${this.strategyId} execution failed: ${err.message}`);
         }
       }
+    }
+
+    const signalled = !evaluation.error && (evaluation.signal === "LONG" || evaluation.signal === "SHORT");
+    state.counters = addCounters(state.counters, {
+      candlesProcessed: 1,
+      signalsGenerated: signalled ? 1 : 0,
+      tradesExecuted: execution?.status === "opened" ? 1 : 0,
+      signalsBlockedByRisk: execution?.status === "blocked" ? 1 : 0,
+      executionErrors: execution?.status === "error" ? 1 : 0,
+    });
+
+    // A signal the strategy genuinely produced and the account refused is kept
+    // in full — direction, price and the safety code — because a flat equity
+    // curve made of refusals and a flat curve made of silence are different
+    // research outcomes and must never render the same.
+    if (signalled && execution?.status === "blocked") {
+      state.lastRefusedSignal = {
+        at: candleAt,
+        symbol: this.symbol,
+        timeframe: this.timeframe,
+        direction: evaluation.signal,
+        price: evaluation.price ?? candle.close,
+        code: execution.code || null,
+        reason: execution.reason,
+      };
     }
 
     const open = trader
@@ -665,90 +738,119 @@ class CandleLiveResearchRunner {
   }
 }
 
-class LiveResearchService {
+class DemoTradingService {
+  /**
+   * One Demo Trading subsystem, and every candle strategy is a first-class
+   * member of it.
+   *
+   * Mindset used to be special: it was the scanner's strategy, so the scanner
+   * owned its ledger and Live Research skipped it, while SMC, Donchian and
+   * VWAP were "live research". That split is the thing that kept recreating
+   * confusion, because it made one strategy the real trader and the rest
+   * secondary. All four now get the identical contract:
+   *
+   *   live closed candles -> the account's own strategy -> strategy signal
+   *   -> hard account safety -> paper execution -> that strategy's ledger
+   *
+   * They will trade at different frequencies, because the strategies differ.
+   * That is the only thing that should differ.
+   *
+   * Internally a runner is strategy x symbol x timeframe, so one account can
+   * watch a whole market universe — but every runner for a strategy writes to
+   * that strategy's single $10,000 ledger. One demo account, one strategy, many
+   * markets.
+   */
   constructor({
     tradingLabService,
     candleSource,
     stateCache = null,
     enabled = true,
-    symbol = "BTCUSDT",
-    timeframe = "1h",
+    // The market universe every demo account watches. One list, so no strategy
+    // gets a wider or narrower view than another.
+    symbols = null,
+    timeframes = null,
+    // Back-compat with the single-market configuration.
+    symbol = null,
+    timeframe = null,
     intervalMs = 60_000,
     reservedStrategyIds = [],
     logger = console,
   } = {}) {
     this.enabled = Boolean(enabled);
-    this.symbol = String(symbol).toUpperCase();
-    this.timeframe = String(timeframe);
+    this.symbols = (symbols && symbols.length ? symbols : symbol ? [symbol] : DEFAULT_DEMO_SYMBOLS)
+      .map((value) => String(value).toUpperCase());
+    this.timeframes = (timeframes && timeframes.length ? timeframes : timeframe ? [timeframe] : ["1h"])
+      .map((value) => String(value));
+    // Kept for status payloads and tests that still speak in one market.
+    this.symbol = this.symbols[0];
+    this.timeframe = this.timeframes[0];
     this.intervalMs = Number(intervalMs) > 0 ? Number(intervalMs) : 60_000;
     this._logger = logger;
     this._timer = null;
     this._running = false;
-    const reserved = new Set((reservedStrategyIds || []).map(String));
-    const eligible = listStrategies({ supportsBacktest: true }).filter((meta) => meta.liveResearchEligible);
 
-    /**
-     * A strategy the Live Scanner is already writing gets no Live Research
-     * runner. One experiment, one execution owner — the same rule the manual
-     * routes enforce, applied at startup.
-     *
-     * This USED TO THROW, which took the entire dashboard down: mindset_v1 is
-     * both scanner eligible and live-research eligible, so every deployment
-     * with ENABLE_LIVE_SCANNER=true failed to boot, health check included, and
-     * restarted forever. A resolvable conflict in one subsystem must not stop
-     * the regime engine, the backtester and every unrelated panel from loading.
-     *
-     * Resolving it in the scanner's favour is what `reservedStrategyIds` was
-     * always for — the name says the scanner has reserved that ledger. The
-     * other eligible strategies still collect live research, and the exclusion
-     * is reported in status() rather than being silent, because "mindset is not
-     * collecting live evidence" is a fact a reader has to be able to see.
-     */
-    this.reservedByScanner = this.enabled
-      ? eligible.filter((meta) => reserved.has(meta.id)).map((meta) => meta.id)
-      : [];
-    if (this.reservedByScanner.length) {
+    const eligible = listStrategies({ supportsBacktest: true }).filter((meta) => meta.liveResearchEligible);
+    this.strategyIds = eligible.map((meta) => meta.id);
+
+    // The Live Scanner is a signal DIAGNOSTIC, not a demo trader. If it is also
+    // configured to paper-trade a strategy this subsystem owns, Demo Trading
+    // wins and the conflict is logged — the opposite of the old arrangement,
+    // where the scanner's reservation left mindset_v1 as the only account
+    // without a demo runner. Never a throw: a writer conflict is resolvable and
+    // must not take the deployment down.
+    const reserved = new Set((reservedStrategyIds || []).map(String));
+    this.contestedByScanner = this.enabled ? this.strategyIds.filter((id) => reserved.has(id)) : [];
+    if (this.contestedByScanner.length) {
       this._logger.warn?.(
-        `[LiveResearch] ${this.reservedByScanner.join(", ")} is written by the Live Scanner, so it collects no live research here. ` +
-          "One ledger has one execution owner.",
+        `[DemoTrading] ${this.contestedByScanner.join(", ")} is also configured for Live Scanner paper trading. ` +
+          "Demo Trading owns the strategy ledgers; disable LIVE_SCANNER_PAPER_TRADE_ENABLED to silence this.",
       );
     }
 
-    this._runners = new Map(
-      eligible
-        .filter((meta) => !this.reservedByScanner.includes(meta.id))
-        .map((meta) => {
-          const definition = getLiveResearchStrategy(meta.id);
-          return [
-            meta.id,
-            new CandleLiveResearchRunner({
-              definition,
-              tradingLabService,
-              candleSource,
-              stateCache,
-              symbol: this.symbol,
-              timeframe: this.timeframe,
-              logger,
-            }),
-          ];
-        }),
-    );
+    // strategy x symbol x timeframe. Every runner for a strategy writes to that
+    // strategy's one ledger, so this multiplies MARKETS WATCHED, never accounts.
+    this._runners = new Map();
+    for (const meta of eligible) {
+      const definition = getLiveResearchStrategy(meta.id);
+      for (const marketSymbol of this.symbols) {
+        for (const marketTimeframe of this.timeframes) {
+          this._runners.set(runnerKey(meta.id, marketSymbol, marketTimeframe), new CandleLiveResearchRunner({
+            definition,
+            tradingLabService,
+            candleSource,
+            stateCache,
+            symbol: marketSymbol,
+            timeframe: marketTimeframe,
+            logger,
+          }));
+        }
+      }
+    }
+  }
+
+  // Every runner belonging to one demo account.
+  runnersFor(strategyId) {
+    const id = String(strategyId);
+    return [...this._runners.entries()]
+      .filter(([key]) => key.startsWith(`${id}|`))
+      .map(([, runner]) => runner);
   }
 
   start() {
     if (!this.enabled) {
-      this._logger.log("[LiveResearch] Disabled via LIVE_RESEARCH_ENABLED=false");
+      this._logger.log("[DemoTrading] Disabled via LIVE_RESEARCH_ENABLED=false");
       return false;
     }
     if (this._timer) return true;
     this._logger.log(
-      `[LiveResearch] Watching ${this.symbol} ${this.timeframe} for ${this._runners.size} isolated strategy accounts every ${Math.round(this.intervalMs / 1000)}s`,
+      `[DemoTrading] ${this.strategyIds.length} demo accounts watching ${this.symbols.length} markets on ` +
+        `${this.timeframes.join(", ")} (${this._runners.size} runners) every ${Math.round(this.intervalMs / 1000)}s`,
     );
     this._timer = setInterval(() => {
-      this.runOnce().catch((err) => this._logger.error?.(`[LiveResearch] Cycle failed: ${err.message}`));
+      this.runOnce().catch((err) => this._logger.error?.(`[DemoTrading] Cycle failed: ${err.message}`));
     }, this.intervalMs);
     if (this._timer.unref) this._timer.unref();
-    this.runOnce().catch((err) => this._logger.error?.(`[LiveResearch] Initial cycle failed: ${err.message}`));
+    this.runOnce().catch((err) => this._logger.error?.(`[DemoTrading] Initial cycle failed: ${err.message}`));
     return true;
   }
 
@@ -764,13 +866,21 @@ class LiveResearchService {
       // Each runner catches and persists its own failure. allSettled is the
       // outer isolation belt: one unexpected rejection still cannot stop the
       // other accounts from processing their candle.
-      const settled = await Promise.allSettled([...this._runners.values()].map((runner) => runner.runOnce()));
+      const entries = [...this._runners.entries()];
+      const settled = await Promise.allSettled(entries.map(([, runner]) => runner.runOnce()));
       return {
         status: "complete",
-        results: settled.map((result, index) => ({
-          strategyId: [...this._runners.keys()][index],
-          ...(result.status === "fulfilled" ? result.value : { status: "error", reason: result.reason?.message || String(result.reason) }),
-        })),
+        results: settled.map((result, index) => {
+          const [, runner] = entries[index];
+          return {
+            strategyId: runner.strategyId,
+            symbol: runner.symbol,
+            timeframe: runner.timeframe,
+            ...(result.status === "fulfilled"
+              ? result.value
+              : { status: "error", reason: result.reason?.message || String(result.reason) }),
+          };
+        }),
       };
     } finally {
       this._running = false;
@@ -781,7 +891,7 @@ class LiveResearchService {
   // eligibility: a strategy can be eligible while the loop is disabled, and a
   // disabled loop owns no experiment.
   ownsStrategy(strategyId) {
-    return this.enabled && this._runners.has(String(strategyId));
+    return this.enabled && this.strategyIds.includes(String(strategyId));
   }
 
   /**
@@ -795,77 +905,117 @@ class LiveResearchService {
    * an immediate trade on a candle that closed before the reset.
    */
   resetExperiment(strategyId) {
-    const runner = this._runners.get(String(strategyId));
-    if (!runner) return false;
-    runner.clearState();
+    // Every market this account watches, not just one: an account resets as a
+    // whole, or its ledger starts from zero while nineteen runners keep their
+    // pre-reset baselines and trade the account on stale history.
+    const runners = this.runnersFor(strategyId);
+    if (!runners.length) return false;
+    for (const runner of runners) runner.clearState();
     return true;
   }
 
+  /**
+   * One demo account's whole state, aggregated across every market it watches.
+   *
+   * The shape stays the one-runner shape the dashboard already reads —
+   * healthStatus, runnerStatus, currentIntent, indicators, activity — because a
+   * reader still wants a single answer to "what is this account doing right
+   * now". What changed is where that answer comes from: a HEADLINE runner is
+   * chosen (the one holding a position, else the most recently evaluated), and
+   * the rest are summarised in `markets` and folded into `counters`.
+   */
   statusFor(strategyId) {
-    const runner = this._runners.get(String(strategyId));
-    if (runner) {
-      const runnerStatus = runner.status();
+    const runners = this.runnersFor(strategyId);
+    if (runners.length) {
+      const states = runners.map((runner) => runner.status());
+      const counters = states.reduce((total, one) => addCounters(total, one.counters), { ...EMPTY_COUNTERS });
+      const headline =
+        states.find((one) => one.runnerStatus === "POSITION_OPEN") ||
+        states.find((one) => one.runnerStatus === "SIGNAL_DETECTED" || one.currentSignal !== "FLAT") ||
+        states.find((one) => one.healthStatus === "ERROR") ||
+        [...states].sort((a, b) => String(b.lastEvaluationAt || "").localeCompare(String(a.lastEvaluationAt || "")))[0];
+
+      // Health is the worst case, not the headline's case: one market erroring
+      // while nineteen run is still an account with a broken runner in it.
+      const errored = states.filter((one) => one.healthStatus === "ERROR");
+      const openMarkets = states.filter((one) => one.runnerStatus === "POSITION_OPEN");
+      const refusals = states
+        .map((one) => one.lastRefusedSignal)
+        .filter(Boolean)
+        .sort((a, b) => String(b.at || "").localeCompare(String(a.at || "")));
+
+      // Every market's activity on one timeline, so an account that traded ETH
+      // does not look idle because BTC is the headline.
+      const activity = states
+        .flatMap((one) =>
+          (one.activity || []).map((entry) => ({ ...entry, symbol: one.symbol, timeframe: one.timeframe })),
+        )
+        .sort((a, b) => String(b.at || "").localeCompare(String(a.at || "")))
+        .slice(0, ACTIVITY_CAP);
+
+      const panel = {
+        strategyId: String(strategyId),
+        // The status panel proper. Six numbers that make a flat account
+        // legible: candles processed proves the runner is alive, signals
+        // generated separates "the strategy saw nothing" from "the account
+        // refused", and blocked/errors separate a risk decision from a fault.
+        counters,
+        marketsWatched: new Set(states.map((one) => one.symbol)).size,
+        timeframesWatched: [...new Set(states.map((one) => one.timeframe))],
+        runnerCount: states.length,
+        runnersErrored: errored.length,
+        openMarkets: openMarkets.map((one) => one.symbol),
+        lastRefusedSignal: refusals[0] || null,
+        markets: states.map((one) => ({
+          symbol: one.symbol,
+          timeframe: one.timeframe,
+          healthStatus: one.healthStatus,
+          runnerStatus: one.runnerStatus,
+          currentSignal: one.currentSignal,
+          lastProcessedCandle: one.lastProcessedCandle,
+          nextExpectedCandle: one.nextExpectedCandle,
+          lastError: one.lastError,
+          counters: one.counters,
+        })),
+      };
+
       if (!this.enabled) {
         return {
-          ...runnerStatus,
+          ...headline,
+          ...panel,
           enabled: false,
           loopRunning: false,
           healthStatus: "PAUSED",
           runnerStatus: "PAUSED",
+          demoTradingStatus: "PAUSED",
           currentIntent: {
             code: "LIVE_RESEARCH_PAUSED",
             title: "LIVE DEMO PAUSED",
             summary: "This isolated research account is not evaluating new candles.",
             reason: "LIVE_RESEARCH_ENABLED=false",
             nextAction: "Enable live research to resume closed-candle evaluation",
-            signal: runnerStatus.currentSignal || "FLAT",
-            currentPrice: runnerStatus.currentIntent?.currentPrice ?? null,
+            signal: headline.currentSignal || "FLAT",
+            currentPrice: headline.currentIntent?.currentPrice ?? null,
             intendedTrade: false,
           },
           retryStatus: "PAUSED",
         };
       }
+
+      const healthStatus = errored.length === states.length ? "ERROR" : errored.length ? "DEGRADED" : "RUNNING";
       return {
         enabled: true,
         loopRunning: Boolean(this._timer),
-        ...runnerStatus,
-      };
-    }
-    // Reserved by the Live Scanner, which owns that ledger. Reported on its own
-    // terms: falling through to the event-replay branch below would tell a
-    // reader mindset_v1 "cannot be evaluated from OHLCV candles", which is
-    // false — it is evaluated, by the other loop.
-    if (this.reservedByScanner.includes(String(strategyId))) {
-      return {
-        enabled: false,
-        loopRunning: Boolean(this._timer),
-        strategyId: String(strategyId),
-        symbol: this.symbol,
-        timeframe: this.timeframe,
-        healthStatus: "OWNED_BY_LIVE_SCANNER",
-        runnerStatus: "OWNED_BY_LIVE_SCANNER",
-        currentSignal: "FLAT",
-        currentIntent: {
-          code: "OWNED_BY_LIVE_SCANNER",
-          title: "MANAGED BY LIVE SCANNER",
-          summary: "The Live Scanner writes this strategy's account, so Live Research does not.",
-          reason: "One experiment ledger has one execution owner.",
-          nextAction: "Watch this account through the Live Scanner",
-          signal: "FLAT",
-          currentPrice: null,
-          intendedTrade: false,
-        },
-        setupState: "NOT_EVALUATED",
-        blockers: ["The Live Scanner already owns this strategy account"],
-        indicators: {},
-        decisionTrail: [],
-        activity: [],
-        lastProcessedCandle: null,
-        nextExpectedCandle: null,
-        lastAttemptedAt: null,
-        lastSuccessfulEvaluationAt: null,
-        lastError: null,
-        retryStatus: "NOT_APPLICABLE",
+        ...headline,
+        ...panel,
+        activity,
+        healthStatus,
+        // Demo trading state is its own field, deliberately not derived from
+        // research maturity: whether this account is trading and how far its
+        // research has matured are separate questions, and collapsing them is
+        // what previously made a backtest-status strategy look untradeable.
+        demoTradingStatus: openMarkets.length ? "IN_POSITION" : healthStatus === "ERROR" ? "ERROR" : "TRADING",
+        lastError: errored.length ? errored[0].lastError : null,
       };
     }
 
@@ -877,6 +1027,15 @@ class LiveResearchService {
       timeframe: null,
       healthStatus: "EVENT_REPLAY_ONLY",
       runnerStatus: "WAITING_FOR_LIVE_EVENT_DATA",
+      demoTradingStatus: "NO_LIVE_RUNNER",
+      counters: { ...EMPTY_COUNTERS },
+      marketsWatched: 0,
+      timeframesWatched: [],
+      runnerCount: 0,
+      runnersErrored: 0,
+      openMarkets: [],
+      lastRefusedSignal: null,
+      markets: [],
       currentSignal: "FLAT",
       currentIntent: {
         code: "MISSING_EVENT_DATA",
@@ -903,23 +1062,35 @@ class LiveResearchService {
   }
 
   status() {
+    const accounts = listStrategies().map((meta) => this.statusFor(meta.id));
     return {
       enabled: this.enabled,
       running: Boolean(this._timer),
       scanning: this._running,
       symbol: this.symbol,
       timeframe: this.timeframe,
+      symbols: this.symbols.slice(),
+      timeframes: this.timeframes.slice(),
+      runnerCount: this._runners.size,
       intervalMs: this.intervalMs,
-      // Visible rather than silent: "mindset is not collecting live research"
-      // is a fact a reader has to be able to see.
-      reservedByScanner: this.reservedByScanner.slice(),
-      runners: listStrategies().map((meta) => this.statusFor(meta.id)),
+      // Visible rather than silent: a second writer configured against a demo
+      // account's ledger is a fact a reader has to be able to see, even though
+      // Demo Trading is the one that wins.
+      contestedByScanner: this.contestedByScanner.slice(),
+      counters: accounts.reduce((total, one) => addCounters(total, one.counters), { ...EMPTY_COUNTERS }),
+      runners: accounts,
     };
   }
 }
 
 module.exports = {
-  LiveResearchService,
+  DemoTradingService,
+  // The subsystem was named Live Research while it was the thing that ran the
+  // three strategies the scanner did not. Kept as an alias so existing wiring
+  // and tests keep resolving while the name settles.
+  LiveResearchService: DemoTradingService,
+  DEFAULT_DEMO_SYMBOLS,
+  EMPTY_COUNTERS,
   CandleLiveResearchRunner,
   strategySpecificRead,
   currentIntent,

@@ -237,6 +237,8 @@ function createApp() {
     candleSource: signalScreenerService,
     stateCache: new PersistentReporterCache(path.join(dataDir, "live-research-state.json")),
     enabled: config.liveResearch.enabled,
+    symbols: config.liveResearch.symbols,
+    timeframes: config.liveResearch.timeframes,
     symbol: config.liveResearch.symbol,
     timeframe: config.liveResearch.timeframe,
     intervalMs: config.liveResearch.intervalMs,

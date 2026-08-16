@@ -104,7 +104,7 @@ test("strategy cards separate research status from live demo state and expose Ac
   const js = read("public/assets/js/trading-lab.js");
   const css = read("public/assets/styles/trading-lab.css");
 
-  assert.match(html, /Research status and live demo state are separate/i);
+  assert.match(html, /Research status and demo trading state are separate/i);
   assert.match(html, /id="tl-activity-shell"/);
   assert.match(js, /Research: /);
   assert.match(js, /LIVE DEMO: /);
@@ -230,4 +230,33 @@ test("everything needed to inspect an autonomous account stays visible", () => {
   assert.match(js, /What is it doing\?/);
   assert.match(js, /Equity/);
   assert.match(html, /id="tl-activity-shell"/);
+});
+
+test("zero trades can never be confused with a dead runner", () => {
+  const js = read("public/assets/js/trading-lab.js");
+  const css = read("public/assets/styles/trading-lab.css");
+
+  // Every one of the six numbers is on the card. Without them an account that
+  // has processed a thousand candles and found no setup renders exactly like
+  // one whose runner never started.
+  for (const label of ["Markets", "Candles", "Signals", "Trades", "Blocked by risk", "Errors"]) {
+    assert.ok(js.includes(`panelStat("${label}"`), `the status panel is missing ${label}`);
+  }
+  assert.match(js, /counters\.candlesProcessed/);
+  assert.match(js, /counters\.signalsGenerated/);
+  assert.match(js, /counters\.signalsBlockedByRisk/);
+  assert.match(js, /counters\.executionErrors/);
+
+  // A refused signal is shown with its reason, not swallowed.
+  assert.match(js, /lastRefusedSignal/);
+  assert.match(js, /Last refused/);
+  // And a partly-broken account says so rather than reading healthy because
+  // nineteen of twenty markets are fine.
+  assert.match(js, /runnersErrored/);
+
+  assert.match(css, /\.tl-acct-panel/);
+  assert.match(css, /\.tl-acct-stat/);
+  assert.match(css, /\.tl-acct-refused/);
+  // Numbers must not clip: the label is what yields when space runs out.
+  assert.match(css, /\.tl-acct-stat strong[^}]*flex:\s*none/s);
 });

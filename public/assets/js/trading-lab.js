@@ -207,6 +207,55 @@
     return "○";
   }
 
+  /* The six numbers that make an empty account readable.
+   *
+   * A demo account showing zero trades has several completely different
+   * explanations — the strategy has not met its conditions, the account was at
+   * its risk cap every time it did, the runner crashed, or the runner never
+   * ran at all — and the trade count alone renders all four identically. So
+   * every account prints candles processed, signals generated, trades
+   * executed, signals blocked by hard risk and execution errors, and a flat
+   * line can always be attributed. */
+  function statusPanel(runner) {
+    var counters = runner.counters || {};
+    if (!runner.runnerCount) return "";
+    var refused = runner.lastRefusedSignal;
+    return (
+      '<div class="tl-acct-panel">' +
+      '<div class="tl-acct-panel-head">DEMO RUNNER</div>' +
+      '<div class="tl-acct-panel-grid">' +
+      panelStat("Markets", String(runner.marketsWatched || 0) + " × " + ((runner.timeframesWatched || []).join(", ") || "—")) +
+      panelStat("Candles", String(counters.candlesProcessed || 0)) +
+      panelStat("Signals", String(counters.signalsGenerated || 0)) +
+      panelStat("Trades", String(counters.tradesExecuted || 0)) +
+      panelStat("Blocked by risk", String(counters.signalsBlockedByRisk || 0), counters.signalsBlockedByRisk ? "tl-acct-stat--warn" : "") +
+      panelStat("Errors", String(counters.executionErrors || 0), counters.executionErrors ? "tl-acct-stat--error" : "") +
+      "</div>" +
+      // The most recent signal the strategy produced and the account refused,
+      // stated in full. "Nothing happened" and "it wanted to and could not"
+      // must never look the same.
+      (refused
+        ? '<div class="tl-acct-refused">Last refused: ' +
+          escapeHtml(refused.direction + " " + refused.symbol) + " — " + escapeHtml(refused.reason || "") +
+          "</div>"
+        : "") +
+      (runner.runnersErrored
+        ? '<div class="tl-acct-refused tl-acct-refused--error">' +
+          escapeHtml(String(runner.runnersErrored)) + " of " + escapeHtml(String(runner.runnerCount)) +
+          " market runners are failing" + (runner.lastError ? ": " + escapeHtml(runner.lastError) : "") +
+          "</div>"
+        : "") +
+      "</div>"
+    );
+  }
+
+  function panelStat(label, value, extraClass) {
+    return (
+      '<div class="tl-acct-stat ' + (extraClass || "") + '"><span>' + escapeHtml(label) +
+      "</span><strong>" + escapeHtml(value) + "</strong></div>"
+    );
+  }
+
   // Which accounts an autonomous loop is currently running, so the toolbar can
   // disable Mark to market for them. Derived from the same payload the cards
   // render, not from a second source that could disagree.
@@ -281,6 +330,7 @@
           accountMetric("Expectancy", m.closedTrades ? (m.expectancyR > 0 ? "+" : "") + m.expectancyR + "R" : "—", pnlClass(m.expectancyR)) +
           accountMetric("Trades", (s.totalTrades || 0) + " closed / " + (s.openPositions || 0) + " open") +
           "</div>" +
+          statusPanel(runner) +
           '<div class="tl-acct-updated">Updated ' + escapeHtml(fmtAgo(runner.lastSuccessfulEvaluationAt)) + "</div>" +
           '<button class="tl-activity-btn" type="button" data-activity-strategy="' + escapeHtml(account.id) + '">' +
           "What is it doing?</button>" +
@@ -339,7 +389,15 @@
 
   function renderMetrics(data) {
     var groups = (data && data.groups) || {};
-    var names = { strategy: "By strategy", symbol: "By symbol", scoreBucket: "By setup score" };
+    // By market and by timeframe are the two breakdowns a multi-market demo
+    // account exists to produce: an account watching twenty pairs on 1h has an
+    // edge somewhere specific, and one blended number hides which.
+    var names = {
+      strategy: "By strategy",
+      symbol: "By market",
+      timeframe: "By timeframe",
+      scoreBucket: "By setup score",
+    };
     var html = Object.keys(names)
       .map(function (dim) {
         var rows = groups[dim] || [];
