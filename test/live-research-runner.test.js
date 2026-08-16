@@ -609,3 +609,149 @@ test("a reserved strategy gets no live-research runner at all", async () => {
   );
   assert.equal(lab.strategyLedger("mindset_v1").getOpenPositions().length, 0);
 });
+
+/* ── Every strategy can actually reach execution ──────────── */
+
+// Candles with enough history and shape for every registered strategy's warmup.
+function realisticBars(count = 400) {
+  const bars = [];
+  for (let i = 0; i < count; i += 1) {
+    const close = 100 + i * 0.3 + Math.sin(i / 7) * 4;
+    bars.push({
+      openTime: i * 3_600_000,
+      closeTime: (i + 1) * 3_600_000 - 1,
+      open: close - 0.2,
+      high: close + 1.2,
+      low: close - 1.2,
+      close,
+      volume: 1000 + (i % 7) * 120,
+    });
+  }
+  return bars;
+}
+
+test("every strategy's real indicators produce a scoreable market state", () => {
+  // The root cause: SMC, Donchian and VWAP report STRUCTURE (break of
+  // structure, channel, stretch) rather than the generic ratios mindset_v1
+  // happens to emit. Reading atrRatio/volumeRatio/macdBullish off a strategy's
+  // own indicators therefore handed `undefined` into market state, and the
+  // checklist threw on `state.volumeRatio.toFixed(1)` — so three of the four
+  // demo accounts crashed the moment they produced a real signal.
+  const { marketState, runChecklist } = require("../src/services/trading/checklist");
+  const { contextAtBar } = require("../src/services/trading/backtest");
+  const { getLiveResearchStrategy, listStrategies } = require("../src/services/trading/strategies");
+  const config = makeTradingConfig();
+  const bars = realisticBars();
+  const context = contextAtBar(bars, config, { index: bars.length - 1 });
+
+  for (const meta of listStrategies({ supportsBacktest: true })) {
+    const evaluation = getLiveResearchStrategy(meta.id).evaluate(bars, bars.length - 1, {});
+    const indicators = evaluation.indicators || {};
+
+    const state = marketState({
+      regime: "TREND_UP",
+      dailyBias: "BULLISH",
+      atrRatio: indicators.atrRatio ?? context.atrRatio,
+      volumeRatio: indicators.volumeRatio ?? context.volumeRatio,
+      macdBullish: indicators.macdBullish ?? context.macdBullish,
+    });
+
+    assert.ok(Number.isFinite(state.atrRatio), `${meta.id} produced a non-numeric atrRatio`);
+    assert.ok(Number.isFinite(state.volumeRatio), `${meta.id} produced a non-numeric volumeRatio`);
+    assert.doesNotThrow(
+      () => runChecklist({ symbol: "BTCUSDT", direction: "LONG", price: 100, atr: 2 }, state),
+      `${meta.id} cannot be scored`,
+    );
+  }
+});
+
+test("an explicit undefined never defeats a market-state default", () => {
+  const { marketState } = require("../src/services/trading/checklist");
+  // Object spread would otherwise make these undefined rather than leaving the
+  // defaults in place, which is exactly how the demo accounts broke.
+  const state = marketState({ atrRatio: undefined, volumeRatio: undefined, macdBullish: undefined });
+  assert.equal(state.atrRatio, 1);
+  assert.equal(state.volumeRatio, 1);
+  assert.equal(state.macdBullish, null);
+  // A caller that genuinely means "not measured" still says so with null.
+  assert.equal(marketState({ fundingRate: null }).fundingRate, null);
+});
+
+for (const strategyId of ["smc_v1", "donchian_breakout_v1", "vwap_reversion_v1", "mindset_v1"]) {
+  test(`${strategyId} opens a position in its own account when it signals`, async () => {
+    const lab = tempLab();
+    const cache = new MemoryStateCache();
+    const rows = realisticBars();
+    // The real strategy definition, with only the entry decision forced — its
+    // genuine indicator payload is what reaches execution, which is the thing
+    // that used to crash.
+    const real = getLiveResearchStrategy(strategyId);
+    const definition = {
+      ...real,
+      evaluate: (bars, index, ctx) => {
+        const evaluation = real.evaluate(bars, index, ctx);
+        return { ...evaluation, signal: "LONG", reasons: [`${strategyId} setup confirmed`] };
+      },
+    };
+    const subject = new CandleLiveResearchRunner({
+      definition,
+      tradingLabService: lab,
+      candleSource: { async getCandles() { return rows; } },
+      stateCache: cache,
+      symbol: "BTCUSDT",
+      timeframe: "1h",
+      logger: QUIET,
+    });
+
+    await startExperiment(subject);
+    rows.push({
+      openTime: 400 * 3_600_000,
+      closeTime: 401 * 3_600_000 - 1,
+      open: 220, high: 222, low: 219, close: 221, volume: 1200,
+    });
+    await subject.runOnce();
+
+    const status = subject.status();
+    assert.notEqual(status.runnerStatus, "ERROR", `${strategyId} errored: ${status.lastError}`);
+    assert.equal(
+      status.currentIntent.reason && /toFixed|undefined/.test(status.currentIntent.reason),
+      false,
+      `${strategyId} failed on a code error reported as a trade refusal: ${status.currentIntent.reason}`,
+    );
+
+    const positions = lab.strategyLedger(strategyId).getOpenPositions();
+    assert.equal(positions.length, 1, `${strategyId} did not open its own position`);
+    assert.equal(positions[0].executionOwner, "live-research");
+
+    // And only its own account — a demo account is one strategy's evidence.
+    for (const other of ["smc_v1", "donchian_breakout_v1", "vwap_reversion_v1", "mindset_v1"]) {
+      if (other === strategyId) continue;
+      assert.equal(lab.strategyLedger(other).getOpenPositions().length, 0, `${strategyId} leaked into ${other}`);
+    }
+  });
+}
+
+test("an execution fault reports ERROR, never a risk refusal", async () => {
+  // Reporting a crash as "blocked" told the dashboard the strategy had been
+  // refused on its merits while execution had actually thrown — the account
+  // read BLOCKED_BY_RISK with health RUNNING, the most misleading pair of
+  // words this system could produce.
+  const lab = tempLab();
+  lab.executeLiveResearch = async () => { throw new Error("ledger exploded"); };
+  const cache = new MemoryStateCache();
+  const rows = realisticBars();
+  const subject = runner({
+    lab,
+    cache,
+    source: { async getCandles() { return rows; } },
+    evaluate: () => signal("LONG"),
+  });
+
+  await startExperiment(subject);
+  rows.push({ openTime: 400 * 3_600_000, closeTime: 401 * 3_600_000 - 1, open: 220, high: 222, low: 219, close: 221, volume: 1200 });
+  await subject.runOnce();
+
+  const status = subject.status();
+  assert.notEqual(status.runnerStatus, "BLOCKED_BY_RISK", "a crash must not be reported as a risk decision");
+  assert.match(status.currentIntent.reason, /ledger exploded/);
+});
