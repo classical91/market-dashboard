@@ -89,6 +89,19 @@ body {
   letter-spacing: 0.16em;
   margin: 22px 12px 10px;
 }
+.auth-controls {
+  margin-top: auto;
+  padding: 20px 12px 4px;
+  display: grid;
+  gap: 8px;
+}
+.auth-role { color: var(--muted); font-size: 11px; }
+.logout-btn {
+  width: 100%; padding: 9px 12px; border: 1px solid var(--border);
+  border-radius: 10px; background: transparent; color: var(--soft);
+  font: inherit; font-size: 12px; cursor: pointer;
+}
+.logout-btn:hover { border-color: var(--blue); color: var(--text); }
 .nav-item {
   display: flex;
   align-items: center;

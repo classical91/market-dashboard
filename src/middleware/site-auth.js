@@ -41,6 +41,7 @@ function parseCookies(header) {
 function signingSecret(config) {
   return [
     config.sitePassword,
+    config.traderclawPassword,
     config.alphaAccessCode,
     config.adminKey,
     "market-dashboard-site-auth-v1",
@@ -66,7 +67,7 @@ function decodeSession(value, config, now = Date.now()) {
   const parts = String(value).split(".");
   if (parts.length !== 4) return null;
   const [role, expires, nonce, provided] = parts;
-  if (!["owner", "alpha"].includes(role)) return null;
+  if (!["owner", "traderclaw", "alpha"].includes(role)) return null;
   if (!nonce || Number(expires) <= now) return null;
   const payload = `${role}.${expires}.${nonce}`;
   if (!safeEqual(provided, sign(payload, secret))) return null;
@@ -92,8 +93,12 @@ function setSessionCookie(res, req, role, config) {
   res.setHeader("Set-Cookie", `${COOKIE_NAME}=${encodeURIComponent(encodeSession(role, config))}; ${cookieOptions(req)}`);
 }
 
-function clearSessionCookie(res) {
-  res.setHeader("Set-Cookie", `${COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
+function clearSessionCookie(res, req) {
+  const secure = req.secure || req.get("x-forwarded-proto") === "https";
+  res.setHeader(
+    "Set-Cookie",
+    `${COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure ? "; Secure" : ""}`,
+  );
 }
 
 function wantsJson(req) {
@@ -125,7 +130,7 @@ function isPublicAuthPath(req) {
 
 function canAccess(req, session) {
   if (!session) return false;
-  if (session.role === "owner") return true;
+  if (session.role === "owner" || session.role === "traderclaw") return true;
   return isAlphaPage(req) || isAlphaAsset(req) || isAlphaReadApi(req);
 }
 
@@ -163,7 +168,7 @@ function renderLogin(error = "", returnTo = "/") {
   <main>
     <form method="post" action="/auth/login">
       <h1>Market Dashboard</h1>
-      <p>Enter the dashboard password or the Alpha Team read-only code.</p>
+      <p>Enter your dashboard account password or the Alpha Team read-only code.</p>
       <input type="hidden" name="returnTo" value="${escapeHtml(safeReturnTo)}">
       <label>Password
         <input name="password" type="password" autocomplete="current-password" autofocus required>
@@ -177,17 +182,40 @@ function renderLogin(error = "", returnTo = "/") {
 }
 
 function createSiteAuth(config) {
-  const enabled = Boolean(config.sitePassword || config.alphaAccessCode);
+  const enabled = Boolean(config.sitePassword || config.traderclawPassword || config.alphaAccessCode);
+  const configuredPasswords = [config.sitePassword, config.traderclawPassword, config.alphaAccessCode].filter(Boolean);
+  if (new Set(configuredPasswords).size !== configuredPasswords.length) {
+    throw new Error("Website account passwords must be distinct");
+  }
+  const revokedSessions = new Map();
+
+  function requestSessionValue(req) {
+    return parseCookies(req.headers.cookie)[COOKIE_NAME] || "";
+  }
+
+  function pruneRevokedSessions(now = Date.now()) {
+    for (const [value, expires] of revokedSessions) {
+      if (expires <= now) revokedSessions.delete(value);
+    }
+  }
+
+  function activeSessionFromRequest(req) {
+    const value = requestSessionValue(req);
+    pruneRevokedSessions();
+    if (revokedSessions.has(value)) return null;
+    return decodeSession(value, config);
+  }
 
   function classifyPassword(password) {
     if (config.sitePassword && safeEqual(password, config.sitePassword)) return "owner";
+    if (config.traderclawPassword && safeEqual(password, config.traderclawPassword)) return "traderclaw";
     if (config.alphaAccessCode && safeEqual(password, config.alphaAccessCode)) return "alpha";
     return null;
   }
 
   return {
     enabled,
-    sessionFromRequest: (req) => sessionFromRequest(req, config),
+    sessionFromRequest: activeSessionFromRequest,
     setSessionCookie: (res, req, role) => setSessionCookie(res, req, role, config),
     clearSessionCookie,
     classifyPassword,
@@ -196,7 +224,7 @@ function createSiteAuth(config) {
         next();
         return;
       }
-      const session = sessionFromRequest(req, config);
+      const session = activeSessionFromRequest(req);
       if (canAccess(req, session)) {
         req.siteSession = session;
         next();
@@ -229,7 +257,10 @@ function createSiteAuth(config) {
       res.redirect(303, role === "alpha" && !returnTo.includes("view=alpha") ? "/signal-screener.html?view=alpha" : returnTo);
     },
     logout(req, res) {
-      clearSessionCookie(res);
+      const value = requestSessionValue(req);
+      const session = decodeSession(value, config);
+      if (session) revokedSessions.set(value, session.expires);
+      clearSessionCookie(res, req);
       res.redirect(303, "/login");
     },
   };

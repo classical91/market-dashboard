@@ -253,6 +253,7 @@ function createApp() {
   const siteAuth = createSiteAuth({
     adminKey: config.admin.apiKey,
     sitePassword: config.access.sitePassword,
+    traderclawPassword: config.access.traderclawPassword,
     alphaAccessCode: config.access.alphaAccessCode,
   });
 
@@ -262,6 +263,15 @@ function createApp() {
   app.get("/login", siteAuth.loginPage);
   app.post("/auth/login", siteAuth.login);
   app.post("/auth/logout", siteAuth.logout);
+  app.get("/api/auth/session", (req, res) => {
+    const session = siteAuth.sessionFromRequest(req);
+    res.setHeader("Cache-Control", "no-store");
+    res.json({
+      configured: siteAuth.enabled,
+      authenticated: Boolean(session),
+      role: session ? session.role : null,
+    });
+  });
   app.post("/api/alpha-team/access", (req, res) => {
     const accessCode = config.access.alphaAccessCode;
     const session = siteAuth.sessionFromRequest(req);

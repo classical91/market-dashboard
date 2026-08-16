@@ -62,7 +62,7 @@ npm run parity -- --traderclaw ../traderclaw
 
 ## Access Control
 
-Website access is optional but recommended for deploys. Set `MARKET_DASHBOARD_LOGIN_PASSWORD` to put the dashboard behind `/login`. That owner password unlocks the full website. Set `ALPHA_TEAM_ACCESS_CODE` to give the Alpha Team a separate read-only password for shared `?view=alpha` pages; that role can open the shared Signal Screener and Pattern Scanner review pages plus their read-only data APIs, but it cannot reach the rest of the dashboard or any mutation/broadcast endpoint. When both website passwords are blank, local/dev behavior stays open.
+Website access is optional but recommended for deploys. Set `MARKET_DASHBOARD_LOGIN_PASSWORD` to put the dashboard behind `/login`; that owner password unlocks the full website. Set `TRADERCLAW_DASHBOARD_LOGIN_PASSWORD` for TraderClaw's separate full-dashboard identity. TraderClaw website access does not grant the separate `ADMIN_API_KEY` required by mutation endpoints. Set `ALPHA_TEAM_ACCESS_CODE` to give the Alpha Team a separate read-only password for shared `?view=alpha` pages; that role can open the shared Signal Screener and Pattern Scanner review pages plus their read-only data APIs, but it cannot reach the rest of the dashboard or any mutation/broadcast endpoint. When all website passwords are blank, local/dev behavior stays open. Signed-in dashboards show the current identity and a logout button in shared navigation.
 
 Action/mutation endpoints are guarded by a shared secret so a public deploy cannot let anonymous visitors spend API credits or send Telegram messages. Set `ADMIN_API_KEY` on the server to enable them; while it is blank these endpoints return `503`:
 
@@ -82,6 +82,7 @@ Most keys are optional. The app is designed to degrade to fallback data where po
 - `PORT` - local/server port, defaults to `3000`.
 - `DATA_DIR` - persistent file directory for reporter logs/caches and X feed cache. On Railway, set this to the mounted volume path, usually `/app/data`.
 - `MARKET_DASHBOARD_LOGIN_PASSWORD` - optional owner website password. When set, unauthenticated visitors are redirected to `/login`.
+- `TRADERCLAW_DASHBOARD_LOGIN_PASSWORD` - optional separate TraderClaw website password. Grants full dashboard browsing as an identifiable TraderClaw session, but does not grant action/mutation access.
 - `ADMIN_API_KEY` - shared secret enabling action/mutation endpoints (see [Access Control](#access-control)). Blank means those endpoints are disabled (`503`).
 - `OPENAI_API_KEY` - enables report generation.
 - `REPORTER_MODEL` - OpenAI model for reporter generation, defaults to `gpt-5.4-mini`.

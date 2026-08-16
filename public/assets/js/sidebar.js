@@ -355,6 +355,24 @@
     );
   }
 
+  function addAuthControls(root, mode) {
+    fetch("/api/auth/session", { headers: { Accept: "application/json" }, cache: "no-store" })
+      .then(function (response) { return response.ok ? response.json() : null; })
+      .then(function (auth) {
+        if (!auth || !auth.configured || !auth.authenticated) return;
+        var prefix = mode === "command" ? "cmd-" : "";
+        var labels = { owner: "Owner", traderclaw: "TraderClaw", alpha: "Alpha Team" };
+        var controls = document.createElement("div");
+        controls.className = prefix + "auth-controls";
+        controls.innerHTML =
+          '<span class="' + prefix + 'auth-role">Signed in: ' + (labels[auth.role] || "Account") + '</span>' +
+          '<form method="post" action="/auth/logout">' +
+          '<button class="' + prefix + 'logout-btn" type="submit">Log out</button></form>';
+        root.appendChild(controls);
+      })
+      .catch(function () { /* Navigation remains usable if auth status is unavailable. */ });
+  }
+
   function wireDropdowns(root) {
     root.querySelectorAll(".nav-dropdown-toggle, .cmd-nav-dropdown-toggle").forEach(function (toggle) {
       toggle.addEventListener("click", function () {
@@ -369,6 +387,7 @@
   function fill(root, mode, instance) {
     root.innerHTML = navigationHtml(mode, instance);
     wireDropdowns(root);
+    addAuthControls(root, mode);
   }
 
   function updateActiveStates() {

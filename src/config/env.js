@@ -115,8 +115,10 @@ const config = {
   },
   access: {
     // Optional website-level login. Owner access can browse the whole dashboard;
-    // Alpha access is read-only and limited to shared ?view=alpha pages.
+    // TraderClaw gets its own identifiable full-dashboard session, while Alpha
+    // access is read-only and limited to shared ?view=alpha pages.
     sitePassword: process.env.MARKET_DASHBOARD_LOGIN_PASSWORD || "",
+    traderclawPassword: process.env.TRADERCLAW_DASHBOARD_LOGIN_PASSWORD || "",
     alphaAccessCode: process.env.ALPHA_TEAM_ACCESS_CODE || "",
   },
   reporter: {
