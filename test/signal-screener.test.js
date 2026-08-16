@@ -112,6 +112,23 @@ test("a forced candle read replaces a cached unfinished kline with one fresh fin
   }
 });
 
+test("live research can request one-minute candles", async () => {
+  const originalFetch = global.fetch;
+  let requestedUrl = "";
+  global.fetch = async (url) => {
+    requestedUrl = String(url);
+    return { ok: true, json: async () => [[0, "100", "101", "99", "100", "1000", 59_999]] };
+  };
+  try {
+    const service = new SignalScreenerService({ cache: new MemoryCache() });
+    const candles = await service.getCandles("BTCUSDT", "1m", { force: true });
+    assert.equal(candles.length, 1);
+    assert.match(requestedUrl, /interval=1m/);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
 test("a wild still-open candle cannot flip the signal, but is shown as the live price", async () => {
   const rows = [];
   for (let i = 0; i < 500; i++) {

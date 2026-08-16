@@ -6,7 +6,7 @@
 // here. Spot price action for the same pairs is a close proxy.
 const BINANCE_KLINES_URL = "https://data-api.binance.vision/api/v3/klines";
 
-const INTERVAL_MAP = { "1h": "1h", "4h": "4h", "1D": "1d" };
+const INTERVAL_MAP = { "1m": "1m", "15m": "15m", "1h": "1h", "4h": "4h", "1D": "1d" };
 
 // Shared top-tokens universe (spot equivalents of the original screener's
 // USDT-perpetual list, extended to 25).
