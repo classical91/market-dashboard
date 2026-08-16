@@ -95,6 +95,7 @@ test("the Lab offers the timeframes the screener can actually fetch", () => {
     assert.ok(INTERVAL_MAP[interval], `the UI offers "${interval}" but the screener cannot fetch it`);
   }
   // And the widening actually happened.
+  assert.match(html, /value="1m"/);
   assert.match(html, /value="15m"/);
   assert.match(html, /value="1W"/);
 });
