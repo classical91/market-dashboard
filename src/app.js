@@ -56,6 +56,7 @@ const { SignalBotService } = require("./services/signal-bot");
 const { SignalTradeBridge } = require("./services/trading/signal-bridge");
 const { SignalActionStore } = require("./services/trading/signal-action-store");
 const { ExperimentStore } = require("./services/trading/experiment-store");
+const { ResearchQueue } = require("./services/trading/research-queue");
 const { LiveScannerService } = require("./services/trading/live-scanner");
 const { LiveResearchService } = require("./services/trading/live-research-runner");
 const { WatchlistService } = require("./services/watchlist");
@@ -156,6 +157,9 @@ function createApp() {
   // Research history. Deliberately its own store under <dataDir>/research, so
   // resetting a paper book can never disturb the record of what was tested.
   const experimentStore = new ExperimentStore({ dataDir });
+  // Stage one of the research workflow: candidates worth backtesting, kept
+  // beside the experiment log they eventually link to.
+  const researchQueue = new ResearchQueue({ dataDir });
   const decisionEngineService = new DecisionEngineService({
     marketDataService,
     signalScreenerService,
@@ -324,7 +328,7 @@ function createApp() {
       traderclaw: config.traderclaw,
     }),
   );
-  app.use("/api/trading-lab", createTradingLabRouter({ tradingLabService, backtestService, signalActionStore, experimentStore, requireAdmin }));
+  app.use("/api/trading-lab", createTradingLabRouter({ tradingLabService, backtestService, signalActionStore, experimentStore, researchQueue, signalScreenerService, requireAdmin }));
   app.use("/api/live-scanner", createLiveScannerRouter({ liveScannerService, requireAdmin }));
   app.use("/api/watchlist", createWatchlistRouter({ watchlistService, requireAdmin }));
   app.use("/api/bot-commands", createBotCommandsRouter({ botCommandsService }));
