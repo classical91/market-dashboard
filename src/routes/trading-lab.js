@@ -4,6 +4,7 @@ const { Router } = require("express");
 
 const { listStrategies, DEFAULT_STRATEGY_ID } = require("../services/trading/strategies");
 const { positionOwner } = require("../services/trading/execution-owner");
+const { planResearch } = require("../services/trading/research-planner");
 
 function asyncRoute(handler) {
   return (req, res, next) => {
@@ -69,6 +70,10 @@ function createTradingLabRouter({
   backtestService,
   signalActionStore = null,
   experimentStore = null,
+  // Stage one of the workflow: what is worth testing, and why. Optional so a
+  // deployment without a candle source still serves the rest of the lab.
+  researchQueue = null,
+  signalScreenerService = null,
   requireAdmin,
 }) {
   const router = Router();
@@ -177,6 +182,133 @@ function createTradingLabRouter({
         minTrades: Math.max(numberOr(req.query.min_trades, 1), 1),
       }),
     );
+  });
+
+  // ── Research: stage one of Market Research → Backtest → Demo → Promotion ──
+  //
+  // Research answers three questions and nothing else: which pairs are worth
+  // testing, what environment they are in, and which strategy × symbol ×
+  // timeframe backtests those two facts justify.
+  //
+  // Everything here produces BACKTEST candidates. No route in this block opens
+  // a position, touches a strategy ledger, or changes a lifecycle status.
+
+  router.get("/research/queue", (req, res) => {
+    if (!researchQueue) {
+      res.json({ total: 0, items: [], enabled: false });
+      return;
+    }
+    const filters = {};
+    for (const key of ["status", "strategy", "symbol", "timeframe", "origin"]) {
+      const value = req.query[key];
+      if (typeof value === "string" && value !== "") filters[key] = value;
+    }
+    res.json({ ...researchQueue.list({ ...filters, limit: numberOr(req.query.limit, 100) }), filters, enabled: true });
+  });
+
+  // A dry run of stage one: discover pairs, read their regimes, and show the
+  // candidates it would generate — without queuing anything. Public like the
+  // other reads; it spends only the screener's already-cached candles.
+  router.get("/research/plan", asyncRoute(async (req, res) => {
+    if (!signalScreenerService) {
+      res.status(503).json({ error: "Research planning needs a candle source" });
+      return;
+    }
+    res.json(
+      await planResearch(signalScreenerService, {
+        interval: typeof req.query.interval === "string" && req.query.interval ? req.query.interval : "1h",
+        limit: numberOr(req.query.limit, 5),
+        timeframes: typeof req.query.timeframes === "string" && req.query.timeframes
+          ? req.query.timeframes.split(",").map((tf) => tf.trim()).filter(Boolean)
+          : ["1h"],
+        includeMismatched: req.query.include_mismatched === "true",
+      }),
+    );
+  }));
+
+  // Run stage one and queue what it finds. Admin-gated because it writes, and
+  // because planning pulls candles for the whole discovery universe.
+  router.post("/research/plan", requireAdmin, asyncRoute(async (req, res) => {
+    if (!researchQueue || !signalScreenerService) {
+      res.status(503).json({ error: "Research planning needs a candle source and a research queue" });
+      return;
+    }
+    const body = req.body || {};
+    const plan = await planResearch(signalScreenerService, {
+      interval: typeof body.interval === "string" && body.interval ? body.interval : "1h",
+      limit: numberOr(body.limit, 5),
+      timeframes: Array.isArray(body.timeframes) && body.timeframes.length ? body.timeframes.map(String) : ["1h"],
+      symbols: Array.isArray(body.symbols) && body.symbols.length ? body.symbols.map(String) : null,
+      strategies: Array.isArray(body.strategies) && body.strategies.length ? body.strategies.map(String) : null,
+      includeMismatched: body.includeMismatched === true,
+    });
+    const queued = researchQueue.enqueueMany(plan.candidates);
+    res.status(201).json({ ...plan, queued });
+  }));
+
+  // Queue one candidate by hand.
+  router.post("/research/queue", requireAdmin, (req, res) => {
+    if (!researchQueue) {
+      res.status(503).json({ error: "Research queue is not configured" });
+      return;
+    }
+    const body = req.body || {};
+    requireFields(body, ["strategy", "symbol", "timeframe"]);
+    const item = researchQueue.enqueue({
+      strategy: String(body.strategy),
+      symbol: String(body.symbol),
+      timeframe: String(body.timeframe),
+      origin: body.origin || "manual",
+      rationale: body.rationale || null,
+      regime: body.regime || null,
+    });
+    res.status(item.deduped ? 200 : 201).json({ item });
+  });
+
+  // Run a queued candidate as a backtest and link the experiment it produced.
+  // The queue item is the question; the experiment record is the answer, and
+  // status carries one to the other so neither is orphaned.
+  router.post("/research/queue/:id/run", requireAdmin, asyncRoute(async (req, res) => {
+    if (!researchQueue || !backtestService) {
+      res.status(503).json({ error: "Running research needs a backtest service and a research queue" });
+      return;
+    }
+    const item = researchQueue.get(req.params.id);
+    if (!item) {
+      res.status(404).json({ error: `No research candidate with id ${req.params.id}` });
+      return;
+    }
+
+    researchQueue.update(item.id, { status: "running" });
+    try {
+      const result = await backtestService.backtestSymbol({
+        symbol: item.symbol,
+        interval: item.timeframe,
+        strategy: item.strategy,
+        options: (req.body || {}).options || {},
+        executionMode: "shared",
+        // Always recorded: a research run whose result is not in the log is
+        // work done twice.
+        record: true,
+        notes: `Research queue ${item.id} — ${item.rationale || item.origin}`,
+      });
+      const updated = researchQueue.update(item.id, {
+        status: "done",
+        experimentId: (result.experiment && result.experiment.id) || result.experimentId || null,
+      });
+      res.json({ item: updated, result });
+    } catch (err) {
+      researchQueue.update(item.id, { status: "failed", error: err.message });
+      throw err;
+    }
+  }));
+
+  router.post("/research/queue/clear-completed", requireAdmin, (req, res) => {
+    if (!researchQueue) {
+      res.status(503).json({ error: "Research queue is not configured" });
+      return;
+    }
+    res.json({ removed: researchQueue.clearCompleted(), ...researchQueue.list({ limit: 100 }) });
   });
 
   // ── Strategy accounts ─────────────────────────────────────────────────────

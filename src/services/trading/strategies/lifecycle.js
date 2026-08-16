@@ -139,6 +139,12 @@ function describeStrategy(strategy) {
     // has not declared one — and so a new strategy that forgets it renders
     // something correct-but-long instead of an empty card.
     shortDescription: strategy.shortDescription || strategy.description,
+    // Whether the strategy trades AGAINST the prevailing trend. The checklist
+    // already reads this off the raw definition to waive its directional regime
+    // gate; exposing it here lets research planning tell a mean-reversion
+    // strategy from a trend-following one without a second list that would
+    // drift from the strategies themselves.
+    tradesCounterTrend: strategy.tradesCounterTrend === true,
     status: strategy.status,
     supportsBacktest: strategy.supportsBacktest,
     supportsEventReplay: strategy.supportsEventReplay === true,
