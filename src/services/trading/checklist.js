@@ -59,7 +59,30 @@ const SCORING_VERSION = "2.0.0";
 //
 // `null` now means "not measured" and is scored as such. A caller with a real
 // feed passes the real value and scores exactly as before.
-function marketState(overrides = {}) {
+// An explicitly-passed `undefined` is not an override — it is a caller that had
+// nothing to say.
+//
+// Object spread does not agree: `{ volumeRatio: 1, ...{ volumeRatio: undefined } }`
+// is `undefined`, not 1. That defeated every default below, and the checklist
+// then called `state.volumeRatio.toFixed(1)` and threw. Three of the four demo
+// accounts hit this the moment they produced a real signal, because SMC,
+// Donchian and VWAP report structural indicators rather than the generic ratios
+// Mindset happens to emit.
+//
+// Stripping undefined here fixes it for every caller at once, rather than
+// leaving the next one to rediscover it. A caller that genuinely means "not
+// measured" passes null, which these defaults and the scoring rules already
+// handle as unmeasured.
+function definedOnly(overrides) {
+  const out = {};
+  for (const [key, value] of Object.entries(overrides || {})) {
+    if (value !== undefined) out[key] = value;
+  }
+  return out;
+}
+
+function marketState(rawOverrides = {}) {
+  const overrides = definedOnly(rawOverrides);
   return {
     regime: "UNKNOWN", // TREND_UP | TREND_DOWN | RANGE | VOLATILE_EXPANSION | LOW_COMPRESSION
     dailyBias: "NEUTRAL", // BULLISH | BEARISH | NEUTRAL

@@ -15,6 +15,8 @@ const { classifyRegime } = require("./regime");
 const { replayOrderForPositions } = require("./replay-order");
 const { listStrategies, getLiveResearchStrategy } = require("./strategies");
 const { EXECUTION_OWNERS, ownedBy } = require("./execution-owner");
+const { contextAtBar } = require("./backtest");
+const { getTradingConfig } = require("./config");
 
 const STATE_TTL_MS = 100 * 365 * 24 * 60 * 60 * 1000;
 const ACTIVITY_CAP = 120;
@@ -214,6 +216,9 @@ class CandleLiveResearchRunner {
     this.definition = definition;
     this.strategyId = definition.id;
     this._lab = tradingLabService;
+    // Indicator periods for the shared candle context. The lab's config, so a
+    // demo account and a backtest measure volatility and momentum the same way.
+    this._config = getTradingConfig();
     this._candles = candleSource;
     this._stateCache = stateCache;
     this.symbol = String(symbol).toUpperCase();
@@ -509,6 +514,16 @@ class CandleLiveResearchRunner {
     }
 
     const evaluation = this.definition.evaluate(closed, index, {});
+
+    // The generic market context every strategy's trade is scored against,
+    // computed once from the bars this runner already holds.
+    //
+    // contextAtBar is the backtester's own function, so a demo account and a
+    // backtest of the same strategy are scored against volatility, volume and
+    // momentum measured identically — which is the whole reason the two are
+    // comparable. It reads bars 0..index only, so it cannot see past the candle
+    // being decided.
+    const context = contextAtBar(closed, this._config, { index });
     let execution = null;
     let assessment = null;
 
@@ -529,11 +544,27 @@ class CandleLiveResearchRunner {
             direction: evaluation.signal,
             entryPrice: evaluation.price ?? candle.close,
             atr: evaluation.indicators?.atr ?? null,
+            // Volatility, volume and momentum come from the CANDLES, not from
+            // whatever generic fields a strategy happens to emit.
+            //
+            // Reading them off `evaluation.indicators` only worked for
+            // mindset_v1. SMC reports structure (BOS, FVG, retest), Donchian
+            // reports its channel, VWAP reports stretch and ADX — none of them
+            // publish atrRatio/volumeRatio/macdBullish, so all three passed
+            // `undefined` into market state and the checklist threw on
+            // `state.volumeRatio.toFixed(1)` the moment they produced a real
+            // signal. Requiring every strategy to also compute generic Trading
+            // Lab indicators would be asking each one to duplicate work the
+            // runner can do once from the bars it already holds.
+            //
+            // A strategy's OWN reading still wins when it has one — mindset_v1
+            // computes these as part of its rules, and its own numbers are what
+            // its signal was based on.
             state: {
               ...(await this._lab.stateForInterval(this.timeframe)),
-              atrRatio: evaluation.indicators?.atrRatio,
-              volumeRatio: evaluation.indicators?.volumeRatio,
-              macdBullish: evaluation.indicators?.macdBullish,
+              atrRatio: evaluation.indicators?.atrRatio ?? context.atrRatio,
+              volumeRatio: evaluation.indicators?.volumeRatio ?? context.volumeRatio,
+              macdBullish: evaluation.indicators?.macdBullish ?? context.macdBullish,
               allowCounterTrend: this.definition.tradesCounterTrend === true,
             },
             allowCounterTrend: this.definition.tradesCounterTrend === true,
@@ -551,7 +582,13 @@ class CandleLiveResearchRunner {
             ? { status: "opened", reason: `Opened ${assessment.opened.id}` }
             : { status: "blocked", reason: assessment.trade.reason };
         } catch (err) {
-          execution = { status: "blocked", reason: err.message };
+          // A thrown error is a FAULT, not a risk decision. Reporting it as
+          // "blocked" told the dashboard the strategy had been refused on its
+          // merits while the truth was that execution crashed — the account
+          // read BLOCKED_BY_RISK with health "RUNNING", which is the most
+          // misleading pair of words this system could produce.
+          execution = { status: "error", reason: err.message };
+          this._logger.error?.(`[LiveResearch] ${this.strategyId} execution failed: ${err.message}`);
         }
       }
     }
