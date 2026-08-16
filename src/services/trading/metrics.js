@@ -129,10 +129,25 @@ function symbolKey(trade) {
   return String(trade.symbol || "unknown");
 }
 
+/**
+ * The timeframe the trade was decided on, from recorded attribution only.
+ *
+ * Never parsed out of `signalSource`: that string's format was never a
+ * contract, and a trade with no recorded timeframe is UNATTRIBUTED rather than
+ * being assigned to whichever interval the account happens to run today. Once a
+ * demo account watches twenty markets on more than one interval, "which
+ * timeframe is this edge actually in?" stops being answerable any other way.
+ */
+function timeframeKey(trade) {
+  const recorded = (trade.meta && trade.meta.timeframe) || trade.timeframe || null;
+  return recorded ? String(recorded) : "UNATTRIBUTED";
+}
+
 const DIMENSIONS = {
   strategy: strategyKey,
   strategyId: strategyIdKey,
   symbol: symbolKey,
+  timeframe: timeframeKey,
   scoreBucket: (trade) => scoreBucket(trade.confidenceScore ?? trade.score),
   // The environment a trade was opened in. Read through the shared
   // regimeOfTrade() rather than a local copy: this grouping and the strategy ×
@@ -183,4 +198,4 @@ function buildStrategyMetrics(history, startingBalance, minTrades = 1) {
   };
 }
 
-module.exports = { calculateTradeMetrics, buildStrategyMetrics, scoreBucket, strategyIdKey, round };
+module.exports = { calculateTradeMetrics, buildStrategyMetrics, scoreBucket, strategyIdKey, timeframeKey, round };

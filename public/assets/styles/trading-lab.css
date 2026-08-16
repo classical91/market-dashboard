@@ -766,6 +766,67 @@
   color: var(--soft) !important;
 }
 
+/* Demo runner status panel. Two columns of small numbers: enough to prove the
+   runner is alive and to attribute a flat equity curve, without competing with
+   the equity figure for attention. */
+.tl-acct-panel {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,0.07);
+}
+
+.tl-acct-panel-head {
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-bottom: 6px;
+}
+
+.tl-acct-panel-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 10px;
+}
+
+.tl-acct-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.tl-acct-stat span {
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--dim);
+  /* The label yields, never the number: a count clipped to its first digit is
+     worse than no count at all. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tl-acct-stat strong {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  flex: none;
+}
+
+.tl-acct-stat--warn strong { color: var(--amber, #f0b429); }
+.tl-acct-stat--error strong { color: #ff6b6b; }
+
+.tl-acct-refused {
+  margin-top: 8px;
+  font-size: 10.5px;
+  line-height: 1.4;
+  color: var(--soft);
+}
+
+.tl-acct-refused--error { color: #ff6b6b; }
+
 .tl-acct-intent {
   display: grid;
   gap: 5px;

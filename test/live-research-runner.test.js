@@ -8,7 +8,7 @@ const path = require("node:path");
 
 const {
   CandleLiveResearchRunner,
-  LiveResearchService,
+  DemoTradingService,
 } = require("../src/services/trading/live-research-runner");
 const { TradingLabService } = require("../src/services/trading/trading-lab");
 const { getLiveResearchStrategy } = require("../src/services/trading/strategies");
@@ -317,19 +317,21 @@ test("one runner error does not stop another account", async () => {
   // between the two runOnce() calls — a flake, not a test.
   const rows = candles();
   const source = { async getCandles() { return rows; } };
-  const service = new LiveResearchService({
+  const service = new DemoTradingService({
     tradingLabService: lab,
     candleSource: source,
     stateCache: new MemoryStateCache(),
+    // One market, so the two injected runners are the whole subsystem.
+    symbols: ["BTCUSDT"],
     logger: QUIET,
   });
-  service._runners.set("smc_v1", runner({
+  service._runners.set("smc_v1|BTCUSDT|1h", runner({
     id: "smc_v1",
     lab,
     source,
     evaluate: () => { throw new Error("SMC test failure"); },
   }));
-  service._runners.set("mindset_v1", runner({ id: "mindset_v1", lab, source, evaluate: () => signal("FLAT") }));
+  service._runners.set("mindset_v1|BTCUSDT|1h", runner({ id: "mindset_v1", lab, source, evaluate: () => signal("FLAT") }));
 
   // First cycle baselines both accounts; a genuinely new close then arrives,
   // and the second cycle evaluates it.
@@ -343,7 +345,7 @@ test("one runner error does not stop another account", async () => {
 });
 
 test("disabled live research reports an explicit paused state", () => {
-  const service = new LiveResearchService({
+  const service = new DemoTradingService({
     tradingLabService: tempLab(),
     candleSource: { async getCandles() { throw new Error("must not be called"); } },
     stateCache: new MemoryStateCache(),
@@ -358,16 +360,20 @@ test("disabled live research reports an explicit paused state", () => {
   assert.match(status.currentIntent.reason, /LIVE_RESEARCH_ENABLED=false/);
 });
 
-test("Live Scanner and Live Research cannot claim the same strategy-account writer", () => {
-  // The invariant is "one ledger, one writer" — and it is now enforced by
-  // EXCLUDING the reserved strategy rather than by throwing.
+test("Demo Trading keeps the strategy ledger when the Live Scanner also claims it", () => {
+  // "One ledger, one writer" still holds; what changed is WHICH writer wins.
   //
-  // Throwing enforced the same rule at ruinous cost: the constructor runs
-  // during createApp(), mindset_v1 is both scanner eligible and live-research
-  // eligible, so every deployment with ENABLE_LIVE_SCANNER=true failed to boot
-  // and restarted forever. The rule was right; taking the whole dashboard down
-  // to enforce it was not.
-  const service = new LiveResearchService({
+  // Excluding the contested strategy was the fix for a boot crash, but it had a
+  // consequence nobody wanted: mindset_v1 is the scanner's strategy, so it was
+  // the one account with no demo runner — the strategy treated as most mature
+  // was the only one not trading its own demo account. Every candle strategy is
+  // now a first-class demo trader, so Demo Trading takes the ledger and the
+  // contest is logged rather than silently resolved against it.
+  //
+  // Still never a throw: the constructor runs inside createApp(), and taking
+  // the whole dashboard down to settle a writer conflict is what caused the
+  // restart loop this rule was rewritten to escape.
+  const service = new DemoTradingService({
     tradingLabService: tempLab(),
     candleSource: { async getCandles() { return candles(); } },
     stateCache: new MemoryStateCache(),
@@ -376,19 +382,19 @@ test("Live Scanner and Live Research cannot claim the same strategy-account writ
     logger: QUIET,
   });
 
-  assert.equal(service.ownsStrategy("mindset_v1"), false, "Live Research must not claim the scanner's ledger");
-  assert.deepEqual(service.reservedByScanner, ["mindset_v1"]);
+  assert.equal(service.ownsStrategy("mindset_v1"), true, "Demo Trading owns every candle strategy's ledger");
+  assert.deepEqual(service.contestedByScanner, ["mindset_v1"], "the conflict is reported, not hidden");
 });
 
 test("BananaGun is event-data-only and never receives a candle runner", () => {
-  const service = new LiveResearchService({
+  const service = new DemoTradingService({
     tradingLabService: tempLab(),
     candleSource: { async getCandles() { throw new Error("must not be called"); } },
     stateCache: new MemoryStateCache(),
     logger: QUIET,
   });
   const status = service.statusFor("shadow_bananagun_v1");
-  assert.equal(service._runners.has("shadow_bananagun_v1"), false);
+  assert.equal(service.runnersFor("shadow_bananagun_v1").length, 0);
   assert.equal(status.healthStatus, "EVENT_REPLAY_ONLY");
   assert.equal(status.runnerStatus, "WAITING_FOR_LIVE_EVENT_DATA");
   assert.match(status.currentIntent.reason, /candidate.*safety/i);
@@ -492,7 +498,7 @@ test("a reset restarts the experiment so no old candle can be traded", async () 
   await subject.runOnce();
   assert.equal(lab.strategyLedger("mindset_v1").getOpenPositions().length, 1);
 
-  const service = new LiveResearchService({
+  const service = new DemoTradingService({
     tradingLabService: lab,
     candleSource: source,
     stateCache: cache,
@@ -549,12 +555,12 @@ test("reading an account never mutates it", async () => {
 
 /* ── Writer conflicts must not take the app down ──────────── */
 
-test("a strategy the Live Scanner owns is excluded, not fatal", () => {
-  // This threw, and mindset_v1 is both scanner eligible and live-research
+test("a writer conflict is reported and resolved, never fatal", () => {
+  // This threw once, and mindset_v1 is both scanner eligible and live-research
   // eligible — so every deployment with ENABLE_LIVE_SCANNER=true failed to
   // boot, health check included. A resolvable conflict in one subsystem must
   // not stop the whole dashboard from starting.
-  const service = new LiveResearchService({
+  const service = new DemoTradingService({
     tradingLabService: tempLab(),
     candleSource: { async getCandles() { return candles(); } },
     stateCache: new MemoryStateCache(),
@@ -562,52 +568,131 @@ test("a strategy the Live Scanner owns is excluded, not fatal", () => {
     logger: QUIET,
   });
 
-  assert.deepEqual(service.reservedByScanner, ["mindset_v1"]);
-  assert.equal(service.ownsStrategy("mindset_v1"), false, "the scanner keeps sole ownership");
-  // Every other eligible strategy still collects live research.
-  for (const id of ["smc_v1", "donchian_breakout_v1", "vwap_reversion_v1"]) {
+  assert.deepEqual(service.contestedByScanner, ["mindset_v1"]);
+  // Every candle strategy — the contested one included — is a demo trader.
+  for (const id of ["mindset_v1", "smc_v1", "donchian_breakout_v1", "vwap_reversion_v1"]) {
     assert.equal(service.ownsStrategy(id), true, id);
   }
+  assert.deepEqual(service.status().contestedByScanner, ["mindset_v1"]);
 });
 
-test("a reserved strategy reports its real reason, not the event-replay one", () => {
-  const service = new LiveResearchService({
-    tradingLabService: tempLab(),
-    candleSource: { async getCandles() { return candles(); } },
-    stateCache: new MemoryStateCache(),
-    reservedStrategyIds: ["mindset_v1"],
-    logger: QUIET,
-  });
-
-  const status = service.statusFor("mindset_v1");
-  assert.equal(status.runnerStatus, "OWNED_BY_LIVE_SCANNER");
-  assert.match(status.currentIntent.summary, /Live Scanner writes this strategy's account/i);
-  // Saying "cannot be evaluated from OHLCV candles" would be false: it IS
-  // evaluated, by the other loop.
-  assert.doesNotMatch(status.currentIntent.summary, /cannot be evaluated/i);
-  assert.notEqual(status.healthStatus, "EVENT_REPLAY_ONLY");
-
-  // And the exclusion is visible at the top level rather than only per runner.
-  assert.deepEqual(service.status().reservedByScanner, ["mindset_v1"]);
-});
-
-test("a reserved strategy gets no live-research runner at all", async () => {
+test("a contested strategy still gets its own demo runners", async () => {
   const lab = tempLab();
-  const service = new LiveResearchService({
+  const service = new DemoTradingService({
     tradingLabService: lab,
     candleSource: { async getCandles() { return candles(); } },
     stateCache: new MemoryStateCache(),
+    symbols: ["BTCUSDT", "ETHUSDT"],
     reservedStrategyIds: ["mindset_v1"],
     logger: QUIET,
   });
 
   const cycle = await service.runOnce();
   assert.equal(cycle.status, "complete");
-  assert.ok(
-    !cycle.results.some((row) => row.strategyId === "mindset_v1"),
-    "the reserved strategy must not be cycled by Live Research",
-  );
-  assert.equal(lab.strategyLedger("mindset_v1").getOpenPositions().length, 0);
+  const mindsetRuns = cycle.results.filter((row) => row.strategyId === "mindset_v1");
+  assert.equal(mindsetRuns.length, 2, "the contested strategy is cycled on every market like any other");
+  assert.deepEqual(mindsetRuns.map((row) => row.symbol).sort(), ["BTCUSDT", "ETHUSDT"]);
+});
+
+/* ── The per-account status panel ─────────────────────────── */
+
+test("one account watches many markets through one ledger", () => {
+  const service = new DemoTradingService({
+    tradingLabService: tempLab(),
+    candleSource: { async getCandles() { return candles(); } },
+    stateCache: new MemoryStateCache(),
+    symbols: ["BTCUSDT", "ETHUSDT", "SOLUSDT"],
+    logger: QUIET,
+  });
+
+  // Three markets multiply RUNNERS, never accounts: the whole point is that
+  // SMC gets a wider search for its setup, not three separate balances.
+  assert.equal(service.runnersFor("smc_v1").length, 3);
+  assert.deepEqual(service.runnersFor("smc_v1").map((one) => one.symbol), ["BTCUSDT", "ETHUSDT", "SOLUSDT"]);
+  assert.equal(service.statusFor("smc_v1").marketsWatched, 3);
+  assert.deepEqual(service.statusFor("smc_v1").timeframesWatched, ["1h"]);
+});
+
+test("the status panel separates a silent strategy from a dead runner", async () => {
+  const lab = tempLab();
+  const rows = candles();
+  const source = { async getCandles() { return rows; } };
+  const service = new DemoTradingService({
+    tradingLabService: lab,
+    candleSource: source,
+    stateCache: new MemoryStateCache(),
+    symbols: ["BTCUSDT"],
+    logger: QUIET,
+  });
+  service._runners.clear();
+  service._runners.set("mindset_v1|BTCUSDT|1h", runner({ id: "mindset_v1", lab, source, evaluate: () => signal("FLAT") }));
+
+  await service.runOnce();          // baseline
+  rows.push(candle(130, { close: 100 }));
+  await service.runOnce();          // one real evaluation
+
+  const status = service.statusFor("mindset_v1");
+  // Zero trades, but the panel proves the runner is alive and the strategy
+  // simply had no setup — the distinction the trade count alone destroys.
+  assert.equal(status.counters.candlesProcessed, 1);
+  assert.equal(status.counters.signalsGenerated, 0);
+  assert.equal(status.counters.tradesExecuted, 0);
+  assert.equal(status.counters.signalsBlockedByRisk, 0);
+  assert.equal(status.counters.executionErrors, 0);
+  assert.equal(status.demoTradingStatus, "TRADING");
+});
+
+test("counters record a trade and an execution fault as different facts", async () => {
+  const lab = tempLab();
+  const rows = candles();
+  const source = { async getCandles() { return rows; } };
+  const service = new DemoTradingService({
+    tradingLabService: lab,
+    candleSource: source,
+    stateCache: new MemoryStateCache(),
+    symbols: ["BTCUSDT"],
+    logger: QUIET,
+  });
+  service._runners.clear();
+  service._runners.set("mindset_v1|BTCUSDT|1h", runner({ id: "mindset_v1", lab, source, evaluate: () => signal("LONG") }));
+  service._runners.set("smc_v1|BTCUSDT|1h", runner({
+    id: "smc_v1", lab, source, evaluate: () => { throw new Error("SMC test failure"); },
+  }));
+
+  await service.runOnce();
+  rows.push(candle(130, { close: 100 }));
+  await service.runOnce();
+
+  const traded = service.statusFor("mindset_v1");
+  assert.equal(traded.counters.signalsGenerated, 1);
+  assert.equal(traded.counters.tradesExecuted, 1);
+  assert.equal(traded.demoTradingStatus, "IN_POSITION");
+
+  const broken = service.statusFor("smc_v1");
+  assert.equal(broken.counters.executionErrors, 1);
+  assert.equal(broken.healthStatus, "ERROR");
+  assert.equal(broken.demoTradingStatus, "ERROR");
+  assert.equal(broken.counters.tradesExecuted, 0);
+});
+
+test("resetting an account clears every market it watches", () => {
+  const service = new DemoTradingService({
+    tradingLabService: tempLab(),
+    candleSource: { async getCandles() { return candles(); } },
+    stateCache: new MemoryStateCache(),
+    symbols: ["BTCUSDT", "ETHUSDT"],
+    logger: QUIET,
+  });
+  const cleared = [];
+  for (const one of service.runnersFor("smc_v1")) {
+    one.clearState = () => cleared.push(one.symbol);
+  }
+
+  // A partial reset would zero the ledger while leaving other markets on their
+  // pre-reset baselines, trading the fresh account on stale history.
+  assert.equal(service.resetExperiment("smc_v1"), true);
+  assert.deepEqual(cleared.sort(), ["BTCUSDT", "ETHUSDT"]);
+  assert.equal(service.resetExperiment("shadow_bananagun_v1"), false);
 });
 
 /* ── Every strategy can actually reach execution ──────────── */
@@ -730,6 +815,82 @@ for (const strategyId of ["smc_v1", "donchian_breakout_v1", "vwap_reversion_v1",
     }
   });
 }
+
+/* ── Many markets, one ledger per strategy ────────────────── */
+
+test("a signal on a non-BTC pair opens a position in that strategy's one account", async () => {
+  const lab = tempLab();
+  const rows = { BTCUSDT: realisticBars(), ETHUSDT: realisticBars(), SOLUSDT: realisticBars() };
+  const service = new DemoTradingService({
+    tradingLabService: lab,
+    candleSource: { async getCandles(symbol) { return rows[symbol]; } },
+    stateCache: new MemoryStateCache(),
+    symbols: ["BTCUSDT", "ETHUSDT", "SOLUSDT"],
+    logger: QUIET,
+  });
+
+  // Only SOL's runner is given a signalling strategy, and it is the real SMC
+  // definition with just its entry decision forced — so the whole path from a
+  // non-BTC candle through to the ledger is exercised.
+  const real = getLiveResearchStrategy("smc_v1");
+  const forced = {
+    ...real,
+    evaluate: (bars, index, ctx) => ({ ...real.evaluate(bars, index, ctx), signal: "LONG", reasons: ["forced"] }),
+  };
+  service._runners.get("smc_v1|SOLUSDT|1h").definition = forced;
+
+  await service.runOnce();
+  const newBar = {
+    openTime: 400 * 3_600_000, closeTime: 401 * 3_600_000 - 1,
+    open: 220, high: 222, low: 219, close: 221, volume: 1200,
+  };
+  for (const symbol of Object.keys(rows)) rows[symbol] = [...rows[symbol], newBar];
+  await service.runOnce();
+
+  // One account, one ledger, and the position carries the market it came from.
+  const positions = lab.strategyLedger("smc_v1").getOpenPositions();
+  assert.equal(positions.length, 1, "the SOL signal did not reach the SMC account");
+  assert.equal(positions[0].symbol, "SOLUSDT");
+
+  const status = service.statusFor("smc_v1");
+  assert.equal(status.marketsWatched, 3);
+  assert.equal(status.counters.candlesProcessed, 3, "every market processed its candle");
+  assert.equal(status.counters.tradesExecuted, 1);
+  assert.deepEqual(status.openMarkets, ["SOLUSDT"]);
+  assert.equal(status.demoTradingStatus, "IN_POSITION");
+});
+
+test("two strategies trading the same pair stay financially isolated", async () => {
+  const lab = tempLab();
+  const rows = realisticBars();
+  const source = { async getCandles() { return rows; } };
+  const service = new DemoTradingService({
+    tradingLabService: lab,
+    candleSource: source,
+    stateCache: new MemoryStateCache(),
+    symbols: ["BTCUSDT"],
+    logger: QUIET,
+  });
+  service._runners.clear();
+  for (const id of ["smc_v1", "donchian_breakout_v1"]) {
+    service._runners.set(`${id}|BTCUSDT|1h`, runner({ id, lab, source, evaluate: () => signal("LONG") }));
+  }
+
+  await service.runOnce();
+  rows.push({ openTime: 400 * 3_600_000, closeTime: 401 * 3_600_000 - 1, open: 220, high: 222, low: 219, close: 221, volume: 1200 });
+  await service.runOnce();
+
+  const smc = lab.strategyLedger("smc_v1");
+  const donchian = lab.strategyLedger("donchian_breakout_v1");
+  assert.equal(smc.getOpenPositions().length, 1);
+  assert.equal(donchian.getOpenPositions().length, 1);
+  assert.notEqual(smc.book, donchian.book, "the two accounts must not share a ledger");
+  // Same pair, same bar — and neither account's balance reflects the other's
+  // exposure. Sharing a book would make each strategy's drawdown the other's.
+  assert.equal(smc.readAccount().startingBalance, donchian.readAccount().startingBalance);
+  assert.equal(smc.getRiskState().openPositions, 1);
+  assert.equal(donchian.getRiskState().openPositions, 1);
+});
 
 test("an execution fault reports ERROR, never a risk refusal", async () => {
   // Reporting a crash as "blocked" told the dashboard the strategy had been

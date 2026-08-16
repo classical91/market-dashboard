@@ -210,8 +210,18 @@ const config = {
     // Evidence collection for every candle-compatible strategy account. This
     // is independent of lifecycle promotion and remains paper-only.
     enabled: process.env.LIVE_RESEARCH_ENABLED !== "false",
-    symbol: process.env.LIVE_RESEARCH_SYMBOL || "BTCUSDT",
-    timeframe: process.env.LIVE_RESEARCH_TIMEFRAME || "1h",
+    // Single-market escape hatches, unset by default. A default of "BTCUSDT"
+    // here would win over the top-20 universe below and quietly pin every demo
+    // account to one pair.
+    symbol: process.env.LIVE_RESEARCH_SYMBOL || null,
+    timeframe: process.env.LIVE_RESEARCH_TIMEFRAME || null,
+    // The market universe every demo account watches. Empty means "the default
+    // top-20 list" rather than "no markets", so an unset variable can never
+    // silently produce accounts with nothing to trade.
+    symbols: parseList(process.env.LIVE_RESEARCH_SYMBOLS),
+    // 1h only for now. Adding a timeframe multiplies runner count by the number
+    // of markets, so it is a deliberate change rather than a default.
+    timeframes: parseList(process.env.LIVE_RESEARCH_TIMEFRAMES),
     intervalMs: parseNumber(process.env.LIVE_RESEARCH_INTERVAL_MS, 60 * 1000),
   },
   traderclaw: {

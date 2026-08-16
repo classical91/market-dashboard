@@ -28,6 +28,7 @@ const {
   acceptsLiveResearchTrades,
 } = require("./strategy-accounts");
 const { PaperTradingService, MemoryStorage } = require("./paper-trader");
+const { checkAccountSafety, checkTradeGeometry } = require("./account-safety");
 const { EXECUTION_OWNERS, ownerFromSignalSource, positionOwner } = require("./execution-owner");
 
 const LEGACY_BOOKS = [
@@ -126,10 +127,26 @@ class TradingLabService {
     // a sixth strategy needs no second list updating. Every strategy gets one,
     // including strategies that may collect live demo evidence without being
     // promoted into the scanner lifecycle. See ./strategy-accounts.
+    //
+    // A demo account watches a whole market universe rather than one pair, so
+    // the position-count cap is raised until the RISK budget is what binds.
+    // At 1% per trade and a 4% total-risk ceiling the account can carry four
+    // full-size positions; a count cap of three stopped the fourth while risk
+    // was still under budget, which meant a multi-market account measured
+    // "which pair signalled first" as much as it measured the strategy. Total
+    // risk, daily loss and one-position-per-symbol all still apply unchanged —
+    // this removes an arbitrary number, not a risk control.
+    this.strategyAccountConfig = {
+      ...config,
+      maxOpenPositions: Math.max(
+        config.maxOpenPositions,
+        Math.ceil(config.maxTotalRisk / config.maxRiskPerTrade),
+      ),
+    };
     this.strategyLedgers = new Map(
       listStrategyAccounts().map((account) => [
         account.id,
-        new PaperTradingService({ dataDir, book: account.ledgerKey, config, priceFeed }),
+        new PaperTradingService({ dataDir, book: account.ledgerKey, config: this.strategyAccountConfig, priceFeed }),
       ]),
     );
     // Unattributed/manual/Decision Engine/Signal Bot evaluation remains useful,
@@ -426,13 +443,71 @@ class TradingLabService {
       requireLiveResearch: liveResearch,
     });
     const assessment = this.evaluate({ book, strategyId, at: openedAt, ...input });
-    if (!assessment.trade.ok) {
-      return { ...assessment, opened: null };
+
+    // ── Who decides ───────────────────────────────────────────────────────
+    //
+    // On the live-research path the STRATEGY's signal is authoritative. A demo
+    // account exists to answer "how does this strategy perform?", and it only
+    // answers that if the strategy decides. Running a valid SMC setup through a
+    // second generic opinion about volume and MACD, and letting that opinion
+    // veto, measures "SMC plus whatever the filter thought" — a strategy nobody
+    // designed.
+    //
+    // The checklist and edge gate still ran, just above, and their verdicts are
+    // recorded on the trade and in the decision trail. They are analytics here:
+    // a disagreement between "the strategy wanted this" and "the checklist
+    // hated it" is a finding worth keeping, not a reason to skip.
+    //
+    // Everywhere else — manual, forward-paper, the signal bridge — the gauntlet
+    // still decides, because those callers have no strategy of their own to be
+    // authoritative.
+    if (!liveResearch) {
+      if (!assessment.trade.ok) {
+        return { ...assessment, opened: null };
+      }
+    } else {
+      const riskState = trader.getRiskState({ at: openedAt });
+      const openSymbols = trader.getOpenPositions().map((position) => position.symbol);
+      const safety = checkAccountSafety({
+        riskState,
+        // The demo account's own config, not the shared one: checking a cap the
+        // ledger does not enforce would refuse a signal the ledger would have
+        // accepted, and record it as a risk decision.
+        config: this.strategyAccountConfig,
+        symbol: input.symbol,
+        openSymbols,
+      });
+      if (!safety.ok) {
+        // A refused signal is a different fact from "no signal", and the
+        // difference is invisible unless it is said. The runner records this so
+        // an account showing no trades can be read as "the strategy found
+        // nothing" or "the strategy wanted to trade and the account was full".
+        return {
+          ...assessment,
+          opened: null,
+          accountSafety: safety,
+          refusedValidSignal: true,
+          reason: safety.reason,
+        };
+      }
     }
 
     // The same resolution evaluate() just used, so the position opens in the
     // ledger whose limits were checked.
-    let trade = { ...assessment.trade };
+    // Live research plans its own trade at the account's full per-trade risk.
+    // assessment.trade was sized by checklist x edge multipliers, which are
+    // exactly the opinions that no longer decide here — leaving them in would
+    // let a gate that may not veto still quietly halve the position.
+    let trade = liveResearch
+      ? planTrade({
+          symbol: input.symbol,
+          direction: input.direction,
+          entryPrice: input.entryPrice,
+          atr: input.atr ?? null,
+          sizeMultiplier: 1,
+          config: this.strategyAccountConfig,
+        })
+      : { ...assessment.trade };
     let appliedExecution = "shared";
 
     // Candle strategies may publish structural stop/target hints. Live
@@ -459,6 +534,19 @@ class TradingLabService {
         }
       }
     }
+    // Geometry, not judgement: a stop on the wrong side or a size that rounds
+    // to nothing cannot become a position however good the setup is.
+    const geometry = checkTradeGeometry(trade);
+    if (!geometry.ok) {
+      return {
+        ...assessment,
+        opened: null,
+        accountSafety: geometry,
+        refusedValidSignal: liveResearch,
+        reason: geometry.reason,
+      };
+    }
+
     const opened = trader.openPosition({
       symbol: trade.symbol,
       direction: trade.direction,
@@ -477,6 +565,17 @@ class TradingLabService {
         edgeDecision: assessment.edge.decision,
         sizeMultiplier: trade.sizeMultiplier,
         executionScope,
+        // Recorded, not obeyed, on the live-research path. Keeping the verdicts
+        // makes "the strategy traded something the checklist disliked" a
+        // measurable class of trade rather than an invisible one.
+        ...(liveResearch
+          ? {
+              strategyAuthoritative: true,
+              analyticsChecklist: assessment.checklist.decision,
+              analyticsChecklistScore: assessment.checklist.confidenceScore,
+              analyticsEdge: assessment.edge.decision,
+            }
+          : {}),
         executionMode: appliedExecution,
         strategyConfidence: strategySignal ? strategySignal.confidence ?? null : null,
         stopHint: strategySignal ? strategySignal.stopHint ?? null : null,

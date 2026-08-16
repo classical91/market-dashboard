@@ -39,7 +39,7 @@ function boot(env) {
     const research = app.locals.liveResearch;
     process.stdout.write(JSON.stringify({
       booted: typeof app === "function",
-      reservedByScanner: research ? research.reservedByScanner : null,
+      contestedByScanner: research ? research.contestedByScanner : null,
       researchOwns: research
         ? ["mindset_v1", "smc_v1", "donchian_breakout_v1", "vwap_reversion_v1"]
             .filter((id) => research.ownsStrategy(id))
@@ -87,10 +87,12 @@ test("a strategy-account writer conflict degrades one loop, not the whole app", 
   const result = boot({ ENABLE_LIVE_SCANNER: "true", LIVE_RESEARCH_ENABLED: "true" });
 
   assert.ok(result.ok, `the app failed to start:\n${result.stderr || ""}`);
-  // The scanner keeps sole ownership of the ledger it writes.
-  assert.deepEqual(result.reservedByScanner, ["mindset_v1"]);
-  assert.ok(!result.researchOwns.includes("mindset_v1"), "Live Research must not claim the scanner's ledger");
-  // And the conflict costs exactly the one strategy it is about — the other
-  // accounts keep collecting evidence.
-  assert.deepEqual(result.researchOwns.sort(), ["donchian_breakout_v1", "smc_v1", "vwap_reversion_v1"]);
+  // The conflict is visible rather than silent.
+  assert.deepEqual(result.contestedByScanner, ["mindset_v1"]);
+  // And it costs no account its demo runner: Demo Trading owns the strategy
+  // ledgers, so all four candle strategies trade their own $10,000 account.
+  assert.deepEqual(
+    result.researchOwns.sort(),
+    ["donchian_breakout_v1", "mindset_v1", "smc_v1", "vwap_reversion_v1"],
+  );
 });
