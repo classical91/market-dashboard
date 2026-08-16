@@ -329,6 +329,23 @@ test("comparison defaults to every registered strategy", async () => {
   assert.ok(body.results.some((row) => row.strategy === "shadow_bananagun_v1" && row.status === "insufficient-data"));
 });
 
+test("strategy account cards expose the latest saved historical backtest", async () => {
+  const run = await post("/api/trading-lab/backtest", {
+    symbol: "BTCUSDT", interval: "1h", strategy: "smc_v1", record: true,
+  });
+  assert.equal(run.status, 200);
+  const recorded = await run.json();
+
+  const res = await fetch(`${base}/api/trading-lab/strategy-accounts`);
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  const smc = body.accounts.find((account) => account.id === "smc_v1");
+  assert.equal(smc.latestBacktest.id, recorded.experimentId);
+  assert.equal(smc.latestBacktest.symbol, "BTCUSDT");
+  assert.equal(smc.latestBacktest.timeframe, "1h");
+  assert.equal(typeof smc.latestBacktest.closedTrades, "number");
+});
+
 test("running or comparing without an admin key is refused", async () => {
   for (const path of ["/api/trading-lab/backtest", "/api/trading-lab/backtest/compare"]) {
     const res = await post(path, { symbol: "BTCUSDT", strategy: "smc_v1" }, { admin: false });

@@ -788,6 +788,26 @@
   color: var(--text);
 }
 
+.tl-backtest-summary {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid rgba(77,163,255,0.24);
+  border-radius: 5px;
+  background: rgba(77,163,255,0.07);
+}
+
+.tl-backtest-summary span,
+.tl-backtest-summary small {
+  color: var(--dim);
+  font-size: 9px;
+  letter-spacing: 0.07em;
+}
+
+.tl-backtest-summary strong { font-size: 12px; }
+.tl-backtest-summary small { display: block; margin-top: 3px; }
+.tl-backtest-summary--empty { opacity: 0.68; }
+
 .tl-acct-updated { margin-top: 2px; }
 
 .tl-activity-btn {

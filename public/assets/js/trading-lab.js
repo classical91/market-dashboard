@@ -239,6 +239,7 @@
         var m = s.riskMetrics || {};
         var runner = account.liveResearch || {};
         var intent = runner.currentIntent || {};
+        var backtest = account.latestBacktest || null;
         var traded = Number(s.totalTrades) > 0;
         var selected = account.id === currentStrategy() ? " is-active" : "";
         var netPnl = Number(s.equity || 0) - Number(s.startingBalance || 0);
@@ -270,6 +271,14 @@
             : "") +
           '<div class="tl-acct-intent"><span>Current intent</span><strong>' +
           escapeHtml(intent.title || "Waiting for runner state") + "</strong></div>" +
+          (backtest
+            ? '<div class="tl-backtest-summary"><span>LATEST HISTORICAL BACKTEST</span><strong>' +
+              escapeHtml(backtest.symbol + " " + backtest.timeframe) + " · " +
+              escapeHtml(String(backtest.closedTrades || 0)) + " trades · " +
+              '<b class="' + pnlClass(backtest.netPnlUsd) + '">' + fmtUsd(backtest.netPnlUsd) +
+              " (" + escapeHtml(String(backtest.netReturnPct)) + "%)</b><small>" +
+              escapeHtml(fmtTime(backtest.createdAt)) + " · " + escapeHtml(backtest.id) + "</small></strong></div>"
+            : '<div class="tl-backtest-summary tl-backtest-summary--empty"><span>LATEST HISTORICAL BACKTEST</span><strong>Not run yet</strong></div>') +
           '<div class="tl-account-metrics">' +
           accountMetric("Net P&L", fmtUsd(netPnl), pnlClass(netPnl)) +
           accountMetric("Signal", escapeHtml(runner.currentSignal || "FLAT")) +

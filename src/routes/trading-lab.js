@@ -16,6 +16,12 @@ function numberOr(value, fallback) {
   return Number.isFinite(n) ? n : fallback;
 }
 
+function latestExperimentFor(experimentStore, strategyId) {
+  if (!experimentStore) return null;
+  const result = experimentStore.list({ strategy: strategyId, limit: 1 });
+  return result.items[0] || null;
+}
+
 function requireFields(body, fields) {
   const missing = fields.filter((f) => body[f] === undefined || body[f] === null || body[f] === "");
   if (missing.length) {
@@ -171,16 +177,25 @@ function createTradingLabRouter({
   // forward and say so.
 
   router.get("/strategy-accounts", asyncRoute(async (req, res) => {
-    res.json(await tradingLabService.strategyAccounts());
+    const result = await tradingLabService.strategyAccounts();
+    res.json({
+      ...result,
+      accounts: result.accounts.map((account) => ({
+        ...account,
+        latestBacktest: latestExperimentFor(experimentStore, account.id),
+      })),
+    });
   }));
 
   router.get("/strategy-accounts/:id", asyncRoute(async (req, res) => {
-    res.json(
-      await tradingLabService.strategyAccount(req.params.id, {
+    const account = await tradingLabService.strategyAccount(req.params.id, {
         minTrades: Math.max(numberOr(req.query.min_trades, 1), 1),
         limit: Math.min(Math.max(numberOr(req.query.limit, 100), 1), 1000),
-      }),
-    );
+      });
+    res.json({
+      ...account,
+      latestBacktest: latestExperimentFor(experimentStore, account.id),
+    });
   }));
 
   router.get("/live-research", (req, res) => {
