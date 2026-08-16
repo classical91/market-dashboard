@@ -48,13 +48,14 @@
       icon: "&#129504;",
       children: [
         { href: "/decision.html", icon: "&#127919;", label: "Decision Engine" },
-        { href: "/trading-lab.html", icon: "&#129514;", label: "Trading Lab" },
+        { href: "/trading-lab.html", icon: "&#129514;", label: "Backtest Lab" },
         { href: "/ai-analysis.html", icon: "&#129504;", label: "AI Analysis" },
         { href: "/layout-analysis.html", icon: "&#128248;", label: "My Layouts" },
         { href: "/pattern-scanner.html", icon: "&#128200;", label: "Pattern Scanner" },
         { href: "/pattern-scanner-trades.html", icon: "&#9733;", label: "My Trades" },
         { href: "/pattern-scanner-stats.html", icon: "&#128202;", label: "Track Record" },
         { href: "/signal-screener.html", icon: "&#9889;", label: "Signal Screener" },
+        { href: "/signal-diagnostics.html", icon: "&#128225;", label: "Signal Diagnostics" },
       ],
     },
     {
@@ -237,7 +238,7 @@
 
   function isAlphaAvailable(href) {
     var path = alphaReviewPath(href);
-    return path === "/signal-screener.html" || path === "/pattern-scanner.html";
+    return path === "/signal-screener.html" || path === "/pattern-scanner.html" || path === "/signal-diagnostics.html";
   }
 
   function alphaHref(href) {

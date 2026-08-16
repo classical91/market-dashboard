@@ -20,6 +20,10 @@ const { getTradingConfig } = require("./config");
 
 const STATE_TTL_MS = 100 * 365 * 24 * 60 * 60 * 1000;
 const ACTIVITY_CAP = 120;
+// Kept in step with signal-screener's INTERVAL_MAP: a timeframe the screener
+// can fetch but this map does not know would silently fall back to the 1h
+// default below, and the runner would then compute the wrong nextExpectedCandle
+// — telling a reader the next decision is an hour away when it is minutes away.
 const TIMEFRAME_MS = Object.freeze({
   "1m": 60_000,
   "3m": 180_000,
@@ -27,8 +31,12 @@ const TIMEFRAME_MS = Object.freeze({
   "15m": 900_000,
   "30m": 1_800_000,
   "1h": 3_600_000,
+  "2h": 7_200_000,
   "4h": 14_400_000,
+  "6h": 21_600_000,
+  "12h": 43_200_000,
   "1d": 86_400_000,
+  "1w": 604_800_000,
 });
 
 function nowIso() {

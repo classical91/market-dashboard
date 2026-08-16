@@ -6,7 +6,25 @@
 // here. Spot price action for the same pairs is a close proxy.
 const BINANCE_KLINES_URL = "https://data-api.binance.vision/api/v3/klines";
 
-const INTERVAL_MAP = { "1m": "1m", "15m": "15m", "1h": "1h", "4h": "4h", "1D": "1d" };
+// Binance kline intervals this app will request. Kept deliberately explicit
+// rather than passing the caller's string through: an unsupported interval
+// should be a named error here, not an opaque 400 from Binance several layers
+// down. Widened beyond 1h/4h/1D so research can ask the same strategy question
+// on the timeframe it was actually designed for — a breakout strategy and a
+// reversion strategy do not live on the same clock.
+const INTERVAL_MAP = {
+  "1m": "1m",
+  "5m": "5m",
+  "15m": "15m",
+  "30m": "30m",
+  "1h": "1h",
+  "2h": "2h",
+  "4h": "4h",
+  "6h": "6h",
+  "12h": "12h",
+  "1D": "1d",
+  "1W": "1w",
+};
 
 // Shared top-tokens universe (spot equivalents of the original screener's
 // USDT-perpetual list, extended to 25).
@@ -308,4 +326,4 @@ class SignalScreenerService {
   }
 }
 
-module.exports = { SignalScreenerService, DEFAULT_TOKENS, dropUnclosedCandle, rsi, ema, macd, vwapSeries, adxSeries };
+module.exports = { SignalScreenerService, DEFAULT_TOKENS, INTERVAL_MAP, dropUnclosedCandle, rsi, ema, macd, vwapSeries, adxSeries };

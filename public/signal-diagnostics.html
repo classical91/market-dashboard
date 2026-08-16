@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Signal Diagnostics &middot; Market Command</title>
+  <script src="/assets/js/settings.js"></script>
+  <link rel="stylesheet" href="/assets/styles/command.css" />
+  <link rel="stylesheet" href="/assets/styles/ai-analysis.css" />
+  <link rel="stylesheet" href="/assets/styles/decision.css" />
+  <link rel="stylesheet" href="/assets/styles/trading-lab.css" />
+</head>
+<body>
+<div class="app">
+  <aside class="cmd-sidebar"></aside>
+  <main class="cmd-main">
+
+    <div class="cmd-page-header">
+      <div>
+        <div class="cmd-page-title">&#128225; Signal Diagnostics</div>
+        <div class="cmd-page-subtitle">Signal plumbing and archived ledgers &mdash; what the Decision Engine, Live Scanner and Signal Bot are doing, and the retired paper books. None of it feeds a demo account.</div>
+      </div>
+    </div>
+
+    <div class="aia-notice" id="sd-notice" style="display:none"></div>
+
+    <div class="tl-concepts">
+      <div>These panels moved out of the <strong>Backtest Lab</strong> because none of them serve a demo account. They are observation surfaces: signal sources, loop health, and read-only history.</div>
+      <div>Nothing here can open a position or write to a strategy ledger. The Decision Engine's plans are scored in an unattributed, non-persistent context; the Signal Bot has no registered strategy identity at all.</div>
+    </div>
+
+    <div class="de-toolbar">
+      <label class="tl-inline-label" for="sd-interval">Decision Engine timeframe</label>
+      <select class="aia-select" id="sd-interval">
+        <option value="15m">15m</option>
+        <option value="1h">1h</option>
+        <option value="4h" selected>4h</option>
+        <option value="1D">1D</option>
+      </select>
+      <button class="aia-run-btn" type="button" id="sd-refresh">Refresh</button>
+      <span class="de-updated" id="sd-updated"></span>
+    </div>
+
+    <div class="de-card">
+      <div class="de-card-title">Decision Engine Candidates</div>
+      <div class="de-card-note">Every execution plan the Decision Engine produced, scored in an unattributed, non-persistent analysis context. These plans <strong>cannot</strong> be written into a strategy account: forward-paper execution requires a registered strategy identity, and a plan has none.</div>
+      <div class="de-table-wrap">
+        <table class="de-table">
+          <thead>
+            <tr>
+              <th>Symbol</th><th>Signal</th><th>Setup</th><th>Checklist</th><th>Edge</th>
+              <th>Size</th><th>Entry</th><th>Stop</th><th>TP1</th><th>TP2</th><th>Risk</th><th>Execution</th>
+            </tr>
+          </thead>
+          <tbody id="sd-candidates-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="de-card">
+      <div class="de-card-title">Live Scanner</div>
+      <div class="de-card-note">Native Bitget perpetual scanner &mdash; pulls its own candles and runs its own strategy on a 60s loop, so no TradingView webhook is needed. Evaluates closed candles only, one entry per symbol/direction/candle, paper trades only. Enable with ENABLE_LIVE_SCANNER=true.</div>
+      <div id="sd-scanner"><div class="de-empty">Loading&hellip;</div></div>
+    </div>
+
+    <div class="de-card">
+      <div class="de-card-title">Signal Bot Would-Have-Traded</div>
+      <div class="de-card-note">Recent Signal Bot bridge decisions. Dry-run is the default; enabling its paper flag records an attribution refusal, because the Signal Bot has no registered strategy identity to attribute a trade to.</div>
+      <div class="de-table-wrap">
+        <table class="de-table">
+          <thead>
+            <tr>
+              <th>Time</th><th>Symbol</th><th>TF</th><th>Dir</th><th>Status</th>
+              <th>Destination</th><th>Entry</th><th>Score</th><th>Size</th><th>Reason</th>
+            </tr>
+          </thead>
+          <tbody id="sd-signal-actions-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <details class="de-card tl-legacy-history">
+      <summary>Legacy Paper History</summary>
+      <div class="de-card-note">Archived reference only. Main, Shadow SMC and Alts are the retired TraderClaw books &mdash; read-only, receiving no new positions, marks, closes or resets. Kept because deleting them would destroy history that is still true.</div>
+      <div id="sd-legacy-books"><div class="de-empty">Loading&hellip;</div></div>
+    </details>
+
+  </main>
+</div>
+<script src="/assets/js/sidebar.js"></script>
+<script src="/assets/js/signal-diagnostics.js"></script>
+</body>
+</html>
