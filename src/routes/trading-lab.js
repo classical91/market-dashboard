@@ -22,6 +22,16 @@ function latestExperimentFor(experimentStore, strategyId) {
   return result.items[0] || null;
 }
 
+function withLatestExperiments(result, experimentStore) {
+  return {
+    ...result,
+    accounts: (result.accounts || []).map((account) => ({
+      ...account,
+      latestBacktest: latestExperimentFor(experimentStore, account.id),
+    })),
+  };
+}
+
 function requireFields(body, fields) {
   const missing = fields.filter((f) => body[f] === undefined || body[f] === null || body[f] === "");
   if (missing.length) {
@@ -68,7 +78,7 @@ function createTradingLabRouter({
   // not a secret, and no external credits are spent serving it.
 
   router.get("/", asyncRoute(async (req, res) => {
-    res.json(await tradingLabService.overview());
+    res.json(withLatestExperiments(await tradingLabService.overview(), experimentStore));
   }));
 
   // The strategies the backtester can run. Public: it is a static catalogue,
@@ -178,13 +188,7 @@ function createTradingLabRouter({
 
   router.get("/strategy-accounts", asyncRoute(async (req, res) => {
     const result = await tradingLabService.strategyAccounts();
-    res.json({
-      ...result,
-      accounts: result.accounts.map((account) => ({
-        ...account,
-        latestBacktest: latestExperimentFor(experimentStore, account.id),
-      })),
-    });
+    res.json(withLatestExperiments(result, experimentStore));
   }));
 
   router.get("/strategy-accounts/:id", asyncRoute(async (req, res) => {

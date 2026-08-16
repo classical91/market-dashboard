@@ -344,6 +344,12 @@ test("strategy account cards expose the latest saved historical backtest", async
   assert.equal(smc.latestBacktest.symbol, "BTCUSDT");
   assert.equal(smc.latestBacktest.timeframe, "1h");
   assert.equal(typeof smc.latestBacktest.closedTrades, "number");
+
+  const overviewRes = await fetch(`${base}/api/trading-lab`);
+  assert.equal(overviewRes.status, 200);
+  const overview = await overviewRes.json();
+  const overviewSmc = overview.accounts.find((account) => account.id === "smc_v1");
+  assert.equal(overviewSmc.latestBacktest.id, recorded.experimentId);
 });
 
 test("running or comparing without an admin key is refused", async () => {
