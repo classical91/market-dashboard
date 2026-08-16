@@ -9,28 +9,94 @@ function read(relativePath) {
   return fs.readFileSync(path.join(__dirname, "..", relativePath), "utf8");
 }
 
-test("Trading Lab UI is strategy-account first and has no active legacy selector", () => {
+test("Backtest Lab is strategy-account first and has no active legacy selector", () => {
   const html = read("public/trading-lab.html");
   const js = read("public/assets/js/trading-lab.js");
 
   assert.doesNotMatch(html, /Portfolio Book/i);
   assert.doesNotMatch(html, /id=["']tl-book["']/i);
   assert.doesNotMatch(js, /bookSelect/);
-  assert.match(html, /Legacy Paper History/i);
-  assert.match(html, /read-only/i);
   assert.match(js, /data-strategy=/);
   assert.match(js, /data\.accounts/);
-  assert.match(js, /data\.legacyBooks/);
 });
 
-test("Trading Lab UI removes unattributed persistent trade actions", () => {
-  const html = read("public/trading-lab.html");
-  const js = read("public/assets/js/trading-lab.js");
+test("the archived ledgers are still readable, on the page that now owns them", () => {
+  // Legacy Paper History moved to Signal Diagnostics — it serves no demo
+  // account. The guarantee that it stays readable and read-only did not move
+  // with it by accident, so it is asserted where the content now lives.
+  const html = read("public/signal-diagnostics.html");
+  const js = read("public/assets/js/signal-diagnostics.js");
 
-  assert.doesNotMatch(js, /Paper trade/);
-  assert.doesNotMatch(js, /candidate-trade/);
-  assert.match(html, /unattributed, non-persistent analysis context/i);
-  assert.match(js, /Research only/);
+  assert.match(html, /Legacy Paper History/i);
+  assert.match(html, /read-only/i);
+  assert.match(js, /data\.legacyBooks/);
+  // And it is gone from the Lab rather than duplicated across both pages.
+  assert.doesNotMatch(read("public/trading-lab.html"), /Legacy Paper History/i);
+});
+
+test("no page offers an unattributed persistent trade action", () => {
+  // The property is about both pages now: the Decision Engine candidates table
+  // moved to Signal Diagnostics, and neither page may offer a way to turn one
+  // of those plans into a persistent trade.
+  for (const file of ["public/assets/js/trading-lab.js", "public/assets/js/signal-diagnostics.js"]) {
+    assert.doesNotMatch(read(file), /Paper trade/, file);
+    assert.doesNotMatch(read(file), /candidate-trade/, file);
+  }
+
+  // And the reason is stated where the candidates are shown.
+  assert.match(read("public/signal-diagnostics.html"), /unattributed, non-persistent analysis context/i);
+  assert.match(read("public/assets/js/signal-diagnostics.js"), /Research only/);
+});
+
+test("the Lab is renamed and points at where the moved panels went", () => {
+  const html = read("public/trading-lab.html");
+
+  assert.match(html, /Backtest Lab/);
+  assert.doesNotMatch(html, /&#129514; Trading Lab/);
+  assert.match(read("public/assets/js/sidebar.js"), /label: "Backtest Lab"/);
+
+  // The CARDS are gone from the Lab. Checked as card titles rather than as bare
+  // phrases: the regime note legitimately explains that the live scanner
+  // decides its own eligibility, and banning the words would forbid the
+  // sentence that says these systems are separate.
+  for (const title of ["Decision Engine Candidates", "Signal Bot Would-Have-Traded", "Live Scanner"]) {
+    assert.ok(
+      !html.includes(`<div class="de-card-title">${title}</div>`),
+      `the ${title} card is still on the Lab page`,
+    );
+  }
+  // And their mount points went with them.
+  for (const id of ["tl-candidates-tbody", "tl-signal-actions-tbody", "tl-scanner", "tl-legacy-books"]) {
+    assert.ok(!html.includes(id), `${id} is orphaned on the Lab page`);
+  }
+  // ...and reachable rather than simply deleted.
+  assert.match(html, /signal-diagnostics\.html/);
+});
+
+test("Signal Diagnostics is reachable from the sidebar under Signal Screener", () => {
+  const sidebar = read("public/assets/js/sidebar.js");
+  const screener = sidebar.indexOf('/signal-screener.html');
+  const diagnostics = sidebar.indexOf('/signal-diagnostics.html');
+
+  assert.ok(diagnostics > -1, "the page is not in the sidebar");
+  assert.ok(diagnostics > screener, "it should sit under Signal Screener");
+});
+
+test("the Lab offers the timeframes the screener can actually fetch", () => {
+  const html = read("public/trading-lab.html");
+  const { INTERVAL_MAP } = require("../src/services/signal-screener");
+
+  // Every interval the backtest selector offers must be one the candle source
+  // can serve — an option that 400s is worse than an absent one.
+  const offered = [...html.matchAll(/<option value="([^"]+)"[^>]*>[^<]*<\/option>/g)]
+    .map((m) => m[1])
+    .filter((value) => /^\d+[mhDW]$/.test(value));
+  for (const interval of offered) {
+    assert.ok(INTERVAL_MAP[interval], `the UI offers "${interval}" but the screener cannot fetch it`);
+  }
+  // And the widening actually happened.
+  assert.match(html, /value="15m"/);
+  assert.match(html, /value="1W"/);
 });
 
 test("strategy cards separate research status from live demo state and expose Account Activity", () => {

@@ -5,14 +5,9 @@
   var updatedEl = document.getElementById("tl-updated");
   var modeEl = document.getElementById("tl-mode");
   var selectedAccountEl = document.getElementById("tl-selected-account");
-  var intervalSelect = document.getElementById("tl-interval");
   var refreshBtn = document.getElementById("tl-refresh-btn");
   var markBtn = document.getElementById("tl-mark-btn");
-  var legacyBooksEl = document.getElementById("tl-legacy-books");
   var positionsTbody = document.getElementById("tl-positions-tbody");
-  var candidatesTbody = document.getElementById("tl-candidates-tbody");
-  var signalActionsTbody = document.getElementById("tl-signal-actions-tbody");
-  var scannerEl = document.getElementById("tl-scanner");
   var metricsEl = document.getElementById("tl-metrics");
   var strategyAccountsEl = document.getElementById("tl-strategy-accounts");
   var activityShell = document.getElementById("tl-activity-shell");
@@ -295,27 +290,6 @@
       .join("");
   }
 
-  function renderLegacyBooks(books) {
-    if (!legacyBooksEl) return;
-    if (!books || !books.length) {
-      legacyBooksEl.innerHTML = '<div class="de-empty">No legacy ledgers found.</div>';
-      return;
-    }
-    legacyBooksEl.innerHTML =
-      '<div class="de-table-wrap"><table class="de-table"><thead><tr>' +
-      '<th>Ledger</th><th>Status</th><th>Closed trades</th><th>Historical balance</th><th>P&amp;L</th>' +
-      '</tr></thead><tbody>' +
-      books.map(function (book) {
-        var s = book.stats || {};
-        return "<tr><td>" + escapeHtml(book.name) + "</td>" +
-          '<td><span class="tl-tag">Archived · read only</span></td>' +
-          "<td>" + Number(book.totalTrades || s.totalTrades || 0) + "</td>" +
-          "<td>$" + Number(s.balance || s.startingBalance || 0).toLocaleString(undefined, { maximumFractionDigits: 2 }) + "</td>" +
-          '<td class="' + pnlClass(s.realizedPnl) + '">' + fmtUsd(s.realizedPnl) + "</td></tr>";
-      }).join("") +
-      "</tbody></table></div>";
-  }
-
   // Positions an autonomous loop manages. The dashboard observes these; it does
   // not participate in them, so the controls that would alter a running
   // experiment are removed rather than left to fail against the API guard.
@@ -361,113 +335,6 @@
         );
       })
       .join("");
-  }
-
-  function renderCandidates(data) {
-    var rows = (data && data.candidates) || [];
-    if (!rows.length) {
-      candidatesTbody.innerHTML = '<tr><td colspan="12" class="de-empty">No execution plans from the Decision Engine right now.</td></tr>';
-      return;
-    }
-    candidatesTbody.innerHTML = rows
-      .map(function (row) {
-        var t = row.trade || {};
-        return (
-          '<tr title="' + reasonsTitle(row.reasons) + '">' +
-          "<td>" + escapeHtml(row.symbol) + "</td>" +
-          '<td class="' + (row.signal === "LONG" ? "tl-up" : "tl-down") + '">' + escapeHtml(row.signal) + "</td>" +
-          "<td>" + (row.setupScore == null ? "—" : row.setupScore) + "</td>" +
-          '<td><span class="' + decisionClass(row.decision) + '">' + escapeHtml(row.decision) + "</span> " + row.confidenceScore + "</td>" +
-          '<td><span class="' + decisionClass(row.edgeDecision) + '">' + escapeHtml(row.edgeDecision) + "</span></td>" +
-          "<td>" + (row.sizeMultiplier ? row.sizeMultiplier.toFixed(2) + "x" : "—") + "</td>" +
-          "<td>" + fmtPrice(row.plan && row.plan.trigger) + "</td>" +
-          "<td>" + fmtPrice(t.stopLoss) + "</td>" +
-          "<td>" + fmtPrice(t.tp1) + "</td>" +
-          "<td>" + fmtPrice(t.tp2) + "</td>" +
-          "<td>" + (t.riskUsd == null ? "—" : "$" + t.riskUsd) + "</td>" +
-          '<td><span class="tl-tag" title="No registered strategy identity">Research only</span></td></tr>'
-        );
-      })
-      .join("");
-  }
-
-  function renderSignalActions(data) {
-    var rows = (data && data.items) || [];
-    if (!rows.length) {
-      signalActionsTbody.innerHTML = '<tr><td colspan="10" class="de-empty">No Signal Bot bridge actions recorded yet.</td></tr>';
-      return;
-    }
-    signalActionsTbody.innerHTML = rows
-      .map(function (row) {
-        var statusClass = row.status === "opened" ? "tl-badge--take" :
-          row.status === "dry-run" ? "tl-badge--reduce" : "tl-badge--skip";
-        return (
-          "<tr>" +
-          "<td>" + fmtTime(row.timestamp) + "</td>" +
-          "<td>" + escapeHtml(row.symbol) + "</td>" +
-          "<td>" + escapeHtml(row.interval) + "</td>" +
-          '<td class="' + (row.direction === "LONG" ? "tl-up" : "tl-down") + '">' + escapeHtml(row.direction) + "</td>" +
-          '<td><span class="tl-badge ' + statusClass + '">' + escapeHtml(row.status) + "</span></td>" +
-          "<td>" + escapeHtml(row.book) + "</td>" +
-          "<td>" + fmtPrice(row.entryPrice) + "</td>" +
-          "<td>" + (row.confidenceScore == null ? "&mdash;" : row.confidenceScore) + "</td>" +
-          "<td>" + (row.sizeMultiplier == null ? "&mdash;" : Number(row.sizeMultiplier).toFixed(2) + "x") + "</td>" +
-          "<td>" + escapeHtml(row.reason) + "</td>" +
-          "</tr>"
-        );
-      })
-      .join("");
-  }
-
-  // Live scanner health: enabled, last scan, last candle, last signal, last
-  // error — the five things that answer "is it actually running?" without
-  // needing the server logs.
-  function renderScanner(data) {
-    if (!scannerEl) return;
-    if (!data || !data.configured) {
-      scannerEl.innerHTML = '<div class="de-empty">Live scanner is not configured.</div>';
-      return;
-    }
-
-    var stateLabel = data.enabled ? (data.running ? "Running" : "Enabled (loop not started)") : "Disabled";
-    var stateClass = data.enabled && data.running ? "tl-up" : data.enabled ? "" : "tl-flat";
-    var signal = data.lastSignal;
-    var candle = data.lastCandle;
-    var signalClass = !signal ? "" : signal.signal === "LONG" ? "tl-up" : signal.signal === "SHORT" ? "tl-down" : "tl-flat";
-
-    var tiles =
-      statTile("State", escapeHtml(stateLabel), stateClass) +
-      statTile("Symbol", escapeHtml(data.symbol) + " &middot; " + escapeHtml(data.timeframe)) +
-      statTile("Strategy", escapeHtml(data.strategy)) +
-      statTile("Mode", data.paperTradeEnabled ? "Paper trading" : "Dry run", data.paperTradeEnabled ? "tl-up" : "tl-flat") +
-      statTile("Last scan", fmtTime(data.lastScanAt)) +
-      statTile("Last candle close", candle ? fmtTime(candle.closedAt) : "&mdash;") +
-      statTile("Last candle price", candle ? fmtPrice(candle.close) : "&mdash;") +
-      statTile("Last signal", signal ? escapeHtml(signal.signal) : "&mdash;", signalClass) +
-      statTile("Scans", data.scanCount + " / " + data.errorCount + " errors", data.errorCount ? "tl-down" : "") +
-      statTile("Last action", data.lastAction ? escapeHtml(data.lastAction.status) : "&mdash;");
-
-    var detail = "";
-    if (signal && signal.indicators) {
-      var ind = signal.indicators;
-      detail +=
-        '<div class="de-card-note">EMA20 ' + fmtPrice(ind.ema20) + " &middot; EMA50 " + fmtPrice(ind.ema50) +
-        " &middot; RSI " + Number(ind.rsi).toFixed(1) + " &middot; trend " + escapeHtml(ind.trend) +
-        " &middot; ATR " + fmtPrice(ind.atr) + "</div>";
-    }
-    if (signal && signal.error) {
-      detail += '<div class="de-card-note">' + escapeHtml(signal.error) + "</div>";
-    }
-    if (data.lastAction) {
-      detail += '<div class="de-card-note">Last action: ' + escapeHtml(data.lastAction.reason) + "</div>";
-    }
-    if (data.lastError) {
-      detail +=
-        '<div class="de-card-note tl-down">Last error (' + fmtTime(data.lastErrorAt) + "): " +
-        escapeHtml(data.lastError) + "</div>";
-    }
-
-    scannerEl.innerHTML = '<div class="tl-stat-grid">' + tiles + "</div>" + detail;
   }
 
   function renderMetrics(data) {
@@ -896,7 +763,6 @@
       modeEl.className = "tl-mode " + (data.mode === "live" ? "tl-mode--live" : "tl-mode--paper");
       updatedEl.textContent = "Updated " + fmtTime(data.updatedAt);
       renderStrategyAccounts({ accounts: strategyAccounts });
-      renderLegacyBooks(data.legacyBooks || data.books || []);
       var selected = strategyAccounts.filter(function (account) { return account.id === currentStrategy(); })[0];
       if (selectedAccountEl) selectedAccountEl.textContent = selected ? selected.name : currentStrategy();
     });
@@ -914,16 +780,6 @@
         renderHistory(detail.history);
         renderRegimeMatrix(detail.regimeMetrics);
       }),
-      getJson("/api/trading-lab/signal-actions?limit=25").then(renderSignalActions),
-      // The scanner panel is independent of the selected strategy: a failure to read it
-      // must not blank the metrics and history alongside it.
-      getJson("/api/live-scanner/status")
-        .then(renderScanner)
-        .catch(function (err) {
-          if (scannerEl) {
-            scannerEl.innerHTML = '<div class="de-empty">Could not read scanner status: ' + escapeHtml(err.message) + "</div>";
-          }
-        }),
     ]);
   }
 
@@ -961,25 +817,11 @@
       });
   }
 
-  function loadCandidates() {
-    candidatesTbody.innerHTML = '<tr><td colspan="12" class="de-empty">Scoring Decision Engine plans&hellip;</td></tr>';
-    return getJson(
-      "/api/trading-lab/decision-candidates?interval=" +
-        encodeURIComponent(intervalSelect.value),
-    )
-      .then(renderCandidates)
-      .catch(function (err) {
-        candidatesTbody.innerHTML =
-          '<tr><td colspan="12" class="de-empty">Could not score plans: ' + escapeHtml(err.message) + "</td></tr>";
-      });
-  }
-
   function refresh() {
     clearError();
     refreshBtn.disabled = true;
     return loadOverview()
       .then(loadStrategyDetail)
-      .then(loadCandidates)
       .then(loadRegime)
       .catch(function (err) { showError(err.message); })
       .then(function () { refreshBtn.disabled = false; });
@@ -1626,7 +1468,6 @@
   }
 
   refreshBtn.addEventListener("click", refresh);
-  intervalSelect.addEventListener("change", loadCandidates);
 
   strategyAccountsEl.addEventListener("click", function (event) {
     var activityButton = event.target.closest("[data-activity-strategy]");

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Trading Lab &middot; Market Command</title>
+  <title>Backtest Lab &middot; Market Command</title>
   <script src="/assets/js/settings.js"></script>
   <link rel="stylesheet" href="/assets/styles/command.css" />
   <link rel="stylesheet" href="/assets/styles/ai-analysis.css" />
@@ -17,8 +17,8 @@
 
     <div class="cmd-page-header">
       <div>
-        <div class="cmd-page-title">&#129514; Trading Lab</div>
-        <div class="cmd-page-subtitle">Paper execution, risk sizing and the historical edge gate &mdash; the Decision Engine says a setup looks good, the Lab says whether setups like it have actually paid</div>
+        <div class="cmd-page-title">&#129514; Backtest Lab</div>
+        <div class="cmd-page-subtitle">Demo accounts and the evidence behind them &mdash; each strategy trades its own $10,000 paper account autonomously, and backtests say whether trades like those have historically paid</div>
       </div>
     </div>
 
@@ -27,7 +27,6 @@
     <div class="tl-concepts">
       <div><strong>Strategy account</strong> — the isolated performance of one strategy, with its own balance and history.</div>
       <div><strong>Live demo research</strong> — continuous simulated evidence collection. It does not promote a strategy or make it scanner-eligible.</div>
-      <div><strong>Legacy paper history</strong> — the retired Main, Shadow SMC and Alts ledgers. They remain readable and receive no new trades.</div>
       <div><strong>Backtest</strong> — a historical replay. It runs on a disposable ledger and never changes a persistent balance.</div>
     </div>
 
@@ -53,22 +52,14 @@
 
     <div class="de-toolbar">
       <span class="tl-inline-label" id="tl-selected-account">Mindset</span>
-      <select class="aia-select" id="tl-interval">
-        <option value="1h">1h</option>
-        <option value="4h" selected>4h</option>
-        <option value="1D">1D</option>
-      </select>
       <button class="aia-run-btn" type="button" id="tl-refresh-btn">Refresh</button>
       <button class="aia-run-btn" type="button" id="tl-mark-btn" title="Mark open positions to market and fire any stop or target reached">Mark to market</button>
       <span class="tl-mode" id="tl-mode"></span>
       <span class="de-updated" id="tl-updated"></span>
     </div>
 
-    <details class="de-card tl-legacy-history">
-      <summary>Legacy Paper History</summary>
-      <div class="de-card-note">Archived reference only. Main, Shadow SMC and Alts are read-only and receive no new positions, marks, closes or resets.</div>
-      <div id="tl-legacy-books"><div class="de-empty">Loading&hellip;</div></div>
-    </details>
+
+    <div class="de-card-note tl-moved-note">Signal sources, loop health and the archived Main / Shadow SMC / Alts ledgers moved to <a href="/signal-diagnostics.html">Signal Diagnostics</a> &mdash; none of them feed a demo account.</div>
 
     <div class="de-card">
       <div class="de-card-title">Market Environment</div>
@@ -77,8 +68,11 @@
         <input class="aia-select tl-input" id="tl-regime-symbol" type="text" value="BTCUSDT" placeholder="Symbol" />
         <select class="aia-select" id="tl-regime-interval">
           <option value="15m">15m</option>
+          <option value="30m">30m</option>
           <option value="1h" selected>1h</option>
+          <option value="2h">2h</option>
           <option value="4h">4h</option>
+          <option value="12h">12h</option>
           <option value="1D">1D</option>
         </select>
         <button class="aia-run-btn" type="button" id="tl-regime-btn">Read regime</button>
@@ -101,53 +95,25 @@
       </div>
     </div>
 
-    <div class="de-card">
-      <div class="de-card-title">Decision Engine Candidates</div>
-      <div class="de-card-note">Every execution plan the Decision Engine produced, scored in an unattributed, non-persistent analysis context. These plans cannot be written into a strategy account without trustworthy strategy identity.</div>
-      <div class="de-table-wrap">
-        <table class="de-table">
-          <thead>
-            <tr>
-              <th>Symbol</th><th>Signal</th><th>Setup</th><th>Checklist</th><th>Edge</th>
-              <th>Size</th><th>Entry</th><th>Stop</th><th>TP1</th><th>TP2</th><th>Risk</th><th>Execution</th>
-            </tr>
-          </thead>
-          <tbody id="tl-candidates-tbody"></tbody>
-        </table>
-      </div>
-    </div>
 
-    <div class="de-card">
-      <div class="de-card-title">Live Scanner</div>
-      <div class="de-card-note">Native Bitget perpetual scanner &mdash; pulls its own candles and runs its own strategy on a 60s loop, so no TradingView webhook is needed. Evaluates closed candles only, one entry per symbol/direction/candle, paper trades only. Enable with ENABLE_LIVE_SCANNER=true.</div>
-      <div id="tl-scanner"><div class="de-empty">Loading&hellip;</div></div>
-    </div>
 
-    <div class="de-card">
-      <div class="de-card-title">Signal Bot Would-Have-Traded</div>
-      <div class="de-card-note">Recent Signal Bot bridge decisions. Dry-run is the default; enabling its paper flag records an attribution refusal because Signal Bot has no registered strategy identity.</div>
-      <div class="de-table-wrap">
-        <table class="de-table">
-          <thead>
-            <tr>
-              <th>Time</th><th>Symbol</th><th>TF</th><th>Dir</th><th>Status</th>
-              <th>Destination</th><th>Entry</th><th>Score</th><th>Size</th><th>Reason</th>
-            </tr>
-          </thead>
-          <tbody id="tl-signal-actions-tbody"></tbody>
-        </table>
-      </div>
-    </div>
 
     <div class="de-card">
       <div class="de-card-title">Backtest</div>
       <div class="de-card-note">Replays historical candles through the same paper-trading engine, so a backtest and a forward paper run agree by construction. Entries fill at the signalling bar's close, and when one bar contains both the stop and a target the stop is taken &mdash; results are pessimistic by design.</div>
       <div class="de-toolbar">
         <input class="aia-select tl-input" id="tl-bt-symbol" type="text" value="BTCUSDT" placeholder="Symbol" />
-        <select class="aia-select" id="tl-bt-interval">
+        <select class="aia-select" id="tl-bt-interval" title="Which timeframe to replay">
+          <option value="5m">5m</option>
+          <option value="15m">15m</option>
+          <option value="30m">30m</option>
           <option value="1h">1h</option>
+          <option value="2h">2h</option>
           <option value="4h" selected>4h</option>
+          <option value="6h">6h</option>
+          <option value="12h">12h</option>
           <option value="1D">1D</option>
+          <option value="1W">1W</option>
         </select>
         <select class="aia-select" id="tl-bt-strategy" title="Which strategy to replay"></select>
         <select class="aia-select" id="tl-bt-mode" title="Which exit rules the replay uses">
