@@ -27,6 +27,7 @@ The app is intentionally lightweight: no bundler, no frontend framework, and no 
 - `/youtube-v2.html` - YouTube Intelligence: live streams, scheduled streams, and latest uploads from tracked channels.
 - `/indicators.html` - Trading and market glossary.
 - `/reporter.html` - Daily report generation workflow.
+- `/api/broadcast-ledger/manual` - mobile-friendly form for recording a broadcast posted by hand. Part of the broadcast receipt ledger, the shared record that keeps the dashboard, the GPT/iOS Shortcut, the ShareBot67 agent and manual posting from duplicating or falsely failing a story. See [docs/broadcast-ledger.md](docs/broadcast-ledger.md).
 
 ## Setup
 
@@ -83,6 +84,8 @@ Most keys are optional. The app is designed to degrade to fallback data where po
 - `DATA_DIR` - persistent file directory for reporter logs/caches and X feed cache. On Railway, set this to the mounted volume path, usually `/app/data`.
 - `MARKET_DASHBOARD_LOGIN_PASSWORD` - optional owner website password. When set, unauthenticated visitors are redirected to `/login`.
 - `ADMIN_API_KEY` - shared secret enabling action/mutation endpoints (see [Access Control](#access-control)). Blank means those endpoints are disabled (`503`).
+- `BROADCAST_LEDGER_API_KEY` - shared secret for the broadcast receipt ledger (`/api/broadcast-ledger`). Falls back to `ADMIN_API_KEY`; blank for both disables those endpoints (`503`). See [docs/broadcast-ledger.md](docs/broadcast-ledger.md).
+- `BROADCAST_LEDGER_RATE_LIMIT_PER_MIN` - per-IP rate limit for the ledger endpoints, defaults to `60` (`0` disables).
 - `OPENAI_API_KEY` - enables report generation.
 - `REPORTER_MODEL` - OpenAI model for reporter generation, defaults to `gpt-5.4-mini`.
 - `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_IDS` - enable Telegram delivery.
@@ -205,9 +208,13 @@ market-dashboard/
         live-scanner.js   native Bitget candle feed + strategy loop
         trade-intent.js   raw strategy intent, with risk fields refused
         intent-handler.js one boundary: gated entries, ungated exits
+    services/broadcast-ledger.js  broadcast receipts: dedupe, idempotency, reconciliation
+    middleware/ledger-auth.js     ledger API key guard (separate secret from ADMIN_API_KEY)
+    middleware/rate-limit.js      in-process per-IP fixed-window limiter
     utils/                validators, errors, mappers
   docs/
     trading-lab.md        migration map and remaining work
+    broadcast-ledger.md   receipt ledger: data model, endpoints, integrations
   scripts/
     lint.js
     build-check.js

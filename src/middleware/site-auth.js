@@ -1,6 +1,7 @@
 "use strict";
 
 const crypto = require("crypto");
+const { isLedgerRequest, isLedgerParamRequest } = require("./ledger-auth");
 
 const COOKIE_NAME = "market_dashboard_session";
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -115,6 +116,24 @@ function isAlphaReadApi(req) {
   return req.method === "GET" && ALPHA_READ_APIS.some((prefix) => req.path === prefix || req.path.startsWith(`${prefix}/`));
 }
 
+// The broadcast ledger is called by machines — the iOS/GPT shortcut and the
+// ShareBot67 agent — which authenticate with an API key and have no session
+// cookie to present. Without this bypass the site login would reject every
+// one of those requests before the ledger's own key guard ever ran, which is
+// exactly the silent failure the ledger exists to prevent. The routes still
+// enforce their own key; this only stops site auth from short-circuiting
+// them first.
+function isLedgerApiPath(req) {
+  return req.path === "/api/broadcast-ledger" || req.path.startsWith("/api/broadcast-ledger/");
+}
+
+// The manual receipt form is opened in a phone browser, which can't set a
+// header — so it alone may authenticate with a `key` parameter. Narrowed to
+// this one path on purpose: keys in URLs end up in history and access logs.
+function isLedgerFormPath(req) {
+  return req.path === "/api/broadcast-ledger/manual";
+}
+
 function isPublicAuthPath(req) {
   return req.path === "/login"
     || req.path === "/auth/login"
@@ -195,6 +214,13 @@ function createSiteAuth(config) {
       if (!enabled || isPublicAuthPath(req)) {
         next();
         return;
+      }
+      if (isLedgerApiPath(req)) {
+        const keys = { ledgerKey: config.ledgerKey, adminKey: config.adminKey };
+        if (isLedgerRequest(req, keys) || (isLedgerFormPath(req) && isLedgerParamRequest(req, keys))) {
+          next();
+          return;
+        }
       }
       const session = sessionFromRequest(req, config);
       if (canAccess(req, session)) {
