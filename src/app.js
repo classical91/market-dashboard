@@ -71,6 +71,7 @@ const { EtherscanService } = require("./services/etherscan");
 const { MarketDataService } = require("./services/market-data");
 const { OnchainService } = require("./services/onchain");
 const { OverviewService } = require("./services/overview");
+const { BroadcastIngestService } = require("./services/broadcast-ingest");
 const { BroadcastLedgerStore } = require("./services/broadcast-ledger");
 const { ReporterService } = require("./services/reporter");
 const { TelegramService } = require("./services/telegram");
@@ -108,6 +109,17 @@ function createApp() {
   // here rather than behind the OpenClaw gateway precisely so it stays
   // readable when that gateway is down.
   const broadcastLedgerStore = new BroadcastLedgerStore({ dataDir });
+  // Watches the same channels the bot posts to and records what it sees, so a
+  // story reaches the ledger even when the path that sent it never reported.
+  // Constructed always, started only by server.js, and a no-op that logs when
+  // BROADCAST_LEDGER_INGEST_ENABLED is not "true".
+  const broadcastIngestService = new BroadcastIngestService({
+    telegramService,
+    broadcastLedgerStore,
+    stateCache: new PersistentReporterCache(path.join(dataDir, "broadcast-ingest-state.json")),
+    enabled: config.broadcastLedger.ingestEnabled,
+    intervalMs: config.broadcastLedger.ingestIntervalMs,
+  });
   const reporterService = new ReporterService({
     cache: reporterCache,
     apiKey: config.reporter.apiKey,
@@ -354,6 +366,7 @@ function createApp() {
     "/api/broadcast-ledger",
     createBroadcastLedgerRouter({
       broadcastLedgerStore,
+      broadcastIngestService,
       requireLedgerKey,
       ledgerKey: config.broadcastLedger.apiKey,
       adminKey: config.admin.apiKey,
@@ -390,6 +403,7 @@ function createApp() {
   // The interval loop is started by server.js, not here — createApp() is also
   // used by tests and the build check, which must not leave timers running.
   app.locals.signalBot = signalBotService;
+  app.locals.broadcastIngest = broadcastIngestService;
   app.locals.liveScanner = liveScannerService;
   app.locals.liveResearch = liveResearchService;
 

@@ -351,3 +351,105 @@ test("message bodies are hashed, never stored", () => {
   assert.ok(receipt.contentHash);
   assert.ok(!raw.includes("must not be persisted"));
 });
+
+/* ── attribution: which path actually sent it ── */
+
+test("a path reporting itself claims the watch's unattributed receipt instead of duplicating it", () => {
+  const store = freshStore();
+  // The channel watch got there first — it polls on a timer.
+  store.createReceipt({
+    source: "telegram-ingest",
+    title: "Fed holds rates steady",
+    url: "https://example.com/news/fed",
+    status: "posted",
+    idempotencyKey: "telegram:-1001:500",
+    destinations: [{ channel: "telegram", chatId: "-1001", status: "posted", messageId: "500" }],
+  });
+
+  const { receipt, created, claimed } = store.createReceipt({
+    source: "shortcut",
+    title: "Fed holds rates steady",
+    url: "https://example.com/news/fed",
+    idempotencyKey: "shortcut-run-1",
+    status: "posted",
+  });
+
+  assert.equal(created, false);
+  assert.equal(claimed, true);
+  assert.equal(store.count(), 1, "one broadcast is one receipt regardless of who recorded it first");
+  assert.equal(receipt.source, "shortcut", "the sender's own claim beats 'observed in the channel'");
+  assert.equal(receipt.destinations[0].messageId, "500", "the watch's message id is kept");
+  assert.equal(receipt.attempts.at(-1).action, "claim");
+});
+
+test("attribution does not depend on which arrived first", () => {
+  const store = freshStore();
+  // Sender first this time, watch second — the ingest path attaches.
+  const { receipt } = store.createReceipt({
+    source: "sharebot67",
+    title: "Ethereum upgrade ships",
+    url: "https://example.com/eth",
+    idempotencyKey: "agent-1",
+    status: "posted",
+  });
+  store.updateReceipt(receipt.id, {
+    destinations: [{ channel: "telegram", chatId: "-1001", status: "posted", messageId: "600" }],
+  });
+
+  assert.equal(store.count(), 1);
+  assert.equal(store.getReceipt(receipt.id).source, "sharebot67");
+});
+
+test("a claim re-uses the claiming path's idempotency key, so its retries still dedupe", () => {
+  const store = freshStore();
+  store.createReceipt({
+    source: "telegram-ingest",
+    title: "Story",
+    url: "https://example.com/s",
+    status: "posted",
+    idempotencyKey: "telegram:-1001:700",
+  });
+
+  store.createReceipt({ source: "shortcut", title: "Story", url: "https://example.com/s", idempotencyKey: "sc-1", status: "posted" });
+  // The shortcut retries after a dropped connection.
+  store.createReceipt({ source: "shortcut", title: "Story", url: "https://example.com/s", idempotencyKey: "sc-1", status: "posted" });
+
+  assert.equal(store.count(), 1);
+});
+
+test("two receipts that each name a path are never merged — that would be guessing", () => {
+  const store = freshStore();
+  store.createReceipt({ source: "shortcut", title: "Story", url: "https://example.com/x", status: "posted" });
+  store.createReceipt({ source: "sharebot67", title: "Story", url: "https://example.com/x", status: "posted" });
+
+  assert.equal(store.count(), 2, "a genuine double-send by two paths stays visible as two records");
+});
+
+test("the watch never claims a receipt a real path already owns", () => {
+  const store = freshStore();
+  const { receipt } = store.createReceipt({
+    source: "shortcut",
+    title: "Story",
+    url: "https://example.com/y",
+    status: "posted",
+  });
+  store.createReceipt({ source: "telegram-ingest", title: "Story", url: "https://example.com/y", status: "posted" });
+
+  assert.equal(store.getReceipt(receipt.id).source, "shortcut");
+});
+
+test("sourceBreakdown answers which path did what, and what nobody claimed", () => {
+  const store = freshStore();
+  store.createReceipt({ source: "shortcut", title: "A", url: "https://e.com/a", status: "posted" });
+  store.createReceipt({ source: "shortcut", title: "B", url: "https://e.com/b", status: "posted" });
+  store.createReceipt({ source: "sharebot67", title: "C", url: "https://e.com/c", status: "posted" });
+  store.createReceipt({ source: "dashboard", kind: "digest", title: "D", url: "https://e.com/d", status: "posted" });
+  store.createReceipt({ source: "telegram-ingest", title: "E", url: "https://e.com/e", status: "posted" });
+
+  const { bySource, unattributed } = store.sourceBreakdown();
+  assert.equal(bySource.shortcut, 2);
+  assert.equal(bySource.sharebot67, 1);
+  assert.equal(bySource.dashboard, 1);
+  assert.equal(bySource["telegram-ingest"], 1);
+  assert.equal(unattributed, 1, "posted by hand, or by a path not reporting itself yet");
+});

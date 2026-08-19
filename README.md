@@ -86,6 +86,8 @@ Most keys are optional. The app is designed to degrade to fallback data where po
 - `ADMIN_API_KEY` - shared secret enabling action/mutation endpoints (see [Access Control](#access-control)). Blank means those endpoints are disabled (`503`).
 - `BROADCAST_LEDGER_API_KEY` - shared secret for the broadcast receipt ledger (`/api/broadcast-ledger`). Falls back to `ADMIN_API_KEY`; blank for both disables those endpoints (`503`). See [docs/broadcast-ledger.md](docs/broadcast-ledger.md).
 - `BROADCAST_LEDGER_RATE_LIMIT_PER_MIN` - per-IP rate limit for the ledger endpoints, defaults to `60` (`0` disables).
+- `BROADCAST_LEDGER_INGEST_ENABLED` - set to `true` to watch the configured Telegram channels and auto-record every post as a broadcast receipt, whichever path sent it. Off by default; requires Telegram to be configured.
+- `BROADCAST_LEDGER_INGEST_INTERVAL_MS` - channel poll interval, defaults to `60000` (floor `15000`).
 - `OPENAI_API_KEY` - enables report generation.
 - `REPORTER_MODEL` - OpenAI model for reporter generation, defaults to `gpt-5.4-mini`.
 - `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_IDS` - enable Telegram delivery.
@@ -209,6 +211,7 @@ market-dashboard/
         trade-intent.js   raw strategy intent, with risk fields refused
         intent-handler.js one boundary: gated entries, ungated exits
     services/broadcast-ledger.js  broadcast receipts: dedupe, idempotency, reconciliation
+    services/broadcast-ingest.js  watches Telegram channels and auto-records what it sees
     middleware/ledger-auth.js     ledger API key guard (separate secret from ADMIN_API_KEY)
     middleware/rate-limit.js      in-process per-IP fixed-window limiter
     utils/                validators, errors, mappers

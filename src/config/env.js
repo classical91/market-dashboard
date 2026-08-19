@@ -128,6 +128,12 @@ const config = {
     // variable is set.
     apiKey: process.env.BROADCAST_LEDGER_API_KEY || "",
     rateLimitPerMinute: parseNumber(process.env.BROADCAST_LEDGER_RATE_LIMIT_PER_MIN, 60),
+    // Watch the configured Telegram channels and auto-record every post as a
+    // receipt. Off unless explicitly switched on by exact value: it starts a
+    // poll loop against the Telegram API, and only one process may consume a
+    // given bot's updates.
+    ingestEnabled: process.env.BROADCAST_LEDGER_INGEST_ENABLED === "true",
+    ingestIntervalMs: parseNumber(process.env.BROADCAST_LEDGER_INGEST_INTERVAL_MS, 60_000),
   },
   reporter: {
     apiKey: process.env.OPENAI_API_KEY || "",

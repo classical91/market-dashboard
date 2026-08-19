@@ -30,7 +30,16 @@ const LEDGER_VERSION = 1;
 const DEFAULT_CAP = 5000;
 const MAX_ATTEMPTS_PER_RECEIPT = 20;
 
-const SOURCES = ["shortcut", "sharebot67", "manual", "dashboard"];
+// "telegram-ingest" means the post was observed in the channel rather than
+// reported by a posting path. It is deliberately its own source: we know the
+// story went out, but not which of the three paths sent it.
+const SOURCES = ["shortcut", "sharebot67", "manual", "dashboard", "telegram-ingest"];
+
+// Sources that name the path that actually did the broadcasting. Everything
+// here is a claim by the sender itself; "telegram-ingest" is the residual —
+// a post nobody claimed, which in practice means it was sent by hand.
+const ATTRIBUTED_SOURCES = SOURCES.filter((source) => source !== "telegram-ingest");
+const UNATTRIBUTED_SOURCE = "telegram-ingest";
 const KINDS = ["story", "digest"];
 const STATUSES = ["pending", "posted", "partial", "failed", "reconciled"];
 const DESTINATION_STATUSES = ["pending", "posted", "failed"];
@@ -246,6 +255,37 @@ class BroadcastLedgerStore {
       }
     }
 
+    const source = SOURCES.includes(input.source) ? input.source : "manual";
+
+    // A path reporting itself claims the unattributed receipt the channel
+    // watch may already have written for the same story, rather than adding a
+    // second one. Without this the answer to "which path sent this?" depends
+    // on a race: the watch polls on a timer, so whether it saw the post before
+    // the sender's own call landed decided whether you got one receipt or two.
+    //
+    // Deliberately narrow. Only a "telegram-ingest" receipt is claimable,
+    // because that source explicitly means "we know it went out, not who sent
+    // it" — merging two receipts that both name a path would be guessing.
+    if (ATTRIBUTED_SOURCES.includes(source)) {
+      const claimable = this._findClaimable(input);
+      if (claimable) {
+        const updated = this.updateReceipt(
+          claimable.id,
+          {
+            source,
+            idempotencyKey: idempotencyKey || claimable.idempotencyKey,
+            title: input.title || input.headline,
+            url: input.url,
+            destinations: Array.isArray(input.destinations) ? input.destinations : [],
+            status: STATUSES.includes(input.status) ? input.status : undefined,
+            action: "claim",
+          },
+          { actor: source },
+        );
+        return { receipt: updated || claimable, created: false, claimed: true };
+      }
+    }
+
     const title = clampString(input.title || input.headline, MAX_TITLE_LEN);
     const url = clampString(input.url, MAX_URL_LEN);
     const canonicalUrl = canonicalizeUrl(url);
@@ -275,7 +315,7 @@ class BroadcastLedgerStore {
       idempotencyKey: idempotencyKey || null,
       createdAt: nowIso(),
       updatedAt: nowIso(),
-      source: SOURCES.includes(input.source) ? input.source : "manual",
+      source,
       kind: KINDS.includes(input.kind) ? input.kind : "story",
       title: title || null,
       url: url || null,
@@ -290,7 +330,7 @@ class BroadcastLedgerStore {
       attempts: [
         {
           at: nowIso(),
-          actor: SOURCES.includes(input.source) ? input.source : "manual",
+          actor: source,
           action: "create",
           ok: isPostedStatus(status),
           detail: `status=${status}`,
@@ -355,6 +395,15 @@ class BroadcastLedgerStore {
       receipt.status = isPostedStatus(receipt.status) && derived === "pending" ? receipt.status : derived;
     }
 
+    // Only ever set by a claim: the sender naming itself is strictly better
+    // information than "observed in the channel".
+    if (SOURCES.includes(patch.source) && receipt.source === UNATTRIBUTED_SOURCE) {
+      receipt.source = patch.source;
+    }
+    if (typeof patch.idempotencyKey === "string" && patch.idempotencyKey) {
+      receipt.idempotencyKey = clampString(patch.idempotencyKey, 200);
+    }
+
     if (typeof patch.reconciledWith === "string") {
       receipt.reconciledWith = clampString(patch.reconciledWith, 80) || null;
     }
@@ -374,6 +423,67 @@ class BroadcastLedgerStore {
     receipts[index] = receipt;
     this._write(receipts);
     return receipt;
+  }
+
+  /**
+   * True when some receipt already records this exact platform message.
+   *
+   * This is what keeps the channel watcher from re-recording a broadcast the
+   * dashboard itself just sent: that receipt already carries the Telegram
+   * message ID, so the post coming back as an update is recognized rather
+   * than duplicated — regardless of whether Telegram echoes a bot's own
+   * channel posts back to it.
+   */
+  hasMessage(channel, chatId, messageId) {
+    if (!chatId || !messageId) return false;
+    const wanted = { channel: String(channel), chatId: String(chatId), messageId: String(messageId) };
+    return this._read().some((receipt) =>
+      (receipt.destinations || []).some(
+        (destination) =>
+          destination.channel === wanted.channel &&
+          String(destination.chatId) === wanted.chatId &&
+          String(destination.messageId) === wanted.messageId,
+      ),
+    );
+  }
+
+  /**
+   * The unattributed receipt covering this same story, if there is one.
+   * Uses the authoritative dedupe tiers only — a headline/time-window guess is
+   * far too loose to hang a merge on.
+   */
+  _findClaimable(input) {
+    const canonicalUrl = canonicalizeUrl(input.url);
+    const contentHash =
+      clampString(input.contentHash, 64) ||
+      hashText(clampString(input.text || input.content, MAX_TEXT_LEN) || clampString(input.title || input.headline, MAX_TITLE_LEN));
+    if (!canonicalUrl && !contentHash) return null;
+
+    return (
+      this._read().find(
+        (receipt) =>
+          receipt.source === UNATTRIBUTED_SOURCE &&
+          ((canonicalUrl && receipt.canonicalUrl === canonicalUrl) ||
+            (contentHash && receipt.contentHash === contentHash)),
+      ) || null
+    );
+  }
+
+  /**
+   * How many broadcasts came from each path. `unattributed` is the count the
+   * channel watch recorded without anyone claiming them — stories that went
+   * out by hand, or from a path that isn't reporting itself yet.
+   */
+  sourceBreakdown({ since } = {}) {
+    const counts = {};
+    SOURCES.forEach((source) => {
+      counts[source] = 0;
+    });
+    this.list({ limit: 500, since }).forEach((receipt) => {
+      if (counts[receipt.source] === undefined) counts[receipt.source] = 0;
+      counts[receipt.source] += 1;
+    });
+    return { bySource: counts, unattributed: counts[UNATTRIBUTED_SOURCE] || 0 };
   }
 
   getReceipt(id) {
@@ -489,6 +599,8 @@ module.exports = {
   deriveStatus,
   isPostedStatus,
   SOURCES,
+  ATTRIBUTED_SOURCES,
+  UNATTRIBUTED_SOURCE,
   KINDS,
   STATUSES,
   LEDGER_VERSION,
