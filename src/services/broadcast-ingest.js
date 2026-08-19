@@ -91,6 +91,18 @@ class BroadcastIngestService {
     this._logger = logger;
     this._timer = null;
     this._conflictReported = false;
+    // Diagnostics. A watch that is running but recording nothing is the hard
+    // case to debug — the causes (wrong chat, a conflict, a bot that cannot
+    // read the chat) are invisible from the ledger alone, so keep enough
+    // state to tell them apart.
+    this._startedAt = null;
+    this._lastPollAt = null;
+    this._lastSummary = null;
+    this._lastError = null;
+    // Chats posts actually arrived from that are NOT being recorded. If this
+    // is non-empty while nothing is landing, TELEGRAM_CHAT_IDS points
+    // somewhere other than where the news is going.
+    this._unwatchedChatIds = new Set();
     // Only the chats the dashboard is configured for. A bot can be in other
     // channels; those are not this ledger's business.
     this._watchedChatIds = new Set(
@@ -123,6 +135,7 @@ class BroadcastIngestService {
       this.runOnce().catch((err) => this._logger.error?.(`[BroadcastIngest] Poll failed: ${err.message}`));
     }, this._intervalMs);
     if (this._timer.unref) this._timer.unref();
+    this._startedAt = new Date().toISOString();
     this.runOnce().catch((err) => this._logger.error?.(`[BroadcastIngest] Initial poll failed: ${err.message}`));
   }
 
@@ -142,9 +155,29 @@ class BroadcastIngestService {
     }
   }
 
+  /**
+   * Everything needed to answer "the watch is on, so why is nothing landing?"
+   * without shell access to the box.
+   */
+  describe() {
+    return {
+      enabled: this.enabled,
+      configured: Boolean(this._telegram && this._telegram.configured),
+      watchedChatIds: [...this._watchedChatIds],
+      unwatchedChatIdsSeen: [...this._unwatchedChatIds],
+      startedAt: this._startedAt,
+      lastPollAt: this._lastPollAt,
+      lastSummary: this._lastSummary,
+      lastError: this._lastError,
+      conflict: this._conflictReported,
+      intervalMs: this._intervalMs,
+    };
+  }
+
   async runOnce() {
     if (!this.enabled) return { polled: 0, recorded: 0, attached: 0, skipped: 0 };
 
+    this._lastPollAt = new Date().toISOString();
     let updates;
     try {
       updates = await this._telegram.getUpdates({ offset: this._offset() });
@@ -159,11 +192,15 @@ class BroadcastIngestService {
               "(or a webhook is set). Give the dashboard its own bot, or turn the channel watch off.",
           );
         }
+        this._lastError = "409 Conflict — another process is polling this bot token";
+        this._lastSummary = { polled: 0, recorded: 0, attached: 0, skipped: 0, conflict: true };
         return { polled: 0, recorded: 0, attached: 0, skipped: 0, conflict: true };
       }
+      this._lastError = err.message;
       throw err;
     }
     this._conflictReported = false;
+    this._lastError = null;
 
     const summary = { polled: updates.length, recorded: 0, attached: 0, skipped: 0 };
     let highestUpdateId = null;
@@ -184,6 +221,8 @@ class BroadcastIngestService {
     // silently dropping a post — re-reading is free, the ingest is idempotent.
     if (highestUpdateId !== null) this._saveOffset(highestUpdateId + 1);
 
+    this._lastSummary = { ...summary };
+
     if (summary.recorded || summary.attached) {
       this._logger.log?.(
         `[BroadcastIngest] ${summary.recorded} recorded, ${summary.attached} attached to existing receipts`,
@@ -197,7 +236,12 @@ class BroadcastIngestService {
     if (!post || !post.chat) return "skipped";
 
     const chatId = String(post.chat.id);
-    if (!this._watchedChatIds.has(chatId)) return "skipped";
+    if (!this._watchedChatIds.has(chatId)) {
+      // Remember it: "posts are arriving, just not from the chat you told me
+      // to watch" is the single most useful thing to be able to say.
+      if (this._unwatchedChatIds.size < 20) this._unwatchedChatIds.add(chatId);
+      return "skipped";
+    }
 
     const messageId = post.message_id != null ? String(post.message_id) : "";
     if (!messageId) return "skipped";

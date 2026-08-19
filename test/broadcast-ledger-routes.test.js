@@ -530,3 +530,100 @@ test("the live page carries the state block, not just the form", async () => {
   assert.match(html, /broadcasts? recorded/i);
   assert.match(html, /Watching your Telegram channels|Channel watch is off/);
 });
+
+/* ── the page must explain a watch that is on but recording nothing ── */
+
+test("a 409 conflict is named on the page, not just in the server log", () => {
+  const { renderManualForm } = require("../src/routes/broadcast-ledger");
+  const html = renderManualForm({
+    recent: [], total: 0, bySource: {}, watching: true,
+    diagnostics: { conflict: true, watchedChatIds: ["-1001"], lastPollAt: new Date().toISOString(),
+      lastSummary: { polled: 0 }, unwatchedChatIdsSeen: [] },
+  });
+
+  assert.match(html, /409 Conflict/);
+  assert.match(html, /same bot token|ShareBot67/i, "and points at the likely cause");
+});
+
+test("posts arriving from an unwatched chat are called out with the chat id", () => {
+  const { renderManualForm } = require("../src/routes/broadcast-ledger");
+  const html = renderManualForm({
+    recent: [], total: 0, bySource: {}, watching: true,
+    diagnostics: { conflict: false, watchedChatIds: ["-1001111"], unwatchedChatIdsSeen: ["-1009999"],
+      lastPollAt: new Date().toISOString(), lastSummary: { polled: 3 } },
+  });
+
+  // The most useful thing the page can say: traffic exists, it's just not
+  // from the chat you configured.
+  assert.match(html, /not watching/i);
+  assert.match(html, /-1009999/);
+  assert.match(html, /TELEGRAM_CHAT_IDS/);
+});
+
+test("an empty TELEGRAM_CHAT_IDS is reported as a configuration fault", () => {
+  const { renderManualForm } = require("../src/routes/broadcast-ledger");
+  const html = renderManualForm({
+    recent: [], total: 0, bySource: {}, watching: true,
+    diagnostics: { conflict: false, watchedChatIds: [], unwatchedChatIdsSeen: [], lastPollAt: null },
+  });
+  assert.match(html, /No chats configured/i);
+});
+
+test("a quiet but healthy watch explains that it only sees posts made after it started", () => {
+  const { renderManualForm } = require("../src/routes/broadcast-ledger");
+  const html = renderManualForm({
+    recent: [], total: 0, bySource: {}, watching: true,
+    diagnostics: { conflict: false, watchedChatIds: ["-1001"], unwatchedChatIdsSeen: [],
+      lastPollAt: new Date().toISOString(), lastSummary: { polled: 0 }, startedAt: new Date().toISOString() },
+  });
+
+  assert.match(html, /after<\/em> it started|after.*it started/i);
+  assert.match(html, /admin/i, "and the group-permission case");
+});
+
+test("no diagnostics block is shown when the watch is off — the banner already says why", () => {
+  const { renderManualForm } = require("../src/routes/broadcast-ledger");
+  const html = renderManualForm({ recent: [], total: 0, bySource: {}, watching: false, diagnostics: null });
+  assert.ok(!/Why is nothing appearing/.test(html));
+  assert.match(html, /Channel watch is off/i);
+});
+
+test("describe() reports what the watch is actually doing", async () => {
+  const { BroadcastIngestService } = require("../src/services/broadcast-ingest");
+  const service = new BroadcastIngestService({
+    telegramService: { configured: true, _chatIds: [{ chatId: "-1001", threadId: null }], async getUpdates() { return []; } },
+    broadcastLedgerStore: { hasMessage: () => false, lookup: () => ({ posted: false }), createReceipt() {}, updateReceipt() {} },
+    stateCache: { get: () => null, set() {} },
+    enabled: true,
+    logger: { log() {}, error() {} },
+  });
+
+  assert.equal(service.describe().lastPollAt, null);
+  await service.runOnce();
+  const d = service.describe();
+  assert.equal(d.enabled, true);
+  assert.deepEqual(d.watchedChatIds, ["-1001"]);
+  assert.ok(d.lastPollAt, "a completed poll is timestamped so a stalled watch is visible");
+  assert.equal(d.lastSummary.polled, 0);
+  assert.equal(d.conflict, false);
+});
+
+test("describe() records a chat that posted but is not being watched", async () => {
+  const { BroadcastIngestService } = require("../src/services/broadcast-ingest");
+  const service = new BroadcastIngestService({
+    telegramService: {
+      configured: true,
+      _chatIds: [{ chatId: "-1001", threadId: null }],
+      async getUpdates() {
+        return [{ update_id: 1, channel_post: { message_id: 5, chat: { id: -1009999 }, text: "Elsewhere" } }];
+      },
+    },
+    broadcastLedgerStore: { hasMessage: () => false, lookup: () => ({ posted: false }), createReceipt() {}, updateReceipt() {} },
+    stateCache: { get: () => null, set() {} },
+    enabled: true,
+    logger: { log() {}, error() {} },
+  });
+
+  await service.runOnce();
+  assert.deepEqual(service.describe().unwatchedChatIdsSeen, ["-1009999"]);
+});

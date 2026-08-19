@@ -332,6 +332,34 @@ hash). Two receipts that each name a path are never merged — a genuine
 double-send by two paths stays visible as two records, which is exactly the
 thing you would want to know about.
 
+### When the watch is on but nothing appears
+
+The page carries a **"Why is nothing appearing?"** block that names the cause,
+so this rarely needs debugging by hand. What it can tell you:
+
+| What it says | What it means |
+| --- | --- |
+| `409 Conflict` | Another process is reading this bot's updates — usually ShareBot67 on the same token, or a webhook. Give the dashboard its own bot. |
+| Posts arriving from a chat you are not watching | Traffic exists, but from a chat id not in `TELEGRAM_CHAT_IDS`. The id is printed; add it. |
+| No chats configured | `TELEGRAM_CHAT_IDS` is empty. |
+| Last poll failed: … | The Telegram error verbatim. |
+| Telegram returning nothing | See the two causes below. |
+
+Two things that surprise people, and neither is a bug:
+
+- **The watch only sees posts made after it started.** Telegram's `getUpdates`
+  is a queue, not a history. A story broadcast before you set
+  `BROADCAST_LEDGER_INGEST_ENABLED=true` will not appear retroactively —
+  record it once by hand if you need it on the ledger.
+- **Channel vs group.** In a *channel*, an admin bot receives every post, so
+  this works with no extra setup. In a *group or supergroup* (including one
+  with topics — if your `TELEGRAM_CHAT_IDS` entries carry a `:threadId`,
+  that's a supergroup), a bot with privacy mode on only sees messages
+  addressed to it. Make the bot an administrator there, or turn privacy mode
+  off via BotFather's `/setprivacy`.
+
+`GET /status` also returns the same detail under `watch` for scripting.
+
 ## Integration 1 — ShareBot67 (`newsreporter`)
 
 ### Preflight, before generating or posting anything

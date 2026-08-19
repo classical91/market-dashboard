@@ -93,6 +93,7 @@ function renderManualForm({
   recent = [],
   formKey = "",
   watching = false,
+  diagnostics = null,
   total = 0,
   bySource = {},
 } = {}) {
@@ -116,6 +117,57 @@ function renderManualForm({
 
   // The page led with a form, so an empty ledger looked identical to a broken
   // one. State first: whether anything is watching, and how much it has seen.
+  // A watch that is on but recording nothing has several possible causes and
+  // they are indistinguishable from the ledger alone. Say which one it is.
+  const d = diagnostics || {};
+  const diagLines = [];
+  if (watching) {
+    if (d.conflict) {
+      diagLines.push(
+        `<strong class="bad">Telegram is refusing the poll (409 Conflict).</strong> Another process is reading this bot's
+         updates \u2014 most likely ShareBot67 on the same bot token, or a webhook. Give the dashboard its own bot.`,
+      );
+    }
+    if (d.lastError && !d.conflict) {
+      diagLines.push(`<strong class="bad">Last poll failed:</strong> ${escapeHtml(d.lastError)}`);
+    }
+    if (Array.isArray(d.watchedChatIds) && d.watchedChatIds.length) {
+      diagLines.push(`Watching chat ${d.watchedChatIds.map((id) => `<code>${escapeHtml(id)}</code>`).join(", ")}`);
+    } else {
+      diagLines.push(
+        `<strong class="bad">No chats configured.</strong> <code>TELEGRAM_CHAT_IDS</code> is empty, so there is nothing to watch.`,
+      );
+    }
+    if (Array.isArray(d.unwatchedChatIdsSeen) && d.unwatchedChatIdsSeen.length) {
+      diagLines.push(
+        `<strong class="bad">Posts are arriving from a chat you are not watching:</strong>
+         ${d.unwatchedChatIdsSeen.map((id) => `<code>${escapeHtml(id)}</code>`).join(", ")}.
+         Add it to <code>TELEGRAM_CHAT_IDS</code>.`,
+      );
+    }
+    if (d.lastPollAt) {
+      const seen = d.lastSummary ? d.lastSummary.polled : 0;
+      diagLines.push(
+        `Last checked ${escapeHtml(new Date(d.lastPollAt).toISOString().replace("T", " ").slice(0, 16))} \u2014
+         ${seen} update${seen === 1 ? "" : "s"} from Telegram`,
+      );
+    } else {
+      diagLines.push("Has not completed a poll yet.");
+    }
+    if (!total && d.lastPollAt && d.lastSummary && !d.lastSummary.polled && !d.conflict) {
+      diagLines.push(
+        `Telegram is returning nothing. The watch only sees posts made <em>after</em> it started
+         (${escapeHtml(String(d.startedAt || "this deploy"))}), and in a group the bot must be an admin to read
+         other senders' messages \u2014 in a channel it already is.`,
+      );
+    }
+  }
+  const diagBlock = diagLines.length
+    ? `<details class="diag"><summary>Why is nothing appearing?</summary><ul>${diagLines
+        .map((line) => `<li>${line}</li>`)
+        .join("")}</ul></details>`
+    : "";
+
   const watchBanner = watching
     ? `<div class="watch on"><strong>\u25cf Watching your Telegram channels</strong>
          <span>Every post is recorded here automatically, whichever path sent it.</span></div>`
@@ -183,6 +235,14 @@ function renderManualForm({
   .tally { font-size:14px; margin:0 0 18px; }
   .tally strong { font-size:17px; }
   .tally.empty { color:var(--muted); font-size:13px; line-height:1.5; }
+  .diag { margin:-8px 0 18px; font-size:13px; }
+  .diag summary { cursor:pointer; color:var(--accent); padding:6px 0; }
+  .diag ul { margin:8px 0 0; padding:0; }
+  .diag li { background:var(--panel); border:1px solid var(--line); border-radius:8px;
+    padding:9px 12px; margin-bottom:7px; color:var(--muted); line-height:1.5; overflow-wrap:anywhere; }
+  .diag strong { color:var(--text); }
+  .diag strong.bad { color:var(--red); }
+  .diag code { background:rgba(255,255,255,.08); padding:1px 5px; border-radius:5px; font-size:12px; color:var(--text); }
 </style>
 </head>
 <body>
@@ -193,6 +253,7 @@ function renderManualForm({
   ${error ? `<div class="msg err">${escapeHtml(error)}</div>` : ""}
   ${watchBanner}
   ${tally}
+  ${diagBlock}
   <h2>Record one by hand</h2>
   <form method="POST" action="/api/broadcast-ledger/manual">
     ${formKey ? `<input type="hidden" name="key" value="${escapeHtml(formKey)}">` : ""}
@@ -280,6 +341,7 @@ function createBroadcastLedgerRouter({
       total: broadcastLedgerStore.count(),
       bySource: broadcastLedgerStore.sourceBreakdown().bySource,
       watching: Boolean(broadcastIngestService && broadcastIngestService.enabled),
+      diagnostics: broadcastIngestService ? broadcastIngestService.describe() : null,
     };
   }
 
@@ -292,6 +354,7 @@ function createBroadcastLedgerRouter({
         // Whether posts are being recorded on their own, which is what decides
         // if anything still has to be entered by hand.
         watching: Boolean(broadcastIngestService && broadcastIngestService.enabled),
+        watch: broadcastIngestService ? broadcastIngestService.describe() : null,
         count: broadcastLedgerStore.count(),
         // Which path did what. "telegram-ingest" is the residual: posts the
         // watch recorded that no path claimed.
