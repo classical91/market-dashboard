@@ -30,7 +30,10 @@ const LEDGER_VERSION = 1;
 const DEFAULT_CAP = 5000;
 const MAX_ATTEMPTS_PER_RECEIPT = 20;
 
-const SOURCES = ["shortcut", "sharebot67", "manual", "dashboard"];
+// "telegram-ingest" means the post was observed in the channel rather than
+// reported by a posting path. It is deliberately its own source: we know the
+// story went out, but not which of the three paths sent it.
+const SOURCES = ["shortcut", "sharebot67", "manual", "dashboard", "telegram-ingest"];
 const KINDS = ["story", "digest"];
 const STATUSES = ["pending", "posted", "partial", "failed", "reconciled"];
 const DESTINATION_STATUSES = ["pending", "posted", "failed"];
@@ -374,6 +377,28 @@ class BroadcastLedgerStore {
     receipts[index] = receipt;
     this._write(receipts);
     return receipt;
+  }
+
+  /**
+   * True when some receipt already records this exact platform message.
+   *
+   * This is what keeps the channel watcher from re-recording a broadcast the
+   * dashboard itself just sent: that receipt already carries the Telegram
+   * message ID, so the post coming back as an update is recognized rather
+   * than duplicated — regardless of whether Telegram echoes a bot's own
+   * channel posts back to it.
+   */
+  hasMessage(channel, chatId, messageId) {
+    if (!chatId || !messageId) return false;
+    const wanted = { channel: String(channel), chatId: String(chatId), messageId: String(messageId) };
+    return this._read().some((receipt) =>
+      (receipt.destinations || []).some(
+        (destination) =>
+          destination.channel === wanted.channel &&
+          String(destination.chatId) === wanted.chatId &&
+          String(destination.messageId) === wanted.messageId,
+      ),
+    );
   }
 
   getReceipt(id) {

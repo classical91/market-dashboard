@@ -54,7 +54,7 @@ only a normalized hash and the headline.
 | `id` | `rcpt_<base36 ts>_<8 hex>` |
 | `idempotencyKey` | Caller-supplied. Re-posting the same key updates the receipt, never duplicates it. |
 | `createdAt` / `updatedAt` | ISO 8601 |
-| `source` | `shortcut` \| `sharebot67` \| `manual` \| `dashboard` |
+| `source` | `shortcut` \| `sharebot67` \| `manual` \| `dashboard` \| `telegram-ingest` (observed in the channel; originating path unknown) |
 | `kind` | `story` (a single item) \| `digest` (the dashboard's 3-section daily report) |
 | `title` | Headline, ≤300 chars |
 | `url` / `canonicalUrl` | Raw and canonicalized. Canonical = https, lowercase host, no `www.`, tracking params stripped, no fragment, no trailing slash. |
@@ -233,6 +233,57 @@ https://<your-app>.up.railway.app/api/broadcast-ledger/manual
 
 Otherwise bookmark the `?key=` form to your home screen and keep it private.
 
+## Automatic recording (the channel watch)
+
+Set `BROADCAST_LEDGER_INGEST_ENABLED=true` and the dashboard polls the Telegram
+channels its bot already posts to, writing a receipt for every post it sees —
+**whoever sent it**.
+
+This is what makes the ledger automatic. Each posting path would otherwise have
+to volunteer a receipt: the shortcut needs an extra action, ShareBot67 needs an
+agent-side change, a hand-posted story needs the form. But all three end up as a
+message in the same channel, so watching the channel covers all three at one
+point instead of three.
+
+Receipts it writes carry `source: "telegram-ingest"` — an honest label, since the
+watcher knows the story went out but not which path sent it. Title is the first
+real headline line (a leading date/emoji banner is skipped); the source URL is
+the first link in the post.
+
+**It does not replace the paths reporting for themselves.** A receipt written by
+the sender knows things a watcher cannot: the canonical source URL when the post
+doesn't contain it, a `pending` state before the send, which destinations failed.
+The watch is the floor — whatever else happens, a story that reached the channel
+is on the ledger. Wire up the integrations below as well and you get both.
+
+### It will not double-record
+
+Two mechanisms, in order:
+
+1. A post whose `(chat, message)` is already on a receipt is skipped outright.
+   This covers the dashboard's own broadcasts coming back as updates, since
+   those receipts already carry their Telegram message IDs.
+2. Otherwise the normal dedupe runs. A post matching an existing receipt by URL
+   or content hash **attaches its message ID to that receipt** rather than
+   forking it, and the reporting path keeps ownership of the record.
+
+### Operational notes
+
+- **One consumer per bot token.** Telegram answers a second `getUpdates` caller
+  with `409 Conflict`. The dashboard's bot is otherwise send-only, so this is
+  normally free — but if ShareBot67 or anything else already polls this same
+  token (or a webhook is set), the watch logs the conflict **once** and stands
+  down rather than fighting it. Give the dashboard its own bot in that case.
+- **The bot must be an admin** in each channel to receive `channel_post`
+  updates. It already is, or it could not post there.
+- Only chats in `TELEGRAM_CHAT_IDS` are recorded. The bot may be in others;
+  those are not the ledger's business.
+- The poll offset is persisted, so a restart resumes instead of re-reading the
+  backlog. It is saved *after* processing, so a crash re-reads rather than
+  drops — re-reading is free, since ingest is idempotent per message.
+- The Settings card shows whether the watch is on, so "am I still filing these
+  by hand?" is answerable at a glance.
+
 ## Integration 1 — ShareBot67 (`newsreporter`)
 
 ### Preflight, before generating or posting anything
@@ -360,4 +411,6 @@ broadcast where *nothing* landed still returns `502` as before.
 | --- | --- | --- |
 | `BROADCAST_LEDGER_API_KEY` | Recommended | The ledger key. Falls back to `ADMIN_API_KEY` if unset. Generate with `openssl rand -hex 32`. |
 | `BROADCAST_LEDGER_RATE_LIMIT_PER_MIN` | No | Default `60`. Set `0` to disable. |
+| `BROADCAST_LEDGER_INGEST_ENABLED` | For automatic recording | `true` turns on the channel watch. Off by default. |
+| `BROADCAST_LEDGER_INGEST_INTERVAL_MS` | No | Poll interval, default `60000`, floor `15000`. |
 | `DATA_DIR` | Yes | Must be the mounted volume path (usually `/app/data`) or the ledger will not survive deploys. |

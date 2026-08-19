@@ -292,6 +292,37 @@ class TelegramService {
     }
   }
 
+  /**
+   * Read pending updates for this bot.
+   *
+   * Only one consumer may poll a given bot token at a time — Telegram answers
+   * a second one with 409 Conflict — so this is safe here precisely because
+   * the dashboard's bot is otherwise send-only. The caller surfaces a 409 as
+   * a configuration problem rather than retrying into it.
+   */
+  async getUpdates({ offset, limit = 100, allowedUpdates = ["channel_post", "message"] } = {}) {
+    if (!this._botToken) throw createServiceError("Telegram bot token is not configured", 400);
+    const url = `${TELEGRAM_API}/bot${this._botToken}/getUpdates`;
+    const body = {
+      limit,
+      timeout: 0,
+      allowed_updates: allowedUpdates,
+    };
+    if (Number.isFinite(offset)) body.offset = offset;
+
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const responseBody = await res.text();
+      throw createServiceError(`Telegram getUpdates failed (${res.status}): ${responseBody.slice(0, 300)}`, res.status);
+    }
+    const payload = await res.json();
+    return Array.isArray(payload.result) ? payload.result : [];
+  }
+
   async postReport(report) {
     if (!this.configured) return;
 

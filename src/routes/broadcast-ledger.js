@@ -156,6 +156,7 @@ function renderManualForm({ notice = "", error = "", values = {}, recent = [], f
 
 function createBroadcastLedgerRouter({
   broadcastLedgerStore,
+  broadcastIngestService,
   requireLedgerKey,
   ledgerKey,
   adminKey,
@@ -208,6 +209,9 @@ function createBroadcastLedgerRouter({
       res.setHeader("Cache-Control", "no-store");
       res.json({
         configured: true,
+        // Whether posts are being recorded on their own, which is what decides
+        // if anything still has to be entered by hand.
+        watching: Boolean(broadcastIngestService && broadcastIngestService.enabled),
         count: broadcastLedgerStore.count(),
         latest: latest
           ? {
