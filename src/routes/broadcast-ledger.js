@@ -197,6 +197,33 @@ function createBroadcastLedgerRouter({
     res.status(401).json({ error: "Unauthorized: sign in as owner or supply a valid broadcast key." });
   }
 
+  // Lightweight probe for the Settings page. Shares the manual form's access
+  // rules on purpose: whatever credential opens the form is exactly what the
+  // Settings card needs to confirm before it offers a link to it. The 401 and
+  // 503 responses are as informative as the 200 — they tell the card whether
+  // to ask for a key or say the ledger isn't configured at all.
+  router.get("/status", requireManualAccess, (req, res, next) => {
+    try {
+      const [latest] = broadcastLedgerStore.list({ limit: 1 });
+      res.setHeader("Cache-Control", "no-store");
+      res.json({
+        configured: true,
+        count: broadcastLedgerStore.count(),
+        latest: latest
+          ? {
+              id: latest.id,
+              title: latest.title,
+              source: latest.source,
+              status: latest.status,
+              createdAt: latest.createdAt,
+            }
+          : null,
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+
   router.get("/manual", requireManualAccess, (req, res) => {
     res.setHeader("Cache-Control", "no-store");
     // noindex is already in the markup; no-store keeps the recent-receipt

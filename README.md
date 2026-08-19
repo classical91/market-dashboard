@@ -27,7 +27,7 @@ The app is intentionally lightweight: no bundler, no frontend framework, and no 
 - `/youtube-v2.html` - YouTube Intelligence: live streams, scheduled streams, and latest uploads from tracked channels.
 - `/indicators.html` - Trading and market glossary.
 - `/reporter.html` - Daily report generation workflow.
-- `/api/broadcast-ledger/manual` - mobile-friendly form for recording a broadcast posted by hand. Part of the broadcast receipt ledger, the shared record that keeps the dashboard, the GPT/iOS Shortcut, the ShareBot67 agent and manual posting from duplicating or falsely failing a story. See [docs/broadcast-ledger.md](docs/broadcast-ledger.md).
+- `/api/broadcast-ledger/manual` - mobile-friendly form for recording a broadcast posted by hand, linked from the **Broadcast Ledger** card on `/settings.html`. Part of the broadcast receipt ledger, the shared record that keeps the dashboard, the GPT/iOS Shortcut, the ShareBot67 agent and manual posting from duplicating or falsely failing a story. See [docs/broadcast-ledger.md](docs/broadcast-ledger.md).
 
 ## Setup
 
