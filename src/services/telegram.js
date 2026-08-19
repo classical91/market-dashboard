@@ -230,6 +230,41 @@ class TelegramService {
     }
   }
 
+  /**
+   * Like _sendToAll, but attempts every configured target and reports each
+   * outcome instead of aborting on the first failure. Used by postReport so
+   * a broadcast that reaches two channels out of three is recorded as a
+   * partial delivery — with the Telegram message IDs that did land — rather
+   * than vanishing behind a single thrown error.
+   *
+   * _sendToAll keeps its throw-on-first-failure behavior for the alert paths,
+   * which have no receipt to attach a partial result to.
+   */
+  async _sendToAllSettled(text) {
+    const results = [];
+    for (const target of this._chatIds) {
+      const base = {
+        channel: "telegram",
+        chatId: String(target.chatId),
+        threadId: target.threadId ? String(target.threadId) : null,
+      };
+      try {
+        const response = await this._send(target, text);
+        results.push({
+          ...base,
+          status: "posted",
+          messageId: response && response.result && response.result.message_id != null
+            ? String(response.result.message_id)
+            : null,
+          error: null,
+        });
+      } catch (err) {
+        results.push({ ...base, status: "failed", messageId: null, error: err.message });
+      }
+    }
+    return results;
+  }
+
   async _sendPhoto(target, photoUrl, caption) {
     const url = `${TELEGRAM_API}/bot${this._botToken}/sendPhoto`;
     const body = {
@@ -267,11 +302,46 @@ class TelegramService {
       { emoji: "📊", title: "MARKETS TOP 10", key: "markets" },
     ];
 
+    // One result row per destination, merged across sections: a channel counts
+    // as posted when every section reached it, and failed as soon as one
+    // didn't. The message ID kept is the last one that landed there.
+    const byDestination = new Map();
     for (const s of sections) {
       const body = formatForTelegram(report[s.key] || "");
       const header = `<b>${s.emoji} ${s.title}</b>\n🗓️ ${escapeHtml(date)}\n\n`;
-      await this._sendToAll(header + body);
+      const results = await this._sendToAllSettled(header + body);
+      results.forEach((result) => {
+        const key = `${result.chatId}:${result.threadId || ""}`;
+        const existing = byDestination.get(key);
+        if (!existing) {
+          byDestination.set(key, { ...result });
+          return;
+        }
+        byDestination.set(key, {
+          ...existing,
+          status: existing.status === "failed" ? "failed" : result.status,
+          messageId: result.messageId || existing.messageId,
+          error: existing.error || result.error,
+        });
+      });
     }
+
+    const destinations = [...byDestination.values()];
+    const posted = destinations.filter((d) => d.status === "posted").length;
+
+    // Nothing landed anywhere: keep the pre-existing contract and surface it
+    // as a failed broadcast. A partial result is returned rather than thrown,
+    // so the caller can record which channels actually did receive it.
+    if (destinations.length && posted === 0) {
+      const error = createServiceError(
+        `Telegram broadcast failed for all ${destinations.length} destination(s): ${destinations[0].error || "unknown error"}`,
+        502,
+      );
+      error.destinations = destinations;
+      throw error;
+    }
+
+    return { destinations, posted, failed: destinations.length - posted };
   }
 
   async postAIAnalysis(result) {

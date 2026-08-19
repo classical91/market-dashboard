@@ -35,6 +35,7 @@ const { createLiveScannerRouter } = require("./routes/live-scanner");
 const { createHealthRouter } = require("./routes/health");
 const { createOnchainRouter } = require("./routes/onchain");
 const { createOverviewRouter } = require("./routes/overview");
+const { createBroadcastLedgerRouter } = require("./routes/broadcast-ledger");
 const { createReporterRouter } = require("./routes/reporter");
 const { createTelegramRouter } = require("./routes/telegram");
 const { createYoutubeRouter } = require("./routes/youtube");
@@ -70,12 +71,14 @@ const { EtherscanService } = require("./services/etherscan");
 const { MarketDataService } = require("./services/market-data");
 const { OnchainService } = require("./services/onchain");
 const { OverviewService } = require("./services/overview");
+const { BroadcastLedgerStore } = require("./services/broadcast-ledger");
 const { ReporterService } = require("./services/reporter");
 const { TelegramService } = require("./services/telegram");
 const { YouTubeIntelligenceService } = require("./services/youtube");
 const { XFeedService } = require("./services/x-feed");
 const { resolveDataDir } = require("./utils/data-dir");
 const { createRequireAdmin } = require("./middleware/admin-auth");
+const { createRequireLedgerKey } = require("./middleware/ledger-auth");
 const { createSiteAuth } = require("./middleware/site-auth");
 
 function createApp() {
@@ -100,6 +103,11 @@ function createApp() {
     covalentService,
   });
   const telegramService = new TelegramService(config.telegram);
+  // Shared source of truth for every completed broadcast, across the
+  // dashboard, the iOS/GPT shortcut, ShareBot67 and manual posting. Lives
+  // here rather than behind the OpenClaw gateway precisely so it stays
+  // readable when that gateway is down.
+  const broadcastLedgerStore = new BroadcastLedgerStore({ dataDir });
   const reporterService = new ReporterService({
     cache: reporterCache,
     apiKey: config.reporter.apiKey,
@@ -250,8 +258,13 @@ function createApp() {
   tradingLabService.attachLiveResearchService(liveResearchService);
 
   const requireAdmin = createRequireAdmin({ adminKey: config.admin.apiKey });
+  const requireLedgerKey = createRequireLedgerKey({
+    ledgerKey: config.broadcastLedger.apiKey,
+    adminKey: config.admin.apiKey,
+  });
   const siteAuth = createSiteAuth({
     adminKey: config.admin.apiKey,
+    ledgerKey: config.broadcastLedger.apiKey,
     sitePassword: config.access.sitePassword,
     alphaAccessCode: config.access.alphaAccessCode,
   });
@@ -337,7 +350,20 @@ function createApp() {
   app.use("/api/pattern-tracker", createPatternTrackerRouter({ patternTrackerService }));
   app.use("/api/onchain", createOnchainRouter({ onchainService }));
   app.use("/api/overview", createOverviewRouter({ overviewService }));
-  app.use("/api/daily-report", createReporterRouter({ reporterService, telegramService, requireAdmin }));
+  app.use(
+    "/api/broadcast-ledger",
+    createBroadcastLedgerRouter({
+      broadcastLedgerStore,
+      requireLedgerKey,
+      ledgerKey: config.broadcastLedger.apiKey,
+      adminKey: config.admin.apiKey,
+      rateLimitPerMinute: config.broadcastLedger.rateLimitPerMinute,
+    }),
+  );
+  app.use(
+    "/api/daily-report",
+    createReporterRouter({ reporterService, telegramService, broadcastLedgerStore, requireAdmin }),
+  );
   app.use("/api/telegram", createTelegramRouter({ telegramService, requireAdmin }));
   app.use("/api/youtube", createYoutubeRouter({ youtubeService, channels: youtubeChannels }));
   app.use("/api/x", createXFeedRouter({ xFeedService, accounts: X_ACCOUNTS }));

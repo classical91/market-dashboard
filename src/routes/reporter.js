@@ -1,6 +1,6 @@
 const { Router } = require("express");
 
-function createReporterRouter({ reporterService, telegramService, requireAdmin }) {
+function createReporterRouter({ reporterService, telegramService, broadcastLedgerStore, requireAdmin }) {
   const router = Router();
 
   function resolveTtlMs(req) {
@@ -64,11 +64,52 @@ function createReporterRouter({ reporterService, telegramService, requireAdmin }
         });
         return;
       }
-      await telegramService.postReport(report);
+      // A pending receipt goes in *before* the send, so a crash mid-broadcast
+      // still leaves a trace for reconciliation to resolve rather than a
+      // silent gap. The idempotency key is the report generation itself, so
+      // a double-clicked Broadcast button can't fork the ledger.
+      const title = `Daily report — ${report.dateStr || new Date().toISOString().slice(0, 10)}`;
+      const receipt = broadcastLedgerStore
+        ? broadcastLedgerStore.createReceipt({
+            source: "dashboard",
+            kind: "digest",
+            title,
+            idempotencyKey: `digest:${report.generatedAt || report.dateStr || Date.now()}`,
+            text: [report.crypto, report.economics, report.markets].filter(Boolean).join("\n"),
+            status: "pending",
+          }).receipt
+        : null;
+
+      let result;
+      try {
+        result = await telegramService.postReport(report);
+      } catch (err) {
+        if (receipt) {
+          broadcastLedgerStore.updateReceipt(
+            receipt.id,
+            { status: "failed", error: err, destinations: err.destinations || [], action: "broadcast" },
+            { actor: "dashboard" },
+          );
+        }
+        throw err;
+      }
+
+      const destinations = (result && result.destinations) || [];
+      const finalReceipt = receipt
+        ? broadcastLedgerStore.updateReceipt(
+            receipt.id,
+            { destinations, action: "broadcast" },
+            { actor: "dashboard" },
+          )
+        : null;
+
       res.json({
         ok: true,
         channelCount: telegramService._chatIds.length,
         broadcastAt: reporterService.markBroadcasted(),
+        receiptId: finalReceipt ? finalReceipt.id : null,
+        status: finalReceipt ? finalReceipt.status : null,
+        destinations,
       });
     } catch (err) {
       next(err);

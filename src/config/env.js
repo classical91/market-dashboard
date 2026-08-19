@@ -119,6 +119,16 @@ const config = {
     sitePassword: process.env.MARKET_DASHBOARD_LOGIN_PASSWORD || "",
     alphaAccessCode: process.env.ALPHA_TEAM_ACCESS_CODE || "",
   },
+  broadcastLedger: {
+    // Deliberately its own secret rather than reusing ADMIN_API_KEY: this key
+    // lives on a phone (the iOS/GPT shortcut) and in the ShareBot67 agent
+    // config, and it should only be able to write broadcast receipts — not
+    // spend OpenAI credits or fire a Telegram broadcast. Falls back to
+    // ADMIN_API_KEY so an existing deploy keeps working before the new
+    // variable is set.
+    apiKey: process.env.BROADCAST_LEDGER_API_KEY || "",
+    rateLimitPerMinute: parseNumber(process.env.BROADCAST_LEDGER_RATE_LIMIT_PER_MIN, 60),
+  },
   reporter: {
     apiKey: process.env.OPENAI_API_KEY || "",
     model: process.env.REPORTER_MODEL || "gpt-5.4-mini",
