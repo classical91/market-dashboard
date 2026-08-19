@@ -68,17 +68,70 @@ function escapeHtml(value) {
  * no build step and no framework — it has to work from a phone, one-handed,
  * at the moment the gateway is down and the story has just gone out by hand.
  */
-function renderManualForm({ notice = "", error = "", values = {}, recent = [], formKey = "" } = {}) {
+const SOURCE_LABELS = {
+  shortcut: "Shortcut",
+  sharebot67: "ShareBot67",
+  dashboard: "Dashboard",
+  manual: "Manual",
+  "telegram-ingest": "Unattributed",
+};
+
+// What a receipt's status means for the only question this page exists to
+// answer: did the story actually go out?
+const STATUS_LABELS = {
+  posted: "Sent",
+  partial: "Sent (some channels)",
+  reconciled: "Sent (by another path)",
+  pending: "Not sent yet",
+  failed: "Failed",
+};
+
+function renderManualForm({
+  notice = "",
+  error = "",
+  values = {},
+  recent = [],
+  formKey = "",
+  watching = false,
+  total = 0,
+  bySource = {},
+} = {}) {
   const rows = recent
     .map((receipt) => {
       const when = receipt.createdAt ? new Date(receipt.createdAt).toISOString().replace("T", " ").slice(0, 16) : "";
+      const source = SOURCE_LABELS[receipt.source] || receipt.source;
+      const statusLabel = STATUS_LABELS[receipt.status] || receipt.status;
       return `<li>
-        <span class="status status-${escapeHtml(receipt.status)}">${escapeHtml(receipt.status)}</span>
+        <span class="status status-${escapeHtml(receipt.status)}">${escapeHtml(statusLabel)}</span>
         <strong>${escapeHtml(receipt.title || receipt.canonicalUrl || receipt.id)}</strong>
-        <span class="meta">${escapeHtml(receipt.source)} · ${escapeHtml(when)}</span>
+        <span class="meta">${escapeHtml(source)} · ${escapeHtml(when)}</span>
       </li>`;
     })
     .join("");
+
+  const breakdown = Object.keys(SOURCE_LABELS)
+    .filter((key) => bySource[key])
+    .map((key) => `${bySource[key]} ${SOURCE_LABELS[key]}`)
+    .join(" · ");
+
+  // The page led with a form, so an empty ledger looked identical to a broken
+  // one. State first: whether anything is watching, and how much it has seen.
+  const watchBanner = watching
+    ? `<div class="watch on"><strong>\u25cf Watching your Telegram channels</strong>
+         <span>Every post is recorded here automatically, whichever path sent it.</span></div>`
+    : `<div class="watch off"><strong>\u25cb Channel watch is off</strong>
+         <span>Broadcasts are only recorded when a path reports itself, or when you file one below.
+         Set <code>BROADCAST_LEDGER_INGEST_ENABLED=true</code> in Railway to record posts automatically.</span></div>`;
+
+  const tally = total
+    ? `<p class="tally"><strong>${total}</strong> broadcast${total === 1 ? "" : "s"} recorded${
+        breakdown ? ` \u2014 ${escapeHtml(breakdown)}` : ""
+      }</p>`
+    : `<p class="tally empty">No broadcasts recorded yet.${
+        watching
+          ? " The watch is running, so the next post to your channels will appear here on its own."
+          : " Nothing is watching your channels, so nothing will appear here until a path reports itself or you file one below."
+      }</p>`;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -116,14 +169,31 @@ function renderManualForm({ notice = "", error = "", values = {}, recent = [], f
   .status-partial, .status-pending { color:var(--amber); }
   .status-failed { color:var(--red); }
   .empty { color:var(--muted); font-size:14px; }
+
+  /* ── State first: what has actually been recorded ── */
+  .watch { border-radius:12px; padding:12px 14px; margin-bottom:12px; font-size:13px; line-height:1.5;
+    border:1px solid var(--line); background:var(--panel); }
+  .watch strong { display:block; font-size:13px; margin-bottom:3px; }
+  .watch span { color:var(--muted); }
+  .watch.on { border-color:rgba(34,197,94,.45); background:rgba(34,197,94,.08); }
+  .watch.on strong { color:var(--green); }
+  .watch.off { border-color:rgba(245,158,11,.45); background:rgba(245,158,11,.08); }
+  .watch.off strong { color:var(--amber); }
+  .watch code { background:rgba(255,255,255,.08); padding:1px 5px; border-radius:5px; font-size:12px; }
+  .tally { font-size:14px; margin:0 0 18px; }
+  .tally strong { font-size:17px; }
+  .tally.empty { color:var(--muted); font-size:13px; line-height:1.5; }
 </style>
 </head>
 <body>
 <main>
-  <h1>Record a broadcast</h1>
-  <p class="sub">Log a story you posted by hand so ShareBot67 doesn't repeat it or report it as failed.</p>
+  <h1>Broadcast receipts</h1>
+  <p class="sub">The shared record that stops ShareBot67 repeating a story or reporting one as failed.</p>
   ${notice ? `<div class="msg ok">${escapeHtml(notice)}</div>` : ""}
   ${error ? `<div class="msg err">${escapeHtml(error)}</div>` : ""}
+  ${watchBanner}
+  ${tally}
+  <h2>Record one by hand</h2>
   <form method="POST" action="/api/broadcast-ledger/manual">
     ${formKey ? `<input type="hidden" name="key" value="${escapeHtml(formKey)}">` : ""}
     <label>Headline
@@ -147,8 +217,7 @@ function renderManualForm({ notice = "", error = "", values = {}, recent = [], f
     </label>
     <button type="submit">Save receipt</button>
   </form>
-  <h2>Last 10 receipts</h2>
-  ${rows ? `<ul>${rows}</ul>` : '<p class="empty">Nothing recorded yet.</p>'}
+  ${rows ? `<h2>Last 10 broadcasts</h2><ul>${rows}</ul>` : ""}
 </main>
 </body>
 </html>`;
@@ -203,6 +272,17 @@ function createBroadcastLedgerRouter({
   // Settings card needs to confirm before it offers a link to it. The 401 and
   // 503 responses are as informative as the 200 — they tell the card whether
   // to ask for a key or say the ledger isn't configured at all.
+  // Every render of the manual page needs the same state block, so build it
+  // once rather than letting the GET and the POST error path drift apart.
+  function pageState() {
+    return {
+      recent: broadcastLedgerStore.list({ limit: 10 }),
+      total: broadcastLedgerStore.count(),
+      bySource: broadcastLedgerStore.sourceBreakdown().bySource,
+      watching: Boolean(broadcastIngestService && broadcastIngestService.enabled),
+    };
+  }
+
   router.get("/status", requireManualAccess, (req, res, next) => {
     try {
       const [latest] = broadcastLedgerStore.list({ limit: 1 });
@@ -237,8 +317,8 @@ function createBroadcastLedgerRouter({
     // list (and any key in the URL) out of the browser cache.
     res.send(
       renderManualForm({
+        ...pageState(),
         notice: req.query.saved ? "Receipt saved." : "",
-        recent: broadcastLedgerStore.list({ limit: 10 }),
         formKey: String(req.query.key || ""),
       }),
     );
@@ -264,9 +344,9 @@ function createBroadcastLedgerRouter({
         res.status(400).setHeader("Cache-Control", "no-store");
         return res.send(
           renderManualForm({
+            ...pageState(),
             error: invalid,
             values: body,
-            recent: broadcastLedgerStore.list({ limit: 10 }),
             formKey: String(body.key || ""),
           }),
         );
