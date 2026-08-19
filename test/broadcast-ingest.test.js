@@ -285,3 +285,43 @@ test("deriveTitle keeps terse headlines, which a length-based rule would eat", (
   assert.equal(deriveTitle("Fed holds rates steady\nMore detail"), "Fed holds rates steady");
   assert.equal(deriveTitle("CRYPTO TOP 10\n🗓️ 19 AUG\nFirst story"), "CRYPTO TOP 10");
 });
+
+/* ── attribution across the watch/report race ── */
+
+test("the watch seeing a post first does not cost you the attribution", async () => {
+  const store = freshStore();
+  // The watch polls on a timer, so it often sees the post seconds before the
+  // sender's own receipt call lands. That ordering used to produce two
+  // receipts: one unattributed, one naming the path.
+  const telegram = fakeTelegram([
+    [channelPost({ updateId: 1, messageId: 500, text: "Fed holds rates steady\nhttps://example.com/news/fed" })],
+  ]);
+  await makeService(telegram, store).runOnce();
+  assert.equal(store.list({ limit: 1 })[0].source, "telegram-ingest");
+
+  // Then the shortcut reports itself.
+  store.createReceipt({
+    source: "shortcut",
+    title: "Fed holds rates steady",
+    url: "https://example.com/news/fed",
+    idempotencyKey: "shortcut-run-1",
+    status: "posted",
+  });
+
+  assert.equal(store.count(), 1, "one broadcast, one receipt");
+  const [receipt] = store.list({ limit: 1 });
+  assert.equal(receipt.source, "shortcut", "the path that sent it wins over 'observed in the channel'");
+  assert.equal(receipt.destinations[0].messageId, "500", "and the watch's message id survives the claim");
+});
+
+test("a post nobody claims stays unattributed, which is the honest answer", async () => {
+  const store = freshStore();
+  const telegram = fakeTelegram([
+    [channelPost({ updateId: 1, messageId: 501, text: "Typed straight into Telegram\nhttps://example.com/manual" })],
+  ]);
+  await makeService(telegram, store).runOnce();
+
+  const { bySource, unattributed } = store.sourceBreakdown();
+  assert.equal(bySource["telegram-ingest"], 1);
+  assert.equal(unattributed, 1);
+});

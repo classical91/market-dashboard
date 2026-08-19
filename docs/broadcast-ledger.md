@@ -284,6 +284,45 @@ Two mechanisms, in order:
 - The Settings card shows whether the watch is on, so "am I still filing these
   by hand?" is answerable at a glance.
 
+## Which path sent it — attribution
+
+`GET /status` returns a `bySource` count, and the Settings card renders it:
+
+> By source: 2 Shortcut · 1 ShareBot67 · 1 Dashboard API · 1 Unattributed
+
+### Telegram cannot tell you this on its own
+
+A `channel_post` update carries no sender identity — channel posts are
+attributed to the channel, not to whoever sent them. So the channel watch can
+prove a story went out, but never who sent it. That is why its receipts carry
+`source: "telegram-ingest"` rather than a guess.
+
+**Attribution therefore comes from each path claiming its own work.** Wire up
+Integrations 1 and 2 below and the `shortcut` and `sharebot67` counts become
+real; the dashboard's Broadcast button already reports itself as `dashboard`.
+
+### The residual is the useful part
+
+Whatever is left as `telegram-ingest` is, by elimination, a broadcast that
+**no path claimed** — a story typed straight into Telegram by hand, or a path
+that has stopped reporting. Both are worth seeing. A rising unattributed count
+after you have wired up the shortcut is a sign the shortcut's receipt call is
+failing silently.
+
+### Ordering does not affect the answer
+
+The watch polls on a timer, so it often sees a post seconds before the
+sender's own receipt call lands. When that happens the sender's call **claims**
+the watch's unattributed receipt — upgrading its source and keeping the
+Telegram message ID — instead of adding a second record. One broadcast is one
+receipt whichever arrived first.
+
+The claim is deliberately narrow: only a `telegram-ingest` receipt is
+claimable, and only via the authoritative dedupe tiers (canonical URL, content
+hash). Two receipts that each name a path are never merged — a genuine
+double-send by two paths stays visible as two records, which is exactly the
+thing you would want to know about.
+
 ## Integration 1 — ShareBot67 (`newsreporter`)
 
 ### Preflight, before generating or posting anything

@@ -248,6 +248,7 @@
           <button class="tg-test-btn" id="ledgerKeyBtn" type="button" style="display:none">Enter Admin Key</button>
         </div>
         <div class="settings-row-sub" id="ledgerWatch" style="margin-top:12px; display:none"></div>
+        <div class="settings-row-sub" id="ledgerSources" style="margin-top:6px; display:none"></div>
         <div class="settings-row-sub" id="ledgerLatest" style="margin-top:6px; display:none"></div>
         <div class="tg-instructions" id="ledgerInstructions" style="display:none">
           <strong>Setup:</strong><br>
@@ -380,6 +381,25 @@
     var keyBtn = document.getElementById('ledgerKeyBtn');
     var latestEl = document.getElementById('ledgerLatest');
     var watchEl = document.getElementById('ledgerWatch');
+    var sourcesEl = document.getElementById('ledgerSources');
+    var SOURCE_LABELS = {
+      shortcut: 'Shortcut',
+      sharebot67: 'ShareBot67',
+      dashboard: 'Dashboard API',
+      manual: 'Manual (form)',
+      'telegram-ingest': 'Unattributed'
+    };
+
+    // Which path sent what. Only paths that report themselves can be named;
+    // "Unattributed" is what the channel watch saw and nobody claimed, which
+    // in practice means it was posted by hand.
+    function describeSources(data) {
+      var counts = data && data.bySource ? data.bySource : {};
+      var parts = Object.keys(SOURCE_LABELS)
+        .filter(function (key) { return counts[key]; })
+        .map(function (key) { return counts[key] + ' ' + SOURCE_LABELS[key]; });
+      return parts.length ? 'By source: ' + parts.join(' · ') : '';
+    }
     var inst = document.getElementById('ledgerInstructions');
     var STATUS_URL = '/api/broadcast-ledger/status';
 
@@ -407,6 +427,9 @@
       keyBtn.style.display = 'none';
       latestEl.textContent = describeLatest(data);
       latestEl.style.display = '';
+      var sources = describeSources(data);
+      sourcesEl.textContent = sources;
+      sourcesEl.style.display = sources ? '' : 'none';
       // The watch is what makes this automatic; say plainly whether it is on,
       // because that is the difference between "nothing to do" and "you still
       // have to file these yourself".
@@ -423,6 +446,7 @@
       link.style.display = 'none';
       keyBtn.style.display = '';
       latestEl.style.display = 'none';
+      sourcesEl.style.display = 'none';
       watchEl.style.display = 'none';
     }
 
@@ -432,6 +456,7 @@
       link.style.display = 'none';
       keyBtn.style.display = 'none';
       latestEl.style.display = 'none';
+      sourcesEl.style.display = 'none';
       watchEl.style.display = 'none';
       inst.style.display = '';
     }
@@ -442,6 +467,7 @@
       link.style.display = 'none';
       keyBtn.style.display = 'none';
       latestEl.style.display = 'none';
+      sourcesEl.style.display = 'none';
       watchEl.style.display = 'none';
     }
 
