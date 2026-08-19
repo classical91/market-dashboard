@@ -131,7 +131,7 @@ function isLedgerApiPath(req) {
 // header — so it alone may authenticate with a `key` parameter. Narrowed to
 // this one path on purpose: keys in URLs end up in history and access logs.
 function isLedgerFormPath(req) {
-  return req.path === "/api/broadcast-ledger/manual";
+  return req.path === "/api/broadcast-ledger/manual" || req.path === "/api/broadcast-ledger/status";
 }
 
 function isPublicAuthPath(req) {

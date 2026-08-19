@@ -150,6 +150,8 @@
       cursor: pointer; transition: 0.18s; font-family: inherit;
     }
     .tg-test-btn:hover:not(:disabled) { background: rgba(255,255,255,0.08); color: var(--text); }
+    /* The ledger form link wears the same chrome as the buttons beside it. */
+    a.tg-test-btn { text-decoration: none; display: inline-flex; align-items: center; }
     .tg-test-btn:disabled { opacity: 0.4; cursor: default; }
     .tg-instructions {
       margin-top: 14px; padding: 14px 16px;
@@ -226,6 +228,32 @@
             <button class="settings-action-btn primary" id="saveReportPrompt" type="button">Save Prompt</button>
             <button class="settings-action-btn" id="resetReportPrompt" type="button">Reset Default</button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Broadcast Ledger -->
+    <div class="settings-section">
+      <div class="settings-label">Broadcast Ledger</div>
+      <div class="settings-card">
+        <div class="settings-row">
+          <div>
+            <div class="settings-row-label">Record a Manual Broadcast</div>
+            <div class="settings-row-sub">Log a story you posted by hand so ShareBot67 doesn&apos;t repeat it or report it as failed</div>
+          </div>
+        </div>
+        <div class="tg-status-row">
+          <span class="status-pill off" id="ledgerStatusPill">⏳ Checking…</span>
+          <a class="tg-test-btn" id="ledgerFormLink" href="/api/broadcast-ledger/manual" target="_blank" rel="noopener" style="display:none">Open Receipt Form</a>
+          <button class="tg-test-btn" id="ledgerKeyBtn" type="button" style="display:none">Enter Admin Key</button>
+        </div>
+        <div class="settings-row-sub" id="ledgerLatest" style="margin-top:12px; display:none"></div>
+        <div class="tg-instructions" id="ledgerInstructions" style="display:none">
+          <strong>Setup:</strong><br>
+          1. Set <code>BROADCAST_LEDGER_API_KEY</code> in your Railway environment variables (<code>openssl rand -hex 32</code>). It falls back to <code>ADMIN_API_KEY</code> if left blank.<br>
+          2. Point <code>DATA_DIR</code> at the mounted volume (usually <code>/app/data</code>) — on ephemeral storage the ledger is wiped on every deploy.<br>
+          3. Redeploy, then reload this page.<br>
+          See <code>docs/broadcast-ledger.md</code> for the endpoint contract, the ShareBot67 preflight steps, and the iOS Shortcut request.
         </div>
       </div>
     </div>
@@ -342,6 +370,98 @@
     });
 
     loadPrompt();
+  })();
+
+  /* ── Broadcast ledger status ────────────────────────── */
+  (function () {
+    var pill = document.getElementById('ledgerStatusPill');
+    var link = document.getElementById('ledgerFormLink');
+    var keyBtn = document.getElementById('ledgerKeyBtn');
+    var latestEl = document.getElementById('ledgerLatest');
+    var inst = document.getElementById('ledgerInstructions');
+    var STATUS_URL = '/api/broadcast-ledger/status';
+
+    function describeLatest(data) {
+      if (!data || !data.count) return 'No receipts recorded yet.';
+      var parts = [data.count + ' receipt' + (data.count !== 1 ? 's' : '') + ' recorded'];
+      if (data.latest) {
+        var when = data.latest.createdAt ? new Date(data.latest.createdAt).toLocaleString() : '';
+        parts.push('latest: ' + (data.latest.title || data.latest.id) +
+          ' (' + data.latest.source + ' · ' + data.latest.status + (when ? ' · ' + when : '') + ')');
+      }
+      return parts.join(' — ');
+    }
+
+    function ready(data, keyForLink) {
+      pill.className = 'status-pill ok';
+      pill.textContent = '✅ Ready';
+      // The form is opened by plain browser navigation, which cannot send a
+      // header — so when the owner session isn't what authorized us, carry the
+      // key in the URL instead. That parameter is accepted on this path only.
+      link.href = keyForLink
+        ? '/api/broadcast-ledger/manual?key=' + encodeURIComponent(keyForLink)
+        : '/api/broadcast-ledger/manual';
+      link.style.display = '';
+      keyBtn.style.display = 'none';
+      latestEl.textContent = describeLatest(data);
+      latestEl.style.display = '';
+      inst.style.display = 'none';
+    }
+
+    function needsKey(message) {
+      pill.className = 'status-pill off';
+      pill.textContent = message || '🔑 Admin key required';
+      link.style.display = 'none';
+      keyBtn.style.display = '';
+      latestEl.style.display = 'none';
+    }
+
+    function notConfigured() {
+      pill.className = 'status-pill off';
+      pill.textContent = '⚠️ Not configured';
+      link.style.display = 'none';
+      keyBtn.style.display = 'none';
+      latestEl.style.display = 'none';
+      inst.style.display = '';
+    }
+
+    function unreachable() {
+      pill.className = 'status-pill off';
+      pill.textContent = '⚠️ Unreachable';
+      link.style.display = 'none';
+      keyBtn.style.display = 'none';
+      latestEl.style.display = 'none';
+    }
+
+    // Probe in the order the form itself accepts credentials: the site session
+    // first (nothing to store, nothing in the URL), then a stored admin key.
+    function probe() {
+      pill.className = 'status-pill off';
+      pill.textContent = '⏳ Checking…';
+      return fetch(STATUS_URL, { credentials: 'same-origin' })
+        .then(function (res) {
+          if (res.status === 503) { notConfigured(); return null; }
+          if (res.ok) return res.json().then(function (data) { ready(data, ''); return null; });
+          if (res.status !== 401) { unreachable(); return null; }
+          // No usable session — fall back to the stored admin key.
+          if (!window.AdminKey || !window.AdminKey.get()) { needsKey(); return null; }
+          return window.AdminKey.fetchSilent(STATUS_URL).then(function (keyed) {
+            if (keyed.status === 503) { notConfigured(); return; }
+            if (!keyed.ok) { needsKey('🔑 Admin key was rejected'); return; }
+            return keyed.json().then(function (data) { ready(data, window.AdminKey.get()); });
+          });
+        })
+        .catch(unreachable);
+    }
+
+    keyBtn.addEventListener('click', function () {
+      if (!window.AdminKey) return;
+      window.AdminKey.prompt('Enter the admin key to open the broadcast receipt form:').then(function (key) {
+        if (key) probe();
+      });
+    });
+
+    probe();
   })();
 
   /* ── Telegram status ────────────────────────────────── */

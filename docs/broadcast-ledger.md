@@ -200,6 +200,14 @@ window is checked. Returns:
 `reconciled` = another path already posted it; do **not** repost, do **not**
 report failure. `outstanding` = genuinely unsent; safe to retry.
 
+### `GET /status` — Settings card probe
+
+Returns `{ configured, count, latest }`, where `latest` is id/title/source/status/
+createdAt for the newest receipt. Shares the manual form's access rules, so its
+`401` and `503` responses are as useful as its `200`: they tell the Settings
+card whether to ask for a key or report the ledger as unconfigured. No message
+content or hashes are returned.
+
 ### `GET|POST /manual` — mobile form
 
 A self-contained, dark, mobile-first page for logging a hand-posted story.
@@ -321,6 +329,11 @@ Optionally, add a *preflight* action at the start of the shortcut too —
 
 Two ways, both work with the gateway down:
 
+0. **From Settings.** The dashboard's Settings page has a **Broadcast Ledger**
+   card with an "Open Receipt Form" link, a live status pill, and a summary of
+   the most recent receipt. It probes the site session first and falls back to
+   your stored admin key, appending it to the link only when the session isn't
+   what authorized you — so the link works either way.
 1. **The form.** Bookmark `https://<your-app>/api/broadcast-ledger/manual` on
    your phone home screen (add `?key=<BROADCAST_LEDGER_API_KEY>` if you don't
    use the dashboard site login). Headline, optional URL, channels, status,

@@ -398,3 +398,58 @@ test("machine endpoints stay key-only — an owner cookie is not enough", async 
   });
   assert.equal(res.status, 401);
 });
+
+/* ── status probe used by the Settings card ── */
+
+test("status reports the ledger's contents to a key-authenticated caller", async () => {
+  const res = await fetch(`${base}/api/broadcast-ledger/status`, {
+    headers: { "x-broadcast-key": LEDGER_KEY },
+  });
+  const body = await res.json();
+
+  assert.equal(res.status, 200);
+  assert.equal(body.configured, true);
+  assert.ok(body.count > 0);
+  assert.ok(body.latest && body.latest.id, "the newest receipt should be summarized");
+  assert.ok(body.latest.createdAt);
+});
+
+test("status accepts the admin key, which is what the Settings page sends", async () => {
+  const res = await fetch(`${base}/api/broadcast-ledger/status`, { headers: { "x-admin-key": ADMIN_KEY } });
+  assert.equal(res.status, 200);
+});
+
+test("status accepts an owner site session with no key at all", async () => {
+  const login = await fetch(`${base}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ password: "site-password", returnTo: "/" }).toString(),
+    redirect: "manual",
+  });
+  const cookie = (login.headers.get("set-cookie") || "").split(";")[0];
+
+  const res = await fetch(`${base}/api/broadcast-ledger/status`, { headers: { cookie } });
+  assert.equal(res.status, 200);
+  assert.equal((await res.json()).configured, true);
+});
+
+test("status 401s an unauthenticated browser, which is how the card knows to ask for a key", async () => {
+  const res = await fetch(`${base}/api/broadcast-ledger/status`);
+  assert.equal(res.status, 401);
+});
+
+test("status leaks no message content — only counts and receipt metadata", async () => {
+  await post("/api/broadcast-ledger/receipts", {
+    source: "manual",
+    title: "Status metadata check",
+    text: "a private body that must never surface in a status probe",
+    idempotencyKey: "status-privacy-check",
+    status: "posted",
+  });
+
+  const res = await fetch(`${base}/api/broadcast-ledger/status`, { headers: { "x-broadcast-key": LEDGER_KEY } });
+  const raw = await res.text();
+
+  assert.ok(!raw.includes("must never surface"));
+  assert.ok(!raw.includes("contentHash"), "hashes are an implementation detail, not status output");
+});
