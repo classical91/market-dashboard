@@ -210,7 +210,16 @@ content or hashes are returned.
 
 ### `GET|POST /manual` — mobile form
 
-A self-contained, dark, mobile-first page for logging a hand-posted story.
+A self-contained, dark, mobile-first page that **leads with state** — whether
+the channel watch is running, how many broadcasts are recorded, the per-path
+breakdown, and the last ten with each one labelled *Sent* / *Sent (some
+channels)* / *Not sent yet* — and then offers a form for logging a hand-posted
+story.
+
+State comes first deliberately. When the page opened with the form, an empty
+ledger looked exactly like a broken one: fields to fill in and a single muted
+"nothing recorded yet". Now an empty ledger says whether anything is watching
+and what to do about it.
 `POST` accepts both a form submission and a JSON body, so a shortcut can use
 it as a simpler alternative to `/receipts`.
 

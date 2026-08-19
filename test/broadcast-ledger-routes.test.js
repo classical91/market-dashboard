@@ -190,7 +190,7 @@ test("manual form renders and is mobile-viewport ready", async () => {
 
   assert.equal(res.status, 200);
   assert.match(html, /<meta name="viewport" content="width=device-width/);
-  assert.match(html, /Record a broadcast/);
+  assert.match(html, /Broadcast receipts/);
   assert.match(html, /name="title"/);
 });
 
@@ -330,7 +330,7 @@ test("the manual form is reachable with a key in the query, since a browser cann
   const html = await res.text();
 
   assert.equal(res.status, 200);
-  assert.match(html, /Record a broadcast/);
+  assert.match(html, /Broadcast receipts/);
   // The key is carried forward so the form's own POST is authorized too.
   assert.match(html, new RegExp(`<input type="hidden" name="key" value="${LEDGER_KEY}"`));
 });
@@ -357,7 +357,7 @@ test("an owner site session reaches the manual form without any key", async () =
 
   const res = await fetch(`${base}/api/broadcast-ledger/manual`, { headers: { cookie } });
   assert.equal(res.status, 200);
-  assert.match(await res.text(), /Record a broadcast/);
+  assert.match(await res.text(), /Broadcast receipts/);
 });
 
 test("a form POST authorized by query key is stored, and the key is not saved as receipt content", async () => {
@@ -452,4 +452,81 @@ test("status leaks no message content — only counts and receipt metadata", asy
 
   assert.ok(!raw.includes("must never surface"));
   assert.ok(!raw.includes("contentHash"), "hashes are an implementation detail, not status output");
+});
+
+/* ── the page must always say whether anything was sent ── */
+
+test("an empty ledger says so explicitly, instead of showing a bare form", async () => {
+  // The complaint this fixes: with nothing recorded, the page showed fields to
+  // fill in and one muted "Nothing recorded yet" line, so an empty ledger was
+  // indistinguishable from a broken one.
+  const emptyDir = fs.mkdtempSync(path.join(os.tmpdir(), "md-ledger-empty-"));
+  const { BroadcastLedgerStore } = require("../src/services/broadcast-ledger");
+  const { renderManualForm } = require("../src/routes/broadcast-ledger");
+  const store = new BroadcastLedgerStore({ dataDir: emptyDir, logger: { error() {} } });
+
+  const html = renderManualForm({
+    recent: store.list({ limit: 10 }),
+    total: store.count(),
+    bySource: store.sourceBreakdown().bySource,
+    watching: false,
+  });
+
+  assert.match(html, /No broadcasts recorded yet/i);
+  assert.match(html, /Channel watch is off/i, "it must say nothing is watching");
+  assert.match(html, /BROADCAST_LEDGER_INGEST_ENABLED/, "and how to turn it on");
+});
+
+test("with the watch on, an empty ledger says the watch will fill it", () => {
+  const { renderManualForm } = require("../src/routes/broadcast-ledger");
+  const html = renderManualForm({ recent: [], total: 0, bySource: {}, watching: true });
+
+  assert.match(html, /Watching your Telegram channels/i);
+  assert.match(html, /will appear here on its own/i);
+  assert.ok(!/Channel watch is off/i.test(html));
+});
+
+test("a populated ledger leads with the count and the per-path breakdown", () => {
+  const { renderManualForm } = require("../src/routes/broadcast-ledger");
+  const html = renderManualForm({
+    recent: [
+      { id: "r1", title: "Fed holds rates", source: "shortcut", status: "posted", createdAt: new Date().toISOString() },
+    ],
+    total: 4,
+    bySource: { shortcut: 2, sharebot67: 1, "telegram-ingest": 1 },
+    watching: true,
+  });
+
+  assert.match(html, /<strong>4<\/strong> broadcasts recorded/);
+  assert.match(html, /2 Shortcut/);
+  assert.match(html, /1 ShareBot67/);
+  assert.match(html, /1 Unattributed/);
+});
+
+test("statuses read as sent-or-not, not as raw enum values", async () => {
+  const { renderManualForm } = require("../src/routes/broadcast-ledger");
+  const at = new Date().toISOString();
+  const html = renderManualForm({
+    recent: [
+      { id: "a", title: "A", source: "shortcut", status: "posted", createdAt: at },
+      { id: "b", title: "B", source: "sharebot67", status: "partial", createdAt: at },
+      { id: "c", title: "C", source: "manual", status: "pending", createdAt: at },
+    ],
+    total: 3,
+    bySource: {},
+    watching: true,
+  });
+
+  assert.match(html, /Sent<\/span>/);
+  assert.match(html, /Sent \(some channels\)/);
+  assert.match(html, /Not sent yet/, "a pending receipt must not read as sent");
+});
+
+test("the live page carries the state block, not just the form", async () => {
+  const res = await fetch(`${base}/api/broadcast-ledger/manual`, { headers: { "x-broadcast-key": LEDGER_KEY } });
+  const html = await res.text();
+
+  assert.equal(res.status, 200);
+  assert.match(html, /broadcasts? recorded/i);
+  assert.match(html, /Watching your Telegram channels|Channel watch is off/);
 });
