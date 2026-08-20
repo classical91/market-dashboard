@@ -1,0 +1,151 @@
+//@version=6
+strategy("Mindset v1 — Recovered Pine Parity Diagnostic", overlay=true, initial_capital=10000, pyramiding=0, process_orders_on_close=true, margin_long=1, margin_short=1, commission_type=strategy.commission.percent, commission_value=0)
+
+// Instrumented copy of the recovered original wrapper. Signal, dynamic-equity
+// sizing, single-position execution, exits, margin, and costs are unchanged.
+riskPct=input.float(1.0,"Risk per trade (%)",minval=0.01,step=0.1)
+fastLen=input.int(20,"Fast EMA",minval=2)
+slowLen=input.int(50,"Slow EMA",minval=2)
+rsiLen=input.int(14,"RSI length",minval=2)
+atrLen=input.int(14,"ATR length",minval=2)
+rsiLongMin=input.float(50,"RSI long minimum")
+rsiLongMax=input.float(75,"RSI long maximum")
+rsiShortMin=input.float(25,"RSI short minimum")
+rsiShortMax=input.float(50,"RSI short maximum")
+slAtrMult=input.float(1.5,"Shared stop ATR multiple",minval=0.1,step=0.1)
+tp1R=input.float(1.5,"TP1 R multiple",minval=0.1,step=0.1)
+tp2R=input.float(2.5,"TP2 R multiple",minval=0.1,step=0.1)
+tp1ClosePct=input.float(50,"TP1 close (%)",minval=1,maxval=99)
+moveToBE=input.bool(true,"Move remaining stop to breakeven after TP1")
+
+f_ema(float src,simple int len)=>
+    float alpha=2.0/(len+1.0)
+    float seed=ta.sma(src,len)
+    float e=na
+    e:=bar_index==len-1?seed:bar_index>=len?alpha*src+(1.0-alpha)*e[1]:na
+    e
+f_atr(simple int len)=>
+    float tr=bar_index>0?math.max(high-low,math.max(math.abs(high-close[1]),math.abs(low-close[1]))):na
+    ta.rma(tr,len)
+f_qty(float entry,float stop,float pct)=>
+    float riskUsd=strategy.equity*pct/100.0
+    float perUnitRisk=math.abs(entry-stop)
+    perUnitRisk>0?riskUsd/perUnitRisk:0.0
+
+emaFast=f_ema(close,fastLen)
+emaSlow=f_ema(close,slowLen)
+rsiVal=ta.rsi(close,rsiLen)
+atrVal=f_atr(atrLen)
+neededBars=math.max(slowLen,math.max(rsiLen+1,atrLen+20))
+ready=bar_index+1>=neededBars and not na(emaFast) and not na(emaSlow) and not na(rsiVal) and not na(atrVal)
+longSignal=ready and emaFast>emaSlow and rsiVal>rsiLongMin and rsiVal<rsiLongMax
+shortSignal=ready and emaFast<emaSlow and rsiVal<rsiShortMax and rsiVal>rsiShortMin
+
+var int longBars=0
+var int shortBars=0
+var int longOpps=0
+var int shortOpps=0
+var int longRequests=0
+var int shortRequests=0
+var int sizingFailures=0
+var int marginRejects=0
+var int blockedOpen=0
+var int longRun=0
+var int shortRun=0
+var int maxLongRun=0
+var int maxShortRun=0
+if longSignal
+    longBars+=1
+    longRun+=1
+    shortRun:=0
+    if not longSignal[1]
+        longOpps+=1
+else if shortSignal
+    shortBars+=1
+    shortRun+=1
+    longRun:=0
+    if not shortSignal[1]
+        shortOpps+=1
+else
+    longRun:=0
+    shortRun:=0
+maxLongRun:=math.max(maxLongRun,longRun)
+maxShortRun:=math.max(maxShortRun,shortRun)
+
+var float entryPx=na
+var float stopPx=na
+var float tp1Px=na
+var float tp2Px=na
+var bool tp1Touched=false
+if strategy.position_size==0 and strategy.position_size[1]!=0
+    entryPx:=na
+    stopPx:=na
+    tp1Px:=na
+    tp2Px:=na
+    tp1Touched:=false
+if (longSignal or shortSignal) and strategy.position_size!=0
+    blockedOpen+=1
+
+if strategy.position_size==0 and (longSignal or shortSignal)
+    if longSignal
+        longRequests+=1
+    else
+        shortRequests+=1
+    entryPx:=close
+    float riskDist=slAtrMult*atrVal
+    stopPx:=longSignal?entryPx-riskDist:entryPx+riskDist
+    tp1Px:=longSignal?entryPx+tp1R*riskDist:entryPx-tp1R*riskDist
+    tp2Px:=longSignal?entryPx+tp2R*riskDist:entryPx-tp2R*riskDist
+    float qty=f_qty(entryPx,stopPx,riskPct)
+    if na(qty) or qty<=0
+        sizingFailures+=1
+    else
+        // Pine has no rejected-order callback; margin=1 means 1% of notional.
+        if qty*entryPx*0.01>strategy.equity
+            marginRejects+=1
+        strategy.entry(longSignal?"Long":"Short",longSignal?strategy.long:strategy.short,qty=qty)
+        strategy.exit(longSignal?"L TP1":"S TP1",longSignal?"Long":"Short",stop=stopPx,limit=tp1Px,qty_percent=tp1ClosePct)
+        strategy.exit(longSignal?"L TP2":"S TP2",longSignal?"Long":"Short",stop=stopPx,limit=tp2Px,qty_percent=100-tp1ClosePct)
+
+if strategy.position_size>0 and not tp1Touched and not na(tp1Px) and high>=tp1Px
+    tp1Touched:=true
+if strategy.position_size<0 and not tp1Touched and not na(tp1Px) and low<=tp1Px
+    tp1Touched:=true
+if strategy.position_size>0 and not na(stopPx)
+    float runnerStop=moveToBE and tp1Touched?entryPx:stopPx
+    strategy.exit("L TP1","Long",stop=stopPx,limit=tp1Px,qty_percent=tp1ClosePct)
+    strategy.exit("L TP2","Long",stop=runnerStop,limit=tp2Px,qty_percent=100-tp1ClosePct)
+if strategy.position_size<0 and not na(stopPx)
+    float runnerStop=moveToBE and tp1Touched?entryPx:stopPx
+    strategy.exit("S TP1","Short",stop=stopPx,limit=tp1Px,qty_percent=tp1ClosePct)
+    strategy.exit("S TP2","Short",stop=runnerStop,limit=tp2Px,qty_percent=100-tp1ClosePct)
+
+int actualLong=0
+int actualShort=0
+if barstate.islast
+    if strategy.closedtrades>0
+        for i=0 to strategy.closedtrades-1
+            if strategy.closedtrades.entry_id(i)=="Long"
+                actualLong+=1
+            else
+                actualShort+=1
+    if strategy.opentrades>0
+        if strategy.opentrades.entry_id(0)=="Long"
+            actualLong+=1
+        else
+            actualShort+=1
+
+var table debug=table.new(position.top_right,2,16,border_width=1)
+if barstate.islast
+    string[] labels=array.from("LONG-condition bars","SHORT-condition bars","Distinct LONG opportunities","Distinct SHORT opportunities","LONG requests / actual","SHORT requests / actual","Actual entries","Closed trades","Open at end","Sizing failures","Estimated margin rejects","Signal bars blocked open","Max LONG state run","Max SHORT state run","Needed bars")
+    string[] values=array.from(str.tostring(longBars),str.tostring(shortBars),str.tostring(longOpps),str.tostring(shortOpps),str.tostring(longRequests)+" / "+str.tostring(actualLong),str.tostring(shortRequests)+" / "+str.tostring(actualShort),str.tostring(strategy.closedtrades+strategy.opentrades),str.tostring(strategy.closedtrades),str.tostring(strategy.opentrades),str.tostring(sizingFailures),str.tostring(marginRejects),str.tostring(blockedOpen),str.tostring(maxLongRun),str.tostring(maxShortRun),str.tostring(neededBars))
+    table.cell(debug,0,0,"Recovered Pine diagnostic")
+    table.cell(debug,1,0,syminfo.tickerid+" "+timeframe.period)
+    for i=0 to array.size(labels)-1
+        table.cell(debug,0,i+1,array.get(labels,i))
+        table.cell(debug,1,i+1,array.get(values,i))
+
+plot(emaFast,"EMA fast")
+plot(emaSlow,"EMA slow")
+plotshape(longSignal and strategy.position_size==0,title="Mindset LONG",style=shape.triangleup,location=location.belowbar,size=size.tiny,text="L")
+plotshape(shortSignal and strategy.position_size==0,title="Mindset SHORT",style=shape.triangledown,location=location.abovebar,size=size.tiny,text="S")

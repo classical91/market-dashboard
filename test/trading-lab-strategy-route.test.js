@@ -126,6 +126,7 @@ test("the strategy catalogue is public, so the selector can render before any ke
   assert.deepEqual(body.strategies.map((s) => s.id).sort(), [
     "donchian_breakout_v1",
     "mindset_v1",
+    "mindset_v1_1",
     "shadow_bananagun_v1",
     "smc_v1",
     "vwap_reversion_v1",
@@ -325,7 +326,7 @@ test("comparison defaults to every registered strategy", async () => {
   const res = await post("/api/trading-lab/backtest/compare", { symbol: "BTCUSDT", interval: "15m" });
   assert.equal(res.status, 200);
   const body = await res.json();
-  assert.equal(body.results.length, 5);
+  assert.equal(body.results.length, 6);
   assert.ok(body.results.some((row) => row.strategy === "shadow_bananagun_v1" && row.status === "insufficient-data"));
 });
 

@@ -10,6 +10,8 @@
     "build": "node scripts/build-check.js",
     "test": "node --test",
     "parity": "node scripts/traderclaw-parity.js",
+    "research:mindset": "node scripts/mindset-research.js",
+    "diagnose:mindset-pine": "node scripts/mindset-pine-diagnostic.js",
     "postinstall": "playwright install chromium || true"
   },
   "dependencies": {

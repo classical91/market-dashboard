@@ -55,6 +55,7 @@
 
 const { checkPositiveInt, checkPositiveNumber } = require("./option-checks");
 const { mindsetV1 } = require("./mindset-v1");
+const { mindsetV11 } = require("./mindset-v1-1");
 const { smcV1 } = require("./smc-v1");
 const { shadowBananagunV1 } = require("./shadow-bananagun-v1");
 const { donchianBreakoutV1 } = require("./donchian-breakout-v1");
@@ -73,6 +74,7 @@ const {
 // process at startup rather than producing unreproducible experiments later.
 const STRATEGIES = [
   mindsetV1,
+  mindsetV11,
   smcV1,
   shadowBananagunV1,
   donchianBreakoutV1,

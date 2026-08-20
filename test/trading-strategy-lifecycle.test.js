@@ -94,7 +94,7 @@ test("nothing is real-money eligible", () => {
 
 test("live demo research capability is independent of lifecycle promotion", () => {
   const byId = new Map(listStrategies().map((strategy) => [strategy.id, strategy]));
-  for (const id of ["mindset_v1", "smc_v1", "donchian_breakout_v1", "vwap_reversion_v1"]) {
+  for (const id of ["mindset_v1", "mindset_v1_1", "smc_v1", "donchian_breakout_v1", "vwap_reversion_v1"]) {
     assert.equal(byId.get(id).liveResearchEligible, true, id);
     assert.ok(byId.get(id).rules && byId.get(id).rules.positionSizing, `${id} has no structured rules`);
   }

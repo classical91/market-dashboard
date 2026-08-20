@@ -111,6 +111,14 @@ function buildExperimentRecord(result, meta = {}) {
     strategyStatus: (strategy && strategy.status) || null,
     gitCommit: meta.gitCommit !== undefined ? meta.gitCommit : resolveGitCommit(),
 
+    // Requested and actually-applied exits are separate facts. A strategy
+    // without native levels can be requested as native and still run shared.
+    executionMode: summary.executionMode,
+    executionApplied: summary.executionApplied,
+    nativeTrades: summary.nativeTrades,
+    sharedTrades: summary.sharedTrades,
+    nativeFallbacks: summary.nativeFallbacks,
+
     // What it ran on
     symbol: summary.symbol,
     timeframe: summary.interval,
@@ -121,12 +129,21 @@ function buildExperimentRecord(result, meta = {}) {
 
     // What happened
     signals: summary.signals,
+    longSignals: summary.longSignals,
+    shortSignals: summary.shortSignals,
+    executedTrades: summary.executedTrades,
+    longTrades: summary.longTrades,
+    shortTrades: summary.shortTrades,
+    skippedCandidates: summary.skippedCandidates,
     closedTrades: summary.closedTrades,
     openAtEnd: summary.openAtEnd,
     winRate: summary.winRate,
     netPnlUsd: summary.netPnlUsd,
     netReturnPct: summary.netReturnPct,
     expectancyR: summary.expectancyR,
+    averageR: summary.averageR,
+    averageWin: summary.averageWin,
+    averageLoss: summary.averageLoss,
     profitFactor: summary.profitFactor,
     maxDrawdownPct: summary.maxDrawdownPct,
     worstLossStreak: summary.worstLossStreak,

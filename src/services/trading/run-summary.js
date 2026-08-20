@@ -13,6 +13,9 @@
 // side-by-side table.
 function summarizeRun(result) {
   const m = result.stats.riskMetrics;
+  const closed = result.trades || [];
+  const opened = [...closed, ...(result.openAtEnd || [])];
+  const countDirection = (rows, direction) => rows.filter((row) => row.direction === direction).length;
   return {
     strategy: result.strategy,
     strategyName: result.strategyName,
@@ -38,11 +41,20 @@ function summarizeRun(result) {
     bars: result.bars,
     warmupBars: result.warmupBars,
     signals: result.signals.length,
+    longSignals: result.signals.filter((row) => (row.direction || row.signal) === "LONG").length,
+    shortSignals: result.signals.filter((row) => (row.direction || row.signal) === "SHORT").length,
+    executedTrades: opened.length,
+    longTrades: countDirection(opened, "LONG"),
+    shortTrades: countDirection(opened, "SHORT"),
+    skippedCandidates: (result.skipped || []).length,
     closedTrades: m.closedTrades,
     openAtEnd: result.openAtEnd.length,
     netPnlUsd: m.netReturnUsd,
     netReturnPct: m.netReturnPct,
     expectancyR: m.expectancyR,
+    averageR: m.expectancyR,
+    averageWin: m.avgWin,
+    averageLoss: m.avgLoss,
     profitFactor: m.profitFactor,
     maxDrawdownPct: m.maxDrawdownPct,
     winRate: result.stats.winRate,

@@ -51,10 +51,10 @@ test("every registered strategy has an account, derived from the registry", () =
   const accounts = listStrategyAccounts().map((a) => a.id).sort();
   const registered = listStrategies().map((s) => s.id).sort();
   assert.deepEqual(accounts, registered);
-  assert.equal(accounts.length, 5);
+  assert.equal(accounts.length, 6);
 });
 
-test("a sixth strategy would not need a second list updating", () => {
+test("another strategy would not need a second list updating", () => {
   // The guard against the failure this design exists to prevent: a
   // hand-maintained mirror of the registry that silently loses an entry.
   // listStrategyAccounts() reads the registry, so this holds by construction —
@@ -282,16 +282,16 @@ test("a trade with no strategy attribution is refused and touches no legacy ledg
 
 /* ── Reporting ────────────────────────────────────────────── */
 
-test("the accounts overview reports equity and lifecycle for all five", async () => {
+test("the accounts overview reports equity and lifecycle for every registered strategy", async () => {
   const lab = tempLab();
   const overview = await lab.strategyAccounts();
 
-  assert.equal(overview.accounts.length, 5);
+  assert.equal(overview.accounts.length, 6);
   assert.equal(overview.mode, "paper");
   assert.equal(
     new Set(overview.accounts.map((account) => account.stats.startingBalance)).size,
     1,
-    "all five accounts must begin with the same fair starting balance",
+    "all strategy accounts must begin with the same fair starting balance",
   );
   for (const account of overview.accounts) {
     assert.ok(account.stats, `${account.id} has no stats`);

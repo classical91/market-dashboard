@@ -1,5 +1,7 @@
 # Trading Lab — TraderClaw migration
 
+The Mindset v1 audit, Pine signal/execution diagnostic, experimental v1.1 ablations, and preliminary chronological results are documented in [Mindset v1 Audit and v1.1 Research](mindset-v1-research.md).
+
 The Trading Lab is TraderClaw's trading-laboratory layer rebuilt as native
 JavaScript inside Market Dashboard: paper execution, risk sizing, historical
 edge gating and expectancy metrics, running on one runtime, one deployment,
@@ -461,6 +463,7 @@ callers that want the counts. `nativeFallbacks` is unchanged.
 | id | version | research status | live demo research | What it is |
 | --- | --- | --- | --- | --- |
 | `mindset_v1` | 1.0.0 | `forward-paper` | candle runner | The live scanner's strategy — EMA20/EMA50 trend with an RSI band filter. Scanner eligible, **not** real-money eligible. The default. |
+| `mindset_v1_1` | 1.1.0-experimental.1 | `experimental` | candle runner | Backtest-only A–F entry-quality ablations against the frozen v1 benchmark. Not scanner eligible. |
 | `smc_v1` | 1.0.0 | `backtest` | candle runner | Mechanical Smart Money Concepts approximation. Live demo evidence collection does not promote it. |
 | `donchian_breakout_v1` | 1.0.0 | `backtest` | candle runner | The unoptimised N-bar breakout baseline. Live demo evidence collection does not promote it. |
 | `vwap_reversion_v1` | 1.0.0 | `backtest` | candle runner | The low-ADX mean-reversion counterweight. Live demo evidence collection does not promote it. |
@@ -742,7 +745,7 @@ trades it does not contain one.
 
 ### Accounts are derived, and are not permissions
 
-`listStrategyAccounts()` reads the strategy registry, so a sixth strategy gets an
+`listStrategyAccounts()` reads the strategy registry, so a new strategy gets an
 account with no second list to update — a test asserts the derivation rather than
 trusting it.
 
@@ -752,6 +755,7 @@ states: research lifecycle and live demo runner intent.
 | Strategy | Research status | Live demo |
 | --- | --- | --- |
 | `mindset_v1` | forward-paper | closed-candle runner |
+| `mindset_v1_1` | experimental | closed-candle runner |
 | `smc_v1`, `donchian_breakout_v1`, `vwap_reversion_v1` | backtest | closed-candle runner |
 | `shadow_bananagun_v1` | experimental | event replay only / waiting for live event data |
 
@@ -1151,7 +1155,7 @@ Done:
 3. Risk sizing and SL/TP logic integrated.
 4. Expectancy, drawdown, win rate, profit factor and R-multiple analytics.
 5. Decision Engine connected to the paper trader.
-6. Five isolated accounts derived from the strategy registry; Main / Shadow SMC / Alts retained as archived, read-only legacy history.
+6. Six isolated accounts derived from the strategy registry; Main / Shadow SMC / Alts retained as archived, read-only legacy history.
 7. Parity check against the Python engines passing.
 8. Backtesting — bar replay over the same paper-trading engine.
 9. Signal-bot bridge — signal transitions feed the Lab, replacing TradingView
