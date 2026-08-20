@@ -368,6 +368,20 @@ test("message bodies are hashed, never stored", () => {
   assert.ok(!raw.includes("must not be persisted"));
 });
 
+test("news type is inferred from the broadcast body before that body is discarded", () => {
+  const store = freshStore();
+  const secretBody = "Bitcoin rallied as the Fed discussed interest rates and inflation.";
+  const { receipt } = store.createReceipt({
+    title: "THURSDAY, AUGUST 20, 2026",
+    text: secretBody,
+    source: "shortcut",
+    status: "posted",
+  });
+
+  assert.equal(receipt.newsType, "Crypto / Economics");
+  assert.ok(!JSON.stringify(receipt).includes(secretBody));
+});
+
 /* ── attribution: which path actually sent it ── */
 
 test("a path reporting itself claims the watch's unattributed receipt instead of duplicating it", () => {
