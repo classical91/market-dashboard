@@ -4,13 +4,19 @@
  * BroadcastIngestService
  *
  * Watches the Telegram channels the dashboard's bot already posts to and
- * writes a broadcast receipt for every post it sees — whoever sent it.
+ * writes a broadcast receipt for the posts it can see.
  *
- * This is what makes the ledger automatic. The three posting paths each had
- * to volunteer a receipt: the shortcut needed an extra action, ShareBot67
- * needed an agent-side change, and a hand-posted story needed the form. But
- * all three end up as a message in the same channel, so watching the channel
- * covers all three at one point instead of three.
+ * IMPORTANT — what it cannot see: Telegram never returns a bot's own outgoing
+ * messages through getUpdates. Anything sent with THIS bot token is therefore
+ * invisible to the watch no matter how it is configured. That covers the iOS
+ * Shortcut and ShareBot67 whenever they send through this same bot, and it is
+ * a protocol limit, not a misconfiguration.
+ *
+ * So the watch covers posts from OTHER senders — a human typing into the
+ * channel, another bot, a different account. Anything going out through this
+ * bot has to record itself, which is what POST /api/broadcast-ledger/broadcast
+ * is for: it sends and writes the receipt in one call, from the real
+ * sendMessage response.
  *
  * It does not replace the paths reporting for themselves. A receipt written
  * by the sender knows things a watcher cannot — the canonical source URL, a

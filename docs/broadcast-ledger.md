@@ -404,17 +404,88 @@ Everything in `reconciled` is done — say nothing, repost nothing. Only
 **The rule this replaces:** never infer failure from a missing gateway
 acknowledgment. Ask the ledger. A posted receipt outranks any absent ack.
 
+## The one thing the channel watch cannot do
+
+**Telegram never returns a bot's own outgoing messages through `getUpdates`.**
+
+This is a protocol limit, not a misconfiguration. Anything sent with the same
+bot token the watch polls is invisible to it — no amount of admin rights or
+chat-id fixing changes that. It covers the iOS Shortcut and ShareBot67 whenever
+they send through this bot.
+
+So the split is:
+
+| Sender | Recorded by |
+| --- | --- |
+| A human typing into the channel, another bot, another account | The channel watch |
+| Anything sent **through this bot** (Shortcut, ShareBot67, dashboard) | The sender, via `POST /broadcast` |
+
+### `POST /broadcast` — send and record in one call
+
+```jsonc
+{
+  "text": "Fed holds rates steady\nhttps://example.com/news/fed",
+  "source": "shortcut",
+  "idempotencyKey": "shortcut-2026-08-19-1430",
+  "title": "optional — otherwise taken from the first headline line",
+  "url": "optional — otherwise the first link in the text",
+  "force": false,
+  "parseMode": "none"
+}
+```
+
+It sends to every configured chat, then writes the receipt **from the real
+`sendMessage` response** — so the message ids on the receipt are Telegram's,
+not the caller's word. Returns `201 { ok, sent, failed, receipt }`.
+
+Three behaviours worth knowing:
+
+- **It refuses a duplicate.** If the ledger already shows the story as sent, it
+  returns `409` with the existing receipt and sends nothing. Pass
+  `"force": true` for a deliberate resend. This is the dedupe working at the
+  moment it matters rather than after the fact.
+- **A retry costs nothing.** Same `idempotencyKey`, or the same story, and the
+  second call is refused before Telegram is touched — a phone on a bad
+  connection cannot double-post.
+- **A partial send is recorded as `partial`**, keeping the ids that landed. A
+  total failure returns `502` and leaves a `failed` receipt, which does *not*
+  read as broadcast to anyone asking later.
+
+`parseMode: "none"` sends the text unformatted — use it if a headline contains
+`<` or `&` and Telegram rejects the message.
+
+### Security note
+
+This endpoint can send to your configured chats, so the ledger key is no longer
+strictly receipt-only. That is a deliberate trade: the alternative is the
+**bot token** living on your phone, which can send anywhere, edit, and delete.
+The ledger key can only post to `TELEGRAM_CHAT_IDS`. Moving the Shortcut onto
+this endpoint is a net reduction in what the phone holds.
+
 ## Integration 2 — GPT / iOS Shortcut
 
-Add one "Get Contents of URL" action at the end of the shortcut, after the
-broadcast succeeds.
+**Point the shortcut at the dashboard instead of `api.telegram.org`.** Replace
+the action that calls Telegram directly with this one — it both sends and
+records, so there is no second action to add and no bot token on the phone.
 
 | Field | Value |
 | --- | --- |
-| URL | `https://<your-app>.up.railway.app/api/broadcast-ledger/receipts` |
+| URL | `https://<your-app>.up.railway.app/api/broadcast-ledger/broadcast` |
 | Method | `POST` |
 | Headers | `x-broadcast-key: <BROADCAST_LEDGER_API_KEY>`, `Content-Type: application/json` |
 | Request Body | JSON (below) |
+
+```jsonc
+{
+  "source": "shortcut",
+  "text": "<the message you were sending to Telegram>",
+  "idempotencyKey": "shortcut-<Current Date, formatted yyyy-MM-dd-HH-mm>"
+}
+```
+
+A direct Telegram send followed by a separate receipt call also works, and is
+what the rest of this section describes — but it can half-fail, leaving a post
+with no receipt. One call cannot.
 
 ```jsonc
 {

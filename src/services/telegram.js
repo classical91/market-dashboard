@@ -203,14 +203,16 @@ class TelegramService {
     return !!(this._botToken && this._chatIds.length);
   }
 
-  async _send(target, text) {
+  async _send(target, text, { parseMode = "HTML" } = {}) {
     const url = `${TELEGRAM_API}/bot${this._botToken}/sendMessage`;
     const body = {
       chat_id: target.chatId,
       text: truncate(text, MAX_MSG_LEN),
-      parse_mode: "HTML",
       disable_web_page_preview: true,
     };
+    // Plain text skips parse_mode entirely: an unescaped "<" in a pasted
+    // headline would otherwise make Telegram reject the whole message.
+    if (parseMode) body.parse_mode = parseMode;
     if (target.threadId) body.message_thread_id = Number(target.threadId);
     const res = await fetch(url, {
       method: "POST",
@@ -240,7 +242,7 @@ class TelegramService {
    * _sendToAll keeps its throw-on-first-failure behavior for the alert paths,
    * which have no receipt to attach a partial result to.
    */
-  async _sendToAllSettled(text) {
+  async _sendToAllSettled(text, options) {
     const results = [];
     for (const target of this._chatIds) {
       const base = {
@@ -249,7 +251,7 @@ class TelegramService {
         threadId: target.threadId ? String(target.threadId) : null,
       };
       try {
-        const response = await this._send(target, text);
+        const response = await this._send(target, text, options);
         results.push({
           ...base,
           status: "posted",
@@ -321,6 +323,40 @@ class TelegramService {
     }
     const payload = await res.json();
     return Array.isArray(payload.result) ? payload.result : [];
+  }
+
+  /**
+   * Send an arbitrary broadcast body to every configured chat and report each
+   * outcome, including the Telegram message id.
+   *
+   * This exists because Telegram never returns a bot's own outgoing messages
+   * through getUpdates — the channel watch is structurally blind to anything
+   * this bot sends. A path that sends through this bot therefore has to record
+   * its own receipt, and the only trustworthy moment to do that is here, from
+   * the real sendMessage response.
+   */
+  async postText(text, { parseMode = "HTML" } = {}) {
+    if (!this.configured) throw createServiceError("Telegram is not configured", 400);
+    const body = String(text || "").trim();
+    if (!body) throw createServiceError("Nothing to send: text is empty", 400);
+
+    const destinations = await this._sendToAllSettled(
+      parseMode === "HTML" ? formatForTelegram(body) : body,
+      { parseMode },
+    );
+    const posted = destinations.filter((d) => d.status === "posted").length;
+
+    // Nothing landed anywhere: same contract as postReport — a total failure
+    // is an error, a partial one is a result the caller records.
+    if (destinations.length && posted === 0) {
+      const error = createServiceError(
+        `Telegram send failed for all ${destinations.length} destination(s): ${destinations[0].error || "unknown error"}`,
+        502,
+      );
+      error.destinations = destinations;
+      throw error;
+    }
+    return { destinations, posted, failed: destinations.length - posted };
   }
 
   async postReport(report) {

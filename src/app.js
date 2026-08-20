@@ -367,6 +367,7 @@ function createApp() {
     createBroadcastLedgerRouter({
       broadcastLedgerStore,
       broadcastIngestService,
+      telegramService,
       requireLedgerKey,
       ledgerKey: config.broadcastLedger.apiKey,
       adminKey: config.admin.apiKey,

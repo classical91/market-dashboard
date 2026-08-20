@@ -434,7 +434,7 @@
       // because that is the difference between "nothing to do" and "you still
       // have to file these yourself".
       watchEl.textContent = data.watching
-        ? '\u2713 Watching your Telegram channels \u2014 posts are recorded automatically, whichever path sent them.'
+        ? '\u2713 Watching your Telegram channels \u2014 posts from other senders are recorded automatically. Anything sent through this bot must broadcast via /api/broadcast-ledger/broadcast to be recorded.'
         : '\u26a0 Channel watch is off \u2014 receipts only arrive from paths that report themselves. Set BROADCAST_LEDGER_INGEST_ENABLED=true to record posts automatically.';
       watchEl.style.display = '';
       inst.style.display = 'none';
