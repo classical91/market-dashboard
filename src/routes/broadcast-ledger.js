@@ -89,9 +89,7 @@ const STATUS_LABELS = {
 function renderManualForm({
   notice = "",
   error = "",
-  values = {},
   recent = [],
-  formKey = "",
   watching = false,
   diagnostics = null,
   total = 0,
@@ -266,30 +264,6 @@ function renderManualForm({
   ${watchBanner}
   ${tally}
   ${diagBlock}
-  <h2>Record one by hand</h2>
-  <form method="POST" action="/api/broadcast-ledger/manual">
-    ${formKey ? `<input type="hidden" name="key" value="${escapeHtml(formKey)}">` : ""}
-    <label>Headline
-      <input name="title" autocapitalize="sentences" autocomplete="off" value="${escapeHtml(values.title)}" required>
-    </label>
-    <label>Source URL <span class="meta">(optional)</span>
-      <input name="url" type="url" inputmode="url" autocapitalize="off" autocorrect="off" placeholder="https://" value="${escapeHtml(values.url)}">
-    </label>
-    <label>What you posted <span class="meta">(optional — hashed, never stored as text)</span>
-      <textarea name="text" autocapitalize="sentences">${escapeHtml(values.text)}</textarea>
-    </label>
-    <label>Channels <span class="meta">(comma-separated)</span>
-      <input name="channels" autocapitalize="off" autocorrect="off" value="${escapeHtml(values.channels || "telegram")}">
-    </label>
-    <label>Status
-      <select name="status">
-        <option value="posted"${values.status === "partial" || values.status === "failed" ? "" : " selected"}>Posted</option>
-        <option value="partial"${values.status === "partial" ? " selected" : ""}>Partial — some channels only</option>
-        <option value="failed"${values.status === "failed" ? " selected" : ""}>Failed</option>
-      </select>
-    </label>
-    <button type="submit">Save receipt</button>
-  </form>
   ${rows ? `<h2>Last 10 broadcasts</h2><ul>${rows}</ul>` : ""}
 </main>
 </body>

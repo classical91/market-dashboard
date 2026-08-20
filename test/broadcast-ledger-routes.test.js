@@ -184,14 +184,14 @@ test("ShareBot67 records destination results against its own pending receipt", a
   assert.equal(body.receipt.attempts.at(-1).actor, "sharebot67");
 });
 
-test("manual form renders and is mobile-viewport ready", async () => {
+test("broadcast receipts page is mobile-ready without a manual-entry form", async () => {
   const res = await fetch(`${base}/api/broadcast-ledger/manual`, { headers: { "x-broadcast-key": LEDGER_KEY } });
   const html = await res.text();
 
   assert.equal(res.status, 200);
   assert.match(html, /<meta name="viewport" content="width=device-width/);
   assert.match(html, /Broadcast receipts/);
-  assert.match(html, /name="title"/);
+  assert.doesNotMatch(html, /Record one by hand|<form|Save receipt|name="title"/);
 });
 
 test("manual form submission stores a posted receipt and redirects", async () => {
@@ -226,7 +226,6 @@ test("the manual form escapes submitted values rather than reflecting markup", a
 
   assert.equal(res.status, 400);
   assert.ok(!html.includes("<script>alert(1)</script>"));
-  assert.match(html, /&lt;script&gt;/);
 });
 
 /* ── offline reconciliation over HTTP ── */
@@ -325,14 +324,14 @@ test("rate limit buckets are per caller, not global", async () => {
 
 /* ── manual form access from a phone browser ── */
 
-test("the manual form is reachable with a key in the query, since a browser cannot set headers", async () => {
+test("the receipts page accepts a key in the query without exposing a manual form", async () => {
   const res = await fetch(`${base}/api/broadcast-ledger/manual?key=${LEDGER_KEY}`);
   const html = await res.text();
 
   assert.equal(res.status, 200);
   assert.match(html, /Broadcast receipts/);
-  // The key is carried forward so the form's own POST is authorized too.
-  assert.match(html, new RegExp(`<input type="hidden" name="key" value="${LEDGER_KEY}"`));
+  assert.doesNotMatch(html, /<form|Record one by hand|Save receipt/);
+  assert.doesNotMatch(html, new RegExp(LEDGER_KEY));
 });
 
 test("the manual form rejects a browser with no credentials at all", async () => {
