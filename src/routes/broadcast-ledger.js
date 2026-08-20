@@ -91,7 +91,6 @@ function renderManualForm({
   error = "",
   recent = [],
   watching = false,
-  diagnostics = null,
   total = 0,
   bySource = {},
 } = {}) {
@@ -116,65 +115,6 @@ function renderManualForm({
     .filter((key) => bySource[key])
     .map((key) => `${bySource[key]} ${SOURCE_LABELS[key]}`)
     .join(" · ");
-
-  // The page led with a form, so an empty ledger looked identical to a broken
-  // one. State first: whether anything is watching, and how much it has seen.
-  // A watch that is on but recording nothing has several possible causes and
-  // they are indistinguishable from the ledger alone. Say which one it is.
-  const d = diagnostics || {};
-  const diagLines = [];
-  if (watching) {
-    if (d.conflict) {
-      diagLines.push(
-        `<strong class="bad">Telegram is refusing the poll (409 Conflict).</strong> Another process is reading this bot's
-         updates \u2014 most likely ShareBot67 on the same bot token, or a webhook. Give the dashboard its own bot.`,
-      );
-    }
-    if (d.lastError && !d.conflict) {
-      diagLines.push(`<strong class="bad">Last poll failed:</strong> ${escapeHtml(d.lastError)}`);
-    }
-    if (Array.isArray(d.watchedChatIds) && d.watchedChatIds.length) {
-      diagLines.push(`Watching chat ${d.watchedChatIds.map((id) => `<code>${escapeHtml(id)}</code>`).join(", ")}`);
-    } else {
-      diagLines.push(
-        `<strong class="bad">No chats configured.</strong> <code>TELEGRAM_CHAT_IDS</code> is empty, so there is nothing to watch.`,
-      );
-    }
-    if (Array.isArray(d.unwatchedChatIdsSeen) && d.unwatchedChatIdsSeen.length) {
-      diagLines.push(
-        `<strong class="bad">Posts are arriving from a chat you are not watching:</strong>
-         ${d.unwatchedChatIdsSeen.map((id) => `<code>${escapeHtml(id)}</code>`).join(", ")}.
-         Add it to <code>TELEGRAM_CHAT_IDS</code>.`,
-      );
-    }
-    if (d.lastPollAt) {
-      const seen = d.lastSummary ? d.lastSummary.polled : 0;
-      diagLines.push(
-        `Last checked ${escapeHtml(new Date(d.lastPollAt).toISOString().replace("T", " ").slice(0, 16))} \u2014
-         ${seen} update${seen === 1 ? "" : "s"} from Telegram`,
-      );
-    } else {
-      diagLines.push("Has not completed a poll yet.");
-    }
-    if (!total && d.lastPollAt && d.lastSummary && !d.lastSummary.polled && !d.conflict) {
-      diagLines.push(
-        `<strong>If you sent it through this bot, the watch cannot see it.</strong> Telegram does not return a
-         bot's own outgoing messages, so a Shortcut or agent posting with this bot token is invisible here.
-         Send via <code>POST /api/broadcast-ledger/broadcast</code> instead and the receipt is written from the
-         send itself.`,
-      );
-      diagLines.push(
-        `Otherwise: the watch only sees posts made <em>after</em> it started
-         (${escapeHtml(String(d.startedAt || "this deploy"))}), and in a group the bot must be an admin to read
-         other senders' messages \u2014 in a channel it already is.`,
-      );
-    }
-  }
-  const diagBlock = diagLines.length
-    ? `<details class="diag"><summary>Why is nothing appearing?</summary><ul>${diagLines
-        .map((line) => `<li>${line}</li>`)
-        .join("")}</ul></details>`
-    : "";
 
   const watchBanner = watching
     ? `<div class="watch on"><strong>\u25cf Watching your Telegram channels</strong>
@@ -263,7 +203,6 @@ function renderManualForm({
   ${error ? `<div class="msg err">${escapeHtml(error)}</div>` : ""}
   ${watchBanner}
   ${tally}
-  ${diagBlock}
   ${rows ? `<h2>Last 10 broadcasts</h2><ul>${rows}</ul>` : ""}
 </main>
 </body>
