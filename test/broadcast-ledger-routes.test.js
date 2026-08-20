@@ -499,7 +499,7 @@ test("a populated ledger leads with the count and the per-path breakdown", () =>
   assert.match(html, /<strong>3<\/strong> broadcasts recorded/);
   assert.match(html, /2 Shortcut/);
   assert.match(html, /1 ShareBot67/);
-  assert.match(html, /Markets · Shortcut/);
+  assert.match(html, /Economics · Shortcut/);
   assert.doesNotMatch(html, /Unattributed/);
 });
 
