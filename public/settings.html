@@ -390,13 +390,11 @@
       shortcut: 'Shortcut',
       sharebot67: 'ShareBot67',
       dashboard: 'Dashboard API',
-      manual: 'Manual (form)',
-      'telegram-ingest': 'Unattributed'
+      manual: 'Manual (form)'
     };
 
     // Which path sent what. Only paths that report themselves can be named;
-    // "Unattributed" is what the channel watch saw and nobody claimed, which
-    // in practice means it was posted by hand.
+    // channel-watch receipts are omitted because no sending path claimed them.
     function describeSources(data) {
       var counts = data && data.bySource ? data.bySource : {};
       var parts = Object.keys(SOURCE_LABELS)

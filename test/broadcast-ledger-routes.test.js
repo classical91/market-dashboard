@@ -500,7 +500,22 @@ test("a populated ledger leads with the count and the per-path breakdown", () =>
   assert.match(html, /<strong>4<\/strong> broadcasts recorded/);
   assert.match(html, /2 Shortcut/);
   assert.match(html, /1 ShareBot67/);
-  assert.match(html, /1 Unattributed/);
+  assert.doesNotMatch(html, /Unattributed/);
+});
+
+test("channel-watch receipts show their timestamp without an unattributed label", () => {
+  const { renderManualForm } = require("../src/routes/broadcast-ledger");
+  const html = renderManualForm({
+    recent: [
+      { id: "watch-1", title: "Posted by hand", source: "telegram-ingest", status: "posted", createdAt: "2026-08-20T18:24:00.000Z" },
+    ],
+    total: 1,
+    bySource: { "telegram-ingest": 1 },
+    watching: true,
+  });
+
+  assert.match(html, /2026-08-20 18:24/);
+  assert.doesNotMatch(html, /Unattributed|telegram-ingest/);
 });
 
 test("statuses read as sent-or-not, not as raw enum values", async () => {
