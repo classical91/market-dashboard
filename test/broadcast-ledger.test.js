@@ -239,6 +239,22 @@ test("every mutation appends to the audit trail", () => {
   assert.equal(final.attempts[1].ok, true);
 });
 
+test("a receipt's news type can be corrected without changing its audit identity", () => {
+  const store = freshStore();
+  const { receipt } = store.createReceipt({
+    title: "Broadcasted today",
+    source: "manual",
+    status: "posted",
+  });
+
+  const updated = store.updateReceipt(receipt.id, { newsType: "Crypto", action: "classify" }, { actor: "operator" });
+
+  assert.equal(updated.id, receipt.id);
+  assert.equal(updated.newsType, "Crypto");
+  assert.equal(updated.attempts.at(-1).action, "classify");
+  assert.equal(updated.attempts.at(-1).actor, "operator");
+});
+
 /* ── offline reconciliation ── */
 
 test("reconcile resolves a pending agent receipt against a manual post of the same story", () => {

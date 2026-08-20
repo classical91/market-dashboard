@@ -405,6 +405,9 @@ class BroadcastLedgerStore {
     if (typeof patch.idempotencyKey === "string" && patch.idempotencyKey) {
       receipt.idempotencyKey = clampString(patch.idempotencyKey, 200);
     }
+    if (typeof patch.newsType === "string" && patch.newsType.trim()) {
+      receipt.newsType = clampString(patch.newsType, MAX_NEWS_TYPE_LEN);
+    }
 
     if (typeof patch.reconciledWith === "string") {
       receipt.reconciledWith = clampString(patch.reconciledWith, 80) || null;
