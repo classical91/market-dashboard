@@ -497,9 +497,8 @@ test("a populated ledger leads with the count and the per-path breakdown", () =>
   });
 
   assert.match(html, /<strong>3<\/strong> broadcasts recorded/);
-  assert.match(html, /2 Shortcut/);
-  assert.match(html, /1 ShareBot67/);
-  assert.match(html, /Economics · Shortcut/);
+  assert.doesNotMatch(html, /2 Shortcut|1 ShareBot67/);
+  assert.match(html, /Economics ·/);
   assert.doesNotMatch(html, /Unattributed/);
 });
 
@@ -516,8 +515,30 @@ test("visible broadcasts show explicit and inferred news-type labels", () => {
     watching: true,
   });
 
-  assert.match(html, /Crypto · Shortcut/);
-  assert.match(html, /Breaking News · ShareBot67/);
+  assert.match(html, /Crypto ·/);
+  assert.match(html, /Breaking News ·/);
+  assert.doesNotMatch(html, /Crypto · Shortcut|Breaking News · ShareBot67/);
+});
+
+test("a generic backfill title becomes a category-first news title", () => {
+  const { renderManualForm } = require("../src/routes/broadcast-ledger");
+  const html = renderManualForm({
+    recent: [{
+      id: "backfill",
+      title: "Broadcasted today — August 20, 2026",
+      newsType: "Crypto",
+      source: "manual",
+      status: "posted",
+      createdAt: "2026-08-20T21:31:00.000Z",
+    }],
+    total: 1,
+    bySource: { manual: 1 },
+    watching: true,
+  });
+
+  assert.match(html, /Crypto News — August 20, 2026/);
+  assert.match(html, /Crypto · 2026-08-20 21:31/);
+  assert.doesNotMatch(html, /Broadcasted today|Manual/);
 });
 
 test("channel-watch receipts are hidden from the visible ledger", () => {
