@@ -191,7 +191,7 @@ test("broadcast receipts page is mobile-ready without a manual-entry form", asyn
   assert.equal(res.status, 200);
   assert.match(html, /<meta name="viewport" content="width=device-width/);
   assert.match(html, /Broadcast receipts/);
-  assert.doesNotMatch(html, /Record one by hand|<form|Save receipt|name="title"/);
+  assert.doesNotMatch(html, /Record one by hand|Save receipt/);
 });
 
 test("manual form submission stores a posted receipt and redirects", async () => {
@@ -330,8 +330,8 @@ test("the receipts page accepts a key in the query without exposing a manual for
 
   assert.equal(res.status, 200);
   assert.match(html, /Broadcast receipts/);
-  assert.doesNotMatch(html, /<form|Record one by hand|Save receipt/);
-  assert.doesNotMatch(html, new RegExp(LEDGER_KEY));
+  assert.doesNotMatch(html, /Record one by hand|Save receipt/);
+  assert.match(html, new RegExp(`name="key" value="${LEDGER_KEY}"`));
 });
 
 test("the manual form rejects a browser with no credentials at all", async () => {
@@ -538,7 +538,21 @@ test("a generic backfill title becomes a category-first news title", () => {
 
   assert.match(html, /Crypto News — August 20, 2026/);
   assert.match(html, /Crypto · 2026-08-20 21:31/);
-  assert.doesNotMatch(html, /Broadcasted today|Manual/);
+  assert.doesNotMatch(html, /Manual ·/);
+});
+
+test("visible receipts include an authenticated edit form", () => {
+  const { renderManualForm } = require("../src/routes/broadcast-ledger");
+  const html = renderManualForm({
+    recent: [{ id: "receipt-1", title: "Daily report", newsType: "Economics", source: "shortcut", status: "posted" }],
+    total: 1,
+    bySource: { shortcut: 1 },
+    formKey: "secret-key",
+  });
+
+  assert.match(html, /manual\/receipt-1\/edit/);
+  assert.match(html, /name="newsType" value="Economics"/);
+  assert.match(html, /name="key" value="secret-key"/);
 });
 
 test("channel-watch receipts are hidden from the visible ledger", () => {

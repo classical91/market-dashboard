@@ -96,6 +96,7 @@ function renderManualForm({
   notice = "",
   error = "",
   recent = [],
+  formKey = "",
   watching = false,
   total = 0,
   bySource = {},
@@ -114,10 +115,19 @@ function renderManualForm({
       const title = /^Broadcasted today\b/i.test(rawTitle) ? `${newsType} News — ${dateLabel}` : rawTitle;
       const statusLabel = STATUS_LABELS[receipt.status] || receipt.status;
       const meta = [newsType, when].filter(Boolean).join(" · ");
+      const keyField = formKey ? `<input type="hidden" name="key" value="${escapeHtml(formKey)}">` : "";
       return `<li>
         <span class="status status-${escapeHtml(receipt.status)}">${escapeHtml(statusLabel)}</span>
         <strong>${escapeHtml(title)}</strong>
         <span class="meta">${escapeHtml(meta)}</span>
+        <details class="receipt-edit"><summary>Edit</summary>
+          <form method="POST" action="/api/broadcast-ledger/manual/${encodeURIComponent(receipt.id)}/edit">
+            ${keyField}
+            <label>Headline<input name="title" value="${escapeHtml(receipt.title || "")}" required></label>
+            <label>News type<input name="newsType" value="${escapeHtml(newsType)}" required></label>
+            <button type="submit">Save changes</button>
+          </form>
+        </details>
       </li>`;
     })
     .join("");
@@ -170,6 +180,12 @@ function renderManualForm({
   li { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-bottom:8px; font-size:14px; }
   li strong { display:block; font-weight:600; margin:3px 0; overflow-wrap:anywhere; }
   .meta { color:var(--muted); font-size:12px; }
+  .receipt-edit { margin-top:8px; font-size:12px; }
+  .receipt-edit summary { color:var(--accent); cursor:pointer; }
+  .receipt-edit form { margin-top:8px; padding:10px; }
+  .receipt-edit label { margin-bottom:8px; }
+  .receipt-edit input { padding:9px; font-size:14px; }
+  .receipt-edit button { padding:9px; font-size:14px; }
   .status { font-size:11px; text-transform:uppercase; letter-spacing:.05em; font-weight:700; }
   .status-posted, .status-reconciled { color:var(--green); }
   .status-partial, .status-pending { color:var(--amber); }
@@ -374,6 +390,25 @@ function createBroadcastLedgerRouter({
 
       if (wantsJson) return res.status(created ? 201 : 200).json({ receipt, created });
       const keyParam = key ? `&key=${encodeURIComponent(key)}` : "";
+      res.redirect(303, `/api/broadcast-ledger/manual?saved=1${keyParam}`);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.post("/manual/:id/edit", requireManualAccess, (req, res, next) => {
+    try {
+      const body = req.body || {};
+      const title = String(body.title || "").trim();
+      const newsType = String(body.newsType || "").trim();
+      if (!title || !newsType) return badRequest(res, "Headline and news type are required.");
+      const receipt = broadcastLedgerStore.updateReceipt(
+        req.params.id,
+        { title, newsType, action: "manual-edit" },
+        { actor: "owner" },
+      );
+      if (!receipt) return res.status(404).json({ error: "Receipt not found." });
+      const keyParam = body.key ? `&key=${encodeURIComponent(body.key)}` : "";
       res.redirect(303, `/api/broadcast-ledger/manual?saved=1${keyParam}`);
     } catch (err) {
       next(err);
