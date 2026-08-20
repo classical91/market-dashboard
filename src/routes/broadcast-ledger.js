@@ -127,6 +127,11 @@ function renderManualForm({
             <label>News type<input name="newsType" value="${escapeHtml(newsType)}" required></label>
             <button type="submit">Save changes</button>
           </form>
+          <form method="POST" action="/api/broadcast-ledger/manual/${encodeURIComponent(receipt.id)}/delete"
+            onsubmit="return confirm('Delete this broadcast receipt? This cannot be undone.');">
+            ${keyField}
+            <button class="delete-button" type="submit">Delete receipt</button>
+          </form>
         </details>
       </li>`;
     })
@@ -186,6 +191,7 @@ function renderManualForm({
   .receipt-edit label { margin-bottom:8px; }
   .receipt-edit input { padding:9px; font-size:14px; }
   .receipt-edit button { padding:9px; font-size:14px; }
+  .receipt-edit .delete-button { background:var(--red); }
   .status { font-size:11px; text-transform:uppercase; letter-spacing:.05em; font-weight:700; }
   .status-posted, .status-reconciled { color:var(--green); }
   .status-partial, .status-pending { color:var(--amber); }
@@ -409,6 +415,17 @@ function createBroadcastLedgerRouter({
       );
       if (!receipt) return res.status(404).json({ error: "Receipt not found." });
       const keyParam = body.key ? `&key=${encodeURIComponent(body.key)}` : "";
+      res.redirect(303, `/api/broadcast-ledger/manual?saved=1${keyParam}`);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.post("/manual/:id/delete", requireManualAccess, (req, res, next) => {
+    try {
+      const deleted = broadcastLedgerStore.deleteReceipt(req.params.id);
+      if (!deleted) return res.status(404).json({ error: "Receipt not found." });
+      const keyParam = req.body && req.body.key ? `&key=${encodeURIComponent(req.body.key)}` : "";
       res.redirect(303, `/api/broadcast-ledger/manual?saved=1${keyParam}`);
     } catch (err) {
       next(err);

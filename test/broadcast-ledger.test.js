@@ -255,6 +255,19 @@ test("a receipt's news type can be corrected without changing its audit identity
   assert.equal(updated.attempts.at(-1).actor, "operator");
 });
 
+test("a selected receipt can be deleted without affecting the others", () => {
+  const store = freshStore();
+  const first = store.createReceipt({ title: "First", source: "shortcut" }).receipt;
+  const second = store.createReceipt({ title: "Second", source: "shortcut" }).receipt;
+
+  const deleted = store.deleteReceipt(first.id);
+
+  assert.equal(deleted.id, first.id);
+  assert.equal(store.list({ limit: 10 }).find((receipt) => receipt.id === first.id), undefined);
+  assert.equal(store.list({ limit: 10 }).find((receipt) => receipt.id === second.id).id, second.id);
+  assert.equal(store.deleteReceipt("missing"), null);
+});
+
 /* ── offline reconciliation ── */
 
 test("reconcile resolves a pending agent receipt against a manual post of the same story", () => {
