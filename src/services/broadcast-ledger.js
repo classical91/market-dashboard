@@ -384,7 +384,7 @@ class BroadcastLedgerStore {
       receipt.destinations = [...merged.values()].slice(0, MAX_DESTINATIONS);
     }
 
-    if (typeof patch.title === "string" && patch.title.trim() && !receipt.title) {
+    if (typeof patch.title === "string" && patch.title.trim()) {
       receipt.title = clampString(patch.title, MAX_TITLE_LEN);
       receipt.headlineKey = headlineKey(receipt.title);
     }
