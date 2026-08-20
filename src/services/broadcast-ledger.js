@@ -444,6 +444,15 @@ class BroadcastLedgerStore {
     return receipt;
   }
 
+  deleteReceipt(id) {
+    const receipts = this._read();
+    const index = receipts.findIndex((receipt) => receipt.id === id);
+    if (index === -1) return null;
+    const [deleted] = receipts.splice(index, 1);
+    this._write(receipts);
+    return deleted;
+  }
+
   /**
    * True when some receipt already records this exact platform message.
    *

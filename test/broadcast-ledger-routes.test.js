@@ -551,6 +551,9 @@ test("visible receipts include an authenticated edit form", () => {
   });
 
   assert.match(html, /manual\/receipt-1\/edit/);
+  assert.match(html, /manual\/receipt-1\/delete/);
+  assert.match(html, /Delete receipt/);
+  assert.match(html, /cannot be undone/);
   assert.match(html, /name="newsType" value="Economics"/);
   assert.match(html, /name="key" value="secret-key"/);
 });
