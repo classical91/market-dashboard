@@ -91,7 +91,8 @@ function newsTypeLabel(receipt) {
   if (receipt.kind === "digest") return "News Digest";
   const title = String(receipt.title || "").toLowerCase();
   if (/\b(bitcoin|crypto|ethereum|solana|blockchain|token)\b/.test(title)) return "Crypto";
-  if (/\b(stock|market|fed|rates?|inflation|earnings|economy|economic)\b/.test(title)) return "Markets";
+  if (/\b(fed|rates?|inflation|economy|economic|gdp|jobs?|unemployment)\b/.test(title)) return "Economics";
+  if (/\b(stock|market|earnings|nasdaq|dow|s&p)\b/.test(title)) return "Markets";
   if (/\b(ai|artificial intelligence|tech|apple|google|microsoft|nvidia|openai)\b/.test(title)) return "Technology";
   if (/\b(war|military|government|election|president|minister|sanction|geopolit)\b/.test(title)) return "Geopolitics";
   if (/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/.test(title)) return "Daily Brief";
