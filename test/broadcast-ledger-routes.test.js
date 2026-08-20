@@ -499,7 +499,25 @@ test("a populated ledger leads with the count and the per-path breakdown", () =>
   assert.match(html, /<strong>3<\/strong> broadcasts recorded/);
   assert.match(html, /2 Shortcut/);
   assert.match(html, /1 ShareBot67/);
+  assert.match(html, /Markets · Shortcut/);
   assert.doesNotMatch(html, /Unattributed/);
+});
+
+test("visible broadcasts show explicit and inferred news-type labels", () => {
+  const { renderManualForm } = require("../src/routes/broadcast-ledger");
+  const at = "2026-08-20T21:31:00.000Z";
+  const html = renderManualForm({
+    recent: [
+      { id: "a", title: "Bitcoin breaks resistance", source: "shortcut", status: "posted", createdAt: at },
+      { id: "b", title: "Morning update", newsType: "Breaking News", source: "sharebot67", status: "posted", createdAt: at },
+    ],
+    total: 2,
+    bySource: { shortcut: 1, sharebot67: 1 },
+    watching: true,
+  });
+
+  assert.match(html, /Crypto · Shortcut/);
+  assert.match(html, /Breaking News · ShareBot67/);
 });
 
 test("channel-watch receipts are hidden from the visible ledger", () => {

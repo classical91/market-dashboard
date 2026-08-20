@@ -86,6 +86,18 @@ const STATUS_LABELS = {
   failed: "Failed",
 };
 
+function newsTypeLabel(receipt) {
+  if (receipt.newsType) return receipt.newsType;
+  if (receipt.kind === "digest") return "News Digest";
+  const title = String(receipt.title || "").toLowerCase();
+  if (/\b(bitcoin|crypto|ethereum|solana|blockchain|token)\b/.test(title)) return "Crypto";
+  if (/\b(stock|market|fed|rates?|inflation|earnings|economy|economic)\b/.test(title)) return "Markets";
+  if (/\b(ai|artificial intelligence|tech|apple|google|microsoft|nvidia|openai)\b/.test(title)) return "Technology";
+  if (/\b(war|military|government|election|president|minister|sanction|geopolit)\b/.test(title)) return "Geopolitics";
+  if (/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/.test(title)) return "Daily Brief";
+  return "General News";
+}
+
 function renderManualForm({
   notice = "",
   error = "",
@@ -102,7 +114,7 @@ function renderManualForm({
       const when = receipt.createdAt ? new Date(receipt.createdAt).toISOString().replace("T", " ").slice(0, 16) : "";
       const source = SOURCE_LABELS[receipt.source] || "";
       const statusLabel = STATUS_LABELS[receipt.status] || receipt.status;
-      const meta = [source, when].filter(Boolean).join(" · ");
+      const meta = [newsTypeLabel(receipt), source, when].filter(Boolean).join(" · ");
       return `<li>
         <span class="status status-${escapeHtml(receipt.status)}">${escapeHtml(statusLabel)}</span>
         <strong>${escapeHtml(receipt.title || receipt.canonicalUrl || receipt.id)}</strong>
@@ -498,6 +510,7 @@ function createBroadcastLedgerRouter({
       const { receipt } = broadcastLedgerStore.createReceipt({
         source,
         kind: SOURCES.includes(body.kind) ? body.kind : body.kind === "digest" ? "digest" : "story",
+        newsType: body.newsType,
         title,
         url,
         text,
