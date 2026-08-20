@@ -74,7 +74,6 @@ const SOURCE_LABELS = {
   sharebot67: "ShareBot67",
   dashboard: "Dashboard",
   manual: "Manual",
-  "telegram-ingest": "Unattributed",
 };
 
 // What a receipt's status means for the only question this page exists to
@@ -101,12 +100,13 @@ function renderManualForm({
   const rows = recent
     .map((receipt) => {
       const when = receipt.createdAt ? new Date(receipt.createdAt).toISOString().replace("T", " ").slice(0, 16) : "";
-      const source = SOURCE_LABELS[receipt.source] || receipt.source;
+      const source = SOURCE_LABELS[receipt.source] || "";
       const statusLabel = STATUS_LABELS[receipt.status] || receipt.status;
+      const meta = [source, when].filter(Boolean).join(" · ");
       return `<li>
         <span class="status status-${escapeHtml(receipt.status)}">${escapeHtml(statusLabel)}</span>
         <strong>${escapeHtml(receipt.title || receipt.canonicalUrl || receipt.id)}</strong>
-        <span class="meta">${escapeHtml(source)} · ${escapeHtml(when)}</span>
+        <span class="meta">${escapeHtml(meta)}</span>
       </li>`;
     })
     .join("");
