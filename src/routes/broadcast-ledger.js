@@ -69,13 +69,6 @@ function escapeHtml(value) {
  * no build step and no framework — it has to work from a phone, one-handed,
  * at the moment the gateway is down and the story has just gone out by hand.
  */
-const SOURCE_LABELS = {
-  shortcut: "Shortcut",
-  sharebot67: "ShareBot67",
-  dashboard: "Dashboard",
-  manual: "Manual",
-};
-
 // What a receipt's status means for the only question this page exists to
 // answer: did the story actually go out?
 const STATUS_LABELS = {
@@ -113,21 +106,21 @@ function renderManualForm({
     .filter((receipt) => receipt.source !== "telegram-ingest")
     .map((receipt) => {
       const when = receipt.createdAt ? new Date(receipt.createdAt).toISOString().replace("T", " ").slice(0, 16) : "";
-      const source = SOURCE_LABELS[receipt.source] || "";
+      const newsType = newsTypeLabel(receipt);
+      const dateLabel = receipt.createdAt
+        ? new Date(receipt.createdAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" })
+        : "";
+      const rawTitle = receipt.title || receipt.canonicalUrl || receipt.id;
+      const title = /^Broadcasted today\b/i.test(rawTitle) ? `${newsType} News — ${dateLabel}` : rawTitle;
       const statusLabel = STATUS_LABELS[receipt.status] || receipt.status;
-      const meta = [newsTypeLabel(receipt), source, when].filter(Boolean).join(" · ");
+      const meta = [newsType, when].filter(Boolean).join(" · ");
       return `<li>
         <span class="status status-${escapeHtml(receipt.status)}">${escapeHtml(statusLabel)}</span>
-        <strong>${escapeHtml(receipt.title || receipt.canonicalUrl || receipt.id)}</strong>
+        <strong>${escapeHtml(title)}</strong>
         <span class="meta">${escapeHtml(meta)}</span>
       </li>`;
     })
     .join("");
-
-  const breakdown = Object.keys(SOURCE_LABELS)
-    .filter((key) => bySource[key])
-    .map((key) => `${bySource[key]} ${SOURCE_LABELS[key]}`)
-    .join(" · ");
 
   const watchBanner = watching
     ? `<div class="watch on"><strong>\u25cf Watching your Telegram channels</strong>
@@ -139,9 +132,7 @@ function renderManualForm({
          Set <code>BROADCAST_LEDGER_INGEST_ENABLED=true</code> in Railway to record posts automatically.</span></div>`;
 
   const tally = visibleTotal
-    ? `<p class="tally"><strong>${visibleTotal}</strong> broadcast${visibleTotal === 1 ? "" : "s"} recorded${
-        breakdown ? ` \u2014 ${escapeHtml(breakdown)}` : ""
-      }</p>`
+    ? `<p class="tally"><strong>${visibleTotal}</strong> broadcast${visibleTotal === 1 ? "" : "s"} recorded</p>`
     : `<p class="tally empty">No broadcasts recorded yet.${
         watching
           ? " The watch is running, so the next post to your channels will appear here on its own."
