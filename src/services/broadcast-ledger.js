@@ -65,6 +65,7 @@ const MAX_TITLE_LEN = 300;
 const MAX_URL_LEN = 2000;
 const MAX_TEXT_LEN = 50000;
 const MAX_ERROR_LEN = 500;
+const MAX_NEWS_TYPE_LEN = 40;
 const MAX_DESTINATIONS = 50;
 
 /** Default window for the conservative tier-3 headline match. */
@@ -317,6 +318,7 @@ class BroadcastLedgerStore {
       updatedAt: nowIso(),
       source,
       kind: KINDS.includes(input.kind) ? input.kind : "story",
+      newsType: clampString(input.newsType || input.category, MAX_NEWS_TYPE_LEN) || null,
       title: title || null,
       url: url || null,
       canonicalUrl,
