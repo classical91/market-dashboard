@@ -134,6 +134,12 @@ const config = {
     // given bot's updates.
     ingestEnabled: process.env.BROADCAST_LEDGER_INGEST_ENABLED === "true",
     ingestIntervalMs: parseNumber(process.env.BROADCAST_LEDGER_INGEST_INTERVAL_MS, 60_000),
+    // Optional, independent ingest watchlist. When omitted, legacy installs
+    // safely inherit the exact Telegram broadcast destinations (including
+    // forum topic ids). Use the Settings UI to deliberately select none.
+    watchTargets: String(process.env.BROADCAST_LEDGER_TELEGRAM_WATCHLIST || "").trim()
+      ? parseList(process.env.BROADCAST_LEDGER_TELEGRAM_WATCHLIST)
+      : null,
   },
   reporter: {
     apiKey: process.env.OPENAI_API_KEY || "",

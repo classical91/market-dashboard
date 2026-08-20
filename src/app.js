@@ -119,6 +119,7 @@ function createApp() {
     stateCache: new PersistentReporterCache(path.join(dataDir, "broadcast-ingest-state.json")),
     enabled: config.broadcastLedger.ingestEnabled,
     intervalMs: config.broadcastLedger.ingestIntervalMs,
+    watchTargets: config.broadcastLedger.watchTargets,
   });
   const reporterService = new ReporterService({
     cache: reporterCache,
@@ -367,6 +368,7 @@ function createApp() {
       broadcastLedgerStore,
       broadcastIngestService,
       telegramService,
+      requireAdmin,
       requireLedgerKey,
       ledgerKey: config.broadcastLedger.apiKey,
       adminKey: config.admin.apiKey,

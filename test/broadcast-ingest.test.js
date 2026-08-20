@@ -31,7 +31,9 @@ function fakeTelegram(queue, { chatIds = [CHAT_A], configured = true } = {}) {
   const calls = [];
   return {
     configured,
-    _chatIds: chatIds.map((chatId) => ({ chatId, threadId: null })),
+    _chatIds: chatIds.map((target) =>
+      target && typeof target === "object" ? target : { chatId: target, threadId: null },
+    ),
     calls,
     async getUpdates(opts) {
       calls.push(opts);
@@ -42,8 +44,16 @@ function fakeTelegram(queue, { chatIds = [CHAT_A], configured = true } = {}) {
   };
 }
 
-function channelPost({ updateId, chatId = CHAT_A, messageId, text }) {
-  return { update_id: updateId, channel_post: { message_id: messageId, chat: { id: Number(chatId) }, text } };
+function channelPost({ updateId, chatId = CHAT_A, threadId, messageId, text }) {
+  return {
+    update_id: updateId,
+    channel_post: {
+      message_id: messageId,
+      chat: { id: Number(chatId) },
+      ...(threadId == null ? {} : { message_thread_id: threadId }),
+      text,
+    },
+  };
 }
 
 function makeService(telegram, store, overrides = {}) {
@@ -122,6 +132,68 @@ test("posts from chats the dashboard does not target are ignored", async () => {
   assert.equal(summary.recorded, 0);
   assert.equal(summary.skipped, 1);
   assert.equal(store.count(), 0);
+});
+
+test("same chatId messages from a different Telegram topic are ignored", async () => {
+  const store = freshStore();
+  const telegram = fakeTelegram(
+    [[
+      channelPost({ updateId: 1, threadId: 6297, messageId: 1, text: "Watched topic" }),
+      channelPost({ updateId: 2, threadId: 7000, messageId: 2, text: "Unrelated topic" }),
+      channelPost({ updateId: 3, messageId: 3, text: "General room" }),
+    ]],
+    { chatIds: [{ chatId: CHAT_A, threadId: "6297" }] },
+  );
+
+  const summary = await makeService(telegram, store).runOnce();
+  assert.deepEqual(summary, { polled: 3, recorded: 1, attached: 0, skipped: 2 });
+  assert.equal(store.count(), 1);
+  assert.equal(store.list({ limit: 1 })[0].destinations[0].threadId, "6297");
+});
+
+test("a channel destination without a thread watches only threadless posts", async () => {
+  const store = freshStore();
+  const telegram = fakeTelegram(
+    [[
+      channelPost({ updateId: 1, messageId: 1, text: "Channel post" }),
+      channelPost({ updateId: 2, threadId: 99, messageId: 2, text: "Topic post" }),
+    ]],
+    { chatIds: [{ chatId: CHAT_A, threadId: null }] },
+  );
+
+  const summary = await makeService(telegram, store).runOnce();
+  assert.equal(summary.recorded, 1);
+  assert.equal(summary.skipped, 1);
+  assert.equal(store.list({ limit: 1 })[0].destinations[0].threadId, null);
+});
+
+test("legacy configuration defaults the ledger watchlist to exact broadcast destinations", () => {
+  const store = freshStore();
+  const telegram = fakeTelegram([], {
+    chatIds: [
+      { chatId: CHAT_A, threadId: "6297" },
+      { chatId: CHAT_B, threadId: null },
+    ],
+  });
+  const service = makeService(telegram, store);
+
+  assert.deepEqual(service.describe().watchedTargets, [
+    { chatId: CHAT_A, threadId: "6297" },
+    { chatId: CHAT_B, threadId: null },
+  ]);
+  assert.deepEqual(telegram._chatIds, [
+    { chatId: CHAT_A, threadId: "6297" },
+    { chatId: CHAT_B, threadId: null },
+  ], "selecting ingest targets must not mutate broadcast destinations");
+});
+
+test("an explicit ledger watchlist can select a subset without changing send destinations", () => {
+  const store = freshStore();
+  const telegram = fakeTelegram([], { chatIds: [CHAT_A, CHAT_B] });
+  const service = makeService(telegram, store, { watchTargets: [CHAT_B] });
+
+  assert.deepEqual(service.describe().watchedTargets, [{ chatId: CHAT_B, threadId: null }]);
+  assert.deepEqual(telegram._chatIds.map((target) => target.chatId), [CHAT_A, CHAT_B]);
 });
 
 test("a post with no usable text is skipped rather than stored as an empty receipt", async () => {
