@@ -546,61 +546,10 @@ test("the live page carries the state block, not just the form", async () => {
   assert.match(html, /Watching your Telegram channels|Channel watch is off/);
 });
 
-/* ── the page must explain a watch that is on but recording nothing ── */
-
-test("a 409 conflict is named on the page, not just in the server log", () => {
+test("the receipts page does not expose the watch diagnostics panel", () => {
   const { renderManualForm } = require("../src/routes/broadcast-ledger");
-  const html = renderManualForm({
-    recent: [], total: 0, bySource: {}, watching: true,
-    diagnostics: { conflict: true, watchedChatIds: ["-1001"], lastPollAt: new Date().toISOString(),
-      lastSummary: { polled: 0 }, unwatchedChatIdsSeen: [] },
-  });
-
-  assert.match(html, /409 Conflict/);
-  assert.match(html, /same bot token|ShareBot67/i, "and points at the likely cause");
-});
-
-test("posts arriving from an unwatched chat are called out with the chat id", () => {
-  const { renderManualForm } = require("../src/routes/broadcast-ledger");
-  const html = renderManualForm({
-    recent: [], total: 0, bySource: {}, watching: true,
-    diagnostics: { conflict: false, watchedChatIds: ["-1001111"], unwatchedChatIdsSeen: ["-1009999"],
-      lastPollAt: new Date().toISOString(), lastSummary: { polled: 3 } },
-  });
-
-  // The most useful thing the page can say: traffic exists, it's just not
-  // from the chat you configured.
-  assert.match(html, /not watching/i);
-  assert.match(html, /-1009999/);
-  assert.match(html, /TELEGRAM_CHAT_IDS/);
-});
-
-test("an empty TELEGRAM_CHAT_IDS is reported as a configuration fault", () => {
-  const { renderManualForm } = require("../src/routes/broadcast-ledger");
-  const html = renderManualForm({
-    recent: [], total: 0, bySource: {}, watching: true,
-    diagnostics: { conflict: false, watchedChatIds: [], unwatchedChatIdsSeen: [], lastPollAt: null },
-  });
-  assert.match(html, /No chats configured/i);
-});
-
-test("a quiet but healthy watch explains that it only sees posts made after it started", () => {
-  const { renderManualForm } = require("../src/routes/broadcast-ledger");
-  const html = renderManualForm({
-    recent: [], total: 0, bySource: {}, watching: true,
-    diagnostics: { conflict: false, watchedChatIds: ["-1001"], unwatchedChatIdsSeen: [],
-      lastPollAt: new Date().toISOString(), lastSummary: { polled: 0 }, startedAt: new Date().toISOString() },
-  });
-
-  assert.match(html, /after<\/em> it started|after.*it started/i);
-  assert.match(html, /admin/i, "and the group-permission case");
-});
-
-test("no diagnostics block is shown when the watch is off — the banner already says why", () => {
-  const { renderManualForm } = require("../src/routes/broadcast-ledger");
-  const html = renderManualForm({ recent: [], total: 0, bySource: {}, watching: false, diagnostics: null });
-  assert.ok(!/Why is nothing appearing/.test(html));
-  assert.match(html, /Channel watch is off/i);
+  const html = renderManualForm({ recent: [], total: 0, bySource: {}, watching: true });
+  assert.doesNotMatch(html, /Why is nothing appearing|No chats configured|Last checked/);
 });
 
 test("describe() reports what the watch is actually doing", async () => {
