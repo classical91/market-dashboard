@@ -140,8 +140,8 @@
     });
 
     document.querySelectorAll(".terminal-section-label").forEach((label) => {
-      if (label.textContent.trim() === "TraderClaw Macro Confluence") {
-        setText(label, "TraderClaw Macro Confluence · 24h factors");
+      if (label.textContent.trim() === "Macro Confluence") {
+        setText(label, "Macro Confluence · 24h factors");
       }
     });
   }

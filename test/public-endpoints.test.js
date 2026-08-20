@@ -14,7 +14,6 @@ process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "md-public-"));
 delete process.env.ADMIN_API_KEY;
 delete process.env.TELEGRAM_BOT_TOKEN;
 delete process.env.TELEGRAM_CHAT_IDS;
-delete process.env.TRADERCLAW_BASE_URL;
 delete process.env.ALPHA_TEAM_ACCESS_CODE;
 
 const { createApp } = require("../src/app");
@@ -48,12 +47,12 @@ test("telegram status stays public", async () => {
   assert.equal(typeof body.configured, "boolean");
 });
 
-test("TraderClaw edge endpoint stays read-only and degrades when unconfigured", async () => {
+// The legacy TraderClaw deployment is retired. The bridge that proxied its
+// /api/*strategy-metrics endpoints is gone, and this asserts it stays gone: a
+// reintroduced route would let a dead host's stale history back onto the page.
+test("the retired TraderClaw edge bridge is gone", async () => {
   const res = await fetch(`${base}/api/decision/traderclaw-edge`);
-  assert.equal(res.status, 200);
-  const body = await res.json();
-  assert.equal(body.configured, false);
-  assert.deepEqual(body.bots, []);
+  assert.equal(res.status, 404);
 });
 
 test("signal bridge actions endpoint stays public and read-only", async () => {

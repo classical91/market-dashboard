@@ -11,7 +11,6 @@
   var newsStrip = document.getElementById("de-news-strip");
   var setupsTbody = document.getElementById("de-setups-tbody");
   var execGrid = document.getElementById("de-exec-grid");
-  var traderclawEdge = document.getElementById("de-traderclaw-edge");
   var journalTbody = document.getElementById("de-journal-tbody");
   var journalStats = document.getElementById("de-journal-stats");
 
@@ -372,42 +371,6 @@
     return n.toFixed(2) + (suffix || "");
   }
 
-  function renderTraderclawEdge(data) {
-    if (!traderclawEdge) return;
-    if (!data || data.configured === false) {
-      traderclawEdge.innerHTML = '<span><b>Not connected</b> set TRADERCLAW_BASE_URL</span>';
-      return;
-    }
-    var bots = data.bots || [];
-    if (!bots.length) {
-      traderclawEdge.innerHTML = '<span><b>No TraderClaw data</b></span>';
-      return;
-    }
-    traderclawEdge.innerHTML = bots.map(function (bot) {
-      if (!bot.ok) {
-        return "<span><b>" + escapeHtml(bot.name) + "</b> " + escapeHtml(bot.error || "unavailable") + "</span>";
-      }
-      var summary = bot.summary || {};
-      return (
-        "<span><b>" + escapeHtml(bot.name) + "</b></span>" +
-        "<span>Trades <b>" + (summary.closed_trades != null ? summary.closed_trades : 0) + "</b></span>" +
-        "<span>Expectancy <b>" + fmtEdgeNumber(summary.expectancy_r, "R") + "</b></span>" +
-        "<span>PF <b>" + fmtEdgeNumber(summary.profit_factor, "") + "</b></span>" +
-        "<span>Max DD <b>" + fmtEdgeNumber(summary.max_drawdown_pct, "%") + "</b></span>"
-      );
-    }).join("");
-  }
-
-  function loadTraderclawEdge() {
-    if (!traderclawEdge) return Promise.resolve();
-    return fetch("/api/decision/traderclaw-edge?min_trades=1")
-      .then(function (res) { return res.json(); })
-      .then(renderTraderclawEdge)
-      .catch(function (err) {
-        traderclawEdge.innerHTML = "<span><b>TraderClaw unavailable</b> " + escapeHtml(err.message) + "</span>";
-      });
-  }
-
   /* ── Main load ───────────────────────────────────────── */
 
   function renderWarnings(dataQuality) {
@@ -445,5 +408,4 @@
   intervalSelect.addEventListener("change", load);
   load();
   loadJournal();
-  loadTraderclawEdge();
 })();

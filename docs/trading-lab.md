@@ -1169,6 +1169,31 @@ Still to do, in order:
 Note that parity passing on metrics and the edge gate is not parity on Bitget,
 which is not ported — the archive decision needs it in place first.
 
+## Retirement
+
+Step 12's code-side half is done: this app no longer calls the standalone
+TraderClaw deployment at `traderclaw-production.up.railway.app`, and no
+configuration here names it. `scripts/traderclaw-parity.js` is deliberately
+kept — it runs against a local checkout of the Python repo, never the network,
+and it is the evidence for the port, so retiring the deployment does not
+retire the parity check.
+
+What retirement does **not** cover, because it lives outside this repository:
+
+- The `classical91/traderclaw` repository and its Railway service.
+- The volume at `/data` on that service, which holds `account.json`,
+  `positions.json`, `trade_history.json` and the `shadow/` and `alts/`
+  subtrees. **Deleting the Railway service destroys that volume.** Archive it
+  first — the read endpoints (`/api/stats`, `/api/positions`, `/api/history`,
+  `/api/strategy-metrics`, and their `/api/shadow/*` and `/api/alts/*`
+  counterparts) are unauthenticated GETs, so a plain `curl` of each is a
+  complete export.
+
+The four current Trading Lab accounts — Mindset, SMC, Donchian and VWAP — never
+depended on the deployment. They are `strategy-<id>` ledgers derived from the
+strategy registry in `src/services/trading/strategies/index.js` and written
+only by in-process paper execution.
+
 ## Signal source
 
 TradingView alert webhooks are **not** the signal source. The subscription that
@@ -1340,7 +1365,8 @@ Binance spot klines on the wrong interval.
 candle, last signal with its indicator readings, last action and last error;
 the Trading Lab page renders it.
 
-The `TRADERCLAW_BASE_URL` HTTP bridge on the Decision Engine page still works
-and is untouched by this change. It should be removed only once the running
-TraderClaw deployment is retired, since it is what currently surfaces that
-deployment's live history.
+The `TRADERCLAW_BASE_URL` HTTP bridge on the Decision Engine page has been
+removed along with the TraderClaw deployment it read from. Nothing in this app
+makes an outbound call to that host any more; the Main, Shadow SMC and Alts
+history it used to surface lives in the archive (see "Retirement" below), and
+the three books remain readable in-app as archived, write-blocked ledgers.

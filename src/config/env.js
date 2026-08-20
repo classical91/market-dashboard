@@ -240,10 +240,6 @@ const config = {
     timeframes: parseList(process.env.LIVE_RESEARCH_TIMEFRAMES),
     intervalMs: parseNumber(process.env.LIVE_RESEARCH_INTERVAL_MS, 60 * 1000),
   },
-  traderclaw: {
-    baseUrl: String(process.env.TRADERCLAW_BASE_URL || "").replace(/\/+$/, ""),
-    requestTimeoutMs: parseNumber(process.env.TRADERCLAW_REQUEST_TIMEOUT_MS, 8000),
-  },
   defillama: {
     baseUrl: process.env.DEFILLAMA_API_BASE_URL || "https://stablecoins.llama.fi/",
     coinsBaseUrl: process.env.DEFILLAMA_COINS_API_BASE_URL || "https://coins.llama.fi/",

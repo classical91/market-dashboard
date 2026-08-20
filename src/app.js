@@ -352,7 +352,6 @@ function createApp() {
       decisionEngineService,
       tradeJournalService,
       requireAdmin,
-      traderclaw: config.traderclaw,
     }),
   );
   app.use("/api/trading-lab", createTradingLabRouter({ tradingLabService, backtestService, signalActionStore, experimentStore, researchQueue, signalScreenerService, requireAdmin }));

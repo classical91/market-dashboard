@@ -200,7 +200,7 @@
     {
       href: "/trading-lab.html",
       icon: "&#129408;",
-      label: "Traderclaw Backtest",
+      label: "Trading Lab Backtest",
     },
     {
       href: "https://t.me/tesr56788",
