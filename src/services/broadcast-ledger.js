@@ -79,6 +79,17 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+function inferNewsType(value) {
+  const text = String(value || "").toLowerCase();
+  const labels = [];
+  if (/\b(bitcoin|btc|crypto|ethereum|eth|solana|blockchain|token)\b/.test(text)) labels.push("Crypto");
+  if (/\b(war|military|government|election|president|minister|sanction|geopolit|nato|ukraine|russia|china|iran|israel)\b/.test(text)) labels.push("Geopolitics");
+  if (/\b(fed|rates?|inflation|economy|economic|gdp|jobs?|unemployment|tariff|recession)\b/.test(text)) labels.push("Economics");
+  if (/\b(stock|market|earnings|nasdaq|dow|s&p)\b/.test(text)) labels.push("Markets");
+  if (/\b(ai|artificial intelligence|tech|apple|google|microsoft|nvidia|openai)\b/.test(text)) labels.push("Technology");
+  return labels.slice(0, 3).join(" / ");
+}
+
 function clampString(value, max) {
   if (typeof value !== "string") return "";
   return value.trim().slice(0, max);
@@ -318,7 +329,10 @@ class BroadcastLedgerStore {
       updatedAt: nowIso(),
       source,
       kind: KINDS.includes(input.kind) ? input.kind : "story",
-      newsType: clampString(input.newsType || input.category, MAX_NEWS_TYPE_LEN) || null,
+      newsType:
+        clampString(input.newsType || input.category, MAX_NEWS_TYPE_LEN) ||
+        clampString(inferNewsType(`${title}\n${text}`), MAX_NEWS_TYPE_LEN) ||
+        null,
       title: title || null,
       url: url || null,
       canonicalUrl,
