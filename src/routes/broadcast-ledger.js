@@ -97,7 +97,10 @@ function renderManualForm({
   total = 0,
   bySource = {},
 } = {}) {
+  const hiddenCount = bySource["telegram-ingest"] || 0;
+  const visibleTotal = Math.max(0, total - hiddenCount);
   const rows = recent
+    .filter((receipt) => receipt.source !== "telegram-ingest")
     .map((receipt) => {
       const when = receipt.createdAt ? new Date(receipt.createdAt).toISOString().replace("T", " ").slice(0, 16) : "";
       const source = SOURCE_LABELS[receipt.source] || "";
@@ -184,8 +187,8 @@ function renderManualForm({
          <span>Broadcasts are only recorded when a path reports itself, or when you file one below.
          Set <code>BROADCAST_LEDGER_INGEST_ENABLED=true</code> in Railway to record posts automatically.</span></div>`;
 
-  const tally = total
-    ? `<p class="tally"><strong>${total}</strong> broadcast${total === 1 ? "" : "s"} recorded${
+  const tally = visibleTotal
+    ? `<p class="tally"><strong>${visibleTotal}</strong> broadcast${visibleTotal === 1 ? "" : "s"} recorded${
         breakdown ? ` \u2014 ${escapeHtml(breakdown)}` : ""
       }</p>`
     : `<p class="tally empty">No broadcasts recorded yet.${
