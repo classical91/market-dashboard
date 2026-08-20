@@ -3,6 +3,7 @@
 const { Router } = require("express");
 const { createRateLimit } = require("../middleware/rate-limit");
 const { isLedgerRequest, isLedgerParamRequest } = require("../middleware/ledger-auth");
+const { deriveTitle, firstUrl } = require("../services/broadcast-ingest");
 const { SOURCES, KINDS, STATUSES, canonicalizeUrl } = require("../services/broadcast-ledger");
 
 const MAX_IDS = 200;
@@ -156,7 +157,13 @@ function renderManualForm({
     }
     if (!total && d.lastPollAt && d.lastSummary && !d.lastSummary.polled && !d.conflict) {
       diagLines.push(
-        `Telegram is returning nothing. The watch only sees posts made <em>after</em> it started
+        `<strong>If you sent it through this bot, the watch cannot see it.</strong> Telegram does not return a
+         bot's own outgoing messages, so a Shortcut or agent posting with this bot token is invisible here.
+         Send via <code>POST /api/broadcast-ledger/broadcast</code> instead and the receipt is written from the
+         send itself.`,
+      );
+      diagLines.push(
+        `Otherwise: the watch only sees posts made <em>after</em> it started
          (${escapeHtml(String(d.startedAt || "this deploy"))}), and in a group the bot must be an admin to read
          other senders' messages \u2014 in a channel it already is.`,
       );
@@ -170,7 +177,9 @@ function renderManualForm({
 
   const watchBanner = watching
     ? `<div class="watch on"><strong>\u25cf Watching your Telegram channels</strong>
-         <span>Every post is recorded here automatically, whichever path sent it.</span></div>`
+         <span>Posts from other senders are recorded automatically. Telegram never reports this bot's own
+         messages back, so anything sent through this bot must broadcast via
+         <code>POST /api/broadcast-ledger/broadcast</code> to be recorded.</span></div>`
     : `<div class="watch off"><strong>\u25cb Channel watch is off</strong>
          <span>Broadcasts are only recorded when a path reports itself, or when you file one below.
          Set <code>BROADCAST_LEDGER_INGEST_ENABLED=true</code> in Railway to record posts automatically.</span></div>`;
@@ -287,6 +296,7 @@ function renderManualForm({
 function createBroadcastLedgerRouter({
   broadcastLedgerStore,
   broadcastIngestService,
+  telegramService,
   requireLedgerKey,
   ledgerKey,
   adminKey,
@@ -494,6 +504,106 @@ function createBroadcastLedgerRouter({
     } catch (err) {
       next(err);
     }
+  });
+
+  /**
+   * Send a broadcast AND record it, in one call.
+   *
+   * The channel watch cannot cover this: Telegram never returns a bot's own
+   * outgoing messages through getUpdates, so anything sent with this bot token
+   * is invisible to the watcher no matter how well it is configured. A sender
+   * using this bot must therefore record its own receipt, and doing it here —
+   * from the real sendMessage response — is the only way the receipt can carry
+   * true message ids rather than the caller's word.
+   *
+   * Point the iOS Shortcut at this instead of api.telegram.org: one call
+   * replaces the direct send, the ledger is written from the actual result,
+   * and the bot token stops living on the phone.
+   */
+  router.post("/broadcast", (req, res, next) => {
+    (async () => {
+      const body = req.body || {};
+      const text = typeof body.text === "string" ? body.text.trim() : "";
+      if (!text) return badRequest(res, "text is required — it is the message to broadcast.");
+      if (body.source && !SOURCES.includes(body.source)) {
+        return badRequest(res, `source must be one of: ${SOURCES.join(", ")}`);
+      }
+      const rawUrl = typeof body.url === "string" ? body.url.trim() : "";
+      if (rawUrl && !canonicalizeUrl(rawUrl)) return badRequest(res, "url must be a valid http(s) URL.");
+
+      const source = SOURCES.includes(body.source) ? body.source : "shortcut";
+      const title = typeof body.title === "string" && body.title.trim() ? body.title : deriveTitle(text);
+      // The Shortcut sends one blob of text with the link inside it. Pulling
+      // the link out is what gives the receipt a canonical URL, and the URL
+      // tier is the only authoritative half of dedupe — without it a resend
+      // check would fall back to hashing the exact wording.
+      const url = rawUrl || firstUrl(text);
+
+      // Refuse to broadcast a story the ledger already shows as sent. This is
+      // the dedupe actually doing its job at the moment it matters, rather
+      // than after the fact. `force: true` overrides for a deliberate resend.
+      if (body.force !== true) {
+        const existing = broadcastLedgerStore.lookup({ url, text, headline: title });
+        if (existing.posted && existing.receipt) {
+          return res.status(409).json({
+            error: "Already broadcast — pass force:true to send it again.",
+            alreadyBroadcast: true,
+            match: existing.match,
+            receipt: existing.receipt,
+          });
+        }
+      }
+
+      // Checked here rather than first: a malformed payload and an
+      // already-broadcast story are both true answers regardless of whether
+      // this deploy can send, and "already sent" is the more useful reply.
+      if (!telegramService || !telegramService.configured) {
+        return res
+          .status(400)
+          .json({ error: "Telegram is not configured (set TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_IDS)" });
+      }
+
+      // Pending first, so a crash mid-send leaves a trace to reconcile rather
+      // than a silent gap.
+      const { receipt } = broadcastLedgerStore.createReceipt({
+        source,
+        kind: SOURCES.includes(body.kind) ? body.kind : body.kind === "digest" ? "digest" : "story",
+        title,
+        url,
+        text,
+        status: "pending",
+        idempotencyKey: typeof body.idempotencyKey === "string" ? body.idempotencyKey : "",
+      });
+
+      let result;
+      try {
+        result = await telegramService.postText(text, {
+          parseMode: body.parseMode === "none" ? null : "HTML",
+        });
+      } catch (err) {
+        const updated = broadcastLedgerStore.updateReceipt(
+          receipt.id,
+          { status: "failed", error: err, destinations: err.destinations || [], action: "broadcast" },
+          { actor: source },
+        );
+        return res.status(err.statusCode || 502).json({
+          error: err.message,
+          receipt: updated || receipt,
+        });
+      }
+
+      const final = broadcastLedgerStore.updateReceipt(
+        receipt.id,
+        { destinations: result.destinations, action: "broadcast" },
+        { actor: source },
+      );
+      res.status(201).json({
+        ok: true,
+        sent: result.posted,
+        failed: result.failed,
+        receipt: final || receipt,
+      });
+    })().catch(next);
   });
 
   // Preflight. GET and POST both work: Shortcuts builds a query string more

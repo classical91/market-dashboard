@@ -627,3 +627,272 @@ test("describe() records a chat that posted but is not being watched", async () 
   await service.runOnce();
   assert.deepEqual(service.describe().unwatchedChatIdsSeen, ["-1009999"]);
 });
+
+/* ── send-and-record: the path the channel watch structurally cannot cover ── */
+
+test("broadcast requires text", async () => {
+  const res = await post("/api/broadcast-ledger/broadcast", { title: "no body" });
+  assert.equal(res.status, 400);
+  assert.match((await res.json()).error, /text is required/i);
+});
+
+test("broadcast rejects an unauthenticated caller", async () => {
+  const res = await fetch(`${base}/api/broadcast-ledger/broadcast`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text: "hello" }),
+  });
+  assert.equal(res.status, 401);
+});
+
+test("broadcast rejects a malformed url before sending anything", async () => {
+  const res = await post("/api/broadcast-ledger/broadcast", { text: "story", url: "not-a-url" });
+  assert.equal(res.status, 400);
+  assert.match((await res.json()).error, /valid http/i);
+});
+
+test("broadcast refuses to resend a story the ledger already shows as sent", async () => {
+  await post("/api/broadcast-ledger/receipts", {
+    source: "shortcut",
+    title: "Duplicate guard",
+    url: "https://example.com/dupe-guard",
+    idempotencyKey: "dupe-guard-seed",
+    status: "posted",
+  });
+
+  const res = await post("/api/broadcast-ledger/broadcast", {
+    text: "Duplicate guard",
+    url: "https://example.com/dupe-guard",
+  });
+  const body = await res.json();
+
+  assert.equal(res.status, 409, "a second send of a posted story must be refused, not sent");
+  assert.equal(body.alreadyBroadcast, true);
+  assert.equal(body.match, "url");
+  assert.equal(body.receipt.source, "shortcut");
+});
+
+test("the duplicate guard runs before Telegram is even consulted", async () => {
+  // Proof the 409 is the dedupe and not the unconfigured-Telegram 400: same
+  // process, Telegram unconfigured, yet this returns 409.
+  const res = await post("/api/broadcast-ledger/broadcast", {
+    text: "Duplicate guard",
+    url: "https://example.com/dupe-guard",
+  });
+  assert.equal(res.status, 409);
+});
+
+/*
+ * Success path, at the router level with a Telegram double. The endpoint's
+ * whole reason to exist is that the receipt is written from the real send
+ * result, so the double returns realistic per-destination outcomes.
+ */
+function mountBroadcastRouter({ sendResult, sendError } = {}) {
+  const express = require("express");
+  const httpMod = require("node:http");
+  const { createBroadcastLedgerRouter } = require("../src/routes/broadcast-ledger");
+  const { BroadcastLedgerStore } = require("../src/services/broadcast-ledger");
+
+  const store = new BroadcastLedgerStore({
+    dataDir: fs.mkdtempSync(path.join(os.tmpdir(), "md-bcast-")),
+    logger: { error() {} },
+  });
+  const sends = [];
+  const telegramService = {
+    configured: true,
+    async postText(text, opts) {
+      sends.push({ text, opts });
+      if (sendError) throw sendError;
+      return sendResult;
+    },
+  };
+  const app = express();
+  app.use(express.json());
+  app.use(
+    "/api/broadcast-ledger",
+    createBroadcastLedgerRouter({
+      broadcastLedgerStore: store,
+      broadcastIngestService: null,
+      telegramService,
+      requireLedgerKey: (req, res, next) => next(),
+      ledgerKey: "k",
+      adminKey: "",
+    }),
+  );
+  const server = httpMod.createServer(app);
+  return { app, server, store, sends };
+}
+
+async function listen(server) {
+  await new Promise((r) => server.listen(0, r));
+  return `http://127.0.0.1:${server.address().port}`;
+}
+
+/**
+ * Run a body against a freshly mounted router and always close the listener.
+ * Without the finally, one failed assertion leaves a live server and the whole
+ * test process hangs instead of reporting the failure.
+ */
+async function withRouter(options, body) {
+  const harness = mountBroadcastRouter(options);
+  const url = await listen(harness.server);
+  try {
+    await body({ ...harness, url });
+  } finally {
+    await new Promise((r) => harness.server.close(r));
+  }
+}
+
+test("a successful broadcast records a posted receipt carrying the real message ids", async () => {
+  await withRouter({
+    sendResult: {
+      posted: 2,
+      failed: 0,
+      destinations: [
+        { channel: "telegram", chatId: "-1001", threadId: null, status: "posted", messageId: "4410", error: null },
+        { channel: "telegram", chatId: "-1002", threadId: null, status: "posted", messageId: "77", error: null },
+      ],
+    },
+  }, async ({ store, sends, url }) => {
+
+    const res = await fetch(`${url}/api/broadcast-ledger/broadcast`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: "Fed holds rates steady\nhttps://example.com/news/fed",
+        idempotencyKey: "shortcut-run-1",
+      }),
+    });
+    const body = await res.json();
+
+    assert.equal(res.status, 201);
+    assert.equal(body.sent, 2);
+    assert.equal(sends.length, 1, "it actually sent");
+    assert.equal(body.receipt.status, "posted");
+    assert.equal(body.receipt.source, "shortcut", "defaults to the shortcut, the path this exists for");
+    assert.equal(body.receipt.title, "Fed holds rates steady", "headline derived from the message");
+    assert.equal(body.receipt.canonicalUrl, "https://example.com/news/fed", "link picked out of the body");
+    assert.deepEqual(
+      body.receipt.destinations.map((d) => d.messageId).sort(),
+      ["4410", "77"],
+      "the ids come from Telegram's response, not the caller's word",
+    );
+    assert.equal(store.count(), 1);
+  });
+});
+
+test("the broadcast is immediately visible to a ShareBot67 preflight", async () => {
+  await withRouter({
+    sendResult: { posted: 1, failed: 0, destinations: [{ channel: "telegram", chatId: "-1", status: "posted", messageId: "9" }] },
+  }, async ({ store, url }) => {
+
+    await fetch(`${url}/api/broadcast-ledger/broadcast`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: "Story\nhttps://example.com/visible" }),
+    });
+
+    // The whole point: the Shortcut sent it, and the agent can now see it.
+    assert.equal(store.lookup({ url: "https://www.example.com/visible/" }).posted, true);
+  });
+});
+
+test("a partial send is recorded as partial, keeping the ids that landed", async () => {
+  await withRouter({
+    sendResult: {
+      posted: 1,
+      failed: 1,
+      destinations: [
+        { channel: "telegram", chatId: "-1001", status: "posted", messageId: "12", error: null },
+        { channel: "telegram", chatId: "-1002", status: "failed", messageId: null, error: "bot was blocked" },
+      ],
+    },
+  }, async ({ url }) => {
+
+    const res = await fetch(`${url}/api/broadcast-ledger/broadcast`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: "Partial story\nhttps://example.com/partial" }),
+    });
+    const body = await res.json();
+
+    assert.equal(body.receipt.status, "partial");
+    assert.equal(body.failed, 1);
+    assert.equal(body.receipt.destinations.find((d) => d.chatId === "-1001").messageId, "12");
+  });
+});
+
+test("a failed send leaves a failed receipt, not a phantom success", async () => {
+  await withRouter({
+    sendError: Object.assign(new Error("Telegram send failed for all 1 destination(s): chat not found"), {
+      statusCode: 502,
+      destinations: [{ channel: "telegram", chatId: "-1001", status: "failed", error: "chat not found" }],
+    }),
+  }, async ({ store, url }) => {
+
+    const res = await fetch(`${url}/api/broadcast-ledger/broadcast`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: "Doomed story\nhttps://example.com/doomed" }),
+    });
+    const body = await res.json();
+
+    assert.equal(res.status, 502);
+    assert.equal(body.receipt.status, "failed");
+    // And it must not read as broadcast to anyone asking later.
+    assert.equal(store.lookup({ url: "https://example.com/doomed" }).posted, false);
+  });
+});
+
+test("a retried broadcast with the same idempotency key does not double-send", async () => {
+  await withRouter({
+    sendResult: { posted: 1, failed: 0, destinations: [{ channel: "telegram", chatId: "-1", status: "posted", messageId: "5" }] },
+  }, async ({ sends, url }) => {
+    const payload = {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: "Retry story\nhttps://example.com/retry", idempotencyKey: "retry-1" }),
+    };
+
+    const first = await fetch(`${url}/api/broadcast-ledger/broadcast`, payload);
+    const second = await fetch(`${url}/api/broadcast-ledger/broadcast`, payload);
+
+    assert.equal(first.status, 201);
+    assert.equal(second.status, 409, "the phone retrying must not fire a second Telegram message");
+    assert.equal(sends.length, 1, "exactly one send reached Telegram");
+  });
+});
+
+test("force:true allows a deliberate resend", async () => {
+  await withRouter({
+    sendResult: { posted: 1, failed: 0, destinations: [{ channel: "telegram", chatId: "-1", status: "posted", messageId: "6" }] },
+  }, async ({ sends, url }) => {
+    const send = (extra) =>
+      fetch(`${url}/api/broadcast-ledger/broadcast`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: "Resend me\nhttps://example.com/resend", ...extra }),
+      });
+
+    await send({});
+    const forced = await send({ force: true });
+
+    assert.equal(forced.status, 201);
+    assert.equal(sends.length, 2);
+  });
+});
+
+test("source is honoured so ShareBot67 can use the same endpoint", async () => {
+  await withRouter({
+    sendResult: { posted: 1, failed: 0, destinations: [{ channel: "telegram", chatId: "-1", status: "posted", messageId: "8" }] },
+  }, async ({ url }) => {
+
+    const res = await fetch(`${url}/api/broadcast-ledger/broadcast`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source: "sharebot67", text: "Agent story\nhttps://example.com/agent" }),
+    });
+
+    assert.equal((await res.json()).receipt.source, "sharebot67");
+  });
+});
