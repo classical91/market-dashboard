@@ -285,13 +285,19 @@ Two mechanisms, in order:
   down rather than fighting it. Give the dashboard its own bot in that case.
 - **The bot must be an admin** in each channel to receive `channel_post`
   updates. It already is, or it could not post there.
-- Only chats in `TELEGRAM_CHAT_IDS` are recorded. The bot may be in others;
-  those are not the ledger's business.
+- The watchlist matches the complete Telegram destination: both `chatId` and
+  `message_thread_id`. A configured topic never includes General or another
+  topic in the same supergroup. A channel destination without a thread matches
+  only threadless channel posts.
+- By default the watchlist inherits the exact `TELEGRAM_CHAT_IDS` broadcast
+  destinations. Set `BROADCAST_LEDGER_TELEGRAM_WATCHLIST` for an explicit
+  initial subset, or select the destinations in Settings. Changing the ledger
+  watchlist never changes where the dashboard sends broadcasts.
 - The poll offset is persisted, so a restart resumes instead of re-reading the
   backlog. It is saved *after* processing, so a crash re-reads rather than
   drops — re-reading is free, since ingest is idempotent per message.
-- The Settings card shows whether the watch is on, so "am I still filing these
-  by hand?" is answerable at a glance.
+- The Settings card shows every configured channel/topic with a checkbox, so
+  the active watchlist is visible and editable without changing send targets.
 
 ## Which path sent it — attribution
 
@@ -340,7 +346,7 @@ so this rarely needs debugging by hand. What it can tell you:
 | What it says | What it means |
 | --- | --- |
 | `409 Conflict` | Another process is reading this bot's updates — usually ShareBot67 on the same token, or a webhook. Give the dashboard its own bot. |
-| Posts arriving from a chat you are not watching | Traffic exists, but from a chat id not in `TELEGRAM_CHAT_IDS`. The id is printed; add it. |
+| Posts arriving from a destination you are not watching | Traffic exists, but its exact chat/topic pair is not selected. General and unrelated topics are intentionally ignored. |
 | No chats configured | `TELEGRAM_CHAT_IDS` is empty. |
 | Last poll failed: … | The Telegram error verbatim. |
 | Telegram returning nothing | See the two causes below. |
@@ -560,4 +566,5 @@ broadcast where *nothing* landed still returns `502` as before.
 | `BROADCAST_LEDGER_RATE_LIMIT_PER_MIN` | No | Default `60`. Set `0` to disable. |
 | `BROADCAST_LEDGER_INGEST_ENABLED` | For automatic recording | `true` turns on the channel watch. Off by default. |
 | `BROADCAST_LEDGER_INGEST_INTERVAL_MS` | No | Poll interval, default `60000`, floor `15000`. |
+| `BROADCAST_LEDGER_TELEGRAM_WATCHLIST` | No | Comma-separated `chatId` or `chatId:threadId` targets. Defaults to the exact `TELEGRAM_CHAT_IDS` destinations when omitted. |
 | `DATA_DIR` | Yes | Must be the mounted volume path (usually `/app/data`) or the ledger will not survive deploys. |

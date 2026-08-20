@@ -37,10 +37,28 @@
  */
 
 const STATE_KEY = "broadcastIngest:offset";
+const WATCHLIST_STATE_KEY = "broadcastIngest:watchTargets";
 const STATE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const WATCHLIST_TTL_MS = 10 * 365 * 24 * 60 * 60 * 1000;
 
 const MAX_TITLE_LEN = 300;
 const DEFAULT_INTERVAL_MS = 60 * 1000;
+
+function normalizeWatchTarget(entry) {
+  if (entry && typeof entry === "object") {
+    const chatId = String(entry.chatId ?? "").trim();
+    const threadId = entry.threadId == null || String(entry.threadId).trim() === ""
+      ? null
+      : String(entry.threadId).trim();
+    return chatId ? { chatId, threadId } : null;
+  }
+  const [chatId, threadId] = String(entry || "").split(":").map((part) => part.trim());
+  return chatId ? { chatId, threadId: threadId || null } : null;
+}
+
+function targetKey(target) {
+  return `${target.chatId}:${target.threadId || ""}`;
+}
 
 // Telegram sends HTML/Markdown as literal text plus entity offsets. The
 // title only needs to read like a headline, so strip the obvious markup
@@ -87,6 +105,7 @@ class BroadcastIngestService {
     stateCache,
     enabled = false,
     intervalMs = DEFAULT_INTERVAL_MS,
+    watchTargets = null,
     logger = console,
   } = {}) {
     this._telegram = telegramService;
@@ -108,18 +127,34 @@ class BroadcastIngestService {
     // Chats posts actually arrived from that are NOT being recorded. If this
     // is non-empty while nothing is landing, TELEGRAM_CHAT_IDS points
     // somewhere other than where the news is going.
-    this._unwatchedChatIds = new Set();
-    // Only the chats the dashboard is configured for. A bot can be in other
-    // channels; those are not this ledger's business.
-    this._watchedChatIds = new Set(
-      (telegramService && telegramService._chatIds ? telegramService._chatIds : []).map((target) =>
-        String(target.chatId),
-      ),
-    );
+    this._unwatchedTargets = new Set();
+    // Keep ingest selection independent from sending. Legacy configuration
+    // inherits the exact send targets, including topic ids; it never widens a
+    // topic destination to the whole supergroup.
+    const sendTargets = telegramService && telegramService._chatIds ? telegramService._chatIds : [];
+    const storedTargets = stateCache ? stateCache.get(WATCHLIST_STATE_KEY) : null;
+    const selected = Array.isArray(storedTargets) ? storedTargets : watchTargets === null ? sendTargets : watchTargets;
+    this._availableTargets = sendTargets.map(normalizeWatchTarget).filter(Boolean);
+    this._watchTargets = selected.map(normalizeWatchTarget).filter(Boolean);
+    this._watchedTargetKeys = new Set(this._watchTargets.map(targetKey));
   }
 
   get enabled() {
     return Boolean(this._enabledFlag && this._telegram && this._telegram.configured);
+  }
+
+  setWatchTargets(entries) {
+    if (!Array.isArray(entries)) throw Object.assign(new Error("targets must be an array"), { statusCode: 400 });
+    const normalized = entries.map(normalizeWatchTarget).filter(Boolean);
+    const available = new Set(this._availableTargets.map(targetKey));
+    const invalid = normalized.find((target) => !available.has(targetKey(target)));
+    if (invalid) {
+      throw Object.assign(new Error(`Unknown Telegram destination: ${targetKey(invalid)}`), { statusCode: 400 });
+    }
+    this._watchTargets = normalized;
+    this._watchedTargetKeys = new Set(normalized.map(targetKey));
+    if (this._stateCache) this._stateCache.set(WATCHLIST_STATE_KEY, normalized, WATCHLIST_TTL_MS);
+    return this.describe();
   }
 
   start() {
@@ -133,7 +168,7 @@ class BroadcastIngestService {
     }
     if (this._timer) return;
     this._logger.log?.(
-      `[BroadcastIngest] Watching ${this._watchedChatIds.size} Telegram chat(s) every ${Math.round(
+      `[BroadcastIngest] Watching ${this._watchedTargetKeys.size} Telegram destination(s) every ${Math.round(
         this._intervalMs / 1000,
       )}s`,
     );
@@ -169,8 +204,13 @@ class BroadcastIngestService {
     return {
       enabled: this.enabled,
       configured: Boolean(this._telegram && this._telegram.configured),
-      watchedChatIds: [...this._watchedChatIds],
-      unwatchedChatIdsSeen: [...this._unwatchedChatIds],
+      availableTargets: this._availableTargets.map((target) => ({ ...target })),
+      watchedTargets: this._watchTargets.map((target) => ({ ...target })),
+      unwatchedTargetsSeen: [...this._unwatchedTargets],
+      // Compatibility for existing diagnostics clients. Matching is always
+      // done with watchedTargets above, never these chat-only summaries.
+      watchedChatIds: [...new Set(this._watchTargets.map((target) => target.chatId))],
+      unwatchedChatIdsSeen: [...new Set([...this._unwatchedTargets].map((key) => key.split(":")[0]))],
       startedAt: this._startedAt,
       lastPollAt: this._lastPollAt,
       lastSummary: this._lastSummary,
@@ -242,10 +282,12 @@ class BroadcastIngestService {
     if (!post || !post.chat) return "skipped";
 
     const chatId = String(post.chat.id);
-    if (!this._watchedChatIds.has(chatId)) {
+    const threadId = post.message_thread_id == null ? null : String(post.message_thread_id);
+    const incomingKey = targetKey({ chatId, threadId });
+    if (!this._watchedTargetKeys.has(incomingKey)) {
       // Remember it: "posts are arriving, just not from the chat you told me
       // to watch" is the single most useful thing to be able to say.
-      if (this._unwatchedChatIds.size < 20) this._unwatchedChatIds.add(chatId);
+      if (this._unwatchedTargets.size < 20) this._unwatchedTargets.add(incomingKey);
       return "skipped";
     }
 
@@ -264,7 +306,7 @@ class BroadcastIngestService {
     const destination = {
       channel: "telegram",
       chatId,
-      threadId: post.message_thread_id != null ? String(post.message_thread_id) : null,
+      threadId,
       status: "posted",
       messageId,
     };
@@ -298,4 +340,12 @@ class BroadcastIngestService {
   }
 }
 
-module.exports = { BroadcastIngestService, deriveTitle, firstUrl, stripMarkup, looksLikeBanner };
+module.exports = {
+  BroadcastIngestService,
+  deriveTitle,
+  firstUrl,
+  stripMarkup,
+  looksLikeBanner,
+  normalizeWatchTarget,
+  targetKey,
+};

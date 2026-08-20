@@ -248,6 +248,8 @@
           <button class="tg-test-btn" id="ledgerKeyBtn" type="button" style="display:none">Enter Admin Key</button>
         </div>
         <div class="settings-row-sub" id="ledgerWatch" style="margin-top:12px; display:none"></div>
+        <div id="ledgerWatchTargets" style="margin-top:10px; display:none"></div>
+        <button class="settings-action-btn primary" id="ledgerWatchSave" type="button" style="margin-top:10px; display:none">Save Ledger Watchlist</button>
         <div class="settings-row-sub" id="ledgerSources" style="margin-top:6px; display:none"></div>
         <div class="settings-row-sub" id="ledgerLatest" style="margin-top:6px; display:none"></div>
         <div class="tg-instructions" id="ledgerInstructions" style="display:none">
@@ -381,6 +383,8 @@
     var keyBtn = document.getElementById('ledgerKeyBtn');
     var latestEl = document.getElementById('ledgerLatest');
     var watchEl = document.getElementById('ledgerWatch');
+    var watchTargetsEl = document.getElementById('ledgerWatchTargets');
+    var watchSave = document.getElementById('ledgerWatchSave');
     var sourcesEl = document.getElementById('ledgerSources');
     var SOURCE_LABELS = {
       shortcut: 'Shortcut',
@@ -402,6 +406,40 @@
     }
     var inst = document.getElementById('ledgerInstructions');
     var STATUS_URL = '/api/broadcast-ledger/status';
+
+    function targetKey(target) {
+      return String(target.chatId) + ':' + (target.threadId || '');
+    }
+
+    function renderWatchTargets(data) {
+      var watch = data && data.watch;
+      var available = watch && Array.isArray(watch.availableTargets) ? watch.availableTargets : [];
+      var selected = new Set((watch && watch.watchedTargets || []).map(targetKey));
+      watchTargetsEl.innerHTML = '';
+      if (!available.length) {
+        watchTargetsEl.textContent = 'No Telegram broadcast destinations are configured.';
+        watchTargetsEl.className = 'settings-row-sub';
+        watchTargetsEl.style.display = '';
+        watchSave.style.display = 'none';
+        return;
+      }
+      available.forEach(function (target) {
+        var label = document.createElement('label');
+        label.className = 'settings-row-sub';
+        label.style.cssText = 'display:flex;align-items:center;gap:8px;margin:7px 0;cursor:pointer';
+        var input = document.createElement('input');
+        input.type = 'checkbox';
+        input.value = targetKey(target);
+        input.checked = selected.has(input.value);
+        label.appendChild(input);
+        label.appendChild(document.createTextNode(target.threadId
+          ? 'Chat ' + target.chatId + ' · topic ' + target.threadId
+          : 'Channel/chat ' + target.chatId + ' · no topic'));
+        watchTargetsEl.appendChild(label);
+      });
+      watchTargetsEl.style.display = '';
+      watchSave.style.display = '';
+    }
 
     function describeLatest(data) {
       if (!data || !data.count) return 'No receipts recorded yet.';
@@ -437,6 +475,7 @@
         ? '\u2713 Watching your Telegram channels \u2014 posts from other senders are recorded automatically. Anything sent through this bot must broadcast via /api/broadcast-ledger/broadcast to be recorded.'
         : '\u26a0 Channel watch is off \u2014 receipts only arrive from paths that report themselves. Set BROADCAST_LEDGER_INGEST_ENABLED=true to record posts automatically.';
       watchEl.style.display = '';
+      renderWatchTargets(data);
       inst.style.display = 'none';
     }
 
@@ -448,6 +487,8 @@
       latestEl.style.display = 'none';
       sourcesEl.style.display = 'none';
       watchEl.style.display = 'none';
+      watchTargetsEl.style.display = 'none';
+      watchSave.style.display = 'none';
     }
 
     function notConfigured() {
@@ -458,6 +499,8 @@
       latestEl.style.display = 'none';
       sourcesEl.style.display = 'none';
       watchEl.style.display = 'none';
+      watchTargetsEl.style.display = 'none';
+      watchSave.style.display = 'none';
       inst.style.display = '';
     }
 
@@ -469,6 +512,8 @@
       latestEl.style.display = 'none';
       sourcesEl.style.display = 'none';
       watchEl.style.display = 'none';
+      watchTargetsEl.style.display = 'none';
+      watchSave.style.display = 'none';
     }
 
     // Probe in the order the form itself accepts credentials: the site session
@@ -497,6 +542,27 @@
       window.AdminKey.prompt('Enter the admin key to open the broadcast receipt form:').then(function (key) {
         if (key) probe();
       });
+    });
+
+    watchSave.addEventListener('click', function () {
+      var targets = Array.from(watchTargetsEl.querySelectorAll('input:checked')).map(function (input) {
+        var splitAt = input.value.lastIndexOf(':');
+        return { chatId: input.value.slice(0, splitAt), threadId: input.value.slice(splitAt + 1) || null };
+      });
+      watchSave.disabled = true;
+      AdminKey.fetch('/api/broadcast-ledger/watchlist', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targets: targets })
+      }).then(function (res) {
+        return res.json().then(function (body) {
+          if (!res.ok) throw new Error(body.error || 'Could not save watchlist');
+          renderWatchTargets({ watch: body.watch });
+          showToast();
+        });
+      }).catch(function (err) {
+        watchEl.textContent = '\u26a0 ' + err.message;
+      }).finally(function () { watchSave.disabled = false; });
     });
 
     probe();

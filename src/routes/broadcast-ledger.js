@@ -297,12 +297,14 @@ function createBroadcastLedgerRouter({
   broadcastLedgerStore,
   broadcastIngestService,
   telegramService,
+  requireAdmin,
   requireLedgerKey,
   ledgerKey,
   adminKey,
   rateLimitPerMinute = 60,
 }) {
   const router = Router();
+  const requireWatchlistAdmin = requireAdmin || requireLedgerKey;
 
   // The key guard already stops anonymous writes; the limiter is there so a
   // stuck shortcut or a retry loop can't spin the ledger's whole-file writes.
@@ -380,6 +382,18 @@ function createBroadcastLedgerRouter({
           : null,
       });
     } catch (err) {
+      next(err);
+    }
+  });
+
+  // Changing what is observed must never change where broadcasts are sent.
+  // Admin auth is deliberately stronger than the receipt-only ledger key.
+  router.put("/watchlist", requireWatchlistAdmin, (req, res, next) => {
+    try {
+      if (!broadcastIngestService) return res.status(503).json({ error: "Telegram ingest is unavailable." });
+      res.json({ watch: broadcastIngestService.setWatchTargets(req.body && req.body.targets) });
+    } catch (err) {
+      if (err.statusCode === 400) return badRequest(res, err.message);
       next(err);
     }
   });
