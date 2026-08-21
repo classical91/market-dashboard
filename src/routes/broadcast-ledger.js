@@ -114,7 +114,9 @@ function renderManualForm({
       const rawTitle = receipt.title || receipt.canonicalUrl || receipt.id;
       const title = /^Broadcasted today\b/i.test(rawTitle) ? `${newsType} News — ${dateLabel}` : rawTitle;
       const statusLabel = STATUS_LABELS[receipt.status] || receipt.status;
-      const meta = [newsType, when].filter(Boolean).join(" · ");
+      const meta = [receipt.status === "posted" ? "Broadcasted" : receipt.status, newsType, when]
+        .filter(Boolean)
+        .join(" · ");
       const keyField = formKey ? `<input type="hidden" name="key" value="${escapeHtml(formKey)}">` : "";
       return `<li>
         <span class="status status-${escapeHtml(receipt.status)}">${escapeHtml(statusLabel)}</span>

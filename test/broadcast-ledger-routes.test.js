@@ -537,7 +537,7 @@ test("a generic backfill title becomes a category-first news title", () => {
   });
 
   assert.match(html, /Crypto News — August 20, 2026/);
-  assert.match(html, /Crypto · 2026-08-20 21:31/);
+  assert.match(html, /Broadcasted · Crypto · 2026-08-20 21:31/);
   assert.doesNotMatch(html, /Manual ·/);
 });
 
