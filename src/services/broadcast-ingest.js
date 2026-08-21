@@ -133,7 +133,15 @@ class BroadcastIngestService {
     // topic destination to the whole supergroup.
     const sendTargets = telegramService && telegramService._chatIds ? telegramService._chatIds : [];
     const storedTargets = stateCache ? stateCache.get(WATCHLIST_STATE_KEY) : null;
-    const selected = Array.isArray(storedTargets) ? storedTargets : watchTargets === null ? sendTargets : watchTargets;
+    // An explicit environment watchlist is the operator's current source of
+    // truth. Previously, an older UI-saved selection in the persistent cache
+    // silently overrode later Railway configuration, leaving newly added
+    // rooms unwatched after every deploy.
+    const selected = watchTargets !== null
+      ? watchTargets
+      : Array.isArray(storedTargets)
+        ? storedTargets
+        : sendTargets;
     this._availableTargets = sendTargets.map(normalizeWatchTarget).filter(Boolean);
     this._watchTargets = selected.map(normalizeWatchTarget).filter(Boolean);
     this._watchedTargetKeys = new Set(this._watchTargets.map(targetKey));

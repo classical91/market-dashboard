@@ -196,6 +196,22 @@ test("an explicit ledger watchlist can select a subset without changing send des
   assert.deepEqual(telegram._chatIds.map((target) => target.chatId), [CHAT_A, CHAT_B]);
 });
 
+test("an explicit environment watchlist overrides an older persisted selection", () => {
+  const store = freshStore();
+  const telegram = fakeTelegram([], { chatIds: [CHAT_A] });
+  const stateCache = memoryCache();
+  stateCache.set("broadcastIngest:watchTargets", [{ chatId: CHAT_A, threadId: null }]);
+
+  const service = makeService(telegram, store, {
+    stateCache,
+    watchTargets: [{ chatId: CHAT_B, threadId: "75972" }],
+  });
+
+  assert.deepEqual(service.describe().watchedTargets, [
+    { chatId: CHAT_B, threadId: "75972" },
+  ]);
+});
+
 test("a post with no usable text is skipped rather than stored as an empty receipt", async () => {
   const store = freshStore();
   const telegram = fakeTelegram([
