@@ -284,6 +284,8 @@ function renderManualForm({
   ${watchBanner}
   ${tally}
   <section class="daily-summary" aria-label="Daily summary"><span>Today · ${escapeHtml(summary?.timeZone || settings.timezone || "America/Vancouver")}</span><strong>${escapeHtml(summaryText(summary))}</strong></section>
+  <details class="filter-panel" open>
+    <summary>Search &amp; filters</summary>
   <form class="ledger-filters" method="GET" action="/api/broadcast-ledger/manual">
     ${formKey ? `<input type="hidden" name="key" value="${escapeHtml(formKey)}">` : ""}
     <label class="search-field">Search<input name="q" value="${escapeHtml(filters.query || "")}" placeholder="Headline or receipt ID"></label>
@@ -292,6 +294,7 @@ function renderManualForm({
     <label>Status<select name="status"><option value="">All statuses</option><option value="broadcasted"${selected(filters.status, "broadcasted")}>Broadcasted</option><option value="blocked"${selected(filters.status, "blocked")}>Blocked</option><option value="failed"${selected(filters.status, "failed")}>Failed</option><option value="pending"${selected(filters.status, "pending")}>Pending</option></select></label>
     <button type="submit">Apply filters</button><a href="/api/broadcast-ledger/manual${formKey ? `?key=${encodeURIComponent(formKey)}` : ""}">Clear</a>
   </form>
+  </details>
   ${rows ? `<div class="ledger-heading"><h2>Broadcast log</h2><span>${visibleReceipts.length} shown</span></div><ul class="receipt-list">${rows}</ul>` : `<p class="empty filtered-empty">No receipts match these filters.</p>`}
 </main>
 </body>

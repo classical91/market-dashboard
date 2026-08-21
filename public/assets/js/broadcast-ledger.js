@@ -6,6 +6,16 @@
     mobileWatch.removeAttribute("open");
   }
 
+  var mobileFilters = document.querySelector(".filter-panel");
+  if (mobileFilters && window.matchMedia("(max-width: 760px)").matches) {
+    var params = new URLSearchParams(window.location.search);
+    var hasActiveFilters = Boolean(
+      params.get("q") || params.get("newsType") || params.get("status") ||
+      (params.get("range") && params.get("range") !== "today")
+    );
+    if (!hasActiveFilters) mobileFilters.removeAttribute("open");
+  }
+
   function toast(message) {
     var old = document.querySelector(".toast");
     if (old) old.remove();
