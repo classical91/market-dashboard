@@ -73,6 +73,7 @@ const { OnchainService } = require("./services/onchain");
 const { OverviewService } = require("./services/overview");
 const { BroadcastIngestService } = require("./services/broadcast-ingest");
 const { BroadcastLedgerStore } = require("./services/broadcast-ledger");
+const { BroadcastLedgerNotificationService } = require("./services/broadcast-ledger-notifications");
 const { ReporterService } = require("./services/reporter");
 const { TelegramService } = require("./services/telegram");
 const { YouTubeIntelligenceService } = require("./services/youtube");
@@ -104,6 +105,12 @@ function createApp() {
     covalentService,
   });
   const telegramService = new TelegramService(config.telegram);
+  const broadcastLedgerNotificationService = new BroadcastLedgerNotificationService({
+    telegramService: new TelegramService({
+      ...config.telegram,
+      chatIds: config.broadcastLedger.notificationTargets,
+    }),
+  });
   // Shared source of truth for every completed broadcast, across the
   // dashboard, the iOS/GPT shortcut, ShareBot67 and manual posting. Lives
   // here rather than behind the OpenClaw gateway precisely so it stays
@@ -368,6 +375,7 @@ function createApp() {
       broadcastLedgerStore,
       broadcastIngestService,
       telegramService,
+      notificationService: broadcastLedgerNotificationService,
       requireAdmin,
       requireLedgerKey,
       ledgerKey: config.broadcastLedger.apiKey,

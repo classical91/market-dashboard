@@ -40,6 +40,60 @@ function post(pathname, body, headers = {}) {
   });
 }
 
+async function withScopedBroadcastApp(run) {
+  const express = require("express");
+  const { createBroadcastLedgerRouter } = require("../src/routes/broadcast-ledger");
+  const { BroadcastLedgerStore } = require("../src/services/broadcast-ledger");
+  const calls = [];
+  const telegramService = {
+    configured: true,
+    async postText(text, options = {}) {
+      calls.push({ text, options });
+      const targets = options.targets || [
+        { chatId: "-100111", threadId: "1" },
+        { chatId: "-100222", threadId: "2" },
+        { chatId: "-100333", threadId: "3" },
+      ];
+      return {
+        posted: targets.length,
+        failed: 0,
+        destinations: targets.map((target, index) => ({
+          channel: "telegram",
+          chatId: String(target.chatId),
+          threadId: target.threadId == null ? null : String(target.threadId),
+          status: "posted",
+          messageId: String(900 + index),
+        })),
+      };
+    },
+  };
+  const broadcastLedgerStore = new BroadcastLedgerStore({
+    dataDir: fs.mkdtempSync(path.join(os.tmpdir(), "md-ledger-scoped-")),
+    logger: { error() {} },
+  });
+  const app = express();
+  app.use(express.json());
+  app.use("/api/broadcast-ledger", createBroadcastLedgerRouter({
+    broadcastLedgerStore,
+    telegramService,
+    requireLedgerKey(req, res, next) {
+      if (req.get("x-broadcast-key") === LEDGER_KEY) return next();
+      res.status(401).json({ error: "Unauthorized" });
+    },
+    ledgerKey: LEDGER_KEY,
+    adminKey: ADMIN_KEY,
+    rateLimitPerMinute: 0,
+  }));
+  const scopedServer = http.createServer(app);
+  await new Promise((resolve) => scopedServer.listen(0, resolve));
+  const scopedBase = `http://127.0.0.1:${scopedServer.address().port}`;
+  try {
+    await run(scopedBase, calls, broadcastLedgerStore);
+  } finally {
+    await new Promise((resolve) => scopedServer.close(resolve));
+  }
+}
+
 /* ── auth ── */
 
 test("an anonymous request is rejected, not silently accepted", async () => {
@@ -112,6 +166,28 @@ test("PATCH on an unknown receipt is a 404", async () => {
   assert.equal(res.status, 404);
 });
 
+test("the Geopolitics guard stores a visible blocked attempt after the daily success limit", async () => {
+  await post("/api/broadcast-ledger/receipts", {
+    source: "shortcut",
+    title: "Geopolitics daily success",
+    newsType: "Geopolitics",
+    status: "posted",
+    idempotencyKey: "route-geo-success",
+  });
+  const res = await post("/api/broadcast-ledger/broadcast/guard", {
+    source: "sharebot67",
+    headline: "Geopolitics blocked follow-up",
+    text: "A second geopolitics attempt",
+    newsType: "Geopolitics",
+    idempotencyKey: "route-geo-blocked",
+  });
+  const body = await res.json();
+  assert.equal(res.status, 409);
+  assert.equal(body.allowed, false);
+  assert.equal(body.receipt.status, "blocked");
+  assert.match(body.reason, /daily limit/i);
+});
+
 /* ── the three integration paths, end to end over HTTP ── */
 
 test("shortcut path: a retried POST is idempotent over HTTP", async () => {
@@ -182,6 +258,137 @@ test("ShareBot67 records destination results against its own pending receipt", a
   assert.equal(patched.status, 200);
   assert.equal(body.receipt.status, "partial");
   assert.equal(body.receipt.attempts.at(-1).actor, "sharebot67");
+});
+
+test("Stock, Crypto, and Economics broadcasts send only to the approved finance topics", async () => {
+  await withScopedBroadcastApp(async (scopedBase, calls) => {
+    for (const newsType of ["Stock", "Crypto", "Economics"]) {
+      const res = await fetch(`${scopedBase}/api/broadcast-ledger/broadcast`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-broadcast-key": LEDGER_KEY },
+        body: JSON.stringify({
+          source: "sharebot67",
+          newsType,
+          title: `${newsType} route test`,
+          text: `${newsType} route test https://example.com/${newsType.toLowerCase()}-route-test`,
+          idempotencyKey: `finance-route-${newsType}`,
+        }),
+      });
+      const body = await res.json();
+
+      assert.equal(res.status, 201);
+      assert.equal(body.receipt.newsType, newsType);
+      assert.deepEqual(body.receipt.destinations.map((destination) => ({
+        chatId: destination.chatId,
+        threadId: destination.threadId,
+      })), [
+        { chatId: "-1001841650798", threadId: "6297" },
+        { chatId: "-1001941064823", threadId: "984" },
+      ]);
+    }
+
+    assert.equal(calls.length, 3);
+    assert.ok(calls.every((call) => Array.isArray(call.options.targets)));
+  });
+});
+
+test("Geopolitics broadcasts keep the separately configured Telegram routing", async () => {
+  await withScopedBroadcastApp(async (scopedBase, calls) => {
+    const res = await fetch(`${scopedBase}/api/broadcast-ledger/broadcast`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-broadcast-key": LEDGER_KEY },
+      body: JSON.stringify({
+        source: "sharebot67",
+        newsType: "Geopolitics",
+        title: "Geopolitics route test",
+        text: "Geopolitics route test https://example.com/geopolitics-route-test",
+        idempotencyKey: "geo-route-test",
+      }),
+    });
+    const body = await res.json();
+
+    assert.equal(res.status, 201);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].options.targets, undefined);
+    assert.deepEqual(body.receipt.destinations.map((destination) => ({
+      chatId: destination.chatId,
+      threadId: destination.threadId,
+    })), [
+      { chatId: "-100111", threadId: "1" },
+      { chatId: "-100222", threadId: "2" },
+      { chatId: "-100333", threadId: "3" },
+    ]);
+  });
+});
+
+test("Ledger Settings can return finance categories to the general Telegram route", async () => {
+  await withScopedBroadcastApp(async (scopedBase, calls) => {
+    const saved = await fetch(`${scopedBase}/api/broadcast-ledger/settings`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", "x-broadcast-key": LEDGER_KEY },
+      body: JSON.stringify({ financeTopicRoutingEnabled: false }),
+    });
+    assert.equal(saved.status, 200);
+    assert.equal((await saved.json()).settings.financeTopicRoutingEnabled, false);
+
+    const res = await fetch(`${scopedBase}/api/broadcast-ledger/broadcast`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-broadcast-key": LEDGER_KEY },
+      body: JSON.stringify({
+        source: "sharebot67",
+        newsType: "Stock",
+        title: "General route setting test",
+        text: "General route setting test https://example.com/general-route-setting-test",
+        idempotencyKey: "general-route-setting-test",
+      }),
+    });
+    const body = await res.json();
+
+    assert.equal(res.status, 201);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].options.targets, undefined);
+    assert.deepEqual(body.receipt.destinations.map((destination) => destination.chatId), [
+      "-100111", "-100222", "-100333",
+    ]);
+  });
+});
+
+test("failed retries use the same persisted finance-routing setting as first delivery", async () => {
+  await withScopedBroadcastApp(async (scopedBase, calls, store) => {
+    const restricted = store.createReceipt({
+      source: "sharebot67",
+      newsType: "Crypto",
+      title: "Restricted retry",
+      status: "failed",
+      destinations: [{ channel: "telegram", chatId: "-1001841650798", threadId: "6297", status: "failed" }],
+    }).receipt;
+    const first = await fetch(`${scopedBase}/api/broadcast-ledger/receipts/${restricted.id}/retry`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-broadcast-key": LEDGER_KEY },
+      body: JSON.stringify({ text: "Restricted retry body" }),
+    });
+    assert.equal(first.status, 200);
+    assert.deepEqual(calls[0].options.targets, [
+      { chatId: "-1001841650798", threadId: "6297" },
+      { chatId: "-1001941064823", threadId: "984" },
+    ]);
+
+    store.updateSettings({ financeTopicRoutingEnabled: false });
+    const general = store.createReceipt({
+      source: "sharebot67",
+      newsType: "Economics",
+      title: "General retry",
+      status: "failed",
+      destinations: [{ channel: "telegram", chatId: "-1001841650798", threadId: "6297", status: "failed" }],
+    }).receipt;
+    const second = await fetch(`${scopedBase}/api/broadcast-ledger/receipts/${general.id}/retry`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-broadcast-key": LEDGER_KEY },
+      body: JSON.stringify({ text: "General retry body" }),
+    });
+    assert.equal(second.status, 200);
+    assert.equal(calls[1].options.targets, undefined);
+  });
 });
 
 test("broadcast receipts page is mobile-ready without a manual-entry form", async () => {
@@ -453,6 +660,33 @@ test("status leaks no message content — only counts and receipt metadata", asy
   assert.ok(!raw.includes("contentHash"), "hashes are an implementation detail, not status output");
 });
 
+test("ledger settings can be read and updated by an administrator", async () => {
+  const read = await fetch(`${base}/api/broadcast-ledger/settings`, { headers: { "x-broadcast-key": LEDGER_KEY } });
+  const initial = await read.json();
+  assert.equal(read.status, 200);
+  assert.equal(initial.settings.timezone, "America/Vancouver");
+  assert.equal(initial.settings.categoryLimits.Geopolitics, 1);
+  assert.equal(initial.settings.financeTopicRoutingEnabled, true);
+
+  const saved = await fetch(`${base}/api/broadcast-ledger/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", "x-admin-key": ADMIN_KEY },
+    body: JSON.stringify({ destinationLabels: { "telegram:-1001:44": "War Room" } }),
+  });
+  const body = await saved.json();
+  assert.equal(saved.status, 200);
+  assert.equal(body.settings.destinationLabels["telegram:-1001:44"], "War Room");
+});
+
+test("the Settings page exposes the persisted finance-routing control and exact topics", () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", "public", "settings.html"), "utf8");
+  assert.match(source, /id="ledgerFinanceRouting"/);
+  assert.match(source, /financeTopicRoutingEnabled/);
+  assert.match(source, /-1001841650798 \/ 6297/);
+  assert.match(source, /-1001941064823 \/ 984/);
+  assert.match(source, /This setting also controls retries/);
+});
+
 /* ── the page must always say whether anything was sent ── */
 
 test("an empty ledger says so explicitly, instead of showing a bare form", async () => {
@@ -496,28 +730,28 @@ test("a populated ledger leads with the count and the per-path breakdown", () =>
     watching: true,
   });
 
-  assert.match(html, /<strong>3<\/strong> broadcasts recorded/);
+  assert.match(html, /<strong>4<\/strong> ledger entries recorded/);
   assert.doesNotMatch(html, /2 Shortcut|1 ShareBot67/);
-  assert.match(html, /Economics ·/);
+  assert.match(html, /Unclassified/);
   assert.doesNotMatch(html, /Unattributed/);
 });
 
-test("visible broadcasts show explicit and inferred news-type labels", () => {
+test("visible broadcasts show sender-supplied labels and expose missing labels", () => {
   const { renderManualForm } = require("../src/routes/broadcast-ledger");
   const at = "2026-08-20T21:31:00.000Z";
   const html = renderManualForm({
     recent: [
-      { id: "a", title: "Bitcoin breaks resistance", source: "shortcut", status: "posted", createdAt: at },
-      { id: "b", title: "Morning update", newsType: "Breaking News", source: "sharebot67", status: "posted", createdAt: at },
+      { id: "a", title: "Bitcoin breaks resistance", newsType: "Crypto", source: "shortcut", status: "posted", createdAt: at },
+      { id: "b", title: "Morning update", source: "sharebot67", status: "posted", createdAt: at },
     ],
     total: 2,
     bySource: { shortcut: 1, sharebot67: 1 },
     watching: true,
   });
 
-  assert.match(html, /Crypto ·/);
-  assert.match(html, /Breaking News ·/);
-  assert.doesNotMatch(html, /Crypto · Shortcut|Breaking News · ShareBot67/);
+  assert.match(html, /Crypto/);
+  assert.match(html, /Unclassified/);
+  assert.match(html, /News Reporter/);
 });
 
 test("a generic backfill title becomes a category-first news title", () => {
@@ -537,8 +771,9 @@ test("a generic backfill title becomes a category-first news title", () => {
   });
 
   assert.match(html, /Crypto News — August 20, 2026/);
-  assert.match(html, /Broadcasted · Crypto · 2026-08-20 21:31/);
-  assert.doesNotMatch(html, /Manual ·/);
+  assert.match(html, /Broadcasted/);
+  assert.match(html, /Crypto/);
+  assert.match(html, /Manual/);
 });
 
 test("visible receipts include an authenticated edit form", () => {
@@ -554,11 +789,34 @@ test("visible receipts include an authenticated edit form", () => {
   assert.match(html, /manual\/receipt-1\/delete/);
   assert.match(html, /Delete receipt/);
   assert.match(html, /cannot be undone/);
-  assert.match(html, /name="newsType" value="Economics"/);
+  assert.match(html, /name="newsType" required/);
+  assert.match(html, /value="Economics" selected/);
   assert.match(html, /name="key" value="secret-key"/);
 });
 
-test("channel-watch receipts are hidden from the visible ledger", () => {
+test("ledger cards expose destination labels, attempt history, copy, search, and retry controls", () => {
+  const { renderManualForm } = require("../src/routes/broadcast-ledger");
+  const { DEFAULT_SETTINGS } = require("../src/services/broadcast-ledger");
+  const html = renderManualForm({
+    recent: [{
+      id: "failed-1", title: "Retry this", newsType: "Geopolitics", source: "sharebot67", status: "failed",
+      createdAt: new Date().toISOString(),
+      destinations: [{ channel: "telegram", chatId: "-1001", threadId: "44", status: "failed", error: "timeout" }],
+      attempts: [{ at: new Date().toISOString(), actor: "sharebot67", action: "broadcast", ok: false, detail: "timeout" }],
+    }],
+    total: 1,
+    bySource: { sharebot67: 1 },
+    settings: { ...DEFAULT_SETTINGS, destinationLabels: { "telegram:-1001:44": "War Room" } },
+  });
+  assert.match(html, /War Room/);
+  assert.match(html, /Attempt history/);
+  assert.match(html, /News Reporter/);
+  assert.match(html, /Copy details/);
+  assert.match(html, /Retry/);
+  assert.match(html, /Headline or receipt ID/);
+});
+
+test("channel-watch receipts remain visible with an explicit source", () => {
   const { renderManualForm } = require("../src/routes/broadcast-ledger");
   const html = renderManualForm({
     recent: [
@@ -569,12 +827,12 @@ test("channel-watch receipts are hidden from the visible ledger", () => {
     watching: true,
   });
 
-  assert.doesNotMatch(html, /Posted by hand|2026-08-20 18:24|Unattributed|telegram-ingest/);
-  assert.doesNotMatch(html, /Last 10 broadcasts/);
-  assert.match(html, /No broadcasts recorded yet/);
+  assert.match(html, /Posted by hand/);
+  assert.match(html, /Channel Watch/);
+  assert.match(html, /Broadcast log/);
 });
 
-test("statuses read as sent-or-not, not as raw enum values", async () => {
+test("statuses use the operator-facing Broadcasted, Failed, Blocked and Pending vocabulary", async () => {
   const { renderManualForm } = require("../src/routes/broadcast-ledger");
   const at = new Date().toISOString();
   const html = renderManualForm({
@@ -588,9 +846,9 @@ test("statuses read as sent-or-not, not as raw enum values", async () => {
     watching: true,
   });
 
-  assert.match(html, /Sent<\/span>/);
-  assert.match(html, /Sent \(some channels\)/);
-  assert.match(html, /Not sent yet/, "a pending receipt must not read as sent");
+  assert.match(html, /Broadcasted<\/span>/);
+  assert.match(html, /Broadcasted \(partial\)/);
+  assert.match(html, /Pending/, "a pending receipt must remain explicit");
 });
 
 test("the live page carries the state block, not just the form", async () => {
@@ -598,7 +856,7 @@ test("the live page carries the state block, not just the form", async () => {
   const html = await res.text();
 
   assert.equal(res.status, 200);
-  assert.match(html, /broadcasts? recorded/i);
+  assert.match(html, /ledger entr(?:y|ies) recorded/i);
   assert.match(html, /Watching your Telegram channels|Channel watch is off/);
 });
 
@@ -707,7 +965,7 @@ test("the duplicate guard runs before Telegram is even consulted", async () => {
  * whole reason to exist is that the receipt is written from the real send
  * result, so the double returns realistic per-destination outcomes.
  */
-function mountBroadcastRouter({ sendResult, sendError } = {}) {
+function mountBroadcastRouter({ sendResult, sendError, sendImpl } = {}) {
   const express = require("express");
   const httpMod = require("node:http");
   const { createBroadcastLedgerRouter } = require("../src/routes/broadcast-ledger");
@@ -718,12 +976,20 @@ function mountBroadcastRouter({ sendResult, sendError } = {}) {
     logger: { error() {} },
   });
   const sends = [];
+  const notifications = [];
   const telegramService = {
     configured: true,
     async postText(text, opts) {
       sends.push({ text, opts });
+      if (sendImpl) return sendImpl(text, opts);
       if (sendError) throw sendError;
       return sendResult;
+    },
+  };
+  const notificationService = {
+    async notify(type, receipt, detail) {
+      notifications.push({ type, receipt, detail });
+      return { sent: true };
     },
   };
   const app = express();
@@ -734,13 +1000,14 @@ function mountBroadcastRouter({ sendResult, sendError } = {}) {
       broadcastLedgerStore: store,
       broadcastIngestService: null,
       telegramService,
+      notificationService,
       requireLedgerKey: (req, res, next) => next(),
       ledgerKey: "k",
       adminKey: "",
     }),
   );
   const server = httpMod.createServer(app);
-  return { app, server, store, sends };
+  return { app, server, store, sends, notifications };
 }
 
 async function listen(server) {
@@ -834,6 +1101,111 @@ test("a second geopolitics attempt on the same Vancouver day is blocked and reco
   });
 });
 
+test("an in-flight geopolitics send reserves capacity before Telegram finishes", async () => {
+  let releaseSend;
+  let markStarted;
+  const started = new Promise((resolve) => { markStarted = resolve; });
+  const sendResult = new Promise((resolve) => { releaseSend = resolve; });
+
+  await withRouter({
+    sendImpl() {
+      markStarted();
+      return sendResult;
+    },
+  }, async ({ url, sends }) => {
+    const firstRequest = fetch(`${url}/api/broadcast-ledger/broadcast`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        source: "shortcut",
+        text: "First in-flight geopolitics story",
+        newsType: "Geopolitics",
+        idempotencyKey: "geo-in-flight-1",
+      }),
+    });
+    await started;
+
+    const secondResponse = await fetch(`${url}/api/broadcast-ledger/broadcast`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        source: "sharebot67",
+        text: "Second concurrent geopolitics story",
+        newsType: "Geopolitics",
+        idempotencyKey: "geo-in-flight-2",
+      }),
+    });
+    const secondBody = await secondResponse.json();
+
+    assert.equal(secondResponse.status, 409);
+    assert.match(secondBody.reason, /reached or reserved/i);
+    assert.equal(sends.length, 1, "the second attempt never reaches Telegram");
+
+    releaseSend({
+      posted: 1,
+      failed: 0,
+      destinations: [{ channel: "telegram", chatId: "-1", status: "posted", messageId: "10" }],
+    });
+    assert.equal((await firstRequest).status, 201);
+  });
+});
+
+test("ledger notification preferences drive blocked, failed, and missing-category alerts", async () => {
+  await withRouter({}, async ({ store, notifications, url }) => {
+    store.createReceipt({
+      source: "shortcut",
+      title: "First geopolitics",
+      newsType: "Geopolitics",
+      status: "posted",
+      idempotencyKey: "notify-geo-first",
+    });
+    const blocked = await fetch(`${url}/api/broadcast-ledger/broadcast/guard`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        source: "sharebot67",
+        title: "Blocked geopolitics",
+        newsType: "Geopolitics",
+        idempotencyKey: "notify-geo-blocked",
+      }),
+    });
+    assert.equal(blocked.status, 409);
+    assert.equal(notifications.at(-1).type, "blocked");
+
+    const missing = await fetch(`${url}/api/broadcast-ledger/broadcast/guard`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source: "sharebot67", title: "No category", idempotencyKey: "notify-missing" }),
+    });
+    assert.equal(missing.status, 409);
+    assert.equal(notifications.at(-1).type, "missingCategory");
+
+    const { receipt } = store.createReceipt({
+      source: "shortcut",
+      title: "Pending failure",
+      newsType: "Markets",
+      status: "pending",
+      idempotencyKey: "notify-failure",
+    });
+    const failed = await fetch(`${url}/api/broadcast-ledger/receipts/${receipt.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source: "shortcut", status: "failed", error: "send failed" }),
+    });
+    assert.equal(failed.status, 200);
+    assert.equal(notifications.at(-1).type, "failed");
+
+    store.updateSettings({ notifications: { blocked: false, failed: false, missingCategory: false } });
+    const countBefore = notifications.length;
+    await fetch(`${url}/api/broadcast-ledger/broadcast/guard`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source: "sharebot67", title: "Muted missing category", idempotencyKey: "notify-muted" }),
+    });
+    assert.equal(notifications.length, countBefore);
+  });
+});
+
 test("ShareBot67 can record a blocked daily geopolitics preflight", async () => {
   await withRouter({}, async ({ store, url }) => {
     store.createReceipt({
@@ -845,7 +1217,7 @@ test("ShareBot67 can record a blocked daily geopolitics preflight", async () => 
     const res = await fetch(`${url}/api/broadcast-ledger/broadcast/guard`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ source: "sharebot67", text: "Second attempt", newsType: "Geopolitics" }),
+      body: JSON.stringify({ source: "sharebot67", text: "Second attempt", newsType: "Geopolitics", idempotencyKey: "geo-preflight-2" }),
     });
     const body = await res.json();
 

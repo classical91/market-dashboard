@@ -242,9 +242,9 @@ class TelegramService {
    * _sendToAll keeps its throw-on-first-failure behavior for the alert paths,
    * which have no receipt to attach a partial result to.
    */
-  async _sendToAllSettled(text, options) {
+  async _sendToAllSettled(text, options, targets = this._chatIds) {
     const results = [];
-    for (const target of this._chatIds) {
+    for (const target of targets.map(normalizeTarget)) {
       const base = {
         channel: "telegram",
         chatId: String(target.chatId),
@@ -335,7 +335,7 @@ class TelegramService {
    * its own receipt, and the only trustworthy moment to do that is here, from
    * the real sendMessage response.
    */
-  async postText(text, { parseMode = "HTML" } = {}) {
+  async postText(text, { parseMode = "HTML", targets = null } = {}) {
     if (!this.configured) throw createServiceError("Telegram is not configured", 400);
     const body = String(text || "").trim();
     if (!body) throw createServiceError("Nothing to send: text is empty", 400);
@@ -343,6 +343,7 @@ class TelegramService {
     const destinations = await this._sendToAllSettled(
       parseMode === "HTML" ? formatForTelegram(body) : body,
       { parseMode },
+      targets || this._chatIds,
     );
     const posted = destinations.filter((d) => d.status === "posted").length;
 

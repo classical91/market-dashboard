@@ -381,7 +381,7 @@ test("message bodies are hashed, never stored", () => {
   assert.ok(!raw.includes("must not be persisted"));
 });
 
-test("news type is inferred from the broadcast body before that body is discarded", () => {
+test("missing news type stays Unclassified and the broadcast body is discarded", () => {
   const store = freshStore();
   const secretBody = "Bitcoin rallied as the Fed discussed interest rates and inflation.";
   const { receipt } = store.createReceipt({
@@ -391,8 +391,104 @@ test("news type is inferred from the broadcast body before that body is discarde
     status: "posted",
   });
 
-  assert.equal(receipt.newsType, "Crypto / Economics");
+  assert.equal(receipt.newsType, "Unclassified");
   assert.ok(!JSON.stringify(receipt).includes(secretBody));
+});
+
+test("ledger settings persist with the recommended defaults", () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "md-ledger-settings-"));
+  const store = new BroadcastLedgerStore({ dataDir, logger: { error() {} } });
+  const defaults = store.getSettings();
+  assert.equal(defaults.requireExactCategory, true);
+  assert.equal(defaults.recordBlockedAttempts, true);
+  assert.equal(defaults.financeTopicRoutingEnabled, true);
+  assert.equal(defaults.timezone, "America/Vancouver");
+  assert.equal(defaults.historyDays, null);
+  assert.equal(defaults.notifications.failed, true);
+  assert.equal(defaults.categoryLimits.Geopolitics, 1);
+
+  store.updateSettings({
+    financeTopicRoutingEnabled: false,
+    categoryLimits: { Geopolitics: 2, Crypto: 2 },
+    duplicateWindows: { Geopolitics: "same-day", Crypto: "24h" },
+    destinationLabels: { "telegram:-1001:44": "War Room" },
+  });
+  const reloaded = new BroadcastLedgerStore({ dataDir, logger: { error() {} } }).getSettings();
+  assert.equal(reloaded.categoryLimits.Crypto, 2);
+  assert.equal(reloaded.financeTopicRoutingEnabled, false);
+  assert.equal(reloaded.duplicateWindows.Geopolitics, "same-day");
+  assert.equal(reloaded.destinationLabels["telegram:-1001:44"], "War Room");
+});
+
+test("guard records a visible blocked attempt when a daily category limit is reached", () => {
+  const store = freshStore();
+  store.createReceipt({
+    source: "shortcut",
+    newsType: "Geopolitics",
+    title: "First geopolitics story",
+    status: "posted",
+    idempotencyKey: "geo-success",
+  });
+  const result = store.guard({
+    source: "sharebot67",
+    newsType: "Geopolitics",
+    title: "Second geopolitics story",
+    text: "Second story",
+    idempotencyKey: "geo-blocked-attempt",
+  });
+
+  assert.equal(result.allowed, false);
+  assert.match(result.reason, /daily limit reached/i);
+  assert.equal(result.receipt.status, "blocked");
+  assert.equal(result.receipt.source, "sharebot67");
+  assert.equal(result.receipt.attempts.at(-1).action, "guard-blocked");
+  assert.equal(store.dailySummary().byCategory.Geopolitics.blocked, 1);
+});
+
+test("an active pending guard receipt atomically reserves the daily category slot", () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "md-ledger-reservation-"));
+  const firstStore = new BroadcastLedgerStore({ dataDir, logger: { error() {} } });
+  const secondStore = new BroadcastLedgerStore({ dataDir, logger: { error() {} } });
+
+  const first = firstStore.guard({
+    source: "sharebot67",
+    newsType: "Geopolitics",
+    title: "First in-flight attempt",
+    idempotencyKey: "geo-reservation-1",
+  });
+  const second = secondStore.guard({
+    source: "shortcut",
+    newsType: "Geopolitics",
+    title: "Concurrent attempt",
+    idempotencyKey: "geo-reservation-2",
+  });
+
+  assert.equal(first.allowed, true);
+  assert.equal(first.receipt.status, "pending");
+  assert.equal(second.allowed, false);
+  assert.match(second.reason, /reached or reserved/i);
+
+  firstStore.updateReceipt(first.receipt.id, { status: "failed", error: "send failed" });
+  const replacement = secondStore.guard({
+    source: "shortcut",
+    newsType: "Geopolitics",
+    title: "Replacement after failure",
+    idempotencyKey: "geo-reservation-3",
+  });
+  assert.equal(replacement.allowed, true, "a failed reservation releases the category slot");
+});
+
+test("guard rejects an unsupported supplied category without guessing", () => {
+  const store = freshStore();
+  const result = store.guard({
+    source: "sharebot67",
+    newsType: "Crypto-ish",
+    title: "Ambiguous label",
+    idempotencyKey: "bad-label-attempt",
+  });
+  assert.equal(result.allowed, false);
+  assert.equal(result.receipt.newsType, "Unclassified");
+  assert.match(result.reason, /not allowed/i);
 });
 
 /* ── attribution: which path actually sent it ── */
