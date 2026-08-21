@@ -671,6 +671,12 @@ test("broadcast rejects a malformed url before sending anything", async () => {
   assert.match((await res.json()).error, /valid http/i);
 });
 
+test("broadcast rejects an uncategorized news send", async () => {
+  const res = await post("/api/broadcast-ledger/broadcast", { text: "Uncategorized story" });
+  assert.equal(res.status, 400);
+  assert.match((await res.json()).error, /newsType must be exactly/i);
+});
+
 test("broadcast refuses to resend a story the ledger already shows as sent", async () => {
   await post("/api/broadcast-ledger/receipts", {
     source: "shortcut",
@@ -683,6 +689,7 @@ test("broadcast refuses to resend a story the ledger already shows as sent", asy
   const res = await post("/api/broadcast-ledger/broadcast", {
     text: "Duplicate guard",
     url: "https://example.com/dupe-guard",
+    newsType: "Stock",
   });
   const body = await res.json();
 
@@ -698,6 +705,7 @@ test("the duplicate guard runs before Telegram is even consulted", async () => {
   const res = await post("/api/broadcast-ledger/broadcast", {
     text: "Duplicate guard",
     url: "https://example.com/dupe-guard",
+    newsType: "Stock",
   });
   assert.equal(res.status, 409);
 });
@@ -780,6 +788,7 @@ test("a successful broadcast records a posted receipt carrying the real message 
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         text: "Fed holds rates steady\nhttps://example.com/news/fed",
+        newsType: "Economics",
         idempotencyKey: "shortcut-run-1",
       }),
     });
@@ -789,6 +798,8 @@ test("a successful broadcast records a posted receipt carrying the real message 
     assert.equal(body.sent, 2);
     assert.equal(sends.length, 1, "it actually sent");
     assert.equal(body.receipt.status, "posted");
+    assert.equal(body.receipt.newsType, "Economics", "one exact category is stored on the receipt");
+    assert.equal(sends[0].opts.newsType, "Economics", "the receipt category also selects the send route");
     assert.equal(body.receipt.source, "shortcut", "defaults to the shortcut, the path this exists for");
     assert.equal(body.receipt.title, "Fed holds rates steady", "headline derived from the message");
     assert.equal(body.receipt.canonicalUrl, "https://example.com/news/fed", "link picked out of the body");
@@ -863,7 +874,7 @@ test("the broadcast is immediately visible to a ShareBot67 preflight", async () 
     await fetch(`${url}/api/broadcast-ledger/broadcast`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: "Story\nhttps://example.com/visible" }),
+      body: JSON.stringify({ text: "Story\nhttps://example.com/visible", newsType: "Crypto" }),
     });
 
     // The whole point: the Shortcut sent it, and the agent can now see it.
@@ -886,7 +897,7 @@ test("a partial send is recorded as partial, keeping the ids that landed", async
     const res = await fetch(`${url}/api/broadcast-ledger/broadcast`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: "Partial story\nhttps://example.com/partial" }),
+      body: JSON.stringify({ text: "Partial story\nhttps://example.com/partial", newsType: "Stock" }),
     });
     const body = await res.json();
 
@@ -907,7 +918,7 @@ test("a failed send leaves a failed receipt, not a phantom success", async () =>
     const res = await fetch(`${url}/api/broadcast-ledger/broadcast`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: "Doomed story\nhttps://example.com/doomed" }),
+      body: JSON.stringify({ text: "Doomed story\nhttps://example.com/doomed", newsType: "Economics" }),
     });
     const body = await res.json();
 
@@ -925,7 +936,7 @@ test("a retried broadcast with the same idempotency key does not double-send", a
     const payload = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: "Retry story\nhttps://example.com/retry", idempotencyKey: "retry-1" }),
+      body: JSON.stringify({ text: "Retry story\nhttps://example.com/retry", newsType: "Crypto", idempotencyKey: "retry-1" }),
     };
 
     const first = await fetch(`${url}/api/broadcast-ledger/broadcast`, payload);
@@ -945,7 +956,7 @@ test("force:true allows a deliberate resend", async () => {
       fetch(`${url}/api/broadcast-ledger/broadcast`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: "Resend me\nhttps://example.com/resend", ...extra }),
+        body: JSON.stringify({ text: "Resend me\nhttps://example.com/resend", newsType: "Stock", ...extra }),
       });
 
     await send({});
@@ -964,7 +975,7 @@ test("source is honoured so ShareBot67 can use the same endpoint", async () => {
     const res = await fetch(`${url}/api/broadcast-ledger/broadcast`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ source: "sharebot67", text: "Agent story\nhttps://example.com/agent" }),
+      body: JSON.stringify({ source: "sharebot67", text: "Agent story\nhttps://example.com/agent", newsType: "Crypto" }),
     });
 
     assert.equal((await res.json()).receipt.source, "sharebot67");

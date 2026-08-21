@@ -180,6 +180,15 @@ function normalizeTarget(entry) {
   return threadId ? { chatId, threadId } : { chatId };
 }
 
+const FINANCE_NEWS_TYPES = new Set(["Crypto", "Stock", "Economics"]);
+const FINANCE_NEWS_TARGETS = Object.freeze([
+  Object.freeze({ chatId: "-1001841650798", threadId: "6297" }),
+  Object.freeze({ chatId: "-1001941064823", threadId: "984" }),
+]);
+const GEOPOLITICS_TARGETS = Object.freeze([
+  Object.freeze({ chatId: "-1001841650798", threadId: "75972" }),
+]);
+
 // Repair the common paste mistakes that produce a 404 from Telegram: a
 // leading "bot" copied from the API URL path, surrounding quotes, and stray
 // whitespace/newlines. A real token always starts with the numeric bot id,
@@ -243,8 +252,12 @@ class TelegramService {
    * which have no receipt to attach a partial result to.
    */
   async _sendToAllSettled(text, options) {
+    return this._sendToTargetsSettled(this._chatIds, text, options);
+  }
+
+  async _sendToTargetsSettled(targets, text, options) {
     const results = [];
-    for (const target of this._chatIds) {
+    for (const target of targets) {
       const base = {
         channel: "telegram",
         chatId: String(target.chatId),
@@ -265,6 +278,12 @@ class TelegramService {
       }
     }
     return results;
+  }
+
+  targetsForNewsType(newsType) {
+    if (FINANCE_NEWS_TYPES.has(newsType)) return FINANCE_NEWS_TARGETS.map((target) => ({ ...target }));
+    if (newsType === "Geopolitics") return GEOPOLITICS_TARGETS.map((target) => ({ ...target }));
+    throw createServiceError("newsType must be exactly Crypto, Stock, Economics, or Geopolitics", 400);
   }
 
   async _sendPhoto(target, photoUrl, caption) {
@@ -326,7 +345,7 @@ class TelegramService {
   }
 
   /**
-   * Send an arbitrary broadcast body to every configured chat and report each
+   * Send one categorized news body to its locked destinations and report each
    * outcome, including the Telegram message id.
    *
    * This exists because Telegram never returns a bot's own outgoing messages
@@ -335,12 +354,13 @@ class TelegramService {
    * its own receipt, and the only trustworthy moment to do that is here, from
    * the real sendMessage response.
    */
-  async postText(text, { parseMode = "HTML" } = {}) {
-    if (!this.configured) throw createServiceError("Telegram is not configured", 400);
+  async postText(text, { parseMode = "HTML", newsType } = {}) {
+    if (!this._botToken) throw createServiceError("Telegram is not configured", 400);
     const body = String(text || "").trim();
     if (!body) throw createServiceError("Nothing to send: text is empty", 400);
 
-    const destinations = await this._sendToAllSettled(
+    const destinations = await this._sendToTargetsSettled(
+      this.targetsForNewsType(newsType),
       parseMode === "HTML" ? formatForTelegram(body) : body,
       { parseMode },
     );
@@ -359,56 +379,16 @@ class TelegramService {
     return { destinations, posted, failed: destinations.length - posted };
   }
 
-  async postReport(report) {
-    if (!this.configured) return;
-
-    const date = report.dateStr || "";
-    const sections = [
-      { emoji: "₿", title: "CRYPTO TOP 10", key: "crypto" },
-      { emoji: "🌍", title: "ECONOMICS TOP 10", key: "economics" },
-      { emoji: "📊", title: "MARKETS TOP 10", key: "markets" },
-    ];
-
-    // One result row per destination, merged across sections: a channel counts
-    // as posted when every section reached it, and failed as soon as one
-    // didn't. The message ID kept is the last one that landed there.
-    const byDestination = new Map();
-    for (const s of sections) {
-      const body = formatForTelegram(report[s.key] || "");
-      const header = `<b>${s.emoji} ${s.title}</b>\n🗓️ ${escapeHtml(date)}\n\n`;
-      const results = await this._sendToAllSettled(header + body);
-      results.forEach((result) => {
-        const key = `${result.chatId}:${result.threadId || ""}`;
-        const existing = byDestination.get(key);
-        if (!existing) {
-          byDestination.set(key, { ...result });
-          return;
-        }
-        byDestination.set(key, {
-          ...existing,
-          status: existing.status === "failed" ? "failed" : result.status,
-          messageId: result.messageId || existing.messageId,
-          error: existing.error || result.error,
-        });
-      });
-    }
-
-    const destinations = [...byDestination.values()];
-    const posted = destinations.filter((d) => d.status === "posted").length;
-
-    // Nothing landed anywhere: keep the pre-existing contract and surface it
-    // as a failed broadcast. A partial result is returned rather than thrown,
-    // so the caller can record which channels actually did receive it.
-    if (destinations.length && posted === 0) {
-      const error = createServiceError(
-        `Telegram broadcast failed for all ${destinations.length} destination(s): ${destinations[0].error || "unknown error"}`,
-        502,
-      );
-      error.destinations = destinations;
-      throw error;
-    }
-
-    return { destinations, posted, failed: destinations.length - posted };
+  async postReportSection({ newsType, text, date = "" }) {
+    const headings = {
+      Crypto: ["₿", "CRYPTO TOP 10"],
+      Stock: ["📊", "STOCKS TOP 10"],
+      Economics: ["🌍", "ECONOMICS TOP 10"],
+    };
+    const heading = headings[newsType];
+    if (!heading) throw createServiceError("Reporter newsType must be Crypto, Stock, or Economics", 400);
+    const message = `<b>${heading[0]} ${heading[1]}</b>\n🗓️ ${escapeHtml(date)}\n\n${formatForTelegram(text)}`;
+    return this.postText(message, { newsType });
   }
 
   async postAIAnalysis(result) {
@@ -560,4 +540,10 @@ class TelegramService {
   }
 }
 
-module.exports = { TelegramService, AI_ANALYSIS_TELEGRAM_WORD_LIMIT, countWords };
+module.exports = {
+  TelegramService,
+  AI_ANALYSIS_TELEGRAM_WORD_LIMIT,
+  countWords,
+  FINANCE_NEWS_TARGETS,
+  GEOPOLITICS_TARGETS,
+};
