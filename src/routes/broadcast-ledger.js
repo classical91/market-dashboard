@@ -81,7 +81,29 @@ const STATUS_LABELS = {
   reconciled: "Sent (by another path)",
   pending: "Not sent yet",
   failed: "Failed",
+  blocked: "Blocked (already broadcast today)",
 };
+
+function vancouverDay(value = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Vancouver",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(value));
+  const part = (type) => parts.find((entry) => entry.type === type)?.value || "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
+function postedGeopoliticsToday(store) {
+  const today = vancouverDay();
+  return store.list({ limit: 500 }).find((receipt) => (
+    ["posted", "partial", "reconciled"].includes(receipt.status)
+    && String(receipt.newsType || "").trim().toLowerCase() === "geopolitics"
+    && receipt.createdAt
+    && vancouverDay(receipt.createdAt) === today
+  )) || null;
+}
 
 function newsTypeLabel(receipt) {
   if (receipt.newsType) return receipt.newsType;
@@ -441,6 +463,48 @@ function createBroadcastLedgerRouter({
   // Every remaining endpoint is machine-facing and key-only.
   router.use(requireLedgerKey);
 
+  function recordDailyCategoryBlock(body = {}) {
+    const newsType = String(body.newsType || "").trim();
+    if (newsType.toLowerCase() !== "geopolitics") return null;
+    const prior = postedGeopoliticsToday(broadcastLedgerStore);
+    if (!prior) return null;
+
+    const text = typeof body.text === "string" ? body.text.trim() : "";
+    const source = SOURCES.includes(body.source) ? body.source : "shortcut";
+    const title = typeof body.title === "string" && body.title.trim()
+      ? body.title.trim()
+      : deriveTitle(text) || "Geopolitics broadcast attempt";
+    const { receipt } = broadcastLedgerStore.createReceipt({
+      source,
+      kind: "digest",
+      newsType: "Geopolitics",
+      title,
+      text,
+      status: "blocked",
+      idempotencyKey: typeof body.idempotencyKey === "string" ? body.idempotencyKey : "",
+      error: "Blocked: Geopolitics was already broadcast today (America/Vancouver).",
+    });
+    return { receipt, prior };
+  }
+
+  // ShareBot67 uses this before posting to its own Telegram destinations.
+  // A blocked attempt is recorded here, so a refusal never disappears.
+  router.post("/broadcast/guard", (req, res, next) => {
+    try {
+      const blocked = recordDailyCategoryBlock(req.body || {});
+      if (blocked) {
+        return res.status(409).json({
+          allowed: false,
+          error: "Geopolitics was already broadcast today.",
+          ...blocked,
+        });
+      }
+      res.json({ allowed: true });
+    } catch (err) {
+      next(err);
+    }
+  });
+
   // Create or upsert a receipt. Idempotent on idempotencyKey — the property
   // that lets a phone on a bad connection retry safely.
   router.post("/receipts", (req, res, next) => {
@@ -530,6 +594,15 @@ function createBroadcastLedgerRouter({
       // tier is the only authoritative half of dedupe — without it a resend
       // check would fall back to hashing the exact wording.
       const url = rawUrl || firstUrl(text);
+
+      const dailyBlock = recordDailyCategoryBlock({ ...body, source, title, text });
+      if (dailyBlock) {
+        return res.status(409).json({
+          allowed: false,
+          error: "Geopolitics was already broadcast today.",
+          ...dailyBlock,
+        });
+      }
 
       // Refuse to broadcast a story the ledger already shows as sent. This is
       // the dedupe actually doing its job at the moment it matters, rather
