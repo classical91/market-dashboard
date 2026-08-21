@@ -801,6 +801,60 @@ test("a successful broadcast records a posted receipt carrying the real message 
   });
 });
 
+test("a second geopolitics attempt on the same Vancouver day is blocked and recorded", async () => {
+  await withRouter({
+    sendResult: { posted: 1, failed: 0, destinations: [] },
+  }, async ({ store, sends, url }) => {
+    store.createReceipt({
+      source: "dashboard",
+      title: "Morning geopolitics",
+      newsType: "Geopolitics",
+      status: "posted",
+      idempotencyKey: "geo-morning",
+    });
+
+    const res = await fetch(`${url}/api/broadcast-ledger/broadcast`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        source: "shortcut",
+        text: "Different geopolitical report",
+        newsType: "Geopolitics",
+        idempotencyKey: "geo-evening-attempt",
+      }),
+    });
+    const body = await res.json();
+
+    assert.equal(res.status, 409);
+    assert.equal(body.allowed, false);
+    assert.equal(body.receipt.status, "blocked");
+    assert.equal(body.receipt.source, "shortcut");
+    assert.equal(sends.length, 0, "the blocked attempt never reaches Telegram");
+    assert.equal(store.list({ limit: 2 })[0].status, "blocked", "the attempt remains visible in the ledger");
+  });
+});
+
+test("ShareBot67 can record a blocked daily geopolitics preflight", async () => {
+  await withRouter({}, async ({ store, url }) => {
+    store.createReceipt({
+      source: "shortcut",
+      title: "First geopolitics",
+      newsType: "Geopolitics",
+      status: "posted",
+    });
+    const res = await fetch(`${url}/api/broadcast-ledger/broadcast/guard`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source: "sharebot67", text: "Second attempt", newsType: "Geopolitics" }),
+    });
+    const body = await res.json();
+
+    assert.equal(res.status, 409);
+    assert.equal(body.receipt.status, "blocked");
+    assert.equal(body.receipt.source, "sharebot67");
+  });
+});
+
 test("the broadcast is immediately visible to a ShareBot67 preflight", async () => {
   await withRouter({
     sendResult: { posted: 1, failed: 0, destinations: [{ channel: "telegram", chatId: "-1", status: "posted", messageId: "9" }] },

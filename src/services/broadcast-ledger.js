@@ -41,7 +41,7 @@ const SOURCES = ["shortcut", "sharebot67", "manual", "dashboard", "telegram-inge
 const ATTRIBUTED_SOURCES = SOURCES.filter((source) => source !== "telegram-ingest");
 const UNATTRIBUTED_SOURCE = "telegram-ingest";
 const KINDS = ["story", "digest"];
-const STATUSES = ["pending", "posted", "partial", "failed", "reconciled"];
+const STATUSES = ["pending", "posted", "partial", "failed", "reconciled", "blocked"];
 const DESTINATION_STATUSES = ["pending", "posted", "failed"];
 
 // Query/campaign parameters that never change which story a URL points at.
