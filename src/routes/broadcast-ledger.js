@@ -7,6 +7,10 @@ const { deriveTitle, firstUrl } = require("../services/broadcast-ingest");
 const { SOURCES, KINDS, STATUSES, canonicalizeUrl } = require("../services/broadcast-ledger");
 
 const MAX_IDS = 200;
+// Stop accidental double-taps/retries, not legitimate recurring coverage.
+// A canonical URL may stay newsworthy for days, so an old receipt must not
+// permanently ban that story from future daily broadcasts.
+const BROADCAST_DUPLICATE_WINDOW_MS = 6 * 60 * 60 * 1000;
 
 function badRequest(res, message) {
   res.status(400).json({ error: message });
@@ -532,7 +536,10 @@ function createBroadcastLedgerRouter({
       // than after the fact. `force: true` overrides for a deliberate resend.
       if (body.force !== true) {
         const existing = broadcastLedgerStore.lookup({ url, text, headline: title });
-        if (existing.posted && existing.receipt) {
+        const existingAgeMs = existing.receipt && existing.receipt.createdAt
+          ? Date.now() - new Date(existing.receipt.createdAt).getTime()
+          : Infinity;
+        if (existing.posted && existing.receipt && existingAgeMs <= BROADCAST_DUPLICATE_WINDOW_MS) {
           return res.status(409).json({
             error: "Already broadcast — pass force:true to send it again.",
             alreadyBroadcast: true,
