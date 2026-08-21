@@ -11,6 +11,7 @@ const MAX_IDS = 200;
 // A canonical URL may stay newsworthy for days, so an old receipt must not
 // permanently ban that story from future daily broadcasts.
 const BROADCAST_DUPLICATE_WINDOW_MS = 6 * 60 * 60 * 1000;
+const ROUTED_NEWS_TYPES = new Set(["Crypto", "Stock", "Economics", "Geopolitics"]);
 
 function badRequest(res, message) {
   res.status(400).json({ error: message });
@@ -586,6 +587,9 @@ function createBroadcastLedgerRouter({
       }
       const rawUrl = typeof body.url === "string" ? body.url.trim() : "";
       if (rawUrl && !canonicalizeUrl(rawUrl)) return badRequest(res, "url must be a valid http(s) URL.");
+      if (!ROUTED_NEWS_TYPES.has(body.newsType)) {
+        return badRequest(res, "newsType must be exactly Crypto, Stock, Economics, or Geopolitics.");
+      }
 
       const source = SOURCES.includes(body.source) ? body.source : "shortcut";
       const title = typeof body.title === "string" && body.title.trim() ? body.title : deriveTitle(text);
@@ -648,6 +652,7 @@ function createBroadcastLedgerRouter({
       try {
         result = await telegramService.postText(text, {
           parseMode: body.parseMode === "none" ? null : "HTML",
+          newsType: body.newsType,
         });
       } catch (err) {
         const updated = broadcastLedgerStore.updateReceipt(

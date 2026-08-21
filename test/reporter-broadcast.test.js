@@ -52,3 +52,74 @@ test("ReporterService.markBroadcasted round-trips through getBroadcastAt", () =>
   assert.ok(broadcastAt);
   assert.equal(reporter.getBroadcastAt(), broadcastAt);
 });
+
+test("reporter sends and receipts each category separately with actual destinations", async () => {
+  const express = require("express");
+  const { createReporterRouter } = require("../src/routes/reporter");
+  const { BroadcastLedgerStore } = require("../src/services/broadcast-ledger");
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "md-reporter-routes-"));
+  const store = new BroadcastLedgerStore({ dataDir, logger: { error() {} } });
+  const calls = [];
+  const exactTargets = [
+    { chatId: "-1001841650798", threadId: "6297" },
+    { chatId: "-1001941064823", threadId: "984" },
+  ];
+  const telegramService = {
+    configured: true,
+    targetsForNewsType: () => exactTargets,
+    async postReportSection(input) {
+      calls.push(input);
+      return {
+        posted: 2,
+        failed: 0,
+        destinations: exactTargets.map((target, index) => ({
+          channel: "telegram",
+          ...target,
+          status: "posted",
+          messageId: `${calls.length}${index}`,
+        })),
+      };
+    },
+  };
+  const reporterService = {
+    peekReport: () => ({
+      configured: true,
+      generatedAt: "2026-08-20T12:00:00.000Z",
+      dateStr: "2026-08-20",
+      crypto: "crypto body",
+      markets: "stock body",
+      economics: "economics body",
+    }),
+    getBroadcastAt: () => null,
+    markBroadcasted: () => "2026-08-20T12:01:00.000Z",
+  };
+  const app = express();
+  app.use(express.json());
+  app.use("/api/daily-report", createReporterRouter({
+    reporterService,
+    telegramService,
+    broadcastLedgerStore: store,
+    requireAdmin: (_req, _res, next) => next(),
+  }));
+  const localServer = http.createServer(app);
+  await new Promise((resolve) => localServer.listen(0, resolve));
+  try {
+    const res = await fetch(`http://127.0.0.1:${localServer.address().port}/api/daily-report/broadcast`, {
+      method: "POST",
+    });
+    const body = await res.json();
+    assert.equal(res.status, 200);
+    assert.deepEqual(calls.map((call) => call.newsType), ["Crypto", "Stock", "Economics"]);
+    assert.equal(body.receiptIds.length, 3);
+    const receipts = store.list({ limit: 10 });
+    assert.deepEqual(receipts.map((receipt) => receipt.newsType).sort(), ["Crypto", "Economics", "Stock"]);
+    receipts.forEach((receipt) => {
+      assert.deepEqual(
+        receipt.destinations.map(({ chatId, threadId }) => ({ chatId, threadId })),
+        exactTargets,
+      );
+    });
+  } finally {
+    await new Promise((resolve) => localServer.close(resolve));
+  }
+});

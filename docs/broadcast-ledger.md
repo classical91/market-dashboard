@@ -248,6 +248,20 @@ Set `BROADCAST_LEDGER_INGEST_ENABLED=true` and the dashboard polls the Telegram
 channels its bot already posts to, writing a receipt for every post it sees —
 **whoever sent it**.
 
+### Category-locked sending
+
+News sends require one exact `newsType`: `Crypto`, `Stock`, `Economics`, or
+`Geopolitics`. Crypto, Stock, and Economics are restricted to these two exact
+destinations, regardless of broader `TELEGRAM_CHAT_IDS` configuration:
+
+- `-1001841650798`, topic `6297`
+- `-1001941064823`, topic `984`
+
+Geopolitics remains separate at `-1001841650798`, topic `75972`. The Daily
+Reporter sends each populated category separately and creates one receipt per
+category. Each receipt contains that one exact `newsType` and only the actual
+Telegram chat/topic results returned by the send.
+
 This is what makes the ledger automatic. Each posting path would otherwise have
 to volunteer a receipt: the shortcut needs an extra action, ShareBot67 needs an
 agent-side change, a hand-posted story needs the form. But all three end up as a

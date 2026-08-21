@@ -7,7 +7,55 @@ const {
   AI_ANALYSIS_TELEGRAM_WORD_LIMIT,
   TelegramService,
   countWords,
+  FINANCE_NEWS_TARGETS,
+  GEOPOLITICS_TARGETS,
 } = require("../src/services/telegram");
+
+test("finance news categories route only to the two approved topics", async () => {
+  const originalFetch = global.fetch;
+  const sentBodies = [];
+  global.fetch = async (_url, options) => {
+    sentBodies.push(JSON.parse(options.body));
+    return { ok: true, json: async () => ({ result: { message_id: sentBodies.length } }), text: async () => "" };
+  };
+  try {
+    const telegram = new TelegramService({
+      botToken: "123456:test-token",
+      chatIds: ["-1009999999999", "-1001841650798:75972"],
+    });
+    for (const newsType of ["Crypto", "Stock", "Economics"]) {
+      const result = await telegram.postText(`${newsType} news`, { newsType, parseMode: null });
+      assert.deepEqual(
+        result.destinations.map(({ chatId, threadId }) => ({ chatId, threadId })),
+        FINANCE_NEWS_TARGETS,
+      );
+    }
+    assert.deepEqual(
+      sentBodies.map(({ chat_id, message_thread_id }) => ({ chatId: String(chat_id), threadId: String(message_thread_id) })),
+      [FINANCE_NEWS_TARGETS, FINANCE_NEWS_TARGETS, FINANCE_NEWS_TARGETS].flat(),
+    );
+    assert.ok(sentBodies.every((body) => body.chat_id !== "-1009999999999"));
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test("geopolitics retains its separate War Room route", async () => {
+  const originalFetch = global.fetch;
+  const sentBodies = [];
+  global.fetch = async (_url, options) => {
+    sentBodies.push(JSON.parse(options.body));
+    return { ok: true, json: async () => ({ result: { message_id: 1 } }), text: async () => "" };
+  };
+  try {
+    const telegram = new TelegramService({ botToken: "123456:test-token", chatIds: ["-1009999999999"] });
+    const result = await telegram.postText("Geopolitics news", { newsType: "Geopolitics", parseMode: null });
+    assert.deepEqual(result.destinations.map(({ chatId, threadId }) => ({ chatId, threadId })), GEOPOLITICS_TARGETS);
+    assert.equal(String(sentBodies[0].message_thread_id), "75972");
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
 
 test("AI analysis Telegram captions stay within the 150-word broadcast limit", async () => {
   const originalFetch = global.fetch;
