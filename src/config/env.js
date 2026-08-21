@@ -195,6 +195,11 @@ const config = {
     chatIds: parseList(process.env.TELEGRAM_CHAT_IDS),
     dashboardUrl: String(process.env.MARKET_DASHBOARD_URL || "").replace(/\/+$/, ""),
   },
+  newsTelegram: {
+    botToken: process.env.NEWS_TELEGRAM_BOT_TOKEN || "",
+    chatIds: parseList(process.env.NEWS_TELEGRAM_CHAT_IDS),
+    dashboardUrl: String(process.env.MARKET_DASHBOARD_URL || "").replace(/\/+$/, ""),
+  },
   signalBot: {
     // On by default whenever Telegram is configured; set SIGNAL_BOT_ENABLED=false to opt out.
     enabled: process.env.SIGNAL_BOT_ENABLED !== "false",

@@ -105,9 +105,12 @@ function createApp() {
     covalentService,
   });
   const telegramService = new TelegramService(config.telegram);
+  // The ledger/Shortcut news route is deliberately isolated from the shared
+  // dashboard sender. Only ShareClaw97's dedicated credentials can send news.
+  const newsTelegramService = new TelegramService(config.newsTelegram);
   const broadcastLedgerNotificationService = new BroadcastLedgerNotificationService({
     telegramService: new TelegramService({
-      ...config.telegram,
+      ...config.newsTelegram,
       chatIds: config.broadcastLedger.notificationTargets,
     }),
   });
@@ -374,7 +377,7 @@ function createApp() {
     createBroadcastLedgerRouter({
       broadcastLedgerStore,
       broadcastIngestService,
-      telegramService,
+      telegramService: newsTelegramService,
       notificationService: broadcastLedgerNotificationService,
       requireAdmin,
       requireLedgerKey,
