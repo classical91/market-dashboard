@@ -398,6 +398,7 @@
     var reportData = null;
     var generationLogEntries = [];
     var localLogKey = 'reporterGenerationLog:v1';
+    var localLogMigrationKey = 'reporterGenerationLog:server-migrated:v1';
     var localLogSynced = false;
     var tabLabels = {
       crypto: 'Emerging Markets',
@@ -733,17 +734,11 @@
     }
 
     function mergeLogEntries(serverLog) {
-      var map = {};
-      readLocalLog().concat(serverLog || []).forEach(function (entry) {
-        if (!entry || !entry.generatedAt) return;
-        var key = logEntryKey(entry);
-        var existing = map[key];
-        if (!existing || (!existing.content && entry.content)) {
-          map[key] = entry;
-        }
-      });
-      var rows = dedupeSameDayEntries(Object.keys(map).map(function (key) {
-        return map[key];
+      // Railway is authoritative after migration. Mirroring its response into
+      // localStorage keeps a fast cache without letting stale phone/desktop
+      // rows resurrect records edited or deleted on another device.
+      var rows = dedupeSameDayEntries((serverLog || []).filter(function (entry) {
+        return entry && entry.generatedAt;
       })).sort(function (a, b) {
         return new Date(b.generatedAt || 0) - new Date(a.generatedAt || 0);
       });
@@ -754,6 +749,9 @@
     function syncLocalLogToServer(serverLog) {
       if (localLogSynced) return Promise.resolve(null);
       localLogSynced = true;
+      try {
+        if (localStorage.getItem(localLogMigrationKey) === '1') return Promise.resolve(null);
+      } catch (err) {}
       var serverKeys = {};
       (serverLog || []).forEach(function (entry) {
         serverKeys[logEntryKey(entry)] = true;
@@ -762,14 +760,18 @@
         return entry && entry.content && entry.generatedAt && !serverKeys[logEntryKey(entry)];
       }).slice(0, 25);
       if (!entries.length) return Promise.resolve(null);
-      // Background sync — attach the admin key only if one is already stored,
-      // never prompt on load, and tolerate 401/503 for anonymous viewers.
-      return AdminKey.fetchSilent('/api/daily-report/logs/import?ttlHours=' + currentTtl(), {
+      // One-time background migration. The owner login cookie authorizes the
+      // upload, so no device-specific admin API key is needed.
+      return fetch('/api/daily-report/logs/import?ttlHours=' + currentTtl(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ entries: entries })
       })
         .then(readApiJson)
+        .then(function (data) {
+          try { localStorage.setItem(localLogMigrationKey, '1'); } catch (err) {}
+          return data;
+        })
         .catch(function () { return null; });
     }
 

@@ -104,6 +104,10 @@ function createApp() {
     covalentService,
   });
   const telegramService = new TelegramService(config.telegram);
+  // News broadcasts use ShareClaw97's dedicated bot and destinations. Keep
+  // this separate from the dashboard/trading Telegram sender so changing a
+  // news route can never redirect TraderClaw alerts.
+  const newsTelegramService = new TelegramService(config.newsTelegram);
   // Shared source of truth for every completed broadcast, across the
   // dashboard, the iOS/GPT shortcut, ShareBot67 and manual posting. Lives
   // here rather than behind the OpenClaw gateway precisely so it stays
@@ -281,6 +285,10 @@ function createApp() {
     sitePassword: config.access.sitePassword,
     alphaAccessCode: config.access.alphaAccessCode,
   });
+  const requireOwner = (req, res, next) => {
+    if (req.siteSession && req.siteSession.role === "owner") return next();
+    return requireAdmin(req, res, next);
+  };
 
   app.disable("x-powered-by");
   app.use(express.json({ limit: "2mb" }));
@@ -367,7 +375,7 @@ function createApp() {
     createBroadcastLedgerRouter({
       broadcastLedgerStore,
       broadcastIngestService,
-      telegramService,
+      telegramService: newsTelegramService,
       requireAdmin,
       requireLedgerKey,
       ledgerKey: config.broadcastLedger.apiKey,
@@ -377,7 +385,7 @@ function createApp() {
   );
   app.use(
     "/api/daily-report",
-    createReporterRouter({ reporterService, telegramService, broadcastLedgerStore, requireAdmin }),
+    createReporterRouter({ reporterService, telegramService, broadcastLedgerStore, requireAdmin, requireOwner }),
   );
   app.use("/api/telegram", createTelegramRouter({ telegramService, requireAdmin }));
   app.use("/api/youtube", createYoutubeRouter({ youtubeService, channels: youtubeChannels }));
