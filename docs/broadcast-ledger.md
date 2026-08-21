@@ -61,14 +61,16 @@ only a normalized hash and the headline.
 | `urlHash` | sha256 of `canonicalUrl`, first 32 hex |
 | `contentHash` | sha256 of normalized text (lowercased, links/emoji/punctuation stripped, whitespace collapsed) |
 | `headlineKey` | First 12 significant words of the normalized title |
-| `destinations[]` | `{ channel, chatId, threadId, status, messageId, messageUrl, error }` |
-| `status` | `pending` \| `posted` \| `partial` \| `failed` \| `reconciled` |
+| `destinations[]` | `{ channel, chatId, threadId, label, status, messageId, messageUrl, error }` |
+| `status` | `pending` \| `posted` \| `partial` \| `failed` \| `blocked` \| `reconciled` |
 | `error` | `{ message }` or null |
 | `reconciledWith` | ID of the receipt that already posted this story |
 | `attempts[]` | Audit trail: `{ at, actor, action, ok, detail }`, last 20 kept |
 
 `posted`, `partial` and `reconciled` all count as "this story went out."
-`pending` and `failed` do not.
+`pending`, `failed` and `blocked` do not. `newsType` is sender-owned: supplied
+labels are never replaced by keyword guessing, and missing labels are stored as
+`Unclassified` so the gap stays visible.
 
 ## Dedupe
 
@@ -118,6 +120,37 @@ per client IP per minute, returning `429` with a `Retry-After` header.
 ## Endpoints
 
 Base path: `/api/broadcast-ledger`
+
+### `POST /broadcast/guard` — category and daily-limit preflight
+
+Send a stable `idempotencyKey`, `source`, exact `newsType`, and the story
+headline/text before Telegram is contacted. The endpoint returns `200` with a
+pending receipt when allowed. A category-policy or daily-limit violation
+returns `409` and, when blocked-attempt recording is enabled, stores a visible
+`blocked` receipt with the reason in its attempt history.
+
+Geopolitics defaults to one successful broadcast per Vancouver calendar day.
+The `/broadcast` send endpoint enforces configured category limits again at the
+send boundary, so skipping the preflight cannot bypass the cap.
+
+Capacity is reserved by the pending receipt created during guard. Successful
+receipts and pending reservations younger than 15 minutes count toward the
+daily limit; failed receipts release capacity, and abandoned reservations
+expire. Ledger mutations share an exclusive file lock, so simultaneous app
+processes using the same mounted `DATA_DIR` cannot both claim the last slot.
+
+### `GET|PUT /settings` — ledger policy
+
+Reads or updates exact-category enforcement, allowed categories, per-category
+daily limits and duplicate windows, blocked-attempt recording, reset timezone,
+history retention, notification preferences, visible sources, destination
+labels, finance-topic routing, and edit/delete permission. Finance-topic routing
+is enabled by default, applies equally to first delivery and retry, and leaves
+Geopolitics on the separately configured Telegram route. Writes require
+administrator access.
+Enabled alerts are delivered to the private Telegram targets configured in
+`BROADCAST_LEDGER_NOTIFICATION_CHAT_IDS`; preferences alone do not select a
+destination.
 
 ### `POST /receipts` — create or update (idempotent)
 
@@ -178,7 +211,15 @@ Query params (`GET`) or JSON body (`POST`): `url`, `headline`, `text`, `hash`,
 
 ### `GET /receipts` — history
 
-`?limit` (≤500, default 50) `&status=` `&source=` `&since=<ISO>`
+`?limit` (≤500, default 50) `&status=` `&source=` `&newsType=`
+`&since=<ISO>` `&q=<headline-or-receipt-id>`. The virtual status
+`broadcasted` includes posted, partial and reconciled receipts.
+
+### `POST /receipts/:id/retry` — retry a failed broadcast
+
+Available to the owner/manual-access path. The receipt must be `failed`, and
+the request must include the exact message in `text`. Message bodies remain
+hash-only in persistent storage; retry asks for the text at action time.
 
 ### `POST /reconcile` — recovery
 
@@ -208,13 +249,14 @@ createdAt for the newest receipt. Shares the manual form's access rules, so its
 card whether to ask for a key or report the ledger as unconfigured. No message
 content or hashes are returned.
 
-### `GET|POST /manual` — mobile form
+### `GET|POST /manual` — ledger UI and mobile form
 
 A self-contained, dark, mobile-first page that **leads with state** — whether
-the channel watch is running, how many broadcasts are recorded, the per-path
-breakdown, and the last ten with each one labelled *Sent* / *Sent (some
-channels)* / *Not sent yet* — and then offers a form for logging a hand-posted
-story.
+the channel watch is running, how many broadcasts are recorded, and a daily
+category summary. It adds Today/7-day/30-day filters, category and status
+filters, headline/receipt search, destination labels, expandable source and
+attempt history, copy details, edit/delete, and failed retry. Destination names
+and policy controls live under **Ledger Settings** on `/settings.html`.
 
 State comes first deliberately. When the page opened with the form, an empty
 ledger looked exactly like a broken one: fields to fill in and a single muted
@@ -370,6 +412,18 @@ Two things that surprise people, and neither is a bug:
 
 ### Preflight, before generating or posting anything
 
+Every attempt supplies one exact allowed `newsType` and its intended
+destination. Geopolitics uses the guard first, with a stable attempt key:
+
+```
+POST /api/broadcast-ledger/broadcast/guard
+{ "source": "sharebot67", "newsType": "Geopolitics", "headline": "...",
+  "text": "...", "idempotencyKey": "sharebot67-<run id>-<story id>" }
+```
+
+A `409` means stop before Telegram. The blocked attempt and reason are already
+visible in the ledger. Other categories use the duplicate lookup:
+
 ```
 POST /api/broadcast-ledger/lookup   { "url": "...", "headline": "...", "text": "..." }
 ```
@@ -385,6 +439,11 @@ POST /api/broadcast-ledger/lookup   { "url": "...", "headline": "...", "text": "
 ```
 POST /api/broadcast-ledger/receipts
 { "source": "sharebot67", "kind": "story", "title": "...", "url": "...",
+  "newsType": "Crypto",
+  "destinations": [
+    { "channel": "telegram", "chatId": "-1001841650798", "threadId": "6297", "status": "pending" },
+    { "channel": "telegram", "chatId": "-1001941064823", "threadId": "984", "status": "pending" }
+  ],
   "idempotencyKey": "sharebot67-<run id>-<story id>", "status": "pending" }
 ```
 
@@ -467,6 +526,14 @@ strictly receipt-only. That is a deliberate trade: the alternative is the
 **bot token** living on your phone, which can send anywhere, edit, and delete.
 The ledger key can only post to `TELEGRAM_CHAT_IDS`. Moving the Shortcut onto
 this endpoint is a net reduction in what the phone holds.
+
+Stock, Crypto and Economics broadcasts are narrower than the general Telegram
+list: when `newsType` is exactly `Stock`, `Crypto` or `Economics`, `/broadcast`
+posts only to `-1001841650798:6297` and `-1001941064823:984`, and the receipt
+records only those actual destinations. Geopolitics routing remains separate.
+The **Restrict Stock, Crypto, and Economics routing** option in Ledger Settings
+is enabled by default and is read by both first delivery and failed retry. An
+operator can disable it to restore the general `TELEGRAM_CHAT_IDS` fan-out.
 
 ## Integration 2 — GPT / iOS Shortcut
 
@@ -567,4 +634,5 @@ broadcast where *nothing* landed still returns `502` as before.
 | `BROADCAST_LEDGER_INGEST_ENABLED` | For automatic recording | `true` turns on the channel watch. Off by default. |
 | `BROADCAST_LEDGER_INGEST_INTERVAL_MS` | No | Poll interval, default `60000`, floor `15000`. |
 | `BROADCAST_LEDGER_TELEGRAM_WATCHLIST` | No | Comma-separated `chatId` or `chatId:threadId` targets. Defaults to the exact `TELEGRAM_CHAT_IDS` destinations when omitted. |
+| `BROADCAST_LEDGER_NOTIFICATION_CHAT_IDS` | For alerts | Comma-separated private `chatId` or `chatId:threadId` targets for enabled blocked, failed, and missing-category notifications. Blank disables delivery. |
 | `DATA_DIR` | Yes | Must be the mounted volume path (usually `/app/data`) or the ledger will not survive deploys. |

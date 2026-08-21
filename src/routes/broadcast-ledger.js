@@ -4,16 +4,34 @@ const { Router } = require("express");
 const { createRateLimit } = require("../middleware/rate-limit");
 const { isLedgerRequest, isLedgerParamRequest } = require("../middleware/ledger-auth");
 const { deriveTitle, firstUrl } = require("../services/broadcast-ingest");
-const { SOURCES, KINDS, STATUSES, canonicalizeUrl } = require("../services/broadcast-ledger");
+const { SOURCES, KINDS, STATUSES, DEFAULT_SETTINGS, canonicalizeUrl, isPostedStatus } = require("../services/broadcast-ledger");
 
 const MAX_IDS = 200;
+const FINANCE_NEWS_TYPES = new Set(["Stock", "Crypto", "Economics"]);
+const FINANCE_NEWS_DESTINATIONS = Object.freeze([
+  Object.freeze({ chatId: "-1001841650798", threadId: "6297" }),
+  Object.freeze({ chatId: "-1001941064823", threadId: "984" }),
+]);
 // Stop accidental double-taps/retries, not legitimate recurring coverage.
 // A canonical URL may stay newsworthy for days, so an old receipt must not
 // permanently ban that story from future daily broadcasts.
 const BROADCAST_DUPLICATE_WINDOW_MS = 6 * 60 * 60 * 1000;
 
+function duplicateWindowMs(value) {
+  if (value === "off") return 0;
+  if (value === "24h") return 24 * 60 * 60 * 1000;
+  if (value === "same-day") return 24 * 60 * 60 * 1000;
+  return BROADCAST_DUPLICATE_WINDOW_MS;
+}
+
 function badRequest(res, message) {
   res.status(400).json({ error: message });
+}
+
+function destinationsForNewsType(newsType, settings) {
+  return settings?.financeTopicRoutingEnabled !== false && FINANCE_NEWS_TYPES.has(newsType)
+    ? FINANCE_NEWS_DESTINATIONS.map((target) => ({ ...target }))
+    : null;
 }
 
 /**
@@ -21,7 +39,7 @@ function badRequest(res, message) {
  * clamps and normalizes everything it keeps, so this layer only has to catch
  * the shapes that would be meaningless rather than merely untidy.
  */
-function validateReceiptPayload(body) {
+function validateReceiptPayload(body, settings = null) {
   if (!body || typeof body !== "object") return "A JSON object body is required.";
   if (body.source && !SOURCES.includes(body.source)) {
     return `source must be one of: ${SOURCES.join(", ")}`;
@@ -34,6 +52,14 @@ function validateReceiptPayload(body) {
   }
   if (body.destinations && !Array.isArray(body.destinations)) {
     return "destinations must be an array.";
+  }
+  const suppliedCategory = String(body.newsType || body.category || "").trim();
+  if (
+    suppliedCategory &&
+    settings?.requireExactCategory &&
+    !settings.allowedCategories.includes(suppliedCategory)
+  ) {
+    return `newsType must be one of: ${settings.allowedCategories.join(", ")}`;
   }
   // A URL that doesn't parse is a caller mistake worth surfacing: stored as-is
   // it yields no canonical URL and no hash, so the receipt would be invisible
@@ -73,49 +99,78 @@ function escapeHtml(value) {
  * no build step and no framework — it has to work from a phone, one-handed,
  * at the moment the gateway is down and the story has just gone out by hand.
  */
-// What a receipt's status means for the only question this page exists to
-// answer: did the story actually go out?
 const STATUS_LABELS = {
-  posted: "Sent",
-  partial: "Sent (some channels)",
-  reconciled: "Sent (by another path)",
-  pending: "Not sent yet",
+  posted: "Broadcasted",
+  partial: "Broadcasted (partial)",
+  reconciled: "Broadcasted (reconciled)",
+  pending: "Pending",
   failed: "Failed",
-  blocked: "Blocked (already broadcast today)",
+  blocked: "Blocked",
 };
 
-function vancouverDay(value = new Date()) {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Vancouver",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(new Date(value));
-  const part = (type) => parts.find((entry) => entry.type === type)?.value || "";
-  return `${part("year")}-${part("month")}-${part("day")}`;
-}
-
-function postedGeopoliticsToday(store) {
-  const today = vancouverDay();
-  return store.list({ limit: 500 }).find((receipt) => (
-    ["posted", "partial", "reconciled"].includes(receipt.status)
-    && String(receipt.newsType || "").trim().toLowerCase() === "geopolitics"
-    && receipt.createdAt
-    && vancouverDay(receipt.createdAt) === today
-  )) || null;
-}
-
 function newsTypeLabel(receipt) {
-  if (receipt.newsType) return receipt.newsType;
-  if (receipt.kind === "digest") return "News Digest";
-  const title = String(receipt.title || "").toLowerCase();
-  if (/\b(bitcoin|crypto|ethereum|solana|blockchain|token)\b/.test(title)) return "Crypto";
-  if (/\b(fed|rates?|inflation|economy|economic|gdp|jobs?|unemployment)\b/.test(title)) return "Economics";
-  if (/\b(stock|market|earnings|nasdaq|dow|s&p)\b/.test(title)) return "Markets";
-  if (/\b(ai|artificial intelligence|tech|apple|google|microsoft|nvidia|openai)\b/.test(title)) return "Technology";
-  if (/\b(war|military|government|election|president|minister|sanction|geopolit)\b/.test(title)) return "Geopolitics";
-  if (/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/.test(title)) return "Daily Brief";
-  return "General News";
+  return receipt.newsType || "Unclassified";
+}
+
+// Channel Watch is an audit fallback, not a reliable news classifier. Keep
+// its raw receipts in storage for reconciliation, but never let ordinary
+// watched-room comments with no exact category leak into the operator ledger.
+function isVisibleReceipt(receipt) {
+  return !(
+    receipt?.source === "telegram-ingest"
+    && newsTypeLabel(receipt) === "Unclassified"
+  );
+}
+
+function visibleDailySummary(store, settings) {
+  const base = store.dailySummary();
+  const summary = { ...base, total: 0, byCategory: {}, byStatus: {} };
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: settings.timezone,
+    year: "numeric", month: "2-digit", day: "2-digit",
+  });
+  store.list({ limit: 500 }).filter(isVisibleReceipt).forEach((receipt) => {
+    if (!receipt.createdAt || formatter.format(new Date(receipt.createdAt)) !== base.date) return;
+    const category = newsTypeLabel(receipt);
+    const status = isPostedStatus(receipt.status) ? "broadcasted" : receipt.status;
+    summary.total += 1;
+    summary.byCategory[category] = summary.byCategory[category] || {};
+    summary.byCategory[category][status] = (summary.byCategory[category][status] || 0) + 1;
+    summary.byStatus[status] = (summary.byStatus[status] || 0) + 1;
+  });
+  return summary;
+}
+
+const SOURCE_LABELS = {
+  shortcut: "Shortcut",
+  dashboard: "Market Dashboard",
+  sharebot67: "News Reporter",
+  manual: "Manual",
+  "telegram-ingest": "Channel Watch",
+};
+
+function destinationName(destination, settings) {
+  if (destination.label) return destination.label;
+  const key = `${destination.channel}:${destination.chatId || ""}:${destination.threadId || ""}`;
+  if (settings.destinationLabels?.[key]) return settings.destinationLabels[key];
+  if (destination.threadId) return `Chat ${destination.chatId} · topic ${destination.threadId}`;
+  if (destination.chatId) return `Chat ${destination.chatId}`;
+  return destination.channel || "Unknown destination";
+}
+
+function selected(value, expected) {
+  return String(value || "") === String(expected) ? " selected" : "";
+}
+
+function summaryText(summary) {
+  if (!summary || !summary.total) return "No broadcast attempts today.";
+  const parts = [];
+  Object.entries(summary.byCategory || {}).forEach(([category, statuses]) => {
+    Object.entries(statuses).forEach(([status, count]) => {
+      parts.push(`${count} ${category} ${status}${status === "blocked" ? " attempt" + (count === 1 ? "" : "s") : ""}`);
+    });
+  });
+  return parts.join(", ");
 }
 
 function renderManualForm({
@@ -126,33 +181,60 @@ function renderManualForm({
   watching = false,
   total = 0,
   bySource = {},
+  filters = {},
+  settings = DEFAULT_SETTINGS,
+  summary = null,
 } = {}) {
-  const hiddenCount = bySource["telegram-ingest"] || 0;
-  const visibleTotal = Math.max(0, total - hiddenCount);
-  const rows = recent
-    .filter((receipt) => receipt.source !== "telegram-ingest")
+  const visibleSources = new Set(settings.visibleSources || SOURCES);
+  const visibleReceipts = recent.filter(isVisibleReceipt).filter((receipt) => visibleSources.has(receipt.source));
+  const visibleTotal = visibleReceipts.length;
+  const categoryOptions = ["", ...(settings.allowedCategories || []), "Unclassified"]
+    .map((category) => `<option value="${escapeHtml(category)}"${selected(filters.newsType, category)}>${escapeHtml(category || "All categories")}</option>`)
+    .join("");
+  const rows = visibleReceipts
     .map((receipt) => {
-      const when = receipt.createdAt ? new Date(receipt.createdAt).toISOString().replace("T", " ").slice(0, 16) : "";
+      const when = receipt.createdAt
+        ? new Date(receipt.createdAt).toLocaleString("en-CA", {
+            timeZone: settings.timezone || "America/Vancouver",
+            year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+          })
+        : "";
       const newsType = newsTypeLabel(receipt);
       const dateLabel = receipt.createdAt
-        ? new Date(receipt.createdAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" })
+        ? new Date(receipt.createdAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: settings.timezone || "America/Vancouver" })
         : "";
       const rawTitle = receipt.title || receipt.canonicalUrl || receipt.id;
       const title = /^Broadcasted today\b/i.test(rawTitle) ? `${newsType} News — ${dateLabel}` : rawTitle;
       const statusLabel = STATUS_LABELS[receipt.status] || receipt.status;
-      const meta = [receipt.status === "posted" ? "Broadcasted" : receipt.status, newsType, when]
-        .filter(Boolean)
-        .join(" · ");
       const keyField = formKey ? `<input type="hidden" name="key" value="${escapeHtml(formKey)}">` : "";
-      return `<li>
-        <span class="status status-${escapeHtml(receipt.status)}">${escapeHtml(statusLabel)}</span>
-        <strong>${escapeHtml(title)}</strong>
-        <span class="meta">${escapeHtml(meta)}</span>
-        <details class="receipt-edit"><summary>Edit</summary>
+      const destinations = (receipt.destinations || []).map((destination) =>
+        `<li><strong>${escapeHtml(destinationName(destination, settings))}</strong><span class="destination-state status-${escapeHtml(destination.status)}">${escapeHtml(destination.status)}</span>${destination.error ? `<span>${escapeHtml(destination.error)}</span>` : ""}</li>`,
+      ).join("");
+      const attempts = (receipt.attempts || []).slice().reverse().map((attempt) =>
+        `<li><time>${escapeHtml(attempt.at ? new Date(attempt.at).toLocaleString("en-CA", { timeZone: settings.timezone || "America/Vancouver" }) : "")}</time><strong>${escapeHtml(SOURCE_LABELS[attempt.actor] || attempt.actor || "Unknown")}</strong><span>${escapeHtml(attempt.action || "attempt")} · ${escapeHtml(attempt.detail || (attempt.ok ? "Completed" : "Not completed"))}</span></li>`,
+      ).join("");
+      const copyPayload = escapeHtml(JSON.stringify({
+        id: receipt.id, headline: receipt.title, category: newsType, source: SOURCE_LABELS[receipt.source] || receipt.source,
+        status: statusLabel, createdAt: receipt.createdAt, destinations: receipt.destinations || [], attempts: receipt.attempts || [],
+      }));
+      const categorySelect = (settings.allowedCategories || []).map((category) =>
+        `<option value="${escapeHtml(category)}"${selected(newsType, category)}>${escapeHtml(category)}</option>`,
+      ).concat(`<option value="Unclassified"${selected(newsType, "Unclassified")}>Unclassified</option>`).join("");
+      return `<li class="receipt-card" data-status="${escapeHtml(receipt.status)}">
+        <div class="receipt-head"><span class="status status-${escapeHtml(receipt.status)}">${escapeHtml(statusLabel)}</span><span class="category">${escapeHtml(newsType)}</span><time>${escapeHtml(when)}</time></div>
+        <strong class="headline">${escapeHtml(title)}</strong>
+        <div class="receipt-meta"><span>${escapeHtml(SOURCE_LABELS[receipt.source] || receipt.source)}</span><code>${escapeHtml(receipt.id)}</code></div>
+        ${destinations ? `<ul class="destinations">${destinations}</ul>` : `<p class="missing-destination">Destination not reported</p>`}
+        <div class="receipt-actions">
+          <button type="button" class="copy-receipt" data-receipt="${copyPayload}">Copy details</button>
+          ${receipt.status === "failed" ? `<button type="button" class="retry-receipt" data-id="${escapeHtml(receipt.id)}">Retry</button>` : ""}
+        </div>
+        <details class="attempt-history"><summary>Attempt history <span>${(receipt.attempts || []).length}</span></summary><ul>${attempts || "<li>No attempt details recorded.</li>"}</ul></details>
+        ${settings.editDeleteEnabled !== false ? `<details class="receipt-edit"><summary>Edit or delete</summary>
           <form method="POST" action="/api/broadcast-ledger/manual/${encodeURIComponent(receipt.id)}/edit">
             ${keyField}
             <label>Headline<input name="title" value="${escapeHtml(receipt.title || "")}" required></label>
-            <label>News type<input name="newsType" value="${escapeHtml(newsType)}" required></label>
+            <label>Exact category<select name="newsType" required>${categorySelect}</select></label>
             <button type="submit">Save changes</button>
           </form>
           <form method="POST" action="/api/broadcast-ledger/manual/${encodeURIComponent(receipt.id)}/delete"
@@ -160,26 +242,26 @@ function renderManualForm({
             ${keyField}
             <button class="delete-button" type="submit">Delete receipt</button>
           </form>
-        </details>
+        </details>` : ""}
       </li>`;
     })
     .join("");
 
   const watchBanner = watching
-    ? `<div class="watch on"><strong>\u25cf Watching your Telegram channels</strong>
+    ? `<details class="watch on" open><summary>\u25cf Channel status</summary><strong>Watching your Telegram channels</strong>
          <span>Posts from other senders are recorded automatically. Telegram never reports this bot's own
          messages back, so anything sent through this bot must broadcast via
-         <code>POST /api/broadcast-ledger/broadcast</code> to be recorded.</span></div>`
-    : `<div class="watch off"><strong>\u25cb Channel watch is off</strong>
-         <span>Broadcasts are only recorded when a path reports itself, or when you file one below.
-         Set <code>BROADCAST_LEDGER_INGEST_ENABLED=true</code> in Railway to record posts automatically.</span></div>`;
+         <code>POST /api/broadcast-ledger/broadcast</code> to be recorded.</span></details>`
+    : `<details class="watch off" open><summary>\u25cb Channel status</summary><strong>Channel watch is off</strong>
+         <span>Broadcasts are only recorded when a sending path reports itself.
+         Set <code>BROADCAST_LEDGER_INGEST_ENABLED=true</code> in Railway to record posts automatically.</span></details>`;
 
   const tally = visibleTotal
-    ? `<p class="tally"><strong>${visibleTotal}</strong> broadcast${visibleTotal === 1 ? "" : "s"} recorded</p>`
+    ? `<p class="tally"><strong>${visibleTotal}</strong> ledger ${visibleTotal === 1 ? "entry" : "entries"} recorded</p>`
     : `<p class="tally empty">No broadcasts recorded yet.${
         watching
           ? " The watch is running, so the next post to your channels will appear here on its own."
-          : " Nothing is watching your channels, so nothing will appear here until a path reports itself or you file one below."
+          : " Nothing is watching your channels, so nothing will appear here until a sending path reports itself."
       }</p>`;
 
   return `<!DOCTYPE html>
@@ -188,66 +270,10 @@ function renderManualForm({
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
-<title>Record Broadcast</title>
-<style>
-  :root { color-scheme: dark; --bg:#0b0e13; --panel:#141920; --line:#232b36; --text:#e6edf5; --muted:#8b98a8; --accent:#3b82f6; --green:#22c55e; --red:#ef4444; --amber:#f59e0b; }
-  * { box-sizing: border-box; }
-  body { margin:0; padding:16px; background:var(--bg); color:var(--text); font:16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-  main { max-width:560px; margin:0 auto; }
-  h1 { font-size:19px; margin:4px 0 4px; }
-  p.sub { color:var(--muted); font-size:13px; margin:0 0 18px; }
-  form { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px; }
-  label { display:block; margin:0 0 14px; font-size:13px; color:var(--muted); }
-  input, select, textarea { width:100%; margin-top:6px; padding:12px; font-size:16px; color:var(--text);
-    background:#0e131a; border:1px solid var(--line); border-radius:8px; font-family:inherit; }
-  textarea { min-height:96px; resize:vertical; }
-  input:focus, select:focus, textarea:focus { outline:2px solid var(--accent); outline-offset:1px; border-color:var(--accent); }
-  button { width:100%; padding:14px; font-size:16px; font-weight:600; color:#fff; background:var(--accent);
-    border:0; border-radius:8px; margin-top:4px; }
-  button:active { opacity:.85; }
-  .msg { padding:12px; border-radius:8px; margin-bottom:14px; font-size:14px; }
-  .msg.ok { background:rgba(34,197,94,.12); border:1px solid var(--green); color:var(--green); }
-  .msg.err { background:rgba(239,68,68,.12); border:1px solid var(--red); color:var(--red); }
-  h2 { font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:26px 0 8px; }
-  ul { list-style:none; margin:0; padding:0; }
-  li { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-bottom:8px; font-size:14px; }
-  li strong { display:block; font-weight:600; margin:3px 0; overflow-wrap:anywhere; }
-  .meta { color:var(--muted); font-size:12px; }
-  .receipt-edit { margin-top:8px; font-size:12px; }
-  .receipt-edit summary { color:var(--accent); cursor:pointer; }
-  .receipt-edit form { margin-top:8px; padding:10px; }
-  .receipt-edit label { margin-bottom:8px; }
-  .receipt-edit input { padding:9px; font-size:14px; }
-  .receipt-edit button { padding:9px; font-size:14px; }
-  .receipt-edit .delete-button { background:var(--red); }
-  .status { font-size:11px; text-transform:uppercase; letter-spacing:.05em; font-weight:700; }
-  .status-posted, .status-reconciled { color:var(--green); }
-  .status-partial, .status-pending { color:var(--amber); }
-  .status-failed { color:var(--red); }
-  .empty { color:var(--muted); font-size:14px; }
-
-  /* ── State first: what has actually been recorded ── */
-  .watch { border-radius:12px; padding:12px 14px; margin-bottom:12px; font-size:13px; line-height:1.5;
-    border:1px solid var(--line); background:var(--panel); }
-  .watch strong { display:block; font-size:13px; margin-bottom:3px; }
-  .watch span { color:var(--muted); }
-  .watch.on { border-color:rgba(34,197,94,.45); background:rgba(34,197,94,.08); }
-  .watch.on strong { color:var(--green); }
-  .watch.off { border-color:rgba(245,158,11,.45); background:rgba(245,158,11,.08); }
-  .watch.off strong { color:var(--amber); }
-  .watch code { background:rgba(255,255,255,.08); padding:1px 5px; border-radius:5px; font-size:12px; }
-  .tally { font-size:14px; margin:0 0 18px; }
-  .tally strong { font-size:17px; }
-  .tally.empty { color:var(--muted); font-size:13px; line-height:1.5; }
-  .diag { margin:-8px 0 18px; font-size:13px; }
-  .diag summary { cursor:pointer; color:var(--accent); padding:6px 0; }
-  .diag ul { margin:8px 0 0; padding:0; }
-  .diag li { background:var(--panel); border:1px solid var(--line); border-radius:8px;
-    padding:9px 12px; margin-bottom:7px; color:var(--muted); line-height:1.5; overflow-wrap:anywhere; }
-  .diag strong { color:var(--text); }
-  .diag strong.bad { color:var(--red); }
-  .diag code { background:rgba(255,255,255,.08); padding:1px 5px; border-radius:5px; font-size:12px; color:var(--text); }
-</style>
+<link rel="icon" href="data:,">
+<title>Broadcast Ledger</title>
+<link rel="stylesheet" href="/assets/styles/broadcast-ledger.css">
+<script defer src="/assets/js/broadcast-ledger.js"></script>
 </head>
 <body>
 <main>
@@ -257,7 +283,16 @@ function renderManualForm({
   ${error ? `<div class="msg err">${escapeHtml(error)}</div>` : ""}
   ${watchBanner}
   ${tally}
-  ${rows ? `<h2>Last 10 broadcasts</h2><ul>${rows}</ul>` : ""}
+  <section class="daily-summary" aria-label="Daily summary"><span>Today · ${escapeHtml(summary?.timeZone || settings.timezone || "America/Vancouver")}</span><strong>${escapeHtml(summaryText(summary))}</strong></section>
+  <form class="ledger-filters" method="GET" action="/api/broadcast-ledger/manual">
+    ${formKey ? `<input type="hidden" name="key" value="${escapeHtml(formKey)}">` : ""}
+    <label class="search-field">Search<input name="q" value="${escapeHtml(filters.query || "")}" placeholder="Headline or receipt ID"></label>
+    <label>Range<select name="range"><option value="today"${selected(filters.range, "today")}>Today</option><option value="7"${selected(filters.range, "7")}>7 days</option><option value="30"${selected(filters.range, "30")}>30 days</option><option value="all"${selected(filters.range, "all")}>All time</option></select></label>
+    <label>Category<select name="newsType">${categoryOptions}</select></label>
+    <label>Status<select name="status"><option value="">All statuses</option><option value="broadcasted"${selected(filters.status, "broadcasted")}>Broadcasted</option><option value="blocked"${selected(filters.status, "blocked")}>Blocked</option><option value="failed"${selected(filters.status, "failed")}>Failed</option><option value="pending"${selected(filters.status, "pending")}>Pending</option></select></label>
+    <button type="submit">Apply filters</button><a href="/api/broadcast-ledger/manual${formKey ? `?key=${encodeURIComponent(formKey)}` : ""}">Clear</a>
+  </form>
+  ${rows ? `<div class="ledger-heading"><h2>Broadcast log</h2><span>${visibleReceipts.length} shown</span></div><ul class="receipt-list">${rows}</ul>` : `<p class="empty filtered-empty">No receipts match these filters.</p>`}
 </main>
 </body>
 </html>`;
@@ -267,6 +302,7 @@ function createBroadcastLedgerRouter({
   broadcastLedgerStore,
   broadcastIngestService,
   telegramService,
+  notificationService,
   requireAdmin,
   requireLedgerKey,
   ledgerKey,
@@ -279,6 +315,24 @@ function createBroadcastLedgerRouter({
   // The key guard already stops anonymous writes; the limiter is there so a
   // stuck shortcut or a retry loop can't spin the ledger's whole-file writes.
   const limiter = createRateLimit({ limit: rateLimitPerMinute, windowMs: 60 * 1000 });
+
+  async function notify(type, receipt, detail = "") {
+    const settings = broadcastLedgerStore.getSettings();
+    if (!notificationService || settings.notifications?.[type] === false) return;
+    await notificationService.notify(type, receipt, detail);
+  }
+
+  async function notifyReceiptChange(receipt, previous = null) {
+    if (!receipt) return;
+    if (receipt.newsType === "Unclassified" && previous?.newsType !== "Unclassified") {
+      await notify("missingCategory", receipt, receipt.error?.message || "No exact allowed category was supplied.");
+    } else if (receipt.status === "blocked" && previous?.status !== "blocked") {
+      await notify("blocked", receipt, receipt.error?.message || "Broadcast attempt was blocked.");
+    }
+    if (receipt.status === "failed" && previous?.status !== "failed") {
+      await notify("failed", receipt, receipt.error?.message || "Broadcast delivery failed.");
+    }
+  }
 
   router.use(limiter);
 
@@ -317,13 +371,42 @@ function createBroadcastLedgerRouter({
   // to ask for a key or say the ledger isn't configured at all.
   // Every render of the manual page needs the same state block, so build it
   // once rather than letting the GET and the POST error path drift apart.
-  function pageState() {
+  function pageState(query = {}) {
+    const settings = broadcastLedgerStore.getSettings();
+    const range = ["today", "7", "30", "all"].includes(String(query.range)) ? String(query.range) : "today";
+    const filters = {
+      range,
+      status: String(query.status || ""),
+      newsType: String(query.newsType || ""),
+      query: String(query.q || ""),
+    };
+    const since = range === "7" || range === "30"
+      ? new Date(Date.now() - Number(range) * 24 * 60 * 60 * 1000).toISOString()
+      : null;
+    let recent = broadcastLedgerStore.list({
+      limit: 500,
+      status: filters.status,
+      newsType: filters.newsType,
+      query: filters.query,
+      since,
+    }).filter(isVisibleReceipt);
+    if (range === "today") {
+      const today = broadcastLedgerStore.dailySummary().date;
+      const formatter = new Intl.DateTimeFormat("en-CA", {
+        timeZone: settings.timezone,
+        year: "numeric", month: "2-digit", day: "2-digit",
+      });
+      recent = recent.filter((receipt) => formatter.format(new Date(receipt.createdAt)) === today);
+    }
     return {
-      recent: broadcastLedgerStore.list({ limit: 10 }),
-      total: broadcastLedgerStore.count(),
+      recent,
+      total: recent.length,
       bySource: broadcastLedgerStore.sourceBreakdown().bySource,
       watching: Boolean(broadcastIngestService && broadcastIngestService.enabled),
       diagnostics: broadcastIngestService ? broadcastIngestService.describe() : null,
+      filters,
+      settings,
+      summary: visibleDailySummary(broadcastLedgerStore, settings),
     };
   }
 
@@ -341,6 +424,8 @@ function createBroadcastLedgerRouter({
         // Which path did what. "telegram-ingest" is the residual: posts the
         // watch recorded that no path claimed.
         bySource: broadcastLedgerStore.sourceBreakdown().bySource,
+        summary: broadcastLedgerStore.dailySummary(),
+        settings: broadcastLedgerStore.getSettings(),
         latest: latest
           ? {
               id: latest.id,
@@ -368,13 +453,27 @@ function createBroadcastLedgerRouter({
     }
   });
 
+  router.get("/settings", requireManualAccess, (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ settings: broadcastLedgerStore.getSettings() });
+  });
+
+  router.put("/settings", requireWatchlistAdmin, (req, res, next) => {
+    try {
+      if (!req.body || typeof req.body !== "object") return badRequest(res, "A JSON object body is required.");
+      res.json({ settings: broadcastLedgerStore.updateSettings(req.body) });
+    } catch (err) {
+      next(err);
+    }
+  });
+
   router.get("/manual", requireManualAccess, (req, res) => {
     res.setHeader("Cache-Control", "no-store");
     // noindex is already in the markup; no-store keeps the recent-receipt
     // list (and any key in the URL) out of the browser cache.
     res.send(
       renderManualForm({
-        ...pageState(),
+        ...pageState(req.query),
         notice: req.query.saved ? "Receipt saved." : "",
         formKey: String(req.query.key || ""),
       }),
@@ -395,7 +494,7 @@ function createBroadcastLedgerRouter({
         .slice(0, 20);
       const status = STATUSES.includes(body.status) ? body.status : "posted";
 
-      const invalid = validateReceiptPayload({ ...body, source: "manual" });
+      const invalid = validateReceiptPayload({ ...body, source: "manual" }, broadcastLedgerStore.getSettings());
       if (invalid) {
         if (wantsJson) return badRequest(res, invalid);
         res.status(400).setHeader("Cache-Control", "no-store");
@@ -436,6 +535,10 @@ function createBroadcastLedgerRouter({
       const title = String(body.title || "").trim();
       const newsType = String(body.newsType || "").trim();
       if (!title || !newsType) return badRequest(res, "Headline and news type are required.");
+      const settings = broadcastLedgerStore.getSettings();
+      if (settings.requireExactCategory && !settings.allowedCategories.includes(newsType) && newsType !== "Unclassified") {
+        return badRequest(res, `newsType must be one of: ${settings.allowedCategories.join(", ")}`);
+      }
       const receipt = broadcastLedgerStore.updateReceipt(
         req.params.id,
         { title, newsType, action: "manual-edit" },
@@ -451,6 +554,9 @@ function createBroadcastLedgerRouter({
 
   router.post("/manual/:id/delete", requireManualAccess, (req, res, next) => {
     try {
+      if (!broadcastLedgerStore.getSettings().editDeleteEnabled) {
+        return res.status(403).json({ error: "Receipt deletion is disabled in Ledger Settings." });
+      }
       const deleted = broadcastLedgerStore.deleteReceipt(req.params.id);
       if (!deleted) return res.status(404).json({ error: "Receipt not found." });
       const keyParam = req.body && req.body.key ? `&key=${encodeURIComponent(req.body.key)}` : "";
@@ -460,67 +566,69 @@ function createBroadcastLedgerRouter({
     }
   });
 
+  router.post("/receipts/:id/retry", requireManualAccess, (req, res, next) => {
+    (async () => {
+      const receipt = broadcastLedgerStore.getReceipt(req.params.id);
+      if (!receipt) return res.status(404).json({ error: "Receipt not found." });
+      if (receipt.status !== "failed") return res.status(409).json({ error: "Only failed broadcasts can be retried." });
+      const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
+      if (!text) return badRequest(res, "text is required because private broadcast bodies are not stored.");
+      if (!telegramService || !telegramService.configured) {
+        return res.status(400).json({ error: "Telegram is not configured." });
+      }
+      try {
+        const targets = destinationsForNewsType(receipt.newsType, broadcastLedgerStore.getSettings());
+        const result = await telegramService.postText(text, { parseMode: "HTML", ...(targets ? { targets } : {}) });
+        const updated = broadcastLedgerStore.updateReceipt(
+          receipt.id,
+          { destinations: result.destinations, error: null, action: "retry", detail: "Operator retried failed broadcast" },
+          { actor: "owner" },
+        );
+        res.json({ ok: true, receipt: updated, sent: result.posted, failed: result.failed });
+      } catch (err) {
+        const updated = broadcastLedgerStore.updateReceipt(
+          receipt.id,
+          { status: "failed", destinations: err.destinations || [], error: err, action: "retry", detail: err.message },
+          { actor: "owner" },
+        );
+        await notify("failed", updated || receipt, err.message);
+        res.status(err.statusCode || 502).json({ error: err.message, receipt: updated });
+      }
+    })().catch(next);
+  });
+
   // Every remaining endpoint is machine-facing and key-only.
   router.use(requireLedgerKey);
 
-  function recordDailyCategoryBlock(body = {}) {
-    const newsType = String(body.newsType || "").trim();
-    if (newsType.toLowerCase() !== "geopolitics") return null;
-    const prior = postedGeopoliticsToday(broadcastLedgerStore);
-    if (!prior) return null;
-
-    const text = typeof body.text === "string" ? body.text.trim() : "";
-    const source = SOURCES.includes(body.source) ? body.source : "shortcut";
-    const title = typeof body.title === "string" && body.title.trim()
-      ? body.title.trim()
-      : deriveTitle(text) || "Geopolitics broadcast attempt";
-    const { receipt } = broadcastLedgerStore.createReceipt({
-      source,
-      kind: "digest",
-      newsType: "Geopolitics",
-      title,
-      text,
-      status: "blocked",
-      idempotencyKey: typeof body.idempotencyKey === "string" ? body.idempotencyKey : "",
-      error: "Blocked: Geopolitics was already broadcast today (America/Vancouver).",
-    });
-    return { receipt, prior };
-  }
-
-  // ShareBot67 uses this before posting to its own Telegram destinations.
-  // A blocked attempt is recorded here, so a refusal never disappears.
   router.post("/broadcast/guard", (req, res, next) => {
-    try {
-      const blocked = recordDailyCategoryBlock(req.body || {});
-      if (blocked) {
-        return res.status(409).json({
-          allowed: false,
-          error: "Geopolitics was already broadcast today.",
-          ...blocked,
-        });
+    (async () => {
+      const body = req.body || {};
+      const invalid = validateReceiptPayload(body, broadcastLedgerStore.getSettings());
+      if (invalid) return badRequest(res, invalid);
+      if (!String(body.idempotencyKey || body.attemptId || "").trim()) {
+        return badRequest(res, "A stable idempotencyKey or attemptId is required.");
       }
-      res.json({ allowed: true });
-    } catch (err) {
-      next(err);
-    }
+      const result = broadcastLedgerStore.guard(body);
+      if (!result.allowed) await notifyReceiptChange(result.receipt);
+      res.status(result.allowed ? 200 : 409).json(result);
+    })().catch(next);
   });
 
   // Create or upsert a receipt. Idempotent on idempotencyKey — the property
   // that lets a phone on a bad connection retry safely.
   router.post("/receipts", (req, res, next) => {
-    try {
-      const invalid = validateReceiptPayload(req.body);
+    (async () => {
+      const invalid = validateReceiptPayload(req.body, broadcastLedgerStore.getSettings());
       if (invalid) return badRequest(res, invalid);
       const { receipt, created } = broadcastLedgerStore.createReceipt(req.body);
+      if (created) await notifyReceiptChange(receipt);
       res.status(created ? 201 : 200).json({ receipt, created });
-    } catch (err) {
-      next(err);
-    }
+    })().catch(next);
   });
 
   // Record destination results / final status against an existing receipt.
   router.patch("/receipts/:id", (req, res, next) => {
-    try {
+    (async () => {
       if (!req.body || typeof req.body !== "object") return badRequest(res, "A JSON object body is required.");
       if (req.body.status && !STATUSES.includes(req.body.status)) {
         return badRequest(res, `status must be one of: ${STATUSES.join(", ")}`);
@@ -529,12 +637,12 @@ function createBroadcastLedgerRouter({
         return badRequest(res, "destinations must be an array.");
       }
       const actor = SOURCES.includes(req.body.source) ? req.body.source : "unknown";
+      const previous = broadcastLedgerStore.getReceipt(req.params.id);
       const receipt = broadcastLedgerStore.updateReceipt(req.params.id, req.body, { actor });
       if (!receipt) return res.status(404).json({ error: "Receipt not found." });
+      await notifyReceiptChange(receipt, previous);
       res.json({ receipt });
-    } catch (err) {
-      next(err);
-    }
+    })().catch(next);
   });
 
   router.get("/receipts/:id", (req, res, next) => {
@@ -554,7 +662,9 @@ function createBroadcastLedgerRouter({
           limit: req.query.limit,
           status: req.query.status,
           source: req.query.source,
+          newsType: req.query.newsType,
           since: req.query.since,
+          query: req.query.q,
         }),
       });
     } catch (err) {
@@ -586,6 +696,12 @@ function createBroadcastLedgerRouter({
       }
       const rawUrl = typeof body.url === "string" ? body.url.trim() : "";
       if (rawUrl && !canonicalizeUrl(rawUrl)) return badRequest(res, "url must be a valid http(s) URL.");
+      const settings = broadcastLedgerStore.getSettings();
+      const suppliedCategory = String(body.newsType || body.category || "").trim();
+      if (suppliedCategory && settings.requireExactCategory && !settings.allowedCategories.includes(suppliedCategory)) {
+        return badRequest(res, `newsType must be one of: ${settings.allowedCategories.join(", ")}`);
+      }
+      const exactNewsType = settings.allowedCategories.includes(suppliedCategory) ? suppliedCategory : "Unclassified";
 
       const source = SOURCES.includes(body.source) ? body.source : "shortcut";
       const title = typeof body.title === "string" && body.title.trim() ? body.title : deriveTitle(text);
@@ -595,13 +711,18 @@ function createBroadcastLedgerRouter({
       // check would fall back to hashing the exact wording.
       const url = rawUrl || firstUrl(text);
 
-      const dailyBlock = recordDailyCategoryBlock({ ...body, source, title, text });
-      if (dailyBlock) {
-        return res.status(409).json({
-          allowed: false,
-          error: "Geopolitics was already broadcast today.",
-          ...dailyBlock,
-        });
+      // A configured daily cap is enforced at the actual send boundary too;
+      // callers should still preflight through /broadcast/guard so blocked
+      // attempts are visible before Telegram is contacted.
+      if (settings.categoryLimits[suppliedCategory]) {
+        if (!String(body.idempotencyKey || "").trim()) {
+          return badRequest(res, `idempotencyKey is required for limited category ${suppliedCategory}.`);
+        }
+        const guarded = broadcastLedgerStore.guard({ ...body, source, title, url, text });
+        if (!guarded.allowed) {
+          await notifyReceiptChange(guarded.receipt);
+          return res.status(409).json(guarded);
+        }
       }
 
       // Refuse to broadcast a story the ledger already shows as sent. This is
@@ -612,7 +733,16 @@ function createBroadcastLedgerRouter({
         const existingAgeMs = existing.receipt && existing.receipt.createdAt
           ? Date.now() - new Date(existing.receipt.createdAt).getTime()
           : Infinity;
-        if (existing.posted && existing.receipt && existingAgeMs <= BROADCAST_DUPLICATE_WINDOW_MS) {
+        const category = suppliedCategory || "Unclassified";
+        const configuredWindow = settings.duplicateWindows[category] || "6h";
+        const windowMs = duplicateWindowMs(configuredWindow);
+        const sameConfiguredDay = configuredWindow === "same-day" && existing.receipt
+          ? new Intl.DateTimeFormat("en-CA", { timeZone: settings.timezone }).format(new Date(existing.receipt.createdAt)) ===
+            new Intl.DateTimeFormat("en-CA", { timeZone: settings.timezone }).format(new Date())
+          : false;
+        const withinWindow = configuredWindow === "same-day" ? sameConfiguredDay : windowMs && existingAgeMs <= windowMs;
+        if (existing.posted && existing.receipt && withinWindow) {
+          await notify("blocked", existing.receipt, "Already broadcast inside the configured duplicate window.");
           return res.status(409).json({
             error: "Already broadcast — pass force:true to send it again.",
             alreadyBroadcast: true,
@@ -635,19 +765,22 @@ function createBroadcastLedgerRouter({
       // than a silent gap.
       const { receipt } = broadcastLedgerStore.createReceipt({
         source,
-        kind: SOURCES.includes(body.kind) ? body.kind : body.kind === "digest" ? "digest" : "story",
-        newsType: body.newsType,
+        kind: KINDS.includes(body.kind) ? body.kind : "story",
+        newsType: exactNewsType,
         title,
         url,
         text,
         status: "pending",
         idempotencyKey: typeof body.idempotencyKey === "string" ? body.idempotencyKey : "",
       });
+      await notifyReceiptChange(receipt);
 
       let result;
       try {
+        const targets = destinationsForNewsType(exactNewsType, settings);
         result = await telegramService.postText(text, {
           parseMode: body.parseMode === "none" ? null : "HTML",
+          ...(targets ? { targets } : {}),
         });
       } catch (err) {
         const updated = broadcastLedgerStore.updateReceipt(
@@ -655,6 +788,7 @@ function createBroadcastLedgerRouter({
           { status: "failed", error: err, destinations: err.destinations || [], action: "broadcast" },
           { actor: source },
         );
+        await notify("failed", updated || receipt, err.message);
         return res.status(err.statusCode || 502).json({
           error: err.message,
           receipt: updated || receipt,

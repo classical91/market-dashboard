@@ -16,7 +16,7 @@
  * zero and survives restarts, but it is safe on a single replica only.
  *
  * File shape:
- *   { "version": 1, "receipts": [ <newest first> ] }
+ *   { "version": 2, "settings": { ... }, "receipts": [ <newest first> ] }
  *
  * Message bodies are never stored — only a normalized hash plus the
  * headline — so the ledger can dedupe without holding private text.
@@ -26,7 +26,7 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 
-const LEDGER_VERSION = 1;
+const LEDGER_VERSION = 2;
 const DEFAULT_CAP = 5000;
 const MAX_ATTEMPTS_PER_RECEIPT = 20;
 
@@ -41,8 +41,27 @@ const SOURCES = ["shortcut", "sharebot67", "manual", "dashboard", "telegram-inge
 const ATTRIBUTED_SOURCES = SOURCES.filter((source) => source !== "telegram-ingest");
 const UNATTRIBUTED_SOURCE = "telegram-ingest";
 const KINDS = ["story", "digest"];
-const STATUSES = ["pending", "posted", "partial", "failed", "reconciled", "blocked"];
+const STATUSES = ["pending", "posted", "partial", "failed", "blocked", "reconciled"];
 const DESTINATION_STATUSES = ["pending", "posted", "failed"];
+const ALLOWED_CATEGORIES = ["Stock", "Crypto", "Geopolitics", "Economics", "Markets", "Technology", "General News"];
+const DUPLICATE_WINDOWS = ["off", "same-day", "6h", "24h"];
+const HISTORY_DAYS = [30, 90, 180, null];
+const DEFAULT_SETTINGS = Object.freeze({
+  requireExactCategory: true,
+  recordBlockedAttempts: true,
+  // Keep finance broadcasts off the general Telegram fan-out unless an
+  // operator explicitly disables this policy in Ledger Settings.
+  financeTopicRoutingEnabled: true,
+  allowedCategories: ALLOWED_CATEGORIES,
+  categoryLimits: { Geopolitics: 1 },
+  duplicateWindows: Object.fromEntries(ALLOWED_CATEGORIES.map((category) => [category, "6h"])),
+  timezone: "America/Vancouver",
+  historyDays: null,
+  notifications: { blocked: true, failed: true, missingCategory: true },
+  editDeleteEnabled: true,
+  visibleSources: ["shortcut", "dashboard", "sharebot67", "manual", "telegram-ingest"],
+  destinationLabels: {},
+});
 
 // Query/campaign parameters that never change which story a URL points at.
 // Stripping them is what lets the same article shared from Telegram, X and a
@@ -70,6 +89,10 @@ const MAX_DESTINATIONS = 50;
 
 /** Default window for the conservative tier-3 headline match. */
 const DEFAULT_HEADLINE_WINDOW_MS = 36 * 60 * 60 * 1000;
+const CAPACITY_RESERVATION_TTL_MS = 15 * 60 * 1000;
+const WRITE_LOCK_WAIT_MS = 250;
+const WRITE_LOCK_STALE_MS = 30 * 1000;
+const LOCK_SLEEP = new Int32Array(new SharedArrayBuffer(4));
 
 function sha256(value) {
   return crypto.createHash("sha256").update(String(value)).digest("hex");
@@ -79,20 +102,76 @@ function nowIso() {
   return new Date().toISOString();
 }
 
-function inferNewsType(value) {
-  const text = String(value || "").toLowerCase();
-  const labels = [];
-  if (/\b(bitcoin|btc|crypto|ethereum|eth|solana|blockchain|token)\b/.test(text)) labels.push("Crypto");
-  if (/\b(war|military|government|election|president|minister|sanction|geopolit|nato|ukraine|russia|china|iran|israel)\b/.test(text)) labels.push("Geopolitics");
-  if (/\b(fed|rates?|inflation|economy|economic|gdp|jobs?|unemployment|tariff|recession)\b/.test(text)) labels.push("Economics");
-  if (/\b(stock|market|earnings|nasdaq|dow|s&p)\b/.test(text)) labels.push("Markets");
-  if (/\b(ai|artificial intelligence|tech|apple|google|microsoft|nvidia|openai)\b/.test(text)) labels.push("Technology");
-  return labels.slice(0, 3).join(" / ");
-}
-
 function clampString(value, max) {
   if (typeof value !== "string") return "";
   return value.trim().slice(0, max);
+}
+
+function cloneDefaults() {
+  return JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+}
+
+function normalizeSettings(input = {}) {
+  const defaults = cloneDefaults();
+  const allowedCategories = Array.isArray(input.allowedCategories)
+    ? [...new Set(input.allowedCategories.map((value) => clampString(String(value), MAX_NEWS_TYPE_LEN)).filter(Boolean))].slice(0, 20)
+    : defaults.allowedCategories;
+  const categories = allowedCategories.length ? allowedCategories : defaults.allowedCategories;
+  const categoryLimits = {};
+  categories.forEach((category) => {
+    const value = Number(input.categoryLimits?.[category]);
+    if (Number.isInteger(value) && value > 0 && value <= 100) categoryLimits[category] = value;
+  });
+  if (!Object.keys(categoryLimits).length && !input.categoryLimits) Object.assign(categoryLimits, defaults.categoryLimits);
+  const duplicateWindows = {};
+  categories.forEach((category) => {
+    const value = input.duplicateWindows?.[category];
+    duplicateWindows[category] = DUPLICATE_WINDOWS.includes(value) ? value : defaults.duplicateWindows[category] || "6h";
+  });
+  const historyDays = input.historyDays === null || input.historyDays === "forever"
+    ? null
+    : HISTORY_DAYS.includes(Number(input.historyDays)) ? Number(input.historyDays) : defaults.historyDays;
+  const timezone = clampString(input.timezone, 80) || defaults.timezone;
+  try { new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(new Date()); } catch { return { ...defaults, allowedCategories: categories, categoryLimits, duplicateWindows }; }
+  const destinationLabels = {};
+  if (input.destinationLabels && typeof input.destinationLabels === "object") {
+    Object.entries(input.destinationLabels).slice(0, 100).forEach(([key, value]) => {
+      const label = clampString(String(value), 80);
+      if (label) destinationLabels[clampString(String(key), 260)] = label;
+    });
+  }
+  return {
+    requireExactCategory: input.requireExactCategory !== false,
+    recordBlockedAttempts: input.recordBlockedAttempts !== false,
+    financeTopicRoutingEnabled: input.financeTopicRoutingEnabled !== false,
+    allowedCategories: categories,
+    categoryLimits,
+    duplicateWindows,
+    timezone,
+    historyDays,
+    notifications: {
+      blocked: input.notifications?.blocked !== false,
+      failed: input.notifications?.failed !== false,
+      missingCategory: input.notifications?.missingCategory !== false,
+    },
+    editDeleteEnabled: input.editDeleteEnabled !== false,
+    visibleSources: Array.isArray(input.visibleSources)
+      ? input.visibleSources.filter((source) => SOURCES.includes(source))
+      : defaults.visibleSources,
+    destinationLabels,
+  };
+}
+
+function dayKey(value, timeZone) {
+  const date = isFiniteDate(value) ? new Date(value) : new Date();
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const part = (type) => parts.find((item) => item.type === type)?.value;
+  return `${part("year")}-${part("month")}-${part("day")}`;
 }
 
 function isFiniteDate(value) {
@@ -175,6 +254,7 @@ function normalizeDestination(input) {
     channel,
     chatId: clampString(String(input.chatId ?? input.chat_id ?? ""), 120) || null,
     threadId: clampString(String(input.threadId ?? input.thread_id ?? ""), 120) || null,
+    label: clampString(input.label || input.name || "", 80) || null,
     status,
     messageId: clampString(String(input.messageId ?? input.message_id ?? ""), 120) || null,
     messageUrl: clampString(input.messageUrl || input.message_url || "", MAX_URL_LEN) || null,
@@ -214,32 +294,117 @@ function isPostedStatus(status) {
 class BroadcastLedgerStore {
   constructor({ dataDir, logger = console, cap = DEFAULT_CAP, headlineWindowMs } = {}) {
     this._file = path.join(dataDir, "broadcast-ledger.json");
+    this._lockFile = `${this._file}.lock`;
+    this._lockDepth = 0;
     this._logger = logger;
     this._cap = cap;
     this._headlineWindowMs = headlineWindowMs || DEFAULT_HEADLINE_WINDOW_MS;
   }
 
-  _read() {
+  _readDocument() {
     try {
       const parsed = JSON.parse(fs.readFileSync(this._file, "utf8"));
       // Tolerate a bare array so a hand-edited or pre-version-1 file still
       // loads rather than silently starting over.
-      if (Array.isArray(parsed)) return parsed;
-      return Array.isArray(parsed?.receipts) ? parsed.receipts : [];
+      if (Array.isArray(parsed)) return { receipts: parsed, settings: cloneDefaults() };
+      return {
+        receipts: Array.isArray(parsed?.receipts) ? parsed.receipts : [],
+        settings: normalizeSettings(parsed?.settings),
+      };
     } catch {
-      return [];
+      return { receipts: [], settings: cloneDefaults() };
     }
   }
 
-  _write(receipts) {
+  _read() {
+    return this._readDocument().receipts;
+  }
+
+  _withExclusiveLock(operation) {
+    if (this._lockDepth) return operation();
+
+    const dir = path.dirname(this._file);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    const deadline = Date.now() + WRITE_LOCK_WAIT_MS;
+    let fd = null;
+
+    while (fd === null) {
+      try {
+        fd = fs.openSync(this._lockFile, "wx");
+      } catch (err) {
+        if (err.code !== "EEXIST") throw err;
+        try {
+          const age = Date.now() - fs.statSync(this._lockFile).mtimeMs;
+          if (age > WRITE_LOCK_STALE_MS) {
+            fs.unlinkSync(this._lockFile);
+            continue;
+          }
+        } catch (statErr) {
+          if (statErr.code === "ENOENT") continue;
+        }
+        if (Date.now() >= deadline) {
+          const busy = new Error("Broadcast ledger is busy; retry the request.");
+          busy.statusCode = 503;
+          busy.expose = true;
+          throw busy;
+        }
+        Atomics.wait(LOCK_SLEEP, 0, 0, 5);
+      }
+    }
+
+    this._lockDepth += 1;
+    try {
+      return operation();
+    } finally {
+      this._lockDepth -= 1;
+      try { fs.closeSync(fd); } catch {}
+      try { fs.unlinkSync(this._lockFile); } catch {}
+    }
+  }
+
+  _write(receipts, settings = this._readDocument().settings) {
+    let tempFile = null;
     try {
       const dir = path.dirname(this._file);
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-      const payload = { version: LEDGER_VERSION, receipts: receipts.slice(0, this._cap) };
-      fs.writeFileSync(this._file, JSON.stringify(payload, null, 2), "utf8");
+      const normalizedSettings = normalizeSettings(settings);
+      const cutoff = normalizedSettings.historyDays
+        ? Date.now() - normalizedSettings.historyDays * 24 * 60 * 60 * 1000
+        : null;
+      const retained = cutoff
+        ? receipts.filter((receipt) => !isFiniteDate(receipt.createdAt) || new Date(receipt.createdAt).getTime() >= cutoff)
+        : receipts;
+      const payload = {
+        version: LEDGER_VERSION,
+        settings: normalizedSettings,
+        receipts: retained.slice(0, this._cap),
+      };
+      tempFile = `${this._file}.${process.pid}.${crypto.randomBytes(4).toString("hex")}.tmp`;
+      fs.writeFileSync(tempFile, JSON.stringify(payload, null, 2), "utf8");
+      fs.renameSync(tempFile, this._file);
+      tempFile = null;
     } catch (err) {
       this._logger.error?.("[BroadcastLedger] Failed to write ledger:", err.message);
+    } finally {
+      if (tempFile) {
+        try { fs.unlinkSync(tempFile); } catch {}
+      }
     }
+  }
+
+  getSettings() {
+    return this._readDocument().settings;
+  }
+
+  updateSettings(patch = {}) {
+    return this._withExclusiveLock(() => this._updateSettings(patch));
+  }
+
+  _updateSettings(patch = {}) {
+    const data = this._readDocument();
+    const settings = normalizeSettings({ ...data.settings, ...patch });
+    this._write(data.receipts, settings);
+    return settings;
   }
 
   _nextId() {
@@ -253,7 +418,13 @@ class BroadcastLedgerStore {
    * likes and the ledger holds one row.
    */
   createReceipt(input = {}) {
-    const receipts = this._read();
+    return this._withExclusiveLock(() => this._createReceipt(input));
+  }
+
+  _createReceipt(input = {}) {
+    const data = this._readDocument();
+    const receipts = data.receipts;
+    const settings = data.settings;
     const idempotencyKey = clampString(input.idempotencyKey, 200);
 
     if (idempotencyKey) {
@@ -329,10 +500,11 @@ class BroadcastLedgerStore {
       updatedAt: nowIso(),
       source,
       kind: KINDS.includes(input.kind) ? input.kind : "story",
-      newsType:
-        clampString(input.newsType || input.category, MAX_NEWS_TYPE_LEN) ||
-        clampString(inferNewsType(`${title}\n${text}`), MAX_NEWS_TYPE_LEN) ||
-        null,
+      // Category is sender-owned data. Never guess from keywords: missing or
+      // unsupported labels stay visibly Unclassified.
+      newsType: settings.allowedCategories.includes(clampString(input.newsType || input.category, MAX_NEWS_TYPE_LEN))
+        ? clampString(input.newsType || input.category, MAX_NEWS_TYPE_LEN)
+        : "Unclassified",
       title: title || null,
       url: url || null,
       canonicalUrl,
@@ -347,15 +519,15 @@ class BroadcastLedgerStore {
         {
           at: nowIso(),
           actor: source,
-          action: "create",
+          action: clampString(input.action, 60) || "create",
           ok: isPostedStatus(status),
-          detail: `status=${status}`,
+          detail: clampString(input.detail, MAX_ERROR_LEN) || `status=${status}`,
         },
       ],
     };
 
     receipts.unshift(receipt);
-    this._write(receipts);
+    this._write(receipts, settings);
     return { receipt, created: true };
   }
 
@@ -365,6 +537,10 @@ class BroadcastLedgerStore {
    * reports each channel separately ends up with one row per channel.
    */
   updateReceipt(id, patch = {}, { actor = "unknown" } = {}) {
+    return this._withExclusiveLock(() => this._updateReceipt(id, patch, { actor }));
+  }
+
+  _updateReceipt(id, patch = {}, { actor = "unknown" } = {}) {
     const receipts = this._read();
     const index = receipts.findIndex((r) => r.id === id);
     if (index === -1) return null;
@@ -420,7 +596,9 @@ class BroadcastLedgerStore {
       receipt.idempotencyKey = clampString(patch.idempotencyKey, 200);
     }
     if (typeof patch.newsType === "string" && patch.newsType.trim()) {
-      receipt.newsType = clampString(patch.newsType, MAX_NEWS_TYPE_LEN);
+      const category = clampString(patch.newsType, MAX_NEWS_TYPE_LEN);
+      const settings = this.getSettings();
+      receipt.newsType = settings.allowedCategories.includes(category) ? category : "Unclassified";
     }
 
     if (typeof patch.reconciledWith === "string") {
@@ -435,7 +613,10 @@ class BroadcastLedgerStore {
         actor: clampString(actor, 60) || "unknown",
         action: clampString(patch.action, 60) || "update",
         ok: isPostedStatus(receipt.status),
-        detail: `status=${receipt.status}`,
+        detail:
+          clampString(patch.detail, MAX_ERROR_LEN) ||
+          clampString(patch.error?.message || patch.error || "", MAX_ERROR_LEN) ||
+          `status=${receipt.status}`,
       },
     ].slice(-MAX_ATTEMPTS_PER_RECEIPT);
 
@@ -445,6 +626,10 @@ class BroadcastLedgerStore {
   }
 
   deleteReceipt(id) {
+    return this._withExclusiveLock(() => this._deleteReceipt(id));
+  }
+
+  _deleteReceipt(id) {
     const receipts = this._read();
     const index = receipts.findIndex((receipt) => receipt.id === id);
     if (index === -1) return null;
@@ -559,14 +744,124 @@ class BroadcastLedgerStore {
     return empty;
   }
 
-  list({ limit = 50, status, source, since } = {}) {
+  list({ limit = 50, status, source, newsType, since, query } = {}) {
     const cap = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 500);
     const sinceMs = since && isFiniteDate(since) ? new Date(since).getTime() : null;
+    const needle = normalizeText(query || "");
     return this._read()
-      .filter((r) => (status ? r.status === status : true))
+      .filter((r) => (status === "broadcasted" ? isPostedStatus(r.status) : status ? r.status === status : true))
       .filter((r) => (source ? r.source === source : true))
+      .filter((r) => (newsType ? r.newsType === newsType : true))
       .filter((r) => (sinceMs ? isFiniteDate(r.createdAt) && new Date(r.createdAt).getTime() >= sinceMs : true))
+      .filter((r) => (needle ? normalizeText(`${r.id} ${r.title || ""}`).includes(needle) : true))
       .slice(0, cap);
+  }
+
+  dailySummary({ at = new Date(), timeZone } = {}) {
+    const settings = this.getSettings();
+    const zone = timeZone || settings.timezone;
+    const targetDay = dayKey(at, zone);
+    const summary = { date: targetDay, timeZone: zone, total: 0, byCategory: {}, byStatus: {} };
+    this._read().forEach((receipt) => {
+      if (!isFiniteDate(receipt.createdAt) || dayKey(receipt.createdAt, zone) !== targetDay) return;
+      summary.total += 1;
+      const category = receipt.newsType || "Unclassified";
+      const status = isPostedStatus(receipt.status) ? "broadcasted" : receipt.status;
+      summary.byCategory[category] = summary.byCategory[category] || {};
+      summary.byCategory[category][status] = (summary.byCategory[category][status] || 0) + 1;
+      summary.byStatus[status] = (summary.byStatus[status] || 0) + 1;
+    });
+    return summary;
+  }
+
+  guard(input = {}) {
+    return this._withExclusiveLock(() => this._guard(input));
+  }
+
+  _guard(input = {}) {
+    const settings = this.getSettings();
+    const requested = clampString(input.newsType || input.category, MAX_NEWS_TYPE_LEN);
+    const newsType = settings.allowedCategories.includes(requested) ? requested : "Unclassified";
+    const source = SOURCES.includes(input.source) ? input.source : "sharebot67";
+    const idempotencyKey = clampString(input.idempotencyKey || input.attemptId, 200);
+    const title = clampString(input.title || input.headline, MAX_TITLE_LEN);
+    const text = clampString(input.text || input.content, MAX_TEXT_LEN);
+    const url = clampString(input.url, MAX_URL_LEN);
+    let reason = null;
+
+    if (idempotencyKey) {
+      const existing = this._read().find((receipt) => receipt.idempotencyKey === idempotencyKey);
+      if (existing) {
+        if (existing.status === "blocked") {
+          return { allowed: false, reason: existing.error?.message || "Attempt already blocked.", receipt: existing };
+        }
+        if (isPostedStatus(existing.status)) {
+          return { allowed: false, reason: "Attempt already broadcast.", receipt: existing };
+        }
+        return { allowed: true, reason: null, receipt: existing, settings: { newsType: existing.newsType, dailyLimit: settings.categoryLimits[existing.newsType] || null } };
+      }
+    }
+
+    if (settings.requireExactCategory && newsType === "Unclassified") {
+      reason = requested
+        ? `Category "${requested}" is not allowed.`
+        : "An exact news category is required.";
+    }
+
+    const dailyLimit = settings.categoryLimits[newsType];
+    if (!reason && dailyLimit) {
+      const today = dayKey(new Date(), settings.timezone);
+      const reservationCutoff = Date.now() - CAPACITY_RESERVATION_TTL_MS;
+      const capacityUsed = this._read().filter(
+        (receipt) =>
+          receipt.newsType === newsType &&
+          isFiniteDate(receipt.createdAt) &&
+          dayKey(receipt.createdAt, settings.timezone) === today &&
+          (
+            isPostedStatus(receipt.status) ||
+            (
+              receipt.status === "pending" &&
+              isFiniteDate(receipt.updatedAt || receipt.createdAt) &&
+              new Date(receipt.updatedAt || receipt.createdAt).getTime() >= reservationCutoff
+            )
+          ),
+      ).length;
+      if (capacityUsed >= dailyLimit) {
+        reason = `${newsType} daily limit reached or reserved (${capacityUsed}/${dailyLimit}, resets in ${settings.timezone}).`;
+      }
+    }
+
+    if (reason) {
+      let receipt = null;
+      if (settings.recordBlockedAttempts) {
+        receipt = this.createReceipt({
+          source,
+          newsType,
+          title: title || "Blocked broadcast attempt",
+          text,
+          url,
+          status: "blocked",
+          error: reason,
+          idempotencyKey,
+          action: "guard-blocked",
+          detail: reason,
+        }).receipt;
+      }
+      return { allowed: false, reason, receipt, settings: { newsType, dailyLimit: dailyLimit || null } };
+    }
+
+    const receipt = this.createReceipt({
+      source,
+      newsType,
+      title,
+      text,
+      url,
+      status: "pending",
+      idempotencyKey,
+      action: "guard",
+      detail: `${newsType} allowed`,
+    }).receipt;
+    return { allowed: true, reason: null, receipt, settings: { newsType, dailyLimit: dailyLimit || null } };
   }
 
   /**
@@ -631,5 +926,7 @@ module.exports = {
   UNATTRIBUTED_SOURCE,
   KINDS,
   STATUSES,
+  ALLOWED_CATEGORIES,
+  DEFAULT_SETTINGS,
   LEDGER_VERSION,
 };

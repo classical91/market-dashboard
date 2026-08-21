@@ -1,6 +1,6 @@
 const { Router } = require("express");
 
-function createReporterRouter({ reporterService, telegramService, broadcastLedgerStore, requireAdmin, requireOwner = requireAdmin }) {
+function createReporterRouter({ reporterService, telegramService, broadcastLedgerStore, requireAdmin }) {
   const router = Router();
 
   function resolveTtlMs(req) {
@@ -118,11 +118,8 @@ function createReporterRouter({ reporterService, telegramService, broadcastLedge
 
   // Import readable browser-backed logs into the server store so reports can
   // be shared across devices after a persistent volume is attached.
-  // Owner-guarded because it writes into the shared server-side report store.
-  // Site authentication already protects this router. Allow an authenticated
-  // owner browser to migrate its legacy local-only history without also
-  // requiring an admin API key in that browser.
-  router.post("/logs/import", requireOwner, (req, res, next) => {
+  // Admin-guarded because it writes into the shared server-side report store.
+  router.post("/logs/import", requireAdmin, (req, res, next) => {
     try {
       const report = reporterService.importLogEntries(req.body?.entries, resolveTtlMs(req));
       res.json(report);

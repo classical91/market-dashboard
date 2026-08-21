@@ -140,6 +140,9 @@ const config = {
     watchTargets: String(process.env.BROADCAST_LEDGER_TELEGRAM_WATCHLIST || "").trim()
       ? parseList(process.env.BROADCAST_LEDGER_TELEGRAM_WATCHLIST)
       : null,
+    // Operational alerts must not be broadcast into the public/news rooms.
+    // Configure one or more private chat/topic targets explicitly.
+    notificationTargets: parseList(process.env.BROADCAST_LEDGER_NOTIFICATION_CHAT_IDS),
   },
   reporter: {
     apiKey: process.env.OPENAI_API_KEY || "",
@@ -190,11 +193,6 @@ const config = {
   telegram: {
     botToken: process.env.TELEGRAM_BOT_TOKEN || "",
     chatIds: parseList(process.env.TELEGRAM_CHAT_IDS),
-    dashboardUrl: String(process.env.MARKET_DASHBOARD_URL || "").replace(/\/+$/, ""),
-  },
-  newsTelegram: {
-    botToken: process.env.NEWS_TELEGRAM_BOT_TOKEN || "",
-    chatIds: parseList(process.env.NEWS_TELEGRAM_CHAT_IDS),
     dashboardUrl: String(process.env.MARKET_DASHBOARD_URL || "").replace(/\/+$/, ""),
   },
   signalBot: {
