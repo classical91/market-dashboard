@@ -112,6 +112,35 @@ function newsTypeLabel(receipt) {
   return receipt.newsType || "Unclassified";
 }
 
+// Channel Watch is an audit fallback, not a reliable news classifier. Keep
+// its raw receipts in storage for reconciliation, but never let ordinary
+// watched-room comments with no exact category leak into the operator ledger.
+function isVisibleReceipt(receipt) {
+  return !(
+    receipt?.source === "telegram-ingest"
+    && newsTypeLabel(receipt) === "Unclassified"
+  );
+}
+
+function visibleDailySummary(store, settings) {
+  const base = store.dailySummary();
+  const summary = { ...base, total: 0, byCategory: {}, byStatus: {} };
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: settings.timezone,
+    year: "numeric", month: "2-digit", day: "2-digit",
+  });
+  store.list({ limit: 500 }).filter(isVisibleReceipt).forEach((receipt) => {
+    if (!receipt.createdAt || formatter.format(new Date(receipt.createdAt)) !== base.date) return;
+    const category = newsTypeLabel(receipt);
+    const status = isPostedStatus(receipt.status) ? "broadcasted" : receipt.status;
+    summary.total += 1;
+    summary.byCategory[category] = summary.byCategory[category] || {};
+    summary.byCategory[category][status] = (summary.byCategory[category][status] || 0) + 1;
+    summary.byStatus[status] = (summary.byStatus[status] || 0) + 1;
+  });
+  return summary;
+}
+
 const SOURCE_LABELS = {
   shortcut: "Shortcut",
   dashboard: "Market Dashboard",
@@ -157,12 +186,12 @@ function renderManualForm({
   summary = null,
 } = {}) {
   const visibleSources = new Set(settings.visibleSources || SOURCES);
-  const visibleTotal = total;
+  const visibleReceipts = recent.filter(isVisibleReceipt).filter((receipt) => visibleSources.has(receipt.source));
+  const visibleTotal = visibleReceipts.length;
   const categoryOptions = ["", ...(settings.allowedCategories || []), "Unclassified"]
     .map((category) => `<option value="${escapeHtml(category)}"${selected(filters.newsType, category)}>${escapeHtml(category || "All categories")}</option>`)
     .join("");
-  const rows = recent
-    .filter((receipt) => visibleSources.has(receipt.source))
+  const rows = visibleReceipts
     .map((receipt) => {
       const when = receipt.createdAt
         ? new Date(receipt.createdAt).toLocaleString("en-CA", {
@@ -263,7 +292,7 @@ function renderManualForm({
     <label>Status<select name="status"><option value="">All statuses</option><option value="broadcasted"${selected(filters.status, "broadcasted")}>Broadcasted</option><option value="blocked"${selected(filters.status, "blocked")}>Blocked</option><option value="failed"${selected(filters.status, "failed")}>Failed</option><option value="pending"${selected(filters.status, "pending")}>Pending</option></select></label>
     <button type="submit">Apply filters</button><a href="/api/broadcast-ledger/manual${formKey ? `?key=${encodeURIComponent(formKey)}` : ""}">Clear</a>
   </form>
-  ${rows ? `<div class="ledger-heading"><h2>Broadcast log</h2><span>${recent.length} shown</span></div><ul class="receipt-list">${rows}</ul>` : `<p class="empty filtered-empty">No receipts match these filters.</p>`}
+  ${rows ? `<div class="ledger-heading"><h2>Broadcast log</h2><span>${visibleReceipts.length} shown</span></div><ul class="receipt-list">${rows}</ul>` : `<p class="empty filtered-empty">No receipts match these filters.</p>`}
 </main>
 </body>
 </html>`;
@@ -360,7 +389,7 @@ function createBroadcastLedgerRouter({
       newsType: filters.newsType,
       query: filters.query,
       since,
-    });
+    }).filter(isVisibleReceipt);
     if (range === "today") {
       const today = broadcastLedgerStore.dailySummary().date;
       const formatter = new Intl.DateTimeFormat("en-CA", {
@@ -377,7 +406,7 @@ function createBroadcastLedgerRouter({
       diagnostics: broadcastIngestService ? broadcastIngestService.describe() : null,
       filters,
       settings,
-      summary: broadcastLedgerStore.dailySummary(),
+      summary: visibleDailySummary(broadcastLedgerStore, settings),
     };
   }
 

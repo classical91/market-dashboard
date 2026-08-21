@@ -730,7 +730,7 @@ test("a populated ledger leads with the count and the per-path breakdown", () =>
     watching: true,
   });
 
-  assert.match(html, /<strong>4<\/strong> ledger entries recorded/);
+  assert.match(html, /<strong>1<\/strong> ledger entry recorded/);
   assert.doesNotMatch(html, /2 Shortcut|1 ShareBot67/);
   assert.match(html, /Unclassified/);
   assert.doesNotMatch(html, /Unattributed/);
@@ -816,19 +816,23 @@ test("ledger cards expose destination labels, attempt history, copy, search, and
   assert.match(html, /Headline or receipt ID/);
 });
 
-test("channel-watch receipts remain visible with an explicit source", () => {
+test("unclassified Channel Watch comments stay out of the visible ledger while classified news remains visible", () => {
   const { renderManualForm } = require("../src/routes/broadcast-ledger");
   const html = renderManualForm({
     recent: [
-      { id: "watch-1", title: "Posted by hand", source: "telegram-ingest", status: "posted", createdAt: "2026-08-20T18:24:00.000Z" },
+      { id: "comment-1", title: "ordinary room comment", newsType: "Unclassified", source: "telegram-ingest", status: "posted", createdAt: "2026-08-20T18:24:00.000Z" },
+      { id: "watch-1", title: "Bitcoin market update", newsType: "Crypto", source: "telegram-ingest", status: "posted", createdAt: "2026-08-20T18:25:00.000Z" },
     ],
-    total: 1,
-    bySource: { "telegram-ingest": 1 },
+    total: 2,
+    bySource: { "telegram-ingest": 2 },
     watching: true,
   });
 
-  assert.match(html, /Posted by hand/);
+  assert.doesNotMatch(html, /ordinary room comment|comment-1/);
+  assert.match(html, /Bitcoin market update/);
   assert.match(html, /Channel Watch/);
+  assert.match(html, /<strong>1<\/strong> ledger entry recorded/);
+  assert.match(html, /1 shown/);
   assert.match(html, /Broadcast log/);
 });
 
