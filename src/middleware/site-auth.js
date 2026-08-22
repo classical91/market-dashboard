@@ -142,6 +142,17 @@ function isPublicAuthPath(req) {
     || req.path === "/api/health";
 }
 
+// GET /api/decision is documented in src/routes/decision.js as read-only
+// public market data, and the TraderClaw agent polls it with no browser
+// session to present. Site auth runs before every API router, so it answered
+// `401 Login required` before that route was ever reached. Scoped to the exact
+// path and read methods on purpose: /api/decision/journal and every mutating
+// journal route stay behind the session cookie and ADMIN_API_KEY.
+function isPublicDecisionRequest(req) {
+  if (req.method !== "GET" && req.method !== "HEAD") return false;
+  return req.path === "/api/decision" || req.path === "/api/decision/";
+}
+
 function canAccess(req, session) {
   if (!session) return false;
   if (session.role === "owner") return true;
@@ -211,7 +222,7 @@ function createSiteAuth(config) {
     clearSessionCookie,
     classifyPassword,
     requireAccess(req, res, next) {
-      if (!enabled || isPublicAuthPath(req)) {
+      if (!enabled || isPublicAuthPath(req) || isPublicDecisionRequest(req)) {
         next();
         return;
       }

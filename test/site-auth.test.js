@@ -82,6 +82,74 @@ test("alpha password unlocks only alpha review pages and read-only alpha data", 
   assert.equal(blockedWrite.status, 403);
 });
 
+// The TraderClaw agent polls GET /api/decision with an API client, not a
+// browser, so it has no session cookie. Site auth used to answer 401 before
+// the decision router ran, which is the exact failure these assertions pin.
+test("anonymous machine callers can read GET /api/decision", async () => {
+  const res = await fetch(`${base}/api/decision?interval=4h`);
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.interval, "4h");
+  assert.ok(body.regime, "decision payload must carry a regime block");
+});
+
+test("the public decision bypass does not open the rest of the namespace", async () => {
+  const journal = await fetch(`${base}/api/decision/journal`);
+  assert.equal(journal.status, 401);
+
+  const write = await fetch(`${base}/api/decision/journal`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ symbol: "BTCUSDT" }),
+  });
+  assert.equal(write.status, 401);
+
+  // Writing *to* the public path must not inherit the read bypass either.
+  const post = await fetch(`${base}/api/decision`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: "{}",
+  });
+  assert.equal(post.status, 401);
+});
+
+test("Trading Lab and admin surfaces stay closed to anonymous callers", async () => {
+  const paperTrade = await fetch(`${base}/api/trading-lab/paper/trades`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: "{}",
+  });
+  assert.equal(paperTrade.status, 401);
+
+  const settings = await fetch(`${base}/api/watchlist`);
+  assert.equal(settings.status, 401);
+});
+
+test("journal reads need an owner session, not just any session", async () => {
+  const { cookie: alphaCookie } = await login("alpha-password", "/signal-screener.html?view=alpha");
+  const alphaJournal = await fetch(`${base}/api/decision/journal`, { headers: { cookie: alphaCookie } });
+  assert.equal(alphaJournal.status, 403);
+
+  const { cookie: ownerCookie } = await login("owner-password", "/");
+  const ownerJournal = await fetch(`${base}/api/decision/journal`, { headers: { cookie: ownerCookie } });
+  assert.equal(ownerJournal.status, 200);
+  const body = await ownerJournal.json();
+  assert.ok(Array.isArray(body.items));
+});
+
+// ADMIN_API_KEY is unset in this file, so journal mutation is disabled outright
+// (503) rather than merely unauthorized — the owner cookie must not be a way
+// around the admin key.
+test("owner session alone cannot write the journal without ADMIN_API_KEY", async () => {
+  const { cookie } = await login("owner-password", "/");
+  const res = await fetch(`${base}/api/decision/journal`, {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie },
+    body: JSON.stringify({ symbol: "BTCUSDT", direction: "long" }),
+  });
+  assert.equal(res.status, 503);
+});
+
 test("wrong password stays on login", async () => {
   const { res } = await login("wrong-password", "/");
   assert.equal(res.status, 401);

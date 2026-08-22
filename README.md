@@ -71,9 +71,37 @@ Action/mutation endpoints are guarded by a shared secret so a public deploy cann
 - `POST /api/daily-report/generate`, `POST /api/daily-report/logs/import`
 - `POST /api/ai-analysis/generate`, `POST /api/ai-analysis/broadcast`
 - `POST /api/telegram/test`, `GET /api/telegram/diagnose`
-- `POST/PATCH/DELETE /api/decision/journal` (trading-journal writes; reads stay public)
+- `POST/PATCH/DELETE /api/decision/journal` (trading-journal writes)
 
 Guarded requests must carry an `x-admin-key` header matching `ADMIN_API_KEY`. The Reporter, AI Analysis, and Settings pages prompt for the key on first use and store it in the browser's `localStorage`. `ADMIN_API_KEY` is separate from the website login: owner login controls browsing, while the admin key controls write/broadcast actions. The public `/api/health` probe returns only `{ "status": "ok" }`; provider-key and cache detail are returned only to admin requests.
+
+### Endpoints reachable without the website login
+
+When `MARKET_DASHBOARD_LOGIN_PASSWORD` is set, site auth runs ahead of every route, so anything not listed here answers `401` (or a `/login` redirect for pages) before its own router is reached. The full list of exceptions:
+
+- `/login`, `POST /auth/login`, `POST /auth/logout` — the login flow itself.
+- `POST /api/alpha-team/access` — the Alpha Team code exchange.
+- `GET /api/health` — the minimal deploy probe.
+- `GET /api/decision` — read-only market decision data, polled by the TraderClaw agent, which authenticates no session cookie. This is the exact path only: `/api/decision/journal` and every mutating journal route still require the owner session (and, for writes, `ADMIN_API_KEY`).
+- `/api/broadcast-ledger*` — machine callers that present `BROADCAST_LEDGER_API_KEY` or `ADMIN_API_KEY`; the ledger routes still enforce that key themselves. See [docs/broadcast-ledger.md](docs/broadcast-ledger.md).
+
+Everything else — including all Trading Lab paper-trade and mutation endpoints, settings, and the rest of `/api/decision/*` — needs a session. The Alpha Team role additionally reaches only the shared `?view=alpha` pages and their read-only data APIs.
+
+Verify this model against a running deploy with `npm run smoke:decision` (see [Production smoke check](#production-smoke-check)).
+
+### Production smoke check
+
+The test suite runs against a local app, so it cannot see a deploy's own environment — a site password that is set, an admin key that is not, a provider key that expired. `npm run smoke:decision` covers that gap from outside:
+
+```bash
+DASHBOARD_URL=https://your-dashboard.up.railway.app npm run smoke:decision
+# or
+npm run smoke:decision -- https://your-dashboard.up.railway.app
+```
+
+It sends no cookies, so it sees exactly what the TraderClaw agent sees, and checks in order: the health probe answers; `GET /api/decision` returns `200` without a login; the payload echoes the interval and carries a regime label/score and scored setups with a direction and action; `/api/decision/journal` and the Trading Lab still answer `401`/`403`; and a write to `/api/decision` is rejected rather than inheriting the read bypass.
+
+Output is `PASS`/`WARN`/`FAIL` per check with the URL and HTTP status, and the exit code is non-zero if any check fails. Degraded upstream market data warns rather than fails — that is a provider outage, not a broken deploy. Every request is a `GET` apart from one `POST /api/decision` that is asserted to be *rejected*; nothing it does can mutate production state or place a trade. Optional: `DECISION_INTERVAL` (default `4h`), `SMOKE_TIMEOUT_MS` (default `20000`).
 
 ## Environment Variables
 
