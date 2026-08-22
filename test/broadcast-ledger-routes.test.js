@@ -1313,7 +1313,7 @@ test("a retried broadcast with the same idempotency key does not double-send", a
   });
 });
 
-test("the default duplicate window blocks the same story after seven hours", async () => {
+test("the default duplicate window blocks rewritten news in the same category after seven hours", async () => {
   await withScopedBroadcastApp(async (url, sends, store) => {
     const payload = {
       method: "POST",
@@ -1328,10 +1328,30 @@ test("the default duplicate window blocks the same story after seven hours", asy
     document.receipts[0].createdAt = new Date(Date.now() - 7 * 60 * 60 * 1000).toISOString();
     fs.writeFileSync(store._file, JSON.stringify(document), "utf8");
 
-    const duplicate = await fetch(`${url}/api/broadcast-ledger/broadcast`, payload);
+    const duplicate = await fetch(`${url}/api/broadcast-ledger/broadcast`, {
+      ...payload,
+      body: JSON.stringify({ text: "Completely rewritten digest with different stories and no URL", newsType: "Stock" }),
+    });
     assert.equal(duplicate.status, 409);
-    assert.equal((await duplicate.json()).alreadyBroadcast, true);
+    const body = await duplicate.json();
+    assert.equal(body.alreadyBroadcast, true);
+    assert.equal(body.match, "category-window");
+    assert.equal(body.receipt.status, "blocked");
     assert.equal(sends.length, 1);
+  });
+});
+
+test("the category window does not block a different news category", async () => {
+  await withScopedBroadcastApp(async (url, sends) => {
+    const send = (newsType, text) => fetch(`${url}/api/broadcast-ledger/broadcast`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-broadcast-key": LEDGER_KEY },
+      body: JSON.stringify({ text, newsType }),
+    });
+
+    assert.equal((await send("Stock", "Stock digest")).status, 201);
+    assert.equal((await send("Crypto", "Crypto digest")).status, 201);
+    assert.equal(sends.length, 2);
   });
 });
 
