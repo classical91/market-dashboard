@@ -812,7 +812,30 @@ test("a successful broadcast records a posted receipt carrying the real message 
   });
 });
 
-test("a second geopolitics attempt on the same Vancouver day is blocked and recorded", async () => {
+test("Geopolitics accepts the existing Shortcut text and newsType payload without an idempotency key", async () => {
+  await withRouter({
+    sendResult: {
+      posted: 1,
+      failed: 0,
+      destinations: [{ channel: "telegram", chatId: "-1001", threadId: "75972", status: "posted", messageId: "81" }],
+    },
+  }, async ({ sends, url }) => {
+    const res = await fetch(`${url}/api/broadcast-ledger/broadcast`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: "Geopolitics briefing", newsType: "Geopolitics" }),
+    });
+    const body = await res.json();
+
+    assert.equal(res.status, 201);
+    assert.equal(sends.length, 1);
+    assert.equal(sends[0].opts.newsType, "Geopolitics");
+    assert.equal(body.receipt.newsType, "Geopolitics");
+    assert.equal(body.receipt.idempotencyKey, null);
+  });
+});
+
+test("a second geopolitics attempt within 24 hours is blocked and recorded", async () => {
   await withRouter({
     sendResult: { posted: 1, failed: 0, destinations: [] },
   }, async ({ store, sends, url }) => {
@@ -831,7 +854,6 @@ test("a second geopolitics attempt on the same Vancouver day is blocked and reco
         source: "shortcut",
         text: "Different geopolitical report",
         newsType: "Geopolitics",
-        idempotencyKey: "geo-evening-attempt",
       }),
     });
     const body = await res.json();
@@ -840,12 +862,50 @@ test("a second geopolitics attempt on the same Vancouver day is blocked and reco
     assert.equal(body.allowed, false);
     assert.equal(body.receipt.status, "blocked");
     assert.equal(body.receipt.source, "shortcut");
+    assert.equal(body.receipt.idempotencyKey, null);
     assert.equal(sends.length, 0, "the blocked attempt never reaches Telegram");
     assert.equal(store.list({ limit: 2 })[0].status, "blocked", "the attempt remains visible in the ledger");
   });
 });
 
-test("ShareBot67 can record a blocked daily geopolitics preflight", async () => {
+test("the Geopolitics category block expires after a rolling 24 hours", async () => {
+  await withRouter({
+    sendResult: { posted: 1, failed: 0, destinations: [{ channel: "telegram", chatId: "-1", status: "posted", messageId: "82" }] },
+  }, async ({ store, sends, url }) => {
+    store.createReceipt({ title: "Old geopolitics", newsType: "Geopolitics", status: "posted" });
+    const ledger = JSON.parse(fs.readFileSync(store._file, "utf8"));
+    ledger.receipts[0].createdAt = new Date(Date.now() - (24 * 60 * 60 * 1000) - 1).toISOString();
+    fs.writeFileSync(store._file, JSON.stringify(ledger), "utf8");
+
+    const res = await fetch(`${url}/api/broadcast-ledger/broadcast`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: "Fresh geopolitics", newsType: "Geopolitics" }),
+    });
+
+    assert.equal(res.status, 201);
+    assert.equal(sends.length, 1);
+  });
+});
+
+test("force:true deliberately overrides the rolling Geopolitics category block", async () => {
+  await withRouter({
+    sendResult: { posted: 1, failed: 0, destinations: [{ channel: "telegram", chatId: "-1", status: "posted", messageId: "83" }] },
+  }, async ({ store, sends, url }) => {
+    store.createReceipt({ title: "Recent geopolitics", newsType: "Geopolitics", status: "posted" });
+
+    const res = await fetch(`${url}/api/broadcast-ledger/broadcast`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: "Deliberate resend", newsType: "Geopolitics", force: true }),
+    });
+
+    assert.equal(res.status, 201);
+    assert.equal(sends.length, 1);
+  });
+});
+
+test("ShareBot67 can record a blocked rolling-window geopolitics preflight", async () => {
   await withRouter({}, async ({ store, url }) => {
     store.createReceipt({
       source: "shortcut",

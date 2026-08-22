@@ -11,6 +11,7 @@ const MAX_IDS = 200;
 // A canonical URL may stay newsworthy for days, so an old receipt must not
 // permanently ban that story from future daily broadcasts.
 const BROADCAST_DUPLICATE_WINDOW_MS = 6 * 60 * 60 * 1000;
+const GEOPOLITICS_DUPLICATE_WINDOW_MS = 24 * 60 * 60 * 1000;
 const ROUTED_NEWS_TYPES = new Set(["Crypto", "Stock", "Economics", "Geopolitics"]);
 
 function badRequest(res, message) {
@@ -82,27 +83,16 @@ const STATUS_LABELS = {
   reconciled: "Sent (by another path)",
   pending: "Not sent yet",
   failed: "Failed",
-  blocked: "Blocked (already broadcast today)",
+  blocked: "Blocked (broadcast in past 24 hours)",
 };
 
-function vancouverDay(value = new Date()) {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Vancouver",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(new Date(value));
-  const part = (type) => parts.find((entry) => entry.type === type)?.value || "";
-  return `${part("year")}-${part("month")}-${part("day")}`;
-}
-
-function postedGeopoliticsToday(store) {
-  const today = vancouverDay();
+function recentPostedGeopolitics(store) {
+  const cutoff = Date.now() - GEOPOLITICS_DUPLICATE_WINDOW_MS;
   return store.list({ limit: 500 }).find((receipt) => (
     ["posted", "partial", "reconciled"].includes(receipt.status)
     && String(receipt.newsType || "").trim().toLowerCase() === "geopolitics"
     && receipt.createdAt
-    && vancouverDay(receipt.createdAt) === today
+    && new Date(receipt.createdAt).getTime() >= cutoff
   )) || null;
 }
 
@@ -464,10 +454,11 @@ function createBroadcastLedgerRouter({
   // Every remaining endpoint is machine-facing and key-only.
   router.use(requireLedgerKey);
 
-  function recordDailyCategoryBlock(body = {}) {
+  function recordCategoryWindowBlock(body = {}) {
     const newsType = String(body.newsType || "").trim();
     if (newsType.toLowerCase() !== "geopolitics") return null;
-    const prior = postedGeopoliticsToday(broadcastLedgerStore);
+    if (body.force === true) return null;
+    const prior = recentPostedGeopolitics(broadcastLedgerStore);
     if (!prior) return null;
 
     const text = typeof body.text === "string" ? body.text.trim() : "";
@@ -483,7 +474,7 @@ function createBroadcastLedgerRouter({
       text,
       status: "blocked",
       idempotencyKey: typeof body.idempotencyKey === "string" ? body.idempotencyKey : "",
-      error: "Blocked: Geopolitics was already broadcast today (America/Vancouver).",
+      error: "Blocked: Geopolitics was already broadcast in the past 24 hours.",
     });
     return { receipt, prior };
   }
@@ -492,11 +483,11 @@ function createBroadcastLedgerRouter({
   // A blocked attempt is recorded here, so a refusal never disappears.
   router.post("/broadcast/guard", (req, res, next) => {
     try {
-      const blocked = recordDailyCategoryBlock(req.body || {});
+      const blocked = recordCategoryWindowBlock(req.body || {});
       if (blocked) {
         return res.status(409).json({
           allowed: false,
-          error: "Geopolitics was already broadcast today.",
+          error: "Geopolitics was already broadcast in the past 24 hours.",
           ...blocked,
         });
       }
@@ -599,12 +590,12 @@ function createBroadcastLedgerRouter({
       // check would fall back to hashing the exact wording.
       const url = rawUrl || firstUrl(text);
 
-      const dailyBlock = recordDailyCategoryBlock({ ...body, source, title, text });
-      if (dailyBlock) {
+      const categoryWindowBlock = recordCategoryWindowBlock({ ...body, source, title, text });
+      if (categoryWindowBlock) {
         return res.status(409).json({
           allowed: false,
-          error: "Geopolitics was already broadcast today.",
-          ...dailyBlock,
+          error: "Geopolitics was already broadcast in the past 24 hours.",
+          ...categoryWindowBlock,
         });
       }
 

@@ -445,8 +445,9 @@ So the split is:
 ```jsonc
 {
   "text": "Fed holds rates steady\nhttps://example.com/news/fed",
+  "newsType": "Economics",
   "source": "shortcut",
-  "idempotencyKey": "shortcut-2026-08-19-1430",
+  "idempotencyKey": "optional retry key",
   "title": "optional — otherwise taken from the first headline line",
   "url": "optional — otherwise the first link in the text",
   "force": false,
@@ -467,6 +468,10 @@ Three behaviours worth knowing:
 - **A retry costs nothing.** Same `idempotencyKey`, or the same story, and the
   second call is refused before Telegram is touched — a phone on a bad
   connection cannot double-post.
+- **Geopolitics has a category window.** A second Geopolitics broadcast within
+  24 rolling hours is blocked even when it is a different story. The existing
+  Shortcut body of `text` plus `newsType` is sufficient; `idempotencyKey` is
+  optional. Pass `"force": true` only for a deliberate override.
 - **A partial send is recorded as `partial`**, keeping the ids that landed. A
   total failure returns `502` and leaves a `failed` receipt, which does *not*
   read as broadcast to anyone asking later.
