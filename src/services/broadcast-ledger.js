@@ -54,7 +54,7 @@ const DEFAULT_SETTINGS = Object.freeze({
   financeTopicRoutingEnabled: true,
   allowedCategories: ALLOWED_CATEGORIES,
   categoryLimits: { Geopolitics: 1 },
-  duplicateWindows: Object.fromEntries(ALLOWED_CATEGORIES.map((category) => [category, "6h"])),
+  duplicateWindows: Object.fromEntries(ALLOWED_CATEGORIES.map((category) => [category, "24h"])),
   timezone: "America/Vancouver",
   historyDays: null,
   notifications: { blocked: true, failed: true, missingCategory: true },
@@ -126,7 +126,7 @@ function normalizeSettings(input = {}) {
   const duplicateWindows = {};
   categories.forEach((category) => {
     const value = input.duplicateWindows?.[category];
-    duplicateWindows[category] = DUPLICATE_WINDOWS.includes(value) ? value : defaults.duplicateWindows[category] || "6h";
+    duplicateWindows[category] = DUPLICATE_WINDOWS.includes(value) ? value : defaults.duplicateWindows[category] || "24h";
   });
   const historyDays = input.historyDays === null || input.historyDays === "forever"
     ? null

@@ -535,7 +535,7 @@
         duplicate.className = 'ledger-category-duplicate'; duplicate.dataset.category = category;
         [['off','Off'],['same-day','Same day'],['6h','6 hours'],['24h','24 hours']].forEach(function (option) {
           var el = document.createElement('option'); el.value = option[0]; el.textContent = option[1];
-          el.selected = (ledgerSettings.duplicateWindows && ledgerSettings.duplicateWindows[category] || '6h') === option[0];
+          el.selected = (ledgerSettings.duplicateWindows && ledgerSettings.duplicateWindows[category] || '24h') === option[0];
           duplicate.appendChild(el);
         });
         row.appendChild(name); row.appendChild(limit); row.appendChild(duplicate); categoriesEl.appendChild(row);

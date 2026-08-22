@@ -12,13 +12,13 @@ const FINANCE_NEWS_DESTINATIONS = Object.freeze([
   Object.freeze({ chatId: "-1001841650798", threadId: "6297" }),
   Object.freeze({ chatId: "-1001941064823", threadId: "984" }),
 ]);
-// Stop accidental double-taps/retries, not legitimate recurring coverage.
-// A canonical URL may stay newsworthy for days, so an old receipt must not
-// permanently ban that story from future daily broadcasts.
-const BROADCAST_DUPLICATE_WINDOW_MS = 6 * 60 * 60 * 1000;
+// Default to a full rolling day so the same story cannot be rebroadcast later
+// in the day merely because the earlier send is more than six hours old.
+const BROADCAST_DUPLICATE_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 function duplicateWindowMs(value) {
   if (value === "off") return 0;
+  if (value === "6h") return 6 * 60 * 60 * 1000;
   if (value === "24h") return 24 * 60 * 60 * 1000;
   if (value === "same-day") return 24 * 60 * 60 * 1000;
   return BROADCAST_DUPLICATE_WINDOW_MS;
@@ -737,7 +737,7 @@ function createBroadcastLedgerRouter({
           ? Date.now() - new Date(existing.receipt.createdAt).getTime()
           : Infinity;
         const category = suppliedCategory || "Unclassified";
-        const configuredWindow = settings.duplicateWindows[category] || "6h";
+        const configuredWindow = settings.duplicateWindows[category] || "24h";
         const windowMs = duplicateWindowMs(configuredWindow);
         const sameConfiguredDay = configuredWindow === "same-day" && existing.receipt
           ? new Intl.DateTimeFormat("en-CA", { timeZone: settings.timezone }).format(new Date(existing.receipt.createdAt)) ===
