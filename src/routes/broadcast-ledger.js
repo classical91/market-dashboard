@@ -728,29 +728,58 @@ function createBroadcastLedgerRouter({
         }
       }
 
-      // Refuse to broadcast a story the ledger already shows as sent. This is
-      // the dedupe actually doing its job at the moment it matters, rather
-      // than after the fact. `force: true` overrides for a deliberate resend.
+      // Refuse another broadcast in the same category during its configured
+      // window. Regenerated wording and missing source URLs make whole-message
+      // hashes insufficient for repeated-news protection.
       if (body.force !== true) {
-        const existing = broadcastLedgerStore.lookup({ url, text, headline: title });
-        const existingAgeMs = existing.receipt && existing.receipt.createdAt
-          ? Date.now() - new Date(existing.receipt.createdAt).getTime()
-          : Infinity;
         const category = suppliedCategory || "Unclassified";
         const configuredWindow = settings.duplicateWindows[category] || "24h";
         const windowMs = duplicateWindowMs(configuredWindow);
-        const sameConfiguredDay = configuredWindow === "same-day" && existing.receipt
-          ? new Intl.DateTimeFormat("en-CA", { timeZone: settings.timezone }).format(new Date(existing.receipt.createdAt)) ===
+        const exact = broadcastLedgerStore.lookup({ url, text, headline: title });
+        const exactAgeMs = exact.receipt?.createdAt
+          ? Date.now() - new Date(exact.receipt.createdAt).getTime()
+          : Infinity;
+        const exactWithinWindow = configuredWindow === "same-day" && exact.receipt
+          ? new Intl.DateTimeFormat("en-CA", { timeZone: settings.timezone }).format(new Date(exact.receipt.createdAt)) ===
             new Intl.DateTimeFormat("en-CA", { timeZone: settings.timezone }).format(new Date())
-          : false;
-        const withinWindow = configuredWindow === "same-day" ? sameConfiguredDay : windowMs && existingAgeMs <= windowMs;
-        if (existing.posted && existing.receipt && withinWindow) {
-          await notify("blocked", existing.receipt, "Already broadcast inside the configured duplicate window.");
+          : Boolean(windowMs && exactAgeMs <= windowMs);
+        if (exact.posted && exact.receipt && exactWithinWindow) {
+          await notify("blocked", exact.receipt, "Already broadcast inside the configured duplicate window.");
+          return res.status(409).json({
+            error: "Already broadcast - pass force:true to send it again.",
+            alreadyBroadcast: true,
+            match: exact.match,
+            receipt: exact.receipt,
+          });
+        }
+        const categoryReceipt = broadcastLedgerStore.list({ newsType: category, status: "broadcasted", limit: 500 })
+          .find((receipt) => {
+            if (!receipt.createdAt) return false;
+            if (configuredWindow === "same-day") {
+              return new Intl.DateTimeFormat("en-CA", { timeZone: settings.timezone }).format(new Date(receipt.createdAt)) ===
+                new Intl.DateTimeFormat("en-CA", { timeZone: settings.timezone }).format(new Date());
+            }
+            return Boolean(windowMs && Date.now() - new Date(receipt.createdAt).getTime() <= windowMs);
+          });
+        if (categoryReceipt) {
+          const blocked = broadcastLedgerStore.createReceipt({
+            source,
+            kind: KINDS.includes(body.kind) ? body.kind : "story",
+            newsType: exactNewsType,
+            title,
+            url,
+            text,
+            status: "blocked",
+            error: `${category} was already broadcast inside the configured ${configuredWindow} window.`,
+            idempotencyKey: body.idempotencyKey,
+          }).receipt;
+          await notifyReceiptChange(blocked);
           return res.status(409).json({
             error: "Already broadcast — pass force:true to send it again.",
             alreadyBroadcast: true,
-            match: existing.match,
-            receipt: existing.receipt,
+            match: "category-window",
+            receipt: blocked,
+            previousReceipt: categoryReceipt,
           });
         }
       }
