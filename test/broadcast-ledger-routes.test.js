@@ -1313,6 +1313,28 @@ test("a retried broadcast with the same idempotency key does not double-send", a
   });
 });
 
+test("the default duplicate window blocks the same story after seven hours", async () => {
+  await withScopedBroadcastApp(async (url, sends, store) => {
+    const payload = {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-broadcast-key": LEDGER_KEY },
+      body: JSON.stringify({ text: "Rolling-day story\nhttps://example.com/rolling-day", newsType: "Stock" }),
+    };
+
+    const first = await fetch(`${url}/api/broadcast-ledger/broadcast`, payload);
+    assert.equal(first.status, 201);
+
+    const document = JSON.parse(fs.readFileSync(store._file, "utf8"));
+    document.receipts[0].createdAt = new Date(Date.now() - 7 * 60 * 60 * 1000).toISOString();
+    fs.writeFileSync(store._file, JSON.stringify(document), "utf8");
+
+    const duplicate = await fetch(`${url}/api/broadcast-ledger/broadcast`, payload);
+    assert.equal(duplicate.status, 409);
+    assert.equal((await duplicate.json()).alreadyBroadcast, true);
+    assert.equal(sends.length, 1);
+  });
+});
+
 test("force:true allows a deliberate resend", async () => {
   await withRouter({
     sendResult: { posted: 1, failed: 0, destinations: [{ channel: "telegram", chatId: "-1", status: "posted", messageId: "6" }] },
