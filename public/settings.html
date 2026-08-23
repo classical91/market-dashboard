@@ -533,9 +533,9 @@
         limit.value = ledgerSettings.categoryLimits && ledgerSettings.categoryLimits[category] || '';
         var duplicate = document.createElement('select');
         duplicate.className = 'ledger-category-duplicate'; duplicate.dataset.category = category;
-        [['off','Off'],['same-day','Same day'],['6h','6 hours'],['24h','24 hours']].forEach(function (option) {
+        [['off','Off'],['same-day','Same day'],['6h','6 hours'],['24h','24 hours'],['42h','42 hours']].forEach(function (option) {
           var el = document.createElement('option'); el.value = option[0]; el.textContent = option[1];
-          el.selected = (ledgerSettings.duplicateWindows && ledgerSettings.duplicateWindows[category] || '24h') === option[0];
+          el.selected = (ledgerSettings.duplicateWindows && ledgerSettings.duplicateWindows[category] || '42h') === option[0];
           duplicate.appendChild(el);
         });
         row.appendChild(name); row.appendChild(limit); row.appendChild(duplicate); categoriesEl.appendChild(row);

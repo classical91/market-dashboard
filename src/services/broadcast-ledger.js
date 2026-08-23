@@ -44,7 +44,7 @@ const KINDS = ["story", "digest"];
 const STATUSES = ["pending", "posted", "partial", "failed", "blocked", "reconciled"];
 const DESTINATION_STATUSES = ["pending", "posted", "failed"];
 const ALLOWED_CATEGORIES = ["Stock", "Crypto", "Geopolitics", "Economics", "Markets", "Technology", "General News"];
-const DUPLICATE_WINDOWS = ["off", "same-day", "6h", "24h"];
+const DUPLICATE_WINDOWS = ["off", "same-day", "6h", "24h", "42h"];
 const HISTORY_DAYS = [30, 90, 180, null];
 const DEFAULT_SETTINGS = Object.freeze({
   requireExactCategory: true,
@@ -54,7 +54,7 @@ const DEFAULT_SETTINGS = Object.freeze({
   financeTopicRoutingEnabled: true,
   allowedCategories: ALLOWED_CATEGORIES,
   categoryLimits: { Geopolitics: 1 },
-  duplicateWindows: Object.fromEntries(ALLOWED_CATEGORIES.map((category) => [category, "24h"])),
+  duplicateWindows: Object.fromEntries(ALLOWED_CATEGORIES.map((category) => [category, "42h"])),
   timezone: "America/Vancouver",
   historyDays: null,
   notifications: { blocked: true, failed: true, missingCategory: true },
@@ -126,7 +126,7 @@ function normalizeSettings(input = {}) {
   const duplicateWindows = {};
   categories.forEach((category) => {
     const value = input.duplicateWindows?.[category];
-    duplicateWindows[category] = DUPLICATE_WINDOWS.includes(value) ? value : defaults.duplicateWindows[category] || "24h";
+    duplicateWindows[category] = DUPLICATE_WINDOWS.includes(value) ? value : defaults.duplicateWindows[category] || "42h";
   });
   const historyDays = input.historyDays === null || input.historyDays === "forever"
     ? null

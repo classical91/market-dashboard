@@ -148,6 +148,11 @@ labels, finance-topic routing, and edit/delete permission. Finance-topic routing
 is enabled by default, applies equally to first delivery and retry, and leaves
 Geopolitics on the separately configured Telegram route. Writes require
 administrator access.
+Every allowed category defaults to an independent rolling `42h` duplicate
+window. Ledger Settings persists each category separately in the mounted data
+volume, so the policy survives restarts and redeploys. `force: true` remains
+the deliberate override. The Shortcut may continue sending only `text` and
+`newsType`; it does not need to add an `idempotencyKey`.
 Enabled alerts are delivered to the private Telegram targets configured in
 `BROADCAST_LEDGER_NOTIFICATION_CHAT_IDS`; preferences alone do not select a
 destination.

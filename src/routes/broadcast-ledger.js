@@ -1,6 +1,7 @@
 "use strict";
 
 const { Router } = require("express");
+const crypto = require("node:crypto");
 const { createRateLimit } = require("../middleware/rate-limit");
 const { isLedgerRequest, isLedgerParamRequest } = require("../middleware/ledger-auth");
 const { deriveTitle, firstUrl } = require("../services/broadcast-ingest");
@@ -8,14 +9,15 @@ const { SOURCES, KINDS, STATUSES, DEFAULT_SETTINGS, canonicalizeUrl, isPostedSta
 const { destinationsForNewsType } = require("../services/news-routing");
 
 const MAX_IDS = 200;
-// Default to a full rolling day so the same story cannot be rebroadcast later
-// in the day merely because the earlier send is more than six hours old.
-const BROADCAST_DUPLICATE_WINDOW_MS = 24 * 60 * 60 * 1000;
+// Default to the operator-approved 42-hour window so rewritten coverage cannot
+// slip through on the following day when persisted settings are unavailable.
+const BROADCAST_DUPLICATE_WINDOW_MS = 42 * 60 * 60 * 1000;
 
 function duplicateWindowMs(value) {
   if (value === "off") return 0;
   if (value === "6h") return 6 * 60 * 60 * 1000;
   if (value === "24h") return 24 * 60 * 60 * 1000;
+  if (value === "42h") return 42 * 60 * 60 * 1000;
   if (value === "same-day") return 24 * 60 * 60 * 1000;
   return BROADCAST_DUPLICATE_WINDOW_MS;
 }
@@ -707,11 +709,17 @@ function createBroadcastLedgerRouter({
       // A configured daily cap is enforced at the actual send boundary too;
       // callers should still preflight through /broadcast/guard so blocked
       // attempts are visible before Telegram is contacted.
-      if (settings.categoryLimits[suppliedCategory]) {
-        if (!String(body.idempotencyKey || "").trim()) {
-          return badRequest(res, `idempotencyKey is required for limited category ${suppliedCategory}.`);
-        }
-        const guarded = broadcastLedgerStore.guard({ ...body, source, title, url, text });
+      const effectiveIdempotencyKey = String(body.idempotencyKey || "").trim()
+        || (settings.categoryLimits[suppliedCategory] ? `broadcast:${crypto.randomUUID()}` : "");
+      if (settings.categoryLimits[suppliedCategory] && body.force !== true) {
+        const guarded = broadcastLedgerStore.guard({
+          ...body,
+          source,
+          title,
+          url,
+          text,
+          idempotencyKey: effectiveIdempotencyKey,
+        });
         if (!guarded.allowed) {
           await notifyReceiptChange(guarded.receipt);
           return res.status(409).json(guarded);
@@ -723,7 +731,7 @@ function createBroadcastLedgerRouter({
       // hashes insufficient for repeated-news protection.
       if (body.force !== true) {
         const category = suppliedCategory || "Unclassified";
-        const configuredWindow = settings.duplicateWindows[category] || "24h";
+        const configuredWindow = settings.duplicateWindows[category] || "42h";
         const windowMs = duplicateWindowMs(configuredWindow);
         const exact = broadcastLedgerStore.lookup({ url, text, headline: title });
         const exactAgeMs = exact.receipt?.createdAt
@@ -761,7 +769,7 @@ function createBroadcastLedgerRouter({
             text,
             status: "blocked",
             error: `${category} was already broadcast inside the configured ${configuredWindow} window.`,
-            idempotencyKey: body.idempotencyKey,
+            idempotencyKey: effectiveIdempotencyKey,
           }).receipt;
           await notifyReceiptChange(blocked);
           return res.status(409).json({
@@ -793,7 +801,7 @@ function createBroadcastLedgerRouter({
         url,
         text,
         status: "pending",
-        idempotencyKey: typeof body.idempotencyKey === "string" ? body.idempotencyKey : "",
+        idempotencyKey: effectiveIdempotencyKey,
       });
       await notifyReceiptChange(receipt);
 
