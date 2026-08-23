@@ -336,15 +336,25 @@ class TelegramService {
    * the real sendMessage response.
    */
   async postText(text, { parseMode = "HTML", targets = null } = {}) {
-    if (!this.configured) throw createServiceError("Telegram is not configured", 400);
     const body = String(text || "").trim();
     if (!body) throw createServiceError("Nothing to send: text is empty", 400);
+    return this._postPreformatted(parseMode === "HTML" ? formatForTelegram(body) : body, { parseMode, targets });
+  }
 
-    const destinations = await this._sendToAllSettled(
-      parseMode === "HTML" ? formatForTelegram(body) : body,
-      { parseMode },
-      targets || this._chatIds,
-    );
+  /**
+   * Send a message whose markup is already final.
+   *
+   * formatForTelegram() escapes `&`, `<` and `>`, so it is not idempotent:
+   * running it over its own output turns `&amp;` into `&amp;amp;` and eats any
+   * HTML tag the caller added deliberately. Callers that assemble their own
+   * markup — a heading around a formatted body — therefore need a way in that
+   * does not format again, rather than formatting twice and shipping a message
+   * with a literal `&lt;b&gt;` in it.
+   */
+  async _postPreformatted(message, { parseMode = "HTML", targets = null } = {}) {
+    if (!this.configured) throw createServiceError("Telegram is not configured", 400);
+
+    const destinations = await this._sendToAllSettled(message, { parseMode }, targets || this._chatIds);
     const posted = destinations.filter((d) => d.status === "posted").length;
 
     // Nothing landed anywhere: same contract as postReport — a total failure
@@ -360,56 +370,33 @@ class TelegramService {
     return { destinations, posted, failed: destinations.length - posted };
   }
 
-  async postReport(report) {
-    if (!this.configured) return;
+  /**
+   * Send one Daily Reporter section as its own categorized broadcast.
+   *
+   * This replaces the old aggregate postReport(), which merged all three
+   * sections into one result set spanning every configured chat. That shape
+   * could not express what the ledger now has to record: which destinations
+   * received *this category*. Merging across sections meant a receipt naming
+   * channels that a given category never reached, and a category identity that
+   * existed only in the message heading.
+   *
+   * Routing is resolved by the caller and passed as `targets`, so the reporter
+   * and the ledger share one destination table rather than each keeping a copy.
+   */
+  async postReportSection({ newsType, text, date = "", targets = null }) {
+    const headings = {
+      Crypto: ["₿", "CRYPTO TOP 10"],
+      Stock: ["📊", "MARKETS TOP 10"],
+      Economics: ["🌍", "ECONOMICS TOP 10"],
+    };
+    const heading = headings[newsType];
+    if (!heading) throw createServiceError("Reporter newsType must be Crypto, Stock, or Economics", 400);
+    const body = String(text || "").trim();
+    if (!body) throw createServiceError("Nothing to send: text is empty", 400);
 
-    const date = report.dateStr || "";
-    const sections = [
-      { emoji: "₿", title: "CRYPTO TOP 10", key: "crypto" },
-      { emoji: "🌍", title: "ECONOMICS TOP 10", key: "economics" },
-      { emoji: "📊", title: "MARKETS TOP 10", key: "markets" },
-    ];
-
-    // One result row per destination, merged across sections: a channel counts
-    // as posted when every section reached it, and failed as soon as one
-    // didn't. The message ID kept is the last one that landed there.
-    const byDestination = new Map();
-    for (const s of sections) {
-      const body = formatForTelegram(report[s.key] || "");
-      const header = `<b>${s.emoji} ${s.title}</b>\n🗓️ ${escapeHtml(date)}\n\n`;
-      const results = await this._sendToAllSettled(header + body);
-      results.forEach((result) => {
-        const key = `${result.chatId}:${result.threadId || ""}`;
-        const existing = byDestination.get(key);
-        if (!existing) {
-          byDestination.set(key, { ...result });
-          return;
-        }
-        byDestination.set(key, {
-          ...existing,
-          status: existing.status === "failed" ? "failed" : result.status,
-          messageId: result.messageId || existing.messageId,
-          error: existing.error || result.error,
-        });
-      });
-    }
-
-    const destinations = [...byDestination.values()];
-    const posted = destinations.filter((d) => d.status === "posted").length;
-
-    // Nothing landed anywhere: keep the pre-existing contract and surface it
-    // as a failed broadcast. A partial result is returned rather than thrown,
-    // so the caller can record which channels actually did receive it.
-    if (destinations.length && posted === 0) {
-      const error = createServiceError(
-        `Telegram broadcast failed for all ${destinations.length} destination(s): ${destinations[0].error || "unknown error"}`,
-        502,
-      );
-      error.destinations = destinations;
-      throw error;
-    }
-
-    return { destinations, posted, failed: destinations.length - posted };
+    // The heading is markup we wrote; only the model's section body is escaped.
+    const message = `<b>${heading[0]} ${heading[1]}</b>\n🗓️ ${escapeHtml(date)}\n\n${formatForTelegram(body)}`;
+    return this._postPreformatted(message, { targets });
   }
 
   async postAIAnalysis(result) {

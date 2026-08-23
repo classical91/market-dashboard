@@ -149,7 +149,7 @@ Most keys are optional. The app is designed to degrade to fallback data where po
 - `BROADCAST_LEDGER_NOTIFICATION_CHAT_IDS` - private Telegram `chatId` or `chatId:threadId` targets for enabled ledger alerts. No alerts are delivered when blank.
 - `OPENAI_API_KEY` - enables report generation.
 - `REPORTER_MODEL` - OpenAI model for reporter generation, defaults to `gpt-5.4-mini`.
-- `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_IDS` - enable Telegram delivery. By default, `Stock`, `Crypto`, and `Economics` ledger broadcasts are restricted to `-1001841650798:6297` and `-1001941064823:984`; Geopolitics keeps the separately configured routing. The persisted **Restrict Stock, Crypto, and Economics routing** Ledger Setting controls this policy for both first delivery and retry.
+- `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_IDS` - enable Telegram delivery. By default, `Stock`, `Crypto`, and `Economics` broadcasts are restricted to `-1001841650798:6297` and `-1001941064823:984`; Geopolitics keeps the separately configured routing. These targets **replace** the configured chat list rather than adding to it, so a broader `TELEGRAM_CHAT_IDS` cannot widen news routing. The policy applies to ledger broadcasts (first delivery and retry) and to the Daily Reporter's per-category sends alike — one table in `src/services/news-routing.js` serves both. The persisted **Restrict Stock, Crypto, and Economics routing** Ledger Setting controls it.
 - `MARKET_DASHBOARD_URL` - public base URL used for Alpha Team `Visit:` links.
 - `ALPHA_TEAM_ACCESS_CODE` - optional read-only password for Alpha Team shared pages opened with `?view=alpha`.
 
