@@ -198,6 +198,14 @@ function renderManualForm({
       const rawTitle = receipt.title || receipt.canonicalUrl || receipt.id;
       const title = /^Broadcasted today\b/i.test(rawTitle) ? `${newsType} News — ${dateLabel}` : rawTitle;
       const statusLabel = STATUS_LABELS[receipt.status] || receipt.status;
+      // A blocked or failed receipt stores why — "Geopolitics was already
+      // broadcast inside the configured 42h window", a Telegram error — but the
+      // card only ever rendered per-destination errors, and a blocked receipt
+      // has no destinations. So the phone showed a bare "Blocked" with no way
+      // to tell a duplicate-window hit from a daily cap or a send failure.
+      // Read from the stored reason rather than the status label so it stays
+      // accurate when the configured window changes.
+      const reason = receipt.error && receipt.error.message ? receipt.error.message : "";
       const keyField = formKey ? `<input type="hidden" name="key" value="${escapeHtml(formKey)}">` : "";
       const destinations = (receipt.destinations || []).map((destination) =>
         `<li><strong>${escapeHtml(destinationName(destination, settings))}</strong><span class="destination-state status-${escapeHtml(destination.status)}">${escapeHtml(destination.status)}</span>${destination.error ? `<span>${escapeHtml(destination.error)}</span>` : ""}</li>`,
@@ -216,6 +224,7 @@ function renderManualForm({
         <div class="receipt-head"><span class="status status-${escapeHtml(receipt.status)}">${escapeHtml(statusLabel)}</span><span class="category">${escapeHtml(newsType)}</span><time>${escapeHtml(when)}</time></div>
         <strong class="headline">${escapeHtml(title)}</strong>
         <div class="receipt-meta"><span>${escapeHtml(SOURCE_LABELS[receipt.source] || receipt.source)}</span><code>${escapeHtml(receipt.id)}</code></div>
+        ${reason ? `<p class="receipt-reason">${escapeHtml(reason)}</p>` : ""}
         ${destinations ? `<ul class="destinations">${destinations}</ul>` : `<p class="missing-destination">Destination not reported</p>`}
         <div class="receipt-actions">
           <button type="button" class="copy-receipt" data-receipt="${copyPayload}">Copy details</button>
