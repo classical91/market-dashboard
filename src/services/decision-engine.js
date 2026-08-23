@@ -268,43 +268,86 @@ function buildRotation({ crypto = [], equities = [], macro = [] } = {}) {
 // Calendar rows carry loose "HH:MM"-style labels rather than full timestamps,
 // so this is deliberately conservative: an unparseable time on a high-impact
 // event still counts as "events today" (medium), never silently low.
+// How long an event counts as "happening now": the run-up chop before a
+// release, and the whipsaw immediately after it. Unchanged from the clock-label
+// version — 45 minutes before, 15 after.
+const NEWS_PRE_WINDOW_MIN = 45;
+const NEWS_POST_WINDOW_MIN = 15;
+
+/**
+ * News risk from today's high-impact events.
+ *
+ * Timed off `item.at` — a real UTC instant — rather than the clock label. The
+ * label version compared "08:30" against `now.getUTCHours()`, so a US feed
+ * publishing 08:30 ET was read as 08:30 UTC and the blackout window sat four or
+ * five hours from the actual release. It also had no date, so yesterday's
+ * event could still be counted down to.
+ *
+ * An event the feed did not timestamp (`at: null`) is reported but never
+ * counted down to: an invented countdown is what a trading gate must not act
+ * on. It still raises the level to medium, because a high-impact release of
+ * unknown time is a reason for caution, not for confidence.
+ */
 function assessNewsRisk(calendarItems = [], now = new Date()) {
   const highImpact = (calendarItems || []).filter((item) => item && item.impact === "High");
   if (!highImpact.length) {
     return { level: "low", reason: "No high-impact events on today's calendar.", nextHighImpact: null };
   }
 
-  const nowMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
-  let imminent = null;
-  let next = null;
-  let nextMinutes = Infinity;
+  const nowMs = now.getTime();
+  const timed = [];
+  const untimed = [];
   for (const item of highImpact) {
-    const match = /^(\d{1,2}):(\d{2})/.exec(String(item.time || ""));
-    if (!match) continue;
-    const eventMinutes = Number(match[1]) * 60 + Number(match[2]);
-    const delta = eventMinutes - nowMinutes;
-    // Inside the pre-event chop window or the immediate post-release whipsaw.
-    if (delta >= -15 && delta <= 45 && !imminent) imminent = { ...item, minutesUntil: delta };
-    if (delta > 45 && eventMinutes < nextMinutes) {
-      next = item;
-      nextMinutes = eventMinutes;
-    }
+    const at = item.at ? Date.parse(item.at) : NaN;
+    if (Number.isFinite(at)) timed.push({ ...item, minutesUntil: Math.round((at - nowMs) / 60000) });
+    else untimed.push(item);
   }
+
+  const describe = (item) => ({
+    time: item.time || "--",
+    title: item.title,
+    at: item.at || null,
+    timezone: item.timezone || null,
+    precision: item.precision || "unknown",
+  });
+
+  // Nearest event inside the window, in either direction: about to land, or
+  // just landed and still repricing.
+  const imminent = timed
+    .filter((item) => item.minutesUntil <= NEWS_PRE_WINDOW_MIN && item.minutesUntil >= -NEWS_POST_WINDOW_MIN)
+    .sort((a, b) => Math.abs(a.minutesUntil) - Math.abs(b.minutesUntil))[0];
 
   if (imminent) {
     const when = imminent.minutesUntil >= 0 ? `in ${imminent.minutesUntil} min` : `${-imminent.minutesUntil} min ago`;
+    const assumed = imminent.precision === "assumed" ? ` — time assumed ${imminent.timezone}` : "";
     return {
       level: "high",
-      reason: `${imminent.title} ${when} (${imminent.time}).`,
-      nextHighImpact: { time: imminent.time, title: imminent.title },
+      reason: `${imminent.title} ${when} (${imminent.time}${imminent.timezone ? ` ${imminent.timezone}` : ""})${assumed}.`,
+      nextHighImpact: describe(imminent),
     };
   }
 
-  const upcoming = next || highImpact[0];
+  const upcoming = timed
+    .filter((item) => item.minutesUntil > NEWS_PRE_WINDOW_MIN)
+    .sort((a, b) => a.minutesUntil - b.minutesUntil)[0];
+
+  if (!upcoming && !untimed.length) {
+    // Every high-impact event today is already well past its window.
+    return {
+      level: "low",
+      reason: `${highImpact.length} high-impact event${highImpact.length > 1 ? "s" : ""} today, all released.`,
+      nextHighImpact: null,
+    };
+  }
+
+  const next = upcoming || untimed[0];
+  const untimedNote = untimed.length
+    ? ` (${untimed.length} with no published time)`
+    : "";
   return {
     level: "medium",
-    reason: `${highImpact.length} high-impact event${highImpact.length > 1 ? "s" : ""} today — next: ${upcoming.title} (${upcoming.time}).`,
-    nextHighImpact: { time: upcoming.time, title: upcoming.title },
+    reason: `${highImpact.length} high-impact event${highImpact.length > 1 ? "s" : ""} today — next: ${next.title} (${next.time || "time unknown"})${untimedNote}.`,
+    nextHighImpact: describe(next),
   };
 }
 
@@ -556,11 +599,28 @@ class DecisionEngineService {
           calendar: calendar.live ? "live" : "fallback",
           signals: screenErrors === 0 ? "live" : screenErrors < screenRows.length ? "partial" : "unavailable",
         },
+        // Enough to prove, from the payload alone, whether news risk was scored
+        // off real scheduled releases: where the calendar came from, why it
+        // fell back if it did, and how many of its events are a real instant
+        // rather than a time we assumed a zone for.
+        calendar: {
+          source: calendar.source || "fallback",
+          live: Boolean(calendar.live),
+          reason: calendar.reason || null,
+          detail: calendar.detail || null,
+          timezone: calendar.timezone || null,
+          fetchedAt: calendar.fetchedAt || null,
+          events: (calendar.items || []).length,
+          timing: calendar.timing || null,
+          droppedNotToday: calendar.droppedNotToday || 0,
+        },
         warnings: [
           ...(crypto.live || crypto.stale ? [] : ["Crypto prices using fallback data — regime score is degraded"]),
           ...(equities.live ? [] : ["Equities using fallback data — regime score is degraded"]),
           ...(macro.live || macro.stale ? [] : ["Macro board using fallback data — regime score is degraded"]),
-          ...(calendar.live ? [] : ["Calendar using fallback data — news risk may be inaccurate"]),
+          ...(calendar.live
+            ? []
+            : [`Calendar using fallback data (${calendar.reason || "unknown"}) — news risk is not scored off real releases${calendar.detail ? `: ${calendar.detail}` : ""}`]),
           ...(screenErrors ? [`${screenErrors} screener symbols failed to scan`] : []),
         ],
       },

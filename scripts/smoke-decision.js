@@ -49,6 +49,22 @@ if (!baseUrl) {
 const results = [];
 let warnings = 0;
 
+/**
+ * A real, finite number — not something that merely survives Number().
+ *
+ * `Number(null)`, `Number("")`, `Number([])` and `Number("  ")` are all 0, and
+ * `Number(true)` is 1, so `Number.isFinite(Number(x))` waves through every one
+ * of them. That is not academic here: scoreSetup() returns `setupScore: null`
+ * for a row with no setup, so a payload of nulls would have validated as a
+ * board of legitimate zero scores — a strict run reporting green over exactly
+ * the missing data it exists to catch.
+ */
+function finiteNumber(value) {
+  if (typeof value === "number") return Number.isFinite(value);
+  if (typeof value === "string" && value.trim() !== "") return Number.isFinite(Number(value));
+  return false;
+}
+
 function record(ok, name, detail) {
   results.push({ ok, name, detail });
   console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? ` — ${detail}` : ""}`);
@@ -123,7 +139,7 @@ async function main() {
 
     const regime = body.regime || null;
     record(
-      Boolean(regime && regime.label && Number.isFinite(Number(regime.score))),
+      Boolean(regime && regime.label && finiteNumber(regime.score)),
       "regime is present with a label and score",
       regime ? `${regime.label} (${regime.score})` : "no regime block",
     );
@@ -134,7 +150,7 @@ async function main() {
     // A setup carrying `error` means the upstream candle feed failed for that
     // symbol. That is a provider problem, not an auth or routing problem, so it
     // warns rather than fails — the endpoint itself is behaving correctly.
-    const scored = (setups || []).filter((s) => s && !s.error && Number.isFinite(Number(s.setupScore)));
+    const scored = (setups || []).filter((s) => s && !s.error && finiteNumber(s.setupScore));
     if (!setups || !setups.length) {
       requireInStrict(false, "at least one setup returned", "no setups returned");
     } else if (!scored.length) {
@@ -167,6 +183,40 @@ async function main() {
         `${liveModules.length}/${moduleNames.length} modules live or stale`,
       );
     }
+    // News risk gates whether a setup is tradeable around a release, so a
+    // fallback calendar is not a cosmetic degradation — it means that gate is
+    // being scored off static seed data. The payload names the cause, so report
+    // it rather than leaving "calendar: fallback" to be interpreted.
+    const cal = (quality && quality.calendar) || null;
+    if (cal) {
+      requireInStrict(
+        cal.live === true,
+        "macro calendar is live",
+        cal.live
+          ? `${cal.source}, ${cal.events} event(s) today, timezone ${cal.timezone}`
+          : `${cal.reason || "unknown reason"}${cal.detail ? ` — ${cal.detail}` : ""}`,
+      );
+
+      // A live feed whose events are all times we assumed a zone for is worth
+      // knowing about: correct only insofar as MACRO_CALENDAR_TIMEZONE is.
+      if (cal.live && cal.timing && cal.timing.total) {
+        const { exact, assumed, untimed, total } = cal.timing;
+        record(true, "calendar event timing", `${exact} exact, ${assumed} assumed, ${untimed} untimed of ${total}`);
+        if (!exact && assumed) {
+          warn(
+            "calendar timing is all assumed",
+            `no event states its own offset — every time is read as ${cal.timezone}; confirm MACRO_CALENDAR_TIMEZONE matches the feed`,
+          );
+        }
+        if (untimed) warn("calendar events without a published time", `${untimed} of ${total} cannot be counted down to`);
+      }
+      if (cal.droppedNotToday) {
+        record(true, "stale calendar events excluded", `${cal.droppedNotToday} event(s) dated to another day were dropped`);
+      }
+    } else {
+      requireInStrict(false, "macro calendar is live", "payload carries no dataQuality.calendar block");
+    }
+
     if (quality && quality.warnings && quality.warnings.length) {
       warn("data quality", `${quality.warnings.length} degraded input(s): ${quality.warnings[0]}`);
     }

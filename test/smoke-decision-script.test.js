@@ -23,7 +23,21 @@ function healthyDecision(interval = "4h") {
       { symbol: "BTCUSDT", signal: "LONG", setupScore: 78, action: "Ready — watch for entry" },
       { symbol: "ETHUSDT", signal: "SHORT", setupScore: 51, action: "Low edge" },
     ],
-    dataQuality: { modules: { crypto: "live", equities: "live" }, warnings: [] },
+    dataQuality: {
+      modules: { crypto: "live", equities: "live", calendar: "live" },
+      calendar: {
+        source: "macro_calendar_url",
+        live: true,
+        reason: null,
+        detail: null,
+        timezone: "America/New_York",
+        fetchedAt: "2026-08-23T12:00:00.000Z",
+        events: 2,
+        timing: { total: 2, exact: 2, assumed: 0, untimed: 0 },
+        droppedNotToday: 0,
+      },
+      warnings: [],
+    },
   };
 }
 
@@ -34,7 +48,18 @@ function degradedDecision() {
     ...healthyDecision(),
     setups: [{ symbol: "BTCUSDT", error: "Binance klines HTTP 403 for BTCUSDT 4h" }],
     dataQuality: {
-      modules: { crypto: "fallback", equities: "fallback", macro: "fallback" },
+      modules: { crypto: "fallback", equities: "fallback", macro: "fallback", calendar: "fallback" },
+      calendar: {
+        source: "fallback",
+        live: false,
+        reason: "request-failed",
+        detail: "Macro calendar HTTP 503",
+        timezone: "UTC",
+        fetchedAt: null,
+        events: 4,
+        timing: { total: 4, exact: 0, assumed: 0, untimed: 4 },
+        droppedNotToday: 0,
+      },
       warnings: ["Crypto prices using fallback data — regime score is degraded"],
     },
   };
@@ -143,6 +168,86 @@ test("strict mode passes a genuinely healthy payload", async () => {
   assert.doesNotMatch(stdout, /^FAIL/m);
 });
 
+// Number(null) is 0, so Number.isFinite(Number(setupScore)) waved a null score
+// through as a legitimate zero. scoreSetup() returns null for a row with no
+// setup, so this is the shape a real degraded board has — a strict run must not
+// report green over exactly the missing data it exists to catch.
+test("strict mode rejects a null setup score instead of reading it as zero", async () => {
+  const { code, stdout } = await runSmoke(
+    {
+      ...LOCKED_DOWN,
+      "GET /api/decision": () => [
+        200,
+        {
+          ...healthyDecision(),
+          setups: [
+            { symbol: "BTCUSDT", signal: "FLAT", setupScore: null, action: "No setup" },
+            { symbol: "ETHUSDT", signal: "FLAT", setupScore: null, action: "No setup" },
+          ],
+        },
+      ],
+    },
+    { strict: true },
+  );
+  assert.equal(code, 1, stdout);
+  assert.match(stdout, /FAIL {2}at least one setup carries a finite setupScore/);
+});
+
+// The same coercion trap, one level up: a null regime score is not a score of 0.
+test("strict mode rejects a null regime score", async () => {
+  const { code, stdout } = await runSmoke(
+    {
+      ...LOCKED_DOWN,
+      "GET /api/decision": () => [
+        200,
+        { ...healthyDecision(), regime: { label: "Risk-On", score: null, modifiers: [] } },
+      ],
+    },
+    { strict: true },
+  );
+  assert.equal(code, 1, stdout);
+  assert.match(stdout, /FAIL {2}regime is present with a label and score/);
+});
+
+// Every other value that survives Number() as a finite number without being one.
+test("strict mode rejects empty-string, boolean and array scores", async () => {
+  for (const score of ["", "   ", true, []]) {
+    const { code, stdout } = await runSmoke(
+      {
+        ...LOCKED_DOWN,
+        "GET /api/decision": () => [
+          200,
+          {
+            ...healthyDecision(),
+            setups: [{ symbol: "BTCUSDT", signal: "LONG", setupScore: score, action: "Watch" }],
+          },
+        ],
+      },
+      { strict: true },
+    );
+    assert.equal(code, 1, `${JSON.stringify(score)} must not read as a score:\n${stdout}`);
+  }
+});
+
+// A genuine numeric zero is a real score and must still pass.
+test("a real zero setup score is accepted", async () => {
+  const { code, stdout } = await runSmoke(
+    {
+      ...LOCKED_DOWN,
+      "GET /api/decision": () => [
+        200,
+        {
+          ...healthyDecision(),
+          setups: [{ symbol: "BTCUSDT", signal: "SHORT", setupScore: 0, action: "Skip" }],
+        },
+      ],
+    },
+    { strict: true },
+  );
+  assert.equal(code, 0, stdout);
+  assert.match(stdout, /PASS {2}at least one setup carries a finite setupScore/);
+});
+
 test("strict mode fails when setups are scored but carry no direction", async () => {
   const { code, stdout } = await runSmoke(
     {
@@ -156,6 +261,63 @@ test("strict mode fails when setups are scored but carry no direction", async ()
   );
   assert.equal(code, 1, stdout);
   assert.match(stdout, /FAIL {2}scored setups carry a direction and an action/);
+});
+
+// News risk gates trading around releases, so a fallback calendar means that
+// gate is scored off seed data — not a cosmetic degradation.
+test("strict mode fails a fallback calendar and names the cause", async () => {
+  const { code, stdout } = await runSmoke(
+    { ...LOCKED_DOWN, "GET /api/decision": () => [200, degradedDecision()] },
+    { strict: true },
+  );
+  assert.equal(code, 1, stdout);
+  assert.match(stdout, /FAIL {2}macro calendar is live/);
+  assert.match(stdout, /request-failed/);
+  assert.match(stdout, /HTTP 503/);
+});
+
+test("normal mode reports the calendar cause without failing on it", async () => {
+  const { code, stdout } = await runSmoke({
+    ...LOCKED_DOWN,
+    "GET /api/decision": () => [200, { ...healthyDecision(), setups: degradedDecision().setups }],
+  });
+  assert.equal(code, 0, stdout);
+  assert.match(stdout, /PASS {2}macro calendar is live/);
+});
+
+// A live feed publishing bare clock labels is only as correct as the configured
+// zone, and that is worth saying out loud rather than reporting a clean green.
+test("a live calendar with no self-stated offsets warns about the assumed zone", async () => {
+  const { code, stdout } = await runSmoke(
+    {
+      ...LOCKED_DOWN,
+      "GET /api/decision": () => {
+        const body = healthyDecision();
+        body.dataQuality.calendar.timing = { total: 2, exact: 0, assumed: 2, untimed: 0 };
+        return [200, body];
+      },
+    },
+    { strict: true },
+  );
+  assert.equal(code, 0, stdout);
+  assert.match(stdout, /WARN {2}calendar timing is all assumed/);
+  assert.match(stdout, /MACRO_CALENDAR_TIMEZONE/);
+});
+
+test("a payload with no calendar block fails strict rather than passing silently", async () => {
+  const { code, stdout } = await runSmoke(
+    {
+      ...LOCKED_DOWN,
+      "GET /api/decision": () => {
+        const body = healthyDecision();
+        delete body.dataQuality.calendar;
+        return [200, body];
+      },
+    },
+    { strict: true },
+  );
+  assert.equal(code, 1, stdout);
+  assert.match(stdout, /FAIL {2}macro calendar is live/);
 });
 
 test("an unreachable deploy fails on health and stops there", async () => {
