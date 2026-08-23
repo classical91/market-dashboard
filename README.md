@@ -101,7 +101,36 @@ npm run smoke:decision -- https://your-dashboard.up.railway.app
 
 It sends no cookies, so it sees exactly what the TraderClaw agent sees, and checks in order: the health probe answers; `GET /api/decision` returns `200` without a login; the payload echoes the interval and carries a regime label/score and scored setups with a direction and action; `/api/decision/journal` and the Trading Lab still answer `401`/`403`; and a write to `/api/decision` is rejected rather than inheriting the read bypass.
 
-Output is `PASS`/`WARN`/`FAIL` per check with the URL and HTTP status, and the exit code is non-zero if any check fails. Degraded upstream market data warns rather than fails — that is a provider outage, not a broken deploy. Every request is a `GET` apart from one `POST /api/decision` that is asserted to be *rejected*; nothing it does can mutate production state or place a trade. Optional: `DECISION_INTERVAL` (default `4h`), `SMOKE_TIMEOUT_MS` (default `20000`).
+It has two modes, because "is the deploy up?" and "is the deploy usable?" are different questions:
+
+| Mode | Answers | Degraded market data |
+| --- | --- | --- |
+| normal (default) | reachability and the access model | `WARN` — a provider outage is not a broken deploy |
+| `--strict` | trading health: a real scored setup with a direction and action, a regime, and market data that is not wholly fallback | `FAIL` — reachable but unusable is not green |
+
+```bash
+npm run smoke:decision -- https://your-dashboard.up.railway.app --strict
+```
+
+Output is `PASS`/`WARN`/`FAIL` per check with the URL and HTTP status, and the exit code is non-zero if any check fails. Every request is a `GET` apart from one `POST /api/decision` that is asserted to be *rejected*; nothing it does can mutate production state or place a trade. Optional: `DECISION_INTERVAL` (default `4h`), `SMOKE_TIMEOUT_MS` (default `20000`), `SMOKE_STRICT=1` as an alternative to `--strict`.
+
+### Paper pipeline reconciliation
+
+`GET /api/trading-lab/pipeline` answers the question no single store could: of everything the signal bridge evaluated, where did each one end up, and did anything silently disappear?
+
+Three stores hold three different kinds of record, and they are deliberately not the same thing:
+
+| Store | File | What it is |
+| --- | --- | --- |
+| `SignalActionStore` | `signal-bridge-log.json` | the **evaluation** ledger — one row per scored transition, whatever the outcome. The denominator. |
+| `PaperTradingService` | `trading-lab/<book>/{positions,history}.json` | the **execution** ledger — paper fills and their closes. |
+| `TradeJournalService` | `trade-journal.json` | the **human** journal — hand-logged and hand-graded through the admin-keyed route. |
+
+The reconciliation view reads all three and writes none of them. In particular it never feeds the human journal: its win-rate and expectancy statistics are only meaningful because a person vouched for every row, so an automated dump would quietly destroy them. The journal is reported alongside, labelled `maintainedBy: "human"`.
+
+`reconciled` is `true` only when every evaluated row reached a terminal status carrying a reason, and every bridge-owned paper fill has an evaluation row behind it. Anything else appears in `discrepancies` (`unknown-status`, `missing-reason`, `missing-attribution`, `unlogged-fill`) with enough detail to go looking. A `summary` line reads like `73 evaluated, 70 blocked, 2 dry-run, 1 failed, 0 unaccounted`.
+
+Note that zero bridge-owned fills is the **designed** outcome today, not a broken pipeline: the Signal Bot has no registered strategy identity, so persistent execution is refused by attribution even when `SIGNAL_BOT_PAPER_TRADE_ENABLED=true`. The view says so explicitly in `execution.note` rather than leaving a bare zero to be misread.
 
 ## Environment Variables
 
