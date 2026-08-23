@@ -527,13 +527,22 @@ strictly receipt-only. That is a deliberate trade: the alternative is the
 The ledger key can only post to `TELEGRAM_CHAT_IDS`. Moving the Shortcut onto
 this endpoint is a net reduction in what the phone holds.
 
-Stock, Crypto and Economics broadcasts are narrower than the general Telegram
-list: when `newsType` is exactly `Stock`, `Crypto` or `Economics`, `/broadcast`
-posts only to `-1001841650798:6297` and `-1001941064823:984`, and the receipt
-records only those actual destinations. Geopolitics routing remains separate.
-The **Restrict Stock, Crypto, and Economics routing** option in Ledger Settings
-is enabled by default and is read by both first delivery and failed retry. An
-operator can disable it to restore the general `TELEGRAM_CHAT_IDS` fan-out.
+Categorized broadcasts are narrower than the general Telegram list. When
+`newsType` is exactly `Stock`, `Crypto` or `Economics`, `/broadcast` posts only
+to `-1001841650798:6297` and `-1001941064823:984`. When it is `Geopolitics`, it
+posts only to the War Room topic, `-1001841650798:75972`. Either way the receipt
+records only the destinations that category actually reached, and these targets
+*replace* the configured chat list rather than adding to it — a broader
+`TELEGRAM_CHAT_IDS` cannot widen news routing.
+
+The two sets do not overlap: finance news never reaches the War Room, and
+Geopolitics never reaches the finance topics.
+
+The **Restrict news categories to their approved topics** option in Ledger
+Settings governs all of the above, is enabled by default, and is read by both
+first delivery and failed retry. An operator can disable it to restore the
+general `TELEGRAM_CHAT_IDS` fan-out. The setting key remains
+`financeTopicRoutingEnabled` so stored settings keep working.
 
 ## Integration 2 — GPT / iOS Shortcut
 
