@@ -292,7 +292,10 @@ test("Stock, Crypto, and Economics broadcasts send only to the approved finance 
   });
 });
 
-test("Geopolitics broadcasts keep the separately configured Telegram routing", async () => {
+// Geopolitics is locked to the War Room topic, and to that alone. It used to
+// follow TELEGRAM_CHAT_IDS like an uncategorized send, which put war-room
+// stories into the general channels next to the market digests.
+test("Geopolitics broadcasts go to the War Room topic", async () => {
   await withScopedBroadcastApp(async (scopedBase, calls) => {
     const res = await fetch(`${scopedBase}/api/broadcast-ledger/broadcast`, {
       method: "POST",
@@ -309,15 +312,39 @@ test("Geopolitics broadcasts keep the separately configured Telegram routing", a
 
     assert.equal(res.status, 201);
     assert.equal(calls.length, 1);
-    assert.equal(calls[0].options.targets, undefined);
+    assert.deepEqual(calls[0].options.targets, [{ chatId: "-1001841650798", threadId: "75972" }]);
     assert.deepEqual(body.receipt.destinations.map((destination) => ({
       chatId: destination.chatId,
       threadId: destination.threadId,
     })), [
-      { chatId: "-100111", threadId: "1" },
-      { chatId: "-100222", threadId: "2" },
-      { chatId: "-100333", threadId: "3" },
+      { chatId: "-1001841650798", threadId: "75972" },
     ]);
+  });
+});
+
+// The War Room is its own room: a Geopolitics send must not also reach the
+// finance topics, and a finance send must not reach the War Room.
+test("Geopolitics and the finance categories do not cross over", async () => {
+  await withScopedBroadcastApp(async (scopedBase, calls) => {
+    for (const newsType of ["Geopolitics", "Crypto"]) {
+      await fetch(`${scopedBase}/api/broadcast-ledger/broadcast`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-broadcast-key": LEDGER_KEY },
+        body: JSON.stringify({
+          source: "sharebot67",
+          newsType,
+          title: `${newsType} crossover test`,
+          text: `${newsType} crossover test https://example.com/${newsType.toLowerCase()}-crossover`,
+          idempotencyKey: `crossover-${newsType}`,
+        }),
+      });
+    }
+
+    const [geo, crypto] = calls.map((call) => call.options.targets.map((t) => `${t.chatId}:${t.threadId}`));
+    assert.deepEqual(geo, ["-1001841650798:75972"]);
+    assert.deepEqual(crypto, ["-1001841650798:6297", "-1001941064823:984"]);
+    assert.ok(!crypto.includes("-1001841650798:75972"), "finance news must not reach the War Room");
+    assert.ok(!geo.some((target) => crypto.includes(target)), "Geopolitics must not reach the finance topics");
   });
 });
 
