@@ -428,6 +428,67 @@ test("broadcast receipts page is mobile-ready without a manual-entry form", asyn
   assert.doesNotMatch(html, /Record one by hand|Save receipt/);
 });
 
+// A blocked receipt has no destinations, and the card only rendered
+// per-destination errors — so the phone showed a bare "Blocked" with no way to
+// tell a duplicate-window hit from a daily cap or a send failure.
+test("a blocked receipt card says why it was blocked", async () => {
+  await post("/api/broadcast-ledger/receipts", {
+    source: "sharebot67",
+    title: "Blocked reason render check",
+    newsType: "Crypto",
+    status: "blocked",
+    error: { message: "Crypto was already broadcast inside the configured 42h window." },
+    idempotencyKey: "blocked-reason-render",
+  });
+
+  const res = await fetch(`${base}/api/broadcast-ledger/manual`, { headers: { "x-broadcast-key": LEDGER_KEY } });
+  const html = await res.text();
+
+  assert.equal(res.status, 200);
+  assert.match(html, /class="receipt-reason"/);
+  assert.match(html, /already broadcast inside the configured 42h window/);
+});
+
+// The reason is stored text and reaches the page unescaped otherwise.
+test("a blocked reason is escaped rather than reflected as markup", async () => {
+  await post("/api/broadcast-ledger/receipts", {
+    source: "sharebot67",
+    title: "Blocked reason escaping check",
+    newsType: "Crypto",
+    status: "blocked",
+    error: { message: "<script>alert(1)</script>" },
+    idempotencyKey: "blocked-reason-escape",
+  });
+
+  const html = await (await fetch(`${base}/api/broadcast-ledger/manual`, {
+    headers: { "x-broadcast-key": LEDGER_KEY },
+  })).text();
+
+  assert.doesNotMatch(html, /<script>alert\(1\)<\/script>/);
+  assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
+});
+
+// A healthy receipt must not grow an empty reason line.
+test("a posted receipt renders no reason line", async () => {
+  await post("/api/broadcast-ledger/receipts", {
+    source: "shortcut",
+    title: "Posted with no reason to show",
+    newsType: "Crypto",
+    status: "posted",
+    idempotencyKey: "posted-no-reason",
+    destinations: [{ channel: "telegram", chatId: "-100999", status: "posted", messageId: "77" }],
+  });
+
+  const html = await (await fetch(`${base}/api/broadcast-ledger/manual`, {
+    headers: { "x-broadcast-key": LEDGER_KEY },
+  })).text();
+
+  const cards = html.split('class="receipt-card"');
+  const card = cards.find((chunk) => chunk.includes("Posted with no reason to show"));
+  assert.ok(card, "the posted receipt must be on the page");
+  assert.ok(!card.includes("receipt-reason"), "a posted receipt has no reason to render");
+});
+
 test("manual form submission stores a posted receipt and redirects", async () => {
   const res = await fetch(`${base}/api/broadcast-ledger/manual`, {
     method: "POST",
