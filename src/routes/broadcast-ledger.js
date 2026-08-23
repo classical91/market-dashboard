@@ -5,13 +5,9 @@ const { createRateLimit } = require("../middleware/rate-limit");
 const { isLedgerRequest, isLedgerParamRequest } = require("../middleware/ledger-auth");
 const { deriveTitle, firstUrl } = require("../services/broadcast-ingest");
 const { SOURCES, KINDS, STATUSES, DEFAULT_SETTINGS, canonicalizeUrl, isPostedStatus } = require("../services/broadcast-ledger");
+const { destinationsForNewsType } = require("../services/news-routing");
 
 const MAX_IDS = 200;
-const FINANCE_NEWS_TYPES = new Set(["Stock", "Crypto", "Economics"]);
-const FINANCE_NEWS_DESTINATIONS = Object.freeze([
-  Object.freeze({ chatId: "-1001841650798", threadId: "6297" }),
-  Object.freeze({ chatId: "-1001941064823", threadId: "984" }),
-]);
 // Default to a full rolling day so the same story cannot be rebroadcast later
 // in the day merely because the earlier send is more than six hours old.
 const BROADCAST_DUPLICATE_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -26,12 +22,6 @@ function duplicateWindowMs(value) {
 
 function badRequest(res, message) {
   res.status(400).json({ error: message });
-}
-
-function destinationsForNewsType(newsType, settings) {
-  return settings?.financeTopicRoutingEnabled !== false && FINANCE_NEWS_TYPES.has(newsType)
-    ? FINANCE_NEWS_DESTINATIONS.map((target) => ({ ...target }))
-    : null;
 }
 
 /**
