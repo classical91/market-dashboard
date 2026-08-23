@@ -406,7 +406,7 @@ test("ledger settings persist with the recommended defaults", () => {
   assert.equal(defaults.historyDays, null);
   assert.equal(defaults.notifications.failed, true);
   assert.equal(defaults.categoryLimits.Geopolitics, 1);
-  assert.ok(Object.values(defaults.duplicateWindows).every((window) => window === "24h"));
+  assert.ok(Object.values(defaults.duplicateWindows).every((window) => window === "42h"));
 
   store.updateSettings({
     financeTopicRoutingEnabled: false,

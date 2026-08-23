@@ -1313,7 +1313,7 @@ test("a retried broadcast with the same idempotency key does not double-send", a
   });
 });
 
-test("the default duplicate window blocks rewritten news in the same category after seven hours", async () => {
+test("the default 42-hour window blocks rewritten news in the same category after 30 hours", async () => {
   await withScopedBroadcastApp(async (url, sends, store) => {
     const payload = {
       method: "POST",
@@ -1325,7 +1325,7 @@ test("the default duplicate window blocks rewritten news in the same category af
     assert.equal(first.status, 201);
 
     const document = JSON.parse(fs.readFileSync(store._file, "utf8"));
-    document.receipts[0].createdAt = new Date(Date.now() - 7 * 60 * 60 * 1000).toISOString();
+    document.receipts[0].createdAt = new Date(Date.now() - 30 * 60 * 60 * 1000).toISOString();
     fs.writeFileSync(store._file, JSON.stringify(document), "utf8");
 
     const duplicate = await fetch(`${url}/api/broadcast-ledger/broadcast`, {
@@ -1338,6 +1338,38 @@ test("the default duplicate window blocks rewritten news in the same category af
     assert.equal(body.match, "category-window");
     assert.equal(body.receipt.status, "blocked");
     assert.equal(sends.length, 1);
+  });
+});
+
+test("the default category window expires after 42 rolling hours", async () => {
+  await withScopedBroadcastApp(async (url, sends, store) => {
+    const send = (text) => fetch(`${url}/api/broadcast-ledger/broadcast`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-broadcast-key": LEDGER_KEY },
+      body: JSON.stringify({ text, newsType: "Stock" }),
+    });
+
+    assert.equal((await send("Old stock report")).status, 201);
+    const document = JSON.parse(fs.readFileSync(store._file, "utf8"));
+    document.receipts[0].createdAt = new Date(Date.now() - 43 * 60 * 60 * 1000).toISOString();
+    fs.writeFileSync(store._file, JSON.stringify(document), "utf8");
+
+    assert.equal((await send("Fresh stock report")).status, 201);
+    assert.equal(sends.length, 2);
+  });
+});
+
+test("Geopolitics keeps accepting the Shortcut text and newsType payload without an idempotency key", async () => {
+  await withScopedBroadcastApp(async (url, sends) => {
+    const res = await fetch(`${url}/api/broadcast-ledger/broadcast`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-broadcast-key": LEDGER_KEY },
+      body: JSON.stringify({ text: "Geopolitics briefing", newsType: "Geopolitics" }),
+    });
+
+    assert.equal(res.status, 201);
+    assert.equal(sends.length, 1);
+    assert.equal((await res.json()).receipt.newsType, "Geopolitics");
   });
 });
 
@@ -1370,6 +1402,20 @@ test("force:true allows a deliberate resend", async () => {
     const forced = await send({ force: true });
 
     assert.equal(forced.status, 201);
+    assert.equal(sends.length, 2);
+  });
+});
+
+test("force:true overrides the Geopolitics category window and daily limit", async () => {
+  await withScopedBroadcastApp(async (url, sends) => {
+    const send = (text, force = false) => fetch(`${url}/api/broadcast-ledger/broadcast`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-broadcast-key": LEDGER_KEY },
+      body: JSON.stringify({ text, newsType: "Geopolitics", force }),
+    });
+
+    assert.equal((await send("First geopolitics report")).status, 201);
+    assert.equal((await send("Deliberate geopolitics override", true)).status, 201);
     assert.equal(sends.length, 2);
   });
 });
