@@ -10,19 +10,33 @@
 // check is a GET, apart from one POST to /api/decision that is asserted to be
 // *rejected* — that route has no POST handler, so it can only 401/403/404.
 //
+// Two modes, because "is the deploy up?" and "is the deploy usable?" are
+// different questions and conflating them is how a green run misleads:
+//
+//   normal (default) — reachability and the access model. Degraded upstream
+//     market data warns, because a Binance outage is not a broken deploy.
+//   strict (--strict, or SMOKE_STRICT=1) — trading health. The payload must
+//     actually be usable: a real scored setup with a direction and an action,
+//     a regime, and market data that is not wholly fallback. Degraded data is
+//     a FAIL here — a dashboard that is reachable but unusable is not green.
+//
 // Usage:
 //   DASHBOARD_URL=https://your-dashboard.up.railway.app npm run smoke:decision
 //   npm run smoke:decision -- https://your-dashboard.up.railway.app
+//   npm run smoke:decision -- https://your-dashboard.up.railway.app --strict
 //
 // Optional:
 //   DECISION_INTERVAL   interval to request, defaults to 4h
 //   SMOKE_TIMEOUT_MS    per-request timeout, defaults to 20000
+//   SMOKE_STRICT        set to 1/true for strict mode
 //
 // Exit code is 0 only when every check passes.
 
 const DEFAULT_TIMEOUT_MS = 20_000;
 
-const baseUrl = String(process.argv[2] || process.env.DASHBOARD_URL || "").replace(/\/+$/, "");
+const args = process.argv.slice(2);
+const strict = args.includes("--strict") || /^(1|true)$/i.test(String(process.env.SMOKE_STRICT || ""));
+const baseUrl = String(args.find((a) => !a.startsWith("-")) || process.env.DASHBOARD_URL || "").replace(/\/+$/, "");
 const interval = process.env.DECISION_INTERVAL || "4h";
 const timeoutMs = Number(process.env.SMOKE_TIMEOUT_MS) || DEFAULT_TIMEOUT_MS;
 
@@ -43,6 +57,13 @@ function record(ok, name, detail) {
 function warn(name, detail) {
   warnings += 1;
   console.log(`WARN  ${name}${detail ? ` — ${detail}` : ""}`);
+}
+
+// Degraded market data: a warning about deploy health, a failure about trading
+// health. The single switch between the two modes.
+function requireInStrict(ok, name, detail) {
+  if (ok || strict) record(ok, name, detail);
+  else warn(name, detail);
 }
 
 // Every request is deliberately cookie-less: the point is to reproduce what an
@@ -80,7 +101,7 @@ function describe(res) {
 }
 
 async function main() {
-  console.log(`smoke:decision — ${baseUrl} (interval ${interval})\n`);
+  console.log(`smoke:decision — ${baseUrl} (interval ${interval}, ${strict ? "strict" : "normal"} mode)\n`);
 
   // 1. The deploy is up at all. Everything after this is meaningless if it is not.
   const health = await request("GET", "/api/health");
@@ -115,14 +136,15 @@ async function main() {
     // warns rather than fails — the endpoint itself is behaving correctly.
     const scored = (setups || []).filter((s) => s && !s.error && Number.isFinite(Number(s.setupScore)));
     if (!setups || !setups.length) {
-      warn("setup scores present", "no setups returned");
+      requireInStrict(false, "at least one setup returned", "no setups returned");
     } else if (!scored.length) {
-      warn(
-        "setup scores present",
+      requireInStrict(
+        false,
+        "at least one setup carries a finite setupScore",
         `all ${setups.length} setups returned an upstream error, e.g. ${(setups[0] && setups[0].error) || "unknown"}`,
       );
     } else {
-      record(true, "setup scores present", `${scored.length}/${setups.length} scored`);
+      record(true, "at least one setup carries a finite setupScore", `${scored.length}/${setups.length} scored`);
       const complete = scored.filter((s) => s.signal && s.action);
       record(
         complete.length === scored.length,
@@ -131,7 +153,20 @@ async function main() {
       );
     }
 
+    // Every module on fallback means the numbers are shaped correctly and mean
+    // nothing — precisely the "reachable but unusable" state strict mode exists
+    // to catch.
     const quality = body.dataQuality || null;
+    const modules = (quality && quality.modules) || {};
+    const moduleNames = Object.keys(modules);
+    const liveModules = moduleNames.filter((name) => modules[name] === "live" || modules[name] === "stale");
+    if (moduleNames.length) {
+      requireInStrict(
+        liveModules.length > 0,
+        "market data is not entirely degraded",
+        `${liveModules.length}/${moduleNames.length} modules live or stale`,
+      );
+    }
     if (quality && quality.warnings && quality.warnings.length) {
       warn("data quality", `${quality.warnings.length} degraded input(s): ${quality.warnings[0]}`);
     }
@@ -154,7 +189,11 @@ async function main() {
     describe(write),
   );
 
-  const lab = await request("GET", "/api/trading-lab/overview");
+  // The real overview route is `router.get("/")` on the mounted router — there
+  // is no `/overview`. Probing a path that does not exist would have proved
+  // only that site auth 401s unrouted URLs, not that the Trading Lab itself is
+  // protected.
+  const lab = await request("GET", "/api/trading-lab");
   if (lab.status === 200) {
     warn("Trading Lab requires a session", `${describe(lab)} (is MARKET_DASHBOARD_LOGIN_PASSWORD set?)`);
   } else {
@@ -167,9 +206,13 @@ async function main() {
 function finish() {
   const failed = results.filter((r) => !r.ok);
   console.log(
-    `\n${failed.length ? "FAILED" : "OK"} — ${results.length - failed.length}/${results.length} checks passed` +
+    `\n${failed.length ? "FAILED" : "OK"} (${strict ? "strict" : "normal"}) — ` +
+      `${results.length - failed.length}/${results.length} checks passed` +
       `${warnings ? `, ${warnings} warning(s)` : ""}`,
   );
+  if (!failed.length && !strict && warnings) {
+    console.log("  note: warnings above are not failures in normal mode — re-run with --strict to gate on them");
+  }
   for (const failure of failed) {
     console.log(`  failing: ${failure.name} — ${failure.detail}`);
   }
