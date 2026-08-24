@@ -1,4 +1,5 @@
 const { createServiceError } = require("../utils/errors");
+const { normalizeCalendar, isValidTimeZone } = require("./calendar-normalize");
 
 const DEFAULT_CRYPTOS = [
   { symbol: "BTC", id: "bitcoin", name: "Bitcoin" },
@@ -92,6 +93,10 @@ class MarketDataService {
         config.macroSymbols || process.env.MACRO_SYMBOLS || "",
       ),
       calendarUrl: config.calendarUrl || process.env.MACRO_CALENDAR_URL || "",
+      // The zone a feed's bare clock labels ("08:30") are published in. Only
+      // consulted when the feed does not state an offset itself; a recognised
+      // suffix on the value ("08:30 ET") still wins over this.
+      calendarTimezone: config.calendarTimezone || process.env.MACRO_CALENDAR_TIMEZONE || "UTC",
     };
     // Last-known-good live responses, keyed per data type, so a transient
     // CoinGecko rate-limit (429) serves slightly stale real data instead of
@@ -369,20 +374,58 @@ class MarketDataService {
     }
   }
 
-  async getCalendar() {
+  /**
+   * Today's macro calendar.
+   *
+   * Every fallback names why. "Calendar is on fallback" used to be a dead end:
+   * a missing URL, a 500 from the provider, a JSON shape we could not read and
+   * a feed with nothing scheduled today all produced the same silent static
+   * list, so there was no way to tell a misconfiguration from an outage from a
+   * quiet Sunday — while news risk carried on being scored off seed data.
+   */
+  async getCalendar({ now = new Date() } = {}) {
     const url = this.config.calendarUrl;
+    const timezone = isValidTimeZone(this.config.calendarTimezone) ? this.config.calendarTimezone : "UTC";
     if (!url) {
-      return calendarFallback();
+      return calendarFallback({
+        reason: "not-configured",
+        detail: "MACRO_CALENDAR_URL is not set",
+        timezone,
+      });
     }
     try {
       const data = await this.singleFetch(url, { Accept: "application/json" }, "Macro calendar");
-      const items = normalizeCalendar(data);
+      const { items, reason, dropped } = normalizeCalendar(data, { timezone, now });
       if (!items.length) {
-        return calendarFallback();
+        return calendarFallback({
+          reason: reason || "empty-feed",
+          detail: reason === "invalid-shape"
+            ? "Feed did not contain an array of events (expected an array, or {events|items|data:[...]})"
+            : reason === "no-events-today"
+              ? `Feed returned ${dropped} event(s), none scheduled today in ${timezone}`
+              : "Feed returned no usable events",
+          timezone,
+        });
       }
-      return { live: true, source: "macro_calendar_url", items };
+      return {
+        live: true,
+        source: "macro_calendar_url",
+        items,
+        timezone,
+        reason: null,
+        detail: null,
+        fetchedAt: new Date().toISOString(),
+        // How much of this is a real instant rather than an assumed one.
+        timing: summarizeTiming(items),
+        droppedNotToday: dropped,
+      };
     } catch (error) {
-      return { ...calendarFallback(), error: error.message };
+      return calendarFallback({
+        reason: "request-failed",
+        detail: error.message,
+        timezone,
+        error: error.message,
+      });
     }
   }
 
@@ -476,11 +519,38 @@ function macroFallback() {
   };
 }
 
-function calendarFallback() {
+function summarizeTiming(items) {
+  return {
+    total: items.length,
+    exact: items.filter((item) => item.precision === "exact").length,
+    assumed: items.filter((item) => item.precision === "assumed").length,
+    untimed: items.filter((item) => item.precision === "unknown").length,
+  };
+}
+
+/**
+ * The static calendar, always carrying the reason the live feed was not used.
+ *
+ * Fallback events are marked `precision: "unknown"` and `at: null` on purpose:
+ * they are illustrative seed data, not a schedule, so news risk must never
+ * count down to one of them as though a real release were imminent.
+ */
+function calendarFallback({ reason = "not-configured", detail = null, timezone = "UTC", error = null } = {}) {
   return {
     live: false,
     source: "fallback",
-    items: FALLBACK_CALENDAR.map((item) => ({ ...item })),
+    timezone,
+    reason,
+    detail,
+    ...(error ? { error } : {}),
+    items: FALLBACK_CALENDAR.map((item) => ({
+      ...item,
+      at: null,
+      timezone,
+      precision: "unknown",
+    })),
+    timing: { total: FALLBACK_CALENDAR.length, exact: 0, assumed: 0, untimed: FALLBACK_CALENDAR.length },
+    droppedNotToday: 0,
   };
 }
 
@@ -541,43 +611,6 @@ function normalizeMacro(data) {
     })
     .filter(Boolean)
     .slice(0, 12);
-}
-
-// Normalize a macro-calendar JSON feed (array or {events|items|data:[...]})
-// into the dashboard's calendar event shape.
-function normalizeCalendar(data) {
-  const rows = Array.isArray(data) ? data : data?.events || data?.items || data?.data || [];
-  if (!Array.isArray(rows)) {
-    return [];
-  }
-  return rows
-    .map((row) => {
-      if (!row || typeof row !== "object") return null;
-      const title = String(row.title || row.event || row.name || "").trim();
-      if (!title) return null;
-      const impactRaw = String(row.impact || row.importance || "Low").trim();
-      const impact = impactRaw.charAt(0).toUpperCase() + impactRaw.slice(1).toLowerCase();
-      return {
-        time: normalizeCalendarTime(row.time || row.datetime || row.date),
-        title: title.slice(0, 120),
-        impact: ["High", "Medium", "Low"].includes(impact) ? impact : "Low",
-        country: row.country ? String(row.country).slice(0, 40) : null,
-      };
-    })
-    .filter(Boolean)
-    .slice(0, 10);
-}
-
-function normalizeCalendarTime(value) {
-  if (value == null) return "--";
-  const text = String(value).trim();
-  // Already a clock-style label (e.g. "08:30" or "14:00 ET"): keep as-is.
-  if (/^\d{1,2}:\d{2}/.test(text)) return text.slice(0, 20);
-  const date = new Date(typeof value === "number" && value < 1e12 ? value * 1000 : value);
-  if (!Number.isNaN(date.getTime())) {
-    return date.toISOString().slice(11, 16);
-  }
-  return text.slice(0, 20) || "--";
 }
 
 // Normalize a variety of news-feed JSON shapes (NewsAPI, Finnhub, generic

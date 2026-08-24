@@ -114,6 +114,39 @@ npm run smoke:decision -- https://your-dashboard.up.railway.app --strict
 
 Output is `PASS`/`WARN`/`FAIL` per check with the URL and HTTP status, and the exit code is non-zero if any check fails. Every request is a `GET` apart from one `POST /api/decision` that is asserted to be *rejected*; nothing it does can mutate production state or place a trade. Optional: `DECISION_INTERVAL` (default `4h`), `SMOKE_TIMEOUT_MS` (default `20000`), `SMOKE_STRICT=1` as an alternative to `--strict`.
 
+### Macro calendar and news risk
+
+The Decision Engine gates news risk on "is a high-impact release inside the next 45 minutes?", and that answer feeds setup quality — so a calendar event has to be a real instant, not a clock label.
+
+Every event resolves to `at`, a UTC ISO timestamp, or to `null`:
+
+| Feed value | `at` | `precision` |
+| --- | --- | --- |
+| `2026-08-23T08:30:00-04:00`, `…Z`, epoch seconds/ms | the instant it states | `exact` |
+| `2026-08-23 09:45` (no offset) | read in `MACRO_CALENDAR_TIMEZONE` | `assumed` |
+| `08:30 ET`, `14:00 UTC` | read in the labelled zone, which beats the configured default | `assumed` |
+| `08:30` (bare) | today, in `MACRO_CALENDAR_TIMEZONE` | `assumed` |
+| `TBA`, unparseable, absent | `null` | `unknown` |
+
+Two rules follow from that:
+
+- **Events dated to another day are dropped.** Yesterday's CPI is never counted down to; `droppedNotToday` reports how many were excluded.
+- **An event with no `at` never produces a countdown.** It still raises news risk to medium — a high-impact release at an unknown time is a reason for caution — but nothing claims it is "in 12 min". Fallback events are all `at: null` for exactly this reason: seed data must never trigger a blackout.
+
+`GET /api/decision` reports the outcome under `dataQuality.calendar`:
+
+```json
+{
+  "source": "macro_calendar_url", "live": true, "reason": null,
+  "timezone": "America/New_York", "events": 2, "droppedNotToday": 1,
+  "timing": { "total": 2, "exact": 0, "assumed": 1, "untimed": 1 }
+}
+```
+
+When it falls back, `reason` says which of these happened — `not-configured`, `request-failed`, `invalid-shape`, `empty-feed`, `no-events-today` — with `detail` carrying the underlying error. A fallback calendar means news risk is being scored off static seed data, so `npm run smoke:decision -- --strict` fails on it.
+
+If `timing.exact` is 0 while `assumed` is non-zero, no event states its own offset and every time is only as correct as `MACRO_CALENDAR_TIMEZONE`. Prefer a feed that emits ISO timestamps with offsets.
+
 ### Paper pipeline reconciliation
 
 `GET /api/trading-lab/pipeline` answers the question no single store could: of everything the signal bridge evaluated, where did each one end up, and did anything silently disappear?
@@ -164,7 +197,8 @@ Most keys are optional. The app is designed to degrade to fallback data where po
 - `MACRO_DATA_URL` - optional JSON macro feed (`{symbol, name, price, changePercent}` rows); takes priority over Finnhub for the macro board.
 - `MACRO_SYMBOLS` - `DISPLAY=PROVIDER_SYMBOL` pairs for the Finnhub macro adapter; defaults to free-tier ETF proxies (`XAU=GLD,DXY=UUP,WTI=USO,VIX=VIXY`).
 - `MACRO_DATA_PROVIDER` - set to `none` to force static macro fallback.
-- `MACRO_CALENDAR_URL` - optional JSON macro-calendar feed (`{time, title, impact, country}` rows).
+- `MACRO_CALENDAR_URL` - optional JSON macro-calendar feed. Accepts a bare array or `{events|items|data: [...]}`; each row needs a title (`title`/`event`/`name`), an impact (`impact`/`importance`), and a time (`time`/`datetime`/`date`/`timestamp`, or a `date` plus a `time`). See [Macro calendar and news risk](#macro-calendar-and-news-risk).
+- `MACRO_CALENDAR_TIMEZONE` - the zone a feed's bare clock labels are published in, e.g. `America/New_York`. Defaults to `UTC`. Only consulted when the event itself carries no offset.
 - `DECISION_CACHE_MS` - Decision Engine payload cache TTL, defaults to `120000`. The engine reuses the feeds above; adding a `US10Y` row via `MACRO_SYMBOLS` or `MACRO_DATA_URL` enriches its regime score and rotation board with live yields.
 
 ### Signal Bot Telegram Alerts
