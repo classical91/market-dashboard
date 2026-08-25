@@ -54,8 +54,9 @@ differently, and never promote a fact between tiers without new evidence.
 
 ### Asserted by the audit, not independently verified
 
-Source: `output/market-dashboard-incident-audit-2026-08-25.md`. Re-derive each
-from primary data before it gates an acceptance criterion.
+Source: `output/market-dashboard-incident-audit-2026-08-25.md`. Every figure
+here is a hypothesis until step 2 reproduces it from primary data. None may
+gate an acceptance criterion before then.
 
 - Exactly **56** strategy-account paper executions opened since
   `2026-08-20T00:00:00Z` are absent from the learning journal by stable
@@ -73,7 +74,7 @@ from primary data before it gates an acceptance criterion.
 - **The `{items}` production-shape observation.** Its source URL was never
   independently confirmed against a specific endpoint. It entered the plan
   through the incident-facts handoff, and no production capture behind it has
-  been identified. See step 2 — it may not be an observation of production at
+  been identified. See §2.1 — it may not be an observation of production at
   all.
 
 ---
@@ -81,14 +82,32 @@ from primary data before it gates an acceptance criterion.
 ## 1. Preserve the workspace
 
 - Inspect all worktrees, branches, and dirty files before changing anything.
-- Branch from **current `main`** (post-#229).
-- Do not reopen #229 — it is squash-merged and final. New branch, new PR.
+- Branch from **current `main`**.
+- Do not reopen a merged PR. New branch, new PR.
 - Do not overwrite or mix in unrelated changes.
 
-## 2. Re-establish the `{items}` provenance before touching the planner
+## 2. Evidence reconstruction — mandatory phase before any planner change
 
-This step gates step 3. Do not modify parsing or pagination logic until it
-resolves.
+**The invariant: reconstruct and freeze the evidence first; only then modify
+recovery code.**
+
+All four checks below must complete before step 3 begins. Not one of them —
+all four. No parsing, pagination, filtering, or reconciliation logic may be
+modified while any check is open, and no manifest may be built.
+
+The counts this recovery is judged on are hypotheses until reproduced from
+primary data. An unverified constant is more dangerous than a missing one: a
+missing constant blocks, while an unverified one silently becomes an
+acceptance gate and certifies whatever it was derived from.
+
+| # | Check | Resolves |
+|---|---|---|
+| 2.1 | `{items}` provenance | Which endpoint, if any, produced the observed shape |
+| 2.2 | Re-derived journal-gap count | Whether **56** reproduces |
+| 2.3 | Re-derived attribution-gap count | Whether **167 / 1,149** reproduces from raw persisted data |
+| 2.4 | Snapshot metadata and hashes | What exact inputs the above were computed from |
+
+### 2.1 Establish the `{items}` provenance
 
 The committed contract returns a plain array. The planner consumes one. So on
 committed code there is no mismatch — the mismatch exists only if production
@@ -116,14 +135,20 @@ branch. A shim converts an unexplained divergence into a silent one.
 Throughout: do not guess response shapes, and do not invent pagination
 parameters.
 
-### 2a. Completeness is asserted, not paginated
+### 2.2 Re-derive the journal-gap population
 
-On the committed contract there is nothing to paginate — no offset, no cursor,
-only a tail-anchored `limit` clamped to 1000. Trades older than the last 1000
-are unreachable at any parameter combination, so traversal cannot be built
-read-only.
+Re-derive the set of strategy-account executions absent from the learning
+journal, keyed on stable `positionId`, inside the window bounded by
+`2026-08-20T00:00:00Z` and the §2.4 snapshot timestamp. Produce the **set of
+IDs**, not just a count — a count that matches by coincidence over a different
+population is a false confirmation.
 
-`totalTrades` already carries the ground truth:
+Completeness of the execution read is a precondition, and it is asserted
+rather than paginated. On the committed contract there is nothing to
+paginate — no offset, no cursor, only a tail-anchored `limit` clamped to 1000.
+Trades older than the last 1000 are unreachable at any parameter combination,
+so traversal cannot be built read-only. `totalTrades` already carries the
+ground truth:
 
 ```
 returned === totalTrades   →  complete, proceed
@@ -131,15 +156,64 @@ returned <  totalTrades    →  fail closed
 ```
 
 Fail closed names the account, `returned`, and `totalTrades`. Widening the
-endpoint's window is a source change and separate approved work.
+endpoint's window is a source change and separate approved work. Follow real
+pagination to exhaustion **only** if 2.1 proved the live endpoint offers it.
 
-Implement real pagination **only** if step 2 proves the live endpoint offers
-it, and then follow that contract to exhaustion. Otherwise the assertion above
-is the completeness proof.
+An incomplete read cannot produce a trustworthy gap population, so a
+truncation here halts the phase — it is not a partial result to carry forward.
+
+### 2.3 Re-derive the attribution-gap population from raw persisted data
+
+Re-derive the rows lacking symbol/direction/strategy attribution, and the
+total row count, from the **raw persisted Signal Bot store** —
+`_read({ normalize: false })`. Never from `/signal-actions` or any other
+normalized read.
+
+This ordering is load-bearing. `normalizeEntry()` synthesizes the very
+attribution under audit (§5a), so a population derived through it would be
+smaller than the true gap by exactly the rows the heuristic guessed — and
+would appear to confirm whatever number the audit reported.
+
+Produce the set of row identities, the gap count, and the total.
+
+### 2.4 Record the reconstruction snapshot
+
+Freeze what the above was computed from, so every later step and every
+manifest ties back to identified inputs:
+
+- snapshot timestamp (this becomes `--through` in §3a)
+- content hash and row count of the raw Signal Bot store
+- per-account `totalTrades` and `returned`
+- endpoint URLs and response shapes exactly as observed in 2.1
+- commit SHA of the code the reconstruction ran against
+
+This record is the evidence base. Manifests reference it; §5c's apply-time
+precondition checks against it.
+
+### 2.5 Stop rule
+
+**Any material discrepancy stops the run.** If a re-derived population or
+count does not reproduce the audit's figure — 56, or 167 of 1,149 — halt
+before planner changes, before manifests, and before any recovery logic.
+Report the audit's figure, the re-derived figure, and the difference in
+membership, not merely in magnitude.
+
+Do not reconcile a discrepancy by adjusting the expected number to match, and
+do not proceed on the larger or smaller of the two. A figure that does not
+reproduce is a finding about the incident, and it is the user's call how to
+proceed.
+
+### Exit criteria
+
+The phase completes when all four checks resolve without discrepancy. The
+re-derived populations then become hard acceptance gates for the rest of the
+work, and the recorded snapshot becomes the reference every manifest cites.
+
+Only at that point may step 3 begin.
 
 ## 3. Fix the recovery planner locally
 
-- Consume only the verified response shape from step 2.
+- Consume only the response shape verified in 2.1.
 - Validate schemas; fail closed on malformed, partial, truncated, or
   contradictory responses.
 - Key on the stable Dashboard `positionId` / journal
@@ -156,9 +230,12 @@ The strategies keep running, so an open-ended "since Aug 20" drifts to 57, 58,
 --from 2026-08-20T00:00:00Z --through <audit-snapshot-time>
 ```
 
-Both mandatory, neither defaulted. Filter on the position's opening timestamp.
-Assert **exactly 56** distinct position IDs inside the window; any other count
-fails closed with the actual count and the boundary rows. Record the snapshot
+Both mandatory, neither defaulted; `--through` is the snapshot timestamp
+recorded in §2.4. Filter on the position's opening timestamp.
+
+Assert against the **population re-derived in §2.2** — the exact ID set, not
+the bare number 56. Any divergence fails closed with the actual count, the
+symmetric difference in membership, and the boundary rows. Record the snapshot
 time in the manifest so the run reproduces.
 
 ### 3b. Duplicate position IDs abort; they are never collapsed
@@ -194,9 +271,9 @@ array — which is why a shape mismatch would not be caught either way.
 
 Add:
 
-- fixtures matching the exact shape verified in step 2
+- fixtures matching the exact shape verified in §2.1
 - `returned < totalTrades` → fail closed
-- multiple pages, and empty pages, **only if** step 2 proved pagination exists
+- multiple pages, and empty pages, **only if** §2.1 proved pagination exists
 - window filtering, including rows on both boundaries
 - the 56-count assertion passing and failing
 - identical duplicates → reported; conflicting duplicates → abort
@@ -237,7 +314,8 @@ using the very heuristic under audit.
   regardless of the field's name or the branch framing it as "recovered".
 - Work from the **raw persisted rows** — `_read({ normalize: false })` bypasses
   normalization — or from sanitized fixtures derived from them, not from the
-  normalized API view alone.
+  normalized API view alone. §2.3 has already established that population;
+  this step classifies it.
 - Classify every field into exactly one bucket, and carry the bucket into the
   manifest:
 
@@ -269,8 +347,9 @@ Design the eventual write path so it cannot repair a moving target:
 expected source hash + row count  →  apply  →  verify
 ```
 
-If the Signal Bot store changes between dry run and approval, the apply
-command aborts rather than applying a manifest built against different bytes.
+The expected values are the ones recorded in §2.4. If the Signal Bot store
+changes between reconstruction and approval, the apply command aborts rather
+than applying a manifest built against different bytes.
 
 ## 6. Produce dry-run artifacts before any write
 
@@ -304,6 +383,7 @@ Commit on a new branch from current `main`; open a new PR. Report:
 - exact dry-run counts
 - unresolved IDs and count
 - proposed deployment command, recovery commands, rollback
-- **step 2's finding**, stated explicitly: which branch of the table applied,
-  and on what evidence
+- **the step 2 reconstruction**, stated explicitly: which branch of the §2.1
+  table applied and on what evidence; whether the §2.2 and §2.3 populations
+  reproduced; and the §2.4 snapshot record
 - any unresolved production/code drift
