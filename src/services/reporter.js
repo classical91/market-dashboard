@@ -3,6 +3,7 @@ const path = require("path");
 const crypto = require("crypto");
 const OpenAI = require("openai");
 const { resolveDataDir } = require("../utils/data-dir");
+const { withExclusiveLock, writeJsonAtomic } = require("./json-file-lock");
 
 const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000;
 const REPORT_SECTIONS = ["crypto", "economics", "markets"];
@@ -222,6 +223,7 @@ class ReporterService {
     this._client = apiKey ? new OpenAI({ apiKey }) : null;
     this._model = model || "gpt-5.4-mini";
     this._logFile = path.join(dataDir || resolveDataDir(), "reporter-generation-log.json");
+    this._lockState = { depth: 0 };
     this._rateLimitedUntil = new Map();
   }
 
@@ -271,27 +273,43 @@ class ReporterService {
   }
 
   _writeLog(entries) {
-    try {
-      const dir = path.dirname(this._logFile);
-      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(this._logFile, JSON.stringify(entries.slice(0, 100), null, 2), "utf8");
-    } catch (err) {
-      console.error("[Reporter] Failed to write generation log:", err.message);
-    }
+    writeJsonAtomic(this._logFile, entries.slice(0, 100), console, "[Reporter]");
+  }
+
+  /**
+   * Serialize a read-modify-write of the generation log.
+   *
+   * Two sections generating at once — which is the normal case, since a cycle
+   * fans out across crypto, economics and markets — would otherwise each read
+   * the same log, prepend their own entry, and write back, so whichever
+   * finished last silently dropped the other's entry.
+   */
+  _updateLog(mutate) {
+    return withExclusiveLock(
+      this._logFile,
+      this._lockState,
+      () => {
+        const log = this._readLog();
+        const next = mutate(log);
+        this._writeLog(next);
+        return next;
+      },
+      { busyMessage: "Reporter generation log is busy; retry the request." },
+    );
   }
 
   _logGeneration(entry) {
-    const log = this._readLog();
-    log.unshift(entry);
-    this._writeLog(log);
+    this._updateLog((log) => {
+      log.unshift(entry);
+      return log;
+    });
   }
 
   importLogEntries(entries, ttlMs) {
     const incoming = Array.isArray(entries) ? entries.map(normalizeImportedLogEntry).filter(Boolean) : [];
     if (!incoming.length) return this._buildReport(ttlMs || DEFAULT_TTL_MS);
 
-    const merged = dedupeLog([...incoming, ...this._readLog()]);
-    this._writeLog(merged);
+    const merged = this._updateLog((log) => dedupeLog([...incoming, ...log]));
 
     const resolvedTtl = ttlMs || DEFAULT_TTL_MS;
     REPORT_SECTIONS.forEach((section) => {
