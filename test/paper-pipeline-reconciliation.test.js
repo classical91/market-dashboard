@@ -156,12 +156,47 @@ test("the reconciliation view accounts for every evaluated setup", async () => {
   assert.equal(report.evaluation.unaccounted, 0, "every row must reach a terminal status");
   assert.equal(report.evaluation.accounted, 4);
   assert.equal(report.evaluation.withReason, 4, "every row must explain itself");
+  assert.equal(report.evaluation.recoveredLegacyAttribution, 0);
   assert.equal(report.evaluation.byStatus["dry-run"], 2);
   assert.equal(report.evaluation.byStatus.failed, 1);
   assert.equal(report.evaluation.byStatus.skipped, 1);
   assert.equal(report.reconciled, true);
   assert.deepEqual(report.discrepancies, []);
   assert.match(report.summary, /^4 evaluated,/);
+});
+
+test("legacy Signal Bot rows recover deterministic identity and attribution without rewriting the log", () => {
+  const dataDir = tempDir("md-reconcile-legacy-");
+  const file = path.join(dataDir, "signal-bridge-log.json");
+  const legacy = {
+    timestamp: "2026-08-20T12:13:06.236Z",
+    symbol: "APTUSDT",
+    interval: "4h",
+    direction: "LONG",
+    status: "dry-run",
+    reason: "Would open (paper trading disabled)",
+  };
+  fs.writeFileSync(file, JSON.stringify([legacy], null, 2));
+
+  const first = new SignalActionStore({ dataDir, logger: QUIET }).recent(1)[0];
+  const second = new SignalActionStore({ dataDir, logger: QUIET }).recent(1)[0];
+  assert.match(first.id, /^legacy-signal-action-[a-f0-9]{20}$/);
+  assert.equal(first.id, second.id, "legacy identity must be stable across reads");
+  assert.equal(first.source, "signal-bot");
+  assert.equal(first.strategy, "signal-bot:4h");
+  assert.equal(first.attributionRecovered, true);
+  assert.deepEqual(JSON.parse(fs.readFileSync(file, "utf8")), [legacy], "read normalization must not rewrite production evidence");
+
+  const store = new SignalActionStore({ dataDir, logger: QUIET });
+  store.record({ source: "signal-bot", symbol: "BTCUSDT", interval: "4h", direction: "LONG", strategy: "signal-bot:4h", status: "blocked", reason: "test" });
+  const persisted = JSON.parse(fs.readFileSync(file, "utf8"));
+  assert.equal(persisted[1].id, undefined, "adding a new row must not backfill the legacy row on disk");
+  assert.equal(persisted[1].strategy, undefined);
+
+  const report = reconcilePaperPipeline({ signalActionStore: new SignalActionStore({ dataDir, logger: QUIET }) });
+  assert.equal(report.reconciled, true);
+  assert.equal(report.evaluation.recoveredLegacyAttribution, 1);
+  assert.deepEqual(report.discrepancies, []);
 });
 
 test("the human trade journal is reported alongside, never written by the pipeline", async () => {

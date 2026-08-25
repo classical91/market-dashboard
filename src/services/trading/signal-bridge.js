@@ -292,6 +292,7 @@ class SignalTradeBridge {
   _record({ transition, status, reason, assessment = null, opened = null }) {
     const action = {
       timestamp: new Date().toISOString(),
+      source: "signal-bot",
       symbol: transition.symbol,
       interval: transition.interval,
       direction: transition.to,

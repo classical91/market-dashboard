@@ -163,6 +163,24 @@ The reconciliation view reads all three and writes none of them. In particular i
 
 `reconciled` is `true` only when every evaluated row reached a terminal status carrying a reason, and every bridge-owned paper fill has an evaluation row behind it. Anything else appears in `discrepancies` (`unknown-status`, `missing-reason`, `missing-attribution`, `unlogged-fill`) with enough detail to go looking. A `summary` line reads like `73 evaluated, 70 blocked, 2 dry-run, 1 failed, 0 unaccounted`.
 
+Legacy Signal Bot rows written before source/strategy attribution receive a deterministic
+`legacy-signal-action-*` identity and an in-memory `signal-bot:<interval>` attribution when
+read. The source file is not rewritten; `evaluation.recoveredLegacyAttribution` reports how
+many rows were recovered. New rows persist a UUID at creation time.
+
+To plan learning-journal recovery without writing either system, provide the existing admin
+key only through the process environment and run:
+
+```powershell
+$env:ADMIN_API_KEY = '<retrieve securely>'
+npm run recovery:journal:plan -- --base-url "https://market-dashboard-production-b2f4.up.railway.app" --journal "C:\path\to\learning-journal-2026.jsonl"
+Remove-Item Env:ADMIN_API_KEY
+```
+
+The command performs keyed GETs only. It joins strategy-account executions to journal rows
+by stable position ID, reports missing/orphan evidence, and keeps blocked, dry-run, failed,
+and skipped signal actions separate from executions. It has no apply mode.
+
 Note that zero bridge-owned fills is the **designed** outcome today, not a broken pipeline: the Signal Bot has no registered strategy identity, so persistent execution is refused by attribution even when `SIGNAL_BOT_PAPER_TRADE_ENABLED=true`. The view says so explicitly in `execution.note` rather than leaving a bare zero to be misread.
 
 ## Environment Variables

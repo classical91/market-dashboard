@@ -111,6 +111,7 @@ function reconcilePaperPipeline({
     accounted: actions.length - unknownStatus.length,
     unaccounted: unknownStatus.length,
     withReason: actions.length - missingReason.length,
+    recoveredLegacyAttribution: actions.filter((row) => row.attributionRecovered === true).length,
     // Scored as tradeable but not filled — the population that would become
     // fills if execution were enabled and attributed.
     eligible: actions.filter((row) => row.status === "dry-run" && /would open/i.test(String(row.reason || ""))).length,

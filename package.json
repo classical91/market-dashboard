@@ -11,6 +11,7 @@
     "test": "node --test",
     "parity": "node scripts/traderclaw-parity.js",
     "smoke:decision": "node scripts/smoke-decision.js",
+    "recovery:journal:plan": "node scripts/plan-learning-journal-recovery.js",
     "postinstall": "playwright install chromium || true"
   },
   "dependencies": {
