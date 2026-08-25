@@ -25,6 +25,7 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const { withExclusiveLock, writeJsonAtomic } = require("./json-file-lock");
 
 const LEDGER_VERSION = 2;
 const DEFAULT_CAP = 5000;
@@ -90,9 +91,6 @@ const MAX_DESTINATIONS = 50;
 /** Default window for the conservative tier-3 headline match. */
 const DEFAULT_HEADLINE_WINDOW_MS = 36 * 60 * 60 * 1000;
 const CAPACITY_RESERVATION_TTL_MS = 15 * 60 * 1000;
-const WRITE_LOCK_WAIT_MS = 250;
-const WRITE_LOCK_STALE_MS = 30 * 1000;
-const LOCK_SLEEP = new Int32Array(new SharedArrayBuffer(4));
 
 function sha256(value) {
   return crypto.createHash("sha256").update(String(value)).digest("hex");
@@ -294,8 +292,7 @@ function isPostedStatus(status) {
 class BroadcastLedgerStore {
   constructor({ dataDir, logger = console, cap = DEFAULT_CAP, headlineWindowMs } = {}) {
     this._file = path.join(dataDir, "broadcast-ledger.json");
-    this._lockFile = `${this._file}.lock`;
-    this._lockDepth = 0;
+    this._lockState = { depth: 0 };
     this._logger = logger;
     this._cap = cap;
     this._headlineWindowMs = headlineWindowMs || DEFAULT_HEADLINE_WINDOW_MS;
@@ -321,75 +318,29 @@ class BroadcastLedgerStore {
   }
 
   _withExclusiveLock(operation) {
-    if (this._lockDepth) return operation();
-
-    const dir = path.dirname(this._file);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    const deadline = Date.now() + WRITE_LOCK_WAIT_MS;
-    let fd = null;
-
-    while (fd === null) {
-      try {
-        fd = fs.openSync(this._lockFile, "wx");
-      } catch (err) {
-        if (err.code !== "EEXIST") throw err;
-        try {
-          const age = Date.now() - fs.statSync(this._lockFile).mtimeMs;
-          if (age > WRITE_LOCK_STALE_MS) {
-            fs.unlinkSync(this._lockFile);
-            continue;
-          }
-        } catch (statErr) {
-          if (statErr.code === "ENOENT") continue;
-        }
-        if (Date.now() >= deadline) {
-          const busy = new Error("Broadcast ledger is busy; retry the request.");
-          busy.statusCode = 503;
-          busy.expose = true;
-          throw busy;
-        }
-        Atomics.wait(LOCK_SLEEP, 0, 0, 5);
-      }
-    }
-
-    this._lockDepth += 1;
-    try {
-      return operation();
-    } finally {
-      this._lockDepth -= 1;
-      try { fs.closeSync(fd); } catch {}
-      try { fs.unlinkSync(this._lockFile); } catch {}
-    }
+    return withExclusiveLock(this._file, this._lockState, operation, {
+      busyMessage: "Broadcast ledger is busy; retry the request.",
+    });
   }
 
   _write(receipts, settings = this._readDocument().settings) {
-    let tempFile = null;
-    try {
-      const dir = path.dirname(this._file);
-      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-      const normalizedSettings = normalizeSettings(settings);
-      const cutoff = normalizedSettings.historyDays
-        ? Date.now() - normalizedSettings.historyDays * 24 * 60 * 60 * 1000
-        : null;
-      const retained = cutoff
-        ? receipts.filter((receipt) => !isFiniteDate(receipt.createdAt) || new Date(receipt.createdAt).getTime() >= cutoff)
-        : receipts;
-      const payload = {
+    const normalizedSettings = normalizeSettings(settings);
+    const cutoff = normalizedSettings.historyDays
+      ? Date.now() - normalizedSettings.historyDays * 24 * 60 * 60 * 1000
+      : null;
+    const retained = cutoff
+      ? receipts.filter((receipt) => !isFiniteDate(receipt.createdAt) || new Date(receipt.createdAt).getTime() >= cutoff)
+      : receipts;
+    writeJsonAtomic(
+      this._file,
+      {
         version: LEDGER_VERSION,
         settings: normalizedSettings,
         receipts: retained.slice(0, this._cap),
-      };
-      tempFile = `${this._file}.${process.pid}.${crypto.randomBytes(4).toString("hex")}.tmp`;
-      fs.writeFileSync(tempFile, JSON.stringify(payload, null, 2), "utf8");
-      fs.renameSync(tempFile, this._file);
-      tempFile = null;
-    } catch (err) {
-      this._logger.error?.("[BroadcastLedger] Failed to write ledger:", err.message);
-    } finally {
-      if (tempFile) {
-        try { fs.unlinkSync(tempFile); } catch {}
-      }
-    }
+      },
+      this._logger,
+      "[BroadcastLedger]",
+    );
   }
 
   getSettings() {
