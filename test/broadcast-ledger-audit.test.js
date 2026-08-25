@@ -512,15 +512,24 @@ test("the daily category limit is enforced from the resolved category", async ()
   });
 });
 
-test("a limited category requires a stable idempotency key", async () => {
+test("a limited category is still guarded when the caller sends no idempotency key", async () => {
+  // The Shortcut is allowed to send only text and newsType, so the route mints
+  // a key rather than refusing. The daily cap must still hold — an omitted key
+  // cannot be a way around it.
   await withLedger(async ({ post }) => {
-    const res = await post("/api/broadcast-ledger/broadcast", {
+    const first = await post("/api/broadcast-ledger/broadcast", {
       newsType: "Geopolitics",
-      text: "No key supplied\nhttps://example.com/audit/geo-nokey",
+      text: "First war-room item\nhttps://example.com/audit/geo-nokey-1",
+    });
+    assert.equal(first.status, 201);
+    assert.ok((await first.json()).receipt.idempotencyKey, "a key is minted so the receipt stays addressable");
+
+    const second = await post("/api/broadcast-ledger/broadcast", {
+      newsType: "Geopolitics",
+      text: "Second war-room item\nhttps://example.com/audit/geo-nokey-2",
     });
 
-    assert.equal(res.status, 400);
-    assert.match((await res.json()).error, /idempotencyKey is required for limited category Geopolitics/);
+    assert.equal(second.status, 409, "omitting the key must not bypass the daily cap");
   });
 });
 

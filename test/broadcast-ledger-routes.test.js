@@ -292,7 +292,10 @@ test("Stock, Crypto, and Economics broadcasts send only to the approved finance 
   });
 });
 
-test("Geopolitics broadcasts keep the separately configured Telegram routing", async () => {
+// Geopolitics is locked to the War Room topic, and to that alone. It used to
+// follow TELEGRAM_CHAT_IDS like an uncategorized send, which put war-room
+// stories into the general channels next to the market digests.
+test("Geopolitics broadcasts go to the War Room topic", async () => {
   await withScopedBroadcastApp(async (scopedBase, calls) => {
     const res = await fetch(`${scopedBase}/api/broadcast-ledger/broadcast`, {
       method: "POST",
@@ -309,15 +312,39 @@ test("Geopolitics broadcasts keep the separately configured Telegram routing", a
 
     assert.equal(res.status, 201);
     assert.equal(calls.length, 1);
-    assert.equal(calls[0].options.targets, undefined);
+    assert.deepEqual(calls[0].options.targets, [{ chatId: "-1001841650798", threadId: "75972" }]);
     assert.deepEqual(body.receipt.destinations.map((destination) => ({
       chatId: destination.chatId,
       threadId: destination.threadId,
     })), [
-      { chatId: "-100111", threadId: "1" },
-      { chatId: "-100222", threadId: "2" },
-      { chatId: "-100333", threadId: "3" },
+      { chatId: "-1001841650798", threadId: "75972" },
     ]);
+  });
+});
+
+// The War Room is its own room: a Geopolitics send must not also reach the
+// finance topics, and a finance send must not reach the War Room.
+test("Geopolitics and the finance categories do not cross over", async () => {
+  await withScopedBroadcastApp(async (scopedBase, calls) => {
+    for (const newsType of ["Geopolitics", "Crypto"]) {
+      await fetch(`${scopedBase}/api/broadcast-ledger/broadcast`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-broadcast-key": LEDGER_KEY },
+        body: JSON.stringify({
+          source: "sharebot67",
+          newsType,
+          title: `${newsType} crossover test`,
+          text: `${newsType} crossover test https://example.com/${newsType.toLowerCase()}-crossover`,
+          idempotencyKey: `crossover-${newsType}`,
+        }),
+      });
+    }
+
+    const [geo, crypto] = calls.map((call) => call.options.targets.map((t) => `${t.chatId}:${t.threadId}`));
+    assert.deepEqual(geo, ["-1001841650798:75972"]);
+    assert.deepEqual(crypto, ["-1001841650798:6297", "-1001941064823:984"]);
+    assert.ok(!crypto.includes("-1001841650798:75972"), "finance news must not reach the War Room");
+    assert.ok(!geo.some((target) => crypto.includes(target)), "Geopolitics must not reach the finance topics");
   });
 });
 
@@ -399,6 +426,67 @@ test("broadcast receipts page is mobile-ready without a manual-entry form", asyn
   assert.match(html, /<meta name="viewport" content="width=device-width/);
   assert.match(html, /Broadcast receipts/);
   assert.doesNotMatch(html, /Record one by hand|Save receipt/);
+});
+
+// A blocked receipt has no destinations, and the card only rendered
+// per-destination errors — so the phone showed a bare "Blocked" with no way to
+// tell a duplicate-window hit from a daily cap or a send failure.
+test("a blocked receipt card says why it was blocked", async () => {
+  await post("/api/broadcast-ledger/receipts", {
+    source: "sharebot67",
+    title: "Blocked reason render check",
+    newsType: "Crypto",
+    status: "blocked",
+    error: { message: "Crypto was already broadcast inside the configured 42h window." },
+    idempotencyKey: "blocked-reason-render",
+  });
+
+  const res = await fetch(`${base}/api/broadcast-ledger/manual`, { headers: { "x-broadcast-key": LEDGER_KEY } });
+  const html = await res.text();
+
+  assert.equal(res.status, 200);
+  assert.match(html, /class="receipt-reason"/);
+  assert.match(html, /already broadcast inside the configured 42h window/);
+});
+
+// The reason is stored text and reaches the page unescaped otherwise.
+test("a blocked reason is escaped rather than reflected as markup", async () => {
+  await post("/api/broadcast-ledger/receipts", {
+    source: "sharebot67",
+    title: "Blocked reason escaping check",
+    newsType: "Crypto",
+    status: "blocked",
+    error: { message: "<script>alert(1)</script>" },
+    idempotencyKey: "blocked-reason-escape",
+  });
+
+  const html = await (await fetch(`${base}/api/broadcast-ledger/manual`, {
+    headers: { "x-broadcast-key": LEDGER_KEY },
+  })).text();
+
+  assert.doesNotMatch(html, /<script>alert\(1\)<\/script>/);
+  assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
+});
+
+// A healthy receipt must not grow an empty reason line.
+test("a posted receipt renders no reason line", async () => {
+  await post("/api/broadcast-ledger/receipts", {
+    source: "shortcut",
+    title: "Posted with no reason to show",
+    newsType: "Crypto",
+    status: "posted",
+    idempotencyKey: "posted-no-reason",
+    destinations: [{ channel: "telegram", chatId: "-100999", status: "posted", messageId: "77" }],
+  });
+
+  const html = await (await fetch(`${base}/api/broadcast-ledger/manual`, {
+    headers: { "x-broadcast-key": LEDGER_KEY },
+  })).text();
+
+  const cards = html.split('class="receipt-card"');
+  const card = cards.find((chunk) => chunk.includes("Posted with no reason to show"));
+  assert.ok(card, "the posted receipt must be on the page");
+  assert.ok(!card.includes("receipt-reason"), "a posted receipt has no reason to render");
 });
 
 test("manual form submission stores a posted receipt and redirects", async () => {
@@ -1313,7 +1401,7 @@ test("a retried broadcast with the same idempotency key does not double-send", a
   });
 });
 
-test("the default duplicate window blocks rewritten news in the same category after seven hours", async () => {
+test("the default 42-hour window blocks rewritten news in the same category after 30 hours", async () => {
   await withScopedBroadcastApp(async (url, sends, store) => {
     const payload = {
       method: "POST",
@@ -1325,7 +1413,7 @@ test("the default duplicate window blocks rewritten news in the same category af
     assert.equal(first.status, 201);
 
     const document = JSON.parse(fs.readFileSync(store._file, "utf8"));
-    document.receipts[0].createdAt = new Date(Date.now() - 7 * 60 * 60 * 1000).toISOString();
+    document.receipts[0].createdAt = new Date(Date.now() - 30 * 60 * 60 * 1000).toISOString();
     fs.writeFileSync(store._file, JSON.stringify(document), "utf8");
 
     const duplicate = await fetch(`${url}/api/broadcast-ledger/broadcast`, {
@@ -1338,6 +1426,38 @@ test("the default duplicate window blocks rewritten news in the same category af
     assert.equal(body.match, "category-window");
     assert.equal(body.receipt.status, "blocked");
     assert.equal(sends.length, 1);
+  });
+});
+
+test("the default category window expires after 42 rolling hours", async () => {
+  await withScopedBroadcastApp(async (url, sends, store) => {
+    const send = (text) => fetch(`${url}/api/broadcast-ledger/broadcast`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-broadcast-key": LEDGER_KEY },
+      body: JSON.stringify({ text, newsType: "Stock" }),
+    });
+
+    assert.equal((await send("Old stock report")).status, 201);
+    const document = JSON.parse(fs.readFileSync(store._file, "utf8"));
+    document.receipts[0].createdAt = new Date(Date.now() - 43 * 60 * 60 * 1000).toISOString();
+    fs.writeFileSync(store._file, JSON.stringify(document), "utf8");
+
+    assert.equal((await send("Fresh stock report")).status, 201);
+    assert.equal(sends.length, 2);
+  });
+});
+
+test("Geopolitics keeps accepting the Shortcut text and newsType payload without an idempotency key", async () => {
+  await withScopedBroadcastApp(async (url, sends) => {
+    const res = await fetch(`${url}/api/broadcast-ledger/broadcast`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-broadcast-key": LEDGER_KEY },
+      body: JSON.stringify({ text: "Geopolitics briefing", newsType: "Geopolitics" }),
+    });
+
+    assert.equal(res.status, 201);
+    assert.equal(sends.length, 1);
+    assert.equal((await res.json()).receipt.newsType, "Geopolitics");
   });
 });
 
@@ -1370,6 +1490,20 @@ test("force:true allows a deliberate resend", async () => {
     const forced = await send({ force: true });
 
     assert.equal(forced.status, 201);
+    assert.equal(sends.length, 2);
+  });
+});
+
+test("force:true overrides the Geopolitics category window and daily limit", async () => {
+  await withScopedBroadcastApp(async (url, sends) => {
+    const send = (text, force = false) => fetch(`${url}/api/broadcast-ledger/broadcast`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-broadcast-key": LEDGER_KEY },
+      body: JSON.stringify({ text, newsType: "Geopolitics", force }),
+    });
+
+    assert.equal((await send("First geopolitics report")).status, 201);
+    assert.equal((await send("Deliberate geopolitics override", true)).status, 201);
     assert.equal(sends.length, 2);
   });
 });

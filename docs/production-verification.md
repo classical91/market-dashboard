@@ -43,9 +43,12 @@ APIs are doubled in every case — no test touches Telegram, Railway or OpenClaw
 
 ### Destination routing
 
-- One routing policy (`destinationsForNewsType`) serves both first delivery and
-  retry. `Stock` / `Crypto` / `Economics` route only to the two finance topics;
-  every other category keeps the general news fan-out.
+- One routing table (`src/services/news-routing.js`) serves first delivery,
+  retry and the Daily Reporter. `Stock` / `Crypto` / `Economics` route only to
+  the two finance topics, `Geopolitics` only to the War Room topic, and every
+  other category keeps the general news fan-out.
+- The locked targets **replace** the configured chat list rather than adding to
+  it, so a broader `TELEGRAM_CHAT_IDS` cannot widen news routing.
 - The routing decision reads the persisted `financeTopicRoutingEnabled`
   setting, so disabling it in Ledger Settings changes first delivery and retry
   together.
@@ -92,7 +95,7 @@ APIs are doubled in every case — no test touches Telegram, Railway or OpenClaw
 
 | Fix | What was wrong |
 | --- | --- |
-| Unclassified exempted from category-window blocking | One Channel Watch record of unrelated room chatter refused **every** category-less broadcast for 24 hours. |
+| Unclassified exempted from category-window blocking | One Channel Watch record of unrelated room chatter refused **every** category-less broadcast for the whole duplicate window. |
 | Timestamp-safe day comparison | A receipt with no `createdAt` threw a `RangeError` and took the whole operator page down. |
 | Retry honours `parseMode` | A story sent as plain text was retried as HTML, reproducing the failure it was meant to clear. |
 | `?key=` no longer reflected unless it authorized the request | A crafted link rendered an owner's ledger with an attacker-chosen value pre-filled into every form. |
@@ -128,8 +131,11 @@ the live deployment.
 
 - [ ] Confirm the destination ids and topic ids are still correct:
       `-1001841650798` topic `6297` and `-1001941064823` topic `984` for
-      Stock/Crypto/Economics. The repository does not prove these are right —
-      it only proves the code routes to exactly these and nowhere else.
+      Stock/Crypto/Economics, and `-1001841650798` topic `75972` (the War Room)
+      for Geopolitics. The repository does not prove these are right — it only
+      proves the code routes to exactly these and nowhere else. All three now
+      come from one shared table in `src/services/news-routing.js`, so the
+      ledger and the Daily Reporter cannot drift apart.
 - [ ] Confirm the news bot is an admin in both chats and may post to those
       topics.
 - [ ] Confirm **only one consumer polls each bot token.** A second consumer
@@ -203,8 +209,9 @@ the live deployment.
 - **The rate limiter is per instance.** The window resets on restart and the
   count is not shared. It stops a stuck client, it is not a security control —
   the API key is.
-- **The category duplicate window is strict by design.** Default `24h` per
-  category means a second story in the same category is refused within the day
-  unless `force: true` is passed or the window is changed in Ledger Settings.
+- **The category duplicate window is strict by design.** Default `42h` per
+  category means a second story in the same category is refused for most of two
+  days unless `force: true` is passed or the window is changed in Ledger
+  Settings.
   This is intentional policy, not a bug; it is now documented in
   `docs/broadcast-ledger.md` so it stops surprising operators.

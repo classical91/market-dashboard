@@ -148,6 +148,11 @@ labels, finance-topic routing, and edit/delete permission. Finance-topic routing
 is enabled by default, applies equally to first delivery and retry, and leaves
 Geopolitics on the separately configured Telegram route. Writes require
 administrator access.
+Every allowed category defaults to an independent rolling `42h` duplicate
+window. Ledger Settings persists each category separately in the mounted data
+volume, so the policy survives restarts and redeploys. `force: true` remains
+the deliberate override. The Shortcut may continue sending only `text` and
+`newsType`; it does not need to add an `idempotencyKey`.
 Enabled alerts are delivered to the private Telegram targets configured in
 `BROADCAST_LEDGER_NOTIFICATION_CHAT_IDS`; preferences alone do not select a
 destination.
@@ -526,7 +531,7 @@ Three behaviours worth knowing:
 #### The category duplicate window
 
 Beyond per-story dedupe, `/broadcast` refuses a *second story in the same
-category* inside that category's configured duplicate window (default `24h`,
+category* inside that category's configured duplicate window (default `42h`,
 set per category under **Ledger Settings**). It returns `409` with
 `match: "category-window"`, records a visible `blocked` receipt, and names the
 earlier receipt in `previousReceipt`. This exists because regenerated wording
@@ -534,8 +539,8 @@ and missing source URLs make a whole-message hash insufficient protection
 against the same news going out twice in different words.
 
 It is deliberately strict. The escape hatches are `"force": true` on a
-deliberate resend, and setting that category's window to `off` or `6h` in
-Ledger Settings.
+deliberate resend, and setting that category's window to `off`, `6h` or `24h`
+in Ledger Settings.
 
 The `Unclassified` bucket is exempt. It is not a topic — it is where every
 unlabelled receipt lands, including the Channel Watch's record of unrelated
@@ -557,13 +562,22 @@ The ledger key can only post to the news sender's own destinations —
 sender on `TELEGRAM_*`. Moving the Shortcut onto this endpoint is a net
 reduction in what the phone holds.
 
-Stock, Crypto and Economics broadcasts are narrower than the general Telegram
-list: when `newsType` is exactly `Stock`, `Crypto` or `Economics`, `/broadcast`
-posts only to `-1001841650798:6297` and `-1001941064823:984`, and the receipt
-records only those actual destinations. Geopolitics routing remains separate.
-The **Restrict Stock, Crypto, and Economics routing** option in Ledger Settings
-is enabled by default and is read by both first delivery and failed retry. An
-operator can disable it to restore the general `TELEGRAM_CHAT_IDS` fan-out.
+Categorized broadcasts are narrower than the general Telegram list. When
+`newsType` is exactly `Stock`, `Crypto` or `Economics`, `/broadcast` posts only
+to `-1001841650798:6297` and `-1001941064823:984`. When it is `Geopolitics`, it
+posts only to the War Room topic, `-1001841650798:75972`. Either way the receipt
+records only the destinations that category actually reached, and these targets
+*replace* the configured chat list rather than adding to it — a broader
+`TELEGRAM_CHAT_IDS` cannot widen news routing.
+
+The two sets do not overlap: finance news never reaches the War Room, and
+Geopolitics never reaches the finance topics.
+
+The **Restrict news categories to their approved topics** option in Ledger
+Settings governs all of the above, is enabled by default, and is read by both
+first delivery and failed retry. An operator can disable it to restore the
+general `TELEGRAM_CHAT_IDS` fan-out. The setting key remains
+`financeTopicRoutingEnabled` so stored settings keep working.
 
 ## Integration 2 — GPT / iOS Shortcut
 

@@ -154,9 +154,15 @@ test("rotation: missing yields feed degrades to a labelled no-data row", () => {
   assert.match(yields.note, /US10Y/);
 });
 
+// Events are timed off `at`, a real UTC instant, rather than a bare clock
+// label — a label carries no zone and no date, so "08:30" was scored against
+// UTC whatever zone the feed published in. See test/calendar-normalize.test.js.
 test("news risk: high-impact event inside the 45-minute window is high", () => {
   const now = new Date("2026-07-07T08:00:00Z");
-  const risk = assessNewsRisk([{ time: "08:30", title: "US CPI Inflation", impact: "High" }], now);
+  const risk = assessNewsRisk(
+    [{ at: "2026-07-07T08:30:00.000Z", time: "08:30", title: "US CPI Inflation", impact: "High" }],
+    now,
+  );
   assert.equal(risk.level, "high");
   assert.match(risk.reason, /US CPI/);
 });
@@ -165,15 +171,18 @@ test("news risk: high-impact events later today are medium; none is low", () => 
   const now = new Date("2026-07-07T08:00:00Z");
   const medium = assessNewsRisk(
     [
-      { time: "14:00", title: "FOMC Statement", impact: "High" },
-      { time: "10:00", title: "Consumer Sentiment", impact: "Medium" },
+      { at: "2026-07-07T14:00:00.000Z", time: "14:00", title: "FOMC Statement", impact: "High" },
+      { at: "2026-07-07T10:00:00.000Z", time: "10:00", title: "Consumer Sentiment", impact: "Medium" },
     ],
     now,
   );
   assert.equal(medium.level, "medium");
   assert.equal(medium.nextHighImpact.title, "FOMC Statement");
 
-  const low = assessNewsRisk([{ time: "10:00", title: "Consumer Sentiment", impact: "Medium" }], now);
+  const low = assessNewsRisk(
+    [{ at: "2026-07-07T10:00:00.000Z", time: "10:00", title: "Consumer Sentiment", impact: "Medium" }],
+    now,
+  );
   assert.equal(low.level, "low");
 });
 

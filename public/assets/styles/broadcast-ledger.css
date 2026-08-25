@@ -71,6 +71,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .destinations strong { color: var(--text); }
 .destination-state { font-size: 9px; font-weight: 800; text-transform: uppercase; }
 .missing-destination { margin: 9px 0 0; color: var(--amber); font-size: 11px; }
+/* Why a receipt is blocked or failed. Wraps rather than truncates: the reason
+   names the category and window, and a clipped one answers nothing. */
+.receipt-reason { margin: 9px 0 0; color: var(--amber); font-size: 11px; line-height: 1.45; overflow-wrap: anywhere; }
 .receipt-actions { display: flex; gap: 7px; margin-top: 12px; }
 .receipt-actions button { min-height: 32px; padding: 5px 10px; font-size: 11px; }
 .retry-receipt { color: var(--amber); }

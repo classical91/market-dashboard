@@ -10,6 +10,7 @@
     "build": "node scripts/build-check.js",
     "test": "node --test",
     "parity": "node scripts/traderclaw-parity.js",
+    "smoke:decision": "node scripts/smoke-decision.js",
     "postinstall": "playwright install chromium || true"
   },
   "dependencies": {

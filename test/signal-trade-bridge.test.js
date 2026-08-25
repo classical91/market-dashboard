@@ -106,6 +106,63 @@ test("dry run is the default: transitions are scored but nothing is opened", asy
   );
 });
 
+// The Aug-21 symptom was an empty journal, not a bad strategy: the question a
+// log has to answer is "was this setup evaluated and rejected, or never seen at
+// all?". These three pin the properties that make that answerable.
+test("every scored transition records its strategy and the regime it was scored in", async () => {
+  const { bridge } = makeBridge();
+
+  const [action] = await bridge.handleTransitions([transition({ interval: "1h" })]);
+
+  assert.equal(action.strategy, "signal-bot:1h", "the edge gate's grouping key must survive into the log");
+  assert.equal(action.regime, "TREND_UP", "a bullish decision state must be readable off the row");
+  assert.equal(action.direction, "LONG");
+  assert.ok(Number.isFinite(action.confidenceScore), "setup score must be recorded");
+  assert.ok(action.reason, "and the row must say why it ended where it did");
+});
+
+test("a scoring failure is recorded as an outcome, not dropped", async () => {
+  const lab = makeLab();
+  lab.evaluate = () => { throw new Error("ledger unavailable"); };
+  const { bridge } = makeBridge({ lab });
+
+  const [action] = await bridge.handleTransitions([transition()]);
+
+  assert.equal(action.status, "failed");
+  assert.match(action.reason, /ledger unavailable/);
+  assert.equal(action.strategy, "signal-bot:4h");
+  assert.equal(action.opened, null);
+});
+
+// The count is the reconciliation: one row per entry transition processed,
+// whatever happened to it. A mid-batch throw used to abandon the loop and
+// return nothing, so the store and the caller disagreed about what ran.
+test("one symbol's failure does not erase the rest of the batch's audit trail", async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "md-reconcile-"));
+  const store = new SignalActionStore({ dataDir, logger: QUIET });
+  const lab = makeLab();
+  const realEvaluate = lab.evaluate.bind(lab);
+  lab.evaluate = (input) => {
+    if (input.symbol === "ETHUSDT") throw new Error("boom");
+    return realEvaluate(input);
+  };
+  const { bridge } = makeBridge({ lab, signalActionStore: store });
+
+  const actions = await bridge.handleTransitions([
+    transition({ symbol: "BTCUSDT" }),
+    transition({ symbol: "ETHUSDT" }),
+    transition({ symbol: "SOLUSDT" }),
+  ]);
+
+  assert.equal(actions.length, 3, "every processed transition must produce exactly one action");
+  assert.equal(store.count(), 3, "and the persisted log must reconcile with the batch");
+  assert.deepEqual(
+    actions.map((a) => `${a.symbol}:${a.status}`),
+    ["BTCUSDT:dry-run", "ETHUSDT:failed", "SOLUSDT:dry-run"],
+  );
+  assert.ok(actions.every((a) => a.reason), "no row may be silent about its outcome");
+});
+
 test("signal bridge actions persist newest-first with every outcome status", async () => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "md-actions-"));
   const signalActionStore = new SignalActionStore({ dataDir, logger: QUIET });

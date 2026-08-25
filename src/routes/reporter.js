@@ -1,4 +1,15 @@
 const { Router } = require("express");
+const { destinationsForNewsType } = require("../services/news-routing");
+const { isPostedStatus } = require("../services/broadcast-ledger");
+
+// The reporter's own section keys, mapped to the ledger's news categories.
+// `markets` is the Stock category — the section key predates the category
+// vocabulary and renaming it would rewrite stored reports.
+const REPORT_CATEGORIES = [
+  { key: "crypto", newsType: "Crypto" },
+  { key: "markets", newsType: "Stock" },
+  { key: "economics", newsType: "Economics" },
+];
 
 function createReporterRouter({ reporterService, telegramService, broadcastLedgerStore, requireAdmin }) {
   const router = Router();
@@ -64,51 +75,92 @@ function createReporterRouter({ reporterService, telegramService, broadcastLedge
         });
         return;
       }
-      // A pending receipt goes in *before* the send, so a crash mid-broadcast
-      // still leaves a trace for reconciliation to resolve rather than a
-      // silent gap. The idempotency key is the report generation itself, so
-      // a double-clicked Broadcast button can't fork the ledger.
-      const title = `Daily report — ${report.dateStr || new Date().toISOString().slice(0, 10)}`;
-      const receipt = broadcastLedgerStore
-        ? broadcastLedgerStore.createReceipt({
-            source: "dashboard",
-            kind: "digest",
-            title,
-            idempotencyKey: `digest:${report.generatedAt || report.dateStr || Date.now()}`,
-            text: [report.crypto, report.economics, report.markets].filter(Boolean).join("\n"),
-            status: "pending",
-          }).receipt
-        : null;
+      // Each category is sent and receipted independently. The aggregate send
+      // merged all three sections into one result set spanning every configured
+      // chat, which meant a receipt could name destinations that a given
+      // category never actually reached, and category identity survived only in
+      // the message heading. One receipt per category keeps both exact.
+      //
+      // A pending receipt still goes in *before* each send, so a crash
+      // mid-broadcast leaves a trace rather than a silent gap, and the
+      // idempotency key is per category so a double-clicked Broadcast button
+      // cannot fork the ledger or resend a category that already landed.
+      const settings = broadcastLedgerStore ? broadcastLedgerStore.getSettings() : null;
+      const stamp = report.generatedAt || report.dateStr || Date.now();
+      const date = report.dateStr || new Date().toISOString().slice(0, 10);
+      const sections = REPORT_CATEGORIES.filter((section) => report[section.key]);
 
-      let result;
-      try {
-        result = await telegramService.postReport(report);
-      } catch (err) {
+      const receipts = [];
+      const destinations = [];
+
+      for (const section of sections) {
+        const created = broadcastLedgerStore
+          ? broadcastLedgerStore.createReceipt({
+              source: "dashboard",
+              kind: "digest",
+              newsType: section.newsType,
+              title: `${section.newsType} daily report — ${date}`,
+              idempotencyKey: `digest:${section.newsType}:${stamp}`,
+              text: report[section.key],
+              // Deliberately no explicit status. A create with no destinations
+              // already defaults to "pending", and a repeat under the same key
+              // is an update — where an explicit "pending" would win outright
+              // and walk an already-posted receipt back, re-sending a category
+              // that had landed. Letting the status derive keeps the store's
+              // own no-regression guard in force.
+            })
+          : null;
+        const receipt = created ? created.receipt : null;
+
+        // Already posted under this key: record it and move on rather than
+        // sending the same category twice.
+        if (receipt && created.created === false && isPostedStatus(receipt.status)) {
+          receipts.push(receipt);
+          destinations.push(...(receipt.destinations || []).map((d) => ({ ...d, newsType: section.newsType })));
+          continue;
+        }
+
+        let result;
+        try {
+          result = await telegramService.postReportSection({
+            newsType: section.newsType,
+            text: report[section.key],
+            date: report.dateStr,
+            targets: destinationsForNewsType(section.newsType, settings),
+          });
+        } catch (err) {
+          if (receipt) {
+            broadcastLedgerStore.updateReceipt(
+              receipt.id,
+              { status: "failed", error: err, destinations: err.destinations || [], action: "broadcast" },
+              { actor: "dashboard" },
+            );
+          }
+          throw err;
+        }
+
+        const sent = (result && result.destinations) || [];
+        destinations.push(...sent.map((d) => ({ ...d, newsType: section.newsType })));
         if (receipt) {
-          broadcastLedgerStore.updateReceipt(
-            receipt.id,
-            { status: "failed", error: err, destinations: err.destinations || [], action: "broadcast" },
-            { actor: "dashboard" },
+          receipts.push(
+            broadcastLedgerStore.updateReceipt(
+              receipt.id,
+              { destinations: sent, action: "broadcast" },
+              { actor: "dashboard" },
+            ),
           );
         }
-        throw err;
       }
-
-      const destinations = (result && result.destinations) || [];
-      const finalReceipt = receipt
-        ? broadcastLedgerStore.updateReceipt(
-            receipt.id,
-            { destinations, action: "broadcast" },
-            { actor: "dashboard" },
-          )
-        : null;
 
       res.json({
         ok: true,
         channelCount: telegramService._chatIds.length,
         broadcastAt: reporterService.markBroadcasted(),
-        receiptId: finalReceipt ? finalReceipt.id : null,
-        status: finalReceipt ? finalReceipt.status : null,
+        // Kept for older clients that read a single receipt; `receipts` is the
+        // full per-category record.
+        receiptId: receipts.length ? receipts[0].id : null,
+        status: receipts.length ? receipts[0].status : null,
+        receipts: receipts.map((r) => ({ id: r.id, newsType: r.newsType, status: r.status })),
         destinations,
       });
     } catch (err) {

@@ -1,25 +1,23 @@
 "use strict";
 
 const { Router } = require("express");
+const crypto = require("node:crypto");
 const { createRateLimit } = require("../middleware/rate-limit");
 const { isLedgerRequest, isLedgerParamRequest } = require("../middleware/ledger-auth");
 const { deriveTitle, firstUrl } = require("../services/broadcast-ingest");
 const { SOURCES, KINDS, STATUSES, DEFAULT_SETTINGS, canonicalizeUrl, isPostedStatus } = require("../services/broadcast-ledger");
+const { destinationsForNewsType } = require("../services/news-routing");
 
 const MAX_IDS = 200;
-const FINANCE_NEWS_TYPES = new Set(["Stock", "Crypto", "Economics"]);
-const FINANCE_NEWS_DESTINATIONS = Object.freeze([
-  Object.freeze({ chatId: "-1001841650798", threadId: "6297" }),
-  Object.freeze({ chatId: "-1001941064823", threadId: "984" }),
-]);
-// Default to a full rolling day so the same story cannot be rebroadcast later
-// in the day merely because the earlier send is more than six hours old.
-const BROADCAST_DUPLICATE_WINDOW_MS = 24 * 60 * 60 * 1000;
+// Default to the operator-approved 42-hour window so rewritten coverage cannot
+// slip through on the following day when persisted settings are unavailable.
+const BROADCAST_DUPLICATE_WINDOW_MS = 42 * 60 * 60 * 1000;
 
 function duplicateWindowMs(value) {
   if (value === "off") return 0;
   if (value === "6h") return 6 * 60 * 60 * 1000;
   if (value === "24h") return 24 * 60 * 60 * 1000;
+  if (value === "42h") return 42 * 60 * 60 * 1000;
   if (value === "same-day") return 24 * 60 * 60 * 1000;
   return BROADCAST_DUPLICATE_WINDOW_MS;
 }
@@ -48,12 +46,6 @@ function isSameDayInZone(value, timeZone, at = new Date()) {
     day: "2-digit",
   });
   return formatter.format(date) === formatter.format(at);
-}
-
-function destinationsForNewsType(newsType, settings) {
-  return settings?.financeTopicRoutingEnabled !== false && FINANCE_NEWS_TYPES.has(newsType)
-    ? FINANCE_NEWS_DESTINATIONS.map((target) => ({ ...target }))
-    : null;
 }
 
 /**
@@ -224,6 +216,14 @@ function renderManualForm({
       const rawTitle = receipt.title || receipt.canonicalUrl || receipt.id;
       const title = /^Broadcasted today\b/i.test(rawTitle) ? `${newsType} News — ${dateLabel}` : rawTitle;
       const statusLabel = STATUS_LABELS[receipt.status] || receipt.status;
+      // A blocked or failed receipt stores why — "Geopolitics was already
+      // broadcast inside the configured 42h window", a Telegram error — but the
+      // card only ever rendered per-destination errors, and a blocked receipt
+      // has no destinations. So the phone showed a bare "Blocked" with no way
+      // to tell a duplicate-window hit from a daily cap or a send failure.
+      // Read from the stored reason rather than the status label so it stays
+      // accurate when the configured window changes.
+      const reason = receipt.error && receipt.error.message ? receipt.error.message : "";
       const keyField = formKey ? `<input type="hidden" name="key" value="${escapeHtml(formKey)}">` : "";
       const destinations = (receipt.destinations || []).map((destination) =>
         `<li><strong>${escapeHtml(destinationName(destination, settings))}</strong><span class="destination-state status-${escapeHtml(destination.status)}">${escapeHtml(destination.status)}</span>${destination.error ? `<span>${escapeHtml(destination.error)}</span>` : ""}</li>`,
@@ -242,6 +242,7 @@ function renderManualForm({
         <div class="receipt-head"><span class="status status-${escapeHtml(receipt.status)}">${escapeHtml(statusLabel)}</span><span class="category">${escapeHtml(newsType)}</span><time>${escapeHtml(when)}</time></div>
         <strong class="headline">${escapeHtml(title)}</strong>
         <div class="receipt-meta"><span>${escapeHtml(SOURCE_LABELS[receipt.source] || receipt.source)}</span><code>${escapeHtml(receipt.id)}</code></div>
+        ${reason ? `<p class="receipt-reason">${escapeHtml(reason)}</p>` : ""}
         ${destinations ? `<ul class="destinations">${destinations}</ul>` : `<p class="missing-destination">Destination not reported</p>`}
         <div class="receipt-actions">
           <button type="button" class="copy-receipt" data-receipt="${copyPayload}">Copy details</button>
@@ -745,11 +746,20 @@ function createBroadcastLedgerRouter({
       // A configured daily cap is enforced at the actual send boundary too;
       // callers should still preflight through /broadcast/guard so blocked
       // attempts are visible before Telegram is contacted.
-      if (settings.categoryLimits[exactNewsType]) {
-        if (!String(body.idempotencyKey || "").trim()) {
-          return badRequest(res, `idempotencyKey is required for limited category ${exactNewsType}.`);
-        }
-        const guarded = broadcastLedgerStore.guard({ ...body, source, title, url, text });
+      // One resolved category drives every policy decision here. Reading the
+      // raw supplied string instead let an unsupported label miss the limit
+      // for the category the receipt would actually be filed under.
+      const effectiveIdempotencyKey = String(body.idempotencyKey || "").trim()
+        || (settings.categoryLimits[exactNewsType] ? `broadcast:${crypto.randomUUID()}` : "");
+      if (settings.categoryLimits[exactNewsType] && body.force !== true) {
+        const guarded = broadcastLedgerStore.guard({
+          ...body,
+          source,
+          title,
+          url,
+          text,
+          idempotencyKey: effectiveIdempotencyKey,
+        });
         if (!guarded.allowed) {
           await notifyReceiptChange(guarded.receipt);
           return res.status(409).json(guarded);
@@ -760,12 +770,10 @@ function createBroadcastLedgerRouter({
       // window. Regenerated wording and missing source URLs make whole-message
       // hashes insufficient for repeated-news protection.
       if (body.force !== true) {
-        // One resolved category drives every policy decision below. Reading the
-        // raw supplied string here instead let an unsupported label pick a
-        // duplicate window for a category the receipt would never be filed
-        // under.
+        // Same resolved category as the limit check above, so one value drives
+        // every policy decision on this request.
         const category = exactNewsType;
-        const configuredWindow = settings.duplicateWindows[category] || "24h";
+        const configuredWindow = settings.duplicateWindows[category] || "42h";
         const windowMs = duplicateWindowMs(configuredWindow);
         const exact = broadcastLedgerStore.lookup({ url, text, headline: title });
         const exactAgeMs = exact.receipt?.createdAt
@@ -811,7 +819,7 @@ function createBroadcastLedgerRouter({
             text,
             status: "blocked",
             error: `${category} was already broadcast inside the configured ${configuredWindow} window.`,
-            idempotencyKey: body.idempotencyKey,
+            idempotencyKey: effectiveIdempotencyKey,
           }).receipt;
           await notifyReceiptChange(blocked);
           return res.status(409).json({
@@ -843,7 +851,7 @@ function createBroadcastLedgerRouter({
         url,
         text,
         status: "pending",
-        idempotencyKey: typeof body.idempotencyKey === "string" ? body.idempotencyKey : "",
+        idempotencyKey: effectiveIdempotencyKey,
       });
       await notifyReceiptChange(receipt);
 

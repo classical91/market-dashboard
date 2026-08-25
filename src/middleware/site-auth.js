@@ -2,6 +2,7 @@
 
 const crypto = require("crypto");
 const { isLedgerRequest, isLedgerParamRequest } = require("./ledger-auth");
+const { isAdminRequest } = require("./admin-auth");
 
 const COOKIE_NAME = "market_dashboard_session";
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -142,6 +143,46 @@ function isPublicAuthPath(req) {
     || req.path === "/api/health";
 }
 
+// GET /api/decision is documented in src/routes/decision.js as read-only
+// public market data, and the TraderClaw agent polls it with no browser
+// session to present. Site auth runs before every API router, so it answered
+// `401 Login required` before that route was ever reached. Scoped to the exact
+// path and read methods on purpose: /api/decision/journal and every mutating
+// journal route stay behind the session cookie and ADMIN_API_KEY.
+function isPublicDecisionRequest(req) {
+  if (req.method !== "GET" && req.method !== "HEAD") return false;
+  return req.path === "/api/decision" || req.path === "/api/decision/";
+}
+
+// The TraderClaw learning-journal sync reads Trading Lab evidence with an API
+// client, not a browser, so it has no session cookie to present — the same
+// shape of caller /api/decision above had to be opened for. Site auth runs
+// before every API router, so it answered `401 Login required` before the
+// Trading Lab router was ever reached, leaving the sync unable to read the
+// source records it exists to journal.
+//
+// Deliberately narrow, the same way the decision bypass is. Only GET/HEAD, only
+// with a valid x-admin-key, and only the four surfaces the sync actually reads.
+// /positions and /history are absent on purpose: the strategy-account routes
+// already carry open positions, closed-trade history, trade counts and metrics,
+// so there is no sync need for the generic ones. /metrics, /experiments,
+// /research, and every mutating route stay behind the owner session cookie.
+const TRADING_LAB_MACHINE_READ_PATHS = new Set([
+  "/api/trading-lab/pipeline",
+  "/api/trading-lab/strategy-accounts",
+  "/api/trading-lab/signal-actions",
+]);
+
+// One path segment only, so this can never widen into a deeper sub-resource.
+const STRATEGY_ACCOUNT_DETAIL_PATH = /^\/api\/trading-lab\/strategy-accounts\/[^/]+$/;
+
+function isTradingLabMachineReadRequest(req, adminKey) {
+  if (req.method !== "GET" && req.method !== "HEAD") return false;
+  const path = req.path.length > 1 && req.path.endsWith("/") ? req.path.slice(0, -1) : req.path;
+  if (!TRADING_LAB_MACHINE_READ_PATHS.has(path) && !STRATEGY_ACCOUNT_DETAIL_PATH.test(path)) return false;
+  return isAdminRequest(req, adminKey);
+}
+
 function canAccess(req, session) {
   if (!session) return false;
   if (session.role === "owner") return true;
@@ -211,7 +252,7 @@ function createSiteAuth(config) {
     clearSessionCookie,
     classifyPassword,
     requireAccess(req, res, next) {
-      if (!enabled || isPublicAuthPath(req)) {
+      if (!enabled || isPublicAuthPath(req) || isPublicDecisionRequest(req)) {
         next();
         return;
       }
@@ -221,6 +262,10 @@ function createSiteAuth(config) {
           next();
           return;
         }
+      }
+      if (isTradingLabMachineReadRequest(req, config.adminKey)) {
+        next();
+        return;
       }
       const session = sessionFromRequest(req, config);
       if (canAccess(req, session)) {

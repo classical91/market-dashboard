@@ -71,9 +71,99 @@ Action/mutation endpoints are guarded by a shared secret so a public deploy cann
 - `POST /api/daily-report/generate`, `POST /api/daily-report/logs/import`
 - `POST /api/ai-analysis/generate`, `POST /api/ai-analysis/broadcast`
 - `POST /api/telegram/test`, `GET /api/telegram/diagnose`
-- `POST/PATCH/DELETE /api/decision/journal` (trading-journal writes; reads stay public)
+- `POST/PATCH/DELETE /api/decision/journal` (trading-journal writes)
 
 Guarded requests must carry an `x-admin-key` header matching `ADMIN_API_KEY`. The Reporter, AI Analysis, and Settings pages prompt for the key on first use and store it in the browser's `localStorage`. `ADMIN_API_KEY` is separate from the website login: owner login controls browsing, while the admin key controls write/broadcast actions. The public `/api/health` probe returns only `{ "status": "ok" }`; provider-key and cache detail are returned only to admin requests.
+
+### Endpoints reachable without the website login
+
+When `MARKET_DASHBOARD_LOGIN_PASSWORD` is set, site auth runs ahead of every route, so anything not listed here answers `401` (or a `/login` redirect for pages) before its own router is reached. The full list of exceptions:
+
+- `/login`, `POST /auth/login`, `POST /auth/logout` — the login flow itself.
+- `POST /api/alpha-team/access` — the Alpha Team code exchange.
+- `GET /api/health` — the minimal deploy probe.
+- `GET /api/decision` — read-only market decision data, polled by the TraderClaw agent, which authenticates no session cookie. This is the exact path only: `/api/decision/journal` and every mutating journal route still require the owner session (and, for writes, `ADMIN_API_KEY`).
+- `/api/broadcast-ledger*` — machine callers that present `BROADCAST_LEDGER_API_KEY` or `ADMIN_API_KEY`; the ledger routes still enforce that key themselves. See [docs/broadcast-ledger.md](docs/broadcast-ledger.md).
+
+Everything else — including all Trading Lab paper-trade and mutation endpoints, settings, and the rest of `/api/decision/*` — needs a session. The Alpha Team role additionally reaches only the shared `?view=alpha` pages and their read-only data APIs.
+
+Verify this model against a running deploy with `npm run smoke:decision` (see [Production smoke check](#production-smoke-check)).
+
+### Production smoke check
+
+The test suite runs against a local app, so it cannot see a deploy's own environment — a site password that is set, an admin key that is not, a provider key that expired. `npm run smoke:decision` covers that gap from outside:
+
+```bash
+DASHBOARD_URL=https://your-dashboard.up.railway.app npm run smoke:decision
+# or
+npm run smoke:decision -- https://your-dashboard.up.railway.app
+```
+
+It sends no cookies, so it sees exactly what the TraderClaw agent sees, and checks in order: the health probe answers; `GET /api/decision` returns `200` without a login; the payload echoes the interval and carries a regime label/score and scored setups with a direction and action; `/api/decision/journal` and the Trading Lab still answer `401`/`403`; and a write to `/api/decision` is rejected rather than inheriting the read bypass.
+
+It has two modes, because "is the deploy up?" and "is the deploy usable?" are different questions:
+
+| Mode | Answers | Degraded market data |
+| --- | --- | --- |
+| normal (default) | reachability and the access model | `WARN` — a provider outage is not a broken deploy |
+| `--strict` | trading health: a real scored setup with a direction and action, a regime, and market data that is not wholly fallback | `FAIL` — reachable but unusable is not green |
+
+```bash
+npm run smoke:decision -- https://your-dashboard.up.railway.app --strict
+```
+
+Output is `PASS`/`WARN`/`FAIL` per check with the URL and HTTP status, and the exit code is non-zero if any check fails. Every request is a `GET` apart from one `POST /api/decision` that is asserted to be *rejected*; nothing it does can mutate production state or place a trade. Optional: `DECISION_INTERVAL` (default `4h`), `SMOKE_TIMEOUT_MS` (default `20000`), `SMOKE_STRICT=1` as an alternative to `--strict`.
+
+### Macro calendar and news risk
+
+The Decision Engine gates news risk on "is a high-impact release inside the next 45 minutes?", and that answer feeds setup quality — so a calendar event has to be a real instant, not a clock label.
+
+Every event resolves to `at`, a UTC ISO timestamp, or to `null`:
+
+| Feed value | `at` | `precision` |
+| --- | --- | --- |
+| `2026-08-23T08:30:00-04:00`, `…Z`, epoch seconds/ms | the instant it states | `exact` |
+| `2026-08-23 09:45` (no offset) | read in `MACRO_CALENDAR_TIMEZONE` | `assumed` |
+| `08:30 ET`, `14:00 UTC` | read in the labelled zone, which beats the configured default | `assumed` |
+| `08:30` (bare) | today, in `MACRO_CALENDAR_TIMEZONE` | `assumed` |
+| `TBA`, unparseable, absent | `null` | `unknown` |
+
+Two rules follow from that:
+
+- **Events dated to another day are dropped.** Yesterday's CPI is never counted down to; `droppedNotToday` reports how many were excluded.
+- **An event with no `at` never produces a countdown.** It still raises news risk to medium — a high-impact release at an unknown time is a reason for caution — but nothing claims it is "in 12 min". Fallback events are all `at: null` for exactly this reason: seed data must never trigger a blackout.
+
+`GET /api/decision` reports the outcome under `dataQuality.calendar`:
+
+```json
+{
+  "source": "macro_calendar_url", "live": true, "reason": null,
+  "timezone": "America/New_York", "events": 2, "droppedNotToday": 1,
+  "timing": { "total": 2, "exact": 0, "assumed": 1, "untimed": 1 }
+}
+```
+
+When it falls back, `reason` says which of these happened — `not-configured`, `request-failed`, `invalid-shape`, `empty-feed`, `no-events-today` — with `detail` carrying the underlying error. A fallback calendar means news risk is being scored off static seed data, so `npm run smoke:decision -- --strict` fails on it.
+
+If `timing.exact` is 0 while `assumed` is non-zero, no event states its own offset and every time is only as correct as `MACRO_CALENDAR_TIMEZONE`. Prefer a feed that emits ISO timestamps with offsets.
+
+### Paper pipeline reconciliation
+
+`GET /api/trading-lab/pipeline` answers the question no single store could: of everything the signal bridge evaluated, where did each one end up, and did anything silently disappear?
+
+Three stores hold three different kinds of record, and they are deliberately not the same thing:
+
+| Store | File | What it is |
+| --- | --- | --- |
+| `SignalActionStore` | `signal-bridge-log.json` | the **evaluation** ledger — one row per scored transition, whatever the outcome. The denominator. |
+| `PaperTradingService` | `trading-lab/<book>/{positions,history}.json` | the **execution** ledger — paper fills and their closes. |
+| `TradeJournalService` | `trade-journal.json` | the **human** journal — hand-logged and hand-graded through the admin-keyed route. |
+
+The reconciliation view reads all three and writes none of them. In particular it never feeds the human journal: its win-rate and expectancy statistics are only meaningful because a person vouched for every row, so an automated dump would quietly destroy them. The journal is reported alongside, labelled `maintainedBy: "human"`.
+
+`reconciled` is `true` only when every evaluated row reached a terminal status carrying a reason, and every bridge-owned paper fill has an evaluation row behind it. Anything else appears in `discrepancies` (`unknown-status`, `missing-reason`, `missing-attribution`, `unlogged-fill`) with enough detail to go looking. A `summary` line reads like `73 evaluated, 70 blocked, 2 dry-run, 1 failed, 0 unaccounted`.
+
+Note that zero bridge-owned fills is the **designed** outcome today, not a broken pipeline: the Signal Bot has no registered strategy identity, so persistent execution is refused by attribution even when `SIGNAL_BOT_PAPER_TRADE_ENABLED=true`. The view says so explicitly in `execution.note` rather than leaving a bare zero to be misread.
 
 ## Environment Variables
 
@@ -92,7 +182,7 @@ Most keys are optional. The app is designed to degrade to fallback data where po
 - `BROADCAST_LEDGER_NOTIFICATION_CHAT_IDS` - private Telegram `chatId` or `chatId:threadId` targets for enabled ledger alerts. No alerts are delivered when blank.
 - `OPENAI_API_KEY` - enables report generation.
 - `REPORTER_MODEL` - OpenAI model for reporter generation, defaults to `gpt-5.4-mini`.
-- `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_IDS` - enable Telegram delivery. By default, `Stock`, `Crypto`, and `Economics` ledger broadcasts are restricted to `-1001841650798:6297` and `-1001941064823:984`; Geopolitics keeps the separately configured routing. The persisted **Restrict Stock, Crypto, and Economics routing** Ledger Setting controls this policy for both first delivery and retry.
+- `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_IDS` - enable Telegram delivery. By default each news category is locked to its approved topics: `Stock`, `Crypto` and `Economics` to `-1001841650798:6297` and `-1001941064823:984`, and `Geopolitics` to the War Room, `-1001841650798:75972`. The two sets do not overlap. These targets **replace** the configured chat list rather than adding to it, so a broader `TELEGRAM_CHAT_IDS` cannot widen news routing. The policy applies to ledger broadcasts (first delivery and retry) and to the Daily Reporter's per-category sends alike — one table in `src/services/news-routing.js` serves both. The persisted **Restrict news categories to their approved topics** Ledger Setting controls it.
 - `MARKET_DASHBOARD_URL` - public base URL used for Alpha Team `Visit:` links.
 - `ALPHA_TEAM_ACCESS_CODE` - optional read-only password for Alpha Team shared pages opened with `?view=alpha`.
 
@@ -107,7 +197,8 @@ Most keys are optional. The app is designed to degrade to fallback data where po
 - `MACRO_DATA_URL` - optional JSON macro feed (`{symbol, name, price, changePercent}` rows); takes priority over Finnhub for the macro board.
 - `MACRO_SYMBOLS` - `DISPLAY=PROVIDER_SYMBOL` pairs for the Finnhub macro adapter; defaults to free-tier ETF proxies (`XAU=GLD,DXY=UUP,WTI=USO,VIX=VIXY`).
 - `MACRO_DATA_PROVIDER` - set to `none` to force static macro fallback.
-- `MACRO_CALENDAR_URL` - optional JSON macro-calendar feed (`{time, title, impact, country}` rows).
+- `MACRO_CALENDAR_URL` - optional JSON macro-calendar feed. Accepts a bare array or `{events|items|data: [...]}`; each row needs a title (`title`/`event`/`name`), an impact (`impact`/`importance`), and a time (`time`/`datetime`/`date`/`timestamp`, or a `date` plus a `time`). See [Macro calendar and news risk](#macro-calendar-and-news-risk).
+- `MACRO_CALENDAR_TIMEZONE` - the zone a feed's bare clock labels are published in, e.g. `America/New_York`. Defaults to `UTC`. Only consulted when the event itself carries no offset.
 - `DECISION_CACHE_MS` - Decision Engine payload cache TTL, defaults to `120000`. The engine reuses the feeds above; adding a `US10Y` row via `MACRO_SYMBOLS` or `MACRO_DATA_URL` enriches its regime score and rotation board with live yields.
 
 ### Signal Bot Telegram Alerts
