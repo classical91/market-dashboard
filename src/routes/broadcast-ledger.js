@@ -28,6 +28,28 @@ function badRequest(res, message) {
   res.status(400).json({ error: message });
 }
 
+/**
+ * Calendar-day comparison in the ledger's reset timezone.
+ *
+ * Every caller of this used to build an Intl formatter around
+ * `new Date(receipt.createdAt)` directly, which throws a RangeError when a
+ * receipt carries no `createdAt` — possible for a hand-edited ledger file or
+ * one restored from the pre-version-1 bare-array shape. A receipt with no
+ * timestamp cannot be "today", so answer false rather than taking the page
+ * down.
+ */
+function isSameDayInZone(value, timeZone, at = new Date()) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  return formatter.format(date) === formatter.format(at);
+}
+
 function destinationsForNewsType(newsType, settings) {
   return settings?.financeTopicRoutingEnabled !== false && FINANCE_NEWS_TYPES.has(newsType)
     ? FINANCE_NEWS_DESTINATIONS.map((target) => ({ ...target }))
@@ -125,12 +147,8 @@ function isVisibleReceipt(receipt) {
 function visibleDailySummary(store, settings) {
   const base = store.dailySummary();
   const summary = { ...base, total: 0, byCategory: {}, byStatus: {} };
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: settings.timezone,
-    year: "numeric", month: "2-digit", day: "2-digit",
-  });
   store.list({ limit: 500 }).filter(isVisibleReceipt).forEach((receipt) => {
-    if (!receipt.createdAt || formatter.format(new Date(receipt.createdAt)) !== base.date) return;
+    if (!isSameDayInZone(receipt.createdAt, settings.timezone)) return;
     const category = newsTypeLabel(receipt);
     const status = isPostedStatus(receipt.status) ? "broadcasted" : receipt.status;
     summary.total += 1;
@@ -352,7 +370,15 @@ function createBroadcastLedgerRouter({
   function requireManualAccess(req, res, next) {
     if (isLedgerRequest(req, { ledgerKey, adminKey })) return next();
 
-    if (isLedgerParamRequest(req, { ledgerKey, adminKey })) return next();
+    if (isLedgerParamRequest(req, { ledgerKey, adminKey })) {
+      // Only a key that actually authorized this request is carried forward
+      // into the rendered form. Without this the page echoed back whatever
+      // `?key=` string the URL happened to carry — so an owner following a
+      // crafted link would render their own ledger with an attacker-chosen
+      // value pre-filled into every form on it.
+      req.ledgerParamAuthorized = true;
+      return next();
+    }
 
     if (req.siteSession && req.siteSession.role === "owner") return next();
 
@@ -394,12 +420,7 @@ function createBroadcastLedgerRouter({
       since,
     }).filter(isVisibleReceipt);
     if (range === "today") {
-      const today = broadcastLedgerStore.dailySummary().date;
-      const formatter = new Intl.DateTimeFormat("en-CA", {
-        timeZone: settings.timezone,
-        year: "numeric", month: "2-digit", day: "2-digit",
-      });
-      recent = recent.filter((receipt) => formatter.format(new Date(receipt.createdAt)) === today);
+      recent = recent.filter((receipt) => isSameDayInZone(receipt.createdAt, settings.timezone));
     }
     return {
       recent,
@@ -478,7 +499,7 @@ function createBroadcastLedgerRouter({
       renderManualForm({
         ...pageState(req.query),
         notice: req.query.saved ? "Receipt saved." : "",
-        formKey: String(req.query.key || ""),
+        formKey: req.ledgerParamAuthorized ? String(req.query.key || "") : "",
       }),
     );
   });
@@ -506,7 +527,7 @@ function createBroadcastLedgerRouter({
             ...pageState(),
             error: invalid,
             values: body,
-            formKey: String(body.key || ""),
+            formKey: req.ledgerParamAuthorized ? String(body.key || "") : "",
           }),
         );
       }
@@ -581,7 +602,14 @@ function createBroadcastLedgerRouter({
       }
       try {
         const targets = destinationsForNewsType(receipt.newsType, broadcastLedgerStore.getSettings());
-        const result = await telegramService.postText(text, { parseMode: "HTML", ...(targets ? { targets } : {}) });
+        // Same parseMode contract as /broadcast. A story originally sent as
+        // plain text — because its headline contains "<" or "&" and Telegram
+        // rejected the HTML — has to be retried the same way or the retry
+        // reproduces the failure it is meant to clear.
+        const result = await telegramService.postText(text, {
+          parseMode: req.body?.parseMode === "none" ? null : "HTML",
+          ...(targets ? { targets } : {}),
+        });
         const updated = broadcastLedgerStore.updateReceipt(
           receipt.id,
           { destinations: result.destinations, error: null, action: "retry", detail: "Operator retried failed broadcast" },
@@ -717,9 +745,9 @@ function createBroadcastLedgerRouter({
       // A configured daily cap is enforced at the actual send boundary too;
       // callers should still preflight through /broadcast/guard so blocked
       // attempts are visible before Telegram is contacted.
-      if (settings.categoryLimits[suppliedCategory]) {
+      if (settings.categoryLimits[exactNewsType]) {
         if (!String(body.idempotencyKey || "").trim()) {
-          return badRequest(res, `idempotencyKey is required for limited category ${suppliedCategory}.`);
+          return badRequest(res, `idempotencyKey is required for limited category ${exactNewsType}.`);
         }
         const guarded = broadcastLedgerStore.guard({ ...body, source, title, url, text });
         if (!guarded.allowed) {
@@ -732,7 +760,11 @@ function createBroadcastLedgerRouter({
       // window. Regenerated wording and missing source URLs make whole-message
       // hashes insufficient for repeated-news protection.
       if (body.force !== true) {
-        const category = suppliedCategory || "Unclassified";
+        // One resolved category drives every policy decision below. Reading the
+        // raw supplied string here instead let an unsupported label pick a
+        // duplicate window for a category the receipt would never be filed
+        // under.
+        const category = exactNewsType;
         const configuredWindow = settings.duplicateWindows[category] || "24h";
         const windowMs = duplicateWindowMs(configuredWindow);
         const exact = broadcastLedgerStore.lookup({ url, text, headline: title });
@@ -740,8 +772,7 @@ function createBroadcastLedgerRouter({
           ? Date.now() - new Date(exact.receipt.createdAt).getTime()
           : Infinity;
         const exactWithinWindow = configuredWindow === "same-day" && exact.receipt
-          ? new Intl.DateTimeFormat("en-CA", { timeZone: settings.timezone }).format(new Date(exact.receipt.createdAt)) ===
-            new Intl.DateTimeFormat("en-CA", { timeZone: settings.timezone }).format(new Date())
+          ? isSameDayInZone(exact.receipt.createdAt, settings.timezone)
           : Boolean(windowMs && exactAgeMs <= windowMs);
         if (exact.posted && exact.receipt && exactWithinWindow) {
           await notify("blocked", exact.receipt, "Already broadcast inside the configured duplicate window.");
@@ -752,15 +783,24 @@ function createBroadcastLedgerRouter({
             receipt: exact.receipt,
           });
         }
-        const categoryReceipt = broadcastLedgerStore.list({ newsType: category, status: "broadcasted", limit: 500 })
-          .find((receipt) => {
-            if (!receipt.createdAt) return false;
-            if (configuredWindow === "same-day") {
-              return new Intl.DateTimeFormat("en-CA", { timeZone: settings.timezone }).format(new Date(receipt.createdAt)) ===
-                new Intl.DateTimeFormat("en-CA", { timeZone: settings.timezone }).format(new Date());
-            }
-            return Boolean(windowMs && Date.now() - new Date(receipt.createdAt).getTime() <= windowMs);
-          });
+        // Category-window blocking answers "has this *topic* already gone out
+        // today?", which is only a meaningful question for a real category.
+        // "Unclassified" is not a topic — it is the bucket every unlabelled
+        // receipt lands in, including the Channel Watch's records of unrelated
+        // room chatter. Scanning it meant one observed comment could refuse
+        // every category-less broadcast for the next 24 hours. The
+        // authoritative URL and content-hash tiers above still cover genuine
+        // repeats of an unlabelled story.
+        const categoryReceipt = category === "Unclassified"
+          ? null
+          : broadcastLedgerStore.list({ newsType: category, status: "broadcasted", limit: 500 })
+            .find((receipt) => {
+              if (!receipt.createdAt) return false;
+              if (configuredWindow === "same-day") {
+                return isSameDayInZone(receipt.createdAt, settings.timezone);
+              }
+              return Boolean(windowMs && Date.now() - new Date(receipt.createdAt).getTime() <= windowMs);
+            });
         if (categoryReceipt) {
           const blocked = broadcastLedgerStore.createReceipt({
             source,

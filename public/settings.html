@@ -513,7 +513,10 @@
       document.getElementById('ledgerTimezone').value = ledgerSettings.timezone || 'America/Vancouver';
       document.getElementById('ledgerHistory').value = ledgerSettings.historyDays == null ? 'forever' : String(ledgerSettings.historyDays);
 
-      var canonical = ['Crypto', 'Geopolitics', 'Economics', 'Markets', 'Technology', 'General News'];
+      // Must list every category the server ships as allowed. A name missing
+      // here only appears while it is still enabled, so unchecking it removed
+      // its row and left no way to switch it back on from this page.
+      var canonical = ['Stock', 'Crypto', 'Geopolitics', 'Economics', 'Markets', 'Technology', 'General News'];
       var categories = Array.from(new Set(canonical.concat(ledgerSettings.allowedCategories || [])));
       categoriesEl.innerHTML = '';
       categories.forEach(function (category) {

@@ -221,6 +221,13 @@ Available to the owner/manual-access path. The receipt must be `failed`, and
 the request must include the exact message in `text`. Message bodies remain
 hash-only in persistent storage; retry asks for the text at action time.
 
+Retry reuses the receipt's own category and that category's routing policy, and
+accepts the same `parseMode: "none"` option as `/broadcast` — a story that was
+originally sent as plain text has to be retried that way or the retry
+reproduces the formatting failure it exists to clear. It updates the existing
+receipt and appends to its attempt history; it never writes a second receipt or
+erases the failure that prompted it.
+
 ### `POST /reconcile` — recovery
 
 ```jsonc
@@ -516,6 +523,26 @@ Three behaviours worth knowing:
   total failure returns `502` and leaves a `failed` receipt, which does *not*
   read as broadcast to anyone asking later.
 
+#### The category duplicate window
+
+Beyond per-story dedupe, `/broadcast` refuses a *second story in the same
+category* inside that category's configured duplicate window (default `24h`,
+set per category under **Ledger Settings**). It returns `409` with
+`match: "category-window"`, records a visible `blocked` receipt, and names the
+earlier receipt in `previousReceipt`. This exists because regenerated wording
+and missing source URLs make a whole-message hash insufficient protection
+against the same news going out twice in different words.
+
+It is deliberately strict. The escape hatches are `"force": true` on a
+deliberate resend, and setting that category's window to `off` or `6h` in
+Ledger Settings.
+
+The `Unclassified` bucket is exempt. It is not a topic — it is where every
+unlabelled receipt lands, including the Channel Watch's record of unrelated
+room chatter, so scanning it would let one observed comment refuse every
+category-less broadcast for a day. Unlabelled stories are still protected by
+the authoritative canonical-URL and content-hash tiers.
+
 `parseMode: "none"` sends the text unformatted — use it if a headline contains
 `<` or `&` and Telegram rejects the message.
 
@@ -524,8 +551,11 @@ Three behaviours worth knowing:
 This endpoint can send to your configured chats, so the ledger key is no longer
 strictly receipt-only. That is a deliberate trade: the alternative is the
 **bot token** living on your phone, which can send anywhere, edit, and delete.
-The ledger key can only post to `TELEGRAM_CHAT_IDS`. Moving the Shortcut onto
-this endpoint is a net reduction in what the phone holds.
+The ledger key can only post to the news sender's own destinations —
+`/broadcast` and its retry go out through `NEWS_TELEGRAM_BOT_TOKEN` /
+`NEWS_TELEGRAM_CHAT_IDS`, deliberately isolated from the shared dashboard
+sender on `TELEGRAM_*`. Moving the Shortcut onto this endpoint is a net
+reduction in what the phone holds.
 
 Stock, Crypto and Economics broadcasts are narrower than the general Telegram
 list: when `newsType` is exactly `Stock`, `Crypto` or `Economics`, `/broadcast`

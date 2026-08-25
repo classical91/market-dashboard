@@ -256,18 +256,39 @@ class BroadcastIngestService {
     this._conflictReported = false;
     this._lastError = null;
 
+    // getUpdates already filters to arrays, but a stubbed or future transport
+    // could hand back anything; a malformed response is an empty poll, never a
+    // crash inside the interval timer.
+    if (!Array.isArray(updates)) updates = [];
+
     const summary = { polled: updates.length, recorded: 0, attached: 0, skipped: 0 };
     let highestUpdateId = null;
 
     for (const update of updates) {
+      if (!update || typeof update !== "object") {
+        summary.skipped += 1;
+        continue;
+      }
       if (Number.isFinite(update.update_id)) {
         highestUpdateId = highestUpdateId === null ? update.update_id : Math.max(highestUpdateId, update.update_id);
       }
-      const post = update.channel_post || update.message;
-      const outcome = this._ingestPost(post);
-      if (outcome === "recorded") summary.recorded += 1;
-      else if (outcome === "attached") summary.attached += 1;
-      else summary.skipped += 1;
+      // One unusable update must not take the batch down with it. Without this
+      // the throw escaped before the offset was saved, so the same poison
+      // update was re-read every interval and every later update behind it
+      // stayed unrecorded — a stall that looks exactly like a watch that has
+      // simply stopped seeing posts.
+      try {
+        const outcome = this._ingestPost(update.channel_post || update.message);
+        if (outcome === "recorded") summary.recorded += 1;
+        else if (outcome === "attached") summary.attached += 1;
+        else summary.skipped += 1;
+      } catch (err) {
+        summary.skipped += 1;
+        summary.errors = (summary.errors || 0) + 1;
+        this._logger.error?.(
+          `[BroadcastIngest] Skipped update ${update.update_id ?? "?"}: ${err.message}`,
+        );
+      }
     }
 
     // Advance past everything handled so the same posts are not re-read.
