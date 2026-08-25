@@ -125,6 +125,30 @@ test("Trading Lab and admin surfaces stay closed to anonymous callers", async ()
   assert.equal(settings.status, 401);
 });
 
+// ADMIN_API_KEY is unset in this file, so the Trading Lab machine-read
+// exemption must not fire: an x-admin-key header is worthless against a deploy
+// that never configured a key. Positive assertions for a keyed deploy live in
+// test/trading-lab-machine-read.test.js.
+test("the Trading Lab machine-read exemption fails closed without ADMIN_API_KEY", async () => {
+  const targets = [
+    "/api/trading-lab/pipeline",
+    "/api/trading-lab/strategy-accounts",
+    "/api/trading-lab/strategy-accounts/mindset_v1",
+    "/api/trading-lab/signal-actions",
+  ];
+  for (const target of targets) {
+    const anonymous = await fetch(`${base}${target}`);
+    assert.equal(anonymous.status, 401, `${target} must stay closed to anonymous callers`);
+
+    const keyed = await fetch(`${base}${target}`, { headers: { "x-admin-key": "any-key" } });
+    assert.equal(keyed.status, 401, `${target} must not open when no admin key is configured`);
+  }
+
+  const { cookie } = await login("owner-password", "/");
+  const owner = await fetch(`${base}/api/trading-lab/pipeline`, { headers: { cookie } });
+  assert.equal(owner.status, 200, "the owner session still reads the pipeline view");
+});
+
 test("journal reads need an owner session, not just any session", async () => {
   const { cookie: alphaCookie } = await login("alpha-password", "/signal-screener.html?view=alpha");
   const alphaJournal = await fetch(`${base}/api/decision/journal`, { headers: { cookie: alphaCookie } });
