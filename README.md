@@ -28,6 +28,7 @@ The app is intentionally lightweight: no bundler, no frontend framework, and no 
 - `/indicators.html` - Trading and market glossary.
 - `/reporter.html` - Daily report generation workflow.
 - `/api/newsroom` - newsroom cycle records and health for the scheduled reporting run: one durable cycle per run, linking generated sections to broadcast receipts and Telegram message ids. See [docs/newsroom-cycles.md](docs/newsroom-cycles.md).
+- `/api/broadcast-ledger/preflight` - answers the environment, persistence and routing half of [docs/production-verification.md](docs/production-verification.md) from inside the running service. Sends nothing, echoes no secret. `node scripts/verify-broadcast-ledger.js --url <host> --key <key>` runs it plus the read-only endpoint checks and prints a verdict.
 - `/api/broadcast-ledger/broadcast` - sends a broadcast to Telegram **and** records the receipt in one call, from the real send result. Telegram never reports a bot's own messages back through `getUpdates`, so anything sent through this bot cannot be picked up by the channel watch and must go through here.
 - `/api/broadcast-ledger/manual` - operational Broadcast Ledger with date/category/status filters, search, daily summaries, destination labels, attempt history, edit/delete, copy, and failed retry. **Ledger Settings** controls exact categories, per-category limits and duplicate windows, blocked-attempt recording, retention, sources, and destination names. See [docs/broadcast-ledger.md](docs/broadcast-ledger.md).
 

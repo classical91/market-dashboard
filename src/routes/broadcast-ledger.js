@@ -5,6 +5,7 @@ const crypto = require("node:crypto");
 const { createRateLimit } = require("../middleware/rate-limit");
 const { isLedgerRequest, isLedgerParamRequest } = require("../middleware/ledger-auth");
 const { deriveTitle, firstUrl } = require("../services/broadcast-ingest");
+const { buildPreflight } = require("../services/broadcast-preflight");
 const { SOURCES, KINDS, STATUSES, DEFAULT_SETTINGS, canonicalizeUrl, isPostedStatus } = require("../services/broadcast-ledger");
 const { destinationsForNewsType } = require("../services/news-routing");
 
@@ -324,6 +325,9 @@ function createBroadcastLedgerRouter({
   broadcastLedgerStore,
   broadcastIngestService,
   telegramService,
+  watchTelegramService,
+  config: appConfig,
+  bootedAt,
   notificationService,
   requireAdmin,
   requireLedgerKey,
@@ -434,6 +438,31 @@ function createBroadcastLedgerRouter({
       summary: visibleDailySummary(broadcastLedgerStore, settings),
     };
   }
+
+  /**
+   * Answers the environment, persistence and routing half of
+   * docs/production-verification.md from inside the running process, where the
+   * real values are. Deliberately sends nothing: delivery and the guard rails
+   * put real messages in real rooms and stay a human decision.
+   */
+  router.get("/preflight", requireManualAccess, (req, res, next) => {
+    try {
+      res.setHeader("Cache-Control", "no-store");
+      res.json(
+        buildPreflight({
+          config: appConfig,
+          broadcastLedgerStore,
+          broadcastIngestService,
+          telegramService: watchTelegramService,
+          newsTelegramService: telegramService,
+          destinationsForNewsType,
+          bootedAt,
+        }),
+      );
+    } catch (err) {
+      next(err);
+    }
+  });
 
   router.get("/status", requireManualAccess, (req, res, next) => {
     try {
