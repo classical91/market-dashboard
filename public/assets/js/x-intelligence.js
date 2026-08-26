@@ -32,25 +32,52 @@
   // chosen were stuck on a single handle's 8 posts.
   var localModeKey = "xIntelligence:lastMode:v2";
   var localKey = "xIntelligence:lastHandle";
-  var localFeedKey = "xIntelligence:feedCache:v3";
+  // Bumped to :v4 for the timestamped schema. The v3 entries it replaces had
+  // no saved-at time, so a browser could show them indefinitely with nothing
+  // to say how old they were — they cannot be repaired in place, only
+  // stranded, which is what the new key does. v3 is dropped on sight to
+  // reclaim the space rather than leaving it to linger.
+  var localFeedKey = "xIntelligence:feedCache:v4";
+  var legacyFeedKeys = ["xIntelligence:feedCache:v3"];
+  var FEED_CACHE_TTL_MS = 45 * 60 * 1000;
   var ALL_MODE = "all";
 
   var renderPostCards = window.XPosts.renderPostCards;
   var renderFeedError = window.XPosts.renderFeedError;
   var renderStaleNotice = window.XPosts.renderStaleNotice;
+  var renderFeedStatus = window.XPosts.renderFeedStatus;
+  var relativeTime = window.XPosts.formatRelativeTime;
 
+  function dropLegacyCaches() {
+    legacyFeedKeys.forEach(function (key) {
+      try { localStorage.removeItem(key); } catch (err) {}
+    });
+  }
+
+  /* Returns the cached payload together with when it was saved and whether
+     that has expired. The age travels with the data so nothing downstream can
+     present it without knowing how old it is. */
   function readCachedFeed() {
     try {
       var parsed = JSON.parse(localStorage.getItem(localFeedKey) || "null");
-      if (!parsed || !Array.isArray(parsed.posts)) return null;
-      return parsed;
+      if (!parsed || !parsed.payload || !Array.isArray(parsed.payload.posts)) return null;
+      var savedAt = Number(parsed.savedAt);
+      if (!isFinite(savedAt) || savedAt <= 0) return null;
+      return {
+        payload: parsed.payload,
+        savedAt: savedAt,
+        savedAtIso: new Date(savedAt).toISOString(),
+        expired: Date.now() - savedAt > FEED_CACHE_TTL_MS,
+      };
     } catch (err) {
       return null;
     }
   }
 
-  function writeCachedFeed(data) {
-    try { localStorage.setItem(localFeedKey, JSON.stringify(data)); } catch (err) {}
+  function writeCachedFeed(payload) {
+    try {
+      localStorage.setItem(localFeedKey, JSON.stringify({ savedAt: Date.now(), payload: payload }));
+    } catch (err) {}
   }
 
   function allAccounts() {
@@ -114,15 +141,131 @@
     });
   }
 
+  /* Resolves to {ok:true, data} or {ok:false, reason}. It must never turn a
+     failure into an empty-but-successful feed: that is what made an outage
+     indistinguishable from "no posts today", and left last week's posts on
+     screen looking current. */
   function loadAccountsFeed() {
-    return fetch("/api/x/accounts")
-      .then(function (res) {
-        if (!res.ok) throw new Error("Request failed: " + res.status);
-        return res.json();
-      })
-      .catch(function () {
-        return { posts: [], failedFeeds: [] };
-      });
+    return fetch("/api/x/accounts", { headers: { Accept: "application/json" } }).then(
+      function (res) {
+        if (!res.ok) {
+          return { ok: false, reason: "The dashboard server returned " + res.status };
+        }
+        return res.json().then(
+          function (data) {
+            if (!data || !Array.isArray(data.posts) || !Array.isArray(data.accounts)) {
+              return { ok: false, reason: "The feed response was malformed" };
+            }
+            return { ok: true, data: data };
+          },
+          function () {
+            return { ok: false, reason: "The feed response could not be parsed" };
+          }
+        );
+      },
+      function () {
+        return { ok: false, reason: "Couldn't reach the dashboard server" };
+      }
+    );
+  }
+
+  function accountMeta(feedData, handle) {
+    var accounts = feedData.accounts || [];
+    for (var i = 0; i < accounts.length; i += 1) {
+      if (accounts[i].handle === handle) return accounts[i];
+    }
+    return null;
+  }
+
+  /* The single place that decides what the reader is told about freshness.
+     Everything it reports comes from explicit timestamps and states on the
+     payload — never from how many posts happen to be present. */
+  function computeStatus(state, handle) {
+    if (!state.loaded) return null;
+
+    // Anything still coming out of the browser cache is labelled as cached —
+    // whether the refresh failed or has simply not landed yet. The cached
+    // payload's own status is never replayed as if it were current.
+    if (state.cache) {
+      var savedAgo = relativeTime(state.cache.savedAtIso);
+      var lead = state.transport.ok ? "Refreshing…" : state.transport.reason + ".";
+      if (state.cache.expired) {
+        return {
+          level: "unavailable",
+          message:
+            lead + " Showing expired cached posts saved " + savedAgo +
+            " — treat these as historical, not current.",
+        };
+      }
+      return {
+        level: state.transport.ok ? "stale" : "offline",
+        message: lead + " Showing cached posts saved " + savedAgo + ".",
+      };
+    }
+
+    if (!state.transport.ok) {
+      return { level: "unavailable", message: state.transport.reason + ". No posts to show." };
+    }
+
+    var checked = relativeTime(state.feedData.generatedAt);
+    var checkedSuffix = checked ? " — checked " + checked : "";
+
+    if (handle) {
+      var meta = accountMeta(state.feedData, handle);
+      if (!meta) return { level: "unavailable", message: "@" + handle + " is not in this feed." };
+      if (meta.error) {
+        var lastGood = relativeTime(meta.lastSuccessfulFetchAt);
+        return {
+          level: "unavailable",
+          message:
+            "Couldn't load @" + handle + checkedSuffix +
+            (lastGood ? ". Last successful fetch " + lastGood + "." : "."),
+        };
+      }
+      if (meta.stale) {
+        return {
+          level: "stale",
+          message:
+            "The latest check for @" + handle + " did not succeed" + checkedSuffix +
+            ". Showing posts last confirmed " + (relativeTime(meta.lastSuccessfulFetchAt) || "at an unknown time") + ".",
+        };
+      }
+      // The distinction that matters: a quiet account is not a stale feed.
+      var newest = relativeTime(meta.newestPostAt);
+      var newestPart = newest ? " @" + handle + "'s latest post is from " + newest + "." : "";
+      var checkedPart = "Checked " + (checked || "just now") + ".";
+      if (meta.dataState === "degraded") {
+        return {
+          level: "degraded",
+          message: checkedPart + " Confirmed via the unofficial fallback source." + newestPart,
+        };
+      }
+      return { level: "live", message: checkedPart + newestPart };
+    }
+
+    var counts = state.feedData.counts || {};
+    var total = (state.feedData.accounts || []).length;
+    var status = state.feedData.status || "unavailable";
+
+    if (status === "unavailable" && !(counts.live || counts.degraded || counts.stale)) {
+      return { level: "unavailable", message: "No accounts could be loaded" + checkedSuffix + "." };
+    }
+    if (status === "live") {
+      return {
+        level: "live",
+        message: "All " + total + " accounts confirmed current" + checkedSuffix + ".",
+      };
+    }
+
+    var parts = [];
+    if (counts.live) parts.push(counts.live + " live");
+    if (counts.degraded) parts.push(counts.degraded + " via fallback");
+    if (counts.stale) parts.push(counts.stale + " cached");
+    if (counts.unavailable) parts.push(counts.unavailable + " unavailable");
+    return {
+      level: status === "degraded" ? "degraded" : status,
+      message: parts.join(", ") + " of " + total + " accounts" + checkedSuffix + ".",
+    };
   }
 
   function init() {
@@ -170,12 +313,17 @@
     var lastHandle = readLastHandle();
     var validLast = accounts.some(function (a) { return a.handle === lastHandle; });
     var lastMode = readLastMode();
+    dropLegacyCaches();
     var cached = readCachedFeed();
     var state = {
       // Default to the full feed; a single account only shows its own posts.
       mode: lastMode === "account" ? "account" : ALL_MODE,
       handle: validLast ? lastHandle : accounts[0].handle,
-      feedData: cached || { posts: [], failedFeeds: [] },
+      feedData: cached ? cached.payload : { posts: [], accounts: [], failedFeeds: [] },
+      // Set while what is on screen came out of the browser cache rather than
+      // this page load's fetch; cleared as soon as the server answers.
+      cache: cached,
+      transport: { ok: true },
       loaded: !!cached,
     };
 
@@ -186,9 +334,14 @@
         return;
       }
       if (state.mode === ALL_MODE) {
-        renderPostCards(pane, state.feedData.posts, "No posts found yet.");
+        renderPostCards(
+          pane,
+          state.feedData.posts,
+          state.transport.ok ? "No posts found yet." : "Couldn't load posts."
+        );
         renderFeedError(pane, state.feedData.failedFeeds);
         renderStaleNotice(pane, state.feedData.staleFeeds);
+        renderFeedStatus(pane, computeStatus(state, null));
         return;
       }
       var handlePosts = state.feedData.posts.filter(function (p) { return p.handle === state.handle; });
@@ -197,11 +350,12 @@
       renderPostCards(
         pane,
         handlePosts,
-        failed
+        failed || !state.transport.ok
           ? "Couldn't load current posts for @" + state.handle + " right now."
           : "No recent posts found for @" + state.handle + "."
       );
       renderStaleNotice(pane, stale);
+      renderFeedStatus(pane, computeStatus(state, state.handle));
     }
 
     function refreshList() {
@@ -233,20 +387,35 @@
     refreshList();
     if (state.mode === ALL_MODE) selectAll(); else selectHandle(state.handle);
 
-    loadAccountsFeed().then(function (data) {
-      var hasFreshPosts = Array.isArray(data.posts) && data.posts.length > 0;
-      // Keep whatever was cached/shown if this fetch came back empty (e.g. a
-      // transient failure), instead of wiping out posts that were already
-      // on screen.
-      if (hasFreshPosts || !state.loaded) {
-        state.feedData = {
-          posts: data.posts || [],
-          failedFeeds: data.failedFeeds || [],
-          staleFeeds: (data.accounts || []).filter(function (a) { return a.stale; }),
-        };
-      }
+    loadAccountsFeed().then(function (result) {
       state.loaded = true;
-      if (hasFreshPosts) writeCachedFeed(state.feedData);
+
+      if (result.ok) {
+        // The server response is authoritative about freshness, including
+        // when it reports that nothing could be loaded. It always replaces
+        // what is on screen — post count is not evidence either way.
+        var data = result.data;
+        state.feedData = {
+          status: data.status,
+          generatedAt: data.generatedAt,
+          lastSuccessfulFetchAt: data.lastSuccessfulFetchAt,
+          newestPostAt: data.newestPostAt,
+          counts: data.counts || {},
+          posts: data.posts,
+          accounts: data.accounts,
+          failedFeeds: data.failedFeeds || [],
+          staleFeeds: data.staleFeeds || [],
+        };
+        state.transport = { ok: true };
+        state.cache = null;
+        writeCachedFeed(state.feedData);
+        renderPane();
+        return;
+      }
+
+      // A transport failure stays a failure. Anything still on screen came
+      // out of the browser cache and gets labelled as such, with its age.
+      state.transport = { ok: false, reason: result.reason };
       renderPane();
     });
   }
