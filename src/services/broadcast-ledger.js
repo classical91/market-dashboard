@@ -87,6 +87,7 @@ const MAX_TEXT_LEN = 50000;
 const MAX_ERROR_LEN = 500;
 const MAX_NEWS_TYPE_LEN = 40;
 const MAX_DESTINATIONS = 50;
+const MAX_ID_LEN = 120;
 
 /** Default window for the conservative tier-3 headline match. */
 const DEFAULT_HEADLINE_WINDOW_MS = 36 * 60 * 60 * 1000;
@@ -453,6 +454,10 @@ class BroadcastLedgerStore {
     const receipt = {
       id: this._nextId(),
       idempotencyKey: idempotencyKey || null,
+      // The newsroom cycle this delivery belongs to, when one exists. Null for
+      // every other sender and for every receipt written before cycles
+      // existed — the field is additive and nothing reads it as required.
+      cycleId: clampString(input.cycleId, MAX_ID_LEN) || null,
       createdAt: nowIso(),
       updatedAt: nowIso(),
       source,
@@ -551,6 +556,12 @@ class BroadcastLedgerStore {
     }
     if (typeof patch.idempotencyKey === "string" && patch.idempotencyKey) {
       receipt.idempotencyKey = clampString(patch.idempotencyKey, 200);
+    }
+    // A cycle id is only ever set, never cleared: the first sender to name its
+    // cycle owns the link, and a later plain update must not orphan the
+    // receipt from the cycle that produced it.
+    if (typeof patch.cycleId === "string" && patch.cycleId.trim() && !receipt.cycleId) {
+      receipt.cycleId = clampString(patch.cycleId, MAX_ID_LEN);
     }
     if (typeof patch.newsType === "string" && patch.newsType.trim()) {
       const category = clampString(patch.newsType, MAX_NEWS_TYPE_LEN);
@@ -701,7 +712,7 @@ class BroadcastLedgerStore {
     return empty;
   }
 
-  list({ limit = 50, status, source, newsType, since, query } = {}) {
+  list({ limit = 50, status, source, newsType, since, query, cycleId } = {}) {
     const cap = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 500);
     const sinceMs = since && isFiniteDate(since) ? new Date(since).getTime() : null;
     const needle = normalizeText(query || "");
@@ -709,6 +720,7 @@ class BroadcastLedgerStore {
       .filter((r) => (status === "broadcasted" ? isPostedStatus(r.status) : status ? r.status === status : true))
       .filter((r) => (source ? r.source === source : true))
       .filter((r) => (newsType ? r.newsType === newsType : true))
+      .filter((r) => (cycleId ? r.cycleId === cycleId : true))
       .filter((r) => (sinceMs ? isFiniteDate(r.createdAt) && new Date(r.createdAt).getTime() >= sinceMs : true))
       .filter((r) => (needle ? normalizeText(`${r.id} ${r.title || ""}`).includes(needle) : true))
       .slice(0, cap);
