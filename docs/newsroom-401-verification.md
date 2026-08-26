@@ -44,12 +44,20 @@ Not the 401 itself — the way this system responds to it:
   `GET /api/newsroom/health` rather than being inferred from silence.
 - A preflight now runs before any generation or delivery, so a missing
   credential produces a readable cycle record instead of a half-finished run.
-- The preflight reports the external agent route as **unverified**, never as
-  passing, because this repository cannot check it.
+- **The agent route can now be checked automatically.** Set
+  `NEWSROOM_AGENT_PREFLIGHT_URL` (plus `_TOKEN`, and `_EXPECT` for the agent
+  identity) and every cycle verifies the gateway identity read-only before
+  spending anything: a `User not found` fails the cycle at preflight, with the
+  right code, instead of surfacing hours later as silence. Until that URL is
+  set the route reports `warn: not verified` — never a pass.
 
 Regression coverage: `test/newsroom-cycle.test.js` —
 *"HTTP 401 \"User not found\" is classified as a provider identity failure"* and
-*"an authentication failure is recorded as non-retryable"*.
+*"an authentication failure is recorded as non-retryable"*;
+`test/newsroom-agent-preflight.test.js` —
+*"HTTP 401 \"User not found\" fails the check as a provider identity failure"*,
+*"a rejected agent route fails preflight and the cycle spends nothing"* and
+*"the token never appears in the result"*.
 
 ---
 
@@ -138,6 +146,14 @@ step 1–2.
 failure and localizes it to OpenClaw's identity for the cron's credential —
 which is the answer this whole checklist is looking for. Nothing further in
 this app needs changing.
+
+**Once you have that endpoint, wire it in.** Set `NEWSROOM_AGENT_PREFLIGHT_URL`
+to it, `NEWSROOM_AGENT_PREFLIGHT_TOKEN` to the cron's credential and
+`NEWSROOM_AGENT_PREFLIGHT_EXPECT` to the agent id from step 1. Every cycle then
+runs this exact check itself, read-only, before spending anything — so the next
+time the identity breaks it fails at preflight with `provider_user_not_found`
+rather than becoming another silent morning. Verify with step 1's preflight
+call: `external-agent-route` should move from `warn` to `pass`.
 
 ### 4. Telegram credentials — read-only, sends nothing
 

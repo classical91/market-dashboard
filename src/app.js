@@ -78,6 +78,7 @@ const { BroadcastLedgerNotificationService } = require("./services/broadcast-led
 const { ReporterService } = require("./services/reporter");
 const { NewsroomCycleStore } = require("./services/newsroom-cycles");
 const { NewsroomService } = require("./services/newsroom");
+const { createAgentRoutePreflight } = require("./services/newsroom-agent-preflight");
 const { TelegramService } = require("./services/telegram");
 const { YouTubeIntelligenceService } = require("./services/youtube");
 const { XFeedService } = require("./services/x-feed");
@@ -155,6 +156,11 @@ function createApp() {
     broadcastLedgerStore,
     sections: config.newsroom.sections,
     expectedRunTimesUtc: config.newsroom.expectedRunTimesUtc,
+    allowPartialDelivery: config.newsroom.allowPartialDelivery,
+    // Null unless NEWSROOM_AGENT_PREFLIGHT_URL is set, in which case the
+    // preflight stops reporting the ShareBot/OpenClaw route as unverified and
+    // starts actually checking it — read-only, before anything is spent.
+    externalPreflight: createAgentRoutePreflight(config.newsroom.agentPreflight),
   });
   const marketDataService = new MarketDataService();
   const overviewService = new OverviewService({

@@ -248,7 +248,13 @@ class NewsroomCycleStore {
           ? preflight.checks.slice(0, 30).map((check) => ({
               name: clampString(check.name, 60),
               ok: Boolean(check.ok),
+              // pass / warn / fail. A check can be ok and still be a warn —
+              // an unverifiable external route lets the cycle run but is not
+              // evidence that the route works.
+              status: clampString(check.status, 20) || (check.ok ? "pass" : "fail"),
               detail: clampString(check.detail),
+              ...(check.code ? { code: clampString(check.code, 60) } : {}),
+              ...(check.skipped ? { skipped: true } : {}),
             }))
           : [],
       };

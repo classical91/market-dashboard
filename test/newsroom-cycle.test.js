@@ -76,7 +76,7 @@ function fakeTelegram({ failOn = null, error } = {}) {
   };
 }
 
-function makeNewsroom({ reporterOptions = {}, telegramService = fakeTelegram() } = {}) {
+function makeNewsroom({ reporterOptions = {}, telegramService = fakeTelegram(), allowPartialDelivery = false } = {}) {
   const dataDir = tempDir();
   const reporterService = fakeReporter({ dataDir, ...reporterOptions });
   const cycleStore = new NewsroomCycleStore({ dataDir, logger: { error() {} } });
@@ -88,6 +88,7 @@ function makeNewsroom({ reporterOptions = {}, telegramService = fakeTelegram() }
     broadcastLedgerStore,
     sections: SECTIONS,
     expectedRunTimesUtc: ["13:00"],
+    allowPartialDelivery,
     logger: { error() {} },
   });
   return { dataDir, newsroom, cycleStore, reporterService, telegramService, broadcastLedgerStore };
@@ -255,6 +256,84 @@ test("a failed slot resumes and generates only the section that is missing", asy
   );
 });
 
+/* ── partial delivery ── */
+
+test("with partial delivery on, the sections that exist go out and the cycle stays partial", async () => {
+  const telegramService = fakeTelegram();
+  const { newsroom } = makeNewsroom({
+    telegramService,
+    allowPartialDelivery: true,
+    reporterOptions: {
+      generate: async (_prompt, callNumber) => {
+        if (callNumber === 2) throw Object.assign(new Error("upstream exploded"), { status: 503 });
+        return { content: `body ${callNumber}`, sources: [] };
+      },
+    },
+  });
+
+  const { cycle } = await newsroom.runCycle({ scheduledAt: SCHEDULED_AT });
+
+  assert.equal(cycle.sectionsGenerated.length, 2);
+  assert.equal(telegramService.calls.length, 2, "only the generated sections are sent");
+  assert.equal(
+    cycle.status,
+    "delivery_partial",
+    "an incomplete report is never completed, even when every send succeeded",
+  );
+  assert.equal(cycle.failures[0].phase, "generation", "the missing section stays visible as a failure");
+});
+
+test("partial delivery never sends a section this cycle did not generate", async () => {
+  // Yesterday's markets section is still cached. Today's markets generation
+  // fails. Delivering the cached copy would publish stale copy under today's
+  // date and hang a receipt on a cycle that never generated it.
+  const telegramService = fakeTelegram();
+  const { newsroom, reporterService } = makeNewsroom({
+    telegramService,
+    allowPartialDelivery: true,
+    reporterOptions: {
+      generate: async (_prompt, callNumber) => {
+        // markets is the third section of the run
+        if (callNumber === 3) throw Object.assign(new Error("upstream exploded"), { status: 503 });
+        return { content: `body ${callNumber}`, sources: [] };
+      },
+    },
+  });
+  reporterService._cache.set("reporter:latest:markets", {
+    dateStr: "YESTERDAY",
+    content: "stale markets body from an earlier day",
+    generatedAt: "2026-08-25T13:00:00.000Z",
+  }, 24 * 60 * 60 * 1000);
+
+  const { cycle } = await newsroom.runCycle({ scheduledAt: SCHEDULED_AT });
+
+  assert.deepEqual(telegramService.calls.map((call) => call.newsType), ["Crypto", "Economics"]);
+  assert.equal(
+    telegramService.calls.some((call) => call.text.includes("stale")),
+    false,
+    "a section from an earlier day must never ride along in today's cycle",
+  );
+  assert.equal(cycle.status, "delivery_partial");
+});
+
+test("with partial delivery off, an incomplete cycle still sends nothing", async () => {
+  const telegramService = fakeTelegram();
+  const { newsroom } = makeNewsroom({
+    telegramService,
+    reporterOptions: {
+      generate: async (_prompt, callNumber) => {
+        if (callNumber === 2) throw Object.assign(new Error("upstream exploded"), { status: 503 });
+        return { content: `body ${callNumber}`, sources: [] };
+      },
+    },
+  });
+
+  const { cycle } = await newsroom.runCycle({ scheduledAt: SCHEDULED_AT });
+
+  assert.equal(cycle.status, "generation_failed");
+  assert.equal(telegramService.calls.length, 0);
+});
+
 /* ── delivery failure and retry ── */
 
 test("one failing category leaves the others delivered and the cycle partial", async () => {
@@ -400,14 +479,18 @@ test("a failed preflight produces a cycle record and sends nothing", async () =>
   assert.ok(cycle.preflight.checks.find((check) => check.name === "telegram-credentials" && !check.ok));
 });
 
-test("the external agent route is reported as unverified rather than assumed", async () => {
+test("an unconfigured agent route is a warn, never a pass", async () => {
   const { newsroom } = makeNewsroom();
   const preflight = await newsroom.preflight();
   const external = preflight.checks.find((check) => check.name === "external-agent-route");
 
   assert.equal(external.skipped, true);
-  assert.match(external.detail, /outside it/i);
+  assert.equal(external.status, "warn", "an unknown route must not read as a passing check");
+  assert.match(external.detail, /not verified/i);
   assert.equal(preflight.ok, true, "an unverifiable external route must not fail a local preflight");
+  assert.ok(
+    preflight.checks.filter((check) => check.name !== "external-agent-route").every((check) => check.status === "pass"),
+  );
 });
 
 /* ── backwards compatibility ── */

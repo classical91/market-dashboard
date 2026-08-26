@@ -28,6 +28,7 @@ const { destinationsForNewsType } = require("./news-routing");
 const { broadcastReportSections, REPORT_CATEGORIES } = require("./report-broadcast");
 const { classifyFailure } = require("./failure-classification");
 const { scheduledCycleKey, ACTIVE_STATUSES, GENERATED_STATUSES } = require("./newsroom-cycles");
+const { UNCONFIGURED_DETAIL, PASS, WARN, FAIL } = require("./newsroom-agent-preflight");
 
 const DEFAULT_SECTIONS = ["crypto", "economics", "markets"];
 // How long a cycle may sit untouched in an active status before a later
@@ -76,6 +77,7 @@ class NewsroomService {
     sections,
     expectedRunTimesUtc = [],
     externalPreflight = null,
+    allowPartialDelivery = false,
     logger = console,
   } = {}) {
     this._cycles = cycleStore;
@@ -85,6 +87,7 @@ class NewsroomService {
     this._sections = Array.isArray(sections) && sections.length ? [...sections] : [...DEFAULT_SECTIONS];
     this._expectedRunTimesUtc = Array.isArray(expectedRunTimesUtc) ? [...expectedRunTimesUtc] : [];
     this._externalPreflight = typeof externalPreflight === "function" ? externalPreflight : null;
+    this._allowPartialDelivery = Boolean(allowPartialDelivery);
     this._logger = logger;
   }
 
@@ -102,7 +105,12 @@ class NewsroomService {
    */
   async preflight() {
     const checks = [];
-    const add = (name, ok, detail, extra = {}) => checks.push({ name, ok: Boolean(ok), detail, ...extra });
+    // `ok` decides whether a cycle may proceed; `status` carries the severity,
+    // in the same pass/warn/fail vocabulary the broadcast preflight uses. They
+    // differ in exactly one place — an unverifiable external route is a warn
+    // that still lets the cycle run.
+    const add = (name, ok, detail, extra = {}) =>
+      checks.push({ name, ok: Boolean(ok), status: ok ? PASS : FAIL, detail, ...extra });
 
     const reporterConfigured = Boolean(this._reporter && this._reporter.configured);
     add(
@@ -158,24 +166,44 @@ class NewsroomService {
     add("broadcast-ledger", Boolean(this._ledger), this._ledger ? "Receipt store is available." : "No broadcast ledger store.");
 
     if (this._externalPreflight) {
+      // A configured route is a real gate: a credential the gateway no longer
+      // recognizes fails the cycle here, before it spends anything, instead of
+      // surfacing as an unexplained silence hours later.
       try {
         const result = await this._externalPreflight();
-        add("external-agent-route", result?.ok !== false, result?.detail || "External route check completed.");
+        const ok = result?.ok !== false;
+        checks.push({
+          name: "external-agent-route",
+          ok,
+          status: result?.status || (ok ? PASS : FAIL),
+          detail: result?.detail || "External route check completed.",
+          ...(result?.code ? { code: result.code } : {}),
+          ...(result?.httpStatus ? { httpStatus: result.httpStatus } : {}),
+        });
       } catch (err) {
+        // createAgentRoutePreflight resolves rather than throws, so reaching
+        // here means a caller-supplied checker misbehaved. Treat it the same
+        // way: a check that cannot answer does not get to pass.
         const classification = classifyFailure(err, { phase: "preflight" });
-        add("external-agent-route", false, `External route check failed: ${classification.message || classification.reason}`);
+        checks.push({
+          name: "external-agent-route",
+          ok: false,
+          status: FAIL,
+          code: classification.code,
+          detail: `External route check failed: ${classification.message || classification.reason}`,
+        });
       }
     } else {
-      // Deliberately not a failure. The ShareBot/OpenClaw agent route is
-      // configured outside this repository, so the honest report is
-      // "unverified here", not a pass or a fail we did not earn.
-      add(
-        "external-agent-route",
-        true,
-        "Not verified from this repository — the ShareBot/OpenClaw agent and model route live outside it. " +
-          "See docs/newsroom-401-verification.md.",
-        { skipped: true },
-      );
+      // Not a failure — the cycle still runs — but not a pass either. The
+      // agent route is configured outside this repository, and calling an
+      // unknown a pass is how a broken route stays invisible.
+      checks.push({
+        name: "external-agent-route",
+        ok: true,
+        status: WARN,
+        skipped: true,
+        detail: UNCONFIGURED_DETAIL,
+      });
     }
 
     return { ok: checks.every((check) => check.ok), checks };
@@ -249,7 +277,7 @@ class NewsroomService {
       return { cycle: this._cycles.getCycle(cycle.id), created, preflight, generation };
     }
 
-    const delivery = await this._deliver(cycle.id, { ttlMs });
+    const delivery = await this._deliver(cycle.id, { ttlMs, incomplete: generation.incomplete });
     return { cycle: this._cycles.getCycle(cycle.id), created, preflight, generation, delivery };
   }
 
@@ -320,20 +348,49 @@ class NewsroomService {
     }
 
     if (failures.length) {
-      // A cycle missing an expected section is not delivered. The next run of
-      // the same slot resumes and generates only what is still missing, which
-      // is why the failure does not have to be fatal to the cycle's report.
       this._cycles.setStatus(cycle.id, "generation_failed");
-      return { ok: false, generatedCount, failures };
+      // By default a cycle missing an expected section is not delivered: a
+      // digest that silently drops a category reads as a complete report to
+      // everyone in the room. The next run of the same slot resumes and
+      // generates only what is still missing, which is why the failure does
+      // not have to be fatal to the cycle's report.
+      //
+      // With allowPartialDelivery on, what exists goes out anyway — but the
+      // cycle can never reach "completed" while an expected section is
+      // missing, so `incomplete` travels with it to delivery.
+      if (!this._allowPartialDelivery || !generatedCount) {
+        return { ok: false, generatedCount, failures };
+      }
+      return { ok: true, incomplete: true, generatedCount, failures };
     }
 
     this._cycles.setStatus(cycle.id, "generated");
     return { ok: true, generatedCount, failures };
   }
 
-  async _deliver(cycleId, { ttlMs } = {}) {
+  async _deliver(cycleId, { ttlMs, incomplete = false } = {}) {
+    const before = this._cycles.getCycle(cycleId);
+    // Recomputed from the record rather than trusted from the caller, so a
+    // delivery *retry* on an incomplete cycle stays partial too — the missing
+    // section is still missing however the delivery got here.
+    const generated = new Set(((before && before.sectionsGenerated) || []).map((entry) => entry.section));
+    const missingSections = ((before && before.sectionsExpected) || []).filter((section) => !generated.has(section));
+    const reportIncomplete = incomplete || missingSections.length > 0;
+
     this._cycles.setStatus(cycleId, "delivering");
-    const report = this._reporter.peekReport(ttlMs);
+    const peeked = this._reporter.peekReport(ttlMs);
+
+    // Deliver only what *this* cycle generated. peekReport returns the latest
+    // cached content per section, which can still hold yesterday's copy of a
+    // section today's run failed to produce — sending that would attach a
+    // receipt to a cycle that never generated it and publish stale copy under
+    // today's date.
+    const report = peeked && peeked.configured !== false
+      ? this._sections.reduce(
+          (carry, section) => (generated.has(section) ? carry : { ...carry, [section]: "" }),
+          peeked,
+        )
+      : peeked;
 
     if (!report || report.configured === false || !this._sections.some((section) => report[section])) {
       this._cycles.recordFailure(cycleId, {
@@ -397,7 +454,10 @@ class NewsroomService {
 
     const posted = destinations.filter(isPostedDestination);
     const failed = destinations.filter((destination) => destination.status === "failed");
-    const anyFailure = failures.length > 0 || failed.length > 0;
+    // A cycle delivering an incomplete report is partial even when every send
+    // succeeded: "completed" has to mean the whole newsroom went out, or the
+    // health panel reports a missing category as a clean run.
+    const anyFailure = failures.length > 0 || failed.length > 0 || reportIncomplete;
     const status = posted.length
       ? anyFailure
         ? "delivery_partial"
@@ -440,6 +500,9 @@ class NewsroomService {
     };
 
     const lastError = cycles.map((cycle) => cycle.lastError).find(Boolean) || null;
+    const agentRouteCheck = cycles
+      .map((cycle) => (cycle.preflight?.checks || []).find((check) => check.name === "external-agent-route"))
+      .find(Boolean) || null;
 
     return {
       status: current ? "running" : lastAttempted ? lastAttempted.status : "idle",
@@ -477,6 +540,17 @@ class NewsroomService {
           0,
         ),
       },
+      // Lifted out of the last preflight so a status panel can show the one
+      // check nobody else can answer without digging into cycle detail.
+      agentRoute: agentRouteCheck
+        ? {
+            status: agentRouteCheck.status,
+            verified: agentRouteCheck.status === PASS,
+            detail: agentRouteCheck.detail,
+            code: agentRouteCheck.code || null,
+          }
+        : { status: WARN, verified: false, detail: UNCONFIGURED_DETAIL, code: null },
+      allowPartialDelivery: this._allowPartialDelivery,
       lastPreflight: lastAttempted ? lastAttempted.preflight : null,
     };
   }
