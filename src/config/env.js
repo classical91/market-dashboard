@@ -148,6 +148,20 @@ const config = {
     apiKey: process.env.OPENAI_API_KEY || "",
     model: process.env.REPORTER_MODEL || "gpt-5.4-mini",
   },
+  newsroom: {
+    // Sections one scheduled newsroom cycle is expected to produce. Empty
+    // means the reporter's own default set rather than "no sections", so an
+    // unset variable can never quietly turn a cycle into a no-op.
+    sections: parseList(process.env.NEWSROOM_SECTIONS),
+    // Optional "HH:MM,HH:MM" in UTC, used only to report the next expected run
+    // in the health endpoint. The schedule itself lives in the external cron —
+    // this repository never starts a timer for it — so a wrong value here
+    // misreports a time, it cannot cause or skip a run.
+    expectedRunTimesUtc: parseList(process.env.NEWSROOM_EXPECTED_RUN_TIMES_UTC),
+    // How many cycles to retain. Cycles are small (no report text — that lives
+    // in the generation log), so the default keeps months of history.
+    historyCap: parseNumber(process.env.NEWSROOM_CYCLE_HISTORY, 200),
+  },
   aiAnalysis: {
     openaiApiKey: process.env.OPENAI_API_KEY || "",
     model: process.env.AI_ANALYSIS_MODEL || process.env.REPORTER_MODEL || "gpt-5.4-mini",
