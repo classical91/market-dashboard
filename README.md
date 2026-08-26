@@ -27,6 +27,7 @@ The app is intentionally lightweight: no bundler, no frontend framework, and no 
 - `/youtube-v2.html` - YouTube Intelligence: live streams, scheduled streams, and latest uploads from tracked channels.
 - `/indicators.html` - Trading and market glossary.
 - `/reporter.html` - Daily report generation workflow.
+- `/api/newsroom` - newsroom cycle records and health for the scheduled reporting run: one durable cycle per run, linking generated sections to broadcast receipts and Telegram message ids. See [docs/newsroom-cycles.md](docs/newsroom-cycles.md).
 - `/api/broadcast-ledger/broadcast` - sends a broadcast to Telegram **and** records the receipt in one call, from the real send result. Telegram never reports a bot's own messages back through `getUpdates`, so anything sent through this bot cannot be picked up by the channel watch and must go through here.
 - `/api/broadcast-ledger/manual` - operational Broadcast Ledger with date/category/status filters, search, daily summaries, destination labels, attempt history, edit/delete, copy, and failed retry. **Ledger Settings** controls exact categories, per-category limits and duplicate windows, blocked-attempt recording, retention, sources, and destination names. See [docs/broadcast-ledger.md](docs/broadcast-ledger.md).
 
@@ -165,6 +166,25 @@ The reconciliation view reads all three and writes none of them. In particular i
 
 Note that zero bridge-owned fills is the **designed** outcome today, not a broken pipeline: the Signal Bot has no registered strategy identity, so persistent execution is refused by attribution even when `SIGNAL_BOT_PAPER_TRADE_ENABLED=true`. The view says so explicitly in `execution.note` rather than leaving a bare zero to be misread.
 
+### Newsroom cycles
+
+`/api/newsroom` records one durable **cycle** per scheduled reporting run, so "did the 13:00 run happen, and how far did it get?" has an answer even when the run failed before writing a report or a receipt. See [docs/newsroom-cycles.md](docs/newsroom-cycles.md).
+
+A cycle links the two records that already existed — the reporter generation log (what was written) and the broadcast ledger (what was sent) — under one id:
+
+```text
+cycle -> generated sections -> broadcast receipts -> destinations -> Telegram message ids
+```
+
+`queued -> generating -> generated -> delivering -> completed`, with `preflight_failed`, `generation_failed`, `delivery_partial` and `delivery_failed` as the failure states. Generation and delivery failures are deliberately distinct: **a cycle that generated its report and failed to deliver is redelivered, never regenerated.**
+
+- A scheduled cycle's identity is its slot floored to the minute, and find-or-create runs under the store's exclusive lock, so a doubled cron invocation joins the existing cycle instead of forking a parallel run. Category-level broadcast idempotency is unchanged and still enforced by the ledger.
+- Every failure is classified `retryable` (429, 5xx, timeouts, network) or `non_retryable` (401/403, 404, 400, missing credentials) before it is stored, so an authentication or configuration fault is not retried on a loop. `HTTP 401: User not found` gets its own code, `provider_user_not_found` — see [docs/newsroom-401-verification.md](docs/newsroom-401-verification.md).
+- A lightweight preflight checks credentials, sections and routing before anything is generated or sent. The ShareBot/OpenClaw agent route is reported as **unverified**, never as passing, because it is configured outside this repository.
+- `GET /api/newsroom/health` is a read-only operational summary (last successful cycle, last attempted cycle, current cycle, next expected run, most recent classified error, generated/delivered/failed counts, reporter model) carrying no credential, prompt body or message text.
+
+Storage is the same locked/atomic JSON the reporter log and ledger use — `<DATA_DIR>/newsroom-cycles.json`. No database was introduced: the reporter has no database layer to extend and the existing primitives were built for this exact fan-out-then-write pattern. Nothing here starts a timer; the schedule lives in the external cron, which calls `POST /api/newsroom/cycles/run` with the slot's `scheduledAt`.
+
 ## Environment Variables
 
 Most keys are optional. The app is designed to degrade to fallback data where possible.
@@ -182,6 +202,9 @@ Most keys are optional. The app is designed to degrade to fallback data where po
 - `BROADCAST_LEDGER_NOTIFICATION_CHAT_IDS` - private Telegram `chatId` or `chatId:threadId` targets for enabled ledger alerts. No alerts are delivered when blank.
 - `OPENAI_API_KEY` - enables report generation.
 - `REPORTER_MODEL` - OpenAI model for reporter generation, defaults to `gpt-5.4-mini`.
+- `NEWSROOM_SECTIONS` - sections one scheduled newsroom cycle is expected to produce. Blank means the reporter's default set (`crypto`, `economics`, `markets`). See [docs/newsroom-cycles.md](docs/newsroom-cycles.md).
+- `NEWSROOM_EXPECTED_RUN_TIMES_UTC` - optional `HH:MM,HH:MM` in UTC, used only to report the next expected run in `/api/newsroom/health`. The schedule itself lives in the external cron; this app starts no timer for it.
+- `NEWSROOM_CYCLE_HISTORY` - how many newsroom cycles to retain, defaults to `200`. Cycles hold no report text, so history is cheap.
 - `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_IDS` - enable Telegram delivery. By default each news category is locked to its approved topics: `Stock`, `Crypto` and `Economics` to `-1001841650798:6297` and `-1001941064823:984`, and `Geopolitics` to the War Room, `-1001841650798:75972`. The two sets do not overlap. These targets **replace** the configured chat list rather than adding to it, so a broader `TELEGRAM_CHAT_IDS` cannot widen news routing. The policy applies to ledger broadcasts (first delivery and retry) and to the Daily Reporter's per-category sends alike — one table in `src/services/news-routing.js` serves both. The persisted **Restrict news categories to their approved topics** Ledger Setting controls it.
 - `MARKET_DASHBOARD_URL` - public base URL used for Alpha Team `Visit:` links.
 - `ALPHA_TEAM_ACCESS_CODE` - optional read-only password for Alpha Team shared pages opened with `?view=alpha`.

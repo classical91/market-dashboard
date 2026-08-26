@@ -37,6 +37,7 @@ const { createOnchainRouter } = require("./routes/onchain");
 const { createOverviewRouter } = require("./routes/overview");
 const { createBroadcastLedgerRouter } = require("./routes/broadcast-ledger");
 const { createReporterRouter } = require("./routes/reporter");
+const { createNewsroomRouter } = require("./routes/newsroom");
 const { createTelegramRouter } = require("./routes/telegram");
 const { createYoutubeRouter } = require("./routes/youtube");
 const { createXFeedRouter } = require("./routes/x-feed");
@@ -75,6 +76,8 @@ const { BroadcastIngestService } = require("./services/broadcast-ingest");
 const { BroadcastLedgerStore } = require("./services/broadcast-ledger");
 const { BroadcastLedgerNotificationService } = require("./services/broadcast-ledger-notifications");
 const { ReporterService } = require("./services/reporter");
+const { NewsroomCycleStore } = require("./services/newsroom-cycles");
+const { NewsroomService } = require("./services/newsroom");
 const { TelegramService } = require("./services/telegram");
 const { YouTubeIntelligenceService } = require("./services/youtube");
 const { XFeedService } = require("./services/x-feed");
@@ -136,6 +139,22 @@ function createApp() {
     apiKey: config.reporter.apiKey,
     model: config.reporter.model,
     dataDir,
+  });
+  // One durable record per scheduled newsroom run, linking the reporter's
+  // generation log to the broadcast ledger's receipts. Storage is the same
+  // locked/atomic JSON the other stores use — the reporter has no database
+  // layer, and introducing one here would buy nothing this pattern doesn't
+  // already give.
+  const newsroomCycleStore = new NewsroomCycleStore({ dataDir, cap: config.newsroom.historyCap });
+  const newsroomService = new NewsroomService({
+    cycleStore: newsroomCycleStore,
+    reporterService,
+    // News digests go through the same sender the Daily Reporter broadcast
+    // route uses, so both paths land in the same locked topics.
+    telegramService,
+    broadcastLedgerStore,
+    sections: config.newsroom.sections,
+    expectedRunTimesUtc: config.newsroom.expectedRunTimesUtc,
   });
   const marketDataService = new MarketDataService();
   const overviewService = new OverviewService({
@@ -389,6 +408,16 @@ function createApp() {
   app.use(
     "/api/daily-report",
     createReporterRouter({ reporterService, telegramService, broadcastLedgerStore, requireAdmin }),
+  );
+  app.use(
+    "/api/newsroom",
+    createNewsroomRouter({
+      newsroomService,
+      cycleStore: newsroomCycleStore,
+      reporterService,
+      broadcastLedgerStore,
+      requireAdmin,
+    }),
   );
   app.use("/api/telegram", createTelegramRouter({ telegramService, requireAdmin }));
   app.use("/api/youtube", createYoutubeRouter({ youtubeService, channels: youtubeChannels }));

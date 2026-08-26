@@ -89,6 +89,47 @@ function dedupeLog(entries) {
   );
 }
 
+/**
+ * Source/evidence a generation actually returned.
+ *
+ * The Responses API attaches `url_citation` annotations to the output text
+ * when the web_search tool contributed to it. When it attaches none, this
+ * returns an empty list: a report with no citations is recorded as having no
+ * citations, never as having invented ones. See docs/newsroom-cycles.md for
+ * what that means operationally.
+ */
+function extractSources(response) {
+  const seen = new Map();
+  const output = Array.isArray(response?.output) ? response.output : [];
+  output.forEach((item) => {
+    const content = Array.isArray(item?.content) ? item.content : [];
+    content.forEach((part) => {
+      const annotations = Array.isArray(part?.annotations) ? part.annotations : [];
+      annotations.forEach((annotation) => {
+        if (!annotation || (annotation.type && annotation.type !== "url_citation")) return;
+        const url = typeof annotation.url === "string" ? annotation.url.trim() : "";
+        if (!url || seen.has(url)) return;
+        seen.set(url, {
+          url: url.slice(0, 2000),
+          title: typeof annotation.title === "string" ? annotation.title.trim().slice(0, 300) : null,
+        });
+      });
+    });
+  });
+  return [...seen.values()];
+}
+
+function normalizeSources(sources) {
+  if (!Array.isArray(sources)) return [];
+  return sources
+    .map((source) => ({
+      url: typeof source?.url === "string" ? source.url.trim().slice(0, 2000) : null,
+      title: typeof source?.title === "string" ? source.title.trim().slice(0, 300) : null,
+    }))
+    .filter((source) => source.url || source.title)
+    .slice(0, 50);
+}
+
 function normalizeImportedLogEntry(entry) {
   if (!entry || typeof entry !== "object") return null;
   const section = normalizeSection(entry.section);
@@ -105,6 +146,11 @@ function normalizeImportedLogEntry(entry) {
     model: typeof entry.model === "string" ? entry.model.slice(0, 80) : null,
     content,
     prompt: typeof entry.prompt === "string" ? entry.prompt.slice(0, 12000) : null,
+    // Both are optional and absent from every entry written before newsroom
+    // cycles existed. They are carried through import rather than required,
+    // so a historical export still round-trips.
+    cycleId: typeof entry.cycleId === "string" ? entry.cycleId.slice(0, 120) : null,
+    sources: normalizeSources(entry.sources),
   };
 }
 
@@ -388,7 +434,41 @@ class ReporterService {
       tools: [{ type: "web_search" }],
       input: prompt,
     });
-    return res.output_text;
+    return { content: res.output_text, sources: extractSources(res) };
+  }
+
+  /** Whether an API key is present. Used by the newsroom preflight. */
+  get configured() {
+    return Boolean(this._client);
+  }
+
+  get model() {
+    return this._model;
+  }
+
+  get sections() {
+    return [...REPORT_SECTIONS];
+  }
+
+  /**
+   * Query the durable generation log.
+   *
+   * The log is the historical record — it holds every section's content, not
+   * just the latest — so a cycle's report stays readable long after the cache
+   * that served the page has expired.
+   */
+  listGenerations({ cycleId, section, since, limit = 50 } = {}) {
+    const cap = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
+    const sinceMs = since && !Number.isNaN(new Date(since).getTime()) ? new Date(since).getTime() : null;
+    return this._readLog()
+      .filter((entry) => (cycleId ? entry.cycleId === cycleId : true))
+      .filter((entry) => (section ? entry.section === section : true))
+      .filter((entry) => {
+        if (!sinceMs) return true;
+        const at = new Date(entry.generatedAt || 0).getTime();
+        return Number.isFinite(at) && at >= sinceMs;
+      })
+      .slice(0, cap);
   }
 
   /**
@@ -406,7 +486,7 @@ class ReporterService {
    * Generate only the requested reporter section, then return the current
    * aggregate cached report so the UI can keep already-generated tabs visible.
    */
-  async generateReport(ttlMs, requestedSection, customPrompt) {
+  async generateReport(ttlMs, requestedSection, customPrompt, { cycleId = null } = {}) {
     if (!this._client) {
       return { configured: false };
     }
@@ -429,6 +509,13 @@ class ReporterService {
         generatedSection: section,
         generationSkipped: true,
         generationSkippedReason: "already-generated-today",
+        // The section already exists, so a cycle that lands here reuses it
+        // rather than paying to remake it. These describe the entry being
+        // reused — including the cycle that first produced it, when there was
+        // one — so the reuse stays traceable.
+        reusedGeneratedAt: (loggedToday && loggedToday.generatedAt) || existingGeneratedAt || null,
+        reusedCycleId: (loggedToday && loggedToday.cycleId) || null,
+        reusedModel: (loggedToday && loggedToday.model) || null,
         nextGenerationDate: formatDateKey(new Date(Date.now() + msUntilNextDay())),
       };
     }
@@ -448,7 +535,7 @@ class ReporterService {
         const dateStr = formatDate();
         const generatedAt = new Date().toISOString();
         const prompt = customPromptForDate(promptOverride, dateStr) || promptForSection(section, dateStr);
-        const content = await this._generate(prompt);
+        const { content, sources } = await this._generate(prompt);
         generatedEntry = {
           section,
           label: SECTION_LABELS[section],
@@ -457,6 +544,8 @@ class ReporterService {
           dateStr,
           content,
           prompt: promptOverride || null,
+          cycleId,
+          sources,
         };
         return generatedEntry;
       });
@@ -475,6 +564,7 @@ class ReporterService {
     report.generatedSection = section;
 
     if (created) {
+      const sources = generatedEntry ? normalizeSources(generatedEntry.sources) : [];
       this._logGeneration({
         section,
         label: SECTION_LABELS[section],
@@ -484,12 +574,17 @@ class ReporterService {
         model: this._model,
         content: generatedEntry ? generatedEntry.content : report[section],
         prompt: generatedEntry ? generatedEntry.prompt : null,
+        // Null for every entry written outside a newsroom cycle — a manual
+        // generation from the studio page still logs, it just has no cycle.
+        cycleId: cycleId || null,
+        sources,
       });
       report.generationLog = this._readLog();
+      report.generatedSources = sources;
     }
 
     return report;
   }
 }
 
-module.exports = { ReporterService };
+module.exports = { ReporterService, REPORT_SECTIONS, SECTION_LABELS, extractSources };
