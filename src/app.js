@@ -378,6 +378,11 @@ function createApp() {
       broadcastLedgerStore,
       broadcastIngestService,
       telegramService: newsTelegramService,
+      // The watch polls the dashboard bot while news goes out through the news
+      // bot. Preflight needs both to report on that asymmetry honestly.
+      watchTelegramService: telegramService,
+      config,
+      bootedAt: new Date().toISOString(),
       notificationService: broadcastLedgerNotificationService,
       requireAdmin,
       requireLedgerKey,

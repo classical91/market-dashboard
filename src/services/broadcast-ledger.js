@@ -291,6 +291,7 @@ function isPostedStatus(status) {
 
 class BroadcastLedgerStore {
   constructor({ dataDir, logger = console, cap = DEFAULT_CAP, headlineWindowMs } = {}) {
+    this._dataDir = dataDir;
     this._file = path.join(dataDir, "broadcast-ledger.json");
     this._lockState = { depth: 0 };
     this._logger = logger;
@@ -341,6 +342,11 @@ class BroadcastLedgerStore {
       this._logger,
       "[BroadcastLedger]",
     );
+  }
+
+  /** Where receipts are written — read by the preflight report. */
+  get dataDir() {
+    return this._dataDir;
   }
 
   getSettings() {

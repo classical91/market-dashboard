@@ -105,22 +105,42 @@ APIs are doubled in every case — no test touches Telegram, Railway or OpenClaw
 
 ---
 
+## RUN THIS FIRST — the automated half
+
+Most of the environment, persistence and routing checks below can be answered
+by the deployment itself. Two ways to get them:
+
+```bash
+node scripts/verify-broadcast-ledger.js \
+  --url https://<your-app>.up.railway.app \
+  --key "$BROADCAST_LEDGER_API_KEY"
+```
+
+or open `GET /api/broadcast-ledger/preflight` in a browser signed in as owner.
+
+It reports pass/warn/fail per check with the reason, and ends with a verdict.
+It **sends nothing** — no secret is ever echoed back, and delivery is never
+exercised, so it is safe to run against production at any time.
+
+What it cannot answer is listed under "Still requires a human" in its own
+output, and marked below.
+
 ## REQUIRES PRODUCTION VERIFICATION
 
-None of this can be established from the repository. Work through it once on
-the live deployment.
+Anything the preflight covers is marked *(automated)*. The rest needs a person,
+because each one puts a real message in a real room.
 
 ### Environment and persistence
 
-- [ ] `DATA_DIR` points at the **mounted Railway volume** (usually `/app/data`),
+- [ ] `DATA_DIR` points at the **mounted Railway volume** (usually `/app/data`), *(automated)*
       not ephemeral container storage. On ephemeral storage every deploy wipes
       the ledger.
-- [ ] `BROADCAST_LEDGER_API_KEY` is set and is **not** the same value as
+- [ ] `BROADCAST_LEDGER_API_KEY` is set and is **not** the same value as *(automated)*
       `ADMIN_API_KEY`. The fallback exists for continuity, not as the target
       state.
-- [ ] `NEWS_TELEGRAM_BOT_TOKEN` and `NEWS_TELEGRAM_CHAT_IDS` are set — these,
+- [ ] `NEWS_TELEGRAM_BOT_TOKEN` and `NEWS_TELEGRAM_CHAT_IDS` are set — these, *(automated)*
       not `TELEGRAM_*`, are what `/broadcast` and its retry send through.
-- [ ] `BROADCAST_LEDGER_NOTIFICATION_CHAT_IDS` points at a **private**
+- [ ] `BROADCAST_LEDGER_NOTIFICATION_CHAT_IDS` points at a **private** *(automated: set/unset only — only you can confirm it is private)*
       chat/topic. Blocked/failed/missing-category alerts go wherever this
       points; unset means alerts silently do not send.
 - [ ] Confirm the app runs on a **single replica**. The store is a whole-file
@@ -129,7 +149,7 @@ the live deployment.
 
 ### Telegram
 
-- [ ] Confirm the destination ids and topic ids are still correct:
+- [ ] Confirm the destination ids and topic ids are still correct: *(automated: the report prints the resolved ids to eyeball)*
       `-1001841650798` topic `6297` and `-1001941064823` topic `984` for
       Stock/Crypto/Economics, and `-1001841650798` topic `75972` (the War Room)
       for Geopolitics. The repository does not prove these are right — it only
@@ -138,11 +158,11 @@ the live deployment.
       ledger and the Daily Reporter cannot drift apart.
 - [ ] Confirm the news bot is an admin in both chats and may post to those
       topics.
-- [ ] Confirm **only one consumer polls each bot token.** A second consumer
+- [ ] Confirm **only one consumer polls each bot token.** A second consumer *(automated: a shared token and an active 409 are both reported)*
       gets `409 Conflict` from Telegram. If `BROADCAST_LEDGER_INGEST_ENABLED`
       is `true`, the dashboard polls the `TELEGRAM_BOT_TOKEN` bot — verify
       nothing else does.
-- [ ] Note the deliberate asymmetry: the channel watch polls the **dashboard**
+- [ ] Note the deliberate asymmetry: the channel watch polls the **dashboard** *(automated: the report says whether watched rooms overlap the news rooms)*
       bot while news is sent through the **news** bot. That keeps the news
       token free for its own consumer, but it means the watch only sees rooms
       listed in `TELEGRAM_CHAT_IDS`. Confirm the watched rooms are the ones you
