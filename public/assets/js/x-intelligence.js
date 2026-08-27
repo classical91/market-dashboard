@@ -302,6 +302,7 @@
           generatedAt: data.generatedAt,
           lastCheckedAt: data.lastCheckedAt,
           mostRecentSuccessfulFetchAt: data.mostRecentSuccessfulFetchAt,
+          oldestSuccessfulFetchAt: data.oldestSuccessfulFetchAt,
           newestPostAt: data.newestPostAt,
           counts: data.counts || {},
           posts: data.posts,

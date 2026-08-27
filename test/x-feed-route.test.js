@@ -85,6 +85,7 @@ test("a total X outage is reported as unavailable, not as an empty feed", async 
   assert.equal(body.failedFeeds.length, X_ACCOUNTS.length);
   assert.ok(body.generatedAt, "the response says when it was generated");
   assert.equal(body.mostRecentSuccessfulFetchAt, null, "nothing has ever been fetched successfully");
+  assert.equal(body.oldestSuccessfulFetchAt, null);
 
   const account = body.accounts[0];
   assert.equal(account.dataState, "unavailable");
@@ -130,6 +131,14 @@ test("a repaired credential recovers once the circuits are reset", async () => {
   assert.equal(body.counts.live, X_ACCOUNTS.length);
   assert.equal(body.posts.length, X_ACCOUNTS.length);
   assert.ok(body.mostRecentSuccessfulFetchAt, "a successful refresh is timestamped");
+  assert.ok(
+    body.oldestSuccessfulFetchAt,
+    "the conservative aggregate is exposed for banners that must not overstate",
+  );
+  assert.ok(
+    new Date(body.oldestSuccessfulFetchAt) <= new Date(body.mostRecentSuccessfulFetchAt),
+    "oldest confirmation cannot be newer than the most recent one",
+  );
 
   const account = body.accounts[0];
   assert.equal(account.provider, "x-api");

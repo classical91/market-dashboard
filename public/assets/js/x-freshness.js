@@ -82,10 +82,14 @@
     // replayed as if it were current.
     if (state.cache) {
       var savedAgo = rel(state.cache.savedAtIso);
-      // What that payload last managed to confirm upstream: older than when
-      // the browser saved it, and the number that says how current it is.
-      var confirmed = rel(state.cache.payload.mostRecentSuccessfulFetchAt);
-      var confirmedPart = confirmed ? "; last confirmed " + confirmed : "";
+      // The worst case among the accounts whose posts are on screen, not the
+      // freshest one: on a mixed feed `mostRecentSuccessfulFetchAt` would let
+      // the best-off account speak for all of them, which reads far more
+      // reassuring than it should. Absent (a cache written before this field
+      // existed) drops the clause rather than substituting the optimistic
+      // number.
+      var confirmed = rel(state.cache.payload.oldestSuccessfulFetchAt);
+      var confirmedPart = confirmed ? "; oldest account confirmation " + confirmed : "";
 
       if (state.serverOutage) {
         return {

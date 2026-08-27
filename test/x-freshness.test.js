@@ -13,12 +13,14 @@ const ago = (ms) => new Date(NOW - ms).toISOString();
 const MINUTE = 60 * 1000;
 const HOUR = 60 * MINUTE;
 
-function cachedPayload({ posts = [{ id: "1", handle: "alpha" }], confirmedAt } = {}) {
+function cachedPayload({ posts = [{ id: "1", handle: "alpha" }], confirmedAt, newestConfirmedAt } = {}) {
+  var oldest = confirmedAt || ago(6 * HOUR);
   return {
     status: "live",
     posts,
     accounts: [{ handle: "alpha", posts, dataState: "live" }],
-    mostRecentSuccessfulFetchAt: confirmedAt || ago(6 * HOUR),
+    mostRecentSuccessfulFetchAt: newestConfirmedAt || oldest,
+    oldestSuccessfulFetchAt: oldest,
   };
 }
 
@@ -44,7 +46,7 @@ test("a reachable server reporting a total provider outage must not evict the br
   );
 });
 
-test("the preserved-cache banner names both when it was saved and when it was last confirmed", () => {
+test("the preserved-cache banner names when it was saved and its worst account confirmation", () => {
   const state = {
     loaded: true,
     transport: { ok: true },
@@ -58,7 +60,7 @@ test("the preserved-cache banner names both when it was saved and when it was la
   assert.equal(status.level, "unavailable", "a provider outage is never dressed up as live");
   assert.equal(
     status.message,
-    "X providers unavailable. Showing browser-cached posts saved 3 hours ago; last confirmed 6 hours ago.",
+    "X providers unavailable. Showing browser-cached posts saved 3 hours ago; oldest account confirmation 6 hours ago.",
   );
 });
 
@@ -174,7 +176,7 @@ test("an unreachable server keeps a fresh cache visible, labelled offline with b
   assert.equal(status.level, "offline");
   assert.equal(
     status.message,
-    "Couldn't reach the dashboard server. Showing cached posts saved 20 minutes ago; last confirmed 1 hour ago.",
+    "Couldn't reach the dashboard server. Showing cached posts saved 20 minutes ago; oldest account confirmation 1 hour ago.",
   );
 });
 
@@ -236,4 +238,36 @@ test("a stale account reports what it last confirmed, not merely that it was che
     status.message,
     "The latest check for @alpha did not succeed — last checked 2 minutes ago. Showing posts last confirmed 5 hours ago.",
   );
+});
+
+test("a mixed feed quotes its worst account confirmation, not its best", () => {
+  // Five minutes for the freshest account, six hours for the oldest. Quoting
+  // the freshest would tell the reader the whole feed is five minutes old.
+  const state = {
+    loaded: true,
+    transport: { ok: true },
+    cache: browserCache({ confirmedAt: ago(6 * HOUR), newestConfirmedAt: ago(5 * MINUTE) }),
+    serverOutage: { status: "unavailable", posts: [] },
+    feedData: cachedPayload(),
+  };
+
+  const status = describeStatus(state, null, NOW);
+  assert.match(status.message, /oldest account confirmation 6 hours ago/);
+  assert.ok(!/5 minutes ago/.test(status.message), "the freshest account must not speak for the feed");
+});
+
+test("a cache written before the conservative field existed drops the clause rather than overstating", () => {
+  const cache = browserCache();
+  delete cache.payload.oldestSuccessfulFetchAt;
+  const state = {
+    loaded: true,
+    transport: { ok: true },
+    cache: cache,
+    serverOutage: { status: "unavailable", posts: [] },
+    feedData: cachedPayload(),
+  };
+
+  const status = describeStatus(state, null, NOW);
+  assert.equal(status.message, "X providers unavailable. Showing browser-cached posts saved 3 hours ago.");
+  assert.ok(!/confirm/.test(status.message), "no confirmation claim without a conservative number");
 });

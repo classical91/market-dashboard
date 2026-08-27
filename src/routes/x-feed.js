@@ -40,6 +40,17 @@ function oldestIso(values) {
 }
 
 /**
+ * The worst case among accounts that actually confirmed something — which is
+ * exactly the set whose posts are on screen. Accounts that never succeeded
+ * contribute no cards, so excluding them does not understate anything; using
+ * the *newest* confirmation instead would, on a mixed feed.
+ */
+function oldestConfirmedIso(values) {
+  const times = isoTimes(values);
+  return times.length ? new Date(Math.min(...times)).toISOString() : null;
+}
+
+/**
  * The response is authoritative about freshness so the client never has to
  * infer provider health from `posts.length`. Every account reports when it
  * was last checked, when it was last successfully fetched, and which provider
@@ -118,6 +129,12 @@ function createXFeedRouter({ xFeedService, accounts, requireAdmin }) {
         generatedAt: new Date().toISOString(),
         lastCheckedAt: oldestIso(payload.map((account) => account.lastCheckedAt)),
         mostRecentSuccessfulFetchAt: newestIso(
+          payload.map((account) => account.lastSuccessfulFetchAt),
+        ),
+        // The conservative counterpart, and the one a "how old is this?"
+        // banner should quote: the freshest account must not speak for the
+        // rest of a mixed feed.
+        oldestSuccessfulFetchAt: oldestConfirmedIso(
           payload.map((account) => account.lastSuccessfulFetchAt),
         ),
         newestPostAt: newestIso(payload.map((account) => account.newestPostAt)),

@@ -67,9 +67,11 @@ cannot be about one protected account, so it is treated as app-level, while a
 single-account timeline is treated as account-level. Without this, one account
 going private would take the whole feed down.
 
-A breaker that simply times out stops reporting the failure that opened it,
-and the next successful request clears it: `state`/`reason` describe the
-circuit *now*, `lastFailure` keeps the history.
+A breaker that simply times out stops reporting the failure that opened it:
+`state`/`reason` describe the circuit *now* and read `null` once it closes,
+while `lastFailure` still names what opened it. The next successful request to
+that provider clears `lastFailure` too — a provider that answers is healthy,
+and diagnostics should not keep describing a problem that is over.
 
 Syndication is best-effort only. It is capped at 3 concurrent requests, and a
 `429` puts the whole endpoint in a 10-minute cooldown — checked again inside
@@ -85,7 +87,8 @@ provider health from `posts.length`.
 status                 live | degraded | stale | unavailable   (worst of all accounts)
 generatedAt            when this response was assembled — NOT when X was checked
 lastCheckedAt          the OLDEST per-account check; null if any was never checked
-mostRecentSuccessfulFetchAt
+mostRecentSuccessfulFetchAt   the NEWEST per-account confirmation
+oldestSuccessfulFetchAt       the OLDEST, among accounts that confirmed anything
 newestPostAt
 counts                 { live, degraded, stale, unavailable }
 providers              official/syndication circuit state
@@ -130,7 +133,15 @@ successful response carries no posts and the browser holds some, the cached
 payload is kept and the banner says so:
 
 > X providers unavailable. Showing browser-cached posts saved 3 hours ago;
-> last confirmed 6 hours ago.
+> oldest account confirmation 6 hours ago.
+
+That figure is `oldestSuccessfulFetchAt`, not the newest one. On a mixed feed
+the freshest account would otherwise speak for all of them and the banner
+would read far more reassuring than the data deserves. Accounts that never
+confirmed anything are excluded rather than counted as infinitely old: they
+contribute no cards, so they cannot make the visible posts any staler. A cache
+written before this field existed drops the clause instead of substituting the
+optimistic number.
 
 A response that carries posts always replaces the cache. Partial outages
 (some accounts live, some not) count as carrying posts: the server is
