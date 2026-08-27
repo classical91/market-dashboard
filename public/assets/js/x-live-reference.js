@@ -183,7 +183,7 @@
     anchor.setAttribute("data-chrome", "noheader nofooter transparent");
     anchor.setAttribute("data-height", String(opts.height || 620));
     anchor.href = "https://twitter.com/" + encodeURIComponent(handle);
-    anchor.textContent = "Posts by @" + handle;
+    anchor.setAttribute("aria-label", "Live X posts for @" + handle);
     embed.appendChild(anchor);
 
     container.appendChild(embed);
