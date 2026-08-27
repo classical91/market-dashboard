@@ -181,22 +181,18 @@
       var copyButton = document.createElement("button");
       copyButton.type = "button";
       copyButton.className = "x-post-copy";
-      copyButton.textContent = "Copy";
+      copyButton.textContent = "Copy link";
       copyButton.addEventListener("click", function () {
         copyButton.disabled = true;
-        copyButton.textContent = "Copying...";
-        copyPostToClipboard(post)
-          .then(function (mode) {
-            setCopyStatus(
-              copyButton,
-              mode === "image" ? "Copied text + photo" : mode === "textImageUrl" ? "Copied text + photo URL" : "Copied text",
-            );
-          })
-          .catch(function () {
-            setCopyStatus(copyButton, "Copy failed");
-          })
+        copyButton.textContent = "Copying link...";
+        copyPostLinkToClipboard(post.url)
+          .then(function () { copyButton.textContent = "Link copied"; })
+          .catch(function () { copyButton.textContent = "Copy failed"; })
           .then(function () {
-            copyButton.disabled = false;
+            window.setTimeout(function () {
+              copyButton.textContent = "Copy link";
+              copyButton.disabled = false;
+            }, 1800);
           });
       });
 
