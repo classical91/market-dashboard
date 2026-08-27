@@ -3,7 +3,7 @@
 const test = require("node:test");
 const assert = require("node:assert");
 
-const { XFeedService } = require("../src/services/x-feed");
+const { XFeedService, worstDataState, safeDataState } = require("../src/services/x-feed");
 const { MemoryCache } = require("../src/services/cache");
 
 function apiResponse(tweets, users) {
@@ -178,11 +178,77 @@ test("a 401 opens the official circuit immediately instead of retrying per accou
   });
 });
 
-test("a 403 is reported as forbidden rather than a generic upstream error", async () => {
-  await withMockedApi((url) => (isSearch(url) ? statusResponse(403) : statusResponse(503)), async () => {
+test("an app-level 403 opens the global circuit", async () => {
+  // X distinguishes app-level access problems from resource-level ones, and
+  // only the former means the provider is unusable for every account.
+  const clientForbidden = {
+    ok: false,
+    status: 403,
+    json: async () => ({
+      title: "Client Forbidden",
+      type: "https://api.twitter.com/2/problems/client-forbidden",
+      detail: "This app is not enrolled for this endpoint.",
+    }),
+    text: async () => "",
+  };
+
+  await withMockedApi((url) => (isSearch(url) ? clientForbidden : statusResponse(503)), async () => {
     const service = new XFeedService({ cache: new MemoryCache() });
-    await service.getAccountFeeds(["alpha"]);
+    await service.getAccountFeeds(["alpha", "beta"]);
     assert.equal(service.providerHealth().official.state, "forbidden");
+    assert.equal(service.providerHealth().official.open, true);
+  });
+});
+
+test("a per-account 403 fails that account alone and leaves the provider up", async () => {
+  // One account goes protected. The other 21 must keep working — a global
+  // breaker here would turn a single private account into a whole-feed outage.
+  const notAuthorized = {
+    ok: false,
+    status: 403,
+    json: async () => ({
+      title: "Forbidden",
+      type: "https://api.twitter.com/2/problems/not-authorized-for-resource",
+      detail: "Sorry, you are not authorized to see the user with id: beta.",
+    }),
+    text: async () => "",
+  };
+  const tweets = [{ id: "700", text: "alpha is public", author_id: "u1", created_at: RECENT_ISO }];
+  const users = [{ id: "u1", username: "alpha" }];
+
+  const respond = (url) => {
+    if (isSearch(url)) return apiResponse(tweets, users);
+    if (isUserLookup(url) || isTimeline(url)) return notAuthorized;
+    return statusResponse(503);
+  };
+
+  await withMockedApi(respond, async () => {
+    const service = new XFeedService({ cache: new MemoryCache() });
+    const feeds = await service.getAccountFeeds(["alpha", "beta"]);
+
+    assert.equal(feeds.get("alpha").dataState, "live", "the healthy account is unaffected");
+    assert.equal(feeds.get("beta").dataState, "unavailable");
+    assert.equal(
+      service.providerHealth().official.open,
+      false,
+      "one protected account must not disable the provider",
+    );
+  });
+});
+
+test("a 404 on one account never opens the global circuit", async () => {
+  const tweets = [{ id: "701", text: "alpha is fine", author_id: "u1", created_at: RECENT_ISO }];
+  const users = [{ id: "u1", username: "alpha" }];
+  const respond = (url) => {
+    if (isSearch(url)) return apiResponse(tweets, users);
+    if (isUserLookup(url) || isTimeline(url)) return statusResponse(404);
+    return statusResponse(503);
+  };
+
+  await withMockedApi(respond, async () => {
+    const service = new XFeedService({ cache: new MemoryCache() });
+    await service.getAccountFeeds(["alpha", "beta"]);
+    assert.equal(service.providerHealth().official.open, false);
   });
 });
 
@@ -392,5 +458,73 @@ test("an empty incremental response keeps the feed live rather than marking it s
     assert.equal(feed.dataState, "live");
     assert.equal(feed.provider, "x-api");
     assert.ok(feed.lastSuccessfulFetchAt);
+  });
+});
+
+/* ── Cache migration must fail closed ──────────────────────────────────── */
+
+test("a pre-schema persisted cache entry is never served as live", async () => {
+  // Exactly what a deploy leaves behind: an entry written by the previous
+  // version, still inside its TTL, carrying no provenance at all.
+  const legacyFeed = {
+    handle: "alpha",
+    source: "api",
+    posts: [{ id: "100", text: "from before the deploy", url: "https://x.com/alpha/status/100", publishedAt: RECENT_ISO }],
+  };
+  const tweets = [{ id: "200", text: "freshly fetched", author_id: "u1", created_at: RECENT_ISO }];
+  const users = [{ id: "u1", username: "alpha" }];
+
+  await withMockedApi(apiResponse(tweets, users), async (requestedUrls) => {
+    const cache = new MemoryCache();
+    cache.set("x:feed:alpha", legacyFeed, 15 * 60 * 1000);
+    const service = new XFeedService({ cache });
+    const feed = await service.getAccountFeed("alpha");
+
+    assert.ok(requestedUrls.length > 0, "a legacy entry forces a refresh instead of being served");
+    assert.equal(feed.schemaVersion, 2);
+    assert.ok(
+      feed.posts.some((post) => post.id === "200"),
+      "the refreshed feed is what gets served",
+    );
+  });
+});
+
+test("worstDataState and safeDataState treat an unknown state as unavailable", () => {
+  assert.equal(worstDataState(["live", "live"]), "live");
+  assert.equal(worstDataState(["live", "degraded"]), "degraded");
+  assert.equal(worstDataState(["live", undefined]), "unavailable");
+  assert.equal(worstDataState(["live", "something-new"]), "unavailable");
+
+  // A legacy feed with posts but no provenance: stale, never live.
+  assert.equal(safeDataState({ posts: [{ id: "1" }] }), "stale");
+  assert.equal(safeDataState({ posts: [] }), "unavailable");
+  assert.equal(safeDataState({ posts: [{ id: "1" }], dataState: "live" }), "stale", "no schemaVersion, no trust");
+  assert.equal(safeDataState({ posts: [{ id: "1" }], dataState: "live", schemaVersion: 2 }), "live");
+});
+
+test("an expired circuit reports healthy again rather than replaying its last failure", async () => {
+  const tweets = [{ id: "800", text: "recovered", author_id: "u1", created_at: RECENT_ISO }];
+  const users = [{ id: "u1", username: "alpha" }];
+  let repaired = false;
+  const respond = (url) => {
+    if (isSearch(url)) return repaired ? apiResponse(tweets, users) : statusResponse(401);
+    return statusResponse(503);
+  };
+
+  await withMockedApi(respond, async () => {
+    const service = new XFeedService({ cache: new MemoryCache() });
+    await service.getAccountFeeds(["alpha"]);
+    assert.equal(service.providerHealth().official.open, true);
+
+    // Simulate the cooldown elapsing rather than an operator resetting it.
+    service._officialCircuit._openUntil = Date.now() - 1000;
+    repaired = true;
+    await service.getAccountFeed("alpha");
+
+    const health = service.providerHealth().official;
+    assert.equal(health.open, false);
+    assert.equal(health.state, null, "current state is not the failure that opened it");
+    assert.equal(health.reason, null);
+    assert.equal(health.lastFailure, null, "a successful request clears the stale failure");
   });
 });

@@ -84,7 +84,7 @@ test("a total X outage is reported as unavailable, not as an empty feed", async 
   assert.equal(body.posts.length, 0);
   assert.equal(body.failedFeeds.length, X_ACCOUNTS.length);
   assert.ok(body.generatedAt, "the response says when it was generated");
-  assert.equal(body.lastSuccessfulFetchAt, null, "nothing has ever been fetched successfully");
+  assert.equal(body.mostRecentSuccessfulFetchAt, null, "nothing has ever been fetched successfully");
 
   const account = body.accounts[0];
   assert.equal(account.dataState, "unavailable");
@@ -102,7 +102,8 @@ test("diagnostics report provider health and cache persistence without leaking t
   assert.equal(body.providers.official.configured, true);
   assert.equal(body.cache.persistent, true);
   assert.ok(body.cache.file.endsWith("x-feed-cache.json"));
-  assert.equal(body.cache.volumeConfigured, true, "DATA_DIR is set for this test run");
+  assert.equal(body.cache.storageSource, "data-dir", "DATA_DIR is what chose the directory");
+  assert.equal(body.cache.explicitDataDirConfigured, true);
   assert.ok("loadState" in body.cache, "a corrupt cache file must be distinguishable from an empty one");
 
   const serialized = JSON.stringify(body);
@@ -128,7 +129,7 @@ test("a repaired credential recovers once the circuits are reset", async () => {
   assert.equal(body.status, "live");
   assert.equal(body.counts.live, X_ACCOUNTS.length);
   assert.equal(body.posts.length, X_ACCOUNTS.length);
-  assert.ok(body.lastSuccessfulFetchAt, "a successful refresh is timestamped");
+  assert.ok(body.mostRecentSuccessfulFetchAt, "a successful refresh is timestamped");
 
   const account = body.accounts[0];
   assert.equal(account.provider, "x-api");

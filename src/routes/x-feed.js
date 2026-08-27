@@ -1,5 +1,5 @@
 const express = require("express");
-const { DATA_STATES, worstDataState } = require("../services/x-feed");
+const { DATA_STATES, worstDataState, safeDataState } = require("../services/x-feed");
 
 function asyncRoute(handler) {
   return (req, res, next) => {
@@ -15,12 +15,28 @@ function sortByPublishedDateDesc(items) {
   });
 }
 
-function newestIso(values) {
-  const times = values
+function isoTimes(values) {
+  return values
     .filter(Boolean)
     .map((value) => new Date(value).getTime())
     .filter((time) => Number.isFinite(time));
+}
+
+function newestIso(values) {
+  const times = isoTimes(values);
   return times.length ? new Date(Math.max(...times)).toISOString() : null;
+}
+
+/**
+ * The conservative aggregate. "All accounts were checked N ago" is only
+ * honest if it uses the account checked longest ago — anything else lets a
+ * single fresh account speak for the ones served from a 15-minute cache.
+ * Returns null when any account was never checked at all.
+ */
+function oldestIso(values) {
+  if (values.some((value) => !value)) return null;
+  const times = isoTimes(values);
+  return times.length === values.length && times.length ? new Date(Math.min(...times)).toISOString() : null;
 }
 
 /**
@@ -43,7 +59,9 @@ function describeAccount(account, feed) {
       source: feed.source || "api",
       provider: feed.provider || null,
       providerState: feed.providerState || null,
-      dataState: feed.dataState || DATA_STATES.LIVE,
+      // Never defaults to live: a feed with no freshness metadata is one we
+      // cannot vouch for, not one we confirmed.
+      dataState: safeDataState(feed),
       lastCheckedAt: feed.lastAttemptAt || null,
       lastSuccessfulFetchAt: feed.lastSuccessfulFetchAt || null,
       newestPostAt: feed.newestPostAt || null,
@@ -94,8 +112,14 @@ function createXFeedRouter({ xFeedService, accounts, requireAdmin }) {
         // Worst-of across accounts: the feed as a whole is only "live" when
         // every account was confirmed current on this refresh.
         status: worstDataState(payload.map((account) => account.dataState)),
+        // When this response was assembled — not when X was last contacted.
+        // A response served from the 15-minute feed cache is generated now
+        // and checked some time ago, and the two must not be conflated.
         generatedAt: new Date().toISOString(),
-        lastSuccessfulFetchAt: newestIso(payload.map((account) => account.lastSuccessfulFetchAt)),
+        lastCheckedAt: oldestIso(payload.map((account) => account.lastCheckedAt)),
+        mostRecentSuccessfulFetchAt: newestIso(
+          payload.map((account) => account.lastSuccessfulFetchAt),
+        ),
         newestPostAt: newestIso(payload.map((account) => account.newestPostAt)),
         counts,
         providers: xFeedService.providerHealth(),

@@ -58,15 +58,20 @@ class PersistentReporterCache {
 
   /**
    * Where this cache actually lives and whether it survived the last boot.
-   * `volumeConfigured` is the one that matters on Railway: without it the
-   * file sits on container-local disk and disappears on every deploy.
+   *
+   * `storageSource` reports which setting chose the directory — it does NOT
+   * prove a Railway volume is really mounted there, only that the app was
+   * told to use it. Confirming the mount is still an operational check.
+   * `default` is the one that matters: the file is then on container-local
+   * disk and disappears on every deploy.
    */
   describe() {
+    const railwayVolume = String(process.env.RAILWAY_VOLUME_MOUNT_PATH || "").trim();
+    const dataDir = String(process.env.DATA_DIR || "").trim();
     return {
       file: this._file,
-      volumeConfigured: Boolean(
-        (process.env.DATA_DIR || process.env.RAILWAY_VOLUME_MOUNT_PATH || "").trim(),
-      ),
+      storageSource: dataDir ? "data-dir" : railwayVolume ? "railway-volume" : "default",
+      explicitDataDirConfigured: Boolean(dataDir || railwayVolume),
       loadState: this._loadState,
       loadError: this._loadError,
       loadedAt: this._loadedAt,

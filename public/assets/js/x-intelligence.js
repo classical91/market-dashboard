@@ -46,7 +46,11 @@
   var renderFeedError = window.XPosts.renderFeedError;
   var renderStaleNotice = window.XPosts.renderStaleNotice;
   var renderFeedStatus = window.XPosts.renderFeedStatus;
-  var relativeTime = window.XPosts.formatRelativeTime;
+  // Shared with the Node tests, so the page and the tests agree on what
+  // the reader is told about freshness.
+  var relativeTime = window.XFreshness.formatRelativeTime;
+  var decideRefresh = window.XFreshness.decideRefresh;
+  var computeStatus = window.XFreshness.describeStatus;
 
   function dropLegacyCaches() {
     legacyFeedKeys.forEach(function (key) {
@@ -167,105 +171,6 @@
         return { ok: false, reason: "Couldn't reach the dashboard server" };
       }
     );
-  }
-
-  function accountMeta(feedData, handle) {
-    var accounts = feedData.accounts || [];
-    for (var i = 0; i < accounts.length; i += 1) {
-      if (accounts[i].handle === handle) return accounts[i];
-    }
-    return null;
-  }
-
-  /* The single place that decides what the reader is told about freshness.
-     Everything it reports comes from explicit timestamps and states on the
-     payload — never from how many posts happen to be present. */
-  function computeStatus(state, handle) {
-    if (!state.loaded) return null;
-
-    // Anything still coming out of the browser cache is labelled as cached —
-    // whether the refresh failed or has simply not landed yet. The cached
-    // payload's own status is never replayed as if it were current.
-    if (state.cache) {
-      var savedAgo = relativeTime(state.cache.savedAtIso);
-      var lead = state.transport.ok ? "Refreshing…" : state.transport.reason + ".";
-      if (state.cache.expired) {
-        return {
-          level: "unavailable",
-          message:
-            lead + " Showing expired cached posts saved " + savedAgo +
-            " — treat these as historical, not current.",
-        };
-      }
-      return {
-        level: state.transport.ok ? "stale" : "offline",
-        message: lead + " Showing cached posts saved " + savedAgo + ".",
-      };
-    }
-
-    if (!state.transport.ok) {
-      return { level: "unavailable", message: state.transport.reason + ". No posts to show." };
-    }
-
-    var checked = relativeTime(state.feedData.generatedAt);
-    var checkedSuffix = checked ? " — checked " + checked : "";
-
-    if (handle) {
-      var meta = accountMeta(state.feedData, handle);
-      if (!meta) return { level: "unavailable", message: "@" + handle + " is not in this feed." };
-      if (meta.error) {
-        var lastGood = relativeTime(meta.lastSuccessfulFetchAt);
-        return {
-          level: "unavailable",
-          message:
-            "Couldn't load @" + handle + checkedSuffix +
-            (lastGood ? ". Last successful fetch " + lastGood + "." : "."),
-        };
-      }
-      if (meta.stale) {
-        return {
-          level: "stale",
-          message:
-            "The latest check for @" + handle + " did not succeed" + checkedSuffix +
-            ". Showing posts last confirmed " + (relativeTime(meta.lastSuccessfulFetchAt) || "at an unknown time") + ".",
-        };
-      }
-      // The distinction that matters: a quiet account is not a stale feed.
-      var newest = relativeTime(meta.newestPostAt);
-      var newestPart = newest ? " @" + handle + "'s latest post is from " + newest + "." : "";
-      var checkedPart = "Checked " + (checked || "just now") + ".";
-      if (meta.dataState === "degraded") {
-        return {
-          level: "degraded",
-          message: checkedPart + " Confirmed via the unofficial fallback source." + newestPart,
-        };
-      }
-      return { level: "live", message: checkedPart + newestPart };
-    }
-
-    var counts = state.feedData.counts || {};
-    var total = (state.feedData.accounts || []).length;
-    var status = state.feedData.status || "unavailable";
-
-    if (status === "unavailable" && !(counts.live || counts.degraded || counts.stale)) {
-      return { level: "unavailable", message: "No accounts could be loaded" + checkedSuffix + "." };
-    }
-    if (status === "live") {
-      return {
-        level: "live",
-        message: "All " + total + " accounts confirmed current" + checkedSuffix + ".",
-      };
-    }
-
-    var parts = [];
-    if (counts.live) parts.push(counts.live + " live");
-    if (counts.degraded) parts.push(counts.degraded + " via fallback");
-    if (counts.stale) parts.push(counts.stale + " cached");
-    if (counts.unavailable) parts.push(counts.unavailable + " unavailable");
-    return {
-      level: status === "degraded" ? "degraded" : status,
-      message: parts.join(", ") + " of " + total + " accounts" + checkedSuffix + ".",
-    };
   }
 
   function init() {
@@ -391,14 +296,12 @@
       state.loaded = true;
 
       if (result.ok) {
-        // The server response is authoritative about freshness, including
-        // when it reports that nothing could be loaded. It always replaces
-        // what is on screen — post count is not evidence either way.
         var data = result.data;
-        state.feedData = {
+        var payload = {
           status: data.status,
           generatedAt: data.generatedAt,
-          lastSuccessfulFetchAt: data.lastSuccessfulFetchAt,
+          lastCheckedAt: data.lastCheckedAt,
+          mostRecentSuccessfulFetchAt: data.mostRecentSuccessfulFetchAt,
           newestPostAt: data.newestPostAt,
           counts: data.counts || {},
           posts: data.posts,
@@ -406,9 +309,26 @@
           failedFeeds: data.failedFeeds || [],
           staleFeeds: data.staleFeeds || [],
         };
+
+        // The outage the server can still answer through: every provider is
+        // down, so this 200 carries no posts. Replacing on it would delete
+        // the last-known-good history and overwrite the stored cache with the
+        // empty response — losing the data at the exact moment it is the only
+        // thing left. Hold what we have and say why.
+        if (decideRefresh(state.cache, payload).action === "preserve") {
+          state.transport = { ok: true };
+          state.serverOutage = payload;
+          renderPane();
+          return;
+        }
+
+        // Otherwise the server is authoritative about freshness and replaces
+        // what is on screen — post count is not evidence either way.
+        state.feedData = payload;
         state.transport = { ok: true };
+        state.serverOutage = null;
         state.cache = null;
-        writeCachedFeed(state.feedData);
+        writeCachedFeed(payload);
         renderPane();
         return;
       }

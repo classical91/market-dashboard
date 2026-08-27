@@ -57,6 +57,7 @@ const STATE_NETWORK_ERROR = "network_error";
 const STATE_UPSTREAM_ERROR = "upstream_error";
 const STATE_CIRCUIT_OPEN = "circuit_open";
 const STATE_NO_DATA = "no_data";
+const STATE_NOT_FOUND = "not_found";
 
 // What the *data* we are serving is worth.
 //   live        — confirmed current by a successful check just now
@@ -79,6 +80,12 @@ const SYNDICATION_COOLDOWN_MS = 10 * 60 * 1000;
 // Syndication is unofficial and unmetered by us — 22 accounts hitting it at
 // once is what earns the 429 in the first place.
 const SYNDICATION_MAX_CONCURRENCY = 3;
+
+// Bumped whenever the freshness metadata on a cached feed changes shape.
+// Entries written before this version carry no provenance at all, and the
+// persistent cache outlives a deploy — so they must never be mistaken for a
+// feed we confirmed. Freshness metadata fails closed, never open.
+const FEED_SCHEMA_VERSION = 2;
 
 const BROWSER_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
@@ -120,8 +127,63 @@ function apiStatusHint(status) {
 function classifyStatus(status) {
   if (status === 401) return STATE_AUTH_FAILED;
   if (status === 403) return STATE_FORBIDDEN;
+  if (status === 404) return STATE_NOT_FOUND;
   if (status === 429) return STATE_RATE_LIMITED;
   return STATE_UPSTREAM_ERROR;
+}
+
+async function readErrorPayload(response) {
+  try {
+    const body = await response.json();
+    return body && typeof body === "object" ? body : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Flattens X's structured error shapes into one searchable string. */
+function errorText(payload) {
+  if (!payload) return "";
+  const parts = [payload.type, payload.title, payload.detail, payload.reason];
+  for (const entry of payload.errors || []) {
+    parts.push(entry?.type, entry?.title, entry?.detail, entry?.message);
+  }
+  return parts.filter(Boolean).join(" ").toLowerCase();
+}
+
+function errorDetail(payload) {
+  const detail = payload?.detail || payload?.title || payload?.errors?.[0]?.detail || payload?.errors?.[0]?.message;
+  return detail ? String(detail).slice(0, 200) : "";
+}
+
+// X documents 403 as covering both app-level access problems and access to a
+// resource this app may not see (a protected or suspended account). Only the
+// first is a reason to disable the provider for every handle.
+const ACCOUNT_SCOPED_MARKERS =
+  /not-authorized-for-resource|not authorized to (see|access|view)|protected|suspended/;
+const APP_SCOPED_MARKERS =
+  /client-forbidden|client-not-enrolled|unsupported-authentication|not enrolled|access to a subset/;
+
+/**
+ * Decides how far a failure reaches:
+ *   "global"  — the provider is unusable for every account (rejected
+ *               credential, app not enrolled, usage cap).
+ *   "account" — this one handle is unavailable; the other 21 are fine.
+ *
+ * `defaultScope` is what an unreadable 403 falls back to, and it comes from
+ * the shape of the request: a recent-search batch covering many handles
+ * cannot be about one protected account, while a single-account timeline
+ * most likely is.
+ */
+function failureScope(status, payload, defaultScope) {
+  if (status === 401 || status === 429) return "global";
+  if (status === 404) return "account";
+  if (status !== 403) return "none";
+
+  const text = errorText(payload);
+  if (ACCOUNT_SCOPED_MARKERS.test(text)) return "account";
+  if (APP_SCOPED_MARKERS.test(text)) return "global";
+  return defaultScope;
 }
 
 /** Classifies a thrown error (transport-level, or one we raised ourselves). */
@@ -205,6 +267,15 @@ class ProviderCircuit {
     this._openedAt = null;
   }
 
+  /**
+   * A provider that answers again is healthy again. Without this, a breaker
+   * that simply timed out keeps reporting the failure that opened it, and
+   * diagnostics show `auth_failed` for a token that is now working.
+   */
+  noteSuccess() {
+    if (!this.isOpen()) this.reset();
+  }
+
   /** The error a caller should fail with instead of making the request. */
   rejection(label) {
     const seconds = Math.max(0, Math.ceil((this._openUntil - Date.now()) / 1000));
@@ -214,14 +285,27 @@ class ProviderCircuit {
     );
   }
 
+  /**
+   * Current state and last failure are reported separately: an expired
+   * breaker is closed *now*, whatever opened it, and conflating the two is
+   * how diagnostics end up describing a problem that is already over.
+   */
   snapshot() {
+    const open = this.isOpen();
     return {
       provider: this.name,
-      open: this.isOpen(),
-      state: this._state,
-      reason: this._reason,
-      openedAt: this._openedAt ? new Date(this._openedAt).toISOString() : null,
-      retryAt: this._openUntil ? new Date(this._openUntil).toISOString() : null,
+      open,
+      state: open ? this._state : null,
+      reason: open ? this._reason : null,
+      openedAt: open && this._openedAt ? new Date(this._openedAt).toISOString() : null,
+      retryAt: open ? new Date(this._openUntil).toISOString() : null,
+      lastFailure: this._state
+        ? {
+            state: this._state,
+            reason: this._reason,
+            at: this._openedAt ? new Date(this._openedAt).toISOString() : null,
+          }
+        : null,
     };
   }
 }
@@ -383,6 +467,7 @@ function decorateFeed(feed, { provider, providerState, dataState, lastSuccessful
   const newestAt = newestPostTime(feed.posts);
   return {
     ...feed,
+    schemaVersion: FEED_SCHEMA_VERSION,
     provider,
     providerState,
     dataState,
@@ -394,6 +479,10 @@ function decorateFeed(feed, { provider, providerState, dataState, lastSuccessful
     stale: dataState === DATA_STALE,
     ...(staleReason ? { staleReason } : {}),
   };
+}
+
+function isCurrentSchema(feed) {
+  return Boolean(feed) && feed.schemaVersion === FEED_SCHEMA_VERSION;
 }
 
 /** A feed we just confirmed against a provider. */
@@ -481,6 +570,24 @@ class XFeedService {
     }
   }
 
+  /**
+   * Turns a failed official-API response into the error to throw, tripping
+   * the breaker only for failures that reach every account. `defaultScope`
+   * decides an unreadable 403 from the shape of the request.
+   */
+  async _officialFailure(response, message, defaultScope) {
+    const payload = await readErrorPayload(response);
+    const state = classifyStatus(response.status);
+    const retryAfterMs = retryAfterMsFrom(response);
+    const detail = errorDetail(payload);
+    const full = `${message}${apiStatusHint(response.status)}${detail ? ` — ${detail}` : ""}`;
+
+    if (failureScope(response.status, payload, defaultScope) === "global") {
+      this._noteOfficialFailure(state, full, retryAfterMs);
+    }
+    return upstreamError(full, { providerState: state, status: response.status, retryAfterMs });
+  }
+
   /** Health of both providers, for diagnostics and for the API contract. */
   providerHealth() {
     return {
@@ -545,12 +652,16 @@ class XFeedService {
       },
     });
     if (!response.ok) {
-      const state = classifyStatus(response.status);
-      const retryAfterMs = retryAfterMsFrom(response);
-      const message = `X API returned ${response.status} for batch of ${handles.length} handles${apiStatusHint(response.status)}`;
-      this._noteOfficialFailure(state, message, retryAfterMs);
-      throw upstreamError(message, { providerState: state, status: response.status, retryAfterMs });
+      // A batch spanning several handles cannot be about one protected
+      // account, so an unreadable 403 there is app-level. A single-handle
+      // batch (the crowded-out top-up) gets the benefit of the doubt.
+      throw await this._officialFailure(
+        response,
+        `X API returned ${response.status} for batch of ${handles.length} handles`,
+        handles.length > 1 ? "global" : "account",
+      );
     }
+    this._officialCircuit.noteSuccess();
 
     const data = await response.json();
     const tweets = Array.isArray(data.data) ? data.data : [];
@@ -602,12 +713,15 @@ class XFeedService {
       },
     });
     if (!response.ok) {
-      const state = classifyStatus(response.status);
-      const retryAfterMs = retryAfterMsFrom(response);
-      const message = `X API returned ${response.status} looking up @${handle}${apiStatusHint(response.status)}`;
-      this._noteOfficialFailure(state, message, retryAfterMs);
-      throw upstreamError(message, { providerState: state, status: response.status, retryAfterMs });
+      // Per-account request: a 403 here is far more likely to be a protected
+      // account than a broken app, so it must not disable the provider.
+      throw await this._officialFailure(
+        response,
+        `X API returned ${response.status} looking up @${handle}`,
+        "account",
+      );
     }
+    this._officialCircuit.noteSuccess();
     const data = await response.json();
     const userId = data.data?.id;
     if (!userId) {
@@ -648,12 +762,13 @@ class XFeedService {
       },
     });
     if (!response.ok) {
-      const state = classifyStatus(response.status);
-      const retryAfterMs = retryAfterMsFrom(response);
-      const message = `X API returned ${response.status} for @${handle}'s timeline${apiStatusHint(response.status)}`;
-      this._noteOfficialFailure(state, message, retryAfterMs);
-      throw upstreamError(message, { providerState: state, status: response.status, retryAfterMs });
+      throw await this._officialFailure(
+        response,
+        `X API returned ${response.status} for @${handle}'s timeline`,
+        "account",
+      );
     }
+    this._officialCircuit.noteSuccess();
 
     const data = await response.json();
     const tweets = Array.isArray(data.data) ? data.data : [];
@@ -826,7 +941,10 @@ class XFeedService {
     const misses = [];
     for (const handle of handles) {
       const cached = this.cache.get(`x:feed:${handle}`);
-      if (cached) feeds.set(handle, cached);
+      // A pre-schema entry survived a deploy in the persistent cache and has
+      // no provenance whatsoever. Refetch rather than serve it: the one thing
+      // we must not do is let it through as a confirmed feed.
+      if (isCurrentSchema(cached)) feeds.set(handle, cached);
       else misses.push(handle);
     }
     if (!misses.length) return feeds;
@@ -966,10 +1084,22 @@ const DATA_STATE_SEVERITY = [DATA_LIVE, DATA_DEGRADED, DATA_STALE, DATA_UNAVAILA
 
 function worstDataState(states) {
   return states.reduce((worst, state) => {
+    // An unrecognised state is not evidence of health.
     const rank = DATA_STATE_SEVERITY.indexOf(state);
-    const worstRank = DATA_STATE_SEVERITY.indexOf(worst);
-    return rank > worstRank ? state : worst;
+    const effective = rank === -1 ? DATA_UNAVAILABLE : state;
+    const effectiveRank = rank === -1 ? DATA_STATE_SEVERITY.indexOf(DATA_UNAVAILABLE) : rank;
+    return effectiveRank > DATA_STATE_SEVERITY.indexOf(worst) ? effective : worst;
   }, DATA_LIVE);
 }
 
-module.exports = { XFeedService, DATA_STATES, worstDataState };
+/**
+ * The data state to report for a feed that arrived without one — a cache
+ * entry written before the freshness schema existed. Never `live`: we have
+ * posts but nothing that says when they were confirmed.
+ */
+function safeDataState(feed) {
+  if (DATA_STATE_SEVERITY.includes(feed?.dataState) && isCurrentSchema(feed)) return feed.dataState;
+  return feed?.posts?.length ? DATA_STALE : DATA_UNAVAILABLE;
+}
+
+module.exports = { XFeedService, DATA_STATES, worstDataState, safeDataState };

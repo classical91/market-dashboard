@@ -25,30 +25,9 @@
     return months + (months === 1 ? " month ago" : " months ago");
   }
 
-  /* Freshness lines need minute resolution ("checked 4 minutes ago"), where
-     post ages are happier rounded to hours. Kept separate on purpose: one
-     describes when we last checked, the other how old the content is. */
-  function formatRelativeTime(iso) {
-    if (!iso) return "";
-    var date = new Date(iso);
-    if (isNaN(date.getTime())) return "";
-    var diffMs = Date.now() - date.getTime();
-    if (diffMs < 0) diffMs = 0;
-    var minute = 60 * 1000;
-    var hour = 60 * minute;
-    var day = 24 * hour;
-    if (diffMs < minute) return "just now";
-    if (diffMs < hour) {
-      var minutes = Math.floor(diffMs / minute);
-      return minutes + (minutes === 1 ? " minute ago" : " minutes ago");
-    }
-    if (diffMs < day) {
-      var hours = Math.floor(diffMs / hour);
-      return hours + (hours === 1 ? " hour ago" : " hours ago");
-    }
-    var days = Math.floor(diffMs / day);
-    return days + (days === 1 ? " day ago" : " days ago");
-  }
+  // Owned by x-freshness.js (shared with the Node tests); re-exported here
+  // so existing XPosts callers keep working.
+  var formatRelativeTime = window.XFreshness.formatRelativeTime;
 
   function sortByPublishedDesc(posts) {
     return posts.slice().sort(function (a, b) {
