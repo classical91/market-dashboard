@@ -169,6 +169,85 @@ test("the tracked list is readable and seeded from the static config", async () 
   assert.equal(body.registry.loadState, "loaded");
 });
 
+test("templates are public, default to markets, and mutations are admin-gated", async () => {
+  const listed = await getJson("/api/x/templates");
+  assert.equal(listed.status, 200);
+  assert.equal(listed.body.defaultTemplateId, "markets");
+  assert.equal(listed.body.templates[0].name, "Crypto & Stocks");
+  assert.equal(listed.body.templates[0].memberships.length, X_ACCOUNTS.length);
+
+  const rejected = await send("/api/x/templates", "POST", {
+    id: "wars", name: "Wars & Geopolitics", sections: [], memberships: [],
+  });
+  assert.equal(rejected.status, 401);
+
+  const unknownAccount = await send("/api/x/templates", "POST", {
+    id: "invalid-template",
+    name: "Invalid",
+    sections: ["Unknown"],
+    memberships: [{ handle: "nottracked", section: "Unknown" }],
+  }, ADMIN);
+  assert.equal(unknownAccount.status, 400);
+});
+
+test("a template scopes accounts, posts, counts, failures, and sections", async () => {
+  mockUpstream(() => healthySearchResponse());
+  const created = await send(
+    "/api/x/templates",
+    "POST",
+    {
+      id: "tech",
+      name: "Tech & AI",
+      accent: "tech",
+      sections: ["Researchers"],
+      memberships: [{ handle: "TechDev_52", section: "Researchers" }],
+    },
+    ADMIN,
+  );
+  assert.equal(created.status, 201);
+
+  const scoped = await getJson("/api/x/accounts?template=tech");
+  assert.equal(scoped.status, 200);
+  assert.equal(scoped.body.template.id, "tech");
+  assert.equal(scoped.body.accounts.length, 1);
+  assert.equal(scoped.body.accounts[0].handle, "TechDev_52");
+  assert.equal(scoped.body.accounts[0].category, "Researchers");
+  assert.equal(scoped.body.posts.length, 1);
+  assert.equal(Object.values(scoped.body.counts).reduce((sum, count) => sum + count, 0), 1);
+  assert.ok(scoped.body.failedFeeds.every((account) => account.handle === "TechDev_52"));
+
+  const missing = await getJson("/api/x/accounts?template=does-not-exist");
+  assert.equal(missing.status, 404);
+});
+
+test("template duplicate, update, reorder, and safe delete APIs persist", async () => {
+  const duplicate = await send("/api/x/templates/tech/duplicate", "POST", { id: "wars", name: "Wars" }, ADMIN);
+  assert.equal(duplicate.status, 201);
+  assert.equal(duplicate.body.template.id, "wars");
+
+  const updated = await send("/api/x/templates/wars", "PUT", {
+    name: "Wars & Geopolitics",
+    description: "Conflict intelligence",
+    accent: "world",
+    sections: ["Official Sources"],
+    memberships: [{ handle: "Barchart", section: "Official Sources" }],
+  }, ADMIN);
+  assert.equal(updated.status, 200);
+  assert.equal(updated.body.template.name, "Wars & Geopolitics");
+
+  const ids = updated.body.templates.map((template) => template.id).reverse();
+  const reordered = await send("/api/x/templates/order", "PUT", { ids }, ADMIN);
+  assert.equal(reordered.status, 200);
+  assert.deepEqual(reordered.body.templates.map((template) => template.id), ids);
+
+  const removed = await send("/api/x/templates/wars", "DELETE", undefined, ADMIN);
+  assert.equal(removed.status, 200);
+  assert.ok(!removed.body.templates.some((template) => template.id === "wars"));
+
+  const protectedDefault = await send("/api/x/templates/markets", "DELETE", undefined, ADMIN);
+  assert.equal(protectedDefault.status, 400);
+});
+
 test("adding and deleting an account requires the admin key", async () => {
   const add = await send("/api/x/accounts/config", "POST", { handle: "temp1", category: "Market Data" });
   assert.equal(add.status, 401, "an unauthenticated add is rejected");

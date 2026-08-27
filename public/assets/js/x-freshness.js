@@ -218,6 +218,12 @@
     var summary = summarizeAccounts(state.feedData.accounts || []);
 
     if (!summary.total) {
+      if (state.feedData.template) {
+        return {
+          level: "empty",
+          message: "No accounts are assigned to this template yet.",
+        };
+      }
       return { level: "unavailable", message: "No accounts could be loaded" + checkedSuffix + "." };
     }
     if (summary.live === summary.total) {

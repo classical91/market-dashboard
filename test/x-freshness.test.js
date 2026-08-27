@@ -13,6 +13,17 @@ const ago = (ms) => new Date(NOW - ms).toISOString();
 const MINUTE = 60 * 1000;
 const HOUR = 60 * MINUTE;
 
+test("an intentionally empty template is distinct from a feed outage", () => {
+  const status = describeStatus({
+    loaded: true,
+    transport: { ok: true },
+    feedData: { template: { id: "new-template" }, accounts: [], posts: [] },
+  }, null, NOW);
+
+  assert.equal(status.level, "empty");
+  assert.match(status.message, /No accounts are assigned/);
+});
+
 function cachedPayload({ posts = [{ id: "1", handle: "alpha" }], confirmedAt, newestConfirmedAt } = {}) {
   var oldest = confirmedAt || ago(6 * HOUR);
   return {

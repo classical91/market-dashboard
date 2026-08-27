@@ -1,6 +1,8 @@
 const express = require("express");
 const { DATA_STATES, worstDataState, safeDataState } = require("../services/x-feed");
 const { DEFAULT_CATEGORIES } = require("../services/x-account-registry");
+const { DEFAULT_TEMPLATE_ID } = require("../services/x-template-registry");
+const { createServiceError } = require("../utils/errors");
 
 function asyncRoute(handler) {
   return (req, res, next) => {
@@ -95,7 +97,17 @@ function describeAccount(account, feed) {
   };
 }
 
-function createXFeedRouter({ xFeedService, accountRegistry, requireAdmin }) {
+function assertKnownTemplateHandles(input, accountRegistry) {
+  const known = new Set(accountRegistry.list().map((account) => account.handle.toLowerCase()));
+  const unknown = (Array.isArray(input?.memberships) ? input.memberships : [])
+    .map((entry) => String(entry?.handle || "").replace(/^@+/, "").toLowerCase())
+    .filter((handle) => handle && !known.has(handle));
+  if (unknown.length) {
+    throw createServiceError(`Template references untracked X account @${unknown[0]}`, 400);
+  }
+}
+
+function createXFeedRouter({ xFeedService, accountRegistry, templateRegistry, requireAdmin }) {
   const router = express.Router();
 
   router.get(
@@ -103,7 +115,9 @@ function createXFeedRouter({ xFeedService, accountRegistry, requireAdmin }) {
     asyncRoute(async (req, res) => {
       // Read per request: the tracked list is editable at runtime now, so a
       // list captured at boot would serve deleted accounts until a restart.
-      const accounts = accountRegistry.list();
+      const templateId = req.query.template || DEFAULT_TEMPLATE_ID;
+      const template = templateRegistry.get(templateId);
+      const accounts = templateRegistry.resolveAccounts(template.id, accountRegistry.list());
       const feeds = await xFeedService.getAccountFeeds(accounts.map((account) => account.handle));
       const payload = accounts.map((account) => describeAccount(account, feeds.get(account.handle)));
 
@@ -124,6 +138,7 @@ function createXFeedRouter({ xFeedService, accountRegistry, requireAdmin }) {
       }, {});
 
       res.json({
+        template,
         // Worst-of across accounts: the feed as a whole is only "live" when
         // every account was confirmed current on this refresh.
         status: worstDataState(payload.map((account) => account.dataState)),
@@ -152,6 +167,19 @@ function createXFeedRouter({ xFeedService, accountRegistry, requireAdmin }) {
     }),
   );
 
+  // Template definitions are public for the same reason account metadata is:
+  // the page needs them to render its switcher before an admin action occurs.
+  router.get(
+    "/templates",
+    asyncRoute(async (req, res) => {
+      res.json({
+        templates: templateRegistry.list(),
+        defaultTemplateId: DEFAULT_TEMPLATE_ID,
+        registry: templateRegistry.describe(),
+      });
+    }),
+  );
+
   // Reading the tracked list needs no admin key: it returns the same handles,
   // labels and categories that /accounts already serves publicly, and the
   // manage panel has to render before anyone can be asked for a key.
@@ -170,6 +198,53 @@ function createXFeedRouter({ xFeedService, accountRegistry, requireAdmin }) {
   // to X: no upstream call is made, so a rejected token or a rate-limited
   // provider can neither block account management nor half-apply a change.
   if (requireAdmin) {
+    router.post(
+      "/templates",
+      requireAdmin,
+      asyncRoute(async (req, res) => {
+        assertKnownTemplateHandles(req.body, accountRegistry);
+        const template = templateRegistry.create(req.body || {});
+        res.status(201).json({ template, templates: templateRegistry.list() });
+      }),
+    );
+
+    router.put(
+      "/templates/order",
+      requireAdmin,
+      asyncRoute(async (req, res) => {
+        const templates = templateRegistry.reorder(req.body?.ids);
+        res.json({ templates });
+      }),
+    );
+
+    router.put(
+      "/templates/:id",
+      requireAdmin,
+      asyncRoute(async (req, res) => {
+        assertKnownTemplateHandles(req.body, accountRegistry);
+        const template = templateRegistry.update(req.params.id, req.body || {});
+        res.json({ template, templates: templateRegistry.list() });
+      }),
+    );
+
+    router.post(
+      "/templates/:id/duplicate",
+      requireAdmin,
+      asyncRoute(async (req, res) => {
+        const template = templateRegistry.duplicate(req.params.id, req.body || {});
+        res.status(201).json({ template, templates: templateRegistry.list() });
+      }),
+    );
+
+    router.delete(
+      "/templates/:id",
+      requireAdmin,
+      asyncRoute(async (req, res) => {
+        const removed = templateRegistry.remove(req.params.id);
+        res.json({ removed, templates: templateRegistry.list() });
+      }),
+    );
+
     router.post(
       "/accounts/config",
       requireAdmin,
@@ -202,6 +277,7 @@ function createXFeedRouter({ xFeedService, accountRegistry, requireAdmin }) {
           providers: xFeedService.providerHealth(),
           cache: xFeedService.cacheDiagnostics(),
           registry: accountRegistry.describe(),
+          templateRegistry: templateRegistry.describe(),
         });
       }),
     );
