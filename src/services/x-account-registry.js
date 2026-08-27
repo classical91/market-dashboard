@@ -97,6 +97,11 @@ class XAccountRegistry {
     this._loadState = "unread";
     this._loadError = null;
     this._corruptBackedUp = false;
+    this._membershipHooks = { onAdd: null, onRemove: null };
+  }
+
+  setMembershipHooks({ onAdd = null, onRemove = null } = {}) {
+    this._membershipHooks = { onAdd, onRemove };
   }
 
   /**
@@ -224,6 +229,11 @@ class XAccountRegistry {
       if (!this._write(next)) {
         throw createServiceError("Could not save the account registry", 500);
       }
+      try {
+        this._membershipHooks.onAdd?.(stored);
+      } catch (err) {
+        this._logger.warn?.(`[XAccounts] Account saved but could not add it to the default template: ${err.message}`);
+      }
       return stored;
     });
   }
@@ -236,6 +246,11 @@ class XAccountRegistry {
       if (!existing) {
         throw createServiceError(`@${handle} is not tracked`, 404);
       }
+
+      // Remove memberships first so a globally deleted account cannot leave
+      // dead references in any template. If that cleanup fails, keep the
+      // global account and report the failure instead.
+      this._membershipHooks.onRemove?.(existing);
 
       const next = accounts.filter((account) => !sameHandle(account.handle, handle));
       if (!this._write(next)) {

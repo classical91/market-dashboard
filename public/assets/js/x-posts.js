@@ -240,6 +240,7 @@
 
   var STATUS_LABELS = {
     live: "Live",
+    empty: "Empty",
     degraded: "Degraded",
     stale: "Stale",
     unavailable: "Unavailable",

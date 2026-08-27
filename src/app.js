@@ -43,6 +43,7 @@ const { createYoutubeRouter } = require("./routes/youtube");
 const { createXFeedRouter } = require("./routes/x-feed");
 const { resolveYoutubeChannels } = require("./config/youtube-channels");
 const { XAccountRegistry } = require("./services/x-account-registry");
+const { XTemplateRegistry } = require("./services/x-template-registry");
 const { TOP_TOKENS } = require("./config/market-symbols");
 const { AIAnalysisService } = require("./services/ai-analysis");
 const { DecisionEngineService } = require("./services/decision-engine");
@@ -181,6 +182,15 @@ function createApp() {
   // src/config/x-accounts.js is now only the first-boot seed.
   const xAccountRegistry = new XAccountRegistry({ dataDir, cache: xFeedCache });
   xAccountRegistry.ensureSeeded();
+  const xTemplateRegistry = new XTemplateRegistry({
+    dataDir,
+    seedAccounts: () => xAccountRegistry.list(),
+  });
+  xTemplateRegistry.ensureSeeded();
+  xAccountRegistry.setMembershipHooks({
+    onAdd: (account) => xTemplateRegistry.addHandleToDefault(account.handle, account.category),
+    onRemove: (account) => xTemplateRegistry.removeHandle(account.handle),
+  });
   const aiAnalysisService = new AIAnalysisService({
     cache: aiAnalysisCache,
     dataDir,
@@ -441,7 +451,15 @@ function createApp() {
   );
   app.use("/api/telegram", createTelegramRouter({ telegramService, requireAdmin }));
   app.use("/api/youtube", createYoutubeRouter({ youtubeService, channels: youtubeChannels }));
-  app.use("/api/x", createXFeedRouter({ xFeedService, accountRegistry: xAccountRegistry, requireAdmin }));
+  app.use(
+    "/api/x",
+    createXFeedRouter({
+      xFeedService,
+      accountRegistry: xAccountRegistry,
+      templateRegistry: xTemplateRegistry,
+      requireAdmin,
+    }),
+  );
 
   app.get("/", (req, res) => {
     res.sendFile(path.join(__dirname, "..", "public", "index.html"));

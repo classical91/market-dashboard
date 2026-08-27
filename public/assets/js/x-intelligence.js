@@ -31,7 +31,8 @@
   // to say how old they were — they cannot be repaired in place, only
   // stranded, which is what the new key does. v3 is dropped on sight to
   // reclaim the space rather than leaving it to linger.
-  var localFeedKey = "xIntelligence:feedCache:v4";
+  var localFeedKey = "xIntelligence:feedCache:v5";
+  var localTemplateKey = "xIntelligence:lastTemplate:v1";
   var legacyFeedKeys = ["xIntelligence:feedCache:v3"];
   var FEED_CACHE_TTL_MS = 45 * 60 * 1000;
   var ALL_MODE = "all";
@@ -55,9 +56,13 @@
   /* Returns the cached payload together with when it was saved and whether
      that has expired. The age travels with the data so nothing downstream can
      present it without knowing how old it is. */
-  function readCachedFeed() {
+  function templateCacheKey(templateId) {
+    return localFeedKey + ":" + encodeURIComponent(templateId || "markets");
+  }
+
+  function readCachedFeed(templateId) {
     try {
-      var parsed = JSON.parse(localStorage.getItem(localFeedKey) || "null");
+      var parsed = JSON.parse(localStorage.getItem(templateCacheKey(templateId)) || "null");
       if (!parsed || !parsed.payload || !Array.isArray(parsed.payload.posts)) return null;
       var savedAt = Number(parsed.savedAt);
       if (!isFinite(savedAt) || savedAt <= 0) return null;
@@ -72,10 +77,18 @@
     }
   }
 
-  function writeCachedFeed(payload) {
+  function writeCachedFeed(templateId, payload) {
     try {
-      localStorage.setItem(localFeedKey, JSON.stringify({ savedAt: Date.now(), payload: payload }));
+      localStorage.setItem(templateCacheKey(templateId), JSON.stringify({ savedAt: Date.now(), payload: payload }));
     } catch (err) {}
+  }
+
+  function readLastTemplate() {
+    try { return localStorage.getItem(localTemplateKey) || ""; } catch (err) { return ""; }
+  }
+
+  function writeLastTemplate(templateId) {
+    try { localStorage.setItem(localTemplateKey, templateId); } catch (err) {}
   }
 
   function accountsOf(feedData) {
@@ -121,7 +134,7 @@
     if (!groups.length) {
       var empty = document.createElement("div");
       empty.className = "x-account-group-title";
-      empty.textContent = "Loading accounts\u2026";
+      empty.textContent = handlers.loaded ? "No accounts assigned." : "Loading accounts\u2026";
       root.appendChild(empty);
       return;
     }
@@ -153,8 +166,8 @@
      failure into an empty-but-successful feed: that is what made an outage
      indistinguishable from "no posts today", and left last week's posts on
      screen looking current. */
-  function loadAccountsFeed() {
-    return fetch("/api/x/accounts", { headers: { Accept: "application/json" } }).then(
+  function loadAccountsFeed(templateId) {
+    return fetch("/api/x/accounts?template=" + encodeURIComponent(templateId || "markets"), { headers: { Accept: "application/json" } }).then(
       function (res) {
         if (!res.ok) {
           return { ok: false, reason: "The dashboard server returned " + res.status };
@@ -177,7 +190,14 @@
     );
   }
 
-  function init() {
+  function loadTemplates() {
+    return fetch("/api/x/templates", { headers: { Accept: "application/json" } }).then(function (res) {
+      if (!res.ok) throw new Error("Could not load X templates");
+      return res.json();
+    });
+  }
+
+  function start(templatePayload) {
     var listRoot = document.getElementById("xAccountList");
     var pane = document.getElementById("xTimelinePane");
     var paneLabel = document.getElementById("xTimelineLabel");
@@ -185,6 +205,10 @@
     var panel = document.getElementById("xAccountPanel");
     var panelToggle = document.getElementById("xAccountToggle");
     var panelToggleLabel = document.getElementById("xAccountToggleLabel");
+    var templateTrigger = document.getElementById("xTemplateTrigger");
+    var templateTriggerLabel = document.getElementById("xTemplateTriggerLabel");
+    var templateMenu = document.getElementById("xTemplateMenu");
+    var templateDescription = document.getElementById("xTemplateDescription");
     if (!listRoot || !pane) return;
 
     // Mobile only (CSS hides the toggle above 980px): the account list starts
@@ -219,9 +243,17 @@
     }
 
     var liveRoot = document.getElementById("xLiveReference");
+    var templates = (templatePayload && templatePayload.templates) || [];
+    var defaultTemplateId = (templatePayload && templatePayload.defaultTemplateId) || "markets";
+    var queryTemplate = "";
+    try { queryTemplate = new URL(window.location.href).searchParams.get("template") || ""; } catch (err) {}
+    var rememberedTemplate = readLastTemplate();
+    var initialTemplateId = [queryTemplate, rememberedTemplate, defaultTemplateId].find(function (id) {
+      return templates.some(function (template) { return template.id === id; });
+    }) || defaultTemplateId;
     var lastMode = readLastMode();
     dropLegacyCaches();
-    var cached = readCachedFeed();
+    var cached = readCachedFeed(initialTemplateId);
     var seedAccounts = accountsOf(cached ? cached.payload : null);
     var lastHandle = readLastHandle();
     var validLast = seedAccounts.some(function (a) { return a.handle === lastHandle; });
@@ -236,7 +268,103 @@
       cache: cached,
       transport: { ok: true },
       loaded: !!cached,
+      templates: templates,
+      templateId: initialTemplateId,
     };
+
+    function activeTemplate() {
+      return state.templates.find(function (template) { return template.id === state.templateId; }) || state.templates[0] || {
+        id: state.templateId, name: state.templateId, description: "", accent: "market",
+      };
+    }
+
+    function setTemplateMenuOpen(open) {
+      if (!templateMenu || !templateTrigger) return;
+      templateMenu.hidden = !open;
+      templateTrigger.setAttribute("aria-expanded", open ? "true" : "false");
+    }
+
+    function renderTemplateSwitcher() {
+      var current = activeTemplate();
+      if (templateTriggerLabel) templateTriggerLabel.textContent = current.name;
+      if (templateDescription) templateDescription.textContent = current.description || "Curated X intelligence workspace";
+      document.body.setAttribute("data-x-accent", current.accent || "market");
+      if (!templateMenu) return;
+      templateMenu.innerHTML = "";
+      state.templates.forEach(function (template) {
+        var option = document.createElement("button");
+        option.type = "button";
+        option.className = "x-template-option" + (template.id === state.templateId ? " active" : "");
+        option.innerHTML = '<span class="x-template-option-name"></span><span class="x-template-option-count"></span>';
+        option.firstChild.textContent = template.name;
+        option.lastChild.textContent = (template.memberships || []).length + " accounts";
+        option.addEventListener("click", function () { selectTemplate(template.id); });
+        templateMenu.appendChild(option);
+      });
+      var divider = document.createElement("div");
+      divider.className = "x-template-menu-divider";
+      templateMenu.appendChild(divider);
+      [["+ New Template", true], ["Manage Templates", false]].forEach(function (entry) {
+        var action = document.createElement("button");
+        action.type = "button";
+        action.className = "x-template-menu-action";
+        action.textContent = entry[0];
+        action.addEventListener("click", function () {
+          setTemplateMenuOpen(false);
+          openTemplateManager(entry[1]);
+        });
+        templateMenu.appendChild(action);
+      });
+    }
+
+    function openTemplateManager(createNew) {
+      window.XTemplatesAdmin.open({
+        activeTemplateId: state.templateId,
+        createNew: createNew,
+        onChange: function (nextTemplates, selectedId) {
+          state.templates = nextTemplates || state.templates;
+          renderTemplateSwitcher();
+          if (selectedId && selectedId !== state.templateId && state.templates.some(function (template) { return template.id === selectedId; })) {
+            selectTemplate(selectedId);
+          } else if (!state.templates.some(function (template) { return template.id === state.templateId; })) {
+            selectTemplate(defaultTemplateId);
+          } else {
+            refresh();
+          }
+        },
+      });
+    }
+
+    function selectTemplate(templateId) {
+      if (!state.templates.some(function (template) { return template.id === templateId; })) return;
+      state.templateId = templateId;
+      writeLastTemplate(templateId);
+      try {
+        var url = new URL(window.location.href);
+        url.searchParams.set("template", templateId);
+        window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+      } catch (err) {}
+      var nextCache = readCachedFeed(templateId);
+      state.cache = nextCache;
+      state.feedData = nextCache ? nextCache.payload : { posts: [], accounts: [], failedFeeds: [], staleFeeds: [] };
+      state.loaded = !!nextCache;
+      state.mode = ALL_MODE;
+      state.transport = { ok: true };
+      state.serverOutage = null;
+      selectAll();
+      renderTemplateSwitcher();
+      refresh();
+    }
+
+    if (templateTrigger && templateMenu) {
+      templateTrigger.addEventListener("click", function (event) {
+        event.stopPropagation();
+        setTemplateMenuOpen(templateMenu.hidden);
+      });
+      document.addEventListener("click", function (event) {
+        if (!event.target.closest || !event.target.closest("#xTemplateSwitcher")) setTemplateMenuOpen(false);
+      });
+    }
 
     function renderPane() {
       syncPanelLabel();
@@ -271,6 +399,7 @@
 
     function refreshList() {
       renderList(listRoot, groupAccounts(accountsOf(state.feedData)), state.mode, state.handle, {
+        loaded: state.loaded,
         onSelectAll: selectAll,
         onSelect: selectHandle,
         onManage: openManager,
@@ -339,6 +468,7 @@
     }
 
     refreshList();
+    renderTemplateSwitcher();
     if (state.mode === ALL_MODE || !state.handle) selectAll(); else selectHandle(state.handle);
 
     /* Re-reads the selection against the accounts the server just reported.
@@ -354,7 +484,7 @@
     }
 
     function refresh() {
-      return loadAccountsFeed().then(function (result) {
+      return loadAccountsFeed(state.templateId).then(function (result) {
       state.loaded = true;
 
       if (result.ok) {
@@ -371,6 +501,7 @@
           accounts: data.accounts,
           failedFeeds: data.failedFeeds || [],
           staleFeeds: data.staleFeeds || [],
+          template: data.template || activeTemplate(),
         };
 
         // The outage the server can still answer through: every provider is
@@ -391,7 +522,7 @@
         state.transport = { ok: true };
         state.serverOutage = null;
         state.cache = null;
-        writeCachedFeed(payload);
+        writeCachedFeed(state.templateId, payload);
         reconcileSelection();
         renderPane();
         refreshList();
@@ -407,6 +538,15 @@
     }
 
     refresh();
+  }
+
+  function init() {
+    loadTemplates().then(start).catch(function () {
+      start({
+        defaultTemplateId: "markets",
+        templates: [{ id: "markets", name: "Crypto & Stocks", description: "Crypto, stocks, macro and technical analysis", accent: "market", memberships: [] }],
+      });
+    });
   }
 
   if (document.readyState === "loading") {
