@@ -1,5 +1,6 @@
 const express = require("express");
 const { DATA_STATES, worstDataState, safeDataState } = require("../services/x-feed");
+const { DEFAULT_CATEGORIES } = require("../services/x-account-registry");
 
 function asyncRoute(handler) {
   return (req, res, next) => {
@@ -94,12 +95,15 @@ function describeAccount(account, feed) {
   };
 }
 
-function createXFeedRouter({ xFeedService, accounts, requireAdmin }) {
+function createXFeedRouter({ xFeedService, accountRegistry, requireAdmin }) {
   const router = express.Router();
 
   router.get(
     "/accounts",
     asyncRoute(async (req, res) => {
+      // Read per request: the tracked list is editable at runtime now, so a
+      // list captured at boot would serve deleted accounts until a restart.
+      const accounts = accountRegistry.list();
       const feeds = await xFeedService.getAccountFeeds(accounts.map((account) => account.handle));
       const payload = accounts.map((account) => describeAccount(account, feeds.get(account.handle)));
 
@@ -148,6 +152,43 @@ function createXFeedRouter({ xFeedService, accounts, requireAdmin }) {
     }),
   );
 
+  // Reading the tracked list needs no admin key: it returns the same handles,
+  // labels and categories that /accounts already serves publicly, and the
+  // manage panel has to render before anyone can be asked for a key.
+  router.get(
+    "/accounts/config",
+    asyncRoute(async (req, res) => {
+      res.json({
+        accounts: accountRegistry.list(),
+        categories: DEFAULT_CATEGORIES,
+        registry: accountRegistry.describe(),
+      });
+    }),
+  );
+
+  // Mutations are admin-gated. Both are deliberately synchronous with respect
+  // to X: no upstream call is made, so a rejected token or a rate-limited
+  // provider can neither block account management nor half-apply a change.
+  if (requireAdmin) {
+    router.post(
+      "/accounts/config",
+      requireAdmin,
+      asyncRoute(async (req, res) => {
+        const account = accountRegistry.add(req.body || {});
+        res.status(201).json({ added: account, accounts: accountRegistry.list() });
+      }),
+    );
+
+    router.delete(
+      "/accounts/config/:handle",
+      requireAdmin,
+      asyncRoute(async (req, res) => {
+        const removed = accountRegistry.remove(req.params.handle);
+        res.json({ removed, accounts: accountRegistry.list() });
+      }),
+    );
+  }
+
   // Admin-only: reports provider health and where the persistent cache
   // actually lives, so a token failure can be told apart from a volume that
   // was never mounted. Never exposes the token itself.
@@ -160,6 +201,7 @@ function createXFeedRouter({ xFeedService, accounts, requireAdmin }) {
           generatedAt: new Date().toISOString(),
           providers: xFeedService.providerHealth(),
           cache: xFeedService.cacheDiagnostics(),
+          registry: accountRegistry.describe(),
         });
       }),
     );

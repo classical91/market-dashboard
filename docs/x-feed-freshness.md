@@ -178,6 +178,46 @@ authoritative and its per-account states describe the rest.
 `public/assets/js/x-freshness.js`, loaded by the page and required directly by
 `test/x-freshness.test.js`, so the tests exercise the code the browser runs.
 
+## Tracked accounts
+
+The list lives in `<DATA_DIR>/x-accounts.json`, not in the bundle:
+
+```
+{ "version": 1, "accounts": [ { "handle", "label", "category", "addedAt" } ] }
+```
+
+`src/config/x-accounts.js` is now only the first-boot seed. Add and delete go
+through `/api/x/accounts/config` (mutations admin-gated; the GET is open,
+since it returns the same handles `/api/x/accounts` already serves) and are
+written under the same exclusive-lock + atomic-rename idiom as the other
+stores here, so a change survives a redeploy on every device rather than on
+the one that made it.
+
+Adding an account never calls X. Only the handle format is validated, so a
+rejected token or a rate-limited provider can neither block account management
+nor half-apply a change. Deleting one also drops its `x:feed:*`,
+`x:feed:latest:*` and `x:userid:*` cache entries — otherwise the account keeps
+returning from cache, which reads exactly like the delete having failed.
+
+A registry file that cannot be read never takes the server down: the seed list
+is served, `registry.loadState` reports `corrupt` in diagnostics, and the
+unreadable file is copied to `x-accounts.json.corrupt` before the next write
+rather than being thrown away by the repair. Individual malformed rows are
+skipped (`loadState: "partial"`) instead of failing the whole file.
+
+## Live X Reference
+
+In single-account mode the page shows X's official embedded profile timeline
+beside the captured posts, so the two can be compared by eye. The panel is
+labelled as a separate source and never claims the two agree — the page has no
+independent evidence of that, and comparing them is the point.
+
+Protected, suspended and deleted accounts cannot be embedded, and browser
+privacy settings block the widget outright, so every failure degrades to
+`Live X timeline unavailable. Open @HANDLE on X to compare manually.` with the
+external link intact. `widgets.js` is injected once per page, and nothing ever
+reads inside the widget's cross-origin iframe — only whether it appeared.
+
 ## Operational checks
 
 Code cannot do these — they belong to whoever holds the credential:

@@ -42,7 +42,7 @@ const { createTelegramRouter } = require("./routes/telegram");
 const { createYoutubeRouter } = require("./routes/youtube");
 const { createXFeedRouter } = require("./routes/x-feed");
 const { resolveYoutubeChannels } = require("./config/youtube-channels");
-const { X_ACCOUNTS } = require("./config/x-accounts");
+const { XAccountRegistry } = require("./services/x-account-registry");
 const { TOP_TOKENS } = require("./config/market-symbols");
 const { AIAnalysisService } = require("./services/ai-analysis");
 const { DecisionEngineService } = require("./services/decision-engine");
@@ -176,6 +176,11 @@ function createApp() {
     liveSearchEnabled: config.youtube.liveSearchEnabled,
   });
   const xFeedService = new XFeedService({ cache: xFeedCache });
+  // The tracked-account list is editable at runtime and persisted next to the
+  // feed cache, so add/delete survives a redeploy. The static config in
+  // src/config/x-accounts.js is now only the first-boot seed.
+  const xAccountRegistry = new XAccountRegistry({ dataDir, cache: xFeedCache });
+  xAccountRegistry.ensureSeeded();
   const aiAnalysisService = new AIAnalysisService({
     cache: aiAnalysisCache,
     dataDir,
@@ -426,7 +431,7 @@ function createApp() {
   );
   app.use("/api/telegram", createTelegramRouter({ telegramService, requireAdmin }));
   app.use("/api/youtube", createYoutubeRouter({ youtubeService, channels: youtubeChannels }));
-  app.use("/api/x", createXFeedRouter({ xFeedService, accounts: X_ACCOUNTS, requireAdmin }));
+  app.use("/api/x", createXFeedRouter({ xFeedService, accountRegistry: xAccountRegistry, requireAdmin }));
 
   app.get("/", (req, res) => {
     res.sendFile(path.join(__dirname, "..", "public", "index.html"));
