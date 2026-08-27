@@ -113,6 +113,33 @@ as `live` on the strength of having no metadata to contradict it. Instead:
   present and `unavailable` when they are not — never `live`;
 - `worstDataState()` treats an unknown state as `unavailable`.
 
+## The aggregate banner summarises; it does not inherit the worst case
+
+`status` in the API payload is the worst state across accounts. That is the
+right conservative summary for a machine reading the contract, but the wrong
+headline for a reader: inheriting it let a single failed account label 21
+healthy ones `UNAVAILABLE`, overstating the outage as badly as the original
+bug understated staleness.
+
+The banner therefore derives its own level from the per-account states, and
+names the accounts that failed:
+
+| Condition | Level |
+| --- | --- |
+| every account `live` | `LIVE` |
+| anything confirmed this refresh (`live` or `degraded`), plus any failures | `DEGRADED` |
+| nothing current, but cached posts exist | `STALE` |
+| nothing usable | `UNAVAILABLE` |
+
+> DEGRADED — 21 live, 1 unavailable (@Barchart) of 22 accounts — last checked
+> just now.
+
+Counts and handles are both derived from `accounts[]`, never from the
+server's `counts`, so the numbers and the named handles cannot disagree. An
+account whose `dataState` is unrecognised counts as unavailable — unknown is
+not evidence of health. Beyond three handles the list truncates to
+`@a, @b, @c +N more` so the banner stays one readable line.
+
 ## Browser cache
 
 `xIntelligence:feedCache:v4` stores `{ savedAt, payload }` with a 45-minute

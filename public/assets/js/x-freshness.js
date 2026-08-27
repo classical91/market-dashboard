@@ -43,6 +43,48 @@
     return days + (days === 1 ? " day ago" : " days ago");
   }
 
+  var MAX_NAMED_HANDLES = 3;
+
+  /* Counts the per-account states and collects the handles that failed, so
+     the banner can name them. Derived from `accounts` rather than the
+     server's `counts` so the numbers and the named handles can never
+     disagree. An account with no recognised `dataState` counts as
+     unavailable — unknown is not evidence of health. */
+  function summarizeAccounts(accounts) {
+    var summary = {
+      total: accounts.length,
+      live: 0,
+      degraded: 0,
+      stale: 0,
+      unavailable: 0,
+      unavailableHandles: [],
+    };
+
+    accounts.forEach(function (account) {
+      var state = account && account.dataState;
+      if (state === "live") summary.live += 1;
+      else if (state === "degraded") summary.degraded += 1;
+      else if (state === "stale") summary.stale += 1;
+      else {
+        summary.unavailable += 1;
+        if (account && account.handle) summary.unavailableHandles.push(account.handle);
+      }
+    });
+
+    // Confirmed against a provider on this refresh, by either route.
+    summary.current = summary.live + summary.degraded;
+    return summary;
+  }
+
+  /* "@a, @b, @c +2 more" — enough to act on without a banner that wraps
+     across the whole pane. */
+  function namedHandles(handles) {
+    if (!handles.length) return "";
+    var shown = handles.slice(0, MAX_NAMED_HANDLES).map(function (handle) { return "@" + handle; });
+    var remaining = handles.length - shown.length;
+    return shown.join(", ") + (remaining > 0 ? " +" + remaining + " more" : "");
+  }
+
   function accountMeta(feedData, handle) {
     var accounts = (feedData && feedData.accounts) || [];
     for (var i = 0; i < accounts.length; i += 1) {
@@ -168,29 +210,39 @@
       return { level: "live", message: checkedPart + newestPart };
     }
 
-    var counts = state.feedData.counts || {};
-    var total = (state.feedData.accounts || []).length;
-    var status = state.feedData.status || "unavailable";
+    // The banner level is computed here rather than inherited from the
+    // payload's `status`. That field is the worst state across accounts —
+    // the right conservative summary for the API — but as a headline it lets
+    // one failed account label 21 healthy ones UNAVAILABLE, which overstates
+    // the outage as badly as the old code understated staleness.
+    var summary = summarizeAccounts(state.feedData.accounts || []);
 
-    if (status === "unavailable" && !(counts.live || counts.degraded || counts.stale)) {
+    if (!summary.total) {
       return { level: "unavailable", message: "No accounts could be loaded" + checkedSuffix + "." };
     }
-    if (status === "live") {
+    if (summary.live === summary.total) {
       return {
         level: "live",
-        message: "All " + total + " accounts confirmed current" + checkedSuffix + ".",
+        message: "All " + summary.total + " accounts confirmed current" + checkedSuffix + ".",
       };
     }
 
     var parts = [];
-    if (counts.live) parts.push(counts.live + " live");
-    if (counts.degraded) parts.push(counts.degraded + " via fallback");
-    if (counts.stale) parts.push(counts.stale + " cached");
-    if (counts.unavailable) parts.push(counts.unavailable + " unavailable");
-    return {
-      level: status === "degraded" ? "degraded" : status,
-      message: parts.join(", ") + " of " + total + " accounts" + checkedSuffix + ".",
-    };
+    if (summary.live) parts.push(summary.live + " live");
+    if (summary.degraded) parts.push(summary.degraded + " via fallback");
+    if (summary.stale) parts.push(summary.stale + " cached");
+    if (summary.unavailable) {
+      var named = namedHandles(summary.unavailableHandles);
+      parts.push(summary.unavailable + " unavailable" + (named ? " (" + named + ")" : ""));
+    }
+    var breakdown = parts.join(", ") + " of " + summary.total + " accounts" + checkedSuffix + ".";
+
+    // Something was confirmed on this refresh, so the feed is usable — just
+    // not whole.
+    if (summary.current) return { level: "degraded", message: breakdown };
+    // Nothing current, but cached posts are still on screen.
+    if (summary.stale) return { level: "stale", message: breakdown };
+    return { level: "unavailable", message: breakdown };
   }
 
   return {
