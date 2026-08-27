@@ -28,13 +28,29 @@
   font-weight: 700;
   color: var(--text);
 }
-.x-timeline-head a {
+.x-timeline-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.x-timeline-actions a {
+  padding: 6px 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.04);
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--muted);
   text-decoration: none;
 }
-.x-timeline-head a:hover { color: var(--text); }
+.x-timeline-actions a:hover {
+  border-color: rgba(77,163,255,0.42);
+  color: var(--text);
+  background: rgba(77,163,255,0.10);
+}
 
 .x-timeline-frame {
   min-height: 620px;
