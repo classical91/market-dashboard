@@ -304,15 +304,6 @@ body {
   border-color: rgba(41, 98, 255, 0.9);
   background: rgba(41, 98, 255, 0.15);
 }
-.cmd-nav-item--imagequeue {
-  border-color: rgba(236, 72, 153, 0.58);
-  background: rgba(236, 72, 153, 0.08);
-  box-shadow: inset 3px 0 0 rgba(236, 72, 153, 0.82);
-}
-.cmd-nav-item--imagequeue:hover {
-  border-color: rgba(236, 72, 153, 0.9);
-  background: rgba(236, 72, 153, 0.15);
-}
 .cmd-nav-item--traderlab {
   border-color: rgba(155,123,255,0.62);
   background: rgba(155,123,255,0.08);
@@ -354,6 +345,52 @@ body {
   border-radius: 99px; background: var(--blue);
   box-shadow: 0 0 12px rgba(77,163,255,0.75);
 }
+.cmd-account {
+  display: grid;
+  gap: 7px;
+  padding: 0 12px 14px;
+}
+.cmd-account-label {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.cmd-account-id {
+  overflow: hidden;
+  color: var(--soft);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cmd-account-form { margin: 0; }
+.cmd-account-action {
+  display: flex;
+  width: 100%;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(77,163,255,0.08);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+}
+.cmd-account-action:hover {
+  border-color: rgba(77,163,255,0.55);
+  background: rgba(77,163,255,0.15);
+}
+.cmd-account-action:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.cmd-account-divider { height: 1px; margin: 0 12px 12px; background: var(--border); }
+.cmd-nav-primary { display: block; }
+.cmd-nav-tools { display: block; margin-top: auto; padding-top: 18px; }
+.cmd-nav-tools .cmd-nav-label { margin-top: 0; }
 .cmd-sidebar-card {
   margin-top: auto;
   padding: 14px; border-radius: 15px;

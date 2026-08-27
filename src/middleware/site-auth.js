@@ -139,6 +139,7 @@ function isPublicAuthPath(req) {
   return req.path === "/login"
     || req.path === "/auth/login"
     || req.path === "/auth/logout"
+    || req.path === "/api/auth/session"
     || req.path === "/api/alpha-team/access"
     || req.path === "/api/health";
 }
@@ -301,6 +302,10 @@ function createSiteAuth(config) {
     },
     logout(req, res) {
       clearSessionCookie(res);
+      if (wantsJson(req)) {
+        res.status(204).end();
+        return;
+      }
       res.redirect(303, "/login");
     },
   };

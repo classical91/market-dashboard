@@ -47,6 +47,38 @@ test("site login redirects anonymous page requests", async () => {
   assert.match(res.headers.get("location"), /^\/login\?returnTo=/);
 });
 
+test("sidebar session status is public and reports the active role", async () => {
+  const anonymous = await fetch(`${base}/api/auth/session`);
+  assert.equal(anonymous.status, 200);
+  assert.deepEqual(await anonymous.json(), {
+    enabled: true,
+    authenticated: false,
+    role: null,
+    identifier: null,
+  });
+
+  const { cookie } = await login("owner-password");
+  const authenticated = await fetch(`${base}/api/auth/session`, { headers: { cookie } });
+  assert.equal(authenticated.status, 200);
+  assert.deepEqual(await authenticated.json(), {
+    enabled: true,
+    authenticated: true,
+    role: "owner",
+    identifier: null,
+  });
+});
+
+test("JSON logout clears the shared dashboard session", async () => {
+  const { cookie } = await login("owner-password");
+  const logout = await fetch(`${base}/auth/logout`, {
+    method: "POST",
+    redirect: "manual",
+    headers: { accept: "application/json", cookie },
+  });
+  assert.equal(logout.status, 204);
+  assert.match(logout.headers.get("set-cookie"), /^market_dashboard_session=;/);
+});
+
 test("owner password unlocks the whole dashboard", async () => {
   const { res: loginRes, cookie } = await login("owner-password", "/settings.html");
   assert.equal(loginRes.status, 303);
