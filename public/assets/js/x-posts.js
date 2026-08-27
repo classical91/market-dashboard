@@ -96,6 +96,13 @@
     });
   }
 
+  function copyPostLinkToClipboard(url) {
+    if (!navigator.clipboard || !navigator.clipboard.writeText) {
+      return Promise.reject(new Error("Clipboard is unavailable"));
+    }
+    return navigator.clipboard.writeText(url);
+  }
+
   function setCopyStatus(button, label) {
     button.textContent = label;
     window.setTimeout(function () {
@@ -139,13 +146,25 @@
       // Open button — it gets pasted into reports and chats constantly, and
       // reading it off the card beats opening the post to copy the URL.
       if (post.url) {
-        var link = document.createElement("a");
+        var link = document.createElement("button");
+        var linkLabel = post.url.replace(/^https?:\/\//, "");
+        link.type = "button";
         link.className = "x-post-link";
-        link.href = post.url;
-        link.target = "_blank";
-        link.rel = "noopener";
-        link.title = post.url;
-        link.textContent = post.url.replace(/^https?:\/\//, "");
+        link.title = "Copy " + post.url;
+        link.textContent = linkLabel;
+        link.addEventListener("click", function () {
+          link.disabled = true;
+          link.textContent = "Copying link...";
+          copyPostLinkToClipboard(post.url)
+            .then(function () { link.textContent = "Link copied"; })
+            .catch(function () { link.textContent = "Copy failed"; })
+            .then(function () {
+              window.setTimeout(function () {
+                link.textContent = linkLabel;
+                link.disabled = false;
+              }, 1800);
+            });
+        });
         card.appendChild(link);
       }
 
@@ -260,6 +279,7 @@
     formatRelativeTime: formatRelativeTime,
     sortByPublishedDesc: sortByPublishedDesc,
     copyPostToClipboard: copyPostToClipboard,
+    copyPostLinkToClipboard: copyPostLinkToClipboard,
     renderPostCards: renderPostCards,
     renderFeedError: renderFeedError,
     renderStaleNotice: renderStaleNotice,

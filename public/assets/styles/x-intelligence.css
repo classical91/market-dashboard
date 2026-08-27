@@ -636,17 +636,31 @@
    long URL cannot push the card's actions out of alignment. */
 .x-post-link {
   display: block;
+  width: 100%;
+  padding: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
   font-size: 11px;
   color: var(--dim, var(--muted));
+  text-align: left;
   text-decoration: none;
+  cursor: pointer;
 }
 
 .x-post-link:hover {
   color: var(--blue);
   text-decoration: underline;
+}
+
+.x-post-link:disabled { cursor: wait; }
+
+.x-post-link:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
 }
 
 .x-live-modal {
