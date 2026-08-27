@@ -295,6 +295,16 @@ function createApp() {
   app.get("/login", siteAuth.loginPage);
   app.post("/auth/login", siteAuth.login);
   app.post("/auth/logout", siteAuth.logout);
+  app.get("/api/auth/session", (req, res) => {
+    const session = siteAuth.sessionFromRequest(req);
+    res.setHeader("Cache-Control", "no-store");
+    res.json({
+      enabled: siteAuth.enabled,
+      authenticated: Boolean(session),
+      role: session ? session.role : null,
+      identifier: null,
+    });
+  });
   app.post("/api/alpha-team/access", (req, res) => {
     const accessCode = config.access.alphaAccessCode;
     const session = siteAuth.sessionFromRequest(req);

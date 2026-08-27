@@ -17,6 +17,8 @@
     document.documentElement.classList.add("alpha-review-mode");
   }
 
+  var accountState = null;
+
   var workspace = [
     { href: "/terminal-suite.html", icon: "&#128421;", label: "Terminal Suite" },
     {
@@ -47,8 +49,6 @@
       label: "AI Analysis",
       icon: "&#129504;",
       children: [
-        { href: "/decision.html", icon: "&#127919;", label: "Decision Engine" },
-        { href: "/trading-lab.html", icon: "&#129514;", label: "Backtest Lab" },
         { href: "/ai-analysis.html", icon: "&#129504;", label: "AI Analysis" },
         { href: "/layout-analysis.html", icon: "&#128248;", label: "My Layouts" },
         { href: "/pattern-scanner.html", icon: "&#128200;", label: "Pattern Scanner" },
@@ -145,33 +145,12 @@
       ],
     },
     {
-      label: "AI Apps",
-      icon: "&#129302;",
-      children: [
-        {
-          href: "https://chatgpt.com/share/6a3ad954-cdf4-83e8-81bb-77966ffefab6",
-          icon: "&#129302;",
-          label: "AI Market Trader",
-        },
-        {
-          href: "https://commentfarm-production-fc8b.up.railway.app/image-converter",
-          icon: "&#128444;",
-          label: "Image Converter",
-        },
-        {
-          href: "https://main-page-production-9927.up.railway.app/ai.html",
-          icon: "&#129504;",
-          label: "AI Portal",
-        },
-        {
-          href: "/bot-commands.html",
-          icon: "&#128172;",
-          label: "Bot Commands",
-        },
-      ],
+      href: "https://main-page-production-9927.up.railway.app/ai.html",
+      icon: "&#129504;",
+      label: "AI Portal",
     },
     {
-      label: "X",
+      label: "𝕏",
       icon: "&#120143;",
       children: [
         { href: "https://x.com/", icon: "&#120143;", label: "Open X.com" },
@@ -186,26 +165,25 @@
       featured: "worldmonitor",
     },
     { href: "https://www.tradingview.com/", icon: "&#128200;", label: "Open TradingView.com", featured: "tradingview" },
+  ];
+
+  var tools = [
     {
-      href: "https://commentfarm-production-fc8b.up.railway.app/queue",
-      icon: "&#128444;",
-      label: "Open ImageQueue",
-      featured: "imagequeue",
+      href: "https://t.me/tesr56788",
+      icon: "&#9992;&#65039;",
+      label: "Trader Lab Telegram",
+    },
+    { href: "/trading-lab.html", icon: "&#129408;", label: "Trading Lab Backtest" },
+    {
+      href: "https://market-dashboard-production-b2f4.up.railway.app/bot-commands.html",
+      icon: "&#128172;",
+      label: "Bot Commands",
+      newTab: false,
     },
     {
       href: "https://trading-strategy-production-1b41.up.railway.app/",
       icon: "&#129504;",
       label: "Decision Engine",
-    },
-    {
-      href: "/trading-lab.html",
-      icon: "&#129408;",
-      label: "Trading Lab Backtest",
-    },
-    {
-      href: "https://t.me/tesr56788",
-      icon: "&#9992;&#65039;",
-      label: "Trader Lab",
     },
     { href: "/indicators.html", icon: "&#128218;", label: "Indicators Glossary" },
     { href: "/settings.html", icon: "&#9881;&#65039;", label: "Settings" },
@@ -284,6 +262,7 @@
     if (isAlphaReviewMode() && !isAlphaAvailable(item.href)) return betaNavItem(item, mode, false);
     var active = isActive(item.href);
     var external = /^https?:\/\//.test(item.href);
+    var newTab = external && item.newTab !== false;
     var featuredClass = item.featured
       ? " " + prefix + "nav-item--featured " + prefix + "nav-item--" + item.featured
       : "";
@@ -294,7 +273,7 @@
     return (
       '<a class="' + prefix + "nav-item" + featuredClass + (active ? " active" : "") + '" href="' + href +
       '" data-nav-href="' + item.href + '"' + (href !== item.href ? ' data-alpha-href="' + href + '"' : "") +
-      (external ? ' target="_blank" rel="noopener"' : "") +
+      (newTab ? ' target="_blank" rel="noopener"' : "") +
       (active ? ' aria-current="page"' : "") + ">" +
       icon + '<span class="' + prefix + 'nav-text">' + item.label + "</span></a>"
     );
@@ -305,16 +284,36 @@
     if (isAlphaReviewMode() && !isAlphaAvailable(item.href)) return betaNavItem(item, mode, true);
     var active = isActive(item.href);
     var external = /^https?:\/\//.test(item.href);
+    var newTab = external && item.newTab !== false;
     var href = alphaHref(item.href);
     return (
       '<a class="' + prefix + 'nav-item ' + prefix + 'nav-subitem' + (active ? " active" : "") +
       '" href="' + href + '" data-nav-href="' + item.href + '"' +
-      (external ? ' target="_blank" rel="noopener"' : "") +
+      (newTab ? ' target="_blank" rel="noopener"' : "") +
       (active ? ' aria-current="page"' : "") +
       '><span class="' + prefix + 'nav-icon" aria-hidden="true">' +
       item.icon + '</span><span class="' + prefix + 'nav-text">' + item.label +
       '</span>' + (external ? '<span class="' + prefix + 'nav-external" aria-hidden="true">&#8599;</span>' : "") +
       "</a>"
+    );
+  }
+
+  function accountHtml(mode) {
+    var prefix = mode === "command" ? "cmd-" : "";
+    if (accountState && accountState.authenticated) {
+      var identifier = accountState.identifier || (accountState.role === "alpha" ? "Alpha Team" : "Owner account");
+      return (
+        '<section class="' + prefix + 'account" aria-label="Account">' +
+        '<div class="' + prefix + 'account-label">Account</div>' +
+        '<div class="' + prefix + 'account-id">' + identifier + '</div>' +
+        '<form action="/auth/logout" method="post" class="' + prefix + 'account-form">' +
+        '<button type="submit" class="' + prefix + 'account-action">Logout</button></form></section>'
+      );
+    }
+    return (
+      '<section class="' + prefix + 'account" aria-label="Account">' +
+      '<div class="' + prefix + 'account-label">Account</div>' +
+      '<a class="' + prefix + 'account-action" href="/login?returnTo=' + encodeURIComponent(window.location.pathname + window.location.search) + '">Login</a></section>'
     );
   }
 
@@ -347,11 +346,16 @@
     var workspaceHtml = workspace.map(function (item, index) {
       return item.children ? dropdown(item, mode, instance + "-" + index) : navItem(item, mode);
     }).join("");
+    var toolsHtml = tools.map(function (item, index) {
+      return item.children ? dropdown(item, mode, instance + "-tools-" + index) : navItem(item, mode);
+    }).join("");
     return (
       '<a class="' + prefix + 'brand" href="/">' +
       '<div class="' + prefix + 'brand-mark">M</div>' +
       '<div class="' + prefix + 'brand-text"><h1>Market Command</h1><span>Live dashboard system</span></div></a>' +
-      '<div class="' + prefix + 'nav-label">Workspace</div>' + workspaceHtml
+      accountHtml(mode) + '<div class="' + prefix + 'account-divider"></div>' +
+      '<nav class="' + prefix + 'nav-primary" aria-label="Market Command">' + workspaceHtml + '</nav>' +
+      '<nav class="' + prefix + 'nav-tools" aria-label="Trading and tools"><div class="' + prefix + 'nav-label">Trading &amp; Tools</div>' + toolsHtml + '</nav>'
     );
   }
 
@@ -369,6 +373,37 @@
   function fill(root, mode, instance) {
     root.innerHTML = navigationHtml(mode, instance);
     wireDropdowns(root);
+    var logoutForm = root.querySelector("." + (mode === "command" ? "cmd-" : "") + "account-form");
+    if (logoutForm) {
+      logoutForm.addEventListener("submit", function (event) {
+        event.preventDefault();
+        fetch("/auth/logout", { method: "POST", credentials: "same-origin", headers: { Accept: "application/json" } })
+          .then(function (response) {
+            if (!response.ok && response.status !== 204) throw new Error("Logout failed");
+            accountState = { authenticated: false };
+            refreshSidebars();
+            window.location.assign("/login?returnTo=" + encodeURIComponent(window.location.pathname + window.location.search));
+          })
+          .catch(function () { logoutForm.submit(); });
+      });
+    }
+  }
+
+  function refreshSidebars() {
+    document.querySelectorAll(".cmd-sidebar").forEach(function (root) { fill(root, "command", "desktop"); });
+    document.querySelectorAll(".sidebar").forEach(function (root) { fill(root, "overview", "desktop"); });
+    document.querySelectorAll(".cmd-drawer").forEach(function (root) { fill(root, "command", "mobile"); });
+    document.querySelectorAll(".mob-drawer").forEach(function (root) { fill(root, "overview", "mobile"); });
+  }
+
+  function loadAccount() {
+    return fetch("/api/auth/session", { credentials: "same-origin", cache: "no-store" })
+      .then(function (response) { return response.ok ? response.json() : { authenticated: false }; })
+      .catch(function () { return { authenticated: false }; })
+      .then(function (state) {
+        accountState = state;
+        refreshSidebars();
+      });
   }
 
   function updateActiveStates() {
@@ -455,6 +490,7 @@
     if (commandMain && !document.getElementById("cmd-mobile-bar")) buildMobile(commandMain, "command");
     if (overviewMain && !document.getElementById("mob-bar")) buildMobile(overviewMain, "overview");
     window.addEventListener("hashchange", updateActiveStates);
+    loadAccount();
   }
 
   if (document.readyState === "loading") {

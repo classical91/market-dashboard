@@ -53,7 +53,7 @@ test("the Lab is renamed and points at where the moved panels went", () => {
 
   assert.match(html, /Backtest Lab/);
   assert.doesNotMatch(html, /&#129514; Trading Lab/);
-  assert.match(read("public/assets/js/sidebar.js"), /label: "Backtest Lab"/);
+  assert.match(read("public/assets/js/sidebar.js"), /label: "Trading Lab Backtest"/);
 
   // The CARDS are gone from the Lab. Checked as card titles rather than as bare
   // phrases: the regime note legitimately explains that the live scanner
