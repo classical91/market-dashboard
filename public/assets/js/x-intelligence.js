@@ -292,6 +292,11 @@
       liveRoot.hidden = false;
       var meta = window.XFreshness.accountMeta(state.feedData, state.handle) || {};
       window.XLiveReference.render(liveRoot, state.handle, meta);
+      // Keep the live X timeline in the same reading flow as the freshness
+      // banner: LIVE first, X's timeline second, captured post cards after it.
+      // renderPostCards clears the pane on refresh, so reinsert this node each
+      // time instead of maintaining a separate side column.
+      pane.insertBefore(liveRoot, pane.firstChild ? pane.firstChild.nextSibling : null);
     }
 
     function openManager() {

@@ -174,25 +174,6 @@
     container.innerHTML = "";
     container.setAttribute("data-handle", handle);
 
-    // The title, the profile link and the capture timestamps all live in a
-    // popup now. They are reference detail, consulted occasionally, and on
-    // screen permanently they crowded out the thing actually being compared.
-    // The feed's Live/Degraded banner is untouched and stays where it was.
-    var head = doc.createElement("div");
-    head.className = "x-live-head";
-
-    var details = doc.createElement("button");
-    details.type = "button";
-    details.className = "x-live-details";
-    details.textContent = "ⓘ Live X details";
-    details.setAttribute("aria-haspopup", "dialog");
-    details.setAttribute("aria-label", "Live X details for @" + handle);
-    details.addEventListener("click", function () {
-      openDetails(doc, described);
-    });
-
-    head.appendChild(details);
-
     var embed = doc.createElement("div");
     embed.className = "x-live-embed";
 
@@ -205,7 +186,6 @@
     anchor.textContent = "Posts by @" + handle;
     embed.appendChild(anchor);
 
-    container.appendChild(head);
     container.appendChild(embed);
 
     function fallback() {
