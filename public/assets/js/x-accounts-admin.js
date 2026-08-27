@@ -156,7 +156,7 @@
           if (!window.confirm(confirmationMessage(account.handle))) return;
           remove.disabled = true;
           say("Removing @" + account.handle + "…");
-          window.AdminKey.fetch("/api/x/accounts/config/" + encodeURIComponent(account.handle), {
+          window.AdminKey.fetchOrSession("/api/x/accounts/config/" + encodeURIComponent(account.handle), {
             method: "DELETE",
           })
             .then(readJson)
@@ -209,7 +209,7 @@
 
       submit.disabled = true;
       say("Adding @" + check.handle + "…");
-      window.AdminKey.fetch("/api/x/accounts/config", {
+      window.AdminKey.fetchOrSession("/api/x/accounts/config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

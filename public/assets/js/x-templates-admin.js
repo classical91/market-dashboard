@@ -33,7 +33,7 @@
   }
 
   function adminFetch(url, options) {
-    return window.AdminKey.fetch(url, options || {}).then(readJson);
+    return window.AdminKey.fetchOrSession(url, options || {}).then(readJson);
   }
 
   function normalizeDraft(draft) {

@@ -206,6 +206,40 @@ test("owner session alone cannot write the journal without ADMIN_API_KEY", async
   assert.equal(res.status, 503);
 });
 
+test("owner session can manage X templates without entering a second admin key", async () => {
+  const { cookie } = await login("owner-password", "/x-intelligence.html");
+  const res = await fetch(`${base}/api/x/templates`, {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie },
+    body: JSON.stringify({
+      id: "owner-session-template",
+      name: "Owner Session Template",
+      sections: [],
+      memberships: [],
+    }),
+  });
+
+  assert.equal(res.status, 201);
+  const body = await res.json();
+  assert.equal(body.template.id, "owner-session-template");
+});
+
+test("alpha session cannot manage X templates", async () => {
+  const { cookie } = await login("alpha-password", "/signal-screener.html?view=alpha");
+  const res = await fetch(`${base}/api/x/templates`, {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie },
+    body: JSON.stringify({
+      id: "alpha-template",
+      name: "Alpha Template",
+      sections: [],
+      memberships: [],
+    }),
+  });
+
+  assert.equal(res.status, 403);
+});
+
 test("wrong password stays on login", async () => {
   const { res } = await login("wrong-password", "/");
   assert.equal(res.status, 401);
