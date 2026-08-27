@@ -25,6 +25,10 @@
     return months + (months === 1 ? " month ago" : " months ago");
   }
 
+  // Owned by x-freshness.js (shared with the Node tests); re-exported here
+  // so existing XPosts callers keep working.
+  var formatRelativeTime = window.XFreshness.formatRelativeTime;
+
   function sortByPublishedDesc(posts) {
     return posts.slice().sort(function (a, b) {
       var aTime = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
@@ -194,19 +198,57 @@
     var note = document.createElement("div");
     note.className = "x-feed-stale";
     note.textContent =
-      "Showing older cached posts for: " +
-      staleFeeds.map(function (a) { return "@" + a.handle; }).join(", ") +
-      " (live fetch unavailable)";
+      "Showing cached posts for: " +
+      staleFeeds
+        .map(function (a) {
+          var confirmed = formatRelativeTime(a.lastSuccessfulFetchAt);
+          return "@" + a.handle + (confirmed ? " (last confirmed " + confirmed + ")" : "");
+        })
+        .join(", ") +
+      " — the latest check did not succeed.";
     root.appendChild(note);
+  }
+
+  var STATUS_LABELS = {
+    live: "Live",
+    degraded: "Degraded",
+    stale: "Stale",
+    unavailable: "Unavailable",
+    offline: "Offline",
+  };
+
+  /* The banner that keeps old-but-unchecked data from reading as current.
+     It is always rendered, including when everything is healthy, so the
+     absence of a warning is never what "live" has to be inferred from. */
+  function renderFeedStatus(root, status) {
+    if (!status || !status.message) return;
+    var level = STATUS_LABELS[status.level] ? status.level : "unavailable";
+
+    var box = document.createElement("div");
+    box.className = "x-feed-status x-feed-status--" + level;
+
+    var label = document.createElement("span");
+    label.className = "x-feed-status-label";
+    label.textContent = STATUS_LABELS[level];
+
+    var text = document.createElement("span");
+    text.className = "x-feed-status-text";
+    text.textContent = status.message;
+
+    box.appendChild(label);
+    box.appendChild(text);
+    root.insertBefore(box, root.firstChild);
   }
 
   window.XPosts = {
     esc: esc,
     formatRelativeDate: formatRelativeDate,
+    formatRelativeTime: formatRelativeTime,
     sortByPublishedDesc: sortByPublishedDesc,
     copyPostToClipboard: copyPostToClipboard,
     renderPostCards: renderPostCards,
     renderFeedError: renderFeedError,
     renderStaleNotice: renderStaleNotice,
+    renderFeedStatus: renderFeedStatus,
   };
 })();

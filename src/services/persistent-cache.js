@@ -26,19 +26,59 @@ class PersistentReporterCache {
 
   /* ── private: hydrate from disk ── */
   _load() {
+    this._loadedAt = new Date().toISOString();
+    this._loadState = "empty";
+    this._loadError = null;
+    this._expiredOnLoad = 0;
     try {
       const raw = fs.readFileSync(this._file, "utf8");
       const parsed = JSON.parse(raw);
       const now = Date.now();
+      let expired = 0;
       for (const [k, entry] of Object.entries(parsed)) {
-        if (entry.expiresAt > now) {
-          this._map.set(k, entry);
-        }
+        if (entry.expiresAt > now) this._map.set(k, entry);
+        else expired += 1;
       }
+      this._loadState = "loaded";
+      this._expiredOnLoad = expired;
       console.log(`[PersistentCache] Loaded ${this._map.size} valid entries from ${this._file}`);
-    } catch {
-      /* file doesn't exist yet or parse error — start fresh */
+    } catch (err) {
+      // A missing file on first boot is normal. A corrupt one is not, and
+      // starting fresh silently makes a persistence fault look exactly like
+      // a legitimate expiry — so say which one this was.
+      if (err.code === "ENOENT") {
+        this._loadState = "absent";
+        return;
+      }
+      this._loadState = err instanceof SyntaxError ? "corrupt" : "unreadable";
+      this._loadError = err.message;
+      console.error(`[PersistentCache] Could not read ${this._file} (${this._loadState}): ${err.message}`);
     }
+  }
+
+  /**
+   * Where this cache actually lives and whether it survived the last boot.
+   *
+   * `storageSource` reports which setting chose the directory — it does NOT
+   * prove a Railway volume is really mounted there, only that the app was
+   * told to use it. Confirming the mount is still an operational check.
+   * `default` is the one that matters: the file is then on container-local
+   * disk and disappears on every deploy.
+   */
+  describe() {
+    const railwayVolume = String(process.env.RAILWAY_VOLUME_MOUNT_PATH || "").trim();
+    const dataDir = String(process.env.DATA_DIR || "").trim();
+    return {
+      file: this._file,
+      storageSource: dataDir ? "data-dir" : railwayVolume ? "railway-volume" : "default",
+      explicitDataDirConfigured: Boolean(dataDir || railwayVolume),
+      loadState: this._loadState,
+      loadError: this._loadError,
+      loadedAt: this._loadedAt,
+      entriesLoaded: this._loadState === "loaded" ? this._map.size : 0,
+      expiredOnLoad: this._expiredOnLoad || 0,
+      entries: this._map.size,
+    };
   }
 
   /* ── private: flush to disk ── */

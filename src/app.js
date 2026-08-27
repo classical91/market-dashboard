@@ -426,7 +426,7 @@ function createApp() {
   );
   app.use("/api/telegram", createTelegramRouter({ telegramService, requireAdmin }));
   app.use("/api/youtube", createYoutubeRouter({ youtubeService, channels: youtubeChannels }));
-  app.use("/api/x", createXFeedRouter({ xFeedService, accounts: X_ACCOUNTS }));
+  app.use("/api/x", createXFeedRouter({ xFeedService, accounts: X_ACCOUNTS, requireAdmin }));
 
   app.get("/", (req, res) => {
     res.sendFile(path.join(__dirname, "..", "public", "index.html"));
