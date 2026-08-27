@@ -115,3 +115,22 @@ test("deletion is confirmed with what will actually be removed", () => {
     "Remove @TechDev_52 from X Intelligence? Existing cached feed data for this account will also be removed.",
   );
 });
+
+/* ── The details popup ─────────────────────────────────────────────────────
+   The title, profile link and capture timestamps moved off the panel and
+   behind a button. What matters is that nothing was lost in the move, and
+   that the feed's own Live/Degraded banner is untouched by it. */
+
+test("the popup carries every detail that used to sit above the timeline", () => {
+  const described = live.describeReference(
+    "trader1sz",
+    { lastCheckedAt: ago(4 * MINUTE), newestPostAt: ago(2 * HOUR) },
+    NOW,
+  );
+
+  assert.equal(described.title, "Live X — @trader1sz");
+  assert.equal(described.openLabel, "Open @trader1sz on X ↗");
+  assert.equal(described.trackedLine, "Tracked by Intelligence: last checked 4 minutes ago");
+  assert.equal(described.newestLine, "Newest captured post: 2 hours ago");
+  assert.equal(described.profileUrl, "https://x.com/trader1sz");
+});

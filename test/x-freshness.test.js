@@ -381,3 +381,14 @@ test("an account with an unrecognised state counts as unavailable, never as heal
   assert.equal(status.level, "degraded");
   assert.match(status.message, /1 unavailable \(@mystery\)/);
 });
+
+
+test("the feed's own freshness banner is unaffected by moving the Live X details", () => {
+  // The popup change is presentation of the reference panel only. The banner
+  // that tells the reader whether the posts are current still renders here.
+  const state = feedOf(manyAccounts(21, 1), "unavailable");
+  const status = describeStatus(state, null, NOW);
+
+  assert.equal(status.level, "degraded");
+  assert.match(status.message, /21 live, 1 unavailable \(@down0\) of 22 accounts/);
+});

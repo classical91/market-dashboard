@@ -35,9 +35,9 @@
     return "";
   }
 
-  /* The comparison context shown above the embed: how current our capture is,
-     so a difference against the live timeline can be interpreted rather than
-     just noticed. Pure, so the wording is covered by tests. */
+  /* The comparison context, shown in the details popup: how current our
+     capture is, so a difference against the live timeline can be interpreted
+     rather than just noticed. Pure, so the wording is covered by tests. */
   function describeReference(handle, meta, now) {
     var checked = relative(meta && meta.lastCheckedAt, now);
     var newest = relative(meta && meta.newestPostAt, now);
@@ -99,6 +99,70 @@
     });
   }
 
+  /* The detail popup. Everything that used to sit above the timeline —
+     which account this is, when we last checked it, how old our newest
+     captured post is, and the link out to X — on demand instead of always. */
+  function openDetails(doc, described) {
+    var overlay = doc.createElement("div");
+    overlay.className = "x-live-modal";
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
+    overlay.setAttribute("aria-label", described.title);
+
+    var box = doc.createElement("div");
+    box.className = "x-live-modal-box";
+
+    var head = doc.createElement("div");
+    head.className = "x-live-modal-head";
+    var title = doc.createElement("span");
+    title.className = "x-live-title";
+    title.textContent = described.title;
+    var close = doc.createElement("button");
+    close.type = "button";
+    close.className = "x-live-modal-close";
+    close.textContent = "×";
+    close.setAttribute("aria-label", "Close");
+    head.appendChild(title);
+    head.appendChild(close);
+
+    var tracked = doc.createElement("div");
+    tracked.className = "x-live-meta";
+    tracked.textContent = described.trackedLine;
+
+    var newest = doc.createElement("div");
+    newest.className = "x-live-meta";
+    newest.textContent = described.newestLine;
+
+    var open = doc.createElement("a");
+    open.className = "x-live-open";
+    open.href = described.profileUrl;
+    open.target = "_blank";
+    open.rel = "noopener";
+    open.textContent = described.openLabel;
+
+    box.appendChild(head);
+    box.appendChild(tracked);
+    box.appendChild(newest);
+    box.appendChild(open);
+    overlay.appendChild(box);
+    doc.body.appendChild(overlay);
+
+    function cleanup() {
+      doc.removeEventListener("keydown", onKey, true);
+      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    }
+    function onKey(e) {
+      if (e.key === "Escape") cleanup();
+    }
+    close.addEventListener("click", cleanup);
+    overlay.addEventListener("click", function (e) {
+      if (e.target === overlay) cleanup();
+    });
+    doc.addEventListener("keydown", onKey, true);
+
+    return { close: cleanup, overlay: overlay };
+  }
+
   var loader = null;
 
   function render(container, handle, meta, options) {
@@ -110,30 +174,24 @@
     container.innerHTML = "";
     container.setAttribute("data-handle", handle);
 
+    // The title, the profile link and the capture timestamps all live in a
+    // popup now. They are reference detail, consulted occasionally, and on
+    // screen permanently they crowded out the thing actually being compared.
+    // The feed's Live/Degraded banner is untouched and stays where it was.
     var head = doc.createElement("div");
     head.className = "x-live-head";
 
-    var title = doc.createElement("span");
-    title.className = "x-live-title";
-    title.textContent = described.title;
+    var details = doc.createElement("button");
+    details.type = "button";
+    details.className = "x-live-details";
+    details.textContent = "ⓘ Live X details";
+    details.setAttribute("aria-haspopup", "dialog");
+    details.setAttribute("aria-label", "Live X details for @" + handle);
+    details.addEventListener("click", function () {
+      openDetails(doc, described);
+    });
 
-    var open = doc.createElement("a");
-    open.className = "x-live-open";
-    open.href = described.profileUrl;
-    open.target = "_blank";
-    open.rel = "noopener";
-    open.textContent = described.openLabel;
-
-    head.appendChild(title);
-    head.appendChild(open);
-
-    var meta1 = doc.createElement("div");
-    meta1.className = "x-live-meta";
-    meta1.textContent = described.trackedLine;
-
-    var meta2 = doc.createElement("div");
-    meta2.className = "x-live-meta";
-    meta2.textContent = described.newestLine;
+    head.appendChild(details);
 
     var embed = doc.createElement("div");
     embed.className = "x-live-embed";
@@ -148,8 +206,6 @@
     embed.appendChild(anchor);
 
     container.appendChild(head);
-    container.appendChild(meta1);
-    container.appendChild(meta2);
     container.appendChild(embed);
 
     function fallback() {
@@ -192,6 +248,7 @@
   return {
     WIDGET_SRC: WIDGET_SRC,
     describeReference: describeReference,
+    openDetails: openDetails,
     createWidgetLoader: createWidgetLoader,
     render: render,
   };
