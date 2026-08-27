@@ -161,6 +161,32 @@ const config = {
     // How many cycles to retain. Cycles are small (no report text — that lives
     // in the generation log), so the default keeps months of history.
     historyCap: parseNumber(process.env.NEWSROOM_CYCLE_HISTORY, 200),
+    // Deliver the sections that exist when another expected section could not
+    // be generated. Off by default: a digest that silently drops a category
+    // reads as a complete report to everyone in the room, and the next run of
+    // the same slot generates only what is missing and then delivers. Turn it
+    // on when a late category is worth less than a late report.
+    allowPartialDelivery: process.env.NEWSROOM_ALLOW_PARTIAL_DELIVERY === "true",
+    // Read-only identity check against the ShareBot/OpenClaw gateway. This is
+    // the one preflight check this repository cannot answer on its own — the
+    // agent and its model route are configured outside it — so it stays
+    // unverified until an operator points it at a real endpoint.
+    agentPreflight: {
+      // A GET that reports who the credential is, e.g. a whoami/agent-lookup.
+      // Never a run endpoint: the preflight must not make the agent do work.
+      url: String(process.env.NEWSROOM_AGENT_PREFLIGHT_URL || "").trim(),
+      // Header the gateway wants the credential in. Bearer is assembled for
+      // Authorization; any other header sends the token verbatim.
+      header: String(process.env.NEWSROOM_AGENT_PREFLIGHT_HEADER || "Authorization").trim(),
+      // The credential the *scheduled* run uses. A route that works by hand
+      // and fails on a schedule is usually two different credentials, so this
+      // is deliberately its own variable rather than reusing another key.
+      token: process.env.NEWSROOM_AGENT_PREFLIGHT_TOKEN || "",
+      // Optional: the agent/model identity the response must name. Without it
+      // the check only proves the credential resolves to *someone*.
+      expectIdentity: String(process.env.NEWSROOM_AGENT_PREFLIGHT_EXPECT || "").trim(),
+      timeoutMs: parseNumber(process.env.NEWSROOM_AGENT_PREFLIGHT_TIMEOUT_MS, 8000),
+    },
   },
   aiAnalysis: {
     openaiApiKey: process.env.OPENAI_API_KEY || "",

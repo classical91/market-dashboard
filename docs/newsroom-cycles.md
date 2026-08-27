@@ -182,13 +182,57 @@ Telegram credentials, destination routing for every expected category, and the
 presence of the receipt store. A failed preflight produces a cycle record with
 `preflight_failed`, the failing checks, and nothing sent.
 
-One check is deliberately not a pass: `external-agent-route`. The
-ShareBot/OpenClaw agent and its model route are configured outside this
-repository, so the check reports "unverified here" rather than a verdict it did
-not earn. `NewsroomService` accepts an `externalPreflight` async function as the
-seam — supply one that queries the gateway and its verdict joins the preflight
-under the same check name. The expected contract is
-`async () => ({ ok: boolean, detail: string })`, and it must not post anything.
+Checks carry a `status` of `pass`, `warn` or `fail` alongside `ok`, matching the
+broadcast preflight's vocabulary. The two differ in exactly one place, below.
+
+### The agent route check
+
+`external-agent-route` is the one question this service cannot answer from its
+own configuration: *does the credential the scheduled run carries still resolve
+to the agent we think it is?* On August 11 it did not, and the answer came back
+from the gateway as `HTTP 401: User not found`.
+
+Set `NEWSROOM_AGENT_PREFLIGHT_URL` to the gateway's identity endpoint and the
+check becomes a real gate — a credential the gateway no longer recognizes fails
+the cycle *before* it spends anything, instead of surfacing as an unexplained
+silence hours later. It is deliberately narrow:
+
+- **GET only.** A preflight must never make the agent do work; a POST to a
+  gateway is how a "check" becomes a run.
+- **The token never leaves.** It goes out in a header and never appears in the
+  result — not even when the gateway echoes it back in an error body.
+- **`warn`, not `pass`, when unconfigured.** An unverifiable route is not a
+  healthy one, it is an unknown one, and calling it a pass is how the August 11
+  failure stayed invisible for as long as it did. The cycle still runs.
+- **A wrong identity fails.** With `NEWSROOM_AGENT_PREFLIGHT_EXPECT` set, a
+  route that resolves to a *different* agent fails as `identity_mismatch`.
+  Without it, the check says plainly that it proved the credential resolves,
+  not which agent it resolves to.
+
+`NewsroomService` still accepts any `externalPreflight` async function as the
+seam; `createAgentRoutePreflight()` is the built-in implementation. The contract
+is `async () => ({ ok, status, detail, code? })`, and it must not post anything.
+
+`GET /api/newsroom/health` lifts the result to `agentRoute: { status, verified,
+detail, code }` so a status panel can show it without reading cycle detail.
+
+### Incomplete cycles
+
+By default a cycle missing an expected section delivers **nothing**
+(`generation_failed`): a digest that silently drops a category reads as a
+complete report to everyone in the room, and the next run of the same slot
+generates only what is missing and then delivers.
+
+Set `NEWSROOM_ALLOW_PARTIAL_DELIVERY=true` when a late category is worth less
+than a late report. Then what exists goes out, with two guarantees:
+
+- the cycle ends `delivery_partial`, never `completed`, while an expected
+  section is missing — including on a delivery *retry*, which recomputes
+  completeness from the record rather than trusting the caller;
+- **only sections this cycle generated are sent.** `peekReport()` returns the
+  latest cached content per section, which can still hold yesterday's copy of a
+  section today's run failed to produce; delivering that would publish stale
+  copy under today's date and hang a receipt on a cycle that never generated it.
 
 ## What this does not do
 
