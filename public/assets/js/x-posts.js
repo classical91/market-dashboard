@@ -135,6 +135,20 @@
       }
       card.appendChild(text);
 
+      // The permalink, visible on the card rather than hidden behind the
+      // Open button — it gets pasted into reports and chats constantly, and
+      // reading it off the card beats opening the post to copy the URL.
+      if (post.url) {
+        var link = document.createElement("a");
+        link.className = "x-post-link";
+        link.href = post.url;
+        link.target = "_blank";
+        link.rel = "noopener";
+        link.title = post.url;
+        link.textContent = post.url.replace(/^https?:\/\//, "");
+        card.appendChild(link);
+      }
+
       var actions = document.createElement("div");
       actions.className = "x-post-actions";
 

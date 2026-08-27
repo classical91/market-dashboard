@@ -653,3 +653,84 @@
   .x-live-reference { grid-area: live; margin-top: 0; }
   .x-rss-placeholder { grid-area: note; }
 }
+
+/* The post permalink, on the card itself. Truncated rather than wrapped so a
+   long URL cannot push the card's actions out of alignment. */
+.x-post-link {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 11px;
+  color: var(--dim, var(--muted));
+  text-decoration: none;
+}
+
+.x-post-link:hover {
+  color: var(--blue);
+  text-decoration: underline;
+}
+
+/* Live X: the reference detail is behind this button now, so the panel is
+   the timeline plus one control. The feed's freshness banner is separate and
+   deliberately still always visible. */
+.x-live-head {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.x-live-details {
+  padding: 4px 8px;
+  border: 0.5px solid var(--border);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.x-live-details:hover {
+  border-color: var(--border-hover);
+  color: var(--text);
+}
+
+.x-live-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(3, 6, 12, 0.66);
+}
+
+.x-live-modal-box {
+  width: 100%;
+  max-width: 380px;
+  box-sizing: border-box;
+  display: grid;
+  gap: 8px;
+  background: var(--surface, #0f1420);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+}
+
+.x-live-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.x-live-modal-close {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
