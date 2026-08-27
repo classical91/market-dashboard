@@ -146,3 +146,86 @@ test("a repaired credential recovers once the circuits are reset", async () => {
   assert.equal(account.stale, false);
   assert.ok(account.newestPostAt, "content age is reported separately from data freshness");
 });
+
+
+/* ── Tracked-account management ────────────────────────────────────────── */
+
+function send(pathname, method, body, headers = {}) {
+  return originalFetch(`${base}${pathname}`, {
+    method,
+    headers: Object.assign({ "Content-Type": "application/json" }, headers),
+    body: body === undefined ? undefined : JSON.stringify(body),
+  }).then(async (res) => ({ status: res.status, body: await res.json().catch(() => null) }));
+}
+
+const ADMIN = { "x-admin-key": "route-test-admin" };
+
+test("the tracked list is readable and seeded from the static config", async () => {
+  const { status, body } = await getJson("/api/x/accounts/config");
+
+  assert.equal(status, 200);
+  assert.equal(body.accounts.length, X_ACCOUNTS.length);
+  assert.ok(body.categories.includes("Crypto Traders"));
+  assert.equal(body.registry.loadState, "loaded");
+});
+
+test("adding and deleting an account requires the admin key", async () => {
+  const add = await send("/api/x/accounts/config", "POST", { handle: "temp1", category: "Market Data" });
+  assert.equal(add.status, 401, "an unauthenticated add is rejected");
+
+  const remove = await send("/api/x/accounts/config/Barchart", "DELETE");
+  assert.equal(remove.status, 401, "an unauthenticated delete is rejected");
+
+  const { body } = await getJson("/api/x/accounts/config");
+  assert.equal(body.accounts.length, X_ACCOUNTS.length, "neither rejected call changed anything");
+});
+
+test("an added account appears in the feed, and a deleted one disappears from it", async () => {
+  mockUpstream(() => healthySearchResponse());
+
+  const added = await send(
+    "/api/x/accounts/config",
+    "POST",
+    { handle: "@tempaccount", label: "Temp", category: "Crypto Traders" },
+    ADMIN,
+  );
+  assert.equal(added.status, 201);
+  assert.equal(added.body.added.handle, "tempaccount", "the leading @ is normalized server-side");
+
+  const withAccount = await getJson("/api/x/accounts");
+  assert.ok(
+    withAccount.body.accounts.some((a) => a.handle === "tempaccount"),
+    "the feed reads the registry per request, not a list captured at boot",
+  );
+
+  const duplicate = await send(
+    "/api/x/accounts/config",
+    "POST",
+    { handle: "TEMPACCOUNT", category: "Market Data" },
+    ADMIN,
+  );
+  assert.equal(duplicate.status, 409, "duplicates are rejected case-insensitively");
+
+  const malformed = await send(
+    "/api/x/accounts/config",
+    "POST",
+    { handle: "not a handle", category: "Market Data" },
+    ADMIN,
+  );
+  assert.equal(malformed.status, 400);
+
+  const removed = await send("/api/x/accounts/config/tempaccount", "DELETE", undefined, ADMIN);
+  assert.equal(removed.status, 200);
+
+  const after = await getJson("/api/x/accounts");
+  assert.ok(
+    !after.body.accounts.some((a) => a.handle === "tempaccount"),
+    "a deleted account must not survive in the feed",
+  );
+});
+
+test("diagnostics report registry health alongside provider health", async () => {
+  const { body } = await getJson("/api/x/diagnostics", ADMIN);
+  assert.ok(body.registry.file.endsWith("x-accounts.json"));
+  assert.equal(body.registry.loadState, "loaded");
+});

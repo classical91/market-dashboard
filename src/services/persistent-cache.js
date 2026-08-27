@@ -110,6 +110,14 @@ class PersistentReporterCache {
     return value;
   }
 
+  /** Removes an entry and flushes, so the deletion survives a restart too. */
+  delete(key) {
+    this._inflight.delete(key);
+    const existed = this._map.delete(key);
+    if (existed) this._save();
+    return existed;
+  }
+
   async getOrLoad(key, ttlMs, loader) {
     const cached = this.get(key);
     if (cached !== null) return cached;

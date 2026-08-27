@@ -1,31 +1,25 @@
 (function () {
   "use strict";
 
-  var GROUPS = [
-    {
-      key: "market-data",
-      label: "Market Data",
-      accounts: ["Barchart"],
-    },
-    {
-      key: "crypto-traders",
-      label: "Crypto Traders",
-      accounts: [
-        "jasonpizzino", "TechDev_52", "TraderAlejito", "trader1sz",
-        "RoccobullboTTom", "CryptoFaibik", "doerXBT", "joker_szn",
-        "52kskew", "LH_btc", "hupzy_agent",
-      ],
-    },
-    {
-      key: "ta-signals",
-      label: "TA & Signals",
-      accounts: [
-        "Luckshuryy", "wacy_time1", "CoinSignals_", "leviathancrypto",
-        "StockmoneyL", "clifton_ideas", "TATrader_Alan", "CryptoCaesarTA",
-        "cryptic_heych", "CharTTrapperZ",
-      ],
-    },
-  ];
+  /* The tracked accounts are no longer hard-coded here. They come from
+     /api/x/accounts, which reads the persistent registry, so adding or
+     deleting one takes effect without a redeploy. Sections are derived from
+     the categories the API returns, in the order it returns them. */
+  function groupAccounts(accounts) {
+    var order = [];
+    var byCategory = {};
+    (accounts || []).forEach(function (account) {
+      var category = account.category || "Other";
+      if (!byCategory[category]) {
+        byCategory[category] = [];
+        order.push(category);
+      }
+      byCategory[category].push(account);
+    });
+    return order.map(function (category) {
+      return { label: category, accounts: byCategory[category] };
+    });
+  }
 
   // Bumped to :v2 to drop selections saved under the old default, where an
   // unset mode meant "first account" — devices that had never explicitly
@@ -84,17 +78,10 @@
     } catch (err) {}
   }
 
-  function allAccounts() {
-    var seen = {};
-    var out = [];
-    GROUPS.forEach(function (group) {
-      group.accounts.forEach(function (handle) {
-        if (seen[handle]) return;
-        seen[handle] = true;
-        out.push({ handle: handle, group: group.key });
-      });
+  function accountsOf(feedData) {
+    return ((feedData && feedData.accounts) || []).map(function (account) {
+      return { handle: account.handle, label: account.label, category: account.category };
     });
-    return out;
   }
 
   function readLastHandle() {
@@ -113,23 +100,40 @@
     try { localStorage.setItem(localModeKey, mode); } catch (err) {}
   }
 
-  function renderList(root, activeMode, activeHandle, onSelectAll, onSelect) {
+  function renderList(root, groups, activeMode, activeHandle, handlers) {
     root.innerHTML = "";
+
+    var manage = document.createElement("button");
+    manage.type = "button";
+    manage.className = "x-account-manage";
+    manage.id = "xManageAccounts";
+    manage.textContent = "\u2699 Manage Accounts";
+    manage.addEventListener("click", handlers.onManage);
+    root.appendChild(manage);
 
     var allCard = document.createElement("button");
     allCard.type = "button";
     allCard.className = "x-account-card x-account-card--all" + (activeMode === ALL_MODE ? " active" : "");
     allCard.innerHTML = '<span class="x-account-handle">&#127760; All Accounts</span>';
-    allCard.addEventListener("click", onSelectAll);
+    allCard.addEventListener("click", handlers.onSelectAll);
     root.appendChild(allCard);
 
-    GROUPS.forEach(function (group) {
+    if (!groups.length) {
+      var empty = document.createElement("div");
+      empty.className = "x-account-group-title";
+      empty.textContent = "Loading accounts\u2026";
+      root.appendChild(empty);
+      return;
+    }
+
+    groups.forEach(function (group) {
       var heading = document.createElement("div");
       heading.className = "x-account-group-title";
       heading.textContent = group.label;
       root.appendChild(heading);
 
-      group.accounts.forEach(function (handle) {
+      group.accounts.forEach(function (account) {
+        var handle = account.handle;
         var card = document.createElement("button");
         card.type = "button";
         card.className = "x-account-card" + (activeMode !== ALL_MODE && handle === activeHandle ? " active" : "");
@@ -138,7 +142,7 @@
           '<a class="x-account-open" href="https://x.com/' + handle + '" target="_blank" rel="noopener">Open &#8599;</a>';
         card.addEventListener("click", function (e) {
           if (e.target && e.target.classList.contains("x-account-open")) return;
-          onSelect(handle);
+          handlers.onSelect(handle);
         });
         root.appendChild(card);
       });
@@ -214,16 +218,18 @@
       });
     }
 
-    var accounts = allAccounts();
-    var lastHandle = readLastHandle();
-    var validLast = accounts.some(function (a) { return a.handle === lastHandle; });
+    var liveRoot = document.getElementById("xLiveReference");
     var lastMode = readLastMode();
     dropLegacyCaches();
     var cached = readCachedFeed();
+    var seedAccounts = accountsOf(cached ? cached.payload : null);
+    var lastHandle = readLastHandle();
+    var validLast = seedAccounts.some(function (a) { return a.handle === lastHandle; });
     var state = {
       // Default to the full feed; a single account only shows its own posts.
       mode: lastMode === "account" ? "account" : ALL_MODE,
-      handle: validLast ? lastHandle : accounts[0].handle,
+      // May be "" until the first payload names the tracked accounts.
+      handle: validLast ? lastHandle : (seedAccounts[0] ? seedAccounts[0].handle : ""),
       feedData: cached ? cached.payload : { posts: [], accounts: [], failedFeeds: [] },
       // Set while what is on screen came out of the browser cache rather than
       // this page load's fetch; cleared as soon as the server answers.
@@ -264,7 +270,43 @@
     }
 
     function refreshList() {
-      renderList(listRoot, state.mode, state.handle, selectAll, selectHandle);
+      renderList(listRoot, groupAccounts(accountsOf(state.feedData)), state.mode, state.handle, {
+        onSelectAll: selectAll,
+        onSelect: selectHandle,
+        onManage: openManager,
+      });
+    }
+
+    /* The Live X Reference is what X itself currently shows, next to what our
+       ingestion captured. Rendered only in single-account mode, and pointed at
+       the newly selected handle on every switch rather than re-injecting the
+       widget script. */
+    function renderLiveReference() {
+      if (!liveRoot) return;
+      if (state.mode === ALL_MODE || !state.handle) {
+        liveRoot.hidden = true;
+        liveRoot.innerHTML = "";
+        liveRoot.removeAttribute("data-handle");
+        return;
+      }
+      liveRoot.hidden = false;
+      var meta = window.XFreshness.accountMeta(state.feedData, state.handle) || {};
+      window.XLiveReference.render(liveRoot, state.handle, meta);
+    }
+
+    function openManager() {
+      window.XAccountsAdmin.open({
+        onChange: function (accounts, change) {
+          // The selected account may have just been deleted; fall back to the
+          // full feed rather than leaving a selection nothing can fill.
+          var stillTracked = (accounts || []).some(function (a) { return a.handle === state.handle; });
+          if (!stillTracked) {
+            state.handle = accounts && accounts[0] ? accounts[0].handle : "";
+            if (state.mode !== ALL_MODE) selectAll();
+          }
+          if (change) refresh();
+        },
+      });
     }
 
     function selectAll() {
@@ -275,6 +317,7 @@
       setPanelOpen(false);
       renderPane();
       refreshList();
+      renderLiveReference();
     }
 
     function selectHandle(handle) {
@@ -287,12 +330,26 @@
       setPanelOpen(false);
       renderPane();
       refreshList();
+      renderLiveReference();
     }
 
     refreshList();
-    if (state.mode === ALL_MODE) selectAll(); else selectHandle(state.handle);
+    if (state.mode === ALL_MODE || !state.handle) selectAll(); else selectHandle(state.handle);
 
-    loadAccountsFeed().then(function (result) {
+    /* Re-reads the selection against the accounts the server just reported.
+       An account deleted from another device disappears here too, rather than
+       leaving a selected handle the feed can never fill. */
+    function reconcileSelection() {
+      var accounts = accountsOf(state.feedData);
+      if (!accounts.length) return;
+      var stillTracked = accounts.some(function (a) { return a.handle === state.handle; });
+      if (stillTracked) return;
+      state.handle = accounts[0].handle;
+      if (state.mode !== ALL_MODE) selectAll();
+    }
+
+    function refresh() {
+      return loadAccountsFeed().then(function (result) {
       state.loaded = true;
 
       if (result.ok) {
@@ -330,7 +387,10 @@
         state.serverOutage = null;
         state.cache = null;
         writeCachedFeed(payload);
+        reconcileSelection();
         renderPane();
+        refreshList();
+        renderLiveReference();
         return;
       }
 
@@ -338,7 +398,10 @@
       // out of the browser cache and gets labelled as such, with its age.
       state.transport = { ok: false, reason: result.reason };
       renderPane();
-    });
+      });
+    }
+
+    refresh();
   }
 
   if (document.readyState === "loading") {
