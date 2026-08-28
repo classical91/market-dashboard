@@ -128,8 +128,17 @@ function makeElement(doc, tag) {
     click() {
       return Promise.all((el.handlers.click || []).map((fn) => fn()));
     },
-    focus() {
-      if (doc) doc.activeElement = el;
+    focus(options) {
+      el.focusOptions = options;
+      if (doc) {
+        doc.activeElement = el;
+        // What a browser does with a focused element, and the whole reason
+        // the scroll offset has to be put back: it brings it into view. iOS
+        // does it to a focused form control whatever preventScroll says,
+        // which `ignoresPreventScroll` models.
+        const honoured = options && options.preventScroll && !doc.ignoresPreventScroll;
+        if (!honoured) doc.defaultView.scrollTo(0, 0);
+      }
     },
     select() {
       el.selected = true;
@@ -160,14 +169,32 @@ function makeSelection() {
   return selection;
 }
 
+// A window that remembers where the page is scrolled to, and records every
+// move — a copy must leave the reader exactly where they were.
+function makeWindow() {
+  const win = {
+    pageXOffset: 0,
+    pageYOffset: 0,
+    scrolls: [],
+    scrollTo(x, y) {
+      win.pageXOffset = x;
+      win.pageYOffset = y;
+      win.scrolls.push([x, y]);
+    },
+  };
+  return win;
+}
+
 // `execCommand` is the fallback's verdict: true, false, or a thrown error.
-function makeDocument(execCommand) {
+function makeDocument(execCommand, { ignoresPreventScroll = false } = {}) {
   const selection = makeSelection();
   const doc = {
     appended: [],
     removed: [],
     copiedValues: [],
     activeElement: null,
+    defaultView: makeWindow(),
+    ignoresPreventScroll,
     selection,
     createElement: (tag) => makeElement(doc, tag),
     createRange: () => ({
@@ -195,10 +222,17 @@ function makeButton(label, doc = null) {
 }
 
 // One place to assemble the environment a bound button runs in.
-function harness({ writeText, execCommand = false, label = "Copy link", url = URL, overrides = {} } = {}) {
+function harness({
+  writeText,
+  execCommand = false,
+  label = "Copy link",
+  url = URL,
+  overrides = {},
+  ignoresPreventScroll = false,
+} = {}) {
   const clock = makeClock();
   const clipboard = writeText ? makeClipboard(writeText) : { calls: [], navigator: {} };
-  const doc = makeDocument(execCommand);
+  const doc = makeDocument(execCommand, { ignoresPreventScroll });
   const button = makeButton(label, doc);
 
   const attempt = XPosts.bindCopyLinkButton(button, url, label, {
@@ -382,6 +416,53 @@ test("the temporary field holds the exact URL, readonly and out of sight", async
   assert.equal(field.style.fontSize, "16px");
   assert.deepEqual(field.selectionRange, [0, URL.length], "the whole URL must be selected");
   assert.equal(field.selected, true, "select() is what non-WebKit browsers act on");
+});
+
+test("copying leaves the page where the reader was scrolled to", async () => {
+  // Focusing an element scrolls it into view, and this path focuses twice:
+  // onto the temporary field, then back onto the button. That was jumping the
+  // reader up the feed on every copy. It must hold whether or not the browser
+  // honours preventScroll — iOS does not.
+  for (const ignoresPreventScroll of [false, true]) {
+    const { doc, button } = harness({
+      writeText: () => Promise.reject(new Error("denied")),
+      execCommand: true,
+      ignoresPreventScroll,
+    });
+
+    doc.defaultView.pageYOffset = 2400;
+    doc.activeElement = button;
+
+    await button.click();
+    await flush();
+
+    assert.equal(
+      doc.defaultView.pageYOffset,
+      2400,
+      `the copy scrolled the page away from the reader (ignoresPreventScroll: ${ignoresPreventScroll})`,
+    );
+    assert.equal(doc.defaultView.pageXOffset, 0);
+    assert.deepEqual(doc.copiedValues, [URL], "and it still copied");
+  }
+});
+
+test("neither focus call asks the browser to scroll", async () => {
+  const { doc, button } = harness({
+    writeText: () => Promise.reject(new Error("denied")),
+    execCommand: true,
+  });
+
+  doc.activeElement = button;
+  await button.click();
+  await flush();
+
+  // The scroll restore is the safety net for iOS, which moves the page to
+  // reveal a focused form control whatever it is asked. Not asking in the
+  // first place is what keeps the restore a no-op everywhere else.
+  const field = doc.copiedFields[0];
+  assert.deepEqual(field.focusOptions, { preventScroll: true }, "the temporary field asked for a scroll");
+  assert.deepEqual(button.focusOptions, { preventScroll: true }, "the refocused button asked for a scroll");
+  assert.deepEqual(doc.defaultView.scrolls, [], "nothing should have scrolled at all");
 });
 
 test("copying gives the page its selection and focus back", async () => {
