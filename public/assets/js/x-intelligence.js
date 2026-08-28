@@ -113,16 +113,11 @@
     try { localStorage.setItem(localModeKey, mode); } catch (err) {}
   }
 
+  /* Manage Accounts is not rendered here: it lives in the panel, outside this
+     list, because the list collapses on mobile and add/remove has to stay
+     reachable while it is folded away. */
   function renderList(root, groups, activeMode, activeHandle, handlers) {
     root.innerHTML = "";
-
-    var manage = document.createElement("button");
-    manage.type = "button";
-    manage.className = "x-account-manage";
-    manage.id = "xManageAccounts";
-    manage.textContent = "\u2699 Manage Accounts";
-    manage.addEventListener("click", handlers.onManage);
-    root.appendChild(manage);
 
     var allCard = document.createElement("button");
     allCard.type = "button";
@@ -241,6 +236,11 @@
         setPanelOpen(panel.classList.contains("is-collapsed"));
       });
     }
+
+    // Static markup rather than part of the list render: the list is hidden
+    // whenever the panel is collapsed, which on mobile is its default state.
+    var manageButton = document.getElementById("xManageAccounts");
+    if (manageButton) manageButton.addEventListener("click", openManager);
 
     var liveRoot = document.getElementById("xLiveReference");
     var templates = (templatePayload && templatePayload.templates) || [];
@@ -402,7 +402,6 @@
         loaded: state.loaded,
         onSelectAll: selectAll,
         onSelect: selectHandle,
-        onManage: openManager,
       });
     }
 

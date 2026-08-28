@@ -55,6 +55,10 @@
           <span class="x-account-toggle-label" id="xAccountToggleLabel">Accounts</span>
           <span class="x-account-toggle-chevron" aria-hidden="true">&#9662;</span>
         </button>
+        <!-- Outside the list on purpose: the list collapses on mobile, and
+             adding or removing accounts has to stay reachable when it is
+             folded away. -->
+        <button type="button" class="x-account-manage" id="xManageAccounts">&#9881; Manage Accounts</button>
         <div class="x-account-list" id="xAccountList"></div>
       </div>
     </div>

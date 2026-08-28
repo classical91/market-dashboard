@@ -481,6 +481,17 @@ body[data-x-accent] .x-account-card--all.active { border-color: var(--x-accent);
 
   .x-account-panel.is-collapsed .x-account-list { display: none; }
 
+  /* Stays put when the list folds away — adding or removing an account must
+     not require finding and opening the account picker first. Sized like the
+     toggle above it so both are comfortable tap targets. */
+  .x-account-manage {
+    margin-bottom: 0;
+    padding: 11px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    -webkit-tap-highlight-color: transparent;
+  }
+
   .x-account-list {
     max-height: 260px;
     overflow-y: auto;
