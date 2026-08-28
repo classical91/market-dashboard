@@ -36,11 +36,28 @@
     return { ok: true, handle: handle };
   }
 
-  function isDuplicate(accounts, handle) {
+  /* Returns the tracked account that already holds this handle, or null.
+     Case-insensitive, because X handles are: @Barchart and @barchart are one
+     account. The server enforces the same rule — this is the fast, friendly
+     half, and it names the existing entry so the reason is obvious. */
+  function findDuplicate(accounts, handle) {
     var wanted = normalizeHandle(handle).toLowerCase();
-    return (accounts || []).some(function (account) {
-      return String(account.handle).toLowerCase() === wanted;
+    if (!wanted) return null;
+    var match = (accounts || []).filter(function (account) {
+      return normalizeHandle(account && account.handle).toLowerCase() === wanted;
     });
+    return match.length ? match[0] : null;
+  }
+
+  function isDuplicate(accounts, handle) {
+    return Boolean(findDuplicate(accounts, handle));
+  }
+
+  function duplicateMessage(account) {
+    return (
+      "@" + account.handle + " is already tracked" +
+      (account.category ? " under " + account.category : "") + "."
+    );
   }
 
   function confirmationMessage(handle) {
@@ -102,10 +119,17 @@
     var categoryList = el(doc, "datalist");
     categoryList.id = "xManageCategories";
 
+    // Says "already tracked" while the handle is still being typed, so a
+    // duplicate is refused before anyone clicks Add rather than after.
+    var dupHint = el(doc, "div", "x-manage-hint");
+    dupHint.setAttribute("role", "status");
+    dupHint.hidden = true;
+
     var submit = el(doc, "button", "x-manage-add", "Add Account");
     submit.type = "submit";
 
     form.appendChild(handleInput);
+    form.appendChild(dupHint);
     form.appendChild(labelInput);
     form.appendChild(categoryInput);
     form.appendChild(categoryList);
@@ -137,8 +161,19 @@
       if (e.key === "Escape") cleanup();
     }
 
+    /* Keeps the duplicate warning and the Add button in step with what is
+       typed and with the list the server last confirmed. */
+    function refreshDuplicateHint() {
+      var existing = findDuplicate(accounts, handleInput.value);
+      dupHint.textContent = existing ? duplicateMessage(existing) : "";
+      dupHint.hidden = !existing;
+      handleInput.setAttribute("aria-invalid", existing ? "true" : "false");
+      submit.disabled = Boolean(existing);
+    }
+
     function renderList() {
       listRoot.innerHTML = "";
+      refreshDuplicateHint();
       if (!accounts.length) {
         listRoot.appendChild(el(doc, "div", "x-manage-empty", "No accounts are tracked yet."));
         return;
@@ -197,8 +232,9 @@
         say(check.reason, "error");
         return;
       }
-      if (isDuplicate(accounts, check.handle)) {
-        say("@" + check.handle + " is already tracked.", "error");
+      var existing = findDuplicate(accounts, check.handle);
+      if (existing) {
+        say(duplicateMessage(existing), "error");
         return;
       }
       var category = categoryInput.value.trim();
@@ -232,9 +268,14 @@
           say(err.message || "Could not add the account.", "error");
         })
         .then(function () {
-          submit.disabled = false;
+          // Re-enables through the duplicate check rather than unconditionally:
+          // a rejected add leaves the handle in the box, and it is still a
+          // duplicate.
+          refreshDuplicateHint();
         });
     });
+
+    handleInput.addEventListener("input", refreshDuplicateHint);
 
     close.addEventListener("click", cleanup);
     overlay.addEventListener("click", function (e) {
@@ -278,6 +319,8 @@
     normalizeHandle: normalizeHandle,
     validateHandle: validateHandle,
     isDuplicate: isDuplicate,
+    findDuplicate: findDuplicate,
+    duplicateMessage: duplicateMessage,
     confirmationMessage: confirmationMessage,
   };
 });

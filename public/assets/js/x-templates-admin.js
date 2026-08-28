@@ -16,6 +16,21 @@
     return JSON.parse(JSON.stringify(value));
   }
 
+  /* One handle, one membership — X handles are case-insensitive, and a
+     template holding an account twice would list it twice in the sidebar and
+     double every one of its posts in the feed. Mirrors the server rule in
+     src/services/x-template-registry.js. */
+  function sameHandle(a, b) {
+    return String(a == null ? "" : a).trim().replace(/^@+/, "").toLowerCase()
+      === String(b == null ? "" : b).trim().replace(/^@+/, "").toLowerCase();
+  }
+
+  function isMember(draft, handle) {
+    return ((draft && draft.memberships) || []).some(function (member) {
+      return sameHandle(member.handle, handle);
+    });
+  }
+
   function el(doc, tag, className, text) {
     var node = doc.createElement(tag);
     if (className) node.className = className;
@@ -48,7 +63,7 @@
     (draft.memberships || []).forEach(function (entry) {
       var canonicalSection = sections.find(function (name) { return name.toLowerCase() === String(entry.section).toLowerCase(); });
       if (!entry.handle || !canonicalSection) return;
-      if (!memberships.some(function (item) { return item.handle.toLowerCase() === entry.handle.toLowerCase(); })) {
+      if (!memberships.some(function (item) { return sameHandle(item.handle, entry.handle); })) {
         memberships.push({ handle: entry.handle, section: canonicalSection });
       }
     });
@@ -301,7 +316,7 @@
         });
 
         var available = state.accounts.filter(function (account) {
-          return !draft.memberships.some(function (member) { return member.handle.toLowerCase() === account.handle.toLowerCase(); });
+          return !isMember(draft, account.handle);
         });
         if (available.length) {
           var addRow = el(doc, "div", "x-template-add-account");
@@ -316,6 +331,14 @@
           });
           accountSelect.addEventListener("change", function () {
             if (!accountSelect.value) return;
+            // The picker already hides accounts this template holds; this
+            // guards the case where the draft moved on since it was rendered,
+            // so one account can never land in two sections.
+            if (isMember(draft, accountSelect.value)) {
+              say("@" + accountSelect.value + " is already in this template.", "error");
+              accountSelect.value = "";
+              return;
+            }
             draft.memberships.push({ handle: accountSelect.value, section: section });
             renderEditor();
           });
@@ -409,5 +432,11 @@
     load();
   }
 
-  return { open: open, slugify: slugify, normalizeDraft: normalizeDraft };
+  return {
+    open: open,
+    slugify: slugify,
+    normalizeDraft: normalizeDraft,
+    sameHandle: sameHandle,
+    isMember: isMember,
+  };
 });
