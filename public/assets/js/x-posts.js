@@ -122,9 +122,17 @@
      way back short of a reload.
 
      So no path here waits on the clipboard indefinitely: the API call races a
-     timeout, a timed-out or failed call falls through to the execCommand
-     path, and the button's own watchdog restores it even if the helper itself
-     misbehaves. */
+     timeout, and the button's own watchdog restores it even if the helper
+     itself misbehaves.
+
+     The second failure, the one that still showed "Copy failed" on an iPhone
+     after the button stopped sticking: WebKit only honours
+     document.execCommand("copy") while it is still processing the user
+     gesture that led to the call. A Clipboard API rejection arrives in a
+     later task, by which time that gesture is gone — so falling back *after*
+     the rejection meant falling back into a browser that had already stopped
+     listening. The fallback therefore runs in the click's own synchronous
+     turn; see copyPostLinkToClipboard. */
 
   var CLIPBOARD_TIMEOUT_MS = 2500;
   var COPY_RESET_MS = 1800;
@@ -168,6 +176,8 @@
     };
   }
 
+  function noop() {}
+
   function later(env, ms, fn) {
     if (typeof env.setTimeout !== "function") return null;
     return env.setTimeout(fn, ms);
@@ -179,51 +189,67 @@
     }
   }
 
-  /* Resolves true/false rather than rejecting: "the Clipboard API did not do
-     it" is not an error here, it is the cue to try the fallback. Resolves
-     false on an unavailable API, a rejection, a synchronous throw, and — the
-     iOS case — on a promise that is still pending when the timeout fires. */
-  function writeViaClipboardApi(text, env) {
+  /* Issues navigator.clipboard.writeText and reports what is already known by
+     the time it returns, which is what decides whether the fallback still has
+     a live user gesture to run under:
+
+       immediate === true   the write already succeeded, synchronously;
+       immediate === false  it already failed — no API, or a synchronous throw;
+       immediate === null   a promise is in flight and nobody knows yet.
+
+     `promise` resolves true/false rather than rejecting: "the Clipboard API
+     did not do it" is not an error here, it is the cue to prefer the
+     fallback's verdict. It never stays pending either — a write still
+     unsettled at clipboardTimeoutMs loses the race, which is the iOS case. */
+  function startClipboardApiWrite(text, env) {
     var nav = env.navigator;
     var clipboard = nav && nav.clipboard;
-    if (!clipboard || typeof clipboard.writeText !== "function") return Promise.resolve(false);
+    var known = function (ok) {
+      return { immediate: ok, promise: Promise.resolve(ok), abandon: noop };
+    };
 
-    return new Promise(function (resolve) {
-      var settled = false;
-      var timer = later(env, env.clipboardTimeoutMs, function () { finish(false); });
+    if (!clipboard || typeof clipboard.writeText !== "function") return known(false);
 
-      function finish(ok) {
+    var pending;
+    try {
+      pending = clipboard.writeText(text);
+    } catch (err) {
+      return known(false);
+    }
+    // A non-thenable return means an implementation that copied synchronously.
+    if (!pending || typeof pending.then !== "function") return known(true);
+
+    var settle;
+    var settled = false;
+    var timer = null;
+    var promise = new Promise(function (resolve) {
+      settle = function (ok) {
         if (settled) return;
         settled = true;
         cancel(env, timer);
         resolve(ok);
-      }
-
-      var pending;
-      try {
-        pending = clipboard.writeText(text);
-      } catch (err) {
-        finish(false);
-        return;
-      }
-      // A non-thenable return means an implementation that copied synchronously.
-      if (!pending || typeof pending.then !== "function") {
-        finish(true);
-        return;
-      }
-      pending.then(function () { finish(true); }, function () { finish(false); });
+      };
     });
+
+    timer = later(env, env.clipboardTimeoutMs, function () { settle(false); });
+    pending.then(function () { settle(true); }, function () { settle(false); });
+
+    // Called once another path has already copied: drops the race timer so a
+    // finished attempt leaves no clock running behind it.
+    return { immediate: null, promise: promise, abandon: function () { settle(false); } };
   }
 
-  /* The compatibility path: a temporary off-screen field plus
-     document.execCommand("copy"). Synchronous, so it cannot hang, and the
-     element is removed on every exit. */
+  /* The compatibility path: a temporary off-screen field holding exactly the
+     URL, plus document.execCommand("copy"). Synchronous, so it cannot hang;
+     the element is removed and the page's own selection and focus are handed
+     back on every exit, including the thrown ones. */
   function writeViaExecCommand(text, env) {
     var doc = env.document;
     if (!doc || !doc.body || typeof doc.createElement !== "function") return false;
     if (typeof doc.execCommand !== "function") return false;
 
     var field = doc.createElement("textarea");
+    var restoreSelection = captureSelection(doc);
     var copied = false;
     try {
       field.value = text;
@@ -240,6 +266,9 @@
         field.style.border = "none";
         field.style.opacity = "0";
         field.style.pointerEvents = "none";
+        // Under 16px iOS zooms the page when a field takes focus, and this one
+        // takes focus on every copy.
+        field.style.fontSize = "16px";
       }
       doc.body.appendChild(field);
       selectAll(field, text, doc);
@@ -250,8 +279,45 @@
       if (field.parentNode && typeof field.parentNode.removeChild === "function") {
         field.parentNode.removeChild(field);
       }
+      restoreSelection();
     }
     return copied;
+  }
+
+  /* The fallback borrows the page's selection and focus for the length of one
+     execCommand. This gives them back, so copying a link never swallows the
+     reader's own selection and never drops keyboard focus off the button that
+     was just activated. */
+  function captureSelection(doc) {
+    var active = doc.activeElement || null;
+    var selection = null;
+    var ranges = [];
+    try {
+      selection = typeof doc.getSelection === "function" ? doc.getSelection() : null;
+      if (selection && selection.rangeCount) {
+        for (var i = 0; i < selection.rangeCount; i += 1) ranges.push(selection.getRangeAt(i));
+      }
+    } catch (err) {
+      selection = null;
+    }
+
+    return function () {
+      try {
+        if (selection && typeof selection.removeAllRanges === "function") {
+          selection.removeAllRanges();
+          for (var i = 0; i < ranges.length; i += 1) {
+            if (typeof selection.addRange === "function") selection.addRange(ranges[i]);
+          }
+        }
+      } catch (err) {
+        /* A selection that can no longer be restored is not worth failing over. */
+      }
+      try {
+        if (active && typeof active.focus === "function") active.focus();
+      } catch (err) {
+        /* Nor is an element that has since left the page. */
+      }
+    };
   }
 
   // iOS Safari ignores select() on a readonly field; a Range over its
@@ -275,16 +341,36 @@
     }
   }
 
-  /* Copies exactly the URL it is given. Resolves with which path succeeded,
-     rejects only when both did. Never stays pending. */
+  /* Copies exactly the URL it is given — never the post text, never an image,
+     never anything else off the card. Resolves with the path that copied,
+     rejects only when neither did, and never stays pending.
+
+     The Clipboard API is asked first. What is deliberate, and what the iPhone
+     bug turned on, is that the fallback does not wait for that answer: it runs
+     here, still inside the synchronous turn of the click, because WebKit only
+     honours execCommand("copy") while the user gesture is being processed. A
+     Clipboard API rejection lands a task later, with the gesture already
+     spent, so a fallback deferred until then can only fail. Both paths write
+     the identical URL, so trying the second before the first has reported back
+     costs a discarded write at worst — and it is skipped entirely when the API
+     has already said, synchronously, that it copied. */
   function copyPostLinkToClipboard(url, options) {
     var env = resolveEnv(options);
     var text = url === null || url === undefined ? "" : String(url);
     if (!text) return Promise.reject(new Error("No link to copy"));
 
-    return writeViaClipboardApi(text, env).then(function (ok) {
+    var api = startClipboardApiWrite(text, env);
+    if (api.immediate === true) return Promise.resolve("clipboard");
+
+    if (writeViaExecCommand(text, env)) {
+      api.abandon();
+      return Promise.resolve("fallback");
+    }
+
+    // The fallback declined, or this document cannot host it. The Clipboard
+    // API is the only one left that can still report success.
+    return api.promise.then(function (ok) {
       if (ok) return "clipboard";
-      if (writeViaExecCommand(text, env)) return "fallback";
       throw new Error("Copy failed");
     });
   }
@@ -301,6 +387,11 @@
   function bindCopyLinkButton(button, url, restingLabel, options) {
     var label = restingLabel === null || restingLabel === undefined ? button.textContent : restingLabel;
     var running = false;
+
+    // The button's own label is the whole status readout, so a screen reader
+    // has to be told the label changed; without this the copy silently
+    // succeeds or silently fails for anyone not watching the pixels.
+    if (typeof button.setAttribute === "function") button.setAttribute("aria-live", "polite");
 
     function attempt() {
       var env = resolveEnv(options);

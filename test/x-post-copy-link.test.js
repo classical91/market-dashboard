@@ -12,6 +12,12 @@
  * comes back — after success, after rejection, after an absent Clipboard API,
  * after the fallback fails, and above all after a promise that never settles.
  *
+ * The same iPhone then found the sequel: the button no longer stuck, it just
+ * said "Copy failed" instead. The fallback was being run after the Clipboard
+ * API's rejection, a task too late for WebKit to still count it as part of the
+ * user's gesture. Hence the second property here — that the fallback has
+ * already run by the time the click handler returns.
+ *
  * The browser is faked rather than emulated: a controllable clock, a
  * scriptable clipboard, and a document just real enough for the execCommand
  * fallback and for renderPostCards. That keeps the never-settles case
@@ -122,23 +128,58 @@ function makeElement(doc, tag) {
     click() {
       return Promise.all((el.handlers.click || []).map((fn) => fn()));
     },
-    focus() {},
-    select() {},
-    setSelectionRange() {},
+    focus() {
+      if (doc) doc.activeElement = el;
+    },
+    select() {
+      el.selected = true;
+    },
+    setSelectionRange(start, end) {
+      el.selectionRange = [start, end];
+    },
   };
   return el;
 }
 
+// Enough of a Selection to tell whether the page's own selection survived a
+// copy: what was there before must be what is there after.
+function makeSelection() {
+  const selection = {
+    ranges: [],
+    get rangeCount() {
+      return selection.ranges.length;
+    },
+    getRangeAt: (index) => selection.ranges[index],
+    removeAllRanges() {
+      selection.ranges = [];
+    },
+    addRange(range) {
+      selection.ranges.push(range);
+    },
+  };
+  return selection;
+}
+
 // `execCommand` is the fallback's verdict: true, false, or a thrown error.
 function makeDocument(execCommand) {
+  const selection = makeSelection();
   const doc = {
     appended: [],
     removed: [],
     copiedValues: [],
+    activeElement: null,
+    selection,
     createElement: (tag) => makeElement(doc, tag),
+    createRange: () => ({
+      selectNodeContents(node) {
+        this.node = node;
+      },
+    }),
+    getSelection: () => selection,
     execCommand(command) {
       const field = doc.body.children[doc.body.children.length - 1];
       doc.copiedValues.push(field ? field.value : null);
+      doc.copiedFields = (doc.copiedFields || []).concat(field ? [field] : []);
       if (typeof execCommand === "function") return execCommand(command);
       return execCommand;
     },
@@ -147,8 +188,8 @@ function makeDocument(execCommand) {
   return doc;
 }
 
-function makeButton(label) {
-  const button = makeElement(null, "button");
+function makeButton(label, doc = null) {
+  const button = makeElement(doc, "button");
   button.textContent = label;
   return button;
 }
@@ -158,7 +199,7 @@ function harness({ writeText, execCommand = false, label = "Copy link", url = UR
   const clock = makeClock();
   const clipboard = writeText ? makeClipboard(writeText) : { calls: [], navigator: {} };
   const doc = makeDocument(execCommand);
-  const button = makeButton(label);
+  const button = makeButton(label, doc);
 
   const attempt = XPosts.bindCopyLinkButton(button, url, label, {
     navigator: clipboard.navigator,
@@ -283,6 +324,93 @@ test("the temporary field is removed from the document on every path", async () 
   }
 });
 
+/* ── The bug: the fallback must still be under the user's gesture ──────── */
+
+test("the fallback runs in the click's own synchronous turn", async () => {
+  // The reason iPhones still saw "Copy failed" after the button stopped
+  // sticking. WebKit only honours execCommand("copy") while it is processing
+  // the gesture that led to it; a Clipboard API rejection arrives a task
+  // later, by which point the gesture is spent and the fallback can only
+  // fail. So the fallback has to have run before the click handler returns —
+  // not after any await, any flush, or any timer.
+  const { doc, button } = harness({
+    writeText: () => Promise.reject(new Error("NotAllowedError")),
+    execCommand: true,
+  });
+
+  button.click();
+
+  assert.deepEqual(
+    doc.copiedValues,
+    [URL],
+    "the fallback did not run while the user gesture was still live",
+  );
+});
+
+test("the fallback is skipped when the Clipboard API copies synchronously", async () => {
+  // A non-thenable return means the implementation already copied. Nothing is
+  // gained by writing the same URL a second time.
+  const { clock, doc, button } = harness({ writeText: () => undefined });
+
+  await button.click();
+  await flush();
+
+  assert.deepEqual(doc.copiedValues, [], "the fallback ran even though the API had already copied");
+  assert.deepEqual(doc.appended, [], "no temporary field should have been created at all");
+  assert.equal(button.textContent, "Link copied");
+  clock.advance(1800);
+  assertResting(button, "Copy link");
+});
+
+test("the temporary field holds the exact URL, readonly and out of sight", async () => {
+  const { doc, button } = harness({
+    writeText: () => Promise.reject(new Error("denied")),
+    execCommand: true,
+  });
+
+  await button.click();
+  await flush();
+
+  const field = doc.copiedFields[0];
+  assert.equal(field.tagName, "textarea");
+  assert.equal(field.value, URL, "the field must carry the permalink and nothing else");
+  assert.equal(field.attributes.readonly, "", "the field must be readonly");
+  assert.equal(field.style.position, "fixed");
+  assert.equal(field.style.opacity, "0");
+  assert.equal(field.style.pointerEvents, "none");
+  // Under 16px iOS zooms the page the moment the field takes focus.
+  assert.equal(field.style.fontSize, "16px");
+  assert.deepEqual(field.selectionRange, [0, URL.length], "the whole URL must be selected");
+  assert.equal(field.selected, true, "select() is what non-WebKit browsers act on");
+});
+
+test("copying gives the page its selection and focus back", async () => {
+  const { doc, button } = harness({
+    writeText: () => Promise.reject(new Error("denied")),
+    execCommand: true,
+  });
+
+  // What the reader had before they tapped: some text selected elsewhere on
+  // the page, and keyboard focus on the copy button itself.
+  const readersRange = { id: "the reader's own selection" };
+  doc.selection.addRange(readersRange);
+  doc.activeElement = button;
+
+  await button.click();
+  await flush();
+
+  assert.deepEqual(
+    doc.selection.ranges,
+    [readersRange],
+    "the fallback swallowed the reader's selection",
+  );
+  assert.equal(
+    doc.activeElement,
+    button,
+    "keyboard focus was left on the discarded field instead of the button",
+  );
+});
+
 /* ── The bug: a promise that never settles ─────────────────────────────── */
 
 test("a clipboard promise that never settles does not strand the button", async () => {
@@ -310,7 +438,7 @@ test("a clipboard promise that never settles does not strand the button", async 
   assertResting(button, "Copy link");
 });
 
-test("a never-settling clipboard promise still copies when the fallback can", async () => {
+test("a never-settling clipboard promise still copies when the fallback can, without waiting for it", async () => {
   const { clock, doc, button } = harness({
     writeText: () => new Promise(() => {}),
     execCommand: true,
@@ -318,13 +446,16 @@ test("a never-settling clipboard promise still copies when the fallback can", as
 
   button.click();
   await flush();
-  clock.advance(2500);
-  await flush();
 
+  // No clock advance: the fallback already copied, so there is nothing left to
+  // wait for. Sitting on "Copying link..." for the length of the clipboard
+  // race would be a 2.5-second lie about work that is finished.
   assert.deepEqual(doc.copiedValues, [URL]);
   assert.equal(button.textContent, "Link copied");
+
   clock.advance(1800);
   assertResting(button, "Copy link");
+  assert.equal(clock.pending, 0, "the abandoned clipboard race left a timer running");
 });
 
 test("the button's watchdog restores it even if the copy helper itself never settles", async () => {
@@ -548,6 +679,24 @@ test("the page's own setTimeout is called the way WebKit demands", async () => {
 
     clock.advance(1800);
     assertResting(copyButton, "Copy link");
+  });
+});
+
+test("both copy controls announce their state to a screen reader", async () => {
+  const doc = makeDocument(true);
+  const clock = makeClock();
+
+  await withFakeBrowser(doc, {}, clock, () => {
+    const root = makeElement(doc, "div");
+    XPosts.renderPostCards(root, [{ id: "1", handle: "alpha", text: "hi", url: URL }]);
+
+    // The label is the entire status readout, so it has to be a live region —
+    // otherwise "Link copied" and "Copy failed" are both silence.
+    for (const className of ["x-post-link", "x-post-copy"]) {
+      const control = findByClass(root, className)[0];
+      assert.equal(control.attributes["aria-live"], "polite", `${className} is not announced`);
+      assert.equal(control.tagName, "button", `${className} must stay keyboard-operable`);
+    }
   });
 });
 
