@@ -236,6 +236,44 @@ test("an absent Clipboard API goes straight to the fallback", async () => {
   assertResting(button, "Copy link");
 });
 
+test("iPhone runs the fallback during the tap before trying the asynchronous Clipboard API", async () => {
+  const order = [];
+  const h = harness({
+    writeText: () => {
+      order.push("clipboard");
+      return Promise.resolve();
+    },
+    execCommand: () => {
+      order.push("fallback");
+      return true;
+    },
+  });
+  h.clipboard.navigator.userAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_6 like Mac OS X) AppleWebKit/605.1.15";
+
+  const pending = h.button.click();
+  assert.deepEqual(order, ["fallback"], "fallback must execute synchronously inside the tap");
+  assert.equal(h.button.attributes["aria-busy"], "true");
+  assert.equal(h.button.attributes["aria-live"], "polite");
+  await pending;
+  assert.deepEqual(h.clipboard.calls, [], "a successful iOS fallback must not perform a second copy");
+  assert.equal(h.button.textContent, "Link copied");
+  h.clock.advance(1800);
+  assert.equal(h.button.attributes["aria-busy"], "false");
+  assertResting(h.button, h.label);
+});
+
+test("touch iPad desktop mode also gets the synchronous fallback", async () => {
+  const h = harness({ writeText: () => Promise.reject(new Error("denied")), execCommand: true });
+  h.clipboard.navigator.userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit/605.1.15";
+  h.clipboard.navigator.platform = "MacIntel";
+  h.clipboard.navigator.maxTouchPoints = 5;
+
+  await h.button.click();
+  assert.deepEqual(h.doc.copiedValues, [URL]);
+  assert.deepEqual(h.clipboard.calls, []);
+  assert.equal(h.button.textContent, "Link copied");
+});
+
 /* ── The fallback's own failures ───────────────────────────────────────── */
 
 test("a fallback that reports failure surfaces it, and still restores the button", async () => {

@@ -254,6 +254,18 @@
     return copied;
   }
 
+  // Clipboard writes that fall back after a rejected promise are already too
+  // late on iOS: WebKit requires execCommand to run inside the original tap.
+  // Prefer the synchronous compatibility path on iPhone/iPad (including the
+  // desktop-UA iPad mode), then use the modern API if that path is unavailable.
+  function needsSynchronousFallback(nav) {
+    if (!nav) return false;
+    var ua = String(nav.userAgent || "");
+    var platform = String(nav.platform || "");
+    return /iPad|iPhone|iPod/i.test(ua) ||
+      (platform === "MacIntel" && Number(nav.maxTouchPoints || 0) > 1);
+  }
+
   // iOS Safari ignores select() on a readonly field; a Range over its
   // contents is what actually takes there, so both are attempted.
   function selectAll(field, text, doc) {
@@ -282,6 +294,16 @@
     var text = url === null || url === undefined ? "" : String(url);
     if (!text) return Promise.reject(new Error("No link to copy"));
 
+    var clipboard = env.navigator && env.navigator.clipboard;
+    var hasClipboardApi = clipboard && typeof clipboard.writeText === "function";
+
+    // Keep this synchronous. Wrapping it in Promise.resolve().then() loses
+    // WebKit's transient user activation and makes execCommand return false.
+    if (!hasClipboardApi || needsSynchronousFallback(env.navigator)) {
+      if (writeViaExecCommand(text, env)) return Promise.resolve("fallback");
+      if (!hasClipboardApi) return Promise.reject(new Error("Copy failed"));
+    }
+
     return writeViaClipboardApi(text, env).then(function (ok) {
       if (ok) return "clipboard";
       if (writeViaExecCommand(text, env)) return "fallback";
@@ -301,6 +323,8 @@
   function bindCopyLinkButton(button, url, restingLabel, options) {
     var label = restingLabel === null || restingLabel === undefined ? button.textContent : restingLabel;
     var running = false;
+    button.setAttribute("aria-live", "polite");
+    button.setAttribute("aria-busy", "false");
 
     function attempt() {
       var env = resolveEnv(options);
@@ -308,6 +332,7 @@
       running = true;
       button.disabled = true;
       button.textContent = COPY_LINK_LABELS.busy;
+      button.setAttribute("aria-busy", "true");
 
       var done = false;
       // The last line of defence: even a helper that never settles cannot
@@ -327,6 +352,7 @@
       function restore() {
         button.textContent = label;
         button.disabled = false;
+        button.setAttribute("aria-busy", "false");
         running = false;
       }
 
