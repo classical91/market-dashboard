@@ -241,15 +241,15 @@
 
   /* The compatibility path: a temporary off-screen field holding exactly the
      URL, plus document.execCommand("copy"). Synchronous, so it cannot hang;
-     the element is removed and the page's own selection and focus are handed
-     back on every exit, including the thrown ones. */
+     the element is removed and the page's own selection, focus and scroll
+     position are handed back on every exit, including the thrown ones. */
   function writeViaExecCommand(text, env) {
     var doc = env.document;
     if (!doc || !doc.body || typeof doc.createElement !== "function") return false;
     if (typeof doc.execCommand !== "function") return false;
 
     var field = doc.createElement("textarea");
-    var restoreSelection = captureSelection(doc);
+    var restorePage = capturePageState(doc);
     var copied = false;
     try {
       field.value = text;
@@ -279,17 +279,26 @@
       if (field.parentNode && typeof field.parentNode.removeChild === "function") {
         field.parentNode.removeChild(field);
       }
-      restoreSelection();
+      restorePage();
     }
     return copied;
   }
 
-  /* The fallback borrows the page's selection and focus for the length of one
-     execCommand. This gives them back, so copying a link never swallows the
-     reader's own selection and never drops keyboard focus off the button that
-     was just activated. */
-  function captureSelection(doc) {
+  /* The fallback borrows three things from the page for the length of one
+     execCommand — the selection, keyboard focus, and the scroll position —
+     and this hands all three back.
+
+     The scroll position is in there because focusing an element scrolls it
+     into view, and this path focuses twice: once onto the temporary field,
+     once back onto the button. preventScroll below asks for neither, but iOS
+     moves the page to reveal a focused form control regardless of what it is
+     asked, which is why copying a link was jumping the reader up the feed.
+     Putting the offset back is the part that actually holds. */
+  function capturePageState(doc) {
     var active = doc.activeElement || null;
+    var win = doc.defaultView || null;
+    var scrollX = win && typeof win.pageXOffset === "number" ? win.pageXOffset : null;
+    var scrollY = win && typeof win.pageYOffset === "number" ? win.pageYOffset : null;
     var selection = null;
     var ranges = [];
     try {
@@ -313,17 +322,35 @@
         /* A selection that can no longer be restored is not worth failing over. */
       }
       try {
-        if (active && typeof active.focus === "function") active.focus();
+        if (active) focusWithoutScrolling(active);
       } catch (err) {
         /* Nor is an element that has since left the page. */
       }
+      // Last, so that it also undoes whatever the refocus above just moved,
+      // and only when something did move: a browser that honoured
+      // preventScroll should not be scrolled to where it already is.
+      try {
+        var moved = win && (win.pageXOffset !== scrollX || win.pageYOffset !== scrollY);
+        if (moved && scrollY !== null && typeof win.scrollTo === "function") {
+          win.scrollTo(scrollX, scrollY);
+        }
+      } catch (err) {
+        /* A page that will not be scrolled is already where it should be. */
+      }
     };
+  }
+
+  // The option is ignored by browsers that predate it rather than throwing,
+  // which is why the scroll offset is restored as well.
+  function focusWithoutScrolling(el) {
+    if (typeof el.focus !== "function") return;
+    el.focus({ preventScroll: true });
   }
 
   // iOS Safari ignores select() on a readonly field; a Range over its
   // contents is what actually takes there, so both are attempted.
   function selectAll(field, text, doc) {
-    if (typeof field.focus === "function") field.focus();
+    focusWithoutScrolling(field);
     if (typeof field.select === "function") field.select();
     try {
       if (typeof doc.createRange === "function" && typeof doc.getSelection === "function") {
