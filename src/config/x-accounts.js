@@ -1,3 +1,23 @@
+const WAR_ACCOUNTS = [
+  { handle: "ReutersWorld", label: "Reuters World", category: "News Agencies" },
+  { handle: "AFP", label: "AFP", category: "News Agencies" },
+  { handle: "GeoConfirmed", label: "GeoConfirmed", category: "Verified OSINT" },
+  { handle: "bellingcat", label: "Bellingcat", category: "Verified OSINT" },
+  { handle: "ACLEDINFO", label: "ACLED", category: "Conflict Data & Maps" },
+  { handle: "Liveuamap", label: "Liveuamap", category: "Conflict Data & Maps" },
+  { handle: "TheStudyofWar", label: "Institute for the Study of War", category: "Defense Analysis" },
+  { handle: "KofmanMichael", label: "Michael Kofman", category: "Defense Analysis" },
+  { handle: "RALee85", label: "Rob Lee", category: "Defense Analysis" },
+  { handle: "RUSI_org", label: "RUSI", category: "Defense Analysis" },
+  { handle: "IISS_org", label: "IISS", category: "Defense Analysis" },
+  { handle: "CSIS", label: "CSIS", category: "Defense Analysis" },
+  { handle: "WarOnTheRocks", label: "War on the Rocks", category: "Defense Analysis" },
+  { handle: "CrisisGroup", label: "International Crisis Group", category: "Defense Analysis" },
+  { handle: "Osinttechnical", label: "OSINTtechnical", category: "Fast / Source Monitoring" },
+  { handle: "sentdefender", label: "OSINTdefender", category: "Fast / Source Monitoring" },
+  { handle: "WarTranslated", label: "WarTranslated", category: "Fast / Source Monitoring" },
+];
+
 const X_ACCOUNTS = [
   { handle: "Barchart", label: "Barchart", category: "Market Data" },
 
@@ -23,6 +43,8 @@ const X_ACCOUNTS = [
   { handle: "CryptoCaesarTA", label: "CryptoCaesarTA", category: "TA & Signals" },
   { handle: "cryptic_heych", label: "cryptic_heych", category: "TA & Signals" },
   { handle: "CharTTrapperZ", label: "CharTTrapperZ", category: "TA & Signals" },
+
+  ...WAR_ACCOUNTS,
 ];
 
-module.exports = { X_ACCOUNTS };
+module.exports = { X_ACCOUNTS, WAR_ACCOUNTS };

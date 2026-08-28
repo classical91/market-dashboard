@@ -52,6 +52,21 @@ test("seeding is idempotent and never overwrites an edited registry", () => {
   );
 });
 
+test("version-one registries gain war accounts without losing entries or duplicating handles by case", () => {
+  const { registry, file } = tempRegistry({ seed: [] });
+  fs.writeFileSync(file, JSON.stringify({ version: 1, accounts: [
+    { handle: "custom", label: "Custom", category: "Local" },
+    { handle: "REUTERSWORLD", label: "Existing Reuters", category: "Local" },
+  ] }));
+
+  assert.equal(registry.ensureSeeded(), true);
+  const accounts = registry.list();
+  assert.ok(accounts.some((entry) => entry.handle === "custom"));
+  assert.equal(accounts.filter((entry) => entry.handle.toLowerCase() === "reutersworld").length, 1);
+  assert.equal(accounts.length, 18);
+  assert.equal(registry.ensureSeeded(), false);
+});
+
 test("an added account persists across a restart", () => {
   const { dataDir, registry } = tempRegistry();
   registry.ensureSeeded();

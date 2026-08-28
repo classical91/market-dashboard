@@ -14,8 +14,9 @@ const path = require("path");
 const { withExclusiveLock, writeJsonAtomic } = require("./json-file-lock");
 const { normalizeHandle } = require("./x-account-registry");
 const { createServiceError } = require("../utils/errors");
+const { WAR_ACCOUNTS } = require("../config/x-accounts");
 
-const REGISTRY_VERSION = 1;
+const REGISTRY_VERSION = 2;
 const DEFAULT_TEMPLATE_ID = "markets";
 const MAX_TEMPLATES = 50;
 const MAX_SECTIONS = 40;
@@ -92,9 +93,11 @@ function normalizeTemplate(input, { requireId = true } = {}) {
 }
 
 function seedMarkets(accounts) {
+  const warHandles = new Set(WAR_ACCOUNTS.map((account) => account.handle.toLowerCase()));
   const sections = [];
   const memberships = [];
   for (const account of accounts || []) {
+    if (warHandles.has(normalizeHandle(account.handle).toLowerCase())) continue;
     const section = clamp(account.category || "Other", MAX_SECTION_LEN) || "Other";
     if (!sections.includes(section)) sections.push(section);
     memberships.push({ handle: normalizeHandle(account.handle), section });
@@ -106,6 +109,27 @@ function seedMarkets(accounts) {
     accent: "market",
     sections,
     memberships,
+  });
+}
+
+function seedWar() {
+  return normalizeTemplate({
+    id: "war",
+    name: "War & Conflict",
+    description: "Conflict intelligence with confirmation, analysis, mapping, and fast source-monitoring layers",
+    accent: "world",
+    sections: ["News Agencies", "Verified OSINT", "Conflict Data & Maps", "Defense Analysis", "Fast / Source Monitoring"],
+    memberships: [
+      ["ReutersWorld", "News Agencies"], ["AFP", "News Agencies"],
+      ["GeoConfirmed", "Verified OSINT"], ["bellingcat", "Verified OSINT"],
+      ["ACLEDINFO", "Conflict Data & Maps"], ["Liveuamap", "Conflict Data & Maps"],
+      ["TheStudyofWar", "Defense Analysis"], ["KofmanMichael", "Defense Analysis"],
+      ["RALee85", "Defense Analysis"], ["RUSI_org", "Defense Analysis"],
+      ["IISS_org", "Defense Analysis"], ["CSIS", "Defense Analysis"],
+      ["WarOnTheRocks", "Defense Analysis"], ["CrisisGroup", "Defense Analysis"],
+      ["Osinttechnical", "Fast / Source Monitoring"], ["sentdefender", "Fast / Source Monitoring"],
+      ["WarTranslated", "Fast / Source Monitoring"],
+    ].map(([handle, section]) => ({ handle, section })),
   });
 }
 
@@ -124,7 +148,7 @@ class XTemplateRegistry {
     const accounts = typeof this._seedAccounts === "function"
       ? this._seedAccounts()
       : this._seedAccounts;
-    return [seedMarkets(accounts || [])];
+    return [seedMarkets(accounts || []), seedWar()];
   }
 
   _read() {
@@ -201,8 +225,29 @@ class XTemplateRegistry {
   ensureSeeded() {
     return this._withLock(() => {
       if (fs.existsSync(this._file)) {
-        this._read();
-        return false;
+        const templates = this._read();
+        let version = 1;
+        try {
+          const parsed = JSON.parse(fs.readFileSync(this._file, "utf8"));
+          version = Number(parsed?.version) || 1;
+        } catch {
+          return false;
+        }
+        if (version >= REGISTRY_VERSION) return false;
+
+        const desired = seedWar();
+        const index = templates.findIndex((template) => template.id === desired.id);
+        if (index < 0) templates.push(desired);
+        else {
+          const existing = templates[index];
+          templates[index] = normalizeTemplate({
+            ...existing,
+            sections: existing.sections.concat(desired.sections),
+            memberships: existing.memberships.concat(desired.memberships),
+          });
+        }
+        if (!this._write(templates)) throw createServiceError("Could not migrate the template registry", 500);
+        return true;
       }
       this._write(this._seed());
       return true;
@@ -359,5 +404,6 @@ module.exports = {
   DEFAULT_TEMPLATE_ID,
   normalizeTemplate,
   seedMarkets,
+  seedWar,
   slugify,
 };

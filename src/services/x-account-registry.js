@@ -28,10 +28,10 @@ const fs = require("fs");
 const path = require("path");
 
 const { withExclusiveLock, writeJsonAtomic } = require("./json-file-lock");
-const { X_ACCOUNTS } = require("../config/x-accounts");
+const { X_ACCOUNTS, WAR_ACCOUNTS } = require("../config/x-accounts");
 const { createServiceError } = require("../utils/errors");
 
-const REGISTRY_VERSION = 1;
+const REGISTRY_VERSION = 2;
 const MAX_ACCOUNTS = 200;
 // X handles are 1-15 characters of [A-Za-z0-9_]. Enforced before persistence
 // so a typo cannot become a permanently failing account in the feed.
@@ -204,8 +204,25 @@ class XAccountRegistry {
   ensureSeeded() {
     return this._withLock(() => {
       if (fs.existsSync(this._file)) {
-        this._read();
-        return false;
+        const accounts = this._read();
+        let version = 1;
+        try {
+          const parsed = JSON.parse(fs.readFileSync(this._file, "utf8"));
+          version = Number(parsed?.version) || 1;
+        } catch {
+          return false;
+        }
+        if (version >= REGISTRY_VERSION) return false;
+
+        const next = accounts.slice();
+        for (const candidate of WAR_ACCOUNTS) {
+          const account = normalizeAccount(candidate);
+          if (!next.some((existing) => sameHandle(existing.handle, account.handle))) {
+            next.push({ ...account, addedAt: new Date().toISOString() });
+          }
+        }
+        if (!this._write(next)) throw createServiceError("Could not migrate the account registry", 500);
+        return true;
       }
       this._write(this._read());
       return true;

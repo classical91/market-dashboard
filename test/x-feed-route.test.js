@@ -18,7 +18,8 @@ process.env.ADMIN_API_KEY = "route-test-admin";
 delete process.env.MARKET_DASHBOARD_LOGIN_PASSWORD;
 
 const { createApp } = require("../src/app");
-const { X_ACCOUNTS } = require("../src/config/x-accounts");
+const { X_ACCOUNTS, WAR_ACCOUNTS } = require("../src/config/x-accounts");
+const MARKET_ACCOUNT_COUNT = X_ACCOUNTS.length - WAR_ACCOUNTS.length;
 
 const originalFetch = global.fetch;
 let server;
@@ -82,7 +83,7 @@ test("a total X outage is reported as unavailable, not as an empty feed", async 
   assert.equal(status, 200, "the page still renders; the payload carries the bad news");
   assert.equal(body.status, "unavailable");
   assert.equal(body.posts.length, 0);
-  assert.equal(body.failedFeeds.length, X_ACCOUNTS.length);
+  assert.equal(body.failedFeeds.length, MARKET_ACCOUNT_COUNT);
   assert.ok(body.generatedAt, "the response says when it was generated");
   assert.equal(body.mostRecentSuccessfulFetchAt, null, "nothing has ever been fetched successfully");
   assert.equal(body.oldestSuccessfulFetchAt, null);
@@ -128,8 +129,8 @@ test("a repaired credential recovers once the circuits are reset", async () => {
   const { body } = await getJson("/api/x/accounts");
 
   assert.equal(body.status, "live");
-  assert.equal(body.counts.live, X_ACCOUNTS.length);
-  assert.equal(body.posts.length, X_ACCOUNTS.length);
+  assert.equal(body.counts.live, MARKET_ACCOUNT_COUNT);
+  assert.equal(body.posts.length, MARKET_ACCOUNT_COUNT);
   assert.ok(body.mostRecentSuccessfulFetchAt, "a successful refresh is timestamped");
   assert.ok(
     body.oldestSuccessfulFetchAt,
@@ -174,7 +175,8 @@ test("templates are public, default to markets, and mutations are admin-gated", 
   assert.equal(listed.status, 200);
   assert.equal(listed.body.defaultTemplateId, "markets");
   assert.equal(listed.body.templates[0].name, "Crypto & Stocks");
-  assert.equal(listed.body.templates[0].memberships.length, X_ACCOUNTS.length);
+  assert.ok(listed.body.templates[0].memberships.length < X_ACCOUNTS.length);
+  assert.equal(listed.body.templates.find((template) => template.id === "war").memberships.length, 17);
 
   const rejected = await send("/api/x/templates", "POST", {
     id: "wars", name: "Wars & Geopolitics", sections: [], memberships: [],

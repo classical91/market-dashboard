@@ -11,7 +11,7 @@ const {
   DEFAULT_TEMPLATE_ID,
   normalizeTemplate,
 } = require("../src/services/x-template-registry");
-const { X_ACCOUNTS } = require("../src/config/x-accounts");
+const { X_ACCOUNTS, WAR_ACCOUNTS } = require("../src/config/x-accounts");
 
 const quietLogger = { warn() {}, error() {}, log() {} };
 
@@ -31,9 +31,42 @@ test("the current account layout seeds Crypto & Stocks without changing its orde
   assert.deepEqual(template.sections, ["Market Data", "Crypto Traders", "TA & Signals"]);
   assert.deepEqual(
     template.memberships.map((entry) => entry.handle),
-    X_ACCOUNTS.map((account) => account.handle),
+    X_ACCOUNTS.filter((account) => !WAR_ACCOUNTS.includes(account)).map((account) => account.handle),
   );
   assert.ok(fs.existsSync(file));
+  assert.deepEqual(registry.list().map((entry) => entry.id), ["markets", "war"]);
+});
+
+test("the war template contains every requested source once and separates monitoring-only sources", () => {
+  const { registry } = tempRegistry();
+  registry.ensureSeeded();
+  const war = registry.get("war");
+  const handles = war.memberships.map((entry) => entry.handle.toLowerCase());
+
+  assert.equal(handles.length, 17);
+  assert.equal(new Set(handles).size, 17);
+  for (const handle of ["reutersworld", "afp", "geoconfirmed", "osinttechnical", "acledinfo", "thestudyofwar", "liveuamap", "bellingcat", "kofmanmichael", "ralee85", "rusi_org", "iiss_org", "csis", "warontherocks", "crisisgroup", "sentdefender", "wartranslated"]) {
+    assert.ok(handles.includes(handle), `missing @${handle}`);
+  }
+  for (const handle of ["sentdefender", "wartranslated"]) {
+    assert.equal(war.memberships.find((entry) => entry.handle.toLowerCase() === handle).section, "Fast / Source Monitoring");
+  }
+});
+
+test("version-one registries gain war sources without losing existing entries or case-insensitive dedupe", () => {
+  const { registry, file } = tempRegistry();
+  fs.writeFileSync(file, JSON.stringify({ version: 1, templates: [{
+    id: "war", name: "Existing War Desk", sections: ["Local"],
+    memberships: [{ handle: "REUTERSWORLD", section: "Local" }, { handle: "Barchart", section: "Local" }],
+  }] }));
+
+  assert.equal(registry.ensureSeeded(), true);
+  const war = registry.get("war");
+  assert.equal(war.name, "Existing War Desk");
+  assert.ok(war.memberships.some((entry) => entry.handle === "Barchart"));
+  assert.equal(war.memberships.filter((entry) => entry.handle.toLowerCase() === "reutersworld").length, 1);
+  assert.equal(war.memberships.length, 18);
+  assert.equal(registry.ensureSeeded(), false);
 });
 
 test("templates persist, preserve empty sections, and allow one handle in several templates", () => {
@@ -82,10 +115,10 @@ test("duplicating and deleting templates never delete or mutate accounts", () =>
 
   const duplicate = registry.duplicate("markets", { name: "Tech & AI", id: "tech" });
   assert.equal(duplicate.id, "tech");
-  assert.equal(duplicate.memberships.length, X_ACCOUNTS.length);
+  assert.equal(duplicate.memberships.length, X_ACCOUNTS.length - WAR_ACCOUNTS.length);
   registry.remove("tech");
 
-  assert.deepEqual(registry.list().map((entry) => entry.id), ["markets"]);
+  assert.deepEqual(registry.list().map((entry) => entry.id), ["markets", "war"]);
   assert.equal(JSON.stringify(X_ACCOUNTS), before);
   assert.throws(() => registry.remove("markets"), /cannot be deleted/);
 });
@@ -145,7 +178,7 @@ test("template order is persistent and must name every template exactly once", (
   registry.create({ id: "wars", name: "Wars", sections: [], memberships: [] });
   registry.create({ id: "tech", name: "Tech", sections: [], memberships: [] });
 
-  registry.reorder(["tech", "markets", "wars"]);
-  assert.deepEqual(registry.list().map((entry) => entry.id), ["tech", "markets", "wars"]);
-  assert.throws(() => registry.reorder(["markets", "wars"]), /every template/);
+  registry.reorder(["tech", "markets", "war", "wars"]);
+  assert.deepEqual(registry.list().map((entry) => entry.id), ["tech", "markets", "war", "wars"]);
+  assert.throws(() => registry.reorder(["markets", "war", "wars"]), /every template/);
 });
