@@ -321,6 +321,10 @@ function createApp() {
   tradingLabService.attachLiveResearchService(liveResearchService);
 
   const requireAdmin = createRequireAdmin({ adminKey: config.admin.apiKey });
+  const requireXAdmin = createRequireAdmin({
+    adminKey: config.admin.apiKey,
+    allowOwnerSession: true,
+  });
   const requireLedgerKey = createRequireLedgerKey({
     ledgerKey: config.broadcastLedger.apiKey,
     adminKey: config.admin.apiKey,
@@ -463,7 +467,7 @@ function createApp() {
       xFeedService,
       accountRegistry: xAccountRegistry,
       templateRegistry: xTemplateRegistry,
-      requireAdmin,
+      requireAdmin: requireXAdmin,
     }),
   );
 
