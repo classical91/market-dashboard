@@ -30,3 +30,13 @@ test("template drafts retain ordered sections and unique account memberships", (
     { handle: "TechDev_52", section: "Conflict Monitors" },
   ]);
 });
+
+test("an account already in the draft is recognized however its handle is written", () => {
+  const draft = { memberships: [{ handle: "Barchart", section: "Market Data" }] };
+
+  for (const typed of ["Barchart", "barchart", "@BARCHART", " @BarChart "]) {
+    assert.equal(templatesAdmin.isMember(draft, typed), true, typed);
+  }
+  assert.equal(templatesAdmin.isMember(draft, "TechDev_52"), false);
+  assert.equal(templatesAdmin.isMember({ memberships: [] }, "Barchart"), false);
+});

@@ -248,6 +248,27 @@ test("template duplicate, update, reorder, and safe delete APIs persist", async 
   assert.equal(protectedDefault.status, 400);
 });
 
+test("a template payload naming one account twice is refused with a 409", async () => {
+  const duplicateMembership = await send("/api/x/templates", "POST", {
+    id: "doubled",
+    name: "Doubled",
+    sections: ["Left", "Right"],
+    memberships: [
+      { handle: "Barchart", section: "Left" },
+      { handle: "@barchart", section: "Right" },
+    ],
+  }, ADMIN);
+
+  assert.equal(duplicateMembership.status, 409);
+  assert.match(duplicateMembership.body.error, /already in this template/);
+
+  const listed = await getJson("/api/x/templates");
+  assert.ok(
+    !listed.body.templates.some((template) => template.id === "doubled"),
+    "the refused template was not half-saved",
+  );
+});
+
 test("adding and deleting an account requires the admin key", async () => {
   const add = await send("/api/x/accounts/config", "POST", { handle: "temp1", category: "Market Data" });
   assert.equal(add.status, 401, "an unauthenticated add is rejected");

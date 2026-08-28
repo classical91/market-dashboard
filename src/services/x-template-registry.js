@@ -12,7 +12,7 @@ const fs = require("fs");
 const path = require("path");
 
 const { withExclusiveLock, writeJsonAtomic } = require("./json-file-lock");
-const { normalizeHandle } = require("./x-account-registry");
+const { normalizeHandle, sameHandle } = require("./x-account-registry");
 const { createServiceError } = require("../utils/errors");
 
 const REGISTRY_VERSION = 1;
@@ -38,10 +38,6 @@ function slugify(value) {
     .slice(0, 40);
 }
 
-function sameHandle(a, b) {
-  return normalizeHandle(a).toLowerCase() === normalizeHandle(b).toLowerCase();
-}
-
 function uniqueStrings(values, max, limit) {
   const result = [];
   for (const value of Array.isArray(values) ? values : []) {
@@ -55,7 +51,16 @@ function uniqueStrings(values, max, limit) {
   return result;
 }
 
-function normalizeTemplate(input, { requireId = true } = {}) {
+/**
+ * Validates and normalizes one template.
+ *
+ * `strict` is used for anything that arrives from the API: a payload naming
+ * one account twice is refused with a 409 rather than quietly saved with the
+ * second mention dropped, so an admin is never told "saved" about a template
+ * that is not what they submitted. Reading a stored file stays lenient — a
+ * legacy or hand-edited file must still load, with the repeat merged away.
+ */
+function normalizeTemplate(input, { requireId = true, strict = false } = {}) {
   const id = slugify(input?.id || input?.name);
   if (requireId && (!id || !ID_PATTERN.test(id))) {
     throw createServiceError("A template id is required (letters, numbers and hyphens only)", 400);
@@ -76,9 +81,17 @@ function normalizeTemplate(input, { requireId = true } = {}) {
       sections.push(section);
       canonicalSection = section;
     }
-    if (!memberships.some((member) => sameHandle(member.handle, handle))) {
-      memberships.push({ handle, section: canonicalSection });
+    const duplicate = memberships.find((member) => sameHandle(member.handle, handle));
+    if (duplicate) {
+      if (strict) {
+        throw createServiceError(
+          `@${duplicate.handle} is already in this template (under ${duplicate.section})`,
+          409,
+        );
+      }
+      continue;
     }
+    memberships.push({ handle, section: canonicalSection });
   }
 
   return {
@@ -230,7 +243,7 @@ class XTemplateRegistry {
       if (templates.length >= MAX_TEMPLATES) {
         throw createServiceError(`At most ${MAX_TEMPLATES} templates can be saved`, 400);
       }
-      const template = normalizeTemplate(input);
+      const template = normalizeTemplate(input, { strict: true });
       if (templates.some((entry) => entry.id === template.id)) {
         throw createServiceError(`A template with id "${template.id}" already exists`, 409);
       }
@@ -246,7 +259,7 @@ class XTemplateRegistry {
       const templates = this._read();
       const index = templates.findIndex((entry) => entry.id === wanted);
       if (index < 0) throw createServiceError(`X template "${wanted}" was not found`, 404);
-      const template = normalizeTemplate({ ...input, id: wanted });
+      const template = normalizeTemplate({ ...input, id: wanted }, { strict: true });
       const next = templates.slice();
       next[index] = template;
       if (!this._write(next)) throw createServiceError("Could not save the template registry", 500);

@@ -22,6 +22,12 @@
  * Adding an account never calls X. Format is the only thing validated, so a
  * rejected bearer token or a rate-limited provider can neither block account
  * management nor leave a half-written registry behind.
+ *
+ * One X account is one row. Handles are compared case-insensitively (X treats
+ * them that way), an add that repeats one is refused with a 409, and the write
+ * path de-duplicates regardless of caller — a second row for one handle would
+ * show the account twice in the sidebar and every one of its posts twice in
+ * the feed.
  */
 
 const fs = require("fs");
@@ -45,6 +51,41 @@ const DEFAULT_CATEGORIES = ["Market Data", "Crypto Traders", "TA & Signals"];
 
 function normalizeHandle(value) {
   return String(value == null ? "" : value).trim().replace(/^@+/, "").trim();
+}
+
+/**
+ * The identity a handle is compared by. X handles are case-insensitive, so
+ * @Barchart and @barchart are one account, not two. Every duplicate check in
+ * the X Intelligence stack goes through this so they cannot drift apart.
+ */
+function canonicalHandle(value) {
+  return normalizeHandle(value).toLowerCase();
+}
+
+function sameHandle(a, b) {
+  return canonicalHandle(a) === canonicalHandle(b);
+}
+
+/**
+ * Drops any account whose handle is already present, keeping the first.
+ * Used as a persistence invariant rather than only as a pre-check: no path —
+ * the seed list, an add, a hand-edited file — should be able to leave two rows
+ * for one account.
+ */
+function dedupeAccounts(accounts) {
+  const seen = new Set();
+  const unique = [];
+  let dropped = 0;
+  for (const account of accounts || []) {
+    const key = canonicalHandle(account?.handle);
+    if (!key || seen.has(key)) {
+      dropped += 1;
+      continue;
+    }
+    seen.add(key);
+    unique.push(account);
+  }
+  return { accounts: unique, dropped };
 }
 
 function clamp(value, max) {
@@ -79,10 +120,6 @@ function normalizeAccount(input) {
     label: clamp(input?.label, MAX_LABEL_LEN) || handle,
     category,
   };
-}
-
-function sameHandle(a, b) {
-  return String(a).toLowerCase() === String(b).toLowerCase();
 }
 
 class XAccountRegistry {
@@ -134,23 +171,32 @@ class XAccountRegistry {
       if (!Array.isArray(accounts)) throw new SyntaxError("no accounts array");
 
       const valid = [];
-      let dropped = 0;
+      let malformed = 0;
+      let duplicates = 0;
       for (const entry of accounts) {
         // One bad row must not take the whole registry down with it.
         try {
           const account = normalizeAccount(entry);
-          if (!valid.some((existing) => sameHandle(existing.handle, account.handle))) {
-            valid.push({ ...account, addedAt: entry?.addedAt || null });
+          if (valid.some((existing) => sameHandle(existing.handle, account.handle))) {
+            // A file edited by hand (or written by an older build) can name
+            // one account twice. Serving both would duplicate the account in
+            // the sidebar and every one of its posts in the feed.
+            duplicates += 1;
+            continue;
           }
+          valid.push({ ...account, addedAt: entry?.addedAt || null });
         } catch {
-          dropped += 1;
+          malformed += 1;
         }
       }
 
-      this._loadState = dropped ? "partial" : "loaded";
-      this._loadError = dropped ? `${dropped} malformed entr${dropped === 1 ? "y" : "ies"} skipped` : null;
-      if (dropped) {
-        this._logger.warn?.(`[XAccounts] Skipped ${dropped} malformed entries in ${this._file}`);
+      const notes = [];
+      if (malformed) notes.push(`${malformed} malformed entr${malformed === 1 ? "y" : "ies"} skipped`);
+      if (duplicates) notes.push(`${duplicates} duplicate handle${duplicates === 1 ? "" : "s"} merged`);
+      this._loadState = notes.length ? "partial" : "loaded";
+      this._loadError = notes.length ? notes.join("; ") : null;
+      if (notes.length) {
+        this._logger.warn?.(`[XAccounts] ${notes.join("; ")} in ${this._file}`);
       }
       return valid;
     } catch (err) {
@@ -176,9 +222,19 @@ class XAccountRegistry {
       }
     }
 
+    // The last line of defence: whatever a caller hands us, one X account
+    // gets one row. add() already rejects a duplicate with a 409 so the
+    // request is answered honestly; this only guarantees that no other path
+    // (the seed list, a repair after a corrupt read, a future caller) can
+    // persist the same handle twice.
+    const { accounts: unique, dropped } = dedupeAccounts(accounts);
+    if (dropped) {
+      this._logger.warn?.(`[XAccounts] Dropped ${dropped} duplicate account row(s) before saving`);
+    }
+
     const written = writeJsonAtomic(
       this._file,
-      { version: REGISTRY_VERSION, accounts: accounts.slice(0, MAX_ACCOUNTS) },
+      { version: REGISTRY_VERSION, accounts: unique.slice(0, MAX_ACCOUNTS) },
       this._logger,
       "[XAccounts]",
     );
@@ -217,8 +273,15 @@ class XAccountRegistry {
       const account = normalizeAccount(input);
       const accounts = this._read();
 
-      if (accounts.some((existing) => sameHandle(existing.handle, account.handle))) {
-        throw createServiceError(`@${account.handle} is already tracked`, 409);
+      // Case-insensitive, because X handles are: @Barchart and @barchart are
+      // the same account. The stored spelling is quoted back so the message
+      // matches what the admin sees in the list.
+      const duplicate = accounts.find((existing) => sameHandle(existing.handle, account.handle));
+      if (duplicate) {
+        throw createServiceError(
+          `@${duplicate.handle} is already tracked under ${duplicate.category}`,
+          409,
+        );
       }
       if (accounts.length >= MAX_ACCOUNTS) {
         throw createServiceError(`At most ${MAX_ACCOUNTS} accounts can be tracked`, 400);
@@ -296,6 +359,9 @@ class XAccountRegistry {
 module.exports = {
   XAccountRegistry,
   normalizeHandle,
+  canonicalHandle,
+  sameHandle,
+  dedupeAccounts,
   normalizeAccount,
   DEFAULT_CATEGORIES,
   HANDLE_PATTERN,

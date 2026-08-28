@@ -623,6 +623,13 @@ body[data-x-accent] .x-account-card--all.active { border-color: var(--x-accent);
   color: var(--muted);
 }
 
+/* Inline "already tracked" warning under the handle field. */
+.x-manage-hint {
+  margin: -2px 0 0;
+  font-size: 12px;
+  color: var(--coral, var(--red));
+}
+
 .x-manage-status.is-error { color: var(--coral, var(--red)); }
 .x-manage-status.is-ok { color: var(--green, #2ECC71); }
 

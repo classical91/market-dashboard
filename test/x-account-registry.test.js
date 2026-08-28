@@ -91,6 +91,62 @@ test("duplicate handles are rejected case-insensitively", () => {
   assert.equal(registry.list().length, 1, "the rejected add left nothing behind");
 });
 
+test("the duplicate refusal names the account as it is already stored", () => {
+  const { registry } = tempRegistry({ seed: [] });
+  registry.add({ handle: "Trader", label: "A Trader", category: "Crypto Traders" });
+
+  // The admin typed @trader; the list shows @Trader. Quoting the stored
+  // spelling and its category is what makes the refusal actionable.
+  assert.throws(
+    () => registry.add({ handle: " @trader ", category: "TA & Signals" }),
+    /@Trader is already tracked under Crypto Traders/,
+  );
+});
+
+test("a duplicate cannot be persisted even when it never goes through add()", () => {
+  // The seed is the one list nothing validates before it is written, so it is
+  // the path a duplicate would reach the file by.
+  const { registry, file } = tempRegistry({
+    seed: [
+      { handle: "Twice", label: "First", category: "Market Data" },
+      { handle: "@TWICE", label: "Second", category: "Crypto Traders" },
+      { handle: "Once", category: "Market Data" },
+    ],
+  });
+
+  registry.ensureSeeded();
+
+  const stored = JSON.parse(fs.readFileSync(file, "utf8"));
+  assert.deepEqual(
+    stored.accounts.map((account) => account.handle),
+    ["Twice", "Once"],
+    "one X account is one row on disk, and the first spelling wins",
+  );
+  assert.equal(stored.accounts[0].label, "First");
+});
+
+test("a hand-edited file naming one account twice serves it once and says so", () => {
+  const { registry, file } = tempRegistry();
+  fs.writeFileSync(
+    file,
+    JSON.stringify({
+      version: 1,
+      accounts: [
+        { handle: "Barchart", label: "Barchart", category: "Market Data" },
+        { handle: "barchart", label: "Barchart again", category: "Crypto Traders" },
+      ],
+    }),
+    "utf8",
+  );
+
+  // Serving both would show the account twice in the sidebar and double every
+  // one of its posts in the feed.
+  assert.deepEqual(registry.list().map((a) => a.handle), ["Barchart"]);
+  const described = registry.describe();
+  assert.equal(described.loadState, "partial");
+  assert.match(described.loadError, /duplicate handle/);
+});
+
 test("malformed handles are rejected before they can reach the feed", () => {
   const { registry } = tempRegistry({ seed: [] });
   for (const bad of ["", "  ", "has space", "toolonghandle1234", "bad-dash", "dot.dot"]) {

@@ -139,6 +139,69 @@ test("normalization rejects nameless templates and removes duplicate membership 
   assert.equal(template.memberships.length, 1);
 });
 
+test("a template that names one account twice is refused rather than quietly trimmed", () => {
+  const { registry } = tempRegistry();
+  registry.ensureSeeded();
+
+  const payload = {
+    id: "wars",
+    name: "Wars",
+    sections: ["Official Sources", "Conflict Monitors"],
+    memberships: [
+      { handle: "Barchart", section: "Official Sources" },
+      { handle: "@BARCHART", section: "Conflict Monitors" },
+    ],
+  };
+
+  assert.throws(() => registry.create(payload), /@Barchart is already in this template/);
+  assert.deepEqual(registry.list().map((entry) => entry.id), ["markets"], "nothing was saved");
+
+  registry.create({ id: "wars", name: "Wars", sections: [], memberships: [] });
+  assert.throws(() => registry.update("wars", payload), /already in this template/);
+  assert.equal(registry.get("wars").memberships.length, 0, "the rejected update changed nothing");
+});
+
+test("a stored template naming one account twice still loads, with the repeat merged", () => {
+  // Strict on the way in, lenient on the way out: a file written by an older
+  // build must not take the switcher down.
+  const { dataDir, registry, file } = tempRegistry();
+  registry.ensureSeeded();
+  fs.writeFileSync(
+    file,
+    JSON.stringify({
+      version: 1,
+      templates: [
+        {
+          id: "markets",
+          name: "Crypto & Stocks",
+          sections: ["Market Data", "Crypto Traders"],
+          memberships: [
+            { handle: "Barchart", section: "Market Data" },
+            { handle: "barchart", section: "Crypto Traders" },
+          ],
+        },
+      ],
+    }),
+    "utf8",
+  );
+
+  const reopened = new XTemplateRegistry({ dataDir, seedAccounts: [], logger: quietLogger });
+  const markets = reopened.get("markets");
+  assert.deepEqual(markets.memberships, [{ handle: "Barchart", section: "Market Data" }]);
+});
+
+test("adding an already tracked handle to the default template is a no-op", () => {
+  const { registry } = tempRegistry();
+  registry.ensureSeeded();
+
+  assert.equal(registry.addHandleToDefault("@barchart", "Somewhere Else"), false);
+  const markets = registry.get("markets");
+  assert.equal(
+    markets.memberships.filter((entry) => entry.handle.toLowerCase() === "barchart").length,
+    1,
+  );
+});
+
 test("template order is persistent and must name every template exactly once", () => {
   const { registry } = tempRegistry();
   registry.ensureSeeded();
