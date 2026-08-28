@@ -1,6 +1,18 @@
 /* Shared X (Twitter) post-card rendering helpers, used by both the curated
-   feed page (x-intelligence.js) and the keyword search page (x-search.js). */
-(function () {
+   feed page (x-intelligence.js) and the keyword search page (x-search.js).
+
+   Loaded as a plain script after x-freshness.js, and required as a module by
+   the tests — the copy-link state machine is the part that broke on iOS, so
+   it has to be exercisable outside a browser. */
+(function (root, factory) {
+  "use strict";
+  var freshness = root && root.XFreshness
+    ? root.XFreshness
+    : (typeof require === "function" ? require("./x-freshness") : null);
+  var api = factory(freshness);
+  if (typeof module === "object" && module.exports) module.exports = api;
+  if (root) root.XPosts = api;
+})(typeof window !== "undefined" ? window : null, function (XFreshness) {
   "use strict";
 
   function esc(s) {
@@ -27,7 +39,7 @@
 
   // Owned by x-freshness.js (shared with the Node tests); re-exported here
   // so existing XPosts callers keep working.
-  var formatRelativeTime = window.XFreshness.formatRelativeTime;
+  var formatRelativeTime = XFreshness.formatRelativeTime;
 
   function sortByPublishedDesc(posts) {
     return posts.slice().sort(function (a, b) {
@@ -96,11 +108,242 @@
     });
   }
 
-  function copyPostLinkToClipboard(url) {
-    if (!navigator.clipboard || !navigator.clipboard.writeText) {
-      return Promise.reject(new Error("Clipboard is unavailable"));
+  /* ── Copying a post's permalink ────────────────────────────────────────
+
+     One helper, used by both the visible permalink and the "Copy link"
+     button, because they were drifting apart and only one of them was ever
+     fixed.
+
+     The failure this is built around: on iOS Safari (and in standalone/PWA
+     contexts especially) navigator.clipboard.writeText can reject oddly, or
+     simply never settle. The old code disabled the button, awaited that
+     promise, and restored the label in .then() — so a promise that never
+     settled left the button disabled on "Copying link..." forever, with no
+     way back short of a reload.
+
+     So no path here waits on the clipboard indefinitely: the API call races a
+     timeout, a timed-out or failed call falls through to the execCommand
+     path, and the button's own watchdog restores it even if the helper itself
+     misbehaves. */
+
+  var CLIPBOARD_TIMEOUT_MS = 2500;
+  var COPY_RESET_MS = 1800;
+  // A margin over the clipboard race, so the button's own watchdog only fires
+  // if the helper itself failed to settle rather than racing its own timeout.
+  var COPY_WATCHDOG_MS = CLIPBOARD_TIMEOUT_MS + 1500;
+
+  var COPY_LINK_LABELS = {
+    busy: "Copying link...",
+    success: "Link copied",
+    failure: "Copy failed",
+  };
+
+  function globalScope() {
+    if (typeof globalThis !== "undefined") return globalThis;
+    if (typeof window !== "undefined") return window;
+    return {};
+  }
+
+  // window.setTimeout detached from window throws "Illegal invocation" in
+  // WebKit and Blink, and this code stores it before calling it.
+  function bound(scope, fn) {
+    return typeof fn === "function" ? fn.bind(scope) : fn;
+  }
+
+  // Every browser touchpoint the copy path uses, resolved at call time so a
+  // test can substitute a clipboard, a document, or a clock.
+  function resolveEnv(options) {
+    var scope = globalScope();
+    var has = function (key) {
+      return options && Object.prototype.hasOwnProperty.call(options, key);
+    };
+    return {
+      navigator: has("navigator") ? options.navigator : scope.navigator,
+      document: has("document") ? options.document : scope.document,
+      setTimeout: has("setTimeout") ? options.setTimeout : bound(scope, scope.setTimeout),
+      clearTimeout: has("clearTimeout") ? options.clearTimeout : bound(scope, scope.clearTimeout),
+      clipboardTimeoutMs: has("clipboardTimeoutMs") ? options.clipboardTimeoutMs : CLIPBOARD_TIMEOUT_MS,
+      resetMs: has("resetMs") ? options.resetMs : COPY_RESET_MS,
+      watchdogMs: has("watchdogMs") ? options.watchdogMs : COPY_WATCHDOG_MS,
+    };
+  }
+
+  function later(env, ms, fn) {
+    if (typeof env.setTimeout !== "function") return null;
+    return env.setTimeout(fn, ms);
+  }
+
+  function cancel(env, timer) {
+    if (timer !== null && timer !== undefined && typeof env.clearTimeout === "function") {
+      env.clearTimeout(timer);
     }
-    return navigator.clipboard.writeText(url);
+  }
+
+  /* Resolves true/false rather than rejecting: "the Clipboard API did not do
+     it" is not an error here, it is the cue to try the fallback. Resolves
+     false on an unavailable API, a rejection, a synchronous throw, and — the
+     iOS case — on a promise that is still pending when the timeout fires. */
+  function writeViaClipboardApi(text, env) {
+    var nav = env.navigator;
+    var clipboard = nav && nav.clipboard;
+    if (!clipboard || typeof clipboard.writeText !== "function") return Promise.resolve(false);
+
+    return new Promise(function (resolve) {
+      var settled = false;
+      var timer = later(env, env.clipboardTimeoutMs, function () { finish(false); });
+
+      function finish(ok) {
+        if (settled) return;
+        settled = true;
+        cancel(env, timer);
+        resolve(ok);
+      }
+
+      var pending;
+      try {
+        pending = clipboard.writeText(text);
+      } catch (err) {
+        finish(false);
+        return;
+      }
+      // A non-thenable return means an implementation that copied synchronously.
+      if (!pending || typeof pending.then !== "function") {
+        finish(true);
+        return;
+      }
+      pending.then(function () { finish(true); }, function () { finish(false); });
+    });
+  }
+
+  /* The compatibility path: a temporary off-screen field plus
+     document.execCommand("copy"). Synchronous, so it cannot hang, and the
+     element is removed on every exit. */
+  function writeViaExecCommand(text, env) {
+    var doc = env.document;
+    if (!doc || !doc.body || typeof doc.createElement !== "function") return false;
+    if (typeof doc.execCommand !== "function") return false;
+
+    var field = doc.createElement("textarea");
+    var copied = false;
+    try {
+      field.value = text;
+      field.setAttribute("readonly", "");
+      // iOS will not select a node it considers hidden, so it is placed
+      // on-screen but invisible and untouchable rather than display:none'd.
+      if (field.style) {
+        field.style.position = "fixed";
+        field.style.top = "0";
+        field.style.left = "0";
+        field.style.width = "1px";
+        field.style.height = "1px";
+        field.style.padding = "0";
+        field.style.border = "none";
+        field.style.opacity = "0";
+        field.style.pointerEvents = "none";
+      }
+      doc.body.appendChild(field);
+      selectAll(field, text, doc);
+      copied = doc.execCommand("copy") === true;
+    } catch (err) {
+      copied = false;
+    } finally {
+      if (field.parentNode && typeof field.parentNode.removeChild === "function") {
+        field.parentNode.removeChild(field);
+      }
+    }
+    return copied;
+  }
+
+  // iOS Safari ignores select() on a readonly field; a Range over its
+  // contents is what actually takes there, so both are attempted.
+  function selectAll(field, text, doc) {
+    if (typeof field.focus === "function") field.focus();
+    if (typeof field.select === "function") field.select();
+    try {
+      if (typeof doc.createRange === "function" && typeof doc.getSelection === "function") {
+        var range = doc.createRange();
+        range.selectNodeContents(field);
+        var selection = doc.getSelection();
+        if (selection) {
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
+      }
+      if (typeof field.setSelectionRange === "function") field.setSelectionRange(0, text.length);
+    } catch (err) {
+      /* Selection is best-effort; execCommand still gets its chance. */
+    }
+  }
+
+  /* Copies exactly the URL it is given. Resolves with which path succeeded,
+     rejects only when both did. Never stays pending. */
+  function copyPostLinkToClipboard(url, options) {
+    var env = resolveEnv(options);
+    var text = url === null || url === undefined ? "" : String(url);
+    if (!text) return Promise.reject(new Error("No link to copy"));
+
+    return writeViaClipboardApi(text, env).then(function (ok) {
+      if (ok) return "clipboard";
+      if (writeViaExecCommand(text, env)) return "fallback";
+      throw new Error("Copy failed");
+    });
+  }
+
+  /* Wires a button to the helper above and owns its label and disabled state.
+
+     The guarantees, in the order they matter:
+       - the button is disabled only while an attempt is actually running;
+       - a second tap during an attempt is ignored rather than starting a
+         second one;
+       - the resting label and enabled state are restored on success, on
+         failure, on a thrown exception, and on the watchdog — there is no
+         path that leaves the button on "Copying link...". */
+  function bindCopyLinkButton(button, url, restingLabel, options) {
+    var label = restingLabel === null || restingLabel === undefined ? button.textContent : restingLabel;
+    var running = false;
+
+    function attempt() {
+      var env = resolveEnv(options);
+      if (running) return Promise.resolve(null);
+      running = true;
+      button.disabled = true;
+      button.textContent = COPY_LINK_LABELS.busy;
+
+      var done = false;
+      // The last line of defence: even a helper that never settles cannot
+      // strand the button, because this fires regardless.
+      var watchdog = later(env, env.watchdogMs, function () { finish(COPY_LINK_LABELS.failure); });
+
+      function finish(text) {
+        if (done) return;
+        done = true;
+        cancel(env, watchdog);
+        button.textContent = text;
+        // Restoring is itself unconditional: it is scheduled here, not
+        // chained onto anything that could still be pending.
+        if (later(env, env.resetMs, restore) === null) restore();
+      }
+
+      function restore() {
+        button.textContent = label;
+        button.disabled = false;
+        running = false;
+      }
+
+      var pending;
+      try {
+        pending = copyPostLinkToClipboard(url, options);
+      } catch (err) {
+        pending = Promise.reject(err);
+      }
+      return pending.then(
+        function (how) { finish(COPY_LINK_LABELS.success); return how; },
+        function () { finish(COPY_LINK_LABELS.failure); return null; }
+      );
+    }
+
+    button.addEventListener("click", attempt);
+    return attempt;
   }
 
   function setCopyStatus(button, label) {
@@ -152,19 +395,7 @@
         link.className = "x-post-link";
         link.title = "Copy " + post.url;
         link.textContent = linkLabel;
-        link.addEventListener("click", function () {
-          link.disabled = true;
-          link.textContent = "Copying link...";
-          copyPostLinkToClipboard(post.url)
-            .then(function () { link.textContent = "Link copied"; })
-            .catch(function () { link.textContent = "Copy failed"; })
-            .then(function () {
-              window.setTimeout(function () {
-                link.textContent = linkLabel;
-                link.disabled = false;
-              }, 1800);
-            });
-        });
+        bindCopyLinkButton(link, post.url, linkLabel);
         card.appendChild(link);
       }
 
@@ -182,19 +413,9 @@
       copyButton.type = "button";
       copyButton.className = "x-post-copy";
       copyButton.textContent = "Copy link";
-      copyButton.addEventListener("click", function () {
-        copyButton.disabled = true;
-        copyButton.textContent = "Copying link...";
-        copyPostLinkToClipboard(post.url)
-          .then(function () { copyButton.textContent = "Link copied"; })
-          .catch(function () { copyButton.textContent = "Copy failed"; })
-          .then(function () {
-            window.setTimeout(function () {
-              copyButton.textContent = "Copy link";
-              copyButton.disabled = false;
-            }, 1800);
-          });
-      });
+      // Same helper as the visible permalink above: one copy path, one state
+      // machine, so a fix to either reaches both.
+      bindCopyLinkButton(copyButton, post.url, "Copy link");
 
       actions.appendChild(openLink);
       actions.appendChild(copyButton);
@@ -270,16 +491,18 @@
     root.insertBefore(box, root.firstChild);
   }
 
-  window.XPosts = {
+  return {
     esc: esc,
     formatRelativeDate: formatRelativeDate,
     formatRelativeTime: formatRelativeTime,
     sortByPublishedDesc: sortByPublishedDesc,
     copyPostToClipboard: copyPostToClipboard,
     copyPostLinkToClipboard: copyPostLinkToClipboard,
+    bindCopyLinkButton: bindCopyLinkButton,
+    COPY_LINK_LABELS: COPY_LINK_LABELS,
     renderPostCards: renderPostCards,
     renderFeedError: renderFeedError,
     renderStaleNotice: renderStaleNotice,
     renderFeedStatus: renderFeedStatus,
   };
-})();
+});
