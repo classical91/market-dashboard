@@ -184,6 +184,37 @@ function isTradingLabMachineReadRequest(req, adminKey) {
   return isAdminRequest(req, adminKey);
 }
 
+// Agent Office shows ShareBot67's live newsroom health on its own status
+// panel. It reads this server from its Node process, not from browser
+// JavaScript — the dashboard key must never reach a browser — so it arrives
+// with an x-admin-key and no session cookie, and site auth would otherwise
+// answer `401 Login required` before the newsroom router ever ran. That is the
+// same shape of caller the Trading Lab exemption above exists for.
+//
+// As narrow as it is possible to be, because an admin key is a read credential
+// for one endpoint here and not a second owner session:
+//
+//   - GET/HEAD only. Nothing that runs a cycle, spends provider credits or
+//     posts to Telegram can travel this way.
+//   - One exact path. `/api/newsroom/cycles`, `/api/newsroom/cycles/:id`,
+//     `/api/newsroom/preflight` and every POST stay behind the owner session
+//     (and, for the writes, the admin guard on the route itself).
+//   - Header only. No `?key=` form, because keys in URLs end up in browser
+//     history, proxy logs and referrers — /health is read by a server, which
+//     can always set a header.
+//
+// GET /health is safe to expose this way: it carries identifiers, statuses,
+// counts and the provider's own error text, and never a credential, a prompt
+// body or report content. See docs/newsroom-cycles.md.
+const NEWSROOM_HEALTH_PATH = "/api/newsroom/health";
+
+function isNewsroomHealthMachineReadRequest(req, adminKey) {
+  if (req.method !== "GET" && req.method !== "HEAD") return false;
+  const path = req.path.length > 1 && req.path.endsWith("/") ? req.path.slice(0, -1) : req.path;
+  if (path !== NEWSROOM_HEALTH_PATH) return false;
+  return isAdminRequest(req, adminKey);
+}
+
 function canAccess(req, session) {
   if (!session) return false;
   if (session.role === "owner") return true;
@@ -268,6 +299,10 @@ function createSiteAuth(config) {
         next();
         return;
       }
+      if (isNewsroomHealthMachineReadRequest(req, config.adminKey)) {
+        next();
+        return;
+      }
       const session = sessionFromRequest(req, config);
       if (canAccess(req, session)) {
         req.siteSession = session;
@@ -311,4 +346,10 @@ function createSiteAuth(config) {
   };
 }
 
-module.exports = { createSiteAuth, parseCookies, decodeSession, encodeSession };
+module.exports = {
+  createSiteAuth,
+  parseCookies,
+  decodeSession,
+  encodeSession,
+  isNewsroomHealthMachineReadRequest,
+};

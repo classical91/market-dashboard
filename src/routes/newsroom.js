@@ -11,7 +11,7 @@
 
 const { Router } = require("express");
 
-function createNewsroomRouter({ newsroomService, cycleStore, reporterService, broadcastLedgerStore, requireAdmin }) {
+function createNewsroomRouter({ newsroomService, cycleStore, broadcastLedgerStore, requireAdmin }) {
   const router = Router();
 
   function resolveTtlMs(req) {
@@ -63,20 +63,14 @@ function createNewsroomRouter({ newsroomService, cycleStore, reporterService, br
         res.status(404).json({ error: "Cycle not found" });
         return;
       }
-      const generations = reporterService.listGenerations({ cycleId: cycle.id, limit: 50 }).map((entry) => ({
-        section: entry.section,
-        label: entry.label,
-        generatedAt: entry.generatedAt,
-        generatedDateKey: entry.generatedDateKey,
-        dateStr: entry.dateStr,
-        model: entry.model,
-        content: entry.content,
-        sources: entry.sources || [],
-        // Whether a custom prompt was used, never its text: a prompt is
-        // operator-authored and may carry things that do not belong in an
-        // operational read.
-        hasCustomPrompt: Boolean(entry.prompt),
-      }));
+      // Resolved through each section's own generation reference rather than
+      // by listing generations logged under this cycle's id. A same-day reused
+      // section writes no new log entry, so a by-cycle query silently misses
+      // it; the reference finds it under the cycle that first wrote it and
+      // reports that link. Prompt bodies stay out: a prompt is
+      // operator-authored and may carry things that do not belong in an
+      // operational read.
+      const generations = newsroomService.resolveCycleGenerations(cycle);
       const receipts = broadcastLedgerStore
         ? broadcastLedgerStore.list({ cycleId: cycle.id, limit: 50 }).map((receipt) => ({
             id: receipt.id,
@@ -115,7 +109,7 @@ function createNewsroomRouter({ newsroomService, cycleStore, reporterService, br
   // Retry delivery for a cycle whose report already exists. Never regenerates.
   router.post("/cycles/:id/deliver", requireAdmin, async (req, res, next) => {
     try {
-      const result = await newsroomService.deliverCycle(req.params.id, { ttlMs: resolveTtlMs(req) });
+      const result = await newsroomService.deliverCycle(req.params.id);
       if (!result) {
         res.status(404).json({ error: "Cycle not found" });
         return;

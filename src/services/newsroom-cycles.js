@@ -17,7 +17,7 @@
  * this fan-out-and-write pattern.
  *
  * File shape:
- *   { "version": 1, "cycles": [ <newest first> ] }
+ *   { "version": 2, "cycles": [ <newest first> ] }
  *
  * Generation failures and delivery failures are deliberately different
  * statuses. A cycle that generated its report and failed to deliver must never
@@ -31,7 +31,12 @@ const crypto = require("crypto");
 const { withExclusiveLock, writeJsonAtomic } = require("./json-file-lock");
 const { classifyFailure } = require("./failure-classification");
 
-const CYCLE_VERSION = 1;
+// 2 adds `generationRef` to each generated section: the exact stored
+// generation that section stands for. Version 1 records have no such field and
+// are read as they were written — the reader resolves them by cycle id,
+// section and exact timestamp instead, and refuses rather than guessing when
+// that cannot identify one generation. Nothing rewrites an old record.
+const CYCLE_VERSION = 2;
 const DEFAULT_CAP = 200;
 const MAX_FAILURES_PER_CYCLE = 30;
 
@@ -111,6 +116,26 @@ function normalizeDestination(input) {
     messageId: clampString(input.messageId, 120) || null,
     status: ["posted", "failed", "pending"].includes(input.status) ? input.status : "pending",
     error: clampString(input.error) || null,
+  };
+}
+
+/**
+ * The exact generation a recorded section stands for.
+ *
+ * A reference is only worth storing if it can identify one generation, so a
+ * reference with no usable timestamp is stored as null rather than as a
+ * half-reference that would later have to be guessed at. A null `cycleId` is
+ * meaningful and preserved: it says the generation was made outside a cycle.
+ */
+function normalizeGenerationRef(input, fallbackSection) {
+  if (!input || typeof input !== "object") return null;
+  const generatedAt = isFiniteDate(input.generatedAt) ? new Date(input.generatedAt).toISOString() : null;
+  const section = clampString(input.section, 40) || clampString(fallbackSection, 40);
+  if (!generatedAt || !section) return null;
+  return {
+    cycleId: clampString(input.cycleId, MAX_ID_LEN) || null,
+    generatedAt,
+    section,
   };
 }
 
@@ -268,6 +293,14 @@ class NewsroomCycleStore {
    * `sources` is whatever evidence the generation actually returned. It is
    * never synthesized: a provider response with no citations records an empty
    * list, because an invented source URL is worse than none.
+   *
+   * `generationRef` is the entry's link to the exact stored generation it
+   * represents — `{ cycleId, generatedAt, section }`, with a null `cycleId`
+   * for a generation made outside a cycle. Delivery reads the report back
+   * through it, so a retry sends this cycle's text rather than whatever is
+   * newest. For a reused same-day section the reference points at the
+   * *original* generation, and `reusedFromCycleId` names the cycle that wrote
+   * it, so the reuse stays traceable.
    */
   recordSectionGenerated(id, input = {}) {
     return this._mutate(id, (cycle) => {
@@ -286,6 +319,10 @@ class NewsroomCycleStore {
         // True when the section was already generated today and reused rather
         // than re-requested from the provider.
         reused: Boolean(input.reused),
+        generationRef: normalizeGenerationRef(input.generationRef, section),
+        // Readability only: the same cycle id the reference already carries,
+        // surfaced where a reader looking at a reused section expects it.
+        reusedFromCycleId: clampString(input.reusedFromCycleId, MAX_ID_LEN) || null,
         sources: Array.isArray(input.sources)
           ? input.sources.slice(0, 50).map((source) => ({
               url: clampString(source?.url, 2000) || null,

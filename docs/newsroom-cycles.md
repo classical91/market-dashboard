@@ -35,7 +35,7 @@ via an atomic rename — the same `json-file-lock` primitives the broadcast
 ledger and the reporter log use.
 
 ```json
-{ "version": 1, "cycles": [ /* newest first */ ] }
+{ "version": 2, "cycles": [ /* newest first */ ] }
 ```
 
 No database was introduced. The reporter has no database layer to extend, the
@@ -58,7 +58,7 @@ the whole store inherits.
 | `scheduledAt` / `startedAt` / `completedAt` / `updatedAt` | timings |
 | `reporter` | `{ model, provider }` as configured at start |
 | `sectionsExpected` | sections this run should produce |
-| `sectionsGenerated` | one entry per produced section: timestamp, model, prompt hash, whether a custom prompt was used, content length, `reused`, `sources` |
+| `sectionsGenerated` | one entry per produced section: timestamp, model, prompt hash, whether a custom prompt was used, content length, `reused`, `reusedFromCycleId`, `generationRef`, `sources` |
 | `receiptIds` | broadcast ledger receipts this cycle wrote |
 | `destinations` | `{ newsType, chatId, threadId, messageId, status }` per target |
 | `preflight` | the last preflight result and its checks |
@@ -107,6 +107,105 @@ delivery writes a `pending` receipt before sending, under the key
 `newsroom:<cycleId>:<newsType>`, and a category that already posted is
 recognized rather than re-sent. That is what makes delivery retry safe.
 
+## Cycle-exact delivery
+
+A cycle is retried by *delivering* it again, never by regenerating it. That
+makes one question load-bearing: **what did this cycle actually write?**
+
+`peekReport()` cannot answer it. It returns the latest content per section,
+which is the right answer for the Daily Reporter page and the wrong one here:
+
+```text
+1. Cycle A generates Crypto A.
+2. Cycle A's Telegram delivery fails.
+3. Cycle B, later, generates Crypto B.
+4. Cycle A's delivery is retried.
+5. peekReport() now holds Crypto B.
+6. Crypto B goes out under cycle A's receipts, message ids and audit trail.
+```
+
+Filtering out sections the cycle never generated does not close this: cycle A
+*did* generate crypto, so crypto is retained — and the content retained is
+still cycle B's. The retained set was right; the content behind it was not.
+
+So each generated section records the generation it *is*:
+
+```json
+"generationRef": {
+  "cycleId": "cyc_1a2b3c4d5e6f7a8b",
+  "generatedAt": "2026-08-26T13:00:04.118Z",
+  "section": "crypto"
+}
+```
+
+Delivery rebuilds the report from those references, section by section, out of
+the durable generation log. `ReporterService.getGenerationForReference()` is
+the only read it uses, and it resolves on exact identity:
+
+- `section` is required;
+- `generatedAt` matches the **exact instant**, never a nearest or latest match;
+- `cycleId`, when the reference carries one, must match the log entry's. A
+  `null` `cycleId` is meaningful — it says the generation was made outside a
+  cycle (a manual studio run, or history written before cycles existed) — and
+  identity then rests on section plus exact timestamp alone.
+
+Anything other than a single match fails. Nothing falls back to "latest".
+
+### Reused generations
+
+A cycle that reuses today's existing report writes no new generation log entry,
+so its reference points at the **original** generation, under the cycle that
+first produced it:
+
+```text
+Cycle B -> generationRef { cycleId: cycle A, generatedAt: A's instant } -> A's content + A's sources
+```
+
+`reused: true` and `reusedFromCycleId` travel on the same entry, so the
+relationship is readable without following the reference. No empty generation
+is ever fabricated to give the reusing cycle a log entry of its own.
+
+This is also why `GET /cycles/:id` no longer resolves generations by querying
+the log for the cycle's own id: a reused section has no entry under that id, so
+the query came back missing it. Cycle detail now resolves every recorded
+section through its reference, reused sections included.
+
+### Failing closed
+
+If a cycle says a section was generated and its exact generation cannot be
+uniquely recovered, delivery **stops for that section**. It does not substitute
+the current report, does not regenerate, and sends no Telegram message. The
+cycle records a classified, non-retryable failure:
+
+| Code | Meaning |
+| --- | --- |
+| `generation_reference_missing` | no stored generation matches the reference — pruned, lost with the volume, or never written |
+| `generation_reference_ambiguous` | more than one stored generation matches, so the reference identifies none of them |
+| `generation_reference_invalid` | the reference names no known section, or carries no usable timestamp |
+
+The failure is visible where every other cycle failure is: on the cycle record,
+in `GET /api/newsroom/health` as `lastError`, and on `GET /cycles/:id`, where
+the affected section comes back `resolved: false` with its code rather than
+being silently dropped.
+
+With the default `NEWSROOM_ALLOW_PARTIAL_DELIVERY=false`, one unresolvable
+section stops the whole delivery — the same rule that already governs a cycle
+missing an expected section. With partial delivery on, the sections that *are*
+proven go out and the cycle ends `delivery_partial`, never `completed`.
+
+### Older records
+
+Cycle records written before references existed have none, and **nothing
+rewrites or deletes them**. They are resolved by what they do carry — the
+cycle's own id, the section, and the section's exact generated timestamp —
+tried in that order and then by section plus exact timestamp, which is how a
+legacy cycle that reused a section resolves, since that text was logged under
+the cycle that first wrote it. Both attempts pin an exact instant. Neither
+widens to "latest", and an ambiguous or absent match fails closed exactly as a
+modern reference does.
+
+Regression coverage: `test/newsroom-cycle-integrity.test.js`.
+
 ## Failure classification
 
 `src/services/failure-classification.js` labels every failure before it is
@@ -150,10 +249,10 @@ and push messages to real channels.
 
 | Method | Path | Guard | Purpose |
 | --- | --- | --- | --- |
-| `GET` | `/health` | site access | operational status (below) |
+| `GET` | `/health` | site access **or** `x-admin-key` | operational status (below) |
 | `GET` | `/preflight` | admin | configuration check; starts nothing, sends nothing |
 | `GET` | `/cycles` | site access | recent cycles (`limit`, `status`, `trigger`, `since`) |
-| `GET` | `/cycles/:id` | site access | one cycle plus its generations and receipts |
+| `GET` | `/cycles/:id` | site access | one cycle plus its referenced generations and its receipts |
 | `POST` | `/cycles/run` | admin | start or resume a slot (`scheduledAt`, `trigger`, `deliver`) |
 | `POST` | `/cycles/:id/deliver` | admin | retry delivery only — never regenerates |
 
@@ -173,6 +272,43 @@ curl -X POST "$BASE/api/newsroom/cycles/run" \
   -H 'content-type: application/json' \
   -d '{"scheduledAt":"2026-08-26T13:00:00.000Z","trigger":"cron"}'
 ```
+
+### Machine access to `/health`
+
+Site login runs before every API router, so a caller with no browser session is
+answered `401 Login required` before the newsroom router is ever reached. Agent
+Office's ShareBot67 panel is exactly that caller: it reads this endpoint from
+its **own Node process**, never from browser JavaScript, because the dashboard
+key must not reach a browser.
+
+`GET /api/newsroom/health` therefore has a narrow machine-read exemption in
+`src/middleware/site-auth.js`, modelled on the Trading Lab one that already
+existed:
+
+```bash
+curl -s "$BASE/api/newsroom/health" -H "x-admin-key: $ADMIN_API_KEY" | jq
+```
+
+The exact boundary:
+
+| | Allowed |
+| --- | --- |
+| Method | `GET` and `HEAD` only |
+| Path | `/api/newsroom/health` exactly (a trailing slash is the same resource) |
+| Credential | a valid `x-admin-key` **header** |
+| Query authentication | none — `?key=` and friends do not authenticate |
+
+Everything else in the namespace is unchanged and stays behind the owner
+session: `/cycles`, `/cycles/:id` (which carries report text), `/preflight`,
+`POST /cycles/run` and `POST /cycles/:id/deliver`. The admin key opens none of
+them through this route, and the owner/alpha session model is untouched — an
+alpha read-only session still cannot read newsroom health.
+
+The endpoint is safe to expose this way because of what it does not carry: no
+credential, no prompt body, no report content — identifiers, statuses, counts,
+timestamps and the provider's own error message.
+
+Pinned by `test/newsroom-health-machine-read.test.js`.
 
 ## Preflight
 
@@ -229,10 +365,11 @@ than a late report. Then what exists goes out, with two guarantees:
 - the cycle ends `delivery_partial`, never `completed`, while an expected
   section is missing — including on a delivery *retry*, which recomputes
   completeness from the record rather than trusting the caller;
-- **only sections this cycle generated are sent.** `peekReport()` returns the
-  latest cached content per section, which can still hold yesterday's copy of a
-  section today's run failed to produce; delivering that would publish stale
-  copy under today's date and hang a receipt on a cycle that never generated it.
+- **only sections this cycle generated are sent**, and only from this cycle's
+  own generations. Delivery never reads the latest cache, so a section today's
+  run failed to produce cannot ride along from yesterday's copy, and a section
+  whose generation cannot be proven is not sent at all — see
+  [Cycle-exact delivery](#cycle-exact-delivery).
 
 ## What this does not do
 
@@ -245,11 +382,13 @@ than a late report. Then what exists goes out, with two guarantees:
   send both paths use now lives in `src/services/report-broadcast.js` so there
   is exactly one sender.
 
-## Agent Office follow-up (not done here)
+## The Agent Office panel
 
-ShareBot's existing countdown/status area in the `agent-office` repository can
-consume `GET /api/newsroom/health` directly — the response is shaped for a
-compact panel:
+ShareBot67's panel in the `agent-office` repository reads `GET
+/api/newsroom/health` **server-to-server** — Agent Office's own Node process
+holds the dashboard key and normalizes the response for the browser, so the key
+never reaches browser JavaScript. The response is shaped for that compact
+panel:
 
 | Panel row | Field |
 | --- | --- |
@@ -259,7 +398,9 @@ compact panel:
 | Delivery status | `lastAttemptedCycle.deliverySucceeded` / `deliveryFailed` |
 | Failed targets | `lastAttemptedCycle.deliveryFailed`, detail via `GET /cycles/:id` |
 | ShareBot health | `status` plus `lastError.code` and `lastError.retryable` |
+| Agent route | `agentRoute.status` and `agentRoute.verified` |
 
-That change belongs in `agent-office`, which is a separate repository and was
-not in scope for this work. Nothing here blocks it: the endpoint is live and
-read-only, and no field it needs requires an admin key.
+The adapter and the panel live in `agent-office`; this side of it is the
+endpoint and the machine-read exemption above. The panel is read-only by
+design: it offers no run, retry or Telegram control, and nothing on it can
+cause this app to generate or send anything.

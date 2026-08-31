@@ -454,7 +454,6 @@ function createApp() {
     createNewsroomRouter({
       newsroomService,
       cycleStore: newsroomCycleStore,
-      reporterService,
       broadcastLedgerStore,
       requireAdmin,
     }),

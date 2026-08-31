@@ -7,6 +7,13 @@ const { withExclusiveLock, writeJsonAtomic } = require("./json-file-lock");
 
 const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000;
 const REPORT_SECTIONS = ["crypto", "economics", "markets"];
+
+// Why a cycle delivery can refuse to send. These are error codes on a stored
+// failure, so they are part of the operational contract and are exported for
+// the newsroom service and its tests rather than retyped as string literals.
+const GENERATION_REFERENCE_MISSING = "generation_reference_missing";
+const GENERATION_REFERENCE_AMBIGUOUS = "generation_reference_ambiguous";
+const GENERATION_REFERENCE_INVALID = "generation_reference_invalid";
 const SECTION_LABELS = {
   crypto: "Emerging Markets",
   economics: "Economics Top 10",
@@ -472,6 +479,77 @@ class ReporterService {
   }
 
   /**
+   * Resolve the one historical generation a cycle's section reference names.
+   *
+   * This is the read that makes a newsroom delivery retry safe. `peekReport()`
+   * answers "what is the latest content for this section", which is the right
+   * question for the Daily Reporter page and the wrong one for a cycle: a
+   * cycle retried after a newer cycle generated the same section would pick up
+   * the newer text and publish it under the older cycle's receipts. So a cycle
+   * asks for an exact generation instead, and this either finds exactly one or
+   * refuses.
+   *
+   * Identity rules:
+   *   - `section` is always required.
+   *   - `generatedAt` is matched on the exact instant, never a nearest match.
+   *   - `cycleId`, when the reference carries one, must match the log entry's.
+   *     A reference with `cycleId: null` describes a generation that was made
+   *     outside a cycle (a manual studio run, or history written before cycles
+   *     existed), and is identified by section plus exact timestamp alone.
+   *
+   * Anything other than a single match fails: nothing here falls back to
+   * "latest", and an ambiguous history is refused rather than guessed at.
+   *
+   * @returns {{ok: true, generation: object} | {ok: false, code: string, detail: string}}
+   */
+  getGenerationForReference(reference = {}) {
+    const section = typeof reference.section === "string" ? reference.section.trim() : "";
+    if (!section || !REPORT_SECTIONS.includes(section)) {
+      return {
+        ok: false,
+        code: GENERATION_REFERENCE_INVALID,
+        detail: `The generation reference names no known report section (${section || "none"}).`,
+      };
+    }
+
+    const at = reference.generatedAt ? new Date(reference.generatedAt) : null;
+    if (!at || Number.isNaN(at.getTime())) {
+      return {
+        ok: false,
+        code: GENERATION_REFERENCE_INVALID,
+        detail: `The generation reference for "${section}" carries no usable generated timestamp.`,
+      };
+    }
+    const atMs = at.getTime();
+
+    const wantedCycleId = typeof reference.cycleId === "string" && reference.cycleId.trim()
+      ? reference.cycleId.trim()
+      : null;
+
+    const matches = this._readLog().filter((entry) => {
+      if (!entry || entry.section !== section || !entry.content) return false;
+      const entryAt = new Date(entry.generatedAt || 0).getTime();
+      if (!Number.isFinite(entryAt) || entryAt !== atMs) return false;
+      if (wantedCycleId) return entry.cycleId === wantedCycleId;
+      return true;
+    });
+
+    if (matches.length === 1) return { ok: true, generation: matches[0] };
+    if (matches.length === 0) {
+      return {
+        ok: false,
+        code: GENERATION_REFERENCE_MISSING,
+        detail: `No stored generation matches ${section} @ ${at.toISOString()}${wantedCycleId ? ` for cycle ${wantedCycleId}` : ""}.`,
+      };
+    }
+    return {
+      ok: false,
+      code: GENERATION_REFERENCE_AMBIGUOUS,
+      detail: `${matches.length} stored generations match ${section} @ ${at.toISOString()}; the reference does not identify one.`,
+    };
+  }
+
+  /**
    * Read-only: return cached section reports if they exist. Never triggers
    * generation, so simply viewing the page can't spend API calls.
    */
@@ -587,4 +665,12 @@ class ReporterService {
   }
 }
 
-module.exports = { ReporterService, REPORT_SECTIONS, SECTION_LABELS, extractSources };
+module.exports = {
+  ReporterService,
+  REPORT_SECTIONS,
+  SECTION_LABELS,
+  extractSources,
+  GENERATION_REFERENCE_MISSING,
+  GENERATION_REFERENCE_AMBIGUOUS,
+  GENERATION_REFERENCE_INVALID,
+};
