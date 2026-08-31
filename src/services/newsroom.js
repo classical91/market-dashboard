@@ -27,6 +27,10 @@ const crypto = require("crypto");
 const { destinationsForNewsType } = require("./news-routing");
 const { broadcastReportSections, REPORT_CATEGORIES } = require("./report-broadcast");
 const { classifyFailure } = require("./failure-classification");
+const {
+  GENERATION_REFERENCE_MISSING,
+  GENERATION_REFERENCE_AMBIGUOUS,
+} = require("./reporter");
 const { scheduledCycleKey, ACTIVE_STATUSES, GENERATED_STATUSES } = require("./newsroom-cycles");
 const { UNCONFIGURED_DETAIL, PASS, WARN, FAIL } = require("./newsroom-agent-preflight");
 
@@ -277,7 +281,7 @@ class NewsroomService {
       return { cycle: this._cycles.getCycle(cycle.id), created, preflight, generation };
     }
 
-    const delivery = await this._deliver(cycle.id, { ttlMs, incomplete: generation.incomplete });
+    const delivery = await this._deliver(cycle.id, { incomplete: generation.incomplete });
     return { cycle: this._cycles.getCycle(cycle.id), created, preflight, generation, delivery };
   }
 
@@ -286,14 +290,149 @@ class NewsroomService {
    * partial or failed delivery retries through, and regenerating a report that
    * already exists would both cost money and change what was published.
    */
-  async deliverCycle(idOrKey, { ttlMs } = {}) {
+  async deliverCycle(idOrKey) {
     const cycle = this._cycles.getCycle(idOrKey);
     if (!cycle) return null;
     if (!GENERATED_STATUSES.has(cycle.status)) {
       return { cycle, skipped: "not-generated" };
     }
-    const delivery = await this._deliver(cycle.id, { ttlMs });
+    const delivery = await this._deliver(cycle.id);
     return { cycle: this._cycles.getCycle(cycle.id), delivery };
+  }
+
+  /**
+   * Resolve the first candidate reference that names exactly one stored
+   * generation.
+   *
+   * Candidates are ordered most specific first. A candidate that matches
+   * nothing falls through to the next — that is what lets a cycle recorded
+   * before generation references existed still be resolved by section and
+   * exact timestamp. A candidate that matches *more than one* generation stops
+   * the search: a looser reference can only match more, so trying one after an
+   * ambiguous match would be guessing, and guessing is the failure mode this
+   * whole path exists to remove.
+   */
+  _resolveGenerationRefs(candidates) {
+    let firstFailure = null;
+    for (const reference of candidates) {
+      if (!reference || !reference.section || !reference.generatedAt) continue;
+      if (typeof this._reporter.getGenerationForReference !== "function") break;
+      const result = this._reporter.getGenerationForReference(reference);
+      if (result.ok) return { ...result, reference };
+      if (result.code === GENERATION_REFERENCE_AMBIGUOUS) return result;
+      firstFailure = firstFailure || result;
+    }
+    return (
+      firstFailure || {
+        ok: false,
+        code: GENERATION_REFERENCE_MISSING,
+        detail: "The cycle records no usable reference to a stored generation for this section.",
+      }
+    );
+  }
+
+  /**
+   * Pin a section that was just produced (or reused) to the exact stored
+   * generation it stands for, so the cycle can record a reference to it.
+   */
+  _resolveFreshGeneration(cycle, section, report) {
+    if (report.generationSkipped) {
+      // Reused: the text belongs to the generation that first wrote it, which
+      // may sit under an earlier cycle's id or under no cycle at all.
+      return this._resolveGenerationRefs([
+        { cycleId: report.reusedCycleId || null, generatedAt: report.reusedGeneratedAt, section },
+        { cycleId: null, generatedAt: report.reusedGeneratedAt, section },
+      ]);
+    }
+
+    const logged =
+      typeof this._reporter.listGenerations === "function"
+        ? this._reporter.listGenerations({ cycleId: cycle.id, section, limit: 1 })[0] || null
+        : null;
+    const generatedAt =
+      (logged && logged.generatedAt) || (report.generatedAtBySection && report.generatedAtBySection[section]) || null;
+    return this._resolveGenerationRefs([
+      logged ? { cycleId: cycle.id, generatedAt: logged.generatedAt, section } : null,
+      { cycleId: null, generatedAt, section },
+    ].filter(Boolean));
+  }
+
+  /**
+   * Resolve one recorded section of a stored cycle back to its generation.
+   *
+   * A cycle written since generation references exist carries the answer and
+   * is resolved strictly. An older record does not, so its own id and the
+   * section's generated timestamp are tried first, then section plus exact
+   * timestamp — which is how a legacy cycle that *reused* a section resolves,
+   * since that text was logged under the cycle that first wrote it. Neither
+   * fallback ever widens to "latest": both pin an exact instant, and an
+   * ambiguous or absent match fails closed.
+   */
+  _resolveCycleSection(cycle, entry) {
+    const section = entry && entry.section;
+    const reference = entry && entry.generationRef;
+    if (reference && reference.generatedAt) {
+      return this._resolveGenerationRefs([
+        {
+          cycleId: reference.cycleId || null,
+          generatedAt: reference.generatedAt,
+          section: reference.section || section,
+        },
+      ]);
+    }
+    return this._resolveGenerationRefs([
+      { cycleId: cycle && cycle.id, generatedAt: entry && entry.generatedAt, section },
+      { cycleId: null, generatedAt: entry && entry.generatedAt, section },
+    ]);
+  }
+
+  /**
+   * The generations a stored cycle's sections actually point at.
+   *
+   * Cycle detail cannot answer this by listing generations logged under the
+   * cycle's own id: a same-day *reused* section writes no new log entry, so
+   * its text lives under the cycle that first produced it and a by-cycle query
+   * misses it entirely. Resolving each recorded section through its reference
+   * finds the reused text and keeps the link back to where it came from —
+   * and, for a section whose generation cannot be uniquely recovered, says so
+   * instead of quietly dropping it.
+   *
+   * Carries content and source URLs, which cycle detail has always exposed. It
+   * does not carry prompt bodies or credentials.
+   */
+  resolveCycleGenerations(cycle) {
+    return ((cycle && cycle.sectionsGenerated) || [])
+      .filter((entry) => entry && entry.section)
+      .map((entry) => {
+        const reference = entry.generationRef || null;
+        const base = {
+          section: entry.section,
+          reused: Boolean(entry.reused),
+          reusedFromCycleId:
+            entry.reusedFromCycleId || (entry.reused && reference ? reference.cycleId : null) || null,
+          generationRef: reference,
+        };
+        const resolution = this._resolveCycleSection(cycle, entry);
+        if (!resolution.ok) {
+          return { ...base, resolved: false, error: { code: resolution.code, detail: resolution.detail } };
+        }
+        const generation = resolution.generation;
+        return {
+          ...base,
+          resolved: true,
+          resolvedFrom: resolution.reference,
+          label: generation.label,
+          generatedAt: generation.generatedAt,
+          generatedDateKey: generation.generatedDateKey,
+          dateStr: generation.dateStr,
+          model: generation.model,
+          cycleId: generation.cycleId || null,
+          content: generation.content,
+          sources: generation.sources || [],
+          // Whether a custom prompt was used, never its text.
+          hasCustomPrompt: Boolean(generation.prompt),
+        };
+      });
   }
 
   async _generate(cycle, { ttlMs } = {}) {
@@ -317,24 +456,39 @@ class NewsroomService {
           throw Object.assign(new Error(`Reporter returned no content for section "${section}"`), { code: "empty_generation" });
         }
 
-        const logged =
-          typeof this._reporter.listGenerations === "function"
-            ? this._reporter.listGenerations({ section, limit: 1 })[0] || null
-            : null;
+        // Which stored generation this section *is*, resolved now while the
+        // answer is unambiguous. Delivery reads the report back through this
+        // reference rather than through the latest cache, so a retry days
+        // later still sends this cycle's text and not a newer one.
+        const resolution = this._resolveFreshGeneration(cycle, section, report);
+        if (!resolution.ok) {
+          // Content exists but its provenance cannot be pinned to a single
+          // stored generation. Recording it as generated would hand delivery a
+          // section it can only guess at, so the section fails here instead.
+          throw Object.assign(new Error(resolution.detail), { code: resolution.code });
+        }
+        const logged = resolution.generation;
+        const reused = Boolean(report.generationSkipped);
         this._cycles.recordSectionGenerated(cycle.id, {
           section,
-          generatedAt:
-            (report.generatedAtBySection && report.generatedAtBySection[section]) ||
-            report.reusedGeneratedAt ||
-            (logged && logged.generatedAt),
-          model: (logged && logged.model) || report.reusedModel || this._reporter.model,
-          promptHash: promptHash(logged && logged.prompt),
-          hasCustomPrompt: Boolean(logged && logged.prompt),
+          generatedAt: logged.generatedAt,
+          model: logged.model || report.reusedModel || this._reporter.model,
+          promptHash: promptHash(logged.prompt),
+          hasCustomPrompt: Boolean(logged.prompt),
           contentLength: String(content).length,
-          reused: Boolean(report.generationSkipped),
-          sources: (logged && logged.sources) || report.generatedSources || [],
+          reused,
+          // The exact generation this section stands for. For a reused
+          // section that is the *original* cycle's generation, which is what
+          // keeps the reuse traceable back to where the text was written.
+          generationRef: {
+            cycleId: logged.cycleId || null,
+            generatedAt: logged.generatedAt,
+            section,
+          },
+          reusedFromCycleId: reused ? logged.cycleId || null : null,
+          sources: logged.sources || report.generatedSources || [],
           sourcesUnavailableReason:
-            (logged && Array.isArray(logged.sources) && logged.sources.length) || (report.generatedSources || []).length
+            (Array.isArray(logged.sources) && logged.sources.length) || (report.generatedSources || []).length
               ? null
               : "The provider response exposed no citations for this section.",
         });
@@ -368,31 +522,88 @@ class NewsroomService {
     return { ok: true, generatedCount, failures };
   }
 
-  async _deliver(cycleId, { ttlMs, incomplete = false } = {}) {
+  /**
+   * The report this cycle actually wrote, rebuilt from its own generation
+   * references.
+   *
+   * Deliberately not `peekReport()`. That returns the *latest* content per
+   * section, which is right for the Daily Reporter page and wrong here: a
+   * cycle whose delivery failed and is retried after a later cycle generated
+   * the same section would pick up the later text and publish it under the
+   * earlier cycle's receipts and audit trail.
+   *
+   * Sections whose exact generation cannot be recovered are not substituted
+   * and not regenerated — they come back in `unresolved` and the caller
+   * refuses to send them.
+   */
+  _rebuildCycleReport(cycle) {
+    const entries = ((cycle && cycle.sectionsGenerated) || []).filter((entry) => entry && entry.section);
+    const report = { configured: true, generated: false, generatedAtBySection: {} };
+    const resolved = [];
+    const unresolved = [];
+
+    entries.forEach((entry) => {
+      const resolution = this._resolveCycleSection(cycle, entry);
+      if (!resolution.ok) {
+        unresolved.push({ section: entry.section, code: resolution.code, detail: resolution.detail });
+        return;
+      }
+      const generation = resolution.generation;
+      report[entry.section] = generation.content;
+      report.generatedAtBySection[entry.section] = generation.generatedAt;
+      report.generated = true;
+      if (!report.generatedAt || String(generation.generatedAt) > String(report.generatedAt)) {
+        report.generatedAt = generation.generatedAt;
+        // The date the text was written for, not today's — a retry must not
+        // relabel an older cycle's report with the date of the retry.
+        if (generation.dateStr) report.dateStr = generation.dateStr;
+      }
+      if (!report.dateStr && generation.dateStr) report.dateStr = generation.dateStr;
+      resolved.push({ section: entry.section, generation, reference: resolution.reference });
+    });
+
+    return { report, resolved, unresolved };
+  }
+
+  async _deliver(cycleId, { incomplete = false } = {}) {
     const before = this._cycles.getCycle(cycleId);
     // Recomputed from the record rather than trusted from the caller, so a
     // delivery *retry* on an incomplete cycle stays partial too — the missing
     // section is still missing however the delivery got here.
     const generated = new Set(((before && before.sectionsGenerated) || []).map((entry) => entry.section));
     const missingSections = ((before && before.sectionsExpected) || []).filter((section) => !generated.has(section));
-    const reportIncomplete = incomplete || missingSections.length > 0;
 
     this._cycles.setStatus(cycleId, "delivering");
-    const peeked = this._reporter.peekReport(ttlMs);
 
-    // Deliver only what *this* cycle generated. peekReport returns the latest
-    // cached content per section, which can still hold yesterday's copy of a
-    // section today's run failed to produce — sending that would attach a
-    // receipt to a cycle that never generated it and publish stale copy under
-    // today's date.
-    const report = peeked && peeked.configured !== false
-      ? this._sections.reduce(
-          (carry, section) => (generated.has(section) ? carry : { ...carry, [section]: "" }),
-          peeked,
-        )
-      : peeked;
+    const { report, unresolved } = this._rebuildCycleReport(before);
+    const reportIncomplete = incomplete || missingSections.length > 0 || unresolved.length > 0;
 
-    if (!report || report.configured === false || !this._sections.some((section) => report[section])) {
+    // Fail closed. A section the cycle claims to have generated but whose
+    // stored generation cannot be uniquely recovered is an integrity failure,
+    // not an invitation to send the latest copy instead.
+    unresolved.forEach((problem) => {
+      this._cycles.recordFailure(cycleId, {
+        phase: "delivery",
+        section: problem.section,
+        classification: {
+          class: "non_retryable",
+          retryable: false,
+          code: problem.code,
+          status: null,
+          message: problem.detail,
+          reason:
+            "The cycle's own generation could not be identified, and delivery will not substitute the latest report. Nothing was sent for this section.",
+        },
+      });
+      this._logger.error?.(`[Newsroom] ${cycleId} delivery blocked for ${problem.section}: ${problem.detail}`);
+    });
+
+    if (unresolved.length && !this._allowPartialDelivery) {
+      this._cycles.setStatus(cycleId, "delivery_failed");
+      return { ok: false, status: "delivery_failed", destinations: [], receipts: [], unresolved };
+    }
+
+    if (!report.generated) {
       this._cycles.recordFailure(cycleId, {
         phase: "delivery",
         classification: {
@@ -405,7 +616,7 @@ class NewsroomService {
         },
       });
       this._cycles.setStatus(cycleId, "delivery_failed");
-      return { ok: false, destinations: [], receipts: [] };
+      return { ok: false, destinations: [], receipts: [], unresolved };
     }
 
     // continueOnError: one dead chat or topic must not cost the other
@@ -465,7 +676,15 @@ class NewsroomService {
       : "delivery_failed";
 
     this._cycles.setStatus(cycleId, status);
-    return { ok: status === "completed", status, destinations, receipts, posted: posted.length, failed: failed.length };
+    return {
+      ok: status === "completed",
+      status,
+      destinations,
+      receipts,
+      posted: posted.length,
+      failed: failed.length,
+      unresolved,
+    };
   }
 
   /**
