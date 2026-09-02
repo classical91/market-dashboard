@@ -152,6 +152,27 @@
   padding: 20px 4px;
 }
 
+/* ── Collapsible section panels ───────────────────────────
+   `sections.js` toggles `.collapsed` on the panel a section
+   header controls. These panels are plain wrappers rather than
+   `.cards` lists, so they carry their own open/closed styling.
+──────────────────────────────────────────────────────────── */
+.yt-section-panel {
+  display: grid;
+  grid-template-rows: 1fr;
+  overflow: hidden;
+  opacity: 1;
+  transition: grid-template-rows 0.25s ease, opacity 0.2s ease;
+}
+.yt-section-panel > * { min-height: 0; }
+.yt-section-panel.collapsed {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  pointer-events: none;
+}
+/* The list keeps a bottom margin that would otherwise survive the fold. */
+.yt-section-panel.collapsed > * { margin-bottom: 0; }
+
 /* ── Channel RSS feed blocks ─────────────────────────────── */
 .yt-channel-feeds {
   display: flex;
