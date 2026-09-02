@@ -242,3 +242,52 @@
   .yt-split { grid-template-columns: 1fr; }
   .yt-queue-pane { max-height: none; }
 }
+
+/* ─────────────────────────────────────────────────────────
+   Theme switcher — mirrors the X Intelligence switcher so the
+   two intelligence pages read as one control, not two
+───────────────────────────────────────────────────────── */
+
+.yt-title-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.yt-theme-switcher { position: relative; }
+.yt-theme-trigger {
+  display: inline-flex; align-items: center; gap: 9px; min-height: 34px;
+  padding: 7px 11px; border: 1px solid rgba(155,123,255,0.34); border-radius: 9px;
+  background: rgba(155,123,255,0.08); color: var(--text); font: inherit;
+  font-size: 12px; font-weight: 700; cursor: pointer;
+  transition: border-color .16s ease, background .16s ease;
+}
+.yt-theme-trigger:hover,
+.yt-theme-trigger[aria-expanded="true"] {
+  border-color: var(--yt-accent, var(--purple));
+  background: color-mix(in srgb, var(--yt-accent, var(--purple)) 14%, transparent);
+}
+.yt-theme-trigger:focus-visible,
+.yt-theme-option:focus-visible { outline: 2px solid var(--yt-accent, var(--blue)); outline-offset: 2px; }
+.yt-theme-menu {
+  position: absolute; z-index: 60; top: calc(100% + 7px); left: 0;
+  width: min(320px, calc(100vw - 40px)); padding: 7px; border: 1px solid var(--border);
+  border-radius: 12px; background: var(--surface, #0f1420);
+  box-shadow: 0 18px 48px rgba(0,0,0,.48); animation: yt-theme-menu-in .16s ease-out;
+}
+@keyframes yt-theme-menu-in { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+.yt-theme-option {
+  display: flex; justify-content: space-between; gap: 12px; width: 100%;
+  padding: 9px 10px; border: 0; border-radius: 8px; background: transparent;
+  color: var(--soft, var(--text)); font: inherit; text-align: left; cursor: pointer;
+}
+.yt-theme-option:hover,
+.yt-theme-option.active { background: rgba(255,255,255,.055); color: var(--text); }
+.yt-theme-option.active { box-shadow: inset 2px 0 var(--yt-accent, var(--purple)); }
+.yt-theme-option-name { font-size: 12px; font-weight: 700; }
+.yt-theme-option-count { font-size: 10px; color: var(--muted); }
+
+body[data-yt-accent="market"] { --yt-accent: var(--purple, #9b7bff); }
+body[data-yt-accent="world"] { --yt-accent: #d6a760; }
+body[data-yt-accent="tech"] { --yt-accent: #52c7d9; }
+body[data-yt-accent="relic"] { --yt-accent: #c98f5c; }
+body[data-yt-accent="macro"] { --yt-accent: #76a7ff; }
+body[data-yt-accent="energy"] { --yt-accent: #65c889; }
+body[data-yt-accent="neutral"] { --yt-accent: #aab3c3; }
+
+body[data-yt-accent] .yt-feed-card:hover { border-color: var(--yt-accent); }

@@ -16,8 +16,18 @@
 
     <div class="cmd-page-header">
       <div>
-        <div class="cmd-page-title">&#127916; YouTube Intelligence</div>
-        <div class="cmd-page-subtitle">Live streams, scheduled streams and latest uploads from trusted channels</div>
+        <div class="yt-title-row">
+          <div class="cmd-page-title">&#127916; YouTube Intelligence</div>
+          <div class="yt-theme-switcher" id="ytThemeSwitcher" hidden>
+            <button type="button" class="yt-theme-trigger" id="ytThemeTrigger"
+                    aria-expanded="false" aria-controls="ytThemeMenu">
+              <span id="ytThemeTriggerLabel">Markets</span>
+              <span aria-hidden="true">&#9662;</span>
+            </button>
+            <div class="yt-theme-menu" id="ytThemeMenu" hidden></div>
+          </div>
+        </div>
+        <div class="cmd-page-subtitle" id="ytThemeDescription">Live streams, scheduled streams and latest uploads from trusted channels</div>
       </div>
     </div>
 

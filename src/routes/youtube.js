@@ -6,7 +6,7 @@ function asyncRoute(handler) {
   };
 }
 
-function createYoutubeRouter({ youtubeService, channels }) {
+function createYoutubeRouter({ youtubeService, channels, themes = [] }) {
   const router = express.Router();
 
   router.get(
@@ -15,7 +15,10 @@ function createYoutubeRouter({ youtubeService, channels }) {
       // getIntelligence never rejects on a single bad channel — failures come
       // back in `failedFeeds` so one dead feed cannot blank the whole page.
       const payload = await youtubeService.getIntelligence(channels);
-      res.json(payload);
+      // Themes ride along with the feed rather than sitting on their own
+      // endpoint: the page cannot render a theme without the videos anyway, and
+      // one response keeps the switcher from flashing the wrong name first.
+      res.json({ ...payload, themes });
     }),
   );
 

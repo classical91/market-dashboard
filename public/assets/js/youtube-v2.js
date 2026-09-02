@@ -73,13 +73,22 @@
       });
     }
 
-    return uploads.map(function (video) {
-      return {
-        video: video,
-        channelLabel: video.channelLabel || video.channelHandle || "YouTube",
-        channelCategory: video.channelCategory || "",
-      };
-    });
+    return uploads.map(toItem);
+  }
+
+  function toItem(video) {
+    return {
+      video: video,
+      // The handle, not the label, is what a theme's membership is keyed by:
+      // labels are display text and two channels may share one.
+      channelHandle: normalizeHandle(video.channelHandle),
+      channelLabel: video.channelLabel || video.channelHandle || "YouTube",
+      channelCategory: video.channelCategory || "",
+    };
+  }
+
+  function normalizeHandle(value) {
+    return String(value == null ? "" : value).trim().replace(/^@+/, "").toLowerCase();
   }
 
   function buildCard(item, onSelect) {
@@ -215,19 +224,54 @@
     return kind === "live" ? "No channels are live right now." : "No streams scheduled right now.";
   }
 
-  function render(roots, data, onSelect) {
+  var THEME_KEY = "yt:theme";
+
+  function readStoredTheme() {
+    try {
+      return window.localStorage.getItem(THEME_KEY) || "";
+    } catch (e) {
+      // Private mode and blocked site data both throw here. A remembered theme
+      // is a convenience; losing it must not stop the page rendering.
+      return "";
+    }
+  }
+
+  function storeTheme(id) {
+    try {
+      window.localStorage.setItem(THEME_KEY, id);
+    } catch (e) {
+      /* best effort */
+    }
+  }
+
+  function themeHandles(theme) {
+    return (theme && theme.channels ? theme.channels : []).map(function (member) {
+      return normalizeHandle(member.handle);
+    });
+  }
+
+  /**
+   * Narrows a list of items to the channels a theme owns.
+   *
+   * An item whose handle the payload never supplied is kept rather than
+   * dropped: older payloads carry no channelHandle, and silently hiding every
+   * video would look like an outage rather than a missing field.
+   */
+  function filterToTheme(items, theme) {
+    var handles = themeHandles(theme);
+    if (!handles.length) return [];
+    return items.filter(function (item) {
+      return !item.channelHandle || handles.indexOf(item.channelHandle) >= 0;
+    });
+  }
+
+  function render(roots, data, onSelect, theme) {
     var meta = data.meta || {};
     var failed = data.failedFeeds || [];
     var items = normalizeUploads(data);
 
     function wrap(list) {
-      return list.map(function (video) {
-        return {
-          video: video,
-          channelLabel: video.channelLabel || video.channelHandle || "YouTube",
-          channelCategory: video.channelCategory || "",
-        };
-      });
+      return list.map(toItem);
     }
 
     var live = data.live
@@ -247,6 +291,34 @@
       return item.video.state !== "live" && item.video.state !== "upcoming";
     });
 
+    if (theme) {
+      var handles = themeHandles(theme);
+
+      // A theme with no channels yet is the normal state of a newly added one.
+      // Saying "no videos found" there reads as a failed fetch and hides the
+      // one thing that would fix it.
+      if (!handles.length) {
+        renderGrid(roots.live, [], "No channels in this theme yet.", onSelect);
+        renderGrid(roots.upcoming, [], "No channels in this theme yet.", onSelect);
+        renderGrid(
+          roots.uploads,
+          [],
+          "No channels in this theme yet — add them to src/config/youtube-themes.js.",
+          onSelect,
+        );
+        return null;
+      }
+
+      live = filterToTheme(live, theme);
+      upcoming = filterToTheme(upcoming, theme);
+      uploads = filterToTheme(uploads, theme);
+      // Only failures for channels this theme owns: another theme's dead feed
+      // is not this view's problem to report.
+      failed = failed.filter(function (channel) {
+        return handles.indexOf(normalizeHandle(channel.handle)) >= 0;
+      });
+    }
+
     renderGrid(roots.live, live, emptyLiveText(meta, "live"), onSelect);
     renderGrid(roots.upcoming, upcoming, emptyLiveText(meta, "upcoming"), onSelect);
     renderGrid(roots.uploads, uploads, "No videos found yet.", onSelect);
@@ -256,6 +328,68 @@
     return first && first.video ? first.video.id : null;
   }
 
+  /**
+   * Builds the theme switcher. Returns a function that re-renders it, or null
+   * when the payload carries no themes — an older server, in which case the
+   * switcher stays hidden and the page renders every channel as it always did.
+   */
+  function setupThemeSwitcher(themes, onChange) {
+    var switcher = document.getElementById("ytThemeSwitcher");
+    var trigger = document.getElementById("ytThemeTrigger");
+    var label = document.getElementById("ytThemeTriggerLabel");
+    var menu = document.getElementById("ytThemeMenu");
+    var description = document.getElementById("ytThemeDescription");
+    if (!switcher || !trigger || !menu || !themes.length) return null;
+
+    switcher.hidden = false;
+
+    function setOpen(open) {
+      menu.hidden = !open;
+      trigger.setAttribute("aria-expanded", open ? "true" : "false");
+    }
+
+    document.addEventListener("click", function (e) {
+      if (!switcher.contains(e.target)) setOpen(false);
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") setOpen(false);
+    });
+    trigger.addEventListener("click", function () {
+      setOpen(menu.hidden);
+    });
+
+    return function renderSwitcher(activeId) {
+      var active = themes.filter(function (theme) { return theme.id === activeId; })[0] || themes[0];
+      if (label) label.textContent = active.name;
+      if (description) description.textContent = active.description || "";
+      document.body.setAttribute("data-yt-accent", active.accent || "market");
+
+      menu.innerHTML = "";
+      themes.forEach(function (theme) {
+        var option = document.createElement("button");
+        option.type = "button";
+        option.className = "yt-theme-option" + (theme.id === active.id ? " active" : "");
+
+        var name = document.createElement("span");
+        name.className = "yt-theme-option-name";
+        name.textContent = theme.name;
+
+        var count = document.createElement("span");
+        count.className = "yt-theme-option-count";
+        var total = (theme.channels || []).length;
+        count.textContent = total + (total === 1 ? " channel" : " channels");
+
+        option.appendChild(name);
+        option.appendChild(count);
+        option.addEventListener("click", function () {
+          setOpen(false);
+          onChange(theme.id);
+        });
+        menu.appendChild(option);
+      });
+    };
+  }
+
   function loadFeeds(roots, onSelect, onInitialVideo) {
     fetch("/api/youtube/channels")
       .then(function (res) {
@@ -263,7 +397,31 @@
         return res.json();
       })
       .then(function (data) {
-        var firstId = render(roots, data || {}, onSelect);
+        var payload = data || {};
+        var themes = payload.themes || [];
+        var stored = readStoredTheme();
+        // A stored id that no longer exists (a theme removed in a deploy) falls
+        // back to the first theme rather than rendering an empty page.
+        var activeId = themes.filter(function (theme) { return theme.id === stored; })[0]
+          ? stored
+          : (themes[0] ? themes[0].id : "");
+
+        function activeTheme() {
+          return themes.filter(function (theme) { return theme.id === activeId; })[0] || null;
+        }
+
+        var renderSwitcher = setupThemeSwitcher(themes, function (id) {
+          if (id === activeId) return;
+          activeId = id;
+          storeTheme(id);
+          if (renderSwitcher) renderSwitcher(activeId);
+          // Re-render from the payload already in hand: switching themes is a
+          // view change, so it costs no request and no YouTube quota.
+          render(roots, payload, onSelect, activeTheme());
+        });
+        if (renderSwitcher) renderSwitcher(activeId);
+
+        var firstId = render(roots, payload, onSelect, activeTheme());
         if (firstId && onInitialVideo) onInitialVideo(firstId);
       })
       .catch(function () {
