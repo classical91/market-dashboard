@@ -77,7 +77,9 @@ test("a theme's empty sections survive, so the manage panel can suggest them", (
 
   assert.deepEqual(dig.channels, [], "no channels yet");
   assert.ok(dig.sections.includes("Lost Civilizations"), "but the layout is still offered");
-  assert.ok(themeSections().includes("AI Labs"), "and reaches the category suggestions");
+  // themeSections still reports what the catalogue names. It no longer seeds
+  // YouTube categories — see the registry tests for that boundary.
+  assert.ok(themeSections().includes("AI Labs"), "and the catalogue still names it");
 });
 
 test("every shipped theme is resolvable, uniquely identified and accented", () => {

@@ -47,7 +47,22 @@ test("reading the tracked channels needs no key — the panel renders before any
   assert.ok(Array.isArray(body.channels));
   assert.ok(body.channels.length, "the seed is served");
   assert.ok(Array.isArray(body.categories));
-  assert.ok(body.categories.some((category) => category.name === "Archaeology"), "theme sections seed categories");
+  // A first boot inherits nothing from the theme catalogue: "Archaeology" is a
+  // section some theme names, not a category anything is filed under.
+  assert.equal(
+    body.categories.some((category) => category.name === "Archaeology"),
+    false,
+    "theme sections do not seed categories",
+  );
+  // The stronger form of the same rule — a fresh registry has no empty category
+  // at all, so every row in the filter is somewhere a channel actually lives.
+  for (const category of body.categories) {
+    assert.ok(category.channelCount > 0, `${category.name} was created with no channels in it`);
+  }
+  assert.ok(
+    body.categories.some((category) => category.name === "Crypto"),
+    "the categories the seeded channels are filed under are still created",
+  );
   assert.equal(
     body.categories.some((category) => category.id === "uncategorized"),
     false,
@@ -74,6 +89,15 @@ test("mutations without the admin key are refused and change nothing", async () 
 });
 
 test("an added channel lands in the theme its category names", async () => {
+  // Archaeology has to be created on purpose now — nothing seeds it — which is
+  // what this asserts before going on to the theme it feeds.
+  const category = await adminApi("/api/youtube/categories/config", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: "Archaeology" }),
+  });
+  assert.equal(category.status, 201);
+
   const res = await adminApi("/api/youtube/channels/config", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -102,7 +126,8 @@ test("adding the same channel twice is a 409, whatever the spelling", async () =
   const res = await adminApi("/api/youtube/channels/config", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ handle: "DIGGERS", category: "Unexplained" }),
+    // A different (and existing) category must not make it a different channel.
+    body: JSON.stringify({ handle: "DIGGERS", category: "Tech" }),
   });
   assert.equal(res.status, 409);
 

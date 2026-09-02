@@ -130,7 +130,14 @@ function resolveYoutubeThemes(themes = YOUTUBE_THEMES, channels = []) {
   return resolved.concat(custom.map(({ normalized, ...theme }) => theme));
 }
 
-/** Every section any theme offers — what the manage panel suggests as categories. */
+/**
+ * Every section any theme offers.
+ *
+ * This no longer seeds YouTube categories. It used to, which meant a section a
+ * theme names — Archaeology, AI Labs — became a YouTube category on first boot
+ * with no channel in it. YouTube categories are created deliberately in the
+ * manage panel now, so themes and categories are independent.
+ */
 function themeSections(themes = YOUTUBE_THEMES) {
   const sections = [];
   for (const theme of themes) {

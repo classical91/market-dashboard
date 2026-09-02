@@ -193,3 +193,86 @@ test("version 1 category strings migrate without losing custom or Test data", ()
   assert.equal(registry.list().filter((channel) => channel.category === "Test").length, 2);
   assert.ok(registry.listCategories().some((category) => category.name === "Custom"));
 });
+
+// --- Categories are independent of the theme catalogue -----------------------
+// The app used to pass `categorySeed: themeSections()`, which turned every
+// section a theme names into a YouTube category holding no channels. These pin
+// the behavior that replaced it: no seed by default, and nothing retroactive.
+
+test("with no categorySeed, a first boot only creates the categories its channels use", () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "md-yt-noseed-"));
+  const registry = new YoutubeChannelRegistry({ dataDir, seed: SEED, logger: quietLogger });
+  registry.ensureSeeded();
+
+  assert.deepEqual(registry.listCategories().map((category) => category.name), ["Crypto"]);
+  for (const category of registry.listCategories()) {
+    assert.ok(category.channelCount > 0, `${category.name} was created with no channels in it`);
+  }
+});
+
+test("the app's own wiring passes no category seed, so themes cannot become categories", () => {
+  const { themeSections } = require("../src/config/youtube-themes");
+  const sections = themeSections();
+  assert.ok(sections.includes("Archaeology") && sections.includes("AI Labs"), "the catalogue still names these");
+
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "md-yt-themefree-"));
+  // Constructed exactly as src/app.js does it — seed only, no categorySeed.
+  const registry = new YoutubeChannelRegistry({ dataDir, seed: SEED, logger: quietLogger });
+  registry.ensureSeeded();
+
+  const names = registry.listCategories().map((category) => category.name);
+  for (const section of sections) {
+    assert.equal(names.includes(section), false, `${section} leaked from the theme catalogue into the categories`);
+  }
+});
+
+test("categories already persisted survive a restart, seed or no seed", () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "md-yt-existing-"));
+  const file = path.join(dataDir, "youtube-channels.json");
+  // A v2 file as an existing install has it, including a category that was
+  // originally created by the old theme seed. It is ordinary user data now.
+  fs.writeFileSync(file, JSON.stringify({
+    version: 2,
+    categories: [
+      { id: "category:crypto", name: "Crypto", slug: "crypto", createdAt: "2026-01-01T00:00:00.000Z" },
+      { id: "category:stocks", name: "Stocks", slug: "stocks", createdAt: "2026-01-01T00:00:00.000Z" },
+      { id: "category:archaeology", name: "Archaeology", slug: "archaeology", createdAt: "2026-01-01T00:00:00.000Z" },
+    ],
+    channels: [
+      { handle: "tradersreality", label: "Trader's Reality", channelId: "", categoryId: "category:crypto" },
+      { handle: "stockmoe", label: "StockMoe", channelId: "", categoryId: "category:stocks" },
+    ],
+  }));
+
+  const before = fs.readFileSync(file, "utf8");
+  const registry = new YoutubeChannelRegistry({ dataDir, seed: SEED, logger: quietLogger });
+  assert.equal(registry.ensureSeeded(), false, "an existing file is never re-seeded");
+  assert.equal(fs.readFileSync(file, "utf8"), before, "a v2 file is not rewritten on boot");
+
+  assert.deepEqual(
+    registry.listCategories().map((category) => category.name),
+    ["Crypto", "Stocks", "Archaeology"],
+    "an empty category that already exists is kept — this change is not retroactive",
+  );
+  assert.deepEqual(
+    registry.list().map((channel) => [channel.handle, channel.categoryId]),
+    [["tradersreality", "category:crypto"], ["stockmoe", "category:stocks"]],
+    "every channel keeps the category it was filed under",
+  );
+});
+
+test("a category can still be created by hand once nothing is seeded", () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "md-yt-manual-"));
+  // An empty seed is the true zero state: no channels, so no categories either.
+  const registry = new YoutubeChannelRegistry({ dataDir, seed: [], logger: quietLogger });
+  registry.ensureSeeded();
+  assert.deepEqual(registry.listCategories(), [], "a genuinely fresh install starts with none");
+
+  const created = registry.addCategory({ name: "Crypto" });
+  assert.equal(created.name, "Crypto");
+  assert.equal(created.id, "category:crypto");
+
+  registry.add({ handle: "cryptosrus", label: "CryptosRUs", categoryId: created.id });
+  assert.equal(registry.listCategories()[0].channelCount, 1);
+  assert.equal(registry.list()[0].category, "Crypto");
+});

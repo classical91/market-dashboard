@@ -92,6 +92,10 @@ function normalizeChannel(input, categories = []) {
 }
 
 class YoutubeChannelRegistry {
+  // `categorySeed` names categories a first boot should have beyond the ones its
+  // seeded channels are filed under. It defaults to none: the app passes no seed,
+  // because a category nothing is filed under is noise in the filter. It stays a
+  // constructor option so a deployment can still ask for one deliberately.
   constructor({ dataDir, seed = YOUTUBE_CHANNELS, categorySeed = [], logger = console } = {}) {
     this._file = path.join(dataDir, "youtube-channels.json");
     this._lockState = { depth: 0 }; this._logger = logger;
