@@ -308,11 +308,22 @@
       : "Showing intelligence from " + (active ? active.name : "this category");
   }
 
-  function fetchFeed(categoryId, roots, onSelect, onInitialVideo, replaceCurrent) {
+  // A category deleted in another tab leaves this page holding an ID the server
+  // no longer knows, which it answers with a 400. That is recoverable: fall
+  // back to All Categories rather than blanking the page.
+  function staleCategoryError(status, categoryId) {
+    return status === 400 && categoryId && categoryId !== "all";
+  }
+
+  function fetchFeed(categoryId, roots, onSelect, onInitialVideo, replaceCurrent, onStale) {
     setLoading(roots, "Loading YouTube intelligence…");
     return fetch("/api/youtube/channels?categoryId=" + encodeURIComponent(categoryId))
       .then(function (res) {
-        if (!res.ok) throw new Error("Request failed: " + res.status);
+        if (!res.ok) {
+          var error = new Error("Request failed: " + res.status);
+          error.stale = staleCategoryError(res.status, categoryId);
+          throw error;
+        }
         return res.json();
       })
       .then(function (data) {
@@ -329,7 +340,11 @@
         if (firstId && onInitialVideo) onInitialVideo(firstId, replaceCurrent);
         return payload;
       })
-      .catch(function () {
+      .catch(function (error) {
+        if (error && error.stale && onStale) {
+          onStale();
+          return null;
+        }
         setLoading(roots, "Channel feeds are unavailable right now.");
       });
   }
@@ -345,14 +360,21 @@
         var stored = readStoredCategory();
         var activeId = stored === "all" || categories.some(function (category) { return category.id === stored; })
           ? (stored || "all") : "all";
+        function fallbackToAll() {
+          if (activeId === "all") {
+            setLoading(roots, "Channel feeds are unavailable right now.");
+            return;
+          }
+          choose("all");
+        }
         function choose(id) {
           activeId = id;
           storeCategory(id);
           setupCategoryFilter(categories, activeId, choose);
-          fetchFeed(activeId, roots, onSelect, onInitialVideo, true);
+          fetchFeed(activeId, roots, onSelect, onInitialVideo, true, fallbackToAll);
         }
         setupCategoryFilter(categories, activeId, choose);
-        return fetchFeed(activeId, roots, onSelect, onInitialVideo, false);
+        return fetchFeed(activeId, roots, onSelect, onInitialVideo, false, fallbackToAll);
       })
       .catch(function () { setLoading(roots, "Channel feeds are unavailable right now."); });
   }

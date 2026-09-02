@@ -227,3 +227,48 @@ test("deleting a used category requires and applies reassignment", async () => {
   assert.equal(body.channels.find((item) => item.handle === "researchdesk").categoryId, "uncategorized");
   assert.equal(body.categories.find((item) => item.id === "uncategorized").channelCount, 1);
 });
+
+test("a category deleted out from under the page is a 400, not a broken feed", async () => {
+  const created = await adminApi("/api/youtube/categories/config", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: "Short Lived" }),
+  });
+  const category = (await created.json()).added;
+
+  const before = await api(`/api/youtube/channels?categoryId=${encodeURIComponent(category.id)}`);
+  assert.equal(before.status, 200);
+
+  const removed = await adminApi(`/api/youtube/categories/config/${encodeURIComponent(category.id)}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: "{}",
+  });
+  assert.equal(removed.status, 200);
+
+  // The page holds the ID until it reloads its config, so this is the response
+  // its "fall back to All Categories" recovery keys off. A 5xx or an empty 200
+  // would leave a stale selection looking like a dead page instead.
+  const after = await api(`/api/youtube/channels?categoryId=${encodeURIComponent(category.id)}`);
+  assert.equal(after.status, 400);
+  assert.match((await after.json()).error, /category/i);
+
+  const all = await api("/api/youtube/channels?categoryId=all");
+  assert.equal(all.status, 200, "All Categories still answers, which is what the fallback selects");
+});
+
+test("Uncategorized is selectable end to end once a channel lands in it", async () => {
+  const config = await (await api("/api/youtube/channels/config")).json();
+  const fallback = config.categories.find((category) => category.id === "uncategorized");
+  assert.ok(fallback, "the fallback appears only while it holds channels");
+  assert.ok(fallback.channelCount > 0);
+
+  const filtered = await api("/api/youtube/channels?categoryId=uncategorized");
+  assert.equal(filtered.status, 200);
+  const body = await filtered.json();
+  assert.equal(body.selectedCategoryId, "uncategorized");
+  assert.ok(
+    body.channels.every((channel) => channel.categoryId === "uncategorized"),
+    "filtering by the fallback returns only unassigned channels",
+  );
+});

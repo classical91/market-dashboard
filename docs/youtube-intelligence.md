@@ -41,6 +41,34 @@ contains channels, both lists expose it with the same count and the Categories t
 marks it read-only, keeping the available categories aligned without displaying an
 empty pseudo-category.
 
+## Manage YouTube Sources panel
+
+The panel is one dialog with two tabs, `Channels` and `Categories`, so channel
+management and category management stay related without being the same job. The
+tab strip is a `tablist`: only the selected tab is in the tab order and
+Left/Right/Home/End move between them.
+
+The Channels tab searches and filters an otherwise unadorned list — display
+name, `@handle`, category badge, Edit and Delete. The Add Channel form is hidden
+until requested. Its category field is a select, never free text, and its
+`+ Create new category` choice reveals a name field inline rather than sending
+the user to the Categories tab: leaving mid-form would discard the handle they
+had already typed. On submit the category is created first and the channel is
+saved against the returned ID, so a channel never references a category by name.
+
+Empty states name the view that is empty — no channels at all, none in the
+selected category, or none matching the search — and each offers Add a channel.
+
+Deletes are confirmed in an in-panel dialog rather than `window.confirm`, and
+every mutation disables its own control while it runs.
+
+## Recovering from a stale selection
+
+A category deleted in another tab leaves the page holding an ID the registry no
+longer knows. `GET /api/youtube/channels?categoryId=<id>` answers 400 for it, and
+the page treats that specific response as recoverable: it reselects
+`All Categories` and refetches instead of rendering a failed-request message.
+
 ## Migration
 
 Version 1 files and legacy channel arrays are migrated in memory by collecting and
