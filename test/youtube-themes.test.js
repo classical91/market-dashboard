@@ -1,8 +1,8 @@
 "use strict";
 
-// Covers the YouTube Intelligence theme config: that a theme can only claim
-// channels the feed actually fetches, that the markets theme stays derived
-// from the channel list, and that the shipped themes keep their layout.
+// Covers YouTube Intelligence theme resolution: that a channel reaches a theme
+// through its category alone, that the derived markets theme catches whatever
+// the others do not, and that the shipped themes match the shared catalogue.
 
 const test = require("node:test");
 const assert = require("node:assert");
@@ -11,62 +11,54 @@ const {
   YOUTUBE_THEMES,
   DEFAULT_THEME_ID,
   resolveYoutubeThemes,
+  themeSections,
 } = require("../src/config/youtube-themes");
+const { SHARED_THEMES } = require("../src/config/intelligence-themes");
 
-const CHANNELS = [
-  { handle: "stockmoe", label: "StockMoe", category: "Stocks", channelId: "" },
-  { handle: "cryptosrus", label: "CryptosRUs", category: "Crypto", channelId: "" },
-];
+function byId(themes, id) {
+  return themes.find((theme) => theme.id === id);
+}
 
-test("the markets theme is derived from the channel list, not a second copy of it", () => {
-  const [markets] = resolveYoutubeThemes(
-    [{ id: DEFAULT_THEME_ID, name: "Markets", accent: "market", derived: true, sections: [], channels: [] }],
-    CHANNELS,
-  );
+test("a channel joins a theme through its category, with no membership to edit", () => {
+  const themes = resolveYoutubeThemes(undefined, [
+    { handle: "stockmoe", category: "Stocks" },
+    { handle: "diggers", category: "Archaeology" },
+    { handle: "shortcuts", category: "Shortcuts & Automation" },
+  ]);
 
-  assert.deepEqual(markets.channels.map((entry) => entry.handle), ["stockmoe", "cryptosrus"]);
-  assert.deepEqual(markets.sections, ["Stocks", "Crypto"], "sections come from the channels' categories");
+  assert.deepEqual(byId(themes, "dig").channels.map((c) => c.handle), ["diggers"]);
+  assert.deepEqual(byId(themes, "stack").channels.map((c) => c.handle), ["shortcuts"]);
 });
 
-test("a theme cannot claim a channel the feed does not fetch", () => {
-  const [theme] = resolveYoutubeThemes(
-    [{
-      id: "dig",
-      name: "Dig Site",
-      accent: "relic",
-      sections: ["Archaeology"],
-      // The second handle is not a configured channel: counting it would tell
-      // the switcher this theme has two channels while the feed shows one.
-      channels: [{ handle: "stockmoe", section: "Archaeology" }, { handle: "nosuchchannel", section: "Archaeology" }],
-    }],
-    CHANNELS,
-  );
-
-  assert.deepEqual(theme.channels.map((entry) => entry.handle), ["stockmoe"]);
+test("category matching ignores case and surrounding space", () => {
+  const themes = resolveYoutubeThemes(undefined, [{ handle: "diggers", category: "  archaeology " }]);
+  assert.deepEqual(byId(themes, "dig").channels.map((c) => c.handle), ["diggers"]);
 });
 
-test("membership accepts a bare handle and an @ prefix, and never repeats a channel", () => {
-  const [theme] = resolveYoutubeThemes(
-    [{ id: "stack", name: "Tech Stack", accent: "tech", sections: [], channels: ["@StockMoe", { handle: "stockmoe", section: "AI Labs" }] }],
-    CHANNELS,
-  );
+test("the derived markets theme holds every channel, so none is ever stranded", () => {
+  const themes = resolveYoutubeThemes(undefined, [
+    { handle: "stockmoe", category: "Stocks" },
+    { handle: "diggers", category: "Archaeology" },
+    // A category no theme declares: it must still be reachable somewhere.
+    { handle: "oddity", category: "Something Brand New" },
+  ]);
 
-  assert.equal(theme.channels.length, 1, "one channel is one membership");
-  assert.equal(theme.channels[0].handle, "stockmoe");
-  assert.deepEqual(theme.sections, ["Stocks"], "a bare handle keeps the channel's own category");
+  const markets = byId(themes, DEFAULT_THEME_ID);
+  assert.deepEqual(markets.channels.map((c) => c.handle), ["stockmoe", "diggers", "oddity"]);
+  assert.ok(markets.sections.includes("Something Brand New"), "the new category becomes a section");
 });
 
-test("a section named only by a membership is added to the theme's section list", () => {
-  const [theme] = resolveYoutubeThemes(
-    [{ id: "dig", name: "Dig Site", accent: "relic", sections: ["Archaeology"], channels: [{ handle: "cryptosrus", section: "Unexplained" }] }],
-    CHANNELS,
-  );
+test("a theme's empty sections survive, so the manage panel can suggest them", () => {
+  const themes = resolveYoutubeThemes(undefined, []);
+  const dig = byId(themes, "dig");
 
-  assert.deepEqual(theme.sections, ["Archaeology", "Unexplained"]);
+  assert.deepEqual(dig.channels, [], "no channels yet");
+  assert.ok(dig.sections.includes("Lost Civilizations"), "but the layout is still offered");
+  assert.ok(themeSections().includes("AI Labs"), "and reaches the category suggestions");
 });
 
-test("the shipped themes resolve, are uniquely identified, and keep their sections", () => {
-  const themes = resolveYoutubeThemes(YOUTUBE_THEMES, CHANNELS);
+test("every shipped theme is resolvable, uniquely identified and accented", () => {
+  const themes = resolveYoutubeThemes(undefined, []);
   const ids = themes.map((theme) => theme.id);
 
   assert.equal(ids[0], DEFAULT_THEME_ID, "markets stays first");
@@ -74,14 +66,23 @@ test("the shipped themes resolve, are uniquely identified, and keep their sectio
   for (const theme of themes) {
     assert.ok(theme.name, `${theme.id} has a name`);
     assert.ok(theme.accent, `${theme.id} has an accent`);
-    if (theme.id === DEFAULT_THEME_ID) continue;
-    assert.ok(theme.sections.length, `${theme.id} ships a section layout`);
-    assert.deepEqual(theme.channels, [], `${theme.id} ships unpopulated`);
   }
 });
 
-test("themes resolve to nothing rather than throwing when no channels are configured", () => {
-  const themes = resolveYoutubeThemes(YOUTUBE_THEMES, []);
-  assert.equal(themes.length, YOUTUBE_THEMES.length);
-  assert.deepEqual(themes[0].channels, [], "the derived markets theme is simply empty");
+test("the shared themes are the catalogue's, not a second copy of it", () => {
+  for (const shared of SHARED_THEMES) {
+    const mine = YOUTUBE_THEMES.find((theme) => theme.id === shared.id);
+    assert.ok(mine, `${shared.id} is offered on the YouTube page`);
+    assert.equal(mine.name, shared.name);
+    assert.equal(mine.description, shared.description);
+    assert.equal(mine.accent, shared.accent);
+    assert.deepEqual(mine.sections, shared.sections);
+  }
+});
+
+test("resolving never mutates the catalogue, so one page cannot change the other's themes", () => {
+  const before = JSON.stringify(SHARED_THEMES);
+  resolveYoutubeThemes(undefined, [{ handle: "oddity", category: "Something Brand New" }]);
+  resolveYoutubeThemes(undefined, [{ handle: "other", category: "Another One" }]);
+  assert.equal(JSON.stringify(SHARED_THEMES), before);
 });

@@ -282,12 +282,21 @@
 .yt-theme-option-name { font-size: 12px; font-weight: 700; }
 .yt-theme-option-count { font-size: 10px; color: var(--muted); }
 
-body[data-yt-accent="market"] { --yt-accent: var(--purple, #9b7bff); }
-body[data-yt-accent="world"] { --yt-accent: #d6a760; }
-body[data-yt-accent="tech"] { --yt-accent: #52c7d9; }
-body[data-yt-accent="relic"] { --yt-accent: #c98f5c; }
-body[data-yt-accent="macro"] { --yt-accent: #76a7ff; }
-body[data-yt-accent="energy"] { --yt-accent: #65c889; }
-body[data-yt-accent="neutral"] { --yt-accent: #aab3c3; }
+body[data-yt-accent="market"] { --yt-accent: var(--accent-market); }
+body[data-yt-accent="world"] { --yt-accent: var(--accent-world); }
+body[data-yt-accent="tech"] { --yt-accent: var(--accent-tech); }
+body[data-yt-accent="relic"] { --yt-accent: var(--accent-relic); }
+body[data-yt-accent="macro"] { --yt-accent: var(--accent-macro); }
+body[data-yt-accent="energy"] { --yt-accent: var(--accent-energy); }
+body[data-yt-accent="neutral"] { --yt-accent: var(--accent-neutral); }
 
 body[data-yt-accent] .yt-feed-card:hover { border-color: var(--yt-accent); }
+
+.yt-manage-trigger {
+  min-height: 34px; padding: 7px 11px; border: 1px solid var(--border);
+  border-radius: 9px; background: transparent; color: var(--soft, var(--text));
+  font: inherit; font-size: 12px; font-weight: 700; cursor: pointer;
+  transition: border-color .16s ease, color .16s ease;
+}
+.yt-manage-trigger:hover { border-color: var(--yt-accent, var(--purple)); color: var(--text); }
+.yt-manage-trigger:focus-visible { outline: 2px solid var(--yt-accent, var(--blue)); outline-offset: 2px; }

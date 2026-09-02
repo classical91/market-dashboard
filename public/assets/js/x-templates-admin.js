@@ -80,20 +80,20 @@
   function open(options) {
     var opts = options || {};
     var doc = document;
-    var overlay = el(doc, "div", "x-manage-overlay x-template-overlay");
+    var overlay = el(doc, "div", "manage-overlay x-template-overlay");
     overlay.setAttribute("role", "dialog");
     overlay.setAttribute("aria-modal", "true");
     overlay.setAttribute("aria-label", "Manage X Intelligence templates");
-    var box = el(doc, "div", "x-manage-box x-template-manager");
-    var head = el(doc, "div", "x-manage-head");
+    var box = el(doc, "div", "manage-box x-template-manager");
+    var head = el(doc, "div", "manage-head");
     head.appendChild(el(doc, "div", "x-template-heading-wrap"));
-    head.firstChild.appendChild(el(doc, "h2", "x-manage-title", "Manage Templates"));
+    head.firstChild.appendChild(el(doc, "h2", "manage-title", "Manage Templates"));
     head.firstChild.appendChild(el(doc, "p", "x-template-help", "Organize global X accounts into reusable intelligence workspaces."));
-    var close = el(doc, "button", "x-manage-close", "×");
+    var close = el(doc, "button", "manage-close", "×");
     close.type = "button";
     close.setAttribute("aria-label", "Close");
     head.appendChild(close);
-    var status = el(doc, "div", "x-manage-status");
+    var status = el(doc, "div", "manage-status");
     status.setAttribute("role", "status");
     var layout = el(doc, "div", "x-template-manager-layout");
     var nav = el(doc, "aside", "x-template-nav");
@@ -110,7 +110,7 @@
 
     function say(message, tone) {
       status.textContent = message || "";
-      status.className = "x-manage-status" + (tone ? " is-" + tone : "");
+      status.className = "manage-status" + (tone ? " is-" + tone : "");
     }
 
     function cleanup() {
@@ -218,18 +218,18 @@
       editor.appendChild(title);
 
       var basics = el(doc, "div", "x-template-basics");
-      var nameInput = el(doc, "input", "x-manage-input");
+      var nameInput = el(doc, "input", "manage-input");
       nameInput.value = draft.name;
       nameInput.placeholder = "Wars & Geopolitics";
       nameInput.addEventListener("input", function () {
         draft.name = nameInput.value;
         if (state.creating) draft.id = slugify(nameInput.value);
       });
-      var descriptionInput = el(doc, "textarea", "x-manage-input x-template-description-input");
+      var descriptionInput = el(doc, "textarea", "manage-input x-template-description-input");
       descriptionInput.value = draft.description;
       descriptionInput.placeholder = "What this workspace monitors";
       descriptionInput.addEventListener("input", function () { draft.description = descriptionInput.value; });
-      var accentInput = el(doc, "select", "x-manage-input");
+      var accentInput = el(doc, "select", "manage-input");
       ["market", "world", "tech", "relic", "macro", "energy", "neutral"].forEach(function (accent) {
         var option = el(doc, "option", "", accent.charAt(0).toUpperCase() + accent.slice(1));
         option.value = accent;
@@ -255,7 +255,7 @@
       editor.appendChild(sectionHead);
 
       var sectionsRoot = el(doc, "div", "x-template-sections");
-      if (!draft.sections.length) sectionsRoot.appendChild(el(doc, "div", "x-manage-empty", "Add a section, then assign tracked accounts."));
+      if (!draft.sections.length) sectionsRoot.appendChild(el(doc, "div", "manage-empty", "Add a section, then assign tracked accounts."));
       draft.sections.forEach(function (section, sectionIndex) {
         var sectionBox = el(doc, "section", "x-template-section");
         var sectionToolbar = el(doc, "div", "x-template-section-toolbar");
@@ -320,7 +320,7 @@
         });
         if (available.length) {
           var addRow = el(doc, "div", "x-template-add-account");
-          var accountSelect = el(doc, "select", "x-manage-input");
+          var accountSelect = el(doc, "select", "manage-input");
           var placeholder = el(doc, "option", "", "Add tracked account…");
           placeholder.value = "";
           accountSelect.appendChild(placeholder);
@@ -350,7 +350,7 @@
       editor.appendChild(sectionsRoot);
 
       var actions = el(doc, "div", "x-template-actions");
-      var save = el(doc, "button", "x-manage-add", state.creating ? "Create Template" : "Save Changes");
+      var save = el(doc, "button", "manage-add", state.creating ? "Create Template" : "Save Changes");
       save.type = "button";
       save.addEventListener("click", function () {
         syncDraftFromFields(nameInput, descriptionInput, accentInput);

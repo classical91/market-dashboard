@@ -452,19 +452,33 @@
       if (playerLink) playerLink.href = watchUrl(state.activeId);
     }
 
-    loadFeeds(
-      roots,
-      function (id) {
-        state.activeId = id;
-        loadActive();
-        window.scrollTo({ top: 0, behavior: "smooth" });
-      },
-      function (id) {
-        if (state.activeId) return;
-        state.activeId = id;
-        loadActive();
-      }
-    );
+    function onSelect(id) {
+      state.activeId = id;
+      loadActive();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function onInitialVideo(id) {
+      if (state.activeId) return;
+      state.activeId = id;
+      loadActive();
+    }
+
+    loadFeeds(roots, onSelect, onInitialVideo);
+
+    var manage = document.getElementById("ytManageChannels");
+    if (manage && window.YoutubeChannelsAdmin) {
+      manage.addEventListener("click", function () {
+        window.YoutubeChannelsAdmin.open({
+          // A channel added or removed changes both the feed and every theme's
+          // count, and the payload in hand is now stale — so refetch rather
+          // than patch, once, when the panel closes.
+          onChange: function () {
+            loadFeeds(roots, onSelect, onInitialVideo);
+          },
+        });
+      });
+    }
   }
 
   if (document.readyState === "loading") {
