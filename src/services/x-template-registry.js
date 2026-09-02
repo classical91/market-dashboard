@@ -6,6 +6,14 @@
  * Templates organize references to globally tracked X handles. Account
  * metadata remains owned by XAccountRegistry, so one handle can be reused by
  * several templates without duplicating feed work or cached data.
+ *
+ * Templates come from two places. Admins create their own through the API, and
+ * the built-in themes in src/config/x-themes.js ship with the dashboard. The
+ * two are the same shape once stored: a built-in theme is an ordinary template
+ * that happened to arrive pre-written, and is editable and deletable like any
+ * other. What the file records about them is only which ones have already been
+ * installed, so a later deploy adding a theme does not also resurrect one an
+ * admin deleted.
  */
 
 const fs = require("fs");
@@ -13,9 +21,13 @@ const path = require("path");
 
 const { withExclusiveLock, writeJsonAtomic } = require("./json-file-lock");
 const { normalizeHandle, sameHandle } = require("./x-account-registry");
+const { BUILT_IN_THEMES } = require("../config/x-themes");
 const { createServiceError } = require("../utils/errors");
 
-const REGISTRY_VERSION = 1;
+// 2 added the seededThemes roster. A version 1 file predates every built-in
+// theme but markets, so it is read as having seeded none of them and the
+// backfill installs them once.
+const REGISTRY_VERSION = 2;
 const DEFAULT_TEMPLATE_ID = "markets";
 const MAX_TEMPLATES = 50;
 const MAX_SECTIONS = 40;
@@ -122,6 +134,14 @@ function seedMarkets(accounts) {
   });
 }
 
+/**
+ * Every theme id the current build ships, markets included. Used both as the
+ * roster a freshly seeded file starts with and as the list the backfill walks.
+ */
+function allThemeIds() {
+  return [DEFAULT_TEMPLATE_ID].concat(BUILT_IN_THEMES.map((theme) => theme.id));
+}
+
 class XTemplateRegistry {
   constructor({ dataDir, seedAccounts = [], logger = console } = {}) {
     this._file = path.join(dataDir, "x-templates.json");
@@ -131,13 +151,18 @@ class XTemplateRegistry {
     this._loadState = "unread";
     this._loadError = null;
     this._corruptBackedUp = false;
+    // Which built-in theme ids this file has already been given. Read from the
+    // file, so a theme an admin deleted is not handed back on the next boot.
+    this._seededThemes = [];
   }
 
   _seed() {
     const accounts = typeof this._seedAccounts === "function"
       ? this._seedAccounts()
       : this._seedAccounts;
-    return [seedMarkets(accounts || [])];
+    return [seedMarkets(accounts || [])].concat(
+      BUILT_IN_THEMES.map((theme) => normalizeTemplate(theme)),
+    );
   }
 
   _read() {
@@ -148,10 +173,12 @@ class XTemplateRegistry {
       if (err.code === "ENOENT") {
         this._loadState = "seeded";
         this._loadError = null;
+        this._seededThemes = allThemeIds();
         return this._seed();
       }
       this._loadState = "unreadable";
       this._loadError = err.message;
+      this._seededThemes = allThemeIds();
       this._logger.error?.(`[XTemplates] Could not read ${this._file}: ${err.message}`);
       return this._seed();
     }
@@ -160,6 +187,13 @@ class XTemplateRegistry {
       const parsed = JSON.parse(raw);
       const source = Array.isArray(parsed) ? parsed : parsed?.templates;
       if (!Array.isArray(source)) throw new SyntaxError("no templates array");
+      // A bare array or a version 1 object has no roster: it was written before
+      // any theme but markets existed, so none of the rest count as installed.
+      this._seededThemes = uniqueStrings(
+        Array.isArray(parsed?.seededThemes) ? parsed.seededThemes.map(slugify) : [],
+        MAX_SECTION_LEN,
+        MAX_TEMPLATES,
+      );
       const templates = [];
       let dropped = 0;
       for (const entry of source) {
@@ -178,7 +212,8 @@ class XTemplateRegistry {
     } catch (err) {
       this._loadState = "corrupt";
       this._loadError = err.message;
-      this._logger.error?.(`[XTemplates] ${this._file} is unreadable; serving the markets seed`);
+      this._seededThemes = allThemeIds();
+      this._logger.error?.(`[XTemplates] ${this._file} is unreadable; serving the built-in themes`);
       return this._seed();
     }
   }
@@ -194,7 +229,13 @@ class XTemplateRegistry {
     }
     const written = writeJsonAtomic(
       this._file,
-      { version: REGISTRY_VERSION, templates: templates.slice(0, MAX_TEMPLATES) },
+      {
+        version: REGISTRY_VERSION,
+        // Carried through every write, not just the seeding one: losing it
+        // would make the next boot reinstall a theme the admin deleted.
+        seededThemes: this._seededThemes.slice(),
+        templates: templates.slice(0, MAX_TEMPLATES),
+      },
       this._logger,
       "[XTemplates]",
     );
@@ -211,13 +252,63 @@ class XTemplateRegistry {
     });
   }
 
+  /**
+   * Writes the seed on a fresh install, and on an existing one installs any
+   * built-in theme this file has not been given yet.
+   *
+   * The backfill is what lets a deploy add a theme: without it a dashboard
+   * that has ever booted would keep only the themes that existed the first
+   * time. It runs at most once per theme — the id is recorded whether or not
+   * the template survives — so deleting a theme is permanent, and an admin who
+   * renamed or re-sectioned one keeps their version.
+   *
+   * Returns true when the file was written.
+   */
   ensureSeeded() {
     return this._withLock(() => {
-      if (fs.existsSync(this._file)) {
-        this._read();
+      if (!fs.existsSync(this._file)) {
+        this._seededThemes = allThemeIds();
+        this._write(this._seed());
+        return true;
+      }
+
+      const templates = this._read();
+      const known = new Set(this._seededThemes);
+      const present = new Set(templates.map((entry) => entry.id));
+      // An id already in the file is skipped without being installed, but is
+      // still recorded: an admin's own "stack" template is theirs to keep, and
+      // overwriting it with the built-in would be the one destructive outcome.
+      const pending = BUILT_IN_THEMES.filter((theme) => !known.has(theme.id));
+      if (!pending.length) return false;
+
+      const added = [];
+      const installed = [];
+      let room = MAX_TEMPLATES - templates.length;
+      for (const theme of pending) {
+        if (present.has(theme.id)) {
+          installed.push(theme.id);
+          continue;
+        }
+        // At the cap, leave the theme unrecorded rather than marking a theme
+        // installed that was never written: deleting a template later frees the
+        // room, and the next boot picks it up.
+        if (room <= 0) continue;
+        added.push(normalizeTemplate(theme));
+        installed.push(theme.id);
+        room -= 1;
+      }
+      if (!installed.length) return false;
+      this._seededThemes = this._seededThemes.concat(installed);
+
+      if (!this._write(templates.concat(added))) {
+        this._logger.error?.(`[XTemplates] Could not install ${installed.length} built-in theme(s)`);
         return false;
       }
-      this._write(this._seed());
+      if (added.length) {
+        this._logger.log?.(
+          `[XTemplates] Installed built-in theme(s): ${added.map((theme) => theme.id).join(", ")}`,
+        );
+      }
       return true;
     });
   }
@@ -370,6 +461,7 @@ class XTemplateRegistry {
 module.exports = {
   XTemplateRegistry,
   DEFAULT_TEMPLATE_ID,
+  BUILT_IN_THEMES,
   normalizeTemplate,
   seedMarkets,
   slugify,

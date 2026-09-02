@@ -230,7 +230,7 @@
       descriptionInput.placeholder = "What this workspace monitors";
       descriptionInput.addEventListener("input", function () { draft.description = descriptionInput.value; });
       var accentInput = el(doc, "select", "x-manage-input");
-      ["market", "world", "tech", "macro", "energy", "neutral"].forEach(function (accent) {
+      ["market", "world", "tech", "relic", "macro", "energy", "neutral"].forEach(function (accent) {
         var option = el(doc, "option", "", accent.charAt(0).toUpperCase() + accent.slice(1));
         option.value = accent;
         option.selected = accent === draft.accent;

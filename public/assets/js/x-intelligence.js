@@ -373,10 +373,19 @@
         return;
       }
       if (state.mode === ALL_MODE) {
+        // A theme that ships with sections but no accounts is the normal state
+        // of a newly installed one, not a failed fetch. Saying "no posts" there
+        // reads as an outage and hides the one thing that would fix it.
+        // The server-resolved account list, not the template's own membership
+        // count: it is what the feed actually ran against, so it stays right
+        // when a membership points at an account that no longer exists.
+        var unpopulated = state.transport.ok && !(state.feedData.accounts || []).length;
         renderPostCards(
           pane,
           state.feedData.posts,
-          state.transport.ok ? "No posts found yet." : "Couldn't load posts."
+          unpopulated
+            ? "No accounts in this theme yet \u2014 add some from Manage accounts."
+            : state.transport.ok ? "No posts found yet." : "Couldn't load posts."
         );
         renderFeedError(pane, state.feedData.failedFeeds);
         renderStaleNotice(pane, state.feedData.staleFeeds);
