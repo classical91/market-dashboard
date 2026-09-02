@@ -9,7 +9,11 @@ const assert = require("node:assert");
 
 const { YouTubeIntelligenceService, FAILURE_REASONS, redactKey } = require("../src/services/youtube");
 const { MemoryCache } = require("../src/services/cache");
-const { resolveYoutubeChannels, parseChannelIdOverrides } = require("../src/config/youtube-channels");
+const {
+  YOUTUBE_CHANNELS,
+  resolveYoutubeChannels,
+  parseChannelIdOverrides,
+} = require("../src/config/youtube-channels");
 
 const CHANNELS = [
   { handle: "stockmoe", label: "StockMoe", category: "Stocks", channelId: "UCaaaaaaaaaaaaaaaaaaaaaa" },
@@ -479,5 +483,5 @@ test("resolveYoutubeChannels applies overrides over the static config", () => {
   const resolved = resolveYoutubeChannels("stockmoe=UCaaaaaaaaaaaaaaaaaaaaaa");
   const stockmoe = resolved.find((channel) => channel.handle === "stockmoe");
   assert.equal(stockmoe.channelId, "UCaaaaaaaaaaaaaaaaaaaaaa");
-  assert.equal(resolved.length, 4, "every configured channel is preserved");
+  assert.equal(resolved.length, YOUTUBE_CHANNELS.length, "every configured channel is preserved");
 });
