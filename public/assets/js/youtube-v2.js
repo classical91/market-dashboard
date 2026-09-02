@@ -417,7 +417,8 @@
           if (renderSwitcher) renderSwitcher(activeId);
           // Re-render from the payload already in hand: switching themes is a
           // view change, so it costs no request and no YouTube quota.
-          render(roots, payload, onSelect, activeTheme());
+          var firstId = render(roots, payload, onSelect, activeTheme());
+          if (firstId && onInitialVideo) onInitialVideo(firstId, true);
         });
         if (renderSwitcher) renderSwitcher(activeId);
 
@@ -458,8 +459,8 @@
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
-    function onInitialVideo(id) {
-      if (state.activeId) return;
+    function onInitialVideo(id, replaceCurrent) {
+      if (state.activeId && !replaceCurrent) return;
       state.activeId = id;
       loadActive();
     }

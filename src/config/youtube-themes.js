@@ -52,6 +52,10 @@ function normalizeHandle(value) {
   return String(value == null ? "" : value).trim().replace(/^@+/, "").toLowerCase();
 }
 
+function categoryThemeId(category) {
+  return `category:${encodeURIComponent(normalizeSection(category))}`;
+}
+
 /**
  * Resolves each theme against the channels the service actually has.
  *
@@ -63,7 +67,7 @@ function normalizeHandle(value) {
 function resolveYoutubeThemes(themes = YOUTUBE_THEMES, channels = []) {
   const list = Array.isArray(channels) ? channels : [];
 
-  return themes.map((theme) => {
+  const resolved = themes.map((theme) => {
     // The derived theme takes its sections from the channels, in first-seen
     // order, so a channel added under a new category is immediately visible
     // somewhere rather than invisible until the config catches up.
@@ -92,6 +96,38 @@ function resolveYoutubeThemes(themes = YOUTUBE_THEMES, channels = []) {
       channels: members,
     };
   });
+
+  // A category typed in the manage panel should become selectable immediately.
+  // Categories already claimed by a named theme (for example Tech -> Tech
+  // Stack) stay there; every other category receives its own generated theme.
+  const claimed = new Set();
+  for (const theme of themes) {
+    if (theme.derived) continue;
+    for (const section of theme.sections || []) claimed.add(normalizeSection(section));
+  }
+
+  const custom = [];
+  for (const channel of list) {
+    const category = String(channel.category || "Other").trim() || "Other";
+    const normalized = normalizeSection(category);
+    if (claimed.has(normalized)) continue;
+    let theme = custom.find((entry) => entry.normalized === normalized);
+    if (!theme) {
+      theme = {
+        normalized,
+        id: categoryThemeId(category),
+        name: category,
+        description: `${category} channels`,
+        accent: "market",
+        sections: [category],
+        channels: [],
+      };
+      custom.push(theme);
+    }
+    theme.channels.push({ handle: normalizeHandle(channel.handle), section: category });
+  }
+
+  return resolved.concat(custom.map(({ normalized, ...theme }) => theme));
 }
 
 /** Every section any theme offers — what the manage panel suggests as categories. */

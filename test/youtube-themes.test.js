@@ -38,6 +38,24 @@ test("category matching ignores case and surrounding space", () => {
 test("a channel in the Tech category appears in the Tech Stack theme", () => {
   const themes = resolveYoutubeThemes(undefined, [{ handle: "techdaily", category: "Tech" }]);
   assert.deepEqual(byId(themes, "stack").channels.map((c) => c.handle), ["techdaily"]);
+  assert.equal(themes.some((theme) => theme.name === "Tech"), false);
+});
+
+test("a custom category becomes a selectable theme with its matching channels", () => {
+  const themes = resolveYoutubeThemes(undefined, [
+    { handle: "tester-one", category: "Test" },
+    { handle: "tester-two", category: " test " },
+    { handle: "stockmoe", category: "Stocks" },
+  ]);
+
+  const testTheme = themes.find((theme) => theme.name === "Test");
+  assert.ok(testTheme);
+  assert.match(testTheme.id, /^category:/);
+  assert.deepEqual(testTheme.channels.map((channel) => channel.handle), ["tester-one", "tester-two"]);
+  assert.deepEqual(
+    themes.find((theme) => theme.name === "Stocks").channels.map((channel) => channel.handle),
+    ["stockmoe"],
+  );
 });
 
 test("the derived markets theme holds every channel, so none is ever stranded", () => {
