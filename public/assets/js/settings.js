@@ -242,8 +242,46 @@ Rules:
 - Use hyphen bullets only.`,
   };
 
+  /* Accent — a colour laid over whichever theme is active. Each option
+     points at the theme's own variable rather than a fixed hex, so every
+     theme keeps supplying a value tuned for its own background and accent
+     text stays readable on light, terminal and the dark palettes alike. */
+  var ACCENTS = {
+    theme:  { label: 'Theme',  color: '',              bg: '' },
+    blue:   { label: 'Blue',   color: 'var(--blue)',   bg: 'var(--blue-bg)' },
+    purple: { label: 'Purple', color: 'var(--purple)', bg: 'var(--purple-bg)' },
+    teal:   { label: 'Teal',   color: 'var(--teal)',   bg: 'var(--teal-bg)' },
+    amber:  { label: 'Amber',  color: 'var(--amber)',  bg: 'var(--amber-bg)' },
+    coral:  { label: 'Coral',  color: 'var(--coral)',  bg: 'var(--coral-bg)' },
+  };
+
   function reporterPromptKey(section) {
     return 'reporterPrompt:' + (DEFAULT_REPORTER_PROMPTS[section] ? section : 'crypto');
+  }
+
+  function getAccent() {
+    var name = localStorage.getItem('accent');
+    return ACCENTS[name] ? name : 'theme';
+  }
+
+  /* Re-applied after every applyTheme(), which rewrites --accent from the
+     theme's own vars and would otherwise wipe the override. Going back to
+     'theme' has to restore those vars explicitly — clearing the attribute
+     alone would leave the previous accent's colour on --accent. */
+  function applyAccent(name) {
+    var accent = ACCENTS[name] ? name : 'theme';
+    var root = document.documentElement;
+    if (accent === 'theme') {
+      var vars = (THEMES[getTheme()] || THEMES.dark).vars;
+      root.style.setProperty('--accent', vars['--accent']);
+      root.style.setProperty('--accent-bg', vars['--accent-bg']);
+      root.removeAttribute('data-accent');
+    } else {
+      root.style.setProperty('--accent', ACCENTS[accent].color);
+      root.style.setProperty('--accent-bg', ACCENTS[accent].bg);
+      root.setAttribute('data-accent', accent);
+    }
+    localStorage.setItem('accent', accent);
   }
 
   function applyTheme(name) {
@@ -267,6 +305,7 @@ Rules:
       }
     }
     localStorage.setItem('theme', name);
+    applyAccent(getAccent());
   }
 
   function getTheme() {
@@ -278,9 +317,12 @@ Rules:
 
   window.AppSettings = {
     THEMES: THEMES,
+    ACCENTS: ACCENTS,
     DEFAULT_REPORTER_PROMPTS: DEFAULT_REPORTER_PROMPTS,
     applyTheme: applyTheme,
     getTheme: getTheme,
+    applyAccent: applyAccent,
+    getAccent: getAccent,
     getFrequency: function () {
       return parseInt(localStorage.getItem('reporterFreqHours') || '24', 10);
     },

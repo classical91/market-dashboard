@@ -526,6 +526,23 @@ body {
 }
 .open-all-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+/* Accent text — with an accent chosen in Settings, the plain section
+   labels, their chevrons and the sidebar group labels take that colour
+   instead of --text. Labels carrying a `--modifier` class (Bitcoin
+   Research amber, Alt Research purple) are content colours and keep
+   theirs; the hover variants are spelled out because the generic
+   `.section-header:hover .section-label` rule outranks a bare
+   `[data-accent] .section-label`. */
+[data-accent] .section-label:not([class*="--"]),
+[data-accent] .section-header:hover .section-label:not([class*="--"]) {
+  color: var(--accent);
+}
+[data-accent] .section-chevron:not([class*="--"]),
+[data-accent] .section-header:hover .section-chevron:not([class*="--"]) {
+  color: var(--accent);
+}
+[data-accent] .cmd-nav-label { color: var(--accent); }
+
 /* themed accent labels — every colour comes from the active theme */
 .section-label--accent,
 .section-header:hover .section-label--accent  { color: var(--accent); }

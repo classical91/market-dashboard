@@ -59,6 +59,29 @@
     }
     .theme-swatch.active .theme-swatch-name { color: var(--text); }
 
+    /* ── Accent swatches ────────────────────────────────── */
+    .accent-grid {
+      display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px;
+    }
+    .accent-swatch {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 13px; border-radius: 11px;
+      border: 1px solid var(--border); background: var(--surface2);
+      cursor: pointer; font-family: inherit;
+      font-size: 12px; font-weight: 700;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      transition: border-color 0.18s, background 0.18s;
+    }
+    .accent-swatch:hover { border-color: var(--border-hover); }
+    .accent-swatch.active {
+      border-color: currentColor;
+      box-shadow: inset 0 0 0 1px currentColor;
+    }
+    .accent-swatch-dot {
+      width: 12px; height: 12px; border-radius: 50%;
+      background: currentColor; flex: 0 0 auto;
+    }
+
     /* ── Frequency toggle ───────────────────────────────── */
     .freq-options { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
     .freq-btn {
@@ -216,6 +239,14 @@
         <div class="settings-row-sub">Applies instantly across all pages</div>
         <div class="theme-grid" id="themeGrid"></div>
       </div>
+      <div class="settings-card" style="margin-top:14px">
+        <div class="settings-row-label">Accent</div>
+        <div class="settings-row-sub">
+          Colours the section labels, chevrons and sidebar group headings, plus
+          every hover and active state. &ldquo;Theme&rdquo; keeps each theme&rsquo;s own accent.
+        </div>
+        <div class="accent-grid" id="accentGrid"></div>
+      </div>
     </div>
 
     <!-- Reporter -->
@@ -366,6 +397,36 @@
         });
         btn.classList.add('active');
         s.applyTheme(name);
+        showToast();
+      });
+      grid.appendChild(btn);
+    });
+  })();
+
+  /* ── Accent ─────────────────────────────────────────────── */
+  (function () {
+    var s = window.AppSettings;
+    var grid = document.getElementById('accentGrid');
+    if (!grid) return;
+    var current = s.getAccent();
+
+    Object.keys(s.ACCENTS).forEach(function (name) {
+      var accent = s.ACCENTS[name];
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'accent-swatch' + (name === current ? ' active' : '');
+      // The swatch paints itself in the accent it applies; "theme" has no
+      // colour of its own, so it shows whatever the current theme uses.
+      btn.style.color = accent.color || 'var(--accent)';
+      btn.innerHTML =
+        '<span class="accent-swatch-dot"></span>' +
+        '<span>' + accent.label + '</span>';
+      btn.addEventListener('click', function () {
+        document.querySelectorAll('.accent-swatch').forEach(function (el) {
+          el.classList.remove('active');
+        });
+        btn.classList.add('active');
+        s.applyAccent(name);
         showToast();
       });
       grid.appendChild(btn);
