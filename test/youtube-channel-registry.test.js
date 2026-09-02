@@ -19,7 +19,7 @@ const {
 const quietLogger = { warn() {}, error() {}, log() {} };
 
 const SEED = [
-  { handle: "stockmoe", label: "StockMoe", category: "Stocks", channelId: "" },
+  { handle: "stockmoe", label: "StockMoe", category: "Crypto", channelId: "" },
   { handle: "cryptosrus", label: "CryptosRUs", category: "Crypto", channelId: "" },
 ];
 

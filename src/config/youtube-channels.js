@@ -9,7 +9,7 @@
 // once with YOUTUBE_API_KEY set and paste the IDs it prints in here, or set
 // them per-deploy through YOUTUBE_CHANNEL_IDS.
 const YOUTUBE_CHANNELS = [
-  { handle: "stockmoe", label: "StockMoe", category: "Stocks", channelId: "" },
+  { handle: "stockmoe", label: "StockMoe", category: "Crypto", channelId: "" },
   { handle: "jaysoncasper", label: "Jayson Casper", category: "Geopolitics", channelId: "" },
   { handle: "tradersreality", label: "Trader's Reality", category: "Crypto", channelId: "" },
   { handle: "cryptosrus", label: "CryptosRUs", category: "Crypto", channelId: "" },
@@ -40,6 +40,31 @@ const YOUTUBE_CHANNELS = [
   { handle: "lewishowes", label: "Lewis Howes", category: "Mentors", channelId: "" },
   { handle: "newearth-sylvie-ivanova", label: "New Earth — Sylvie Ivanova", category: "Underworld", channelId: "" },
   { handle: "joerogan", label: "Joe Rogan", category: "Underworld", channelId: "" },
+  { handle: "theAIsearch", label: "The AI Search", category: "Tech", channelId: "" },
+  { handle: "JeffSu", label: "Jeff Su", category: "Tech", channelId: "" },
+  { handle: "aiadvantage", label: "AI Advantage", category: "Tech", channelId: "" },
+  { handle: "beardfm", label: "Beard FM", category: "Tech", channelId: "" },
+  { handle: "nateherk", label: "Nate Herk", category: "Tech", channelId: "" },
+  { handle: "morecryptoonline", label: "More Crypto Online", category: "Crypto", channelId: "" },
+  { handle: "MindMathMoney", label: "Mind Math Money", category: "Crypto", channelId: "" },
+  { handle: "OscarRamos", label: "Oscar Ramos", category: "Crypto", channelId: "" },
+  { handle: "AnthonyPompliano", label: "Anthony Pompliano", category: "Crypto", channelId: "" },
+  { handle: "DaytradeWarrior", label: "Day Trade Warrior", category: "Crypto", channelId: "" },
+  { handle: "stevenvanmetre5087", label: "Steven Van Metre", category: "Crypto", channelId: "" },
+  { handle: "fxmentorus", label: "FX Mentor US", category: "Crypto", channelId: "" },
+  { handle: "mreflow", label: "Mr. E Flow", category: "Crypto", channelId: "" },
+  { handle: "J_Bravo", label: "J Bravo", category: "Crypto", channelId: "" },
+  { handle: "jordancamirand", label: "Jordan Camirand", category: "Crypto", channelId: "" },
+  { handle: "MyFinancialFriend", label: "My Financial Friend", category: "Crypto", channelId: "" },
+  { handle: "FrankieCandles", label: "Frankie Candles", category: "Crypto", channelId: "" },
+  { handle: "AdrianMorrison", label: "Adrian Morrison", category: "Sales", channelId: "" },
+  { handle: "TheDiaryOfACEOClips", label: "The Diary Of A CEO Clips", category: "Underworld", channelId: "" },
+  { handle: "mikewanders", label: "Mike Wanders", category: "Underworld", channelId: "" },
+  { handle: "JasonAChannel", label: "Jason A", category: "Underworld", channelId: "" },
+  { handle: "CashJordan", label: "Cash Jordan", category: "War", channelId: "" },
+  { handle: "MaxAfterburnerusa", label: "Max Afterburner", category: "War", channelId: "" },
+  { handle: "DannyHaiphongYT", label: "Danny Haiphong", category: "War", channelId: "" },
+  { handle: "NYPrepper", label: "NY Prepper", category: "War", channelId: "" },
 ];
 
 const CHANNEL_ID_PATTERN = /^UC[A-Za-z0-9_-]{22}$/;

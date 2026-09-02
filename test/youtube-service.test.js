@@ -16,7 +16,7 @@ const {
 } = require("../src/config/youtube-channels");
 
 const CHANNELS = [
-  { handle: "stockmoe", label: "StockMoe", category: "Stocks", channelId: "UCaaaaaaaaaaaaaaaaaaaaaa" },
+  { handle: "stockmoe", label: "StockMoe", category: "Crypto", channelId: "UCaaaaaaaaaaaaaaaaaaaaaa" },
   { handle: "cryptosrus", label: "CryptosRUs", category: "Crypto", channelId: "UCbbbbbbbbbbbbbbbbbbbbbb" },
 ];
 
