@@ -1237,6 +1237,18 @@ html {
 .section-header:hover .section-chevron { color: var(--text); }
 .section-header.collapsed .section-chevron { transform: rotate(-90deg); }
 
+/* Accent text — matches the hub pages. Headers carrying an .ovh-accent-*
+   class have a deliberate per-section colour and keep it. */
+[data-accent] .section-header:not([class*="ovh-accent"]) .section-label,
+[data-accent] .section-header:not([class*="ovh-accent"]):hover .section-label {
+  color: var(--accent);
+}
+[data-accent] .section-header:not([class*="ovh-accent"]) .section-chevron,
+[data-accent] .section-header:not([class*="ovh-accent"]):hover .section-chevron {
+  color: var(--accent);
+}
+[data-accent] .nav-label { color: var(--accent); }
+
 /* Per-section accent colors — left border + label tint.
    The :hover variants keep the tint from being flattened to --text. */
 .ovh-accent-blue   { border-left-color: var(--blue); }
