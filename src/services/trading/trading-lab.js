@@ -437,6 +437,39 @@ class TradingLabService {
     // strategy is refused; a missing identity is refused; neither can fall back
     // to Main/Shadow/Alts.
     const liveResearch = executionScope === "live-research";
+
+    // ── One ledger, one writer ────────────────────────────────────────────
+    //
+    // A demo account's claim is "$10,000 became $10,x, and every trade came
+    // from this strategy's own runner". A second writer destroys that claim
+    // silently — the balance still moves, it just no longer answers any
+    // question. Mindset was the live case: the Live Scanner paper-trades
+    // mindset_v1 at 15m on one symbol through the full gauntlet, while Demo
+    // Trading runs it at 1h across twenty markets with the strategy
+    // authoritative. Two experiments, one balance, no way to separate them
+    // afterwards.
+    //
+    // This used to be enforced by EXCLUDING a contested strategy from Demo
+    // Trading, which cost that account its runner. Demo Trading now keeps the
+    // ledger, so the exclusion is gone — and the rule has to be enforced here
+    // instead. Reporting the conflict in `contestedByScanner` was never
+    // enforcement; it was a log line asserting a property nothing checked.
+    //
+    // Refused rather than silently redirected: a caller that believed it was
+    // recording a trade needs to hear that it was not.
+    if (!liveResearch && strategyId) {
+      const owner = this.autonomousOwnerOf(strategyId);
+      if (owner) {
+        throw Object.assign(
+          new Error(
+            `${strategyId} is running an autonomous demo experiment owned by ${owner}, so its ledger takes trades from that runner only. ` +
+              "A second writer would mix two experiments into one balance. Disable LIVE_SCANNER_PAPER_TRADE_ENABLED to stop the scanner writing here.",
+          ),
+          { statusCode: 409, expose: true },
+        );
+      }
+    }
+
     const trader = this.ledgerFor({
       strategyId,
       requireForward: !liveResearch,

@@ -286,7 +286,15 @@ function createTradingLabRouter({
         interval: item.timeframe,
         strategy: item.strategy,
         options: (req.body || {}).options || {},
-        executionMode: "shared",
+        // The caller's choice, not a constant. Forcing "shared" meant a queued
+        // run of a strategy that publishes its own stop and target measured
+        // the SHARED ATR exits instead — the research log then recorded a
+        // result under that strategy's name that its own exit rules never
+        // produced. "native" falls back to shared per trade when a strategy
+        // names no levels, and appliedExecution reports how many did, so the
+        // honest default is to let the request say and to default to the
+        // conservative mode rather than to hide the choice.
+        executionMode: (req.body || {}).executionMode || "shared",
         // Always recorded: a research run whose result is not in the log is
         // work done twice.
         record: true,
