@@ -36,8 +36,10 @@ Authenticated `/api/youtube/channels/config` and
 Renaming a category changes only its canonical category record. Deleting a category
 with assigned channels requires a destination category or the virtual
 `uncategorized` destination; channels are never deleted as a side effect.
-The Categories tab includes this virtual category as a read-only, protected fallback
-so its list and counts match the categories available in page and manager filters.
+The virtual fallback is hidden from page and manager lists while unused. If it
+contains channels, both lists expose it with the same count and the Categories tab
+marks it read-only, keeping the available categories aligned without displaying an
+empty pseudo-category.
 
 ## Migration
 

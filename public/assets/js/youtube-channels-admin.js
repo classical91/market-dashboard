@@ -225,7 +225,10 @@
     }
     function renderCategories() {
       var wrap = el(doc, "div", "ytm-panel");
-      wrap.appendChild(el(doc, "p", "ytm-section-copy", "Categories are reusable. Uncategorized is the protected fallback for channels without an assignment."));
+      var hasFallback = state.categories.some(function (category) { return category.virtual; });
+      var copy = "Categories are reusable. Renaming one updates every assigned channel automatically.";
+      if (hasFallback) copy += " Uncategorized is shown because it contains channels.";
+      wrap.appendChild(el(doc, "p", "ytm-section-copy", copy));
       wrap.appendChild(categoryForm(null));
       var real = state.categories.filter(function (category) { return !category.virtual; });
       if (!real.length) wrap.appendChild(el(doc, "div", "manage-empty", "Create your first category to organize YouTube sources."));

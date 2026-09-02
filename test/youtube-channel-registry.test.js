@@ -124,6 +124,7 @@ test("deleting a used category requires and applies a safe reassignment", () => 
   const channel = registry.list().find((item) => item.handle === "temporary");
   assert.equal(channel.categoryId, "uncategorized");
   assert.equal(channel.category, "Uncategorized");
+  assert.equal(registry.listCategories().find((item) => item.id === "uncategorized").channelCount, 1);
 });
 
 test("editing a channel changes its canonical category assignment", () => {

@@ -210,7 +210,8 @@ class YoutubeChannelRegistry {
       if (!channel.categoryId || !valid.has(channel.categoryId)) other += 1;
       else counts.set(channel.categoryId, (counts.get(channel.categoryId) || 0) + 1);
     });
-    return state.categories.map((item) => categoryView(item, counts.get(item.id) || 0)).concat(uncategorizedView(other));
+    const categories = state.categories.map((item) => categoryView(item, counts.get(item.id) || 0));
+    return other ? categories.concat(uncategorizedView(other)) : categories;
   }
   ensureSeeded() {
     return this._withLock(() => {
