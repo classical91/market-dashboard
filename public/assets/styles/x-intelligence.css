@@ -46,6 +46,7 @@ body[data-x-accent="world"] { --x-accent: #d6a760; }
 body[data-x-accent="tech"] { --x-accent: #52c7d9; }
 body[data-x-accent="macro"] { --x-accent: #76a7ff; }
 body[data-x-accent="energy"] { --x-accent: #65c889; }
+body[data-x-accent="relic"] { --x-accent: #c98f5c; }
 body[data-x-accent="neutral"] { --x-accent: #aab3c3; }
 body[data-x-accent] .x-account-card.active,
 body[data-x-accent] .x-account-card--all.active { border-color: var(--x-accent); }
