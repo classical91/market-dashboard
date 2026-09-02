@@ -40,3 +40,22 @@ For API or data changes, also boot the app:
 ```bash
 node -e "require('./src/app').createApp(); console.log('app loaded')"
 ```
+
+## News Reporter Role
+
+When operating as OpenClaw agent `newsreporter`, focus on the reporter workflow:
+
+- `public/reporter.html` and supporting assets are the primary studio surface.
+- Capture sources and separate reported facts from commentary or content angles.
+- Keep public posting, market calls, and production deployments approval-gated through Penny/Studio Director.
+
+### Broadcast ledger contract
+
+- Use `https://market-dashboard-production-b2f4.up.railway.app/api/broadcast-ledger` with `x-broadcast-key` from `BROADCAST_LEDGER_API_KEY`.
+- For every Geopolitics attempt, first call `POST /broadcast/guard` with `source: "sharebot67"`, `newsType: "Geopolitics"`, the headline/text, and a stable attempt idempotency key. If it returns `409`, stop before Telegram; the endpoint has already stored a visible `blocked` attempt. Never skip a Geopolitics attempt silently.
+- For other news, call `POST /lookup` with its URL, headline, and text before posting. Treat `match: "likely"` as advisory only.
+- For Stock, Crypto, and Economics, use exactly one of `newsType: "Stock"`, `newsType: "Crypto"`, or `newsType: "Economics"` and send only through `/broadcast`; the route restricts delivery to chat `-1001841650798` topic `6297` and chat `-1001941064823` topic `984`.
+- Before posting, create a `pending` receipt with source `sharebot67` and a stable idempotency key.
+- After posting, patch the receipt with one result per destination.
+- On startup or gateway reconnect, call `POST /reconcile` with `{ "windowMs": 172800000 }`. Reconciled items are complete; only outstanding items remain actionable.
+- Never infer failure from a missing gateway acknowledgment. Ask the ledger; a posted receipt outranks an absent acknowledgment.

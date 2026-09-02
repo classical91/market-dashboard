@@ -105,7 +105,11 @@ test("getCalendar falls back without MACRO_CALENDAR_URL", async () => {
   assert.ok(result.items.length > 0);
 });
 
+// Events now carry `at` — a resolved UTC instant — rather than a bare clock
+// label, and anything dated to another day is dropped rather than posing as
+// today's. `now` is injected so the fixture's date is the day under test.
 test("getCalendar normalizes a JSON calendar feed", async () => {
+  const now = new Date("2026-07-06T12:00:00Z");
   const service = new MarketDataService({ calendarUrl: "https://feed.test/calendar" });
   const result = await withMockedFetch(
     () => ({
@@ -116,15 +120,29 @@ test("getCalendar normalizes a JSON calendar feed", async () => {
         { notitle: true },
       ],
     }),
-    () => service.getCalendar(),
+    () => service.getCalendar({ now }),
   );
   assert.equal(result.live, true);
   assert.equal(result.source, "macro_calendar_url");
   assert.equal(result.items.length, 3);
-  assert.deepEqual(result.items[0], { time: "08:30", title: "US CPI", impact: "High", country: "US" });
-  assert.equal(result.items[1].time, "14:00");
-  assert.equal(result.items[1].impact, "High");
-  assert.equal(result.items[2].impact, "Low");
+
+  const cpi = result.items.find((item) => item.title === "US CPI");
+  assert.equal(cpi.time, "08:30");
+  assert.equal(cpi.impact, "High");
+  assert.equal(cpi.country, "US");
+  // No zone configured, so a bare label is read as UTC — and said to be assumed.
+  assert.equal(cpi.at, "2026-07-06T08:30:00.000Z");
+  assert.equal(cpi.precision, "assumed");
+
+  const fed = result.items.find((item) => item.title === "Fed Speaker");
+  assert.equal(fed.time, "14:00");
+  assert.equal(fed.impact, "High");
+  assert.equal(fed.at, "2026-07-06T14:00:00.000Z");
+  assert.equal(fed.precision, "exact", "an explicit Z offset needs no assumption");
+
+  const minor = result.items.find((item) => item.title === "Minor print");
+  assert.equal(minor.impact, "Low");
+  assert.equal(minor.at, null, "no time given means no instant invented");
 });
 
 test("getCalendar reports fallback with the error when the feed fails", async () => {

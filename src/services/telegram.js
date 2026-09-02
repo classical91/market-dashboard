@@ -203,14 +203,16 @@ class TelegramService {
     return !!(this._botToken && this._chatIds.length);
   }
 
-  async _send(target, text) {
+  async _send(target, text, { parseMode = "HTML" } = {}) {
     const url = `${TELEGRAM_API}/bot${this._botToken}/sendMessage`;
     const body = {
       chat_id: target.chatId,
       text: truncate(text, MAX_MSG_LEN),
-      parse_mode: "HTML",
       disable_web_page_preview: true,
     };
+    // Plain text skips parse_mode entirely: an unescaped "<" in a pasted
+    // headline would otherwise make Telegram reject the whole message.
+    if (parseMode) body.parse_mode = parseMode;
     if (target.threadId) body.message_thread_id = Number(target.threadId);
     const res = await fetch(url, {
       method: "POST",
@@ -228,6 +230,41 @@ class TelegramService {
     for (const target of this._chatIds) {
       await this._send(target, text);
     }
+  }
+
+  /**
+   * Like _sendToAll, but attempts every configured target and reports each
+   * outcome instead of aborting on the first failure. Used by postReport so
+   * a broadcast that reaches two channels out of three is recorded as a
+   * partial delivery — with the Telegram message IDs that did land — rather
+   * than vanishing behind a single thrown error.
+   *
+   * _sendToAll keeps its throw-on-first-failure behavior for the alert paths,
+   * which have no receipt to attach a partial result to.
+   */
+  async _sendToAllSettled(text, options, targets = this._chatIds) {
+    const results = [];
+    for (const target of targets.map(normalizeTarget)) {
+      const base = {
+        channel: "telegram",
+        chatId: String(target.chatId),
+        threadId: target.threadId ? String(target.threadId) : null,
+      };
+      try {
+        const response = await this._send(target, text, options);
+        results.push({
+          ...base,
+          status: "posted",
+          messageId: response && response.result && response.result.message_id != null
+            ? String(response.result.message_id)
+            : null,
+          error: null,
+        });
+      } catch (err) {
+        results.push({ ...base, status: "failed", messageId: null, error: err.message });
+      }
+    }
+    return results;
   }
 
   async _sendPhoto(target, photoUrl, caption) {
@@ -257,21 +294,109 @@ class TelegramService {
     }
   }
 
-  async postReport(report) {
-    if (!this.configured) return;
+  /**
+   * Read pending updates for this bot.
+   *
+   * Only one consumer may poll a given bot token at a time — Telegram answers
+   * a second one with 409 Conflict — so this is safe here precisely because
+   * the dashboard's bot is otherwise send-only. The caller surfaces a 409 as
+   * a configuration problem rather than retrying into it.
+   */
+  async getUpdates({ offset, limit = 100, allowedUpdates = ["channel_post", "message"] } = {}) {
+    if (!this._botToken) throw createServiceError("Telegram bot token is not configured", 400);
+    const url = `${TELEGRAM_API}/bot${this._botToken}/getUpdates`;
+    const body = {
+      limit,
+      timeout: 0,
+      allowed_updates: allowedUpdates,
+    };
+    if (Number.isFinite(offset)) body.offset = offset;
 
-    const date = report.dateStr || "";
-    const sections = [
-      { emoji: "₿", title: "CRYPTO TOP 10", key: "crypto" },
-      { emoji: "🌍", title: "ECONOMICS TOP 10", key: "economics" },
-      { emoji: "📊", title: "MARKETS TOP 10", key: "markets" },
-    ];
-
-    for (const s of sections) {
-      const body = formatForTelegram(report[s.key] || "");
-      const header = `<b>${s.emoji} ${s.title}</b>\n🗓️ ${escapeHtml(date)}\n\n`;
-      await this._sendToAll(header + body);
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const responseBody = await res.text();
+      throw createServiceError(`Telegram getUpdates failed (${res.status}): ${responseBody.slice(0, 300)}`, res.status);
     }
+    const payload = await res.json();
+    return Array.isArray(payload.result) ? payload.result : [];
+  }
+
+  /**
+   * Send an arbitrary broadcast body to every configured chat and report each
+   * outcome, including the Telegram message id.
+   *
+   * This exists because Telegram never returns a bot's own outgoing messages
+   * through getUpdates — the channel watch is structurally blind to anything
+   * this bot sends. A path that sends through this bot therefore has to record
+   * its own receipt, and the only trustworthy moment to do that is here, from
+   * the real sendMessage response.
+   */
+  async postText(text, { parseMode = "HTML", targets = null } = {}) {
+    const body = String(text || "").trim();
+    if (!body) throw createServiceError("Nothing to send: text is empty", 400);
+    return this._postPreformatted(parseMode === "HTML" ? formatForTelegram(body) : body, { parseMode, targets });
+  }
+
+  /**
+   * Send a message whose markup is already final.
+   *
+   * formatForTelegram() escapes `&`, `<` and `>`, so it is not idempotent:
+   * running it over its own output turns `&amp;` into `&amp;amp;` and eats any
+   * HTML tag the caller added deliberately. Callers that assemble their own
+   * markup — a heading around a formatted body — therefore need a way in that
+   * does not format again, rather than formatting twice and shipping a message
+   * with a literal `&lt;b&gt;` in it.
+   */
+  async _postPreformatted(message, { parseMode = "HTML", targets = null } = {}) {
+    if (!this.configured) throw createServiceError("Telegram is not configured", 400);
+
+    const destinations = await this._sendToAllSettled(message, { parseMode }, targets || this._chatIds);
+    const posted = destinations.filter((d) => d.status === "posted").length;
+
+    // Nothing landed anywhere: same contract as postReport — a total failure
+    // is an error, a partial one is a result the caller records.
+    if (destinations.length && posted === 0) {
+      const error = createServiceError(
+        `Telegram send failed for all ${destinations.length} destination(s): ${destinations[0].error || "unknown error"}`,
+        502,
+      );
+      error.destinations = destinations;
+      throw error;
+    }
+    return { destinations, posted, failed: destinations.length - posted };
+  }
+
+  /**
+   * Send one Daily Reporter section as its own categorized broadcast.
+   *
+   * This replaces the old aggregate postReport(), which merged all three
+   * sections into one result set spanning every configured chat. That shape
+   * could not express what the ledger now has to record: which destinations
+   * received *this category*. Merging across sections meant a receipt naming
+   * channels that a given category never reached, and a category identity that
+   * existed only in the message heading.
+   *
+   * Routing is resolved by the caller and passed as `targets`, so the reporter
+   * and the ledger share one destination table rather than each keeping a copy.
+   */
+  async postReportSection({ newsType, text, date = "", targets = null }) {
+    const headings = {
+      Crypto: ["₿", "CRYPTO TOP 10"],
+      Stock: ["📊", "MARKETS TOP 10"],
+      Economics: ["🌍", "ECONOMICS TOP 10"],
+    };
+    const heading = headings[newsType];
+    if (!heading) throw createServiceError("Reporter newsType must be Crypto, Stock, or Economics", 400);
+    const body = String(text || "").trim();
+    if (!body) throw createServiceError("Nothing to send: text is empty", 400);
+
+    // The heading is markup we wrote; only the model's section body is escaped.
+    const message = `<b>${heading[0]} ${heading[1]}</b>\n🗓️ ${escapeHtml(date)}\n\n${formatForTelegram(body)}`;
+    return this._postPreformatted(message, { targets });
   }
 
   async postAIAnalysis(result) {

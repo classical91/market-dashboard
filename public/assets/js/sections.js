@@ -46,6 +46,7 @@ function initSections(storeKey) {
 
     header.classList.remove('collapsed');
     cards.classList.remove('collapsed');
+    header.setAttribute('aria-expanded', 'true');
     saveCollapsed(
       Array.from(headers)
         .filter(sectionHeader => sectionHeader.classList.contains('collapsed'))
@@ -58,10 +59,21 @@ function initSections(storeKey) {
     const cards = cardsFor(id);
     if (!cards) return;
 
+    // The header is the dropdown's trigger and the card list is its panel.
+    header.setAttribute('role', 'button');
+    header.setAttribute('tabindex', '0');
+    // Some pages point a header at itself (no separate panel element); a
+    // self-referencing aria-controls would be meaningless, so skip it there.
+    if (cards !== header) {
+      if (!cards.id) cards.id = 'cards-' + id;
+      header.setAttribute('aria-controls', cards.id);
+    }
+
     if (collapsed.includes(id)) {
       header.classList.add('collapsed');
       cards.classList.add('collapsed');
     }
+    header.setAttribute('aria-expanded', collapsed.includes(id) ? 'false' : 'true');
 
     // "Open All" button — opens every link in this section in new tabs.
     const links = Array.from(cards.querySelectorAll('a[href]'));
@@ -92,15 +104,27 @@ function initSections(storeKey) {
       else header.appendChild(btn);
     }
 
-    header.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
+    function toggle() {
       const isCollapsed = cards.classList.toggle('collapsed');
       header.classList.toggle('collapsed', isCollapsed);
+      header.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
       const list = getCollapsed();
       if (isCollapsed) { if (!list.includes(id)) list.push(id); }
       else { const i = list.indexOf(id); if (i > -1) list.splice(i, 1); }
       saveCollapsed(list);
+    }
+
+    header.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      toggle();
+    });
+
+    header.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
+      e.preventDefault();
+      e.stopPropagation();
+      toggle();
     });
   });
 

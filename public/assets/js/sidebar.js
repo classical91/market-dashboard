@@ -17,198 +17,160 @@
     document.documentElement.classList.add("alpha-review-mode");
   }
 
+  var accountState = null;
+
   var workspace = [
-    { href: "/terminal-suite.html", icon: "&#128421;", label: "Terminal Suite" },
+    { href: "/terminal-suite.html", label: "Terminal Suite" },
     {
       label: "Overview",
-      icon: "&#128202;",
       children: [
-        { href: "/", icon: "&#127968;", label: "Top" },
-        { href: "/#ticker", icon: "&#128200;", label: "Ticker" },
-        { href: "/#calendars-tools", icon: "&#128197;", label: "Calendars & Tools" },
-        { href: "/#kpiGrid", icon: "&#128202;", label: "Key Indicators" },
-        { href: "/#market-pulse", icon: "&#128201;", label: "Market Pulse" },
-        { href: "/#market-heatmap", icon: "&#127777;&#65039;", label: "Market Heatmap" },
-        { href: "/#risk-meter", icon: "&#9878;&#65039;", label: "Risk Meter" },
-        { href: "/#watchlist", icon: "&#128065;&#65039;", label: "Watchlist" },
-        { href: "/#alerts", icon: "&#128276;", label: "Alerts" },
-        { href: "/#macro-calendar", icon: "&#128198;", label: "Macro Calendar" },
-        { href: "/#news-pulse", icon: "&#128240;", label: "News Pulse" },
-        { href: "/#ovh-market-overview", icon: "&#128202;", label: "TV Market Overview" },
-        { href: "/#ovh-technical-analysis", icon: "&#128200;", label: "Technical Analysis" },
-        { href: "/#ovh-derivatives", icon: "&#9878;&#65039;", label: "Derivatives & Positioning" },
-        { href: "/#ovh-liquidity", icon: "&#128167;", label: "Liquidity & Volatility" },
-        { href: "/#ovh-heatmap", icon: "&#127777;&#65039;", label: "Crypto Heatmap" },
-        { href: "/#ovh-econ-calendar", icon: "&#128197;", label: "Economic Calendar" },
-        { href: "/#ovh-top-stories", icon: "&#128240;", label: "Top Stories" },
+        { href: "/", label: "Top" },
+        { href: "/#ticker", label: "Ticker" },
+        { href: "/#calendars-tools", label: "Calendars & Tools" },
+        { href: "/#kpiGrid", label: "Key Indicators" },
+        { href: "/#market-pulse", label: "Market Pulse" },
+        { href: "/#market-heatmap", label: "Market Heatmap" },
+        { href: "/#risk-meter", label: "Risk Meter" },
+        { href: "/#watchlist", label: "Watchlist" },
+        { href: "/#alerts", label: "Alerts" },
+        { href: "/#macro-calendar", label: "Macro Calendar" },
+        { href: "/#news-pulse", label: "News Pulse" },
+        { href: "/#ovh-market-overview", label: "TV Market Overview" },
+        { href: "/#ovh-technical-analysis", label: "Technical Analysis" },
+        { href: "/#ovh-derivatives", label: "Derivatives & Positioning" },
+        { href: "/#ovh-liquidity", label: "Liquidity & Volatility" },
+        { href: "/#ovh-heatmap", label: "Crypto Heatmap" },
+        { href: "/#ovh-econ-calendar", label: "Economic Calendar" },
+        { href: "/#ovh-top-stories", label: "Top Stories" },
       ],
     },
     {
       label: "AI Analysis",
-      icon: "&#129504;",
       children: [
-        { href: "/decision.html", icon: "&#127919;", label: "Decision Engine" },
-        { href: "/trading-lab.html", icon: "&#129514;", label: "Backtest Lab" },
-        { href: "/ai-analysis.html", icon: "&#129504;", label: "AI Analysis" },
-        { href: "/layout-analysis.html", icon: "&#128248;", label: "My Layouts" },
-        { href: "/pattern-scanner.html", icon: "&#128200;", label: "Pattern Scanner" },
-        { href: "/pattern-scanner-trades.html", icon: "&#9733;", label: "My Trades" },
-        { href: "/pattern-scanner-stats.html", icon: "&#128202;", label: "Track Record" },
-        { href: "/signal-screener.html", icon: "&#9889;", label: "Signal Screener" },
-        { href: "/signal-diagnostics.html", icon: "&#128225;", label: "Signal Diagnostics" },
+        { href: "/ai-analysis.html", label: "AI Analysis" },
+        { href: "/layout-analysis.html", label: "My Layouts" },
+        { href: "/pattern-scanner.html", label: "Pattern Scanner" },
+        { href: "/pattern-scanner-trades.html", label: "My Trades" },
+        { href: "/pattern-scanner-stats.html", label: "Track Record" },
+        { href: "/signal-screener.html", label: "Signal Screener" },
+        { href: "/signal-diagnostics.html", label: "Signal Diagnostics" },
       ],
     },
     {
       label: "Reporter",
-      icon: "&#128240;",
       children: [
-        { href: "/emerging-markets.html", icon: "&#128640;", label: "Emerging Markets" },
-        { href: "/economics-top-10.html", icon: "&#127758;", label: "Economics Top 10" },
-        { href: "/markets-top-10.html", icon: "&#128202;", label: "Markets Top 10" },
+        { href: "/emerging-markets.html", label: "Emerging Markets" },
+        { href: "/economics-top-10.html", label: "Economics Top 10" },
+        { href: "/markets-top-10.html", label: "Markets Top 10" },
       ],
     },
     {
       label: "Market Intel Links",
-      icon: "&#128200;",
       children: [
-        { href: "/market-intel.html", icon: "&#128200;", label: "Market Intel Home" },
+        { href: "/market-intel.html", label: "Market Intel Home" },
         {
           label: "Market Intel",
-          icon: "&#128202;",
           children: [
-            { href: "/market-intel.html#cross-asset-overview", icon: "&#128200;", label: "Cross-Asset Overview" },
-            { href: "/market-intel.html#macro-indicators", icon: "&#128202;", label: "Macro Indicators" },
+            { href: "/market-intel.html#cross-asset-overview", label: "Cross-Asset Overview" },
+            { href: "/market-intel.html#macro-indicators", label: "Macro Indicators" },
           ],
         },
         {
           label: "Crypto",
-          icon: "&#8383;",
           children: [
-            { href: "/crypto.html#interactive-dashboards", icon: "&#128225;", label: "Interactive Dashboards" },
-            { href: "/crypto.html#crypto-research", icon: "&#8383;", label: "Bitcoin Research" },
-            { href: "/crypto.html#alt-research", icon: "&#9672;", label: "Alt Research" },
-            { href: "/crypto.html#tradingview-tickers", icon: "&#128200;", label: "TradingView Tickers" },
-            { href: "/crypto.html#etf-flows", icon: "&#127974;", label: "ETF Flows" },
-            { href: "/crypto.html#long-vs-shorts", icon: "&#9878;&#65039;", label: "Long vs Shorts" },
-            { href: "/crypto.html#market-overview-dashboard", icon: "&#128202;", label: "Market Volumes" },
-            { href: "/crypto.html#news", icon: "&#128240;", label: "Crypto News" },
-            { href: "/crypto.html#market-cap", icon: "&#128200;", label: "Market Cap" },
-            { href: "/crypto.html#market-trends", icon: "&#128293;", label: "Market Trends" },
-            { href: "/crypto.html#rankings", icon: "&#127942;", label: "Rankings" },
-            { href: "/crypto.html#liquidations", icon: "&#9889;", label: "Liquidations" },
-            { href: "/crypto.html#open-interest", icon: "&#128200;", label: "Open-Interest Overview" },
-            { href: "/crypto.html#heatmaps", icon: "&#127777;", label: "Heatmaps & Momentum" },
+            { href: "/crypto.html#interactive-dashboards", label: "Interactive Dashboards" },
+            { href: "/crypto.html#crypto-research", label: "Bitcoin Research" },
+            { href: "/crypto.html#alt-research", label: "Alt Research" },
+            { href: "/crypto.html#tradingview-tickers", label: "TradingView Tickers" },
+            { href: "/crypto.html#etf-flows", label: "ETF Flows" },
+            { href: "/crypto.html#long-vs-shorts", label: "Long vs Shorts" },
+            { href: "/crypto.html#market-overview-dashboard", label: "Market Volumes" },
+            { href: "/crypto.html#news", label: "Crypto News" },
+            { href: "/crypto.html#market-cap", label: "Market Cap" },
+            { href: "/crypto.html#market-trends", label: "Market Trends" },
+            { href: "/crypto.html#rankings", label: "Rankings" },
+            { href: "/crypto.html#liquidations", label: "Liquidations" },
+            { href: "/crypto.html#open-interest", label: "Open-Interest Overview" },
+            { href: "/crypto.html#heatmaps", label: "Heatmaps & Momentum" },
             {
               label: "On-Chain Analytics",
-              icon: "&#128279;",
               children: [
-                { href: "/on-chain.html", icon: "&#128279;", label: "On-Chain Hub" },
-                { href: "/on-chain.html#platforms", icon: "&#128225;", label: "Platforms" },
-                { href: "/on-chain.html#exchange-flows", icon: "&#8652;", label: "Exchange Flows" },
-                { href: "/on-chain.html#network-activity", icon: "&#128200;", label: "Network Activity" },
-                { href: "/on-chain.html#derivatives", icon: "&#9889;", label: "Derivatives" },
-                { href: "/on-chain.html#cycle-indicators", icon: "&#128204;", label: "Cycle Indicators" },
-                { href: "/on-chain.html#whale-tracking", icon: "&#128011;", label: "Whale Tracking" },
-                { href: "/on-chain.html#stablecoin-flows", icon: "&#128176;", label: "Stablecoin Flows" },
-                { href: "/on-chain.html#defi", icon: "&#127963;", label: "DeFi" },
+                { href: "/on-chain.html", label: "On-Chain Hub" },
+                { href: "/on-chain.html#platforms", label: "Platforms" },
+                { href: "/on-chain.html#exchange-flows", label: "Exchange Flows" },
+                { href: "/on-chain.html#network-activity", label: "Network Activity" },
+                { href: "/on-chain.html#derivatives", label: "Derivatives" },
+                { href: "/on-chain.html#cycle-indicators", label: "Cycle Indicators" },
+                { href: "/on-chain.html#whale-tracking", label: "Whale Tracking" },
+                { href: "/on-chain.html#stablecoin-flows", label: "Stablecoin Flows" },
+                { href: "/on-chain.html#defi", label: "DeFi" },
               ],
             },
-            { href: "/crypto.html#cmc-indicators", icon: "&#128204;", label: "Indicators" },
-            { href: "/crypto.html#qualitative", icon: "&#9998;", label: "Qual. Analysis" },
+            { href: "/crypto.html#cmc-indicators", label: "Indicators" },
+            { href: "/crypto.html#qualitative", label: "Qual. Analysis" },
           ],
         },
         {
           label: "Traditional",
-          icon: "&#127974;",
           children: [
-            { href: "/traditional.html#cnbc", icon: "&#128250;", label: "CNBC" },
-            { href: "/traditional.html#news-analysis", icon: "&#128240;", label: "News & Analysis" },
-            { href: "/traditional.html#market-data", icon: "&#128200;", label: "Market Data" },
-            { href: "/traditional.html#macro", icon: "&#127757;", label: "Macro" },
-            { href: "/traditional.html#global", icon: "&#127760;", label: "Global" },
-            { href: "/traditional.html#commodities", icon: "&#9981;", label: "Commodities" },
+            { href: "/traditional.html#cnbc", label: "CNBC" },
+            { href: "/traditional.html#news-analysis", label: "News & Analysis" },
+            { href: "/traditional.html#market-data", label: "Market Data" },
+            { href: "/traditional.html#macro", label: "Macro" },
+            { href: "/traditional.html#global", label: "Global" },
+            { href: "/traditional.html#commodities", label: "Commodities" },
           ],
         },
       ],
     },
     {
       label: "YouTube",
-      icon: "&#9654;&#65039;",
       children: [
-        { href: "/youtube-v2.html", icon: "&#127916;", label: "YouTube Intelligence" },
-        { href: "https://www.youtube.com/", icon: "&#9654;&#65039;", label: "YouTube.com" },
+        { href: "/youtube-v2.html", label: "YouTube Intelligence" },
+        { href: "https://www.youtube.com/", label: "YouTube.com" },
         {
           href: "https://yt-summarizer-production-4521.up.railway.app/",
-          icon: "&#128221;",
           label: "YouTube Summarizer",
         },
       ],
     },
     {
-      label: "AI Apps",
-      icon: "&#129302;",
-      children: [
-        {
-          href: "https://chatgpt.com/share/6a3ad954-cdf4-83e8-81bb-77966ffefab6",
-          icon: "&#129302;",
-          label: "AI Market Trader",
-        },
-        {
-          href: "https://commentfarm-production-fc8b.up.railway.app/image-converter",
-          icon: "&#128444;",
-          label: "Image Converter",
-        },
-        {
-          href: "https://main-page-production-9927.up.railway.app/ai.html",
-          icon: "&#129504;",
-          label: "AI Portal",
-        },
-        {
-          href: "/bot-commands.html",
-          icon: "&#128172;",
-          label: "Bot Commands",
-        },
-      ],
+      href: "https://main-page-production-9927.up.railway.app/ai.html",
+      label: "AI Portal",
     },
     {
-      label: "X",
-      icon: "&#120143;",
+      label: "𝕏",
       children: [
-        { href: "https://x.com/", icon: "&#120143;", label: "Open X.com" },
-        { href: "/x-intelligence.html", icon: "&#120143;", label: "X Intelligence" },
-        { href: "/x-search.html", icon: "&#128269;", label: "Search X" },
+        { href: "https://x.com/", label: "Open X.com" },
+        { href: "/x-intelligence.html", label: "X Intelligence" },
+        { href: "/x-search.html", label: "Search X" },
       ],
     },
     {
       href: "https://www.worldmonitor.app/dashboard?lat=168.3787&lon=-46.4780&zoom=2.50&view=america&timeRange=48h&layers=conflicts%2Chotspots%2Csanctions%2Cweather%2Coutages%2Cnatural%2CiranAttacks",
-      icon: "&#127758;",
       label: "Open WorldMonitor.com",
       featured: "worldmonitor",
     },
-    { href: "https://www.tradingview.com/", icon: "&#128200;", label: "Open TradingView.com", featured: "tradingview" },
+    { href: "https://www.tradingview.com/", label: "Open TradingView.com", featured: "tradingview" },
+  ];
+
+  var tools = [
     {
-      href: "https://commentfarm-production-fc8b.up.railway.app/queue",
-      icon: "&#128444;",
-      label: "Open ImageQueue",
-      featured: "imagequeue",
+      href: "https://t.me/tesr56788",
+      label: "Trader Lab Telegram",
+    },
+    { href: "/trading-lab.html", label: "Trading Lab Backtest" },
+    {
+      href: "https://market-dashboard-production-b2f4.up.railway.app/bot-commands.html",
+      label: "Bot Commands",
+      newTab: false,
     },
     {
       href: "https://trading-strategy-production-1b41.up.railway.app/",
-      icon: "&#129504;",
       label: "Decision Engine",
     },
-    {
-      href: "/trading-lab.html",
-      icon: "&#129408;",
-      label: "Traderclaw Backtest",
-    },
-    {
-      href: "https://t.me/tesr56788",
-      icon: "&#9992;&#65039;",
-      label: "Trader Lab",
-    },
-    { href: "/indicators.html", icon: "&#128218;", label: "Indicators Glossary" },
-    { href: "/settings.html", icon: "&#9881;&#65039;", label: "Settings" },
+    { href: "/indicators.html", label: "Indicators Glossary" },
+    { href: "/settings.html", label: "Settings" },
   ];
 
   function currentPath() {
@@ -253,7 +215,6 @@
     var prefix = mode === "command" ? "cmd-" : "";
     return (
       '<span class="' + prefix + "nav-item " + (subitem ? prefix + "nav-subitem " : "") + prefix + 'nav-item--beta" aria-disabled="true">' +
-      '<span class="' + prefix + 'nav-icon" aria-hidden="true">' + item.icon + '</span>' +
       '<span class="' + prefix + 'nav-text">' + item.label + '</span>' +
       '<span class="' + prefix + 'nav-beta-pill">BETA</span></span>'
     );
@@ -284,17 +245,16 @@
     if (isAlphaReviewMode() && !isAlphaAvailable(item.href)) return betaNavItem(item, mode, false);
     var active = isActive(item.href);
     var external = /^https?:\/\//.test(item.href);
+    var newTab = external && item.newTab !== false;
     var featuredClass = item.featured
       ? " " + prefix + "nav-item--featured " + prefix + "nav-item--" + item.featured
       : "";
-    var icon = item.dot
-      ? '<span class="' + prefix + 'nav-dot"></span>'
-      : '<span class="' + prefix + 'nav-icon" aria-hidden="true">' + item.icon + "</span>";
+    var icon = item.dot ? '<span class="' + prefix + 'nav-dot"></span>' : "";
     var href = alphaHref(item.href);
     return (
       '<a class="' + prefix + "nav-item" + featuredClass + (active ? " active" : "") + '" href="' + href +
       '" data-nav-href="' + item.href + '"' + (href !== item.href ? ' data-alpha-href="' + href + '"' : "") +
-      (external ? ' target="_blank" rel="noopener"' : "") +
+      (newTab ? ' target="_blank" rel="noopener"' : "") +
       (active ? ' aria-current="page"' : "") + ">" +
       icon + '<span class="' + prefix + 'nav-text">' + item.label + "</span></a>"
     );
@@ -305,16 +265,35 @@
     if (isAlphaReviewMode() && !isAlphaAvailable(item.href)) return betaNavItem(item, mode, true);
     var active = isActive(item.href);
     var external = /^https?:\/\//.test(item.href);
+    var newTab = external && item.newTab !== false;
     var href = alphaHref(item.href);
     return (
       '<a class="' + prefix + 'nav-item ' + prefix + 'nav-subitem' + (active ? " active" : "") +
       '" href="' + href + '" data-nav-href="' + item.href + '"' +
-      (external ? ' target="_blank" rel="noopener"' : "") +
+      (newTab ? ' target="_blank" rel="noopener"' : "") +
       (active ? ' aria-current="page"' : "") +
-      '><span class="' + prefix + 'nav-icon" aria-hidden="true">' +
-      item.icon + '</span><span class="' + prefix + 'nav-text">' + item.label +
+      '><span class="' + prefix + 'nav-text">' + item.label +
       '</span>' + (external ? '<span class="' + prefix + 'nav-external" aria-hidden="true">&#8599;</span>' : "") +
       "</a>"
+    );
+  }
+
+  function accountHtml(mode) {
+    var prefix = mode === "command" ? "cmd-" : "";
+    if (accountState && accountState.authenticated) {
+      var identifier = accountState.identifier || (accountState.role === "alpha" ? "Alpha Team" : "Owner account");
+      return (
+        '<section class="' + prefix + 'account" aria-label="Account">' +
+        '<div class="' + prefix + 'account-label">Account</div>' +
+        '<div class="' + prefix + 'account-id">' + identifier + '</div>' +
+        '<form action="/auth/logout" method="post" class="' + prefix + 'account-form">' +
+        '<button type="submit" class="' + prefix + 'account-action">Logout</button></form></section>'
+      );
+    }
+    return (
+      '<section class="' + prefix + 'account" aria-label="Account">' +
+      '<div class="' + prefix + 'account-label">Account</div>' +
+      '<a class="' + prefix + 'account-action" href="/login?returnTo=' + encodeURIComponent(window.location.pathname + window.location.search) + '">Login</a></section>'
     );
   }
 
@@ -335,7 +314,6 @@
       '<div class="' + prefix + 'nav-dropdown' + (nested ? " " + prefix + "nav-subdropdown" : "") + (open ? " open" : "") + '" data-dropdown-key="' + storageKey + '">' +
       '<button class="' + prefix + 'nav-item ' + (nested ? prefix + "nav-subitem " : "") + prefix + 'nav-dropdown-toggle' + (active ? " active" : "") +
       '" type="button" aria-expanded="' + (open ? "true" : "false") + '" aria-controls="' + id + '">' +
-      '<span class="' + prefix + 'nav-icon" aria-hidden="true">' + item.icon + '</span>' +
       '<span class="' + prefix + 'nav-text">' + item.label + '</span>' +
       '<span class="' + prefix + 'nav-caret" aria-hidden="true">&#9656;</span></button>' +
       '<div class="' + prefix + 'nav-dropdown-menu" id="' + id + '">' + children + "</div></div>"
@@ -347,11 +325,16 @@
     var workspaceHtml = workspace.map(function (item, index) {
       return item.children ? dropdown(item, mode, instance + "-" + index) : navItem(item, mode);
     }).join("");
+    var toolsHtml = tools.map(function (item, index) {
+      return item.children ? dropdown(item, mode, instance + "-tools-" + index) : navItem(item, mode);
+    }).join("");
     return (
       '<a class="' + prefix + 'brand" href="/">' +
       '<div class="' + prefix + 'brand-mark">M</div>' +
       '<div class="' + prefix + 'brand-text"><h1>Market Command</h1><span>Live dashboard system</span></div></a>' +
-      '<div class="' + prefix + 'nav-label">Workspace</div>' + workspaceHtml
+      accountHtml(mode) + '<div class="' + prefix + 'account-divider"></div>' +
+      '<nav class="' + prefix + 'nav-primary" aria-label="Market Command">' + workspaceHtml + '</nav>' +
+      '<nav class="' + prefix + 'nav-tools" aria-label="Trading and tools"><div class="' + prefix + 'nav-label">Trading &amp; Tools</div>' + toolsHtml + '</nav>'
     );
   }
 
@@ -369,6 +352,37 @@
   function fill(root, mode, instance) {
     root.innerHTML = navigationHtml(mode, instance);
     wireDropdowns(root);
+    var logoutForm = root.querySelector("." + (mode === "command" ? "cmd-" : "") + "account-form");
+    if (logoutForm) {
+      logoutForm.addEventListener("submit", function (event) {
+        event.preventDefault();
+        fetch("/auth/logout", { method: "POST", credentials: "same-origin", headers: { Accept: "application/json" } })
+          .then(function (response) {
+            if (!response.ok && response.status !== 204) throw new Error("Logout failed");
+            accountState = { authenticated: false };
+            refreshSidebars();
+            window.location.assign("/login?returnTo=" + encodeURIComponent(window.location.pathname + window.location.search));
+          })
+          .catch(function () { logoutForm.submit(); });
+      });
+    }
+  }
+
+  function refreshSidebars() {
+    document.querySelectorAll(".cmd-sidebar").forEach(function (root) { fill(root, "command", "desktop"); });
+    document.querySelectorAll(".sidebar").forEach(function (root) { fill(root, "overview", "desktop"); });
+    document.querySelectorAll(".cmd-drawer").forEach(function (root) { fill(root, "command", "mobile"); });
+    document.querySelectorAll(".mob-drawer").forEach(function (root) { fill(root, "overview", "mobile"); });
+  }
+
+  function loadAccount() {
+    return fetch("/api/auth/session", { credentials: "same-origin", cache: "no-store" })
+      .then(function (response) { return response.ok ? response.json() : { authenticated: false }; })
+      .catch(function () { return { authenticated: false }; })
+      .then(function (state) {
+        accountState = state;
+        refreshSidebars();
+      });
   }
 
   function updateActiveStates() {
@@ -455,6 +469,7 @@
     if (commandMain && !document.getElementById("cmd-mobile-bar")) buildMobile(commandMain, "command");
     if (overviewMain && !document.getElementById("mob-bar")) buildMobile(overviewMain, "overview");
     window.addEventListener("hashchange", updateActiveStates);
+    loadAccount();
   }
 
   if (document.readyState === "loading") {

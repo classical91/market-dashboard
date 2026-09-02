@@ -47,6 +47,38 @@ test("site login redirects anonymous page requests", async () => {
   assert.match(res.headers.get("location"), /^\/login\?returnTo=/);
 });
 
+test("sidebar session status is public and reports the active role", async () => {
+  const anonymous = await fetch(`${base}/api/auth/session`);
+  assert.equal(anonymous.status, 200);
+  assert.deepEqual(await anonymous.json(), {
+    enabled: true,
+    authenticated: false,
+    role: null,
+    identifier: null,
+  });
+
+  const { cookie } = await login("owner-password");
+  const authenticated = await fetch(`${base}/api/auth/session`, { headers: { cookie } });
+  assert.equal(authenticated.status, 200);
+  assert.deepEqual(await authenticated.json(), {
+    enabled: true,
+    authenticated: true,
+    role: "owner",
+    identifier: null,
+  });
+});
+
+test("JSON logout clears the shared dashboard session", async () => {
+  const { cookie } = await login("owner-password");
+  const logout = await fetch(`${base}/auth/logout`, {
+    method: "POST",
+    redirect: "manual",
+    headers: { accept: "application/json", cookie },
+  });
+  assert.equal(logout.status, 204);
+  assert.match(logout.headers.get("set-cookie"), /^market_dashboard_session=;/);
+});
+
 test("owner password unlocks the whole dashboard", async () => {
   const { res: loginRes, cookie } = await login("owner-password", "/settings.html");
   assert.equal(loginRes.status, 303);
@@ -80,6 +112,132 @@ test("alpha password unlocks only alpha review pages and read-only alpha data", 
     body: JSON.stringify({ symbol: "BTCUSDT", interval: "4h" }),
   });
   assert.equal(blockedWrite.status, 403);
+});
+
+// The TraderClaw agent polls GET /api/decision with an API client, not a
+// browser, so it has no session cookie. Site auth used to answer 401 before
+// the decision router ran, which is the exact failure these assertions pin.
+test("anonymous machine callers can read GET /api/decision", async () => {
+  const res = await fetch(`${base}/api/decision?interval=4h`);
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.interval, "4h");
+  assert.ok(body.regime, "decision payload must carry a regime block");
+});
+
+test("the public decision bypass does not open the rest of the namespace", async () => {
+  const journal = await fetch(`${base}/api/decision/journal`);
+  assert.equal(journal.status, 401);
+
+  const write = await fetch(`${base}/api/decision/journal`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ symbol: "BTCUSDT" }),
+  });
+  assert.equal(write.status, 401);
+
+  // Writing *to* the public path must not inherit the read bypass either.
+  const post = await fetch(`${base}/api/decision`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: "{}",
+  });
+  assert.equal(post.status, 401);
+});
+
+test("Trading Lab and admin surfaces stay closed to anonymous callers", async () => {
+  const paperTrade = await fetch(`${base}/api/trading-lab/paper/trades`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: "{}",
+  });
+  assert.equal(paperTrade.status, 401);
+
+  const settings = await fetch(`${base}/api/watchlist`);
+  assert.equal(settings.status, 401);
+});
+
+// ADMIN_API_KEY is unset in this file, so the Trading Lab machine-read
+// exemption must not fire: an x-admin-key header is worthless against a deploy
+// that never configured a key. Positive assertions for a keyed deploy live in
+// test/trading-lab-machine-read.test.js.
+test("the Trading Lab machine-read exemption fails closed without ADMIN_API_KEY", async () => {
+  const targets = [
+    "/api/trading-lab/pipeline",
+    "/api/trading-lab/strategy-accounts",
+    "/api/trading-lab/strategy-accounts/mindset_v1",
+    "/api/trading-lab/signal-actions",
+  ];
+  for (const target of targets) {
+    const anonymous = await fetch(`${base}${target}`);
+    assert.equal(anonymous.status, 401, `${target} must stay closed to anonymous callers`);
+
+    const keyed = await fetch(`${base}${target}`, { headers: { "x-admin-key": "any-key" } });
+    assert.equal(keyed.status, 401, `${target} must not open when no admin key is configured`);
+  }
+
+  const { cookie } = await login("owner-password", "/");
+  const owner = await fetch(`${base}/api/trading-lab/pipeline`, { headers: { cookie } });
+  assert.equal(owner.status, 200, "the owner session still reads the pipeline view");
+});
+
+test("journal reads need an owner session, not just any session", async () => {
+  const { cookie: alphaCookie } = await login("alpha-password", "/signal-screener.html?view=alpha");
+  const alphaJournal = await fetch(`${base}/api/decision/journal`, { headers: { cookie: alphaCookie } });
+  assert.equal(alphaJournal.status, 403);
+
+  const { cookie: ownerCookie } = await login("owner-password", "/");
+  const ownerJournal = await fetch(`${base}/api/decision/journal`, { headers: { cookie: ownerCookie } });
+  assert.equal(ownerJournal.status, 200);
+  const body = await ownerJournal.json();
+  assert.ok(Array.isArray(body.items));
+});
+
+// ADMIN_API_KEY is unset in this file, so journal mutation is disabled outright
+// (503) rather than merely unauthorized — the owner cookie must not be a way
+// around the admin key.
+test("owner session alone cannot write the journal without ADMIN_API_KEY", async () => {
+  const { cookie } = await login("owner-password", "/");
+  const res = await fetch(`${base}/api/decision/journal`, {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie },
+    body: JSON.stringify({ symbol: "BTCUSDT", direction: "long" }),
+  });
+  assert.equal(res.status, 503);
+});
+
+test("owner session can manage X templates without entering a second admin key", async () => {
+  const { cookie } = await login("owner-password", "/x-intelligence.html");
+  const res = await fetch(`${base}/api/x/templates`, {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie },
+    body: JSON.stringify({
+      id: "owner-session-template",
+      name: "Owner Session Template",
+      sections: [],
+      memberships: [],
+    }),
+  });
+
+  assert.equal(res.status, 201);
+  const body = await res.json();
+  assert.equal(body.template.id, "owner-session-template");
+});
+
+test("alpha session cannot manage X templates", async () => {
+  const { cookie } = await login("alpha-password", "/signal-screener.html?view=alpha");
+  const res = await fetch(`${base}/api/x/templates`, {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie },
+    body: JSON.stringify({
+      id: "alpha-template",
+      name: "Alpha Template",
+      sections: [],
+      memberships: [],
+    }),
+  });
+
+  assert.equal(res.status, 403);
 });
 
 test("wrong password stays on login", async () => {

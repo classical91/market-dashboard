@@ -20,6 +20,7 @@ delete process.env.ADMIN_API_KEY;
 delete process.env.MARKET_DASHBOARD_LOGIN_PASSWORD;
 
 const { createApp } = require("../src/app");
+const { YOUTUBE_CHANNELS } = require("../src/config/youtube-channels");
 
 const originalFetch = global.fetch;
 let server;
@@ -58,7 +59,7 @@ test("a total outage degrades into failedFeeds instead of a 500", async () => {
   assert.deepEqual(body.videos, []);
   assert.deepEqual(body.live, []);
   assert.deepEqual(body.upcoming, []);
-  assert.equal(body.failedFeeds.length, 4, "every configured channel reports its own failure");
+  assert.equal(body.failedFeeds.length, YOUTUBE_CHANNELS.length, "every configured channel reports its own failure");
   body.failedFeeds.forEach((channel) => {
     assert.equal(typeof channel.reason, "string");
     assert.equal(typeof channel.error, "string");
@@ -128,7 +129,7 @@ test("channels endpoint returns the full intelligence shape", async () => {
   assert.ok(Array.isArray(body.channels));
   assert.ok(Array.isArray(body.failedFeeds));
   assert.equal(body.meta.apiConfigured, true);
-  assert.equal(body.channels.length, 4, "failed channels stay in the list so the UI can name them");
+  assert.equal(body.channels.length, YOUTUBE_CHANNELS.length, "failed channels stay in the list so the UI can name them");
 
   const stockmoe = body.channels.find((channel) => channel.handle === "stockmoe");
   assert.equal(stockmoe.source, "api");
@@ -137,10 +138,29 @@ test("channels endpoint returns the full intelligence shape", async () => {
   assert.equal(stockmoe.videos[0].channelLabel, "StockMoe");
   assert.equal(stockmoe.videos[0].state, "video");
 
-  // The three channels with no configured ID and no API resolution still fail
+  // Every channel except StockMoe has no configured ID or API resolution and still fails
   // on their own, without taking StockMoe down with them.
-  assert.equal(body.failedFeeds.length, 3);
+  assert.equal(body.failedFeeds.length, YOUTUBE_CHANNELS.length - 1);
   assert.equal(body.videos.length, 1);
+
+  // Themes ride along with the feed so the switcher renders in one round trip.
+  assert.ok(Array.isArray(body.themes), "the payload carries the theme list");
+  assert.equal(body.themes[0].id, "markets");
+  assert.deepEqual(
+    body.themes[0].channels.map((entry) => entry.handle).sort(),
+    body.channels.map((channel) => channel.handle.toLowerCase()).sort(),
+    "the derived markets theme covers exactly the tracked channels",
+  );
+  for (const theme of body.themes) {
+    // Every membership must name a channel the feed fetched, or the switcher's
+    // count promises videos the page cannot show.
+    for (const member of theme.channels) {
+      assert.ok(
+        body.channels.some((channel) => channel.handle.toLowerCase() === member.handle),
+        `${theme.id} names an untracked channel: ${member.handle}`,
+      );
+    }
+  }
 });
 
 test("an unknown channel handle is a 404, not a crash", async () => {

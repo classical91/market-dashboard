@@ -1,6 +1,8 @@
 "use strict";
 
 const crypto = require("crypto");
+const { isLedgerRequest, isLedgerParamRequest } = require("./ledger-auth");
+const { isAdminRequest } = require("./admin-auth");
 
 const COOKIE_NAME = "market_dashboard_session";
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -115,12 +117,106 @@ function isAlphaReadApi(req) {
   return req.method === "GET" && ALPHA_READ_APIS.some((prefix) => req.path === prefix || req.path.startsWith(`${prefix}/`));
 }
 
+// The broadcast ledger is called by machines — the iOS/GPT shortcut and the
+// ShareBot67 agent — which authenticate with an API key and have no session
+// cookie to present. Without this bypass the site login would reject every
+// one of those requests before the ledger's own key guard ever ran, which is
+// exactly the silent failure the ledger exists to prevent. The routes still
+// enforce their own key; this only stops site auth from short-circuiting
+// them first.
+function isLedgerApiPath(req) {
+  return req.path === "/api/broadcast-ledger" || req.path.startsWith("/api/broadcast-ledger/");
+}
+
+// The manual receipt form is opened in a phone browser, which can't set a
+// header — so it alone may authenticate with a `key` parameter. Narrowed to
+// this one path on purpose: keys in URLs end up in history and access logs.
+function isLedgerFormPath(req) {
+  return req.path === "/api/broadcast-ledger/manual" || req.path === "/api/broadcast-ledger/status";
+}
+
 function isPublicAuthPath(req) {
   return req.path === "/login"
     || req.path === "/auth/login"
     || req.path === "/auth/logout"
+    || req.path === "/api/auth/session"
     || req.path === "/api/alpha-team/access"
     || req.path === "/api/health";
+}
+
+// GET /api/decision is documented in src/routes/decision.js as read-only
+// public market data, and the TraderClaw agent polls it with no browser
+// session to present. Site auth runs before every API router, so it answered
+// `401 Login required` before that route was ever reached. Scoped to the exact
+// path and read methods on purpose: /api/decision/journal and every mutating
+// journal route stay behind the session cookie and ADMIN_API_KEY.
+function isPublicDecisionRequest(req) {
+  if (req.method !== "GET" && req.method !== "HEAD") return false;
+  return req.path === "/api/decision" || req.path === "/api/decision/";
+}
+
+// The TraderClaw learning-journal sync reads Trading Lab evidence with an API
+// client, not a browser, so it has no session cookie to present — the same
+// shape of caller /api/decision above had to be opened for. Site auth runs
+// before every API router, so it answered `401 Login required` before the
+// Trading Lab router was ever reached, leaving the sync unable to read the
+// source records it exists to journal.
+//
+// Deliberately narrow, the same way the decision bypass is. Only GET/HEAD, only
+// with a valid x-admin-key, and only the four surfaces the sync actually reads.
+// /positions and /history are absent on purpose: the strategy-account routes
+// already carry open positions, closed-trade history, trade counts and metrics,
+// so there is no sync need for the generic ones. /metrics, /experiments,
+// /research, and every mutating route stay behind the owner session cookie.
+const TRADING_LAB_MACHINE_READ_PATHS = new Set([
+  "/api/trading-lab/pipeline",
+  "/api/trading-lab/strategy-accounts",
+  "/api/trading-lab/signal-actions",
+]);
+
+// One path segment only, so this can never widen into a deeper sub-resource.
+const STRATEGY_ACCOUNT_DETAIL_PATH = /^\/api\/trading-lab\/strategy-accounts\/[^/]+$/;
+
+function isTradingLabMachineReadRequest(req, adminKey) {
+  if (req.method !== "GET" && req.method !== "HEAD") return false;
+  const path = req.path.length > 1 && req.path.endsWith("/") ? req.path.slice(0, -1) : req.path;
+  if (!TRADING_LAB_MACHINE_READ_PATHS.has(path) && !STRATEGY_ACCOUNT_DETAIL_PATH.test(path)) return false;
+  return isAdminRequest(req, adminKey);
+}
+
+// Agent Office shows ShareBot67's live newsroom health on its own status
+// panel. It reads this server from its Node process, not from browser
+// JavaScript — the dashboard key must never reach a browser — so it arrives
+// with an x-admin-key and no session cookie, and site auth would otherwise
+// answer `401 Login required` before the newsroom router ever ran. That is the
+// same shape of caller the Trading Lab exemption above exists for.
+//
+// As narrow as it is possible to be, because an admin key is a read credential
+// for two verification endpoints here and not a second owner session:
+//
+//   - GET/HEAD only. Nothing that runs a cycle, spends provider credits or
+//     posts to Telegram can travel this way.
+//   - Two exact paths: health, which Agent Office reads, and preflight, which
+//     verifies configuration and the external agent identity without running a
+//     cycle or spending provider credits. Cycle reads and every POST stay
+//     behind the owner session (and, for writes, the route's admin guard).
+//   - Header only. No `?key=` form, because keys in URLs end up in browser
+//     history, proxy logs and referrers — /health is read by a server, which
+//     can always set a header.
+//
+// GET /health is safe to expose this way: it carries identifiers, statuses,
+// counts and the provider's own error text, and never a credential, a prompt
+// body or report content. See docs/newsroom-cycles.md.
+const NEWSROOM_MACHINE_READ_PATHS = new Set([
+  "/api/newsroom/health",
+  "/api/newsroom/preflight",
+]);
+
+function isNewsroomHealthMachineReadRequest(req, adminKey) {
+  if (req.method !== "GET" && req.method !== "HEAD") return false;
+  const path = req.path.length > 1 && req.path.endsWith("/") ? req.path.slice(0, -1) : req.path;
+  if (!NEWSROOM_MACHINE_READ_PATHS.has(path)) return false;
+  return isAdminRequest(req, adminKey);
 }
 
 function canAccess(req, session) {
@@ -192,7 +288,22 @@ function createSiteAuth(config) {
     clearSessionCookie,
     classifyPassword,
     requireAccess(req, res, next) {
-      if (!enabled || isPublicAuthPath(req)) {
+      if (!enabled || isPublicAuthPath(req) || isPublicDecisionRequest(req)) {
+        next();
+        return;
+      }
+      if (isLedgerApiPath(req)) {
+        const keys = { ledgerKey: config.ledgerKey, adminKey: config.adminKey };
+        if (isLedgerRequest(req, keys) || (isLedgerFormPath(req) && isLedgerParamRequest(req, keys))) {
+          next();
+          return;
+        }
+      }
+      if (isTradingLabMachineReadRequest(req, config.adminKey)) {
+        next();
+        return;
+      }
+      if (isNewsroomHealthMachineReadRequest(req, config.adminKey)) {
         next();
         return;
       }
@@ -230,9 +341,19 @@ function createSiteAuth(config) {
     },
     logout(req, res) {
       clearSessionCookie(res);
+      if (wantsJson(req)) {
+        res.status(204).end();
+        return;
+      }
       res.redirect(303, "/login");
     },
   };
 }
 
-module.exports = { createSiteAuth, parseCookies, decodeSession, encodeSession };
+module.exports = {
+  createSiteAuth,
+  parseCookies,
+  decodeSession,
+  encodeSession,
+  isNewsroomHealthMachineReadRequest,
+};

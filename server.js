@@ -24,4 +24,8 @@ app.listen(config.port, () => {
     console.log("[LiveScanner] Not configured — check LIVE_SCANNER_* settings");
   }
   if (app.locals.liveResearch) app.locals.liveResearch.start();
+  // Same contract again: the broadcast channel watch is a timer, so it starts
+  // here rather than in createApp(). start() logs and returns when the watch
+  // is disabled or Telegram is unconfigured.
+  if (app.locals.broadcastIngest) app.locals.broadcastIngest.start();
 });

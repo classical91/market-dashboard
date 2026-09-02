@@ -10,6 +10,7 @@
  * mobile browsers silently suppress native prompt() dialogs.
  *
  *   AdminKey.fetch(url, opts)       -> asks for the key if missing (modal),
+ *   AdminKey.fetchOrSession(url, opts) -> tries the owner cookie before a key,
  *                                      re-asks once on a 401. Use for
  *                                      user-initiated actions (button clicks).
  *   AdminKey.fetchSilent(url, opts) -> attaches the key only if already
@@ -205,11 +206,21 @@
     return global.fetch(url, withKey(options, get()));
   }
 
+  // Browser management pages already carry the signed site-session cookie.
+  // Let an opted-in server route accept that first; a 401 falls back to the
+  // existing key prompt so deployments without site login keep working.
+  function sessionOrAdminFetch(url, options) {
+    return global.fetch(url, options || {}).then(function (res) {
+      return res.status === 401 ? adminFetch(url, options) : res;
+    });
+  }
+
   global.AdminKey = {
     get: get,
     set: set,
     prompt: promptForKey,
     fetch: adminFetch,
+    fetchOrSession: sessionOrAdminFetch,
     fetchSilent: silentFetch,
   };
 })(window);

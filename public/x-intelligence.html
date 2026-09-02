@@ -16,8 +16,18 @@
 
     <div class="cmd-page-header">
       <div>
-        <div class="cmd-page-title">X Intelligence</div>
-        <div class="cmd-page-subtitle">Curated trader &amp; analyst feeds, latest posts pulled from X</div>
+        <div class="x-title-row">
+          <div class="cmd-page-title">X Intelligence</div>
+          <div class="x-template-switcher" id="xTemplateSwitcher">
+            <button type="button" class="x-template-trigger" id="xTemplateTrigger"
+                    aria-expanded="false" aria-controls="xTemplateMenu">
+              <span id="xTemplateTriggerLabel">Crypto &amp; Stocks</span>
+              <span aria-hidden="true">&#9662;</span>
+            </button>
+            <div class="x-template-menu" id="xTemplateMenu" hidden></div>
+          </div>
+        </div>
+        <div class="cmd-page-subtitle" id="xTemplateDescription">Crypto, stocks, macro and technical analysis</div>
       </div>
     </div>
 
@@ -25,9 +35,16 @@
       <div class="x-timeline-pane">
         <div class="x-timeline-head">
           <span id="xTimelineLabel">&mdash;</span>
-          <a id="xTimelineLink" href="https://x.com/" target="_blank" rel="noopener">Open on X &#8599;</a>
+          <div class="x-timeline-actions">
+            <a id="xTimelineLink" href="https://x.com/" target="_blank" rel="noopener">Open on X &#8599;</a>
+            <a href="https://commentfarm-production-fc8b.up.railway.app/queue" target="_blank" rel="noopener">Open FarmQueue &#8599;</a>
+          </div>
         </div>
         <div class="x-timeline-frame" id="xTimelinePane"></div>
+        <!-- What X itself currently shows, for comparison against what the
+             ingestion above captured. Hidden until a single account is
+             selected; never presented as proof the two agree. -->
+        <section class="x-live-reference" id="xLiveReference" hidden></section>
         <p class="x-rss-placeholder">
           Uses the official X API when a bearer token is configured. If that is unavailable, the dashboard falls back to X's public syndication feed and may show the last posts that feed returned.
         </p>
@@ -38,6 +55,10 @@
           <span class="x-account-toggle-label" id="xAccountToggleLabel">Accounts</span>
           <span class="x-account-toggle-chevron" aria-hidden="true">&#9662;</span>
         </button>
+        <!-- Outside the list on purpose: the list collapses on mobile, and
+             adding or removing accounts has to stay reachable when it is
+             folded away. -->
+        <button type="button" class="x-account-manage" id="xManageAccounts">&#9881; Manage Accounts</button>
         <div class="x-account-list" id="xAccountList"></div>
       </div>
     </div>
@@ -47,7 +68,12 @@
   </main>
 </div>
 <script src="/assets/js/sidebar.js"></script>
+<script src="/assets/js/admin-key.js"></script>
+<script src="/assets/js/x-freshness.js"></script>
 <script src="/assets/js/x-posts.js"></script>
+<script src="/assets/js/x-live-reference.js"></script>
+<script src="/assets/js/x-accounts-admin.js"></script>
+<script src="/assets/js/x-templates-admin.js"></script>
 <script src="/assets/js/x-intelligence.js"></script>
 </body>
 </html>

@@ -146,3 +146,160 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ─────────────────────────────────────────────────────────
+   Manage panel — the add/remove modal shared by the
+   intelligence pages (X accounts, YouTube channels).
+   Lived in x-intelligence.css until YouTube needed the same
+   panel; one copy here beats two that drift.
+───────────────────────────────────────────────────────── */
+
+
+.manage-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(3, 6, 12, 0.66);
+}
+
+.manage-box {
+  width: 100%;
+  max-width: 480px;
+  max-height: 82vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+  background: var(--surface, #0f1420);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+}
+
+.manage-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.manage-title {
+  margin: 0;
+  font-size: 15px;
+}
+
+.manage-close {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.manage-form {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.manage-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+}
+
+.manage-add {
+  padding: 10px 14px;
+  border: none;
+  border-radius: 8px;
+  background: var(--green, #2ECC71);
+  color: #04122b;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.manage-add:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.manage-status {
+  min-height: 18px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Inline "already tracked" warning under the handle field. */
+.manage-hint {
+  margin: -2px 0 0;
+  font-size: 12px;
+  color: var(--coral, var(--red));
+}
+
+.manage-status.is-error { color: var(--coral, var(--red)); }
+.manage-status.is-ok { color: var(--green, #2ECC71); }
+
+.manage-list {
+  display: grid;
+  gap: 6px;
+}
+
+.manage-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 0.5px solid var(--border);
+  border-radius: 8px;
+}
+
+.manage-row-text { display: grid; gap: 2px; min-width: 0; }
+.manage-row-handle { font-size: 13px; }
+.manage-row-meta { font-size: 11px; color: var(--muted); }
+
+.manage-delete {
+  flex: none;
+  padding: 6px 10px;
+  border: 0.5px solid var(--border);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--coral, var(--red));
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.manage-delete:disabled { opacity: 0.5; cursor: default; }
+.manage-empty { font-size: 12px; color: var(--muted); }
+
+/* ─────────────────────────────────────────────────────────
+   Intelligence theme accents — one definition of each colour,
+   referenced by both X Intelligence and YouTube Intelligence.
+   The pages keep their own --x-accent / --yt-accent variables
+   (they scope different components); only the palette is shared,
+   because a theme that looked amber on one page and bronze on
+   the other would read as two different themes.
+───────────────────────────────────────────────────────── */
+
+:root {
+  --accent-market: var(--purple, #9b7bff);
+  --accent-world: #d6a760;
+  --accent-tech: #52c7d9;
+  --accent-relic: #c98f5c;
+  --accent-macro: #76a7ff;
+  --accent-energy: #65c889;
+  --accent-neutral: #aab3c3;
+}

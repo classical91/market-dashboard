@@ -230,21 +230,38 @@ class SignalTradeBridge {
         continue;
       }
 
-      if (!states.has(interval)) states.set(interval, await this._lab.stateForInterval(interval));
-      const input = {
-        book: this.book,
-        symbol,
-        direction,
-        entryPrice,
-        atr: await this._atrFor(symbol, interval),
-        state: states.get(interval),
-        strategy: `signal-bot:${interval}`,
-      };
+      // Scoring one symbol must never cost the audit trail of the others. An
+      // evaluate() throw used to abandon the whole batch mid-loop: the actions
+      // already recorded were dropped from the return value even though the
+      // store had them, and the symbol that threw got no record at all. A
+      // failure is an outcome, so it is recorded like every other one.
+      let assessment;
+      try {
+        if (!states.has(interval)) states.set(interval, await this._lab.stateForInterval(interval));
+        const input = {
+          book: this.book,
+          symbol,
+          direction,
+          entryPrice,
+          atr: await this._atrFor(symbol, interval),
+          state: states.get(interval),
+          strategy: `signal-bot:${interval}`,
+        };
 
-      // The Signal Bot has no registered strategy identity. It can still be
-      // scored in the process-local analysis ledger, but it may never be
-      // persisted into a strategy account or an archived legacy ledger.
-      const assessment = this._lab.evaluate(input);
+        // The Signal Bot has no registered strategy identity. It can still be
+        // scored in the process-local analysis ledger, but it may never be
+        // persisted into a strategy account or an archived legacy ledger.
+        assessment = this._lab.evaluate(input);
+      } catch (err) {
+        actions.push(
+          this._record({
+            transition,
+            status: "failed",
+            reason: `Scoring failed: ${err.message}`,
+          }),
+        );
+        continue;
+      }
 
       // Dry run (the default): score it, log the verdict, open nothing.
       if (!this.paperTradeEnabled) {
@@ -285,6 +302,12 @@ class SignalTradeBridge {
       decision: assessment ? assessment.decision : null,
       confidenceScore: assessment ? assessment.checklist.confidenceScore : null,
       sizeMultiplier: assessment ? assessment.sizeMultiplier : null,
+      // Attribution, recorded for reading back — the edge gate's grouping key
+      // and the regime the setup was scored in. Neither is an input to any
+      // decision above; both are what makes a row in the log answer "why" on
+      // its own, without re-running the scan that produced it.
+      strategy: `signal-bot:${transition.interval}`,
+      regime: assessment && assessment.state ? assessment.state.regime : null,
       opened,
     };
     let stored = action;

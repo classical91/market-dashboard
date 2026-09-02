@@ -24,6 +24,11 @@ class MemoryCache {
     return value;
   }
 
+  delete(key) {
+    this.inflight.delete(key);
+    return this.values.delete(key);
+  }
+
   async getOrLoad(key, ttlMs, loader) {
     const cached = this.get(key);
     if (cached !== null) {

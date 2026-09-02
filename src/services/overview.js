@@ -67,7 +67,14 @@ class OverviewService {
     if (news.live) sources.push("news:feed");
     else warnings.push(withReason("News feed using fallback (set MARKET_NEWS_URL for live)", news.error));
     if (calendar.live) sources.push("calendar:feed");
-    else warnings.push(withReason("Macro calendar using fallback (set MACRO_CALENDAR_URL for live)", calendar.error));
+    // Name the actual cause rather than always pointing at the env var: a
+    // configured feed that is erroring or empty is a different problem from an
+    // unconfigured one, and "set MACRO_CALENDAR_URL" is wrong advice for it.
+    else if (calendar.reason && calendar.reason !== "not-configured") {
+      warnings.push(withReason(`Macro calendar using fallback (${calendar.reason})`, calendar.detail || calendar.error));
+    } else {
+      warnings.push(withReason("Macro calendar using fallback (set MACRO_CALENDAR_URL for live)", calendar.error));
+    }
     if (onchainResult.error) warnings.push(withReason("On-chain service unavailable", onchainResult.error.message));
     if (onchain?.meta?.note) warnings.push(onchain.meta.note);
     if (onchain) sources.push("internal:onchain");

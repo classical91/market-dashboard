@@ -1,6 +1,7 @@
 const { Router } = require("express");
+const { broadcastReportSections } = require("../services/report-broadcast");
 
-function createReporterRouter({ reporterService, telegramService, requireAdmin }) {
+function createReporterRouter({ reporterService, telegramService, broadcastLedgerStore, requireAdmin }) {
   const router = Router();
 
   function resolveTtlMs(req) {
@@ -64,11 +65,30 @@ function createReporterRouter({ reporterService, telegramService, requireAdmin }
         });
         return;
       }
-      await telegramService.postReport(report);
+      // Each category is sent and receipted independently — see
+      // services/report-broadcast.js, which the scheduled newsroom cycle shares
+      // with this route so both senders honour the same per-category receipts
+      // and idempotency keys. `continueOnError` stays off here: an interactive
+      // broadcast that fails should surface as an error response rather than
+      // reporting ok with a hole in it.
+      const { receipts, destinations } = await broadcastReportSections({
+        report,
+        telegramService,
+        broadcastLedgerStore,
+        source: "dashboard",
+        actor: "dashboard",
+      });
+
       res.json({
         ok: true,
         channelCount: telegramService._chatIds.length,
         broadcastAt: reporterService.markBroadcasted(),
+        // Kept for older clients that read a single receipt; `receipts` is the
+        // full per-category record.
+        receiptId: receipts.length ? receipts[0].id : null,
+        status: receipts.length ? receipts[0].status : null,
+        receipts: receipts.map((r) => ({ id: r.id, newsType: r.newsType, status: r.status })),
+        destinations,
       });
     } catch (err) {
       next(err);

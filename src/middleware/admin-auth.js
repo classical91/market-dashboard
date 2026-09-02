@@ -26,10 +26,19 @@ function isAdminRequest(req, adminKey) {
 //   left open, so a misconfigured deploy can never expose credit-spending or
 //   broadcast routes to anonymous callers.
 // - When it is set, callers must present a matching x-admin-key header.
-function createRequireAdmin({ adminKey }) {
+function createRequireAdmin({ adminKey, allowOwnerSession = false }) {
   const configured = typeof adminKey === "string" && adminKey.length > 0;
 
   return function requireAdmin(req, res, next) {
+    // Browser-facing management surfaces may explicitly opt into the signed
+    // owner session established by site-auth. This is deliberately disabled
+    // by default so machine and credit-spending routes keep their existing
+    // key-only contract unless their caller opts in.
+    if (allowOwnerSession && req.siteSession?.role === "owner") {
+      next();
+      return;
+    }
+
     if (!configured) {
       res.status(503).json({
         error:

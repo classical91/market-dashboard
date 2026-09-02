@@ -119,9 +119,74 @@ const config = {
     sitePassword: process.env.MARKET_DASHBOARD_LOGIN_PASSWORD || "",
     alphaAccessCode: process.env.ALPHA_TEAM_ACCESS_CODE || "",
   },
+  broadcastLedger: {
+    // Deliberately its own secret rather than reusing ADMIN_API_KEY: this key
+    // lives on a phone (the iOS/GPT shortcut) and in the ShareBot67 agent
+    // config, and it should only be able to write broadcast receipts — not
+    // spend OpenAI credits or fire a Telegram broadcast. Falls back to
+    // ADMIN_API_KEY so an existing deploy keeps working before the new
+    // variable is set.
+    apiKey: process.env.BROADCAST_LEDGER_API_KEY || "",
+    rateLimitPerMinute: parseNumber(process.env.BROADCAST_LEDGER_RATE_LIMIT_PER_MIN, 60),
+    // Watch the configured Telegram channels and auto-record every post as a
+    // receipt. Off unless explicitly switched on by exact value: it starts a
+    // poll loop against the Telegram API, and only one process may consume a
+    // given bot's updates.
+    ingestEnabled: process.env.BROADCAST_LEDGER_INGEST_ENABLED === "true",
+    ingestIntervalMs: parseNumber(process.env.BROADCAST_LEDGER_INGEST_INTERVAL_MS, 60_000),
+    // Optional, independent ingest watchlist. When omitted, legacy installs
+    // safely inherit the exact Telegram broadcast destinations (including
+    // forum topic ids). Use the Settings UI to deliberately select none.
+    watchTargets: String(process.env.BROADCAST_LEDGER_TELEGRAM_WATCHLIST || "").trim()
+      ? parseList(process.env.BROADCAST_LEDGER_TELEGRAM_WATCHLIST)
+      : null,
+    // Operational alerts must not be broadcast into the public/news rooms.
+    // Configure one or more private chat/topic targets explicitly.
+    notificationTargets: parseList(process.env.BROADCAST_LEDGER_NOTIFICATION_CHAT_IDS),
+  },
   reporter: {
     apiKey: process.env.OPENAI_API_KEY || "",
     model: process.env.REPORTER_MODEL || "gpt-5.4-mini",
+  },
+  newsroom: {
+    // Sections one scheduled newsroom cycle is expected to produce. Empty
+    // means the reporter's own default set rather than "no sections", so an
+    // unset variable can never quietly turn a cycle into a no-op.
+    sections: parseList(process.env.NEWSROOM_SECTIONS),
+    // Optional "HH:MM,HH:MM" in UTC, used only to report the next expected run
+    // in the health endpoint. The schedule itself lives in the external cron —
+    // this repository never starts a timer for it — so a wrong value here
+    // misreports a time, it cannot cause or skip a run.
+    expectedRunTimesUtc: parseList(process.env.NEWSROOM_EXPECTED_RUN_TIMES_UTC),
+    // How many cycles to retain. Cycles are small (no report text — that lives
+    // in the generation log), so the default keeps months of history.
+    historyCap: parseNumber(process.env.NEWSROOM_CYCLE_HISTORY, 200),
+    // Deliver the sections that exist when another expected section could not
+    // be generated. Off by default: a digest that silently drops a category
+    // reads as a complete report to everyone in the room, and the next run of
+    // the same slot generates only what is missing and then delivers. Turn it
+    // on when a late category is worth less than a late report.
+    allowPartialDelivery: process.env.NEWSROOM_ALLOW_PARTIAL_DELIVERY === "true",
+    // Read-only identity check against the ShareBot/OpenClaw gateway. This is
+    // the one preflight check this repository cannot answer on its own — the
+    // agent and its model route are configured outside it — so it stays
+    // unverified until an operator points it at a real endpoint.
+    agentPreflight: {
+      // A GET that reports who the credential is, e.g. a whoami/agent-lookup.
+      // Never a run endpoint: the preflight must not make the agent do work.
+      url: String(process.env.NEWSROOM_AGENT_PREFLIGHT_URL || "").trim(),
+      // Header the gateway wants the credential in. Bearer is assembled for
+      // Authorization; any other header sends the token verbatim.
+      header: String(process.env.NEWSROOM_AGENT_PREFLIGHT_HEADER || "Authorization").trim(),
+      // The credential the *scheduled* run uses. A route that works by hand
+      // and fails on a schedule is usually two different credentials, so this
+      // is deliberately its own variable rather than reusing another key.
+      token: process.env.NEWSROOM_AGENT_PREFLIGHT_TOKEN || "",
+      // Optional: the agent/model identity the response must name. Without it
+      // the check only proves the credential resolves to *someone*.
+      expectIdentity: String(process.env.NEWSROOM_AGENT_PREFLIGHT_EXPECT || "").trim(),
+      timeoutMs: parseNumber(process.env.NEWSROOM_AGENT_PREFLIGHT_TIMEOUT_MS, 8000),
+    },
   },
   aiAnalysis: {
     openaiApiKey: process.env.OPENAI_API_KEY || "",
@@ -168,6 +233,11 @@ const config = {
   telegram: {
     botToken: process.env.TELEGRAM_BOT_TOKEN || "",
     chatIds: parseList(process.env.TELEGRAM_CHAT_IDS),
+    dashboardUrl: String(process.env.MARKET_DASHBOARD_URL || "").replace(/\/+$/, ""),
+  },
+  newsTelegram: {
+    botToken: process.env.NEWS_TELEGRAM_BOT_TOKEN || "",
+    chatIds: parseList(process.env.NEWS_TELEGRAM_CHAT_IDS),
     dashboardUrl: String(process.env.MARKET_DASHBOARD_URL || "").replace(/\/+$/, ""),
   },
   signalBot: {
@@ -223,10 +293,6 @@ const config = {
     // of markets, so it is a deliberate change rather than a default.
     timeframes: parseList(process.env.LIVE_RESEARCH_TIMEFRAMES),
     intervalMs: parseNumber(process.env.LIVE_RESEARCH_INTERVAL_MS, 60 * 1000),
-  },
-  traderclaw: {
-    baseUrl: String(process.env.TRADERCLAW_BASE_URL || "").replace(/\/+$/, ""),
-    requestTimeoutMs: parseNumber(process.env.TRADERCLAW_REQUEST_TIMEOUT_MS, 8000),
   },
   defillama: {
     baseUrl: process.env.DEFILLAMA_API_BASE_URL || "https://stablecoins.llama.fi/",

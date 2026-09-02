@@ -73,13 +73,22 @@
       });
     }
 
-    return uploads.map(function (video) {
-      return {
-        video: video,
-        channelLabel: video.channelLabel || video.channelHandle || "YouTube",
-        channelCategory: video.channelCategory || "",
-      };
-    });
+    return uploads.map(toItem);
+  }
+
+  function toItem(video) {
+    return {
+      video: video,
+      // The handle, not the label, is what a theme's membership is keyed by:
+      // labels are display text and two channels may share one.
+      channelHandle: normalizeHandle(video.channelHandle),
+      channelLabel: video.channelLabel || video.channelHandle || "YouTube",
+      channelCategory: video.channelCategory || "",
+    };
+  }
+
+  function normalizeHandle(value) {
+    return String(value == null ? "" : value).trim().replace(/^@+/, "").toLowerCase();
   }
 
   function buildCard(item, onSelect) {
@@ -215,19 +224,33 @@
     return kind === "live" ? "No channels are live right now." : "No streams scheduled right now.";
   }
 
+  var CATEGORY_KEY = "yt:category";
+
+  function readStoredCategory() {
+    try {
+      return window.localStorage.getItem(CATEGORY_KEY) || "";
+    } catch (e) {
+      // Private mode and blocked site data both throw here. A remembered category
+      // is a convenience; losing it must not stop the page rendering.
+      return "";
+    }
+  }
+
+  function storeCategory(id) {
+    try {
+      window.localStorage.setItem(CATEGORY_KEY, id);
+    } catch (e) {
+      /* best effort */
+    }
+  }
+
   function render(roots, data, onSelect) {
     var meta = data.meta || {};
     var failed = data.failedFeeds || [];
     var items = normalizeUploads(data);
 
     function wrap(list) {
-      return list.map(function (video) {
-        return {
-          video: video,
-          channelLabel: video.channelLabel || video.channelHandle || "YouTube",
-          channelCategory: video.channelCategory || "",
-        };
-      });
+      return list.map(toItem);
     }
 
     var live = data.live
@@ -256,23 +279,104 @@
     return first && first.video ? first.video.id : null;
   }
 
+  function setLoading(roots, message) {
+    Object.keys(roots).forEach(function (key) {
+      if (roots[key]) roots[key].innerHTML = '<div class="yt-empty">' + message + "</div>";
+    });
+  }
+
+  function setupCategoryFilter(categories, activeId, onChange) {
+    var select = document.getElementById("ytCategoryFilter");
+    var description = document.getElementById("ytCategoryDescription");
+    if (!select) return;
+    select.innerHTML = "";
+    [{ id: "all", name: "All Categories", channelCount: (categories || []).reduce(function (sum, category) {
+      return sum + Number(category.channelCount || 0);
+    }, 0) }].concat(categories || []).forEach(function (category) {
+      var option = document.createElement("option");
+      option.value = category.id;
+      option.textContent = category.name + " (" + Number(category.channelCount || 0) + ")";
+      select.appendChild(option);
+    });
+    select.value = activeId;
+    select.onchange = function () { onChange(select.value); };
+    var active = [{ id: "all", name: "All Categories" }].concat(categories || []).filter(function (item) {
+      return item.id === activeId;
+    })[0];
+    if (description) description.textContent = activeId === "all"
+      ? "Every tracked YouTube source"
+      : "Showing intelligence from " + (active ? active.name : "this category");
+  }
+
+  // A category deleted in another tab leaves this page holding an ID the server
+  // no longer knows, which it answers with a 400. That is recoverable: fall
+  // back to All Categories rather than blanking the page.
+  function staleCategoryError(status, categoryId) {
+    return status === 400 && categoryId && categoryId !== "all";
+  }
+
+  function fetchFeed(categoryId, roots, onSelect, onInitialVideo, replaceCurrent, onStale) {
+    setLoading(roots, "Loading YouTube intelligence…");
+    return fetch("/api/youtube/channels?categoryId=" + encodeURIComponent(categoryId))
+      .then(function (res) {
+        if (!res.ok) {
+          var error = new Error("Request failed: " + res.status);
+          error.stale = staleCategoryError(res.status, categoryId);
+          throw error;
+        }
+        return res.json();
+      })
+      .then(function (data) {
+        var payload = data || {};
+        if (!payload.channels || !payload.channels.length) {
+          var name = payload.selectedCategory && payload.selectedCategory.name;
+          var empty = categoryId === "all"
+            ? "Add your first YouTube channel to start building intelligence feeds."
+            : "No channels in " + (name || "this category") + " yet — add a channel.";
+          setLoading(roots, empty);
+          return null;
+        }
+        var firstId = render(roots, payload, onSelect);
+        if (firstId && onInitialVideo) onInitialVideo(firstId, replaceCurrent);
+        return payload;
+      })
+      .catch(function (error) {
+        if (error && error.stale && onStale) {
+          onStale();
+          return null;
+        }
+        setLoading(roots, "Channel feeds are unavailable right now.");
+      });
+  }
+
   function loadFeeds(roots, onSelect, onInitialVideo) {
-    fetch("/api/youtube/channels")
+    fetch("/api/youtube/channels/config", { headers: { Accept: "application/json" } })
       .then(function (res) {
         if (!res.ok) throw new Error("Request failed: " + res.status);
         return res.json();
       })
-      .then(function (data) {
-        var firstId = render(roots, data || {}, onSelect);
-        if (firstId && onInitialVideo) onInitialVideo(firstId);
-      })
-      .catch(function () {
-        Object.keys(roots).forEach(function (key) {
-          if (roots[key]) {
-            roots[key].innerHTML = '<div class="yt-empty">Channel feeds are unavailable right now.</div>';
+      .then(function (config) {
+        var categories = config.categories || [];
+        var stored = readStoredCategory();
+        var activeId = stored === "all" || categories.some(function (category) { return category.id === stored; })
+          ? (stored || "all") : "all";
+        function fallbackToAll() {
+          if (activeId === "all") {
+            setLoading(roots, "Channel feeds are unavailable right now.");
+            return;
           }
-        });
-      });
+          choose("all");
+        }
+        function choose(id) {
+          activeId = id;
+          storeCategory(id);
+          setupCategoryFilter(categories, activeId, choose);
+          fetchFeed(activeId, roots, onSelect, onInitialVideo, true, fallbackToAll);
+        }
+        setupCategoryFilter(categories, activeId, choose);
+        return fetchFeed(activeId, roots, onSelect, onInitialVideo, false, fallbackToAll);
+      })
+      .catch(function () { setLoading(roots, "Channel feeds are unavailable right now."); });
   }
 
   function init() {
@@ -294,19 +398,33 @@
       if (playerLink) playerLink.href = watchUrl(state.activeId);
     }
 
-    loadFeeds(
-      roots,
-      function (id) {
-        state.activeId = id;
-        loadActive();
-        window.scrollTo({ top: 0, behavior: "smooth" });
-      },
-      function (id) {
-        if (state.activeId) return;
-        state.activeId = id;
-        loadActive();
-      }
-    );
+    function onSelect(id) {
+      state.activeId = id;
+      loadActive();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function onInitialVideo(id, replaceCurrent) {
+      if (state.activeId && !replaceCurrent) return;
+      state.activeId = id;
+      loadActive();
+    }
+
+    loadFeeds(roots, onSelect, onInitialVideo);
+
+    var manage = document.getElementById("ytManageChannels");
+    if (manage && window.YoutubeChannelsAdmin) {
+      manage.addEventListener("click", function () {
+        window.YoutubeChannelsAdmin.open({
+          // A channel added or removed changes both the feed and every theme's
+          // count, and the payload in hand is now stale — so refetch rather
+          // than patch, once, when the panel closes.
+          onChange: function () {
+            loadFeeds(roots, onSelect, onInitialVideo);
+          },
+        });
+      });
+    }
   }
 
   if (document.readyState === "loading") {

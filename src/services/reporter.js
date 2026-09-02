@@ -3,9 +3,17 @@ const path = require("path");
 const crypto = require("crypto");
 const OpenAI = require("openai");
 const { resolveDataDir } = require("../utils/data-dir");
+const { withExclusiveLock, writeJsonAtomic } = require("./json-file-lock");
 
 const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000;
 const REPORT_SECTIONS = ["crypto", "economics", "markets"];
+
+// Why a cycle delivery can refuse to send. These are error codes on a stored
+// failure, so they are part of the operational contract and are exported for
+// the newsroom service and its tests rather than retyped as string literals.
+const GENERATION_REFERENCE_MISSING = "generation_reference_missing";
+const GENERATION_REFERENCE_AMBIGUOUS = "generation_reference_ambiguous";
+const GENERATION_REFERENCE_INVALID = "generation_reference_invalid";
 const SECTION_LABELS = {
   crypto: "Emerging Markets",
   economics: "Economics Top 10",
@@ -88,6 +96,47 @@ function dedupeLog(entries) {
   );
 }
 
+/**
+ * Source/evidence a generation actually returned.
+ *
+ * The Responses API attaches `url_citation` annotations to the output text
+ * when the web_search tool contributed to it. When it attaches none, this
+ * returns an empty list: a report with no citations is recorded as having no
+ * citations, never as having invented ones. See docs/newsroom-cycles.md for
+ * what that means operationally.
+ */
+function extractSources(response) {
+  const seen = new Map();
+  const output = Array.isArray(response?.output) ? response.output : [];
+  output.forEach((item) => {
+    const content = Array.isArray(item?.content) ? item.content : [];
+    content.forEach((part) => {
+      const annotations = Array.isArray(part?.annotations) ? part.annotations : [];
+      annotations.forEach((annotation) => {
+        if (!annotation || (annotation.type && annotation.type !== "url_citation")) return;
+        const url = typeof annotation.url === "string" ? annotation.url.trim() : "";
+        if (!url || seen.has(url)) return;
+        seen.set(url, {
+          url: url.slice(0, 2000),
+          title: typeof annotation.title === "string" ? annotation.title.trim().slice(0, 300) : null,
+        });
+      });
+    });
+  });
+  return [...seen.values()];
+}
+
+function normalizeSources(sources) {
+  if (!Array.isArray(sources)) return [];
+  return sources
+    .map((source) => ({
+      url: typeof source?.url === "string" ? source.url.trim().slice(0, 2000) : null,
+      title: typeof source?.title === "string" ? source.title.trim().slice(0, 300) : null,
+    }))
+    .filter((source) => source.url || source.title)
+    .slice(0, 50);
+}
+
 function normalizeImportedLogEntry(entry) {
   if (!entry || typeof entry !== "object") return null;
   const section = normalizeSection(entry.section);
@@ -104,6 +153,11 @@ function normalizeImportedLogEntry(entry) {
     model: typeof entry.model === "string" ? entry.model.slice(0, 80) : null,
     content,
     prompt: typeof entry.prompt === "string" ? entry.prompt.slice(0, 12000) : null,
+    // Both are optional and absent from every entry written before newsroom
+    // cycles existed. They are carried through import rather than required,
+    // so a historical export still round-trips.
+    cycleId: typeof entry.cycleId === "string" ? entry.cycleId.slice(0, 120) : null,
+    sources: normalizeSources(entry.sources),
   };
 }
 
@@ -222,6 +276,7 @@ class ReporterService {
     this._client = apiKey ? new OpenAI({ apiKey }) : null;
     this._model = model || "gpt-5.4-mini";
     this._logFile = path.join(dataDir || resolveDataDir(), "reporter-generation-log.json");
+    this._lockState = { depth: 0 };
     this._rateLimitedUntil = new Map();
   }
 
@@ -271,27 +326,43 @@ class ReporterService {
   }
 
   _writeLog(entries) {
-    try {
-      const dir = path.dirname(this._logFile);
-      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(this._logFile, JSON.stringify(entries.slice(0, 100), null, 2), "utf8");
-    } catch (err) {
-      console.error("[Reporter] Failed to write generation log:", err.message);
-    }
+    writeJsonAtomic(this._logFile, entries.slice(0, 100), console, "[Reporter]");
+  }
+
+  /**
+   * Serialize a read-modify-write of the generation log.
+   *
+   * Two sections generating at once — which is the normal case, since a cycle
+   * fans out across crypto, economics and markets — would otherwise each read
+   * the same log, prepend their own entry, and write back, so whichever
+   * finished last silently dropped the other's entry.
+   */
+  _updateLog(mutate) {
+    return withExclusiveLock(
+      this._logFile,
+      this._lockState,
+      () => {
+        const log = this._readLog();
+        const next = mutate(log);
+        this._writeLog(next);
+        return next;
+      },
+      { busyMessage: "Reporter generation log is busy; retry the request." },
+    );
   }
 
   _logGeneration(entry) {
-    const log = this._readLog();
-    log.unshift(entry);
-    this._writeLog(log);
+    this._updateLog((log) => {
+      log.unshift(entry);
+      return log;
+    });
   }
 
   importLogEntries(entries, ttlMs) {
     const incoming = Array.isArray(entries) ? entries.map(normalizeImportedLogEntry).filter(Boolean) : [];
     if (!incoming.length) return this._buildReport(ttlMs || DEFAULT_TTL_MS);
 
-    const merged = dedupeLog([...incoming, ...this._readLog()]);
-    this._writeLog(merged);
+    const merged = this._updateLog((log) => dedupeLog([...incoming, ...log]));
 
     const resolvedTtl = ttlMs || DEFAULT_TTL_MS;
     REPORT_SECTIONS.forEach((section) => {
@@ -370,7 +441,112 @@ class ReporterService {
       tools: [{ type: "web_search" }],
       input: prompt,
     });
-    return res.output_text;
+    return { content: res.output_text, sources: extractSources(res) };
+  }
+
+  /** Whether an API key is present. Used by the newsroom preflight. */
+  get configured() {
+    return Boolean(this._client);
+  }
+
+  get model() {
+    return this._model;
+  }
+
+  get sections() {
+    return [...REPORT_SECTIONS];
+  }
+
+  /**
+   * Query the durable generation log.
+   *
+   * The log is the historical record — it holds every section's content, not
+   * just the latest — so a cycle's report stays readable long after the cache
+   * that served the page has expired.
+   */
+  listGenerations({ cycleId, section, since, limit = 50 } = {}) {
+    const cap = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
+    const sinceMs = since && !Number.isNaN(new Date(since).getTime()) ? new Date(since).getTime() : null;
+    return this._readLog()
+      .filter((entry) => (cycleId ? entry.cycleId === cycleId : true))
+      .filter((entry) => (section ? entry.section === section : true))
+      .filter((entry) => {
+        if (!sinceMs) return true;
+        const at = new Date(entry.generatedAt || 0).getTime();
+        return Number.isFinite(at) && at >= sinceMs;
+      })
+      .slice(0, cap);
+  }
+
+  /**
+   * Resolve the one historical generation a cycle's section reference names.
+   *
+   * This is the read that makes a newsroom delivery retry safe. `peekReport()`
+   * answers "what is the latest content for this section", which is the right
+   * question for the Daily Reporter page and the wrong one for a cycle: a
+   * cycle retried after a newer cycle generated the same section would pick up
+   * the newer text and publish it under the older cycle's receipts. So a cycle
+   * asks for an exact generation instead, and this either finds exactly one or
+   * refuses.
+   *
+   * Identity rules:
+   *   - `section` is always required.
+   *   - `generatedAt` is matched on the exact instant, never a nearest match.
+   *   - `cycleId`, when the reference carries one, must match the log entry's.
+   *     A reference with `cycleId: null` describes a generation that was made
+   *     outside a cycle (a manual studio run, or history written before cycles
+   *     existed), and is identified by section plus exact timestamp alone.
+   *
+   * Anything other than a single match fails: nothing here falls back to
+   * "latest", and an ambiguous history is refused rather than guessed at.
+   *
+   * @returns {{ok: true, generation: object} | {ok: false, code: string, detail: string}}
+   */
+  getGenerationForReference(reference = {}) {
+    const section = typeof reference.section === "string" ? reference.section.trim() : "";
+    if (!section || !REPORT_SECTIONS.includes(section)) {
+      return {
+        ok: false,
+        code: GENERATION_REFERENCE_INVALID,
+        detail: `The generation reference names no known report section (${section || "none"}).`,
+      };
+    }
+
+    const at = reference.generatedAt ? new Date(reference.generatedAt) : null;
+    if (!at || Number.isNaN(at.getTime())) {
+      return {
+        ok: false,
+        code: GENERATION_REFERENCE_INVALID,
+        detail: `The generation reference for "${section}" carries no usable generated timestamp.`,
+      };
+    }
+    const atMs = at.getTime();
+
+    const wantedCycleId = typeof reference.cycleId === "string" && reference.cycleId.trim()
+      ? reference.cycleId.trim()
+      : null;
+
+    const matches = this._readLog().filter((entry) => {
+      if (!entry || entry.section !== section || !entry.content) return false;
+      const entryAt = new Date(entry.generatedAt || 0).getTime();
+      if (!Number.isFinite(entryAt) || entryAt !== atMs) return false;
+      if (wantedCycleId) return entry.cycleId === wantedCycleId;
+      return true;
+    });
+
+    if (matches.length === 1) return { ok: true, generation: matches[0] };
+    if (matches.length === 0) {
+      return {
+        ok: false,
+        code: GENERATION_REFERENCE_MISSING,
+        detail: `No stored generation matches ${section} @ ${at.toISOString()}${wantedCycleId ? ` for cycle ${wantedCycleId}` : ""}.`,
+      };
+    }
+    return {
+      ok: false,
+      code: GENERATION_REFERENCE_AMBIGUOUS,
+      detail: `${matches.length} stored generations match ${section} @ ${at.toISOString()}; the reference does not identify one.`,
+    };
   }
 
   /**
@@ -388,7 +564,7 @@ class ReporterService {
    * Generate only the requested reporter section, then return the current
    * aggregate cached report so the UI can keep already-generated tabs visible.
    */
-  async generateReport(ttlMs, requestedSection, customPrompt) {
+  async generateReport(ttlMs, requestedSection, customPrompt, { cycleId = null } = {}) {
     if (!this._client) {
       return { configured: false };
     }
@@ -411,6 +587,13 @@ class ReporterService {
         generatedSection: section,
         generationSkipped: true,
         generationSkippedReason: "already-generated-today",
+        // The section already exists, so a cycle that lands here reuses it
+        // rather than paying to remake it. These describe the entry being
+        // reused — including the cycle that first produced it, when there was
+        // one — so the reuse stays traceable.
+        reusedGeneratedAt: (loggedToday && loggedToday.generatedAt) || existingGeneratedAt || null,
+        reusedCycleId: (loggedToday && loggedToday.cycleId) || null,
+        reusedModel: (loggedToday && loggedToday.model) || null,
         nextGenerationDate: formatDateKey(new Date(Date.now() + msUntilNextDay())),
       };
     }
@@ -430,7 +613,7 @@ class ReporterService {
         const dateStr = formatDate();
         const generatedAt = new Date().toISOString();
         const prompt = customPromptForDate(promptOverride, dateStr) || promptForSection(section, dateStr);
-        const content = await this._generate(prompt);
+        const { content, sources } = await this._generate(prompt);
         generatedEntry = {
           section,
           label: SECTION_LABELS[section],
@@ -439,6 +622,8 @@ class ReporterService {
           dateStr,
           content,
           prompt: promptOverride || null,
+          cycleId,
+          sources,
         };
         return generatedEntry;
       });
@@ -457,6 +642,7 @@ class ReporterService {
     report.generatedSection = section;
 
     if (created) {
+      const sources = generatedEntry ? normalizeSources(generatedEntry.sources) : [];
       this._logGeneration({
         section,
         label: SECTION_LABELS[section],
@@ -466,12 +652,25 @@ class ReporterService {
         model: this._model,
         content: generatedEntry ? generatedEntry.content : report[section],
         prompt: generatedEntry ? generatedEntry.prompt : null,
+        // Null for every entry written outside a newsroom cycle — a manual
+        // generation from the studio page still logs, it just has no cycle.
+        cycleId: cycleId || null,
+        sources,
       });
       report.generationLog = this._readLog();
+      report.generatedSources = sources;
     }
 
     return report;
   }
 }
 
-module.exports = { ReporterService };
+module.exports = {
+  ReporterService,
+  REPORT_SECTIONS,
+  SECTION_LABELS,
+  extractSources,
+  GENERATION_REFERENCE_MISSING,
+  GENERATION_REFERENCE_AMBIGUOUS,
+  GENERATION_REFERENCE_INVALID,
+};

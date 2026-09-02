@@ -35,12 +35,15 @@ const { createLiveScannerRouter } = require("./routes/live-scanner");
 const { createHealthRouter } = require("./routes/health");
 const { createOnchainRouter } = require("./routes/onchain");
 const { createOverviewRouter } = require("./routes/overview");
+const { createBroadcastLedgerRouter } = require("./routes/broadcast-ledger");
 const { createReporterRouter } = require("./routes/reporter");
+const { createNewsroomRouter } = require("./routes/newsroom");
 const { createTelegramRouter } = require("./routes/telegram");
 const { createYoutubeRouter } = require("./routes/youtube");
 const { createXFeedRouter } = require("./routes/x-feed");
 const { resolveYoutubeChannels } = require("./config/youtube-channels");
-const { X_ACCOUNTS } = require("./config/x-accounts");
+const { XAccountRegistry } = require("./services/x-account-registry");
+const { XTemplateRegistry } = require("./services/x-template-registry");
 const { TOP_TOKENS } = require("./config/market-symbols");
 const { AIAnalysisService } = require("./services/ai-analysis");
 const { DecisionEngineService } = require("./services/decision-engine");
@@ -70,12 +73,20 @@ const { EtherscanService } = require("./services/etherscan");
 const { MarketDataService } = require("./services/market-data");
 const { OnchainService } = require("./services/onchain");
 const { OverviewService } = require("./services/overview");
+const { BroadcastIngestService } = require("./services/broadcast-ingest");
+const { BroadcastLedgerStore } = require("./services/broadcast-ledger");
+const { BroadcastLedgerNotificationService } = require("./services/broadcast-ledger-notifications");
 const { ReporterService } = require("./services/reporter");
+const { NewsroomCycleStore } = require("./services/newsroom-cycles");
+const { NewsroomService } = require("./services/newsroom");
+const { createAgentRoutePreflight } = require("./services/newsroom-agent-preflight");
 const { TelegramService } = require("./services/telegram");
 const { YouTubeIntelligenceService } = require("./services/youtube");
+const { YoutubeChannelRegistry } = require("./services/youtube-channel-registry");
 const { XFeedService } = require("./services/x-feed");
 const { resolveDataDir } = require("./utils/data-dir");
 const { createRequireAdmin } = require("./middleware/admin-auth");
+const { createRequireLedgerKey } = require("./middleware/ledger-auth");
 const { createSiteAuth } = require("./middleware/site-auth");
 
 function createApp() {
@@ -100,11 +111,58 @@ function createApp() {
     covalentService,
   });
   const telegramService = new TelegramService(config.telegram);
+  // The ledger/Shortcut news route is deliberately isolated from the shared
+  // dashboard sender. Only ShareClaw97's dedicated credentials can send news.
+  const newsTelegramService = new TelegramService(config.newsTelegram);
+  const broadcastLedgerNotificationService = new BroadcastLedgerNotificationService({
+    telegramService: new TelegramService({
+      ...config.newsTelegram,
+      chatIds: config.broadcastLedger.notificationTargets,
+    }),
+  });
+  // Shared source of truth for every completed broadcast, across the
+  // dashboard, the iOS/GPT shortcut, ShareBot67 and manual posting. Lives
+  // here rather than behind the OpenClaw gateway precisely so it stays
+  // readable when that gateway is down.
+  const broadcastLedgerStore = new BroadcastLedgerStore({ dataDir });
+  // Watches the same channels the bot posts to and records what it sees, so a
+  // story reaches the ledger even when the path that sent it never reported.
+  // Constructed always, started only by server.js, and a no-op that logs when
+  // BROADCAST_LEDGER_INGEST_ENABLED is not "true".
+  const broadcastIngestService = new BroadcastIngestService({
+    telegramService,
+    broadcastLedgerStore,
+    stateCache: new PersistentReporterCache(path.join(dataDir, "broadcast-ingest-state.json")),
+    enabled: config.broadcastLedger.ingestEnabled,
+    intervalMs: config.broadcastLedger.ingestIntervalMs,
+    watchTargets: config.broadcastLedger.watchTargets,
+  });
   const reporterService = new ReporterService({
     cache: reporterCache,
     apiKey: config.reporter.apiKey,
     model: config.reporter.model,
     dataDir,
+  });
+  // One durable record per scheduled newsroom run, linking the reporter's
+  // generation log to the broadcast ledger's receipts. Storage is the same
+  // locked/atomic JSON the other stores use — the reporter has no database
+  // layer, and introducing one here would buy nothing this pattern doesn't
+  // already give.
+  const newsroomCycleStore = new NewsroomCycleStore({ dataDir, cap: config.newsroom.historyCap });
+  const newsroomService = new NewsroomService({
+    cycleStore: newsroomCycleStore,
+    reporterService,
+    // News digests go through the same sender the Daily Reporter broadcast
+    // route uses, so both paths land in the same locked topics.
+    telegramService,
+    broadcastLedgerStore,
+    sections: config.newsroom.sections,
+    expectedRunTimesUtc: config.newsroom.expectedRunTimesUtc,
+    allowPartialDelivery: config.newsroom.allowPartialDelivery,
+    // Null unless NEWSROOM_AGENT_PREFLIGHT_URL is set, in which case the
+    // preflight stops reporting the ShareBot/OpenClaw route as unverified and
+    // starts actually checking it — read-only, before anything is spent.
+    externalPreflight: createAgentRoutePreflight(config.newsroom.agentPreflight),
   });
   const marketDataService = new MarketDataService();
   const overviewService = new OverviewService({
@@ -113,7 +171,22 @@ function createApp() {
     cache,
     cacheTtlMs: Number(process.env.OVERVIEW_CACHE_MS) || 60_000,
   });
-  const youtubeChannels = resolveYoutubeChannels(config.youtube.channelIds);
+  // The tracked channel list is editable at runtime and persisted next to the
+  // feed cache, so add/delete survives a redeploy. The static config in
+  // src/config/youtube-channels.js is now only the first-boot seed.
+  //
+  // No `categorySeed` is passed: a first boot gets exactly the categories its
+  // seeded channels are filed under, and nothing else. Seeding from the theme
+  // catalogue used to turn every section a theme names — Archaeology, AI Labs,
+  // Apple & iOS — into a YouTube category holding no channels, which made the
+  // filter read as a list of things to fix rather than a list of what is
+  // tracked. Themes and YouTube categories are independent now.
+  const youtubeChannelRegistry = new YoutubeChannelRegistry({
+    dataDir,
+    seed: resolveYoutubeChannels(config.youtube.channelIds),
+  });
+  youtubeChannelRegistry.ensureSeeded();
+  const youtubeChannels = youtubeChannelRegistry.list();
   const youtubeService = new YouTubeIntelligenceService({
     cache,
     idCache: youtubeIdCache,
@@ -126,6 +199,20 @@ function createApp() {
     liveSearchEnabled: config.youtube.liveSearchEnabled,
   });
   const xFeedService = new XFeedService({ cache: xFeedCache });
+  // The tracked-account list is editable at runtime and persisted next to the
+  // feed cache, so add/delete survives a redeploy. The static config in
+  // src/config/x-accounts.js is now only the first-boot seed.
+  const xAccountRegistry = new XAccountRegistry({ dataDir, cache: xFeedCache });
+  xAccountRegistry.ensureSeeded();
+  const xTemplateRegistry = new XTemplateRegistry({
+    dataDir,
+    seedAccounts: () => xAccountRegistry.list(),
+  });
+  xTemplateRegistry.ensureSeeded();
+  xAccountRegistry.setMembershipHooks({
+    onAdd: (account) => xTemplateRegistry.addHandleToDefault(account.handle, account.category),
+    onRemove: (account) => xTemplateRegistry.removeHandle(account.handle),
+  });
   const aiAnalysisService = new AIAnalysisService({
     cache: aiAnalysisCache,
     dataDir,
@@ -250,8 +337,17 @@ function createApp() {
   tradingLabService.attachLiveResearchService(liveResearchService);
 
   const requireAdmin = createRequireAdmin({ adminKey: config.admin.apiKey });
+  const requireXAdmin = createRequireAdmin({
+    adminKey: config.admin.apiKey,
+    allowOwnerSession: true,
+  });
+  const requireLedgerKey = createRequireLedgerKey({
+    ledgerKey: config.broadcastLedger.apiKey,
+    adminKey: config.admin.apiKey,
+  });
   const siteAuth = createSiteAuth({
     adminKey: config.admin.apiKey,
+    ledgerKey: config.broadcastLedger.apiKey,
     sitePassword: config.access.sitePassword,
     alphaAccessCode: config.access.alphaAccessCode,
   });
@@ -262,6 +358,16 @@ function createApp() {
   app.get("/login", siteAuth.loginPage);
   app.post("/auth/login", siteAuth.login);
   app.post("/auth/logout", siteAuth.logout);
+  app.get("/api/auth/session", (req, res) => {
+    const session = siteAuth.sessionFromRequest(req);
+    res.setHeader("Cache-Control", "no-store");
+    res.json({
+      enabled: siteAuth.enabled,
+      authenticated: Boolean(session),
+      role: session ? session.role : null,
+      identifier: null,
+    });
+  });
   app.post("/api/alpha-team/access", (req, res) => {
     const accessCode = config.access.alphaAccessCode;
     const session = siteAuth.sessionFromRequest(req);
@@ -327,20 +433,66 @@ function createApp() {
       decisionEngineService,
       tradeJournalService,
       requireAdmin,
-      traderclaw: config.traderclaw,
     }),
   );
-  app.use("/api/trading-lab", createTradingLabRouter({ tradingLabService, backtestService, signalActionStore, experimentStore, researchQueue, signalScreenerService, requireAdmin }));
+  app.use("/api/trading-lab", createTradingLabRouter({ tradingLabService, backtestService, signalActionStore, experimentStore, researchQueue, signalScreenerService, tradeJournalService, requireAdmin }));
   app.use("/api/live-scanner", createLiveScannerRouter({ liveScannerService, requireAdmin }));
   app.use("/api/watchlist", createWatchlistRouter({ watchlistService, requireAdmin }));
   app.use("/api/bot-commands", createBotCommandsRouter({ botCommandsService }));
   app.use("/api/pattern-tracker", createPatternTrackerRouter({ patternTrackerService }));
   app.use("/api/onchain", createOnchainRouter({ onchainService }));
   app.use("/api/overview", createOverviewRouter({ overviewService }));
-  app.use("/api/daily-report", createReporterRouter({ reporterService, telegramService, requireAdmin }));
+  app.use(
+    "/api/broadcast-ledger",
+    createBroadcastLedgerRouter({
+      broadcastLedgerStore,
+      broadcastIngestService,
+      telegramService: newsTelegramService,
+      // The watch polls the dashboard bot while news goes out through the news
+      // bot. Preflight needs both to report on that asymmetry honestly.
+      watchTelegramService: telegramService,
+      config,
+      bootedAt: new Date().toISOString(),
+      notificationService: broadcastLedgerNotificationService,
+      requireAdmin,
+      requireLedgerKey,
+      ledgerKey: config.broadcastLedger.apiKey,
+      adminKey: config.admin.apiKey,
+      rateLimitPerMinute: config.broadcastLedger.rateLimitPerMinute,
+    }),
+  );
+  app.use(
+    "/api/daily-report",
+    createReporterRouter({ reporterService, telegramService, broadcastLedgerStore, requireAdmin }),
+  );
+  app.use(
+    "/api/newsroom",
+    createNewsroomRouter({
+      newsroomService,
+      cycleStore: newsroomCycleStore,
+      broadcastLedgerStore,
+      requireAdmin,
+    }),
+  );
   app.use("/api/telegram", createTelegramRouter({ telegramService, requireAdmin }));
-  app.use("/api/youtube", createYoutubeRouter({ youtubeService, channels: youtubeChannels }));
-  app.use("/api/x", createXFeedRouter({ xFeedService, accounts: X_ACCOUNTS }));
+  app.use(
+    "/api/youtube",
+    createYoutubeRouter({
+      youtubeService,
+      channelRegistry: youtubeChannelRegistry,
+      channelIdOverrides: config.youtube.channelIds,
+      requireAdmin,
+    }),
+  );
+  app.use(
+    "/api/x",
+    createXFeedRouter({
+      xFeedService,
+      accountRegistry: xAccountRegistry,
+      templateRegistry: xTemplateRegistry,
+      requireAdmin: requireXAdmin,
+    }),
+  );
 
   app.get("/", (req, res) => {
     res.sendFile(path.join(__dirname, "..", "public", "index.html"));
@@ -364,6 +516,7 @@ function createApp() {
   // The interval loop is started by server.js, not here — createApp() is also
   // used by tests and the build check, which must not leave timers running.
   app.locals.signalBot = signalBotService;
+  app.locals.broadcastIngest = broadcastIngestService;
   app.locals.liveScanner = liveScannerService;
   app.locals.liveResearch = liveResearchService;
 

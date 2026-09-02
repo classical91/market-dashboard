@@ -59,6 +59,29 @@
     }
     .theme-swatch.active .theme-swatch-name { color: var(--text); }
 
+    /* ── Accent swatches ────────────────────────────────── */
+    .accent-grid {
+      display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px;
+    }
+    .accent-swatch {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 13px; border-radius: 11px;
+      border: 1px solid var(--border); background: var(--surface2);
+      cursor: pointer; font-family: inherit;
+      font-size: 12px; font-weight: 700;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      transition: border-color 0.18s, background 0.18s;
+    }
+    .accent-swatch:hover { border-color: var(--border-hover); }
+    .accent-swatch.active {
+      border-color: currentColor;
+      box-shadow: inset 0 0 0 1px currentColor;
+    }
+    .accent-swatch-dot {
+      width: 12px; height: 12px; border-radius: 50%;
+      background: currentColor; flex: 0 0 auto;
+    }
+
     /* ── Frequency toggle ───────────────────────────────── */
     .freq-options { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
     .freq-btn {
@@ -150,6 +173,8 @@
       cursor: pointer; transition: 0.18s; font-family: inherit;
     }
     .tg-test-btn:hover:not(:disabled) { background: rgba(255,255,255,0.08); color: var(--text); }
+    /* The ledger form link wears the same chrome as the buttons beside it. */
+    a.tg-test-btn { text-decoration: none; display: inline-flex; align-items: center; }
     .tg-test-btn:disabled { opacity: 0.4; cursor: default; }
     .tg-instructions {
       margin-top: 14px; padding: 14px 16px;
@@ -159,6 +184,25 @@
     .tg-instructions code {
       background: rgba(255,255,255,0.08); padding: 1px 5px;
       border-radius: 5px; font-size: 11px; color: var(--soft);
+    }
+    .ledger-policy { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 14px; }
+    .ledger-policy > summary { cursor: pointer; color: var(--text); font-size: 13px; font-weight: 700; }
+    .ledger-policy-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 18px; margin-top: 16px; }
+    .ledger-control { display: grid; gap: 5px; color: var(--muted); font-size: 12px; }
+    .ledger-control.checkbox { grid-template-columns: auto 1fr; align-items: center; }
+    .ledger-control select, .ledger-control input[type="number"], .ledger-control input[type="text"] {
+      width: 100%; border: 1px solid var(--border); border-radius: 10px; padding: 9px 10px;
+      background: rgba(255,255,255,.04); color: var(--text); font: inherit;
+    }
+    .ledger-category-table { margin: 16px 0; overflow-x: auto; }
+    .ledger-category-row { display: grid; grid-template-columns: minmax(130px, 1fr) 100px 130px; gap: 10px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+    .ledger-category-row input, .ledger-category-row select { min-width: 0; border: 1px solid var(--border); border-radius: 9px; padding: 8px; background: rgba(255,255,255,.04); color: var(--text); }
+    .ledger-destinations { display: grid; gap: 8px; margin: 12px 0; }
+    .ledger-destination-row { display: grid; grid-template-columns: minmax(180px, 1fr) 1fr; gap: 10px; align-items: center; color: var(--muted); font-size: 11px; }
+    @media (max-width: 640px) {
+      .ledger-policy-grid { grid-template-columns: 1fr; }
+      .ledger-category-row { grid-template-columns: 1fr 78px 110px; }
+      .ledger-destination-row { grid-template-columns: 1fr; }
     }
 
     /* ── Saved toast ────────────────────────────────────── */
@@ -195,6 +239,14 @@
         <div class="settings-row-sub">Applies instantly across all pages</div>
         <div class="theme-grid" id="themeGrid"></div>
       </div>
+      <div class="settings-card" style="margin-top:14px">
+        <div class="settings-row-label">Accent</div>
+        <div class="settings-row-sub">
+          Colours the section labels, chevrons and sidebar group headings, plus
+          every hover and active state. &ldquo;Theme&rdquo; keeps each theme&rsquo;s own accent.
+        </div>
+        <div class="accent-grid" id="accentGrid"></div>
+      </div>
     </div>
 
     <!-- Reporter -->
@@ -226,6 +278,59 @@
             <button class="settings-action-btn primary" id="saveReportPrompt" type="button">Save Prompt</button>
             <button class="settings-action-btn" id="resetReportPrompt" type="button">Reset Default</button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Broadcast Ledger -->
+    <div class="settings-section">
+      <div class="settings-label">Broadcast Ledger</div>
+      <div class="settings-card">
+        <div class="settings-row">
+          <div>
+            <div class="settings-row-label">Broadcast Receipts</div>
+            <div class="settings-row-sub">The shared record that stops ShareBot67 repeating a story or reporting one as failed</div>
+          </div>
+        </div>
+        <div class="tg-status-row">
+          <span class="status-pill off" id="ledgerStatusPill">⏳ Checking…</span>
+          <a class="tg-test-btn" id="ledgerFormLink" href="/api/broadcast-ledger/manual" target="_blank" rel="noopener" style="display:none">Open Receipt Form</a>
+          <button class="tg-test-btn" id="ledgerKeyBtn" type="button" style="display:none">Enter Admin Key</button>
+        </div>
+        <div class="settings-row-sub" id="ledgerWatch" style="margin-top:12px; display:none"></div>
+        <div id="ledgerWatchTargets" style="margin-top:10px; display:none"></div>
+        <button class="settings-action-btn primary" id="ledgerWatchSave" type="button" style="margin-top:10px; display:none">Save Ledger Watchlist</button>
+        <div class="settings-row-sub" id="ledgerSources" style="margin-top:6px; display:none"></div>
+        <div class="settings-row-sub" id="ledgerLatest" style="margin-top:6px; display:none"></div>
+        <details class="ledger-policy" id="ledgerPolicy" style="display:none">
+          <summary>Ledger Settings</summary>
+          <div class="ledger-policy-grid">
+            <label class="ledger-control checkbox"><input id="ledgerExactCategory" type="checkbox"> Require exact category</label>
+            <label class="ledger-control checkbox"><input id="ledgerRecordBlocked" type="checkbox"> Record blocked attempts</label>
+            <label class="ledger-control checkbox"><input id="ledgerFinanceRouting" type="checkbox"> Restrict news categories to their approved topics</label>
+            <div class="settings-row-sub"><strong>Finance route:</strong> only <code>-1001841650798 / 6297</code> and <code>-1001941064823 / 984</code>. Geopolitics continues through its separate Telegram route. This setting also controls retries.</div>
+            <label class="ledger-control checkbox"><input id="ledgerBlockedNotifications" type="checkbox"> Blocked-attempt notifications</label>
+            <label class="ledger-control checkbox"><input id="ledgerFailureNotifications" type="checkbox"> Failure notifications</label>
+            <label class="ledger-control checkbox"><input id="ledgerMissingNotifications" type="checkbox"> Missing-category notifications</label>
+            <div class="settings-row-sub">Alerts are delivered only to private targets configured with <code>BROADCAST_LEDGER_NOTIFICATION_CHAT_IDS</code>.</div>
+            <label class="ledger-control checkbox"><input id="ledgerEditDelete" type="checkbox"> Allow edit and delete</label>
+            <label class="ledger-control">Reset timezone<select id="ledgerTimezone"><option>America/Vancouver</option><option>UTC</option><option>America/New_York</option></select></label>
+            <label class="ledger-control">Keep history for<select id="ledgerHistory"><option value="forever">Forever</option><option value="30">30 days</option><option value="90">90 days</option><option value="180">180 days</option></select></label>
+          </div>
+          <div class="settings-row-sub" style="margin-top:16px">Allowed categories, daily successful-broadcast limits, and duplicate windows</div>
+          <div class="ledger-category-table" id="ledgerCategories"></div>
+          <div class="settings-row-sub">Sources shown in the ledger</div>
+          <div class="ledger-destinations" id="ledgerVisibleSources"></div>
+          <div class="settings-row-sub">Destination labels</div>
+          <div class="ledger-destinations" id="ledgerDestinationLabels"></div>
+          <button class="settings-action-btn primary" id="ledgerPolicySave" type="button">Save Ledger Settings</button>
+        </details>
+        <div class="tg-instructions" id="ledgerInstructions" style="display:none">
+          <strong>Setup:</strong><br>
+          1. Set <code>BROADCAST_LEDGER_API_KEY</code> in your Railway environment variables (<code>openssl rand -hex 32</code>). It falls back to <code>ADMIN_API_KEY</code> if left blank.<br>
+          2. Point <code>DATA_DIR</code> at the mounted volume (usually <code>/app/data</code>) — on ephemeral storage the ledger is wiped on every deploy.<br>
+          3. Redeploy, then reload this page.<br>
+          See <code>docs/broadcast-ledger.md</code> for the endpoint contract, the ShareBot67 preflight steps, and the iOS Shortcut request.
         </div>
       </div>
     </div>
@@ -298,6 +403,36 @@
     });
   })();
 
+  /* ── Accent ─────────────────────────────────────────────── */
+  (function () {
+    var s = window.AppSettings;
+    var grid = document.getElementById('accentGrid');
+    if (!grid) return;
+    var current = s.getAccent();
+
+    Object.keys(s.ACCENTS).forEach(function (name) {
+      var accent = s.ACCENTS[name];
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'accent-swatch' + (name === current ? ' active' : '');
+      // The swatch paints itself in the accent it applies; "theme" has no
+      // colour of its own, so it shows whatever the current theme uses.
+      btn.style.color = accent.color || 'var(--accent)';
+      btn.innerHTML =
+        '<span class="accent-swatch-dot"></span>' +
+        '<span>' + accent.label + '</span>';
+      btn.addEventListener('click', function () {
+        document.querySelectorAll('.accent-swatch').forEach(function (el) {
+          el.classList.remove('active');
+        });
+        btn.classList.add('active');
+        s.applyAccent(name);
+        showToast();
+      });
+      grid.appendChild(btn);
+    });
+  })();
+
   /* ── Frequency ──────────────────────────────────────────── */
   (function () {
     var s = window.AppSettings;
@@ -342,6 +477,337 @@
     });
 
     loadPrompt();
+  })();
+
+  /* ── Broadcast ledger status ────────────────────────── */
+  (function () {
+    var pill = document.getElementById('ledgerStatusPill');
+    var link = document.getElementById('ledgerFormLink');
+    var keyBtn = document.getElementById('ledgerKeyBtn');
+    var latestEl = document.getElementById('ledgerLatest');
+    var watchEl = document.getElementById('ledgerWatch');
+    var watchTargetsEl = document.getElementById('ledgerWatchTargets');
+    var watchSave = document.getElementById('ledgerWatchSave');
+    var sourcesEl = document.getElementById('ledgerSources');
+    var policyEl = document.getElementById('ledgerPolicy');
+    var categoriesEl = document.getElementById('ledgerCategories');
+    var destinationLabelsEl = document.getElementById('ledgerDestinationLabels');
+    var visibleSourcesEl = document.getElementById('ledgerVisibleSources');
+    var policySave = document.getElementById('ledgerPolicySave');
+    var ledgerSettings = null;
+    var availableTargets = [];
+    var SOURCE_LABELS = {
+      shortcut: 'Shortcut',
+      sharebot67: 'News Reporter',
+      dashboard: 'Market Dashboard',
+      manual: 'Manual',
+      'telegram-ingest': 'Channel Watch'
+    };
+
+    // Which path sent what. Only paths that report themselves can be named;
+    // channel-watch receipts are omitted because no sending path claimed them.
+    function describeSources(data) {
+      var counts = data && data.bySource ? data.bySource : {};
+      var parts = Object.keys(SOURCE_LABELS)
+        .filter(function (key) { return counts[key]; })
+        .map(function (key) { return counts[key] + ' ' + SOURCE_LABELS[key]; });
+      return parts.length ? 'By source: ' + parts.join(' · ') : '';
+    }
+    var inst = document.getElementById('ledgerInstructions');
+    var STATUS_URL = '/api/broadcast-ledger/status';
+
+    function targetKey(target) {
+      return String(target.chatId) + ':' + (target.threadId || '');
+    }
+
+    function renderWatchTargets(data) {
+      var watch = data && data.watch;
+      var available = watch && Array.isArray(watch.availableTargets) ? watch.availableTargets : [];
+      availableTargets = available;
+      var selected = new Set((watch && watch.watchedTargets || []).map(targetKey));
+      watchTargetsEl.innerHTML = '';
+      if (!available.length) {
+        watchTargetsEl.textContent = 'No Telegram broadcast destinations are configured.';
+        watchTargetsEl.className = 'settings-row-sub';
+        watchTargetsEl.style.display = '';
+        watchSave.style.display = 'none';
+        return;
+      }
+      available.forEach(function (target) {
+        var label = document.createElement('label');
+        label.className = 'settings-row-sub';
+        label.style.cssText = 'display:flex;align-items:center;gap:8px;margin:7px 0;cursor:pointer';
+        var input = document.createElement('input');
+        input.type = 'checkbox';
+        input.value = targetKey(target);
+        input.checked = selected.has(input.value);
+        label.appendChild(input);
+        label.appendChild(document.createTextNode(target.threadId
+          ? 'Chat ' + target.chatId + ' · topic ' + target.threadId
+          : 'Channel/chat ' + target.chatId + ' · no topic'));
+        watchTargetsEl.appendChild(label);
+      });
+      watchTargetsEl.style.display = '';
+      watchSave.style.display = '';
+    }
+
+    function addTextInput(parent, value, dataKey) {
+      var input = document.createElement('input');
+      input.type = 'text';
+      input.value = value || '';
+      input.dataset.key = dataKey;
+      input.placeholder = 'Room label';
+      parent.appendChild(input);
+    }
+
+    function renderPolicy(data) {
+      ledgerSettings = data && data.settings ? data.settings : null;
+      if (!ledgerSettings) { policyEl.style.display = 'none'; return; }
+      policyEl.style.display = '';
+      document.getElementById('ledgerExactCategory').checked = ledgerSettings.requireExactCategory !== false;
+      document.getElementById('ledgerRecordBlocked').checked = ledgerSettings.recordBlockedAttempts !== false;
+      document.getElementById('ledgerFinanceRouting').checked = ledgerSettings.financeTopicRoutingEnabled !== false;
+      document.getElementById('ledgerBlockedNotifications').checked = ledgerSettings.notifications && ledgerSettings.notifications.blocked !== false;
+      document.getElementById('ledgerFailureNotifications').checked = ledgerSettings.notifications && ledgerSettings.notifications.failed !== false;
+      document.getElementById('ledgerMissingNotifications').checked = ledgerSettings.notifications && ledgerSettings.notifications.missingCategory !== false;
+      document.getElementById('ledgerEditDelete').checked = ledgerSettings.editDeleteEnabled !== false;
+      document.getElementById('ledgerTimezone').value = ledgerSettings.timezone || 'America/Vancouver';
+      document.getElementById('ledgerHistory').value = ledgerSettings.historyDays == null ? 'forever' : String(ledgerSettings.historyDays);
+
+      // Must list every category the server ships as allowed. A name missing
+      // here only appears while it is still enabled, so unchecking it removed
+      // its row and left no way to switch it back on from this page.
+      var canonical = ['Stock', 'Crypto', 'Geopolitics', 'Economics', 'Markets', 'Technology', 'General News'];
+      var categories = Array.from(new Set(canonical.concat(ledgerSettings.allowedCategories || [])));
+      categoriesEl.innerHTML = '';
+      categories.forEach(function (category) {
+        var row = document.createElement('label');
+        row.className = 'ledger-category-row';
+        var name = document.createElement('span');
+        var allowed = document.createElement('input');
+        allowed.type = 'checkbox';
+        allowed.className = 'ledger-category-allowed';
+        allowed.dataset.category = category;
+        allowed.checked = (ledgerSettings.allowedCategories || []).includes(category);
+        name.appendChild(allowed);
+        name.appendChild(document.createTextNode(' ' + category));
+        var limit = document.createElement('input');
+        limit.type = 'number'; limit.min = '1'; limit.max = '100'; limit.placeholder = 'No limit';
+        limit.className = 'ledger-category-limit'; limit.dataset.category = category;
+        limit.value = ledgerSettings.categoryLimits && ledgerSettings.categoryLimits[category] || '';
+        var duplicate = document.createElement('select');
+        duplicate.className = 'ledger-category-duplicate'; duplicate.dataset.category = category;
+        [['off','Off'],['same-day','Same day'],['6h','6 hours'],['24h','24 hours'],['42h','42 hours']].forEach(function (option) {
+          var el = document.createElement('option'); el.value = option[0]; el.textContent = option[1];
+          el.selected = (ledgerSettings.duplicateWindows && ledgerSettings.duplicateWindows[category] || '42h') === option[0];
+          duplicate.appendChild(el);
+        });
+        row.appendChild(name); row.appendChild(limit); row.appendChild(duplicate); categoriesEl.appendChild(row);
+      });
+
+      visibleSourcesEl.innerHTML = '';
+      Object.keys(SOURCE_LABELS).forEach(function (source) {
+        var label = document.createElement('label'); label.className = 'ledger-control checkbox';
+        var input = document.createElement('input'); input.type = 'checkbox'; input.value = source;
+        input.checked = (ledgerSettings.visibleSources || []).includes(source);
+        label.appendChild(input); label.appendChild(document.createTextNode(SOURCE_LABELS[source]));
+        visibleSourcesEl.appendChild(label);
+      });
+
+      destinationLabelsEl.innerHTML = '';
+      var labelTargets = availableTargets.slice();
+      var knownTargetKeys = new Set(labelTargets.map(targetKey));
+      Object.keys(ledgerSettings.destinationLabels || {}).forEach(function (key) {
+        if (!key.startsWith('telegram:')) return;
+        var raw = key.slice('telegram:'.length);
+        if (knownTargetKeys.has(raw)) return;
+        var splitAt = raw.lastIndexOf(':');
+        labelTargets.push({ chatId: raw.slice(0, splitAt), threadId: raw.slice(splitAt + 1) || null });
+        knownTargetKeys.add(raw);
+      });
+      labelTargets.forEach(function (target) {
+        var key = 'telegram:' + targetKey(target);
+        var row = document.createElement('label'); row.className = 'ledger-destination-row';
+        row.appendChild(document.createTextNode(target.threadId ? 'Chat ' + target.chatId + ' · topic ' + target.threadId : 'Chat ' + target.chatId));
+        addTextInput(row, ledgerSettings.destinationLabels && ledgerSettings.destinationLabels[key], key);
+        destinationLabelsEl.appendChild(row);
+      });
+      if (!labelTargets.length) destinationLabelsEl.textContent = 'No configured Telegram destinations.';
+    }
+
+    function describeLatest(data) {
+      if (!data || !data.count) return 'No receipts recorded yet.';
+      var parts = [data.count + ' receipt' + (data.count !== 1 ? 's' : '') + ' recorded'];
+      if (data.latest) {
+        var when = data.latest.createdAt ? new Date(data.latest.createdAt).toLocaleString() : '';
+        parts.push('latest: ' + (data.latest.title || data.latest.id) +
+          ' (' + data.latest.source + ' · ' + data.latest.status + (when ? ' · ' + when : '') + ')');
+      }
+      return parts.join(' — ');
+    }
+
+    function ready(data, keyForLink) {
+      pill.className = 'status-pill ok';
+      pill.textContent = '✅ Ready';
+      // The form is opened by plain browser navigation, which cannot send a
+      // header — so when the owner session isn't what authorized us, carry the
+      // key in the URL instead. That parameter is accepted on this path only.
+      link.href = keyForLink
+        ? '/api/broadcast-ledger/manual?key=' + encodeURIComponent(keyForLink)
+        : '/api/broadcast-ledger/manual';
+      link.style.display = '';
+      keyBtn.style.display = 'none';
+      latestEl.textContent = describeLatest(data);
+      latestEl.style.display = '';
+      var sources = describeSources(data);
+      sourcesEl.textContent = sources;
+      sourcesEl.style.display = sources ? '' : 'none';
+      // The watch is what makes this automatic; say plainly whether it is on,
+      // because that is the difference between "nothing to do" and "you still
+      // have to file these yourself".
+      watchEl.textContent = data.watching
+        ? '\u2713 Watching your Telegram channels \u2014 posts from other senders are recorded automatically. Anything sent through this bot must broadcast via /api/broadcast-ledger/broadcast to be recorded.'
+        : '\u26a0 Channel watch is off \u2014 receipts only arrive from paths that report themselves. Set BROADCAST_LEDGER_INGEST_ENABLED=true to record posts automatically.';
+      watchEl.style.display = '';
+      renderWatchTargets(data);
+      renderPolicy(data);
+      inst.style.display = 'none';
+    }
+
+    function needsKey(message) {
+      pill.className = 'status-pill off';
+      pill.textContent = message || '🔑 Admin key required';
+      link.style.display = 'none';
+      keyBtn.style.display = '';
+      latestEl.style.display = 'none';
+      sourcesEl.style.display = 'none';
+      watchEl.style.display = 'none';
+      watchTargetsEl.style.display = 'none';
+      watchSave.style.display = 'none';
+      policyEl.style.display = 'none';
+    }
+
+    function notConfigured() {
+      pill.className = 'status-pill off';
+      pill.textContent = '⚠️ Not configured';
+      link.style.display = 'none';
+      keyBtn.style.display = 'none';
+      latestEl.style.display = 'none';
+      sourcesEl.style.display = 'none';
+      watchEl.style.display = 'none';
+      watchTargetsEl.style.display = 'none';
+      watchSave.style.display = 'none';
+      policyEl.style.display = 'none';
+      inst.style.display = '';
+    }
+
+    function unreachable() {
+      pill.className = 'status-pill off';
+      pill.textContent = '⚠️ Unreachable';
+      link.style.display = 'none';
+      keyBtn.style.display = 'none';
+      latestEl.style.display = 'none';
+      sourcesEl.style.display = 'none';
+      watchEl.style.display = 'none';
+      watchTargetsEl.style.display = 'none';
+      watchSave.style.display = 'none';
+      policyEl.style.display = 'none';
+    }
+
+    // Probe in the order the form itself accepts credentials: the site session
+    // first (nothing to store, nothing in the URL), then a stored admin key.
+    function probe() {
+      pill.className = 'status-pill off';
+      pill.textContent = '⏳ Checking…';
+      return fetch(STATUS_URL, { credentials: 'same-origin' })
+        .then(function (res) {
+          if (res.status === 503) { notConfigured(); return null; }
+          if (res.ok) return res.json().then(function (data) { ready(data, ''); return null; });
+          if (res.status !== 401) { unreachable(); return null; }
+          // No usable session — fall back to the stored admin key.
+          if (!window.AdminKey || !window.AdminKey.get()) { needsKey(); return null; }
+          return window.AdminKey.fetchSilent(STATUS_URL).then(function (keyed) {
+            if (keyed.status === 503) { notConfigured(); return; }
+            if (!keyed.ok) { needsKey('🔑 Admin key was rejected'); return; }
+            return keyed.json().then(function (data) { ready(data, window.AdminKey.get()); });
+          });
+        })
+        .catch(unreachable);
+    }
+
+    keyBtn.addEventListener('click', function () {
+      if (!window.AdminKey) return;
+      window.AdminKey.prompt('Enter the admin key to open the broadcast receipt form:').then(function (key) {
+        if (key) probe();
+      });
+    });
+
+    watchSave.addEventListener('click', function () {
+      var targets = Array.from(watchTargetsEl.querySelectorAll('input:checked')).map(function (input) {
+        var splitAt = input.value.lastIndexOf(':');
+        return { chatId: input.value.slice(0, splitAt), threadId: input.value.slice(splitAt + 1) || null };
+      });
+      watchSave.disabled = true;
+      AdminKey.fetch('/api/broadcast-ledger/watchlist', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targets: targets })
+      }).then(function (res) {
+        return res.json().then(function (body) {
+          if (!res.ok) throw new Error(body.error || 'Could not save watchlist');
+          renderWatchTargets({ watch: body.watch });
+          showToast();
+        });
+      }).catch(function (err) {
+        watchEl.textContent = '\u26a0 ' + err.message;
+      }).finally(function () { watchSave.disabled = false; });
+    });
+
+    policySave.addEventListener('click', function () {
+      var allowedCategories = Array.from(categoriesEl.querySelectorAll('.ledger-category-allowed:checked')).map(function (input) { return input.dataset.category; });
+      var categoryLimits = {};
+      categoriesEl.querySelectorAll('.ledger-category-limit').forEach(function (input) {
+        if (allowedCategories.includes(input.dataset.category) && Number(input.value) > 0) categoryLimits[input.dataset.category] = Number(input.value);
+      });
+      var duplicateWindows = {};
+      categoriesEl.querySelectorAll('.ledger-category-duplicate').forEach(function (input) {
+        if (allowedCategories.includes(input.dataset.category)) duplicateWindows[input.dataset.category] = input.value;
+      });
+      var destinationLabels = {};
+      destinationLabelsEl.querySelectorAll('input[data-key]').forEach(function (input) {
+        if (input.value.trim()) destinationLabels[input.dataset.key] = input.value.trim();
+      });
+      var payload = {
+        requireExactCategory: document.getElementById('ledgerExactCategory').checked,
+        recordBlockedAttempts: document.getElementById('ledgerRecordBlocked').checked,
+        financeTopicRoutingEnabled: document.getElementById('ledgerFinanceRouting').checked,
+        allowedCategories: allowedCategories,
+        categoryLimits: categoryLimits,
+        duplicateWindows: duplicateWindows,
+        timezone: document.getElementById('ledgerTimezone').value,
+        historyDays: document.getElementById('ledgerHistory').value === 'forever' ? null : Number(document.getElementById('ledgerHistory').value),
+        notifications: {
+          blocked: document.getElementById('ledgerBlockedNotifications').checked,
+          failed: document.getElementById('ledgerFailureNotifications').checked,
+          missingCategory: document.getElementById('ledgerMissingNotifications').checked
+        },
+        editDeleteEnabled: document.getElementById('ledgerEditDelete').checked,
+        visibleSources: Array.from(visibleSourcesEl.querySelectorAll('input:checked')).map(function (input) { return input.value; }),
+        destinationLabels: destinationLabels
+      };
+      policySave.disabled = true;
+      AdminKey.fetch('/api/broadcast-ledger/settings', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+      }).then(function (res) {
+        return res.json().then(function (body) {
+          if (!res.ok) throw new Error(body.error || 'Could not save ledger settings');
+          ledgerSettings = body.settings; renderPolicy({ settings: ledgerSettings, watch: { availableTargets: availableTargets } }); showToast();
+        });
+      }).catch(function (err) { watchEl.textContent = '\u26a0 ' + err.message; })
+        .finally(function () { policySave.disabled = false; });
+    });
+
+    probe();
   })();
 
   /* ── Telegram status ────────────────────────────────── */

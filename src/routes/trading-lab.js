@@ -5,6 +5,7 @@ const { Router } = require("express");
 const { listStrategies, DEFAULT_STRATEGY_ID } = require("../services/trading/strategies");
 const { positionOwner } = require("../services/trading/execution-owner");
 const { planResearch } = require("../services/trading/research-planner");
+const { reconcilePaperPipeline } = require("../services/trading/pipeline-reconciliation");
 
 function asyncRoute(handler) {
   return (req, res, next) => {
@@ -74,6 +75,9 @@ function createTradingLabRouter({
   // deployment without a candle source still serves the rest of the lab.
   researchQueue = null,
   signalScreenerService = null,
+  // Read for the reconciliation view only. The pipeline never writes the human
+  // journal — see pipeline-reconciliation.js.
+  tradeJournalService = null,
   requireAdmin,
 }) {
   const router = Router();
@@ -172,6 +176,20 @@ function createTradingLabRouter({
       ? signalActionStore.count()
       : items.length;
     res.json({ total, items });
+  });
+
+  // The reconciliation view: of everything the bridge evaluated, where did each
+  // one end up, and did anything silently disappear? Read-only, and it never
+  // writes the human trade journal — it reports it alongside.
+  router.get("/pipeline", (req, res) => {
+    res.json(
+      reconcilePaperPipeline({
+        signalActionStore,
+        tradingLabService,
+        tradeJournalService,
+        limit: Math.min(Math.max(numberOr(req.query.limit, 500), 1), 2000),
+      }),
+    );
   });
 
   router.get("/metrics", (req, res) => {
