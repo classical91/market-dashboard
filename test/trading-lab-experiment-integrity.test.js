@@ -274,3 +274,84 @@ test("the guards sit behind the admin gate, not in front of it", async () => {
   const res = await post("/api/trading-lab/mark", { strategyId: "mindset_v1" }, { key: null });
   assert.equal(res.status, 401, "an anonymous caller is rejected before ownership is even considered");
 });
+
+/* ── One ledger, one writer ───────────────────────────────── */
+
+const TRADEABLE = {
+  regime: "TREND_UP",
+  dailyBias: "BULLISH",
+  volumeRatio: 1.6,
+  macdBullish: true,
+  stochSignal: "OVERSOLD_CROSS",
+};
+
+function scannerWrite(strategyId) {
+  return lab.execute({
+    strategyId,
+    symbol: "BTCUSDT",
+    direction: "LONG",
+    entryPrice: 100,
+    atr: 2,
+    state: { ...TRADEABLE },
+    signalSource: "live-scanner:15m",
+    executionOwner: "live-scanner",
+  });
+}
+
+test("the Live Scanner cannot write into a ledger a demo runner owns", async () => {
+  // The live production configuration: ENABLE_LIVE_SCANNER on with paper
+  // trading defaulting to enabled, and Demo Trading also defaulting on. Both
+  // targeted mindset_v1's single $10,000 ledger — the scanner at 15m on one
+  // symbol through the full gauntlet, the demo runner at 1h across twenty
+  // markets with the strategy authoritative. Two experiments, one balance, and
+  // no way to separate them afterwards.
+  //
+  // Reporting the conflict was never enforcement. This is.
+  lab.attachLiveResearchService(fakeResearchService({ owns: ["mindset_v1"] }));
+
+  await assert.rejects(() => scannerWrite("mindset_v1"), /autonomous demo experiment/i);
+  assert.equal(
+    lab.strategyLedger("mindset_v1").getOpenPositions().length,
+    0,
+    "the refused write must leave no position behind",
+  );
+});
+
+test("the guard costs nothing when no demo runner owns the ledger", async () => {
+  // Ownership is FACT, not eligibility: with the loop detached or disabled,
+  // nothing owns the ledger and the ordinary forward-paper path is unchanged.
+  lab.attachLiveResearchService(null);
+  const detached = await scannerWrite("mindset_v1");
+  assert.ok(detached.opened, "a write with no autonomous owner must still succeed");
+
+  lab.strategyLedger("mindset_v1").reset();
+  lab.attachLiveResearchService(fakeResearchService({ enabled: false, owns: ["mindset_v1"] }));
+  const disabled = await scannerWrite("mindset_v1");
+  assert.ok(disabled.opened, "a disabled loop owns nothing and must not block a write");
+});
+
+test("the refusal is scoped to the contested account, not to every strategy", async () => {
+  // A guard that refused writes to accounts nothing owns would be a different
+  // bug in the same place.
+  lab.attachLiveResearchService(fakeResearchService({ owns: ["mindset_v1"] }));
+  await assert.rejects(() => scannerWrite("mindset_v1"));
+  const other = await scannerWrite("smc_v1").catch((err) => ({ error: err.message }));
+  assert.ok(!other.error || !/autonomous demo experiment/i.test(other.error), other.error);
+});
+
+test("the demo runner itself still writes to the ledger it owns", async () => {
+  // The guard must stop the SECOND writer, not the owner. If it blocked the
+  // runner too, every demo account would go permanently flat and the fix would
+  // be worse than the defect.
+  lab.attachLiveResearchService(fakeResearchService({ owns: ["mindset_v1"] }));
+  const opened = await lab.executeLiveResearch({
+    strategyId: "mindset_v1",
+    symbol: "BTCUSDT",
+    direction: "LONG",
+    entryPrice: 100,
+    atr: 2,
+    state: { ...TRADEABLE },
+    signalSource: "live-research:1h",
+  });
+  assert.ok(opened.opened, "the owning runner must still be able to trade its own account");
+});
