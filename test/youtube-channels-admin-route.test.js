@@ -47,7 +47,7 @@ test("reading the tracked channels needs no key — the panel renders before any
   assert.ok(Array.isArray(body.channels));
   assert.ok(body.channels.length, "the seed is served");
   assert.ok(Array.isArray(body.categories));
-  assert.ok(body.categories.includes("Archaeology"), "theme sections are offered as categories");
+  assert.ok(body.categories.some((category) => category.name === "Archaeology"), "theme sections seed categories");
   assert.equal(body.registry.loadState !== "corrupt", true);
 });
 
@@ -135,4 +135,89 @@ test("deleting a channel removes it from the list and from its theme", async () 
 test("deleting a channel that is not tracked is a 404", async () => {
   const res = await adminApi("/api/youtube/channels/config/nobody", { method: "DELETE" });
   assert.equal(res.status, 404);
+});
+
+test("category CRUD is canonical and renames assigned channels centrally", async () => {
+  const created = await adminApi("/api/youtube/categories/config", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: "Research" }),
+  });
+  assert.equal(created.status, 201);
+  const category = (await created.json()).added;
+
+  const duplicate = await adminApi("/api/youtube/categories/config", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: " research " }),
+  });
+  assert.equal(duplicate.status, 409);
+
+  const channel = await adminApi("/api/youtube/channels/config", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ handle: "researchdesk", categoryId: category.id }),
+  });
+  assert.equal(channel.status, 201);
+
+  const renamed = await adminApi(`/api/youtube/categories/config/${encodeURIComponent(category.id)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: "Deep Research" }),
+  });
+  assert.equal(renamed.status, 200);
+  const renamedBody = await renamed.json();
+  assert.equal(renamedBody.channels.find((item) => item.handle === "researchdesk").category, "Deep Research");
+});
+
+test("category filtering happens before YouTube intelligence is fetched", async () => {
+  const config = await (await api("/api/youtube/channels/config")).json();
+  const research = config.categories.find((category) => category.name === "Deep Research");
+  const filtered = await api(`/api/youtube/channels?categoryId=${encodeURIComponent(research.id)}`);
+  assert.equal(filtered.status, 200);
+  const body = await filtered.json();
+  assert.equal(body.selectedCategoryId, research.id);
+  assert.deepEqual(body.channels.map((channel) => channel.handle), ["researchdesk"]);
+});
+
+test("editing a channel moves it without delete and re-add", async () => {
+  const config = await (await api("/api/youtube/channels/config")).json();
+  const crypto = config.categories.find((category) => category.name === "Crypto");
+  const updated = await adminApi("/api/youtube/channels/config/researchdesk", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ handle: "researchdesk", label: "Research Desk", categoryId: crypto.id }),
+  });
+  assert.equal(updated.status, 200);
+  assert.equal((await updated.json()).updated.categoryId, crypto.id);
+});
+
+test("deleting a used category requires and applies reassignment", async () => {
+  const created = await adminApi("/api/youtube/categories/config", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: "Temporary" }),
+  });
+  const temporary = (await created.json()).added;
+  await adminApi("/api/youtube/channels/config/researchdesk", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ handle: "researchdesk", categoryId: temporary.id }),
+  });
+  const refused = await adminApi(`/api/youtube/categories/config/${encodeURIComponent(temporary.id)}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: "{}",
+  });
+  assert.equal(refused.status, 409);
+  assert.equal((await refused.json()).code, "CATEGORY_NOT_EMPTY");
+
+  const removed = await adminApi(`/api/youtube/categories/config/${encodeURIComponent(temporary.id)}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reassignToCategoryId: "uncategorized" }),
+  });
+  assert.equal(removed.status, 200);
+  const body = await removed.json();
+  assert.equal(body.channels.find((item) => item.handle === "researchdesk").categoryId, "uncategorized");
 });

@@ -1,311 +1,303 @@
 "use strict";
 
-/**
- * YoutubeChannelRegistry
- *
- * The runtime source of truth for which YouTube channels the dashboard tracks.
- *
- * The list used to live only in src/config/youtube-channels.js, which meant
- * adding or dropping a channel was a code change and a redeploy — and with
- * themes on the page that was the whole friction: a theme could be switched to
- * but never filled. That static list is now the seed. On first boot it is
- * written into a JSON file under DATA_DIR (the Railway volume in production),
- * and from then on the file is what the feed reads.
- *
- * This is deliberately the same idiom as XAccountRegistry: one JSON file,
- * rewritten whole under an exclusive lock via an atomic rename. No new storage
- * technology, and an operator who has debugged one registry has debugged both.
- *
- * File shape:
- *   { "version": 1, "channels": [ { handle, label, category, channelId, addedAt } ] }
- *
- * Adding a channel never calls YouTube. Only the format is validated, so an
- * exhausted API quota can neither block channel management nor leave a
- * half-written registry behind — the feed resolves the channel ID on its next
- * refresh, exactly as it does for a seeded channel with no configured ID.
- *
- * A channel's `category` is what places it in a theme (see
- * src/config/youtube-themes.js), so adding a channel under "Archaeology" is
- * all it takes to fill the Dig Site theme.
- */
-
+// One persisted source of truth for YouTube categories and channels. Version 1
+// stored category names on every channel; version 2 stores stable category IDs
+// and resolves names at the API boundary.
 const fs = require("fs");
 const path = require("path");
-
 const { withExclusiveLock, writeJsonAtomic } = require("./json-file-lock");
 const { YOUTUBE_CHANNELS, isChannelId } = require("../config/youtube-channels");
 const { createServiceError } = require("../utils/errors");
 
-const REGISTRY_VERSION = 1;
+const REGISTRY_VERSION = 2;
 const MAX_CHANNELS = 200;
-// A YouTube handle is 3-30 characters of [A-Za-z0-9._-]. Enforced before
-// persistence so a typo cannot become a permanently failing feed.
+const MAX_CATEGORIES = 100;
+const UNCATEGORIZED_ID = "uncategorized";
 const HANDLE_PATTERN = /^[A-Za-z0-9._-]{3,30}$/;
-const MAX_LABEL_LEN = 60;
-const MAX_CATEGORY_LEN = 40;
+const CATEGORY_ID_PATTERN = /^category:[a-z0-9][a-z0-9-]{0,63}$/;
 
+function clean(value, max) { return String(value == null ? "" : value).trim().slice(0, max); }
 function normalizeHandle(value) {
-  return String(value == null ? "" : value).trim().replace(/^@+/, "").trim();
+  const raw = String(value == null ? "" : value).trim();
+  const url = raw.match(/(?:youtube\.com\/(?:@|c\/|user\/))([^/?#]+)/i);
+  return String(url ? url[1] : raw).replace(/^@+/, "").trim();
 }
-
-/**
- * The identity a handle is compared by. YouTube handles are case-insensitive
- * for lookup, so @StockMoe and @stockmoe are one channel, not two.
- */
-function canonicalHandle(value) {
-  return normalizeHandle(value).toLowerCase();
+function canonicalHandle(value) { return normalizeHandle(value).toLowerCase(); }
+function sameHandle(a, b) { return canonicalHandle(a) === canonicalHandle(b); }
+function normalizeCategoryName(value) { return clean(value, 40).replace(/\s+/g, " "); }
+function canonicalCategoryName(value) { return normalizeCategoryName(value).toLocaleLowerCase(); }
+function categorySlug(value) {
+  return normalizeCategoryName(value).normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48) || "category";
 }
-
-function sameHandle(a, b) {
-  return canonicalHandle(a) === canonicalHandle(b);
+function uniqueCategoryId(name, categories) {
+  const base = `category:${categorySlug(name)}`;
+  const ids = new Set(categories.map((item) => item.id));
+  if (!ids.has(base)) return base;
+  let suffix = 2;
+  while (ids.has(`${base}-${suffix}`)) suffix += 1;
+  return `${base}-${suffix}`;
 }
-
-function clamp(value, max) {
-  return String(value == null ? "" : value).trim().slice(0, max);
+function categoryView(category, channelCount = 0) {
+  return { id: category.id, name: category.name, slug: category.slug, createdAt: category.createdAt || null, channelCount };
 }
-
-/** Drops any channel whose handle is already present, keeping the first. */
+function uncategorizedView(channelCount = 0) {
+  return { id: UNCATEGORIZED_ID, name: "Uncategorized", slug: UNCATEGORIZED_ID, createdAt: null, channelCount, virtual: true };
+}
+function normalizeCategory(input, categories = [], keepId = false) {
+  const name = normalizeCategoryName(input?.name ?? input);
+  if (!name) throw createServiceError("A category name is required", 400);
+  const duplicate = categories.find((item) => canonicalCategoryName(item.name) === canonicalCategoryName(name));
+  if (duplicate) throw createServiceError(`The category "${duplicate.name}" already exists`, 409);
+  const requested = keepId ? String(input?.id || "").trim() : "";
+  return {
+    id: CATEGORY_ID_PATTERN.test(requested) ? requested : uniqueCategoryId(name, categories),
+    name,
+    slug: categorySlug(name),
+    createdAt: input?.createdAt || new Date().toISOString(),
+  };
+}
 function dedupeChannels(channels) {
-  const seen = new Set();
-  const unique = [];
-  let dropped = 0;
+  const seen = new Set(); const unique = []; let dropped = 0;
   for (const channel of channels || []) {
     const key = canonicalHandle(channel?.handle);
-    if (!key || seen.has(key)) {
-      dropped += 1;
-      continue;
-    }
-    seen.add(key);
-    unique.push(channel);
+    if (!key || seen.has(key)) { dropped += 1; continue; }
+    seen.add(key); unique.push(channel);
   }
   return { channels: unique, dropped };
 }
-
-/**
- * Validates and normalizes one channel. Throws a 400-shaped error rather than
- * persisting anything questionable — the registry is read on every feed
- * refresh, so a bad row is a permanent failure, not a one-off.
- */
-function normalizeChannel(input) {
+function normalizeChannelFields(input) {
   const handle = normalizeHandle(input?.handle);
   if (!handle) throw createServiceError("A YouTube handle is required", 400);
-  if (!HANDLE_PATTERN.test(handle)) {
-    throw createServiceError(
-      `"${handle}" is not a valid YouTube handle (3-30 letters, numbers, dots, dashes or underscores)`,
-      400,
-    );
+  if (!HANDLE_PATTERN.test(handle)) throw createServiceError(`"${handle}" is not a valid YouTube handle`, 400);
+  const channelId = String(input?.channelId == null ? "" : input.channelId).trim();
+  if (channelId && !isChannelId(channelId)) throw createServiceError(`"${channelId}" is not a valid channel ID (UC followed by 22 characters)`, 400);
+  return { handle, label: clean(input?.label ?? input?.displayName, 60) || handle, channelId };
+}
+function resolveCategoryId(input, categories) {
+  const id = String(input?.categoryId == null ? "" : input.categoryId).trim();
+  if (id === UNCATEGORIZED_ID) return null;
+  if (!id && !input?.category) throw createServiceError("A category is required", 400);
+  if (id) {
+    if (categories.some((category) => category.id === id)) return id;
+    throw createServiceError("Choose an existing category", 400);
   }
-
-  const category = clamp(input?.category, MAX_CATEGORY_LEN);
-  if (!category) throw createServiceError("A category is required", 400);
-
-  // An ID is optional. A blank or malformed one is stored as "" so the service
-  // resolves it through the API rather than building a broken feed URL — the
-  // same rule resolveYoutubeChannels applies to the static list.
-  const rawId = String(input?.channelId == null ? "" : input.channelId).trim();
-  if (rawId && !isChannelId(rawId)) {
-    throw createServiceError(`"${rawId}" is not a valid channel ID (UC followed by 22 characters)`, 400);
-  }
-
-  return {
-    handle,
-    label: clamp(input?.label, MAX_LABEL_LEN) || handle,
-    category,
-    channelId: rawId,
-  };
+  const wanted = canonicalCategoryName(input?.category);
+  const match = categories.find((category) => canonicalCategoryName(category.name) === wanted);
+  if (!match) throw createServiceError("Choose an existing category", 400);
+  return match.id;
+}
+function normalizeChannel(input, categories = []) {
+  return { ...normalizeChannelFields(input), categoryId: resolveCategoryId(input, categories) };
 }
 
 class YoutubeChannelRegistry {
-  constructor({ dataDir, seed = YOUTUBE_CHANNELS, logger = console } = {}) {
+  constructor({ dataDir, seed = YOUTUBE_CHANNELS, categorySeed = [], logger = console } = {}) {
     this._file = path.join(dataDir, "youtube-channels.json");
-    this._lockState = { depth: 0 };
-    this._logger = logger;
-    this._seed = seed;
-    this._loadState = "unread";
-    this._loadError = null;
-    this._corruptBackedUp = false;
+    this._lockState = { depth: 0 }; this._logger = logger;
+    this._seed = Array.isArray(seed) ? seed : [];
+    this._categorySeed = Array.isArray(categorySeed) ? categorySeed : [];
+    this._loadState = "unread"; this._loadError = null;
+    this._corruptBackedUp = false; this._needsMigration = false;
   }
 
-  /**
-   * Reads the file, seeding it from the static config the first time.
-   *
-   * A file that exists but cannot be parsed is the dangerous case: returning
-   * an empty list would silently untrack every channel and blank the page.
-   * The seed is served instead, and the unreadable file is preserved until a
-   * write can back it up.
-   */
-  _read() {
-    let raw;
-    try {
-      raw = fs.readFileSync(this._file, "utf8");
-    } catch (err) {
-      if (err.code === "ENOENT") {
-        this._loadState = "seeded";
-        this._loadError = null;
-        return this._seed.map((channel) => normalizeChannel(channel));
+  _seedState() {
+    const categories = [];
+    const addName = (value) => {
+      const name = normalizeCategoryName(value);
+      if (name && !categories.some((item) => canonicalCategoryName(item.name) === canonicalCategoryName(name))) {
+        categories.push(normalizeCategory({ name }, categories));
       }
-      this._loadState = "unreadable";
-      this._loadError = err.message;
-      this._logger.error?.(`[YoutubeChannels] Could not read ${this._file}: ${err.message}`);
-      return this._seed.map((channel) => normalizeChannel(channel));
-    }
-
-    try {
-      const parsed = JSON.parse(raw);
-      const source = Array.isArray(parsed) ? parsed : parsed?.channels;
-      if (!Array.isArray(source)) throw new SyntaxError("no channels array");
-
-      const valid = [];
-      let malformed = 0;
-      let duplicates = 0;
-      for (const entry of source) {
-        // One bad row must not take the whole registry down with it.
-        try {
-          const channel = normalizeChannel(entry);
-          if (valid.some((existing) => sameHandle(existing.handle, channel.handle))) {
-            duplicates += 1;
-            continue;
-          }
-          valid.push({ ...channel, addedAt: entry?.addedAt || null });
-        } catch {
-          malformed += 1;
-        }
-      }
-
-      const notes = [];
-      if (malformed) notes.push(`${malformed} malformed entr${malformed === 1 ? "y" : "ies"} skipped`);
-      if (duplicates) notes.push(`${duplicates} duplicate handle${duplicates === 1 ? "" : "s"} merged`);
-      this._loadState = notes.length ? "partial" : "loaded";
-      this._loadError = notes.length ? notes.join("; ") : null;
-      if (notes.length) this._logger.warn?.(`[YoutubeChannels] ${notes.join("; ")} in ${this._file}`);
-      return valid;
-    } catch (err) {
-      this._loadState = "corrupt";
-      this._loadError = err.message;
-      this._logger.error?.(
-        `[YoutubeChannels] ${this._file} is unreadable (${err.message}); serving the seed list instead`,
-      );
-      return this._seed.map((channel) => normalizeChannel(channel));
-    }
-  }
-
-  _write(channels) {
-    // Preserve whatever could not be parsed before overwriting it, so a
-    // corrupt registry is recoverable by hand rather than lost to the fix.
-    if (this._loadState === "corrupt" && !this._corruptBackedUp) {
+    };
+    this._categorySeed.forEach(addName); this._seed.forEach((channel) => addName(channel?.category));
+    const channels = [];
+    for (const entry of this._seed) {
       try {
-        fs.copyFileSync(this._file, `${this._file}.corrupt`);
-        this._corruptBackedUp = true;
-        this._logger.warn?.(`[YoutubeChannels] Backed up the unreadable registry to ${this._file}.corrupt`);
-      } catch {
-        /* best effort — never block the repair on the backup */
+        const category = categories.find((item) => canonicalCategoryName(item.name) === canonicalCategoryName(entry?.category));
+        channels.push({ ...normalizeChannelFields(entry), categoryId: category?.id || null, addedAt: entry?.addedAt || null });
+      } catch { /* ignore malformed seed row */ }
+    }
+    return { categories, channels };
+  }
+
+  _normalizeState(parsed) {
+    const legacy = Array.isArray(parsed) || Number(parsed?.version || 1) < REGISTRY_VERSION;
+    const sourceChannels = Array.isArray(parsed) ? parsed : parsed?.channels;
+    if (!Array.isArray(sourceChannels)) throw new SyntaxError("no channels array");
+    const categories = [];
+    const addLegacyName = (value) => {
+      const name = normalizeCategoryName(value);
+      if (name && !categories.some((item) => canonicalCategoryName(item.name) === canonicalCategoryName(name))) {
+        categories.push(normalizeCategory({ name }, categories));
+      }
+    };
+    if (legacy) {
+      this._categorySeed.forEach(addLegacyName);
+      sourceChannels.forEach((channel) => addLegacyName(channel?.category));
+    } else {
+      for (const entry of parsed.categories || []) {
+        try {
+          const category = normalizeCategory(entry, categories, true);
+          if (!categories.some((item) => item.id === category.id)) categories.push(category);
+        } catch { /* skip duplicate or malformed category */ }
       }
     }
 
-    const { channels: unique, dropped } = dedupeChannels(channels);
-    if (dropped) {
-      this._logger.warn?.(`[YoutubeChannels] Dropped ${dropped} duplicate channel row(s) before saving`);
+    const channels = []; let malformed = 0; let duplicates = 0;
+    for (const entry of sourceChannels) {
+      try {
+        const fields = normalizeChannelFields(entry);
+        if (channels.some((item) => sameHandle(item.handle, fields.handle))) { duplicates += 1; continue; }
+        const categoryId = legacy
+          ? categories.find((item) => canonicalCategoryName(item.name) === canonicalCategoryName(entry?.category))?.id || null
+          : categories.some((item) => item.id === entry?.categoryId) ? entry.categoryId : null;
+        channels.push({ ...fields, categoryId, addedAt: entry?.addedAt || null });
+      } catch { malformed += 1; }
     }
-
-    const written = writeJsonAtomic(
-      this._file,
-      { version: REGISTRY_VERSION, channels: unique.slice(0, MAX_CHANNELS) },
-      this._logger,
-      "[YoutubeChannels]",
-    );
-    if (written) {
-      this._loadState = "loaded";
-      this._loadError = null;
-    }
-    return written;
+    this._needsMigration = legacy;
+    const notes = [];
+    if (legacy) notes.push("version 1 data migrated to category IDs");
+    if (malformed) notes.push(`${malformed} malformed entries skipped`);
+    if (duplicates) notes.push(`${duplicates} duplicate handles merged`);
+    this._loadState = notes.length ? "partial" : "loaded";
+    this._loadError = notes.length ? notes.join("; ") : null;
+    return { categories, channels };
   }
 
+  _read() {
+    try {
+      return this._normalizeState(JSON.parse(fs.readFileSync(this._file, "utf8")));
+    } catch (error) {
+      if (error.code === "ENOENT") {
+        this._loadState = "seeded"; this._loadError = null; this._needsMigration = false;
+        return this._seedState();
+      }
+      this._loadState = "corrupt"; this._loadError = error.message;
+      this._logger.error?.(`[YoutubeChannels] ${this._file} is unreadable (${error.message}); serving the seed list instead`);
+      return this._seedState();
+    }
+  }
+
+  _write(state) {
+    if (this._loadState === "corrupt" && !this._corruptBackedUp) {
+      try { fs.copyFileSync(this._file, `${this._file}.corrupt`); this._corruptBackedUp = true; } catch { /* best effort */ }
+    }
+    const { channels, dropped } = dedupeChannels(state.channels);
+    if (dropped) this._logger.warn?.(`[YoutubeChannels] Dropped ${dropped} duplicate channel rows before saving`);
+    const ok = writeJsonAtomic(this._file, {
+      version: REGISTRY_VERSION,
+      categories: state.categories.slice(0, MAX_CATEGORIES),
+      channels: channels.slice(0, MAX_CHANNELS),
+    }, this._logger, "[YoutubeChannels]");
+    if (ok) { this._loadState = "loaded"; this._loadError = null; this._needsMigration = false; }
+    return ok;
+  }
   _withLock(operation) {
-    return withExclusiveLock(this._file, this._lockState, operation, {
-      busyMessage: "The YouTube channel registry is busy; retry the request.",
-    });
+    return withExclusiveLock(this._file, this._lockState, operation, { busyMessage: "The YouTube source registry is busy; retry the request." });
   }
-
-  /** The tracked channels, in the order the feed and switcher should show them. */
   list() {
-    return this._read().map(({ handle, label, category, channelId }) => ({
-      handle,
-      label,
-      category,
-      channelId,
+    const state = this._read(); const byId = new Map(state.categories.map((item) => [item.id, item]));
+    return state.channels.map(({ handle, label, channelId, categoryId }) => ({
+      handle, label, channelId,
+      categoryId: categoryId || UNCATEGORIZED_ID,
+      category: byId.get(categoryId)?.name || "Uncategorized",
     }));
   }
-
-  /** Writes the seed out on first boot so the file exists to be edited. */
+  listCategories() {
+    const state = this._read(); const counts = new Map(); let other = 0;
+    const valid = new Set(state.categories.map((item) => item.id));
+    state.channels.forEach((channel) => {
+      if (!channel.categoryId || !valid.has(channel.categoryId)) other += 1;
+      else counts.set(channel.categoryId, (counts.get(channel.categoryId) || 0) + 1);
+    });
+    return state.categories.map((item) => categoryView(item, counts.get(item.id) || 0)).concat(uncategorizedView(other));
+  }
   ensureSeeded() {
     return this._withLock(() => {
-      if (fs.existsSync(this._file)) {
-        this._read();
-        return false;
-      }
-      this._write(this._read());
-      return true;
+      if (!fs.existsSync(this._file)) return this._write(this._seedState());
+      const state = this._read(); if (this._needsMigration) this._write(state); return false;
     });
   }
-
   add(input) {
     return this._withLock(() => {
-      const channel = normalizeChannel(input);
-      const channels = this._read();
-
-      const duplicate = channels.find((existing) => sameHandle(existing.handle, channel.handle));
-      if (duplicate) {
-        throw createServiceError(
-          `@${duplicate.handle} is already tracked under ${duplicate.category}`,
-          409,
-        );
-      }
-      if (channels.length >= MAX_CHANNELS) {
-        throw createServiceError(`At most ${MAX_CHANNELS} channels can be tracked`, 400);
-      }
-
+      const state = this._read(); const channel = normalizeChannel(input, state.categories);
+      if (state.channels.some((item) => sameHandle(item.handle, channel.handle))) throw createServiceError(`@${channel.handle} is already tracked`, 409);
+      if (state.channels.length >= MAX_CHANNELS) throw createServiceError(`At most ${MAX_CHANNELS} channels can be tracked`, 400);
       const stored = { ...channel, addedAt: new Date().toISOString() };
-      if (!this._write(channels.concat(stored))) {
-        throw createServiceError("Could not save the channel registry", 500);
-      }
+      if (!this._write({ ...state, channels: state.channels.concat(stored) })) throw createServiceError("Could not save the source registry", 500);
       return stored;
     });
   }
-
+  update(handleInput, input) {
+    return this._withLock(() => {
+      const state = this._read(); const index = state.channels.findIndex((item) => sameHandle(item.handle, handleInput));
+      if (index < 0) throw createServiceError(`@${normalizeHandle(handleInput)} is not tracked`, 404);
+      const updated = normalizeChannel(input, state.categories);
+      if (state.channels.some((item, i) => i !== index && sameHandle(item.handle, updated.handle))) throw createServiceError(`@${updated.handle} is already tracked`, 409);
+      const channels = state.channels.slice(); channels[index] = { ...updated, addedAt: channels[index].addedAt || null };
+      if (!this._write({ ...state, channels })) throw createServiceError("Could not save the source registry", 500);
+      return channels[index];
+    });
+  }
   remove(handleInput) {
     return this._withLock(() => {
-      const handle = normalizeHandle(handleInput);
-      const channels = this._read();
-      const existing = channels.find((channel) => sameHandle(channel.handle, handle));
-      if (!existing) throw createServiceError(`@${handle} is not tracked`, 404);
-
-      if (!this._write(channels.filter((channel) => !sameHandle(channel.handle, handle)))) {
-        throw createServiceError("Could not save the channel registry", 500);
-      }
+      const state = this._read(); const existing = state.channels.find((item) => sameHandle(item.handle, handleInput));
+      if (!existing) throw createServiceError(`@${normalizeHandle(handleInput)} is not tracked`, 404);
+      if (!this._write({ ...state, channels: state.channels.filter((item) => !sameHandle(item.handle, handleInput)) })) throw createServiceError("Could not save the source registry", 500);
       return existing;
     });
   }
-
-  /** Surfaces a registry problem instead of leaving it to be inferred. */
+  addCategory(input) {
+    return this._withLock(() => {
+      const state = this._read();
+      if (state.categories.length >= MAX_CATEGORIES) throw createServiceError(`At most ${MAX_CATEGORIES} categories can be created`, 400);
+      const category = normalizeCategory(input, state.categories);
+      if (!this._write({ ...state, categories: state.categories.concat(category) })) throw createServiceError("Could not save the source registry", 500);
+      return categoryView(category);
+    });
+  }
+  updateCategory(categoryId, input) {
+    return this._withLock(() => {
+      const state = this._read(); const index = state.categories.findIndex((item) => item.id === categoryId);
+      if (index < 0) throw createServiceError("Category not found", 404);
+      const name = normalizeCategoryName(input?.name);
+      if (!name) throw createServiceError("A category name is required", 400);
+      if (state.categories.some((item, i) => i !== index && canonicalCategoryName(item.name) === canonicalCategoryName(name))) throw createServiceError(`The category "${name}" already exists`, 409);
+      const categories = state.categories.slice(); categories[index] = { ...categories[index], name, slug: categorySlug(name) };
+      if (!this._write({ ...state, categories })) throw createServiceError("Could not save the source registry", 500);
+      return categoryView(categories[index], state.channels.filter((item) => item.categoryId === categoryId).length);
+    });
+  }
+  removeCategory(categoryId, { reassignToCategoryId } = {}) {
+    return this._withLock(() => {
+      const state = this._read(); const category = state.categories.find((item) => item.id === categoryId);
+      if (!category) throw createServiceError("Category not found", 404);
+      const assigned = state.channels.filter((item) => item.categoryId === categoryId).length;
+      let replacement = null;
+      if (assigned) {
+        if (reassignToCategoryId == null) {
+          const error = createServiceError(`${category.name} contains ${assigned} channels; choose where to move them`, 409);
+          error.code = "CATEGORY_NOT_EMPTY"; error.channelCount = assigned; throw error;
+        }
+        if (reassignToCategoryId !== UNCATEGORIZED_ID) {
+          replacement = state.categories.find((item) => item.id === reassignToCategoryId);
+          if (!replacement || replacement.id === categoryId) throw createServiceError("Choose another category or Uncategorized", 400);
+        }
+      }
+      const channels = state.channels.map((item) => item.categoryId === categoryId ? { ...item, categoryId: replacement?.id || null } : item);
+      if (!this._write({ categories: state.categories.filter((item) => item.id !== categoryId), channels })) throw createServiceError("Could not save the source registry", 500);
+      return { ...categoryView(category, assigned), reassignedToCategoryId: replacement?.id || UNCATEGORIZED_ID };
+    });
+  }
   describe() {
-    const channels = this._read();
-    return {
-      file: this._file,
-      loadState: this._loadState,
-      loadError: this._loadError,
-      channels: channels.length,
-      seedChannels: this._seed.length,
-    };
+    const state = this._read();
+    return { file: this._file, version: REGISTRY_VERSION, loadState: this._loadState, loadError: this._loadError, channels: state.channels.length, categories: state.categories.length, seedChannels: this._seed.length };
   }
 }
 
 module.exports = {
-  YoutubeChannelRegistry,
-  normalizeHandle,
-  canonicalHandle,
-  sameHandle,
-  dedupeChannels,
-  normalizeChannel,
-  HANDLE_PATTERN,
-  MAX_CHANNELS,
+  YoutubeChannelRegistry, normalizeHandle, canonicalHandle, sameHandle,
+  normalizeCategoryName, canonicalCategoryName, categorySlug, dedupeChannels,
+  normalizeChannel, HANDLE_PATTERN, MAX_CHANNELS, MAX_CATEGORIES,
+  UNCATEGORIZED_ID, REGISTRY_VERSION,
 };

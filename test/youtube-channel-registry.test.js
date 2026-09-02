@@ -25,7 +25,12 @@ const SEED = [
 
 function tempRegistry(seed = SEED) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "md-yt-channels-"));
-  const registry = new YoutubeChannelRegistry({ dataDir, seed, logger: quietLogger });
+  const registry = new YoutubeChannelRegistry({
+    dataDir,
+    seed,
+    categorySeed: ["Stocks", "Crypto", "Archaeology"],
+    logger: quietLogger,
+  });
   return { dataDir, registry, file: path.join(dataDir, "youtube-channels.json") };
 }
 
@@ -37,7 +42,7 @@ test("the static config seeds the registry once, then the file is the source of 
   assert.deepEqual(registry.list().map((c) => c.handle), ["stockmoe", "cryptosrus"]);
 
   // A second boot with a different seed must not resurrect or replace anything.
-  const reopened = new YoutubeChannelRegistry({ dataDir, seed: [], logger: quietLogger });
+  const reopened = new YoutubeChannelRegistry({ dataDir, seed: [], categorySeed: [], logger: quietLogger });
   assert.equal(reopened.ensureSeeded(), false, "an existing file is left alone");
   assert.deepEqual(reopened.list().map((c) => c.handle), ["stockmoe", "cryptosrus"]);
 });
@@ -51,7 +56,7 @@ test("adds and deletes persist across a restart", () => {
   assert.ok(added.addedAt, "the add is timestamped");
   registry.remove("stockmoe");
 
-  const reopened = new YoutubeChannelRegistry({ dataDir, seed: SEED, logger: quietLogger });
+  const reopened = new YoutubeChannelRegistry({ dataDir, seed: SEED, categorySeed: ["Stocks", "Crypto", "Archaeology"], logger: quietLogger });
   const handles = reopened.list().map((c) => c.handle);
   assert.deepEqual(handles, ["cryptosrus", "Diggers"]);
 });
@@ -62,7 +67,7 @@ test("one channel is one row, however the handle is spelled", () => {
 
   assert.throws(
     () => registry.add({ handle: "@STOCKMOE", category: "Stocks" }),
-    /already tracked under Stocks/,
+    /already tracked/,
   );
   assert.equal(registry.list().length, 2, "the rejected add saved nothing");
 
@@ -89,9 +94,45 @@ test("a malformed channel is refused rather than persisted", () => {
 });
 
 test("a blank channel ID is stored empty so the feed resolves it instead", () => {
-  const channel = normalizeChannel({ handle: "someone", category: "Stocks", channelId: "   " });
+  const channel = normalizeChannel(
+    { handle: "someone", categoryId: "category:stocks", channelId: "   " },
+    [{ id: "category:stocks", name: "Stocks" }],
+  );
   assert.equal(channel.channelId, "");
   assert.equal(channel.label, "someone", "an empty label falls back to the handle");
+});
+
+test("categories are canonical, rename centrally, and survive restart", () => {
+  const { dataDir, registry } = tempRegistry();
+  registry.ensureSeeded();
+  assert.throws(() => registry.addCategory({ name: " stocks " }), /already exists/);
+  const added = registry.addCategory({ name: "Research" });
+  registry.add({ handle: "researcher", categoryId: added.id });
+  registry.updateCategory(added.id, { name: "Deep Research" });
+  assert.equal(registry.list().find((item) => item.handle === "researcher").category, "Deep Research");
+  const reopened = new YoutubeChannelRegistry({ dataDir, seed: [], logger: quietLogger });
+  assert.equal(reopened.listCategories().find((item) => item.id === added.id).name, "Deep Research");
+});
+
+test("deleting a used category requires and applies a safe reassignment", () => {
+  const { registry } = tempRegistry();
+  registry.ensureSeeded();
+  const category = registry.addCategory({ name: "Temporary" });
+  registry.add({ handle: "temporary", categoryId: category.id });
+  assert.throws(() => registry.removeCategory(category.id), /choose where to move/);
+  registry.removeCategory(category.id, { reassignToCategoryId: "uncategorized" });
+  const channel = registry.list().find((item) => item.handle === "temporary");
+  assert.equal(channel.categoryId, "uncategorized");
+  assert.equal(channel.category, "Uncategorized");
+});
+
+test("editing a channel changes its canonical category assignment", () => {
+  const { registry } = tempRegistry();
+  registry.ensureSeeded();
+  const crypto = registry.listCategories().find((item) => item.name === "Crypto");
+  const updated = registry.update("stockmoe", { handle: "stockmoe", label: "Stock Moe", categoryId: crypto.id });
+  assert.equal(updated.categoryId, crypto.id);
+  assert.equal(registry.list().find((item) => item.handle === "stockmoe").category, "Crypto");
 });
 
 test("removing a channel that is not tracked is a 404, not a silent success", () => {
@@ -131,4 +172,23 @@ test("one bad row does not take the readable rows down with it", () => {
 
   assert.deepEqual(registry.list().map((c) => c.handle), ["stockmoe", "cryptosrus"]);
   assert.equal(registry.describe().loadState, "partial");
+});
+
+test("version 1 category strings migrate without losing custom or Test data", () => {
+  const { dataDir, file } = tempRegistry();
+  fs.writeFileSync(file, JSON.stringify({
+    version: 1,
+    channels: [
+      { handle: "testerone", label: "Tester One", category: " Test " },
+      { handle: "testertwo", label: "Tester Two", category: "test" },
+      { handle: "customdesk", label: "Custom Desk", category: "Custom" },
+    ],
+  }));
+  const registry = new YoutubeChannelRegistry({ dataDir, seed: SEED, categorySeed: ["Stocks", "Crypto"], logger: quietLogger });
+  assert.equal(registry.ensureSeeded(), false);
+  const stored = JSON.parse(fs.readFileSync(file, "utf8"));
+  assert.equal(stored.version, 2);
+  assert.equal(stored.categories.filter((category) => category.name.toLowerCase() === "test").length, 1);
+  assert.equal(registry.list().filter((channel) => channel.category === "Test").length, 2);
+  assert.ok(registry.listCategories().some((category) => category.name === "Custom"));
 });

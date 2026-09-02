@@ -42,6 +42,7 @@ const { createTelegramRouter } = require("./routes/telegram");
 const { createYoutubeRouter } = require("./routes/youtube");
 const { createXFeedRouter } = require("./routes/x-feed");
 const { resolveYoutubeChannels } = require("./config/youtube-channels");
+const { themeSections } = require("./config/youtube-themes");
 const { XAccountRegistry } = require("./services/x-account-registry");
 const { XTemplateRegistry } = require("./services/x-template-registry");
 const { TOP_TOKENS } = require("./config/market-symbols");
@@ -177,6 +178,7 @@ function createApp() {
   const youtubeChannelRegistry = new YoutubeChannelRegistry({
     dataDir,
     seed: resolveYoutubeChannels(config.youtube.channelIds),
+    categorySeed: themeSections(),
   });
   youtubeChannelRegistry.ensureSeeded();
   const youtubeChannels = youtubeChannelRegistry.list();

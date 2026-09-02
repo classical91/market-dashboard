@@ -593,6 +593,7 @@ class YouTubeIntelligenceService {
           handle: channel.handle,
           label: channel.label,
           category: channel.category,
+          categoryId: channel.categoryId,
           reason,
           // Safe by construction: SAFE_MESSAGES text only, never the detail.
           error: SAFE_MESSAGES[reason] || "Failed to load feed",
@@ -601,6 +602,7 @@ class YouTubeIntelligenceService {
           handle: channel.handle,
           label: channel.label,
           category: channel.category,
+          categoryId: channel.categoryId,
           reason,
           error: SAFE_MESSAGES[reason] || "Failed to load feed",
         });
@@ -624,6 +626,7 @@ class YouTubeIntelligenceService {
           channelHandle: channel.handle,
           channelLabel: channel.label,
           channelCategory: channel.category,
+          channelCategoryId: channel.categoryId,
         };
       });
 
@@ -631,6 +634,7 @@ class YouTubeIntelligenceService {
         handle: channel.handle,
         label: channel.label,
         category: channel.category,
+        categoryId: channel.categoryId,
         channelId: feed.channelId,
         title: feed.title,
         source: feed.source,
