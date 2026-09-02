@@ -192,13 +192,14 @@ function isTradingLabMachineReadRequest(req, adminKey) {
 // same shape of caller the Trading Lab exemption above exists for.
 //
 // As narrow as it is possible to be, because an admin key is a read credential
-// for one endpoint here and not a second owner session:
+// for two verification endpoints here and not a second owner session:
 //
 //   - GET/HEAD only. Nothing that runs a cycle, spends provider credits or
 //     posts to Telegram can travel this way.
-//   - One exact path. `/api/newsroom/cycles`, `/api/newsroom/cycles/:id`,
-//     `/api/newsroom/preflight` and every POST stay behind the owner session
-//     (and, for the writes, the admin guard on the route itself).
+//   - Two exact paths: health, which Agent Office reads, and preflight, which
+//     verifies configuration and the external agent identity without running a
+//     cycle or spending provider credits. Cycle reads and every POST stay
+//     behind the owner session (and, for writes, the route's admin guard).
 //   - Header only. No `?key=` form, because keys in URLs end up in browser
 //     history, proxy logs and referrers — /health is read by a server, which
 //     can always set a header.
@@ -206,12 +207,15 @@ function isTradingLabMachineReadRequest(req, adminKey) {
 // GET /health is safe to expose this way: it carries identifiers, statuses,
 // counts and the provider's own error text, and never a credential, a prompt
 // body or report content. See docs/newsroom-cycles.md.
-const NEWSROOM_HEALTH_PATH = "/api/newsroom/health";
+const NEWSROOM_MACHINE_READ_PATHS = new Set([
+  "/api/newsroom/health",
+  "/api/newsroom/preflight",
+]);
 
 function isNewsroomHealthMachineReadRequest(req, adminKey) {
   if (req.method !== "GET" && req.method !== "HEAD") return false;
   const path = req.path.length > 1 && req.path.endsWith("/") ? req.path.slice(0, -1) : req.path;
-  if (path !== NEWSROOM_HEALTH_PATH) return false;
+  if (!NEWSROOM_MACHINE_READ_PATHS.has(path)) return false;
   return isAdminRequest(req, adminKey);
 }
 

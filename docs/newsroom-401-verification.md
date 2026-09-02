@@ -303,7 +303,8 @@ anything.
    curl -s "$BASE/api/newsroom/preflight" -H "x-admin-key: $ADMIN_API_KEY" | jq
    ```
 
-   This generates nothing, sends nothing and spends nothing. A passing
+   This exact GET accepts the admin key without a browser session. It generates
+   nothing, sends nothing and spends nothing. A passing
    `external-agent-route` check is the evidence; a `fail` carrying
    `provider_user_not_found` is the failure still reproducing.
 

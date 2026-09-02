@@ -28,14 +28,14 @@ delete process.env.TELEGRAM_CHAT_IDS;
 const { createApp } = require("../src/app");
 
 const HEALTH = "/api/newsroom/health";
+const PREFLIGHT = "/api/newsroom/preflight";
 
 // Everything else the newsroom exposes. None of it may be reachable with the
-// health credential: cycle detail carries report text, preflight names
-// configuration, and the two POSTs spend provider credits and post to Telegram.
+// verification credential: cycle detail carries report text, and the two POSTs
+// spend provider credits or post to Telegram.
 const CLOSED_READS = [
   "/api/newsroom/cycles",
   "/api/newsroom/cycles/cyc_anything",
-  "/api/newsroom/preflight",
 ];
 const CLOSED_WRITES = [
   ["POST", "/api/newsroom/cycles/run"],
@@ -83,6 +83,18 @@ test("a valid admin key reads newsroom health", async () => {
   assert.equal(head.status, 200);
 });
 
+test("a valid admin key runs the read-only newsroom preflight", async () => {
+  const res = await fetch(`${base}${PREFLIGHT}`, { headers: adminHeaders });
+  assert.equal(res.status, 200);
+
+  const body = await res.json();
+  assert.equal(body.ok, false, "missing test credentials make the preflight fail closed");
+  assert.ok(Array.isArray(body.checks));
+
+  const head = await fetch(`${base}${PREFLIGHT}`, { method: "HEAD", headers: adminHeaders });
+  assert.equal(head.status, 200);
+});
+
 test("anonymous and wrong-key callers stay locked out of health", async () => {
   const anonymous = await fetch(`${base}${HEALTH}`);
   assert.equal(anonymous.status, 401, "site login still guards health for a browser with no session");
@@ -108,7 +120,7 @@ test("the key cannot travel in the query string", async () => {
   }
 });
 
-test("the health key does not open the rest of the newsroom API", async () => {
+test("the verification key does not open the rest of the newsroom API", async () => {
   for (const target of CLOSED_READS) {
     const res = await fetch(`${base}${target}`, { headers: adminHeaders });
     assert.equal(res.status, 401, `${target} must stay behind the owner session`);
