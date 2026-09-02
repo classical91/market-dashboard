@@ -25,6 +25,11 @@ function freshReporter() {
   return { service, logFile: path.join(dataDir, "reporter-generation-log.json") };
 }
 
+test("the Reporter Room exposes the four newsroom desks", () => {
+  const { service } = freshReporter();
+  assert.deepEqual(service.sections, ["geopolitics", "economics", "markets", "crypto"]);
+});
+
 // The log keeps one entry per section per day, so a test that wants many
 // surviving entries has to vary the day key, not just the timestamp.
 function entry(section, generatedAt, generatedDateKey = "2026-08-25") {

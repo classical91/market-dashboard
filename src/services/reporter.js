@@ -6,7 +6,9 @@ const { resolveDataDir } = require("../utils/data-dir");
 const { withExclusiveLock, writeJsonAtomic } = require("./json-file-lock");
 
 const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000;
-const REPORT_SECTIONS = ["crypto", "economics", "markets"];
+// Keep `markets` as the stored/API key for backward compatibility, while the
+// studio presents it as Stocks. Renaming the key would orphan saved reports.
+const REPORT_SECTIONS = ["geopolitics", "economics", "markets", "crypto"];
 
 // Why a cycle delivery can refuse to send. These are error codes on a stored
 // failure, so they are part of the operational contract and are exported for
@@ -15,9 +17,10 @@ const GENERATION_REFERENCE_MISSING = "generation_reference_missing";
 const GENERATION_REFERENCE_AMBIGUOUS = "generation_reference_ambiguous";
 const GENERATION_REFERENCE_INVALID = "generation_reference_invalid";
 const SECTION_LABELS = {
-  crypto: "Emerging Markets",
+  geopolitics: "Geopolitics Top 10",
   economics: "Economics Top 10",
-  markets: "Markets Top 10",
+  markets: "Stocks Top 10",
+  crypto: "Crypto Top 10",
 };
 
 const SYSTEM_PROMPT =
@@ -58,7 +61,8 @@ function isGeneratedToday(entry) {
 }
 
 function normalizeSection(section) {
-  return REPORT_SECTIONS.includes(section) ? section : "crypto";
+  const normalized = section === "stocks" ? "markets" : section;
+  return REPORT_SECTIONS.includes(normalized) ? normalized : "crypto";
 }
 
 function logEntryDayKey(entry) {
@@ -219,6 +223,26 @@ FORMAT RULES (STRICT):
 GOAL: concise, globally balanced daily economics snapshot.`;
 }
 
+function geopoliticsPrompt(dateStr) {
+  return `🗓️🌍 ${dateStr}
+TOP 10 GEOPOLITICAL DEVELOPMENTS BRIEF (LAST 24-48 HOURS)
+
+Search for current, verified geopolitical developments from the last 24-48 hours and produce a globally balanced TOP 10 report.
+
+PRIORITIZE:
+- Active conflicts, ceasefires, sanctions, and diplomatic negotiations
+- Material changes in alliances, defense posture, or security policy
+- Trade restrictions, energy-security events, and shipping disruptions
+- Elections or government decisions with international consequences
+
+RULES:
+- Output exactly 10 stories.
+- Use a bold numbered heading: **#[N] [REGION] — [HEADLINE]**
+- Add 2-3 short hyphen bullets: what happened, why it matters, and what to watch.
+- Separate confirmed facts from analysis; do not speculate or make market calls.
+- Avoid duplicating the same event from multiple sources.`;
+}
+
 function marketsPrompt(dateStr) {
   return `🗓️ ${dateStr}
 
@@ -244,6 +268,7 @@ Rules:
 }
 
 function promptForSection(section, dateStr) {
+  if (section === "geopolitics") return geopoliticsPrompt(dateStr);
   if (section === "economics") return economicsPrompt(dateStr);
   if (section === "markets") return marketsPrompt(dateStr);
   return cryptoPrompt(dateStr);
@@ -333,7 +358,7 @@ class ReporterService {
    * Serialize a read-modify-write of the generation log.
    *
    * Two sections generating at once — which is the normal case, since a cycle
-   * fans out across crypto, economics and markets — would otherwise each read
+   * fans out across the newsroom desks — would otherwise each read
    * the same log, prepend their own entry, and write back, so whichever
    * finished last silently dropped the other's entry.
    */

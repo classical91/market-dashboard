@@ -29,6 +29,7 @@ const REPORT_CATEGORIES = [
   { key: "crypto", newsType: "Crypto" },
   { key: "markets", newsType: "Stock" },
   { key: "economics", newsType: "Economics" },
+  { key: "geopolitics", newsType: "Geopolitics" },
 ];
 
 /**

@@ -373,7 +373,7 @@ class TelegramService {
   /**
    * Send one Daily Reporter section as its own categorized broadcast.
    *
-   * This replaces the old aggregate postReport(), which merged all three
+   * This replaces the old aggregate postReport(), which merged every
    * sections into one result set spanning every configured chat. That shape
    * could not express what the ledger now has to record: which destinations
    * received *this category*. Merging across sections meant a receipt naming
@@ -385,12 +385,13 @@ class TelegramService {
    */
   async postReportSection({ newsType, text, date = "", targets = null }) {
     const headings = {
+      Geopolitics: ["🌍", "GEOPOLITICS TOP 10"],
       Crypto: ["₿", "CRYPTO TOP 10"],
-      Stock: ["📊", "MARKETS TOP 10"],
-      Economics: ["🌍", "ECONOMICS TOP 10"],
+      Stock: ["📈", "STOCKS TOP 10"],
+      Economics: ["🏦", "ECONOMICS TOP 10"],
     };
     const heading = headings[newsType];
-    if (!heading) throw createServiceError("Reporter newsType must be Crypto, Stock, or Economics", 400);
+    if (!heading) throw createServiceError("Reporter newsType must be Geopolitics, Economics, Stock, or Crypto", 400);
     const body = String(text || "").trim();
     if (!body) throw createServiceError("Nothing to send: text is empty", 400);
 

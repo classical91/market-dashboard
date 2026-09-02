@@ -1,6 +1,6 @@
 "use strict";
 
-// The Daily Reporter used to send all three sections as one aggregate blast and
+// The Daily Reporter used to send every section as one aggregate blast and
 // write one receipt spanning every configured chat. That receipt could name
 // destinations a given category never reached, and the category itself existed
 // only in the message heading. These pin the per-category replacement: one
@@ -16,7 +16,11 @@ const express = require("express");
 
 const { createReporterRouter } = require("../src/routes/reporter");
 const { BroadcastLedgerStore } = require("../src/services/broadcast-ledger");
-const { FINANCE_NEWS_DESTINATIONS, destinationsForNewsType } = require("../src/services/news-routing");
+const {
+  FINANCE_NEWS_DESTINATIONS,
+  GEOPOLITICS_DESTINATIONS,
+  destinationsForNewsType,
+} = require("../src/services/news-routing");
 
 const DEFAULT_CHATS = [
   { chatId: "-100111", threadId: "1" },
@@ -57,6 +61,7 @@ function report(overrides = {}) {
     configured: true,
     dateStr: "2026-08-23",
     generatedAt: "2026-08-23T06:00:00.000Z",
+    geopolitics: "geopolitics body",
     crypto: "crypto body",
     economics: "economics body",
     markets: "markets body",
@@ -107,10 +112,10 @@ test("each section is sent once, as its own category", async () => {
     const res = await broadcast(base);
     assert.equal(res.status, 200);
 
-    assert.deepEqual(telegramService.calls.map((c) => c.newsType), ["Crypto", "Stock", "Economics"]);
+    assert.deepEqual(telegramService.calls.map((c) => c.newsType), ["Crypto", "Stock", "Economics", "Geopolitics"]);
     assert.deepEqual(
       telegramService.calls.map((c) => c.text),
-      ["crypto body", "markets body", "economics body"],
+      ["crypto body", "markets body", "economics body", "geopolitics body"],
       "the reporter's `markets` section is the Stock category",
     );
   });
@@ -120,16 +125,17 @@ test("each category gets its own receipt naming only its own destinations", asyn
   await withReporterApp(async ({ base, store }) => {
     const body = await (await broadcast(base)).json();
 
-    assert.equal(body.receipts.length, 3);
-    assert.deepEqual(body.receipts.map((r) => r.newsType), ["Crypto", "Stock", "Economics"]);
+    assert.equal(body.receipts.length, 4);
+    assert.deepEqual(body.receipts.map((r) => r.newsType), ["Crypto", "Stock", "Economics", "Geopolitics"]);
     assert.ok(body.receipts.every((r) => r.status === "posted"), JSON.stringify(body.receipts));
 
     for (const summary of body.receipts) {
       const receipt = store.getReceipt(summary.id);
       assert.equal(receipt.newsType, summary.newsType);
+      const expected = summary.newsType === "Geopolitics" ? GEOPOLITICS_DESTINATIONS : FINANCE_NEWS_DESTINATIONS;
       assert.deepEqual(
         receipt.destinations.map((d) => ({ chatId: d.chatId, threadId: d.threadId })),
-        FINANCE_NEWS_DESTINATIONS.map((d) => ({ chatId: d.chatId, threadId: d.threadId })),
+        expected.map((d) => ({ chatId: d.chatId, threadId: d.threadId })),
         "a receipt must name the destinations that category actually reached",
       );
     }
@@ -155,7 +161,7 @@ test("only sections with content are sent", async () => {
       await broadcast(base);
       assert.deepEqual(telegramService.calls.map((c) => c.newsType), ["Crypto"]);
     },
-    { current: report({ economics: "", markets: "" }) },
+    { current: report({ geopolitics: "", economics: "", markets: "" }) },
   );
 });
 
@@ -206,11 +212,11 @@ test("re-broadcasting the same report does not resend a category that already po
 
   try {
     await broadcast(base);
-    assert.equal(telegramService.calls.length, 3);
+    assert.equal(telegramService.calls.length, 4);
 
     const second = await (await broadcast(base)).json();
-    assert.equal(telegramService.calls.length, 3, "no category may be sent twice under the same key");
-    assert.equal(second.receipts.length, 3, "the existing receipts are still reported back");
+    assert.equal(telegramService.calls.length, 4, "no category may be sent twice under the same key");
+    assert.equal(second.receipts.length, 4, "the existing receipts are still reported back");
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }

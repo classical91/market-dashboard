@@ -196,6 +196,18 @@
   };
 
   var DEFAULT_REPORTER_PROMPTS = {
+    geopolitics:
+`{date}
+TOP 10 GEOPOLITICAL DEVELOPMENTS BRIEF (LAST 24-48 HOURS)
+
+Search for current, verified geopolitical developments and produce a globally balanced TOP 10 report.
+
+Rules:
+- Output exactly 10 stories.
+- Prioritize conflicts, diplomacy, sanctions, defense, trade restrictions, energy security, and shipping disruptions.
+- Use a bold numbered heading and 2-3 short hyphen bullets per story.
+- Separate confirmed facts from analysis and do not make market calls.
+- Avoid duplicating the same event from multiple sources.`,
     crypto:
 `{date}
 TOP 10 EMERGING / TRENDING CRYPTO TOKENS

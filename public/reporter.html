@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Daily Reporter · Market Command</title>
+  <title>Reporter Room · Market Command</title>
   <script src="/assets/js/settings.js"></script>
   <link rel="stylesheet" href="/assets/styles/command.css" />
   <style>
@@ -35,6 +35,119 @@
     .reporter-broadcast-status.ok { color: var(--green); }
     .reporter-actions {
       display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+    .newsroom-overview {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 300px;
+      gap: 18px;
+      margin: 0 0 24px;
+      animation: newsroom-enter 0.35s ease-out both;
+    }
+    .newsroom-main,
+    .shareclaw-panel {
+      background: rgba(9,14,24,0.72);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      backdrop-filter: blur(14px);
+    }
+    .newsroom-main { padding: 18px; }
+    .newsroom-section-head,
+    .shareclaw-head,
+    .master-news-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+    }
+    .newsroom-kicker {
+      color: var(--amber);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+    }
+    .newsroom-heading {
+      color: var(--text);
+      font-size: 16px;
+      font-weight: 800;
+      margin-top: 3px;
+    }
+    .newsroom-read-note { color: var(--muted); font-size: 11px; text-align: right; }
+    .desk-status-list { display: grid; margin-top: 14px; }
+    .desk-status {
+      appearance: none;
+      background: transparent;
+      border: 0;
+      border-top: 1px solid var(--border);
+      color: inherit;
+      cursor: pointer;
+      display: grid;
+      grid-template-columns: 28px minmax(120px, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      padding: 11px 2px;
+      text-align: left;
+      transition: background 0.15s ease, padding 0.15s ease;
+    }
+    .desk-status:first-child { border-top: 0; }
+    .desk-status:hover { background: rgba(255,255,255,0.035); padding-left: 8px; padding-right: 8px; }
+    .desk-status-icon { font-size: 17px; text-align: center; }
+    .desk-status-name { color: var(--text); display: block; font-size: 13px; font-weight: 700; }
+    .desk-status-meta { color: var(--muted); display: block; font-size: 11px; margin-top: 2px; }
+    .desk-status-state { color: var(--dim); font-size: 11px; font-weight: 700; white-space: nowrap; }
+    .desk-status-state.ready { color: var(--green); }
+    .master-news { border-top: 1px solid var(--border); margin-top: 8px; padding-top: 17px; }
+    .master-news-title { color: var(--text); font-size: 15px; font-weight: 800; }
+    .master-news-title span { color: var(--amber); }
+    .master-toggle { display: inline-flex; gap: 3px; padding: 3px; border: 1px solid var(--border); border-radius: 10px; }
+    .master-toggle button {
+      background: transparent; border: 0; border-radius: 7px; color: var(--muted);
+      cursor: pointer; font: inherit; font-size: 10px; font-weight: 800; padding: 5px 8px;
+    }
+    .master-toggle button.active { background: var(--amber-bg); color: var(--amber); }
+    .master-news-list { display: grid; gap: 2px; margin-top: 10px; }
+    .master-story {
+      appearance: none; background: transparent; border: 0; border-radius: 9px;
+      color: inherit; cursor: pointer; display: grid; grid-template-columns: 24px minmax(0,1fr) auto;
+      gap: 9px; align-items: start; padding: 8px; text-align: left; transition: background 0.15s;
+    }
+    .master-story:hover { background: rgba(245,197,66,0.06); }
+    .master-rank { color: var(--amber); font-size: 11px; font-weight: 900; padding-top: 1px; }
+    .master-story-title { color: var(--soft); font-size: 12px; font-weight: 650; line-height: 1.4; }
+    .master-story-desk { color: var(--muted); font-size: 9px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+    .master-empty { color: var(--muted); font-size: 12px; padding: 14px 8px 4px; }
+    .shareclaw-panel { padding: 18px; align-self: start; }
+    .shareclaw-title { color: var(--text); font-size: 15px; font-weight: 800; }
+    .shareclaw-state { color: var(--muted); display: flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 700; }
+    .shareclaw-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dim); }
+    .shareclaw-state.online { color: var(--green); }
+    .shareclaw-state.online .shareclaw-dot { background: var(--green); box-shadow: 0 0 0 4px rgba(0,227,150,0.1); animation: status-pulse 2.4s ease-out infinite; }
+    .shareclaw-times { display: grid; gap: 8px; border-top: 1px solid var(--border); margin-top: 14px; padding-top: 14px; }
+    .shareclaw-time { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 11px; }
+    .shareclaw-time strong { color: var(--soft); font-weight: 700; text-align: right; }
+    .shareclaw-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 17px 0; }
+    .shareclaw-metric { border-left: 1px solid var(--border); padding-left: 10px; }
+    .shareclaw-metric-value { color: var(--text); font-size: 18px; font-weight: 800; }
+    .shareclaw-metric-label { color: var(--muted); font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; }
+    .shareclaw-run { width: 100%; justify-content: center; margin: 0; }
+    .shareclaw-note { color: var(--muted); font-size: 10px; line-height: 1.5; margin-top: 9px; text-align: center; }
+    .shareclaw-message { color: var(--muted); font-size: 11px; line-height: 1.45; margin-top: 10px; min-height: 16px; }
+    .shareclaw-message.error { color: var(--red); }
+    .shareclaw-message.ok { color: var(--green); }
+    @keyframes newsroom-enter { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes status-pulse { 0%, 100% { box-shadow: 0 0 0 4px rgba(0,227,150,0.08); } 50% { box-shadow: 0 0 0 7px rgba(0,227,150,0); } }
+    @media (max-width: 900px) {
+      .newsroom-overview { grid-template-columns: 1fr; }
+      .shareclaw-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; }
+      .shareclaw-head { grid-column: 1 / -1; }
+    }
+    @media (max-width: 620px) {
+      .newsroom-overview { margin-left: -4px; margin-right: -4px; }
+      .newsroom-main, .shareclaw-panel { padding: 14px; }
+      .shareclaw-panel { display: block; }
+      .newsroom-read-note { display: none; }
+      .desk-status { grid-template-columns: 26px minmax(0,1fr); }
+      .desk-status-state { grid-column: 2; }
     }
     .reporter-log {
       display: none;
@@ -116,6 +229,7 @@
       cursor: default;
     }
     .reporter-log-item.crypto .reporter-log-label { color: var(--purple); }
+    .reporter-log-item.geopolitics .reporter-log-label { color: var(--amber); }
     .reporter-log-item.economics .reporter-log-label { color: var(--blue); }
     .reporter-log-item.markets .reporter-log-label { color: var(--teal); }
     .reporter-log-name {
@@ -252,6 +366,10 @@
       background: linear-gradient(180deg, var(--purple-bg), rgba(155,123,255,0.03)), var(--surface);
       border-color: rgba(155,123,255,0.3);
     }
+    .story--geopolitics {
+      background: linear-gradient(180deg, var(--amber-bg), rgba(245,197,66,0.025)), var(--surface);
+      border-color: rgba(245,197,66,0.28);
+    }
     .story--economics {
       background: linear-gradient(180deg, var(--blue-bg), rgba(77,163,255,0.03)), var(--surface);
       border-color: rgba(77,163,255,0.3);
@@ -325,6 +443,7 @@
     @media (prefers-reduced-motion: reduce) {
       body.crypto-bg { animation: none; }
       .crypto-bg-decor span { animation: none; }
+      .newsroom-overview, .shareclaw-state.online .shareclaw-dot { animation: none; }
     }
 
     /* App content sits above the fixed decor layer. */
@@ -338,10 +457,56 @@
 
     <div class="cmd-page-header">
       <div>
-        <div class="cmd-page-title" id="reporterPageTitle">📰 Daily News Reporter</div>
-        <div class="cmd-page-subtitle" id="reporterPageSubtitle">AI-generated briefing &middot; generated on demand</div>
+        <div class="cmd-page-title" id="reporterPageTitle">📰 Reporter Room</div>
+        <div class="cmd-page-subtitle" id="reporterPageSubtitle">Newsroom archive, monitoring and manual control</div>
       </div>
     </div>
+
+    <section class="newsroom-overview" id="newsroomOverview" aria-label="Reporter Room overview">
+      <div class="newsroom-main">
+        <div class="newsroom-section-head">
+          <div>
+            <div class="newsroom-kicker">News desks</div>
+            <div class="newsroom-heading">Latest saved briefings</div>
+          </div>
+          <div class="newsroom-read-note">Read-only on page load<br>No AI generation</div>
+        </div>
+        <div class="desk-status-list" id="deskStatusList" aria-live="polite"></div>
+
+        <div class="master-news">
+          <div class="master-news-head">
+            <div class="master-news-title"><span>🔥</span> Master News</div>
+            <div class="master-toggle" aria-label="Master News story count">
+              <button class="active" type="button" data-master-limit="5">Top 5</button>
+              <button type="button" data-master-limit="10">Top 10</button>
+            </div>
+          </div>
+          <div class="master-news-list" id="masterNewsList"></div>
+        </div>
+      </div>
+
+      <aside class="shareclaw-panel" aria-label="ShareClaw status">
+        <div class="shareclaw-head">
+          <div class="shareclaw-title">🤖 ShareClaw</div>
+          <div class="shareclaw-state" id="shareclawState"><span class="shareclaw-dot"></span><span>Checking</span></div>
+        </div>
+        <div class="shareclaw-times">
+          <div class="shareclaw-time"><span>Last run</span><strong id="shareclawLastRun">—</strong></div>
+          <div class="shareclaw-time"><span>Next run</span><strong id="shareclawNextRun">—</strong></div>
+        </div>
+        <div class="shareclaw-metrics">
+          <div class="shareclaw-metric"><div class="shareclaw-metric-value" id="metricSources">—</div><div class="shareclaw-metric-label">Cited sources</div></div>
+          <div class="shareclaw-metric"><div class="shareclaw-metric-value" id="metricCandidates">0</div><div class="shareclaw-metric-label">Candidates</div></div>
+          <div class="shareclaw-metric"><div class="shareclaw-metric-value" id="metricDuplicates">0</div><div class="shareclaw-metric-label">Duplicates removed</div></div>
+          <div class="shareclaw-metric"><div class="shareclaw-metric-value" id="metricStories">0</div><div class="shareclaw-metric-label">Final stories</div></div>
+          <div class="shareclaw-metric"><div class="shareclaw-metric-value" id="metricDesks">0/4</div><div class="shareclaw-metric-label">Desks ready</div></div>
+          <div class="shareclaw-metric"><div class="shareclaw-metric-value" id="metricCycles">0</div><div class="shareclaw-metric-label">Runs tracked</div></div>
+        </div>
+        <button class="open-all-btn shareclaw-run" id="shareclawRunBtn" type="button">⚡ Run Now</button>
+        <div class="shareclaw-note">Generates and saves all desks. It never broadcasts.</div>
+        <div class="shareclaw-message" id="shareclawMessage" aria-live="polite"></div>
+      </aside>
+    </section>
 
     <!-- Date + generated-at badges -->
     <div class="reporter-header-row" id="reporterHeaderRow" style="display:none">
@@ -356,9 +521,10 @@
 
     <!-- Tabs -->
     <div class="reporter-tabs" id="reporterTabs">
-      <button class="reporter-tab active" data-tab="crypto">₿ Crypto Top 10</button>
-      <button class="reporter-tab" data-tab="economics">🌍 Economics Top 10</button>
-      <button class="reporter-tab" data-tab="markets">📊 Markets Top 10</button>
+      <button class="reporter-tab active" data-tab="geopolitics">🌍 Geopolitics</button>
+      <button class="reporter-tab" data-tab="economics">🏦 Economics</button>
+      <button class="reporter-tab" data-tab="markets">📈 Stocks</button>
+      <button class="reporter-tab" data-tab="crypto">₿ Crypto</button>
     </div>
 
     <div class="reporter-link-row" id="reporterExternalLinks"></div>
@@ -394,20 +560,29 @@
       markets: '/markets-top-10.html'
     };
     var fixedSection = pageSections[window.location.pathname] || '';
-    var activeTab = fixedSection || 'crypto';
+    var activeTab = fixedSection || 'geopolitics';
+    var sectionOrder = ['geopolitics', 'economics', 'markets', 'crypto'];
+    var masterLimit = 5;
     var reportData = null;
     var generationLogEntries = [];
     var localLogKey = 'reporterGenerationLog:v1';
     var localLogSynced = false;
     var tabLabels = {
-      crypto: 'Emerging Markets',
+      geopolitics: 'Geopolitics Top 10',
       economics: 'Economics Top 10',
-      markets: 'Markets Top 10'
+      markets: 'Stocks Top 10',
+      crypto: 'Crypto Top 10'
+    };
+    var deskMeta = {
+      geopolitics: { icon: '🌍', short: 'Geopolitics' },
+      economics: { icon: '🏦', short: 'Economics' },
+      markets: { icon: '📈', short: 'Stocks' },
+      crypto: { icon: '₿', short: 'Crypto' }
     };
     var pageTitles = {
       crypto: '🚀 Emerging Markets',
       economics: '🌍 Economics Top 10',
-      markets: '📊 Markets Top 10'
+      markets: '📈 Stocks Top 10'
     };
     var pageSubtitles = {
       crypto: 'Trending tokens briefing · generated on demand',
@@ -454,6 +629,125 @@
           return '<div class="' + cardClass + '">' + html + '</div>';
         })
         .join('');
+    }
+
+    function splitStoryBlocks(text) {
+      return String(text || '').split(/\n{2,}/).map(function (block) {
+        return block.trim();
+      }).filter(Boolean);
+    }
+
+    function storyTitle(block) {
+      var line = String(block || '').split('\n').map(function (item) {
+        return item.trim();
+      }).find(function (item) { return item && !item.startsWith('- '); }) || 'Saved story';
+      return line.replace(/^\*\*|\*\*$/g, '').replace(/^#+\s*/, '').slice(0, 150);
+    }
+
+    function titleTokens(block) {
+      var ignored = { the: true, and: true, for: true, with: true, from: true, this: true, that: true };
+      return storyTitle(block).toLowerCase()
+        .replace(/#[0-9]+/g, ' ')
+        .replace(/[^a-z0-9]+/g, ' ')
+        .split(/\s+/)
+        .filter(function (token) { return token.length > 2 && !ignored[token]; });
+    }
+
+    function isNearDuplicate(block, accepted) {
+      var tokens = titleTokens(block);
+      if (!tokens.length) return false;
+      return accepted.some(function (story) {
+        var other = titleTokens(story.block);
+        var union = {};
+        tokens.concat(other).forEach(function (token) { union[token] = true; });
+        var overlap = tokens.filter(function (token) { return other.indexOf(token) !== -1; }).length;
+        return overlap / Math.max(Object.keys(union).length, 1) >= 0.62;
+      });
+    }
+
+    function masterStories(data) {
+      var byDesk = {};
+      sectionOrder.forEach(function (section) {
+        byDesk[section] = splitStoryBlocks(data && data[section]);
+      });
+      var candidates = [];
+      for (var rank = 0; rank < 10; rank += 1) {
+        sectionOrder.forEach(function (section) {
+          if (byDesk[section][rank]) candidates.push({ section: section, block: byDesk[section][rank] });
+        });
+      }
+      var stories = [];
+      candidates.forEach(function (story) {
+        if (!isNearDuplicate(story.block, stories)) stories.push(story);
+      });
+      stories.candidateCount = candidates.length;
+      stories.duplicatesRemoved = candidates.length - stories.length;
+      return stories;
+    }
+
+    function shortTimestamp(iso) {
+      if (!iso) return 'Not generated';
+      var ts = new Date(iso);
+      if (Number.isNaN(ts.getTime())) return 'Saved';
+      return 'Updated ' + ts.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    }
+
+    function renderDeskStatus(data) {
+      var el = document.getElementById('deskStatusList');
+      if (!el) return;
+      var generated = data && data.generatedAtBySection || {};
+      el.innerHTML = sectionOrder.map(function (section) {
+        var meta = deskMeta[section];
+        var ready = Boolean(data && data[section]);
+        return '<button class="desk-status" type="button" data-desk-section="' + section + '">' +
+          '<span class="desk-status-icon" aria-hidden="true">' + meta.icon + '</span>' +
+          '<span><span class="desk-status-name">' + esc(meta.short) + '</span>' +
+          '<span class="desk-status-meta">' + esc(shortTimestamp(generated[section])) + '</span></span>' +
+          '<span class="desk-status-state' + (ready ? ' ready' : '') + '">' + (ready ? '✓ Ready' : '○ Waiting') + '</span>' +
+          '</button>';
+      }).join('');
+    }
+
+    function currentSourceCount(data) {
+      var times = data && data.generatedAtBySection || {};
+      var urls = {};
+      (data && data.generationLog || []).forEach(function (entry) {
+        if (!entry || !entry.section || times[entry.section] !== entry.generatedAt) return;
+        (entry.sources || []).forEach(function (source) {
+          var key = source && (source.url || source.title);
+          if (key) urls[key] = true;
+        });
+      });
+      return Object.keys(urls).length;
+    }
+
+    function renderMasterNews(data) {
+      var el = document.getElementById('masterNewsList');
+      if (!el) return;
+      var all = masterStories(data);
+      var stories = all.slice(0, masterLimit);
+      if (!stories.length) {
+        el.innerHTML = '<div class="master-empty">Master News appears when saved desk reports are available.</div>';
+      } else {
+        el.innerHTML = stories.map(function (story, index) {
+          var meta = deskMeta[story.section];
+          return '<button class="master-story" type="button" data-master-section="' + story.section + '">' +
+            '<span class="master-rank">' + String(index + 1).padStart(2, '0') + '</span>' +
+            '<span class="master-story-title">' + applyBold(storyTitle(story.block)) + '</span>' +
+            '<span class="master-story-desk">' + esc(meta.short) + '</span></button>';
+        }).join('');
+      }
+      var ready = sectionOrder.filter(function (section) { return Boolean(data && data[section]); }).length;
+      var deskMetric = document.getElementById('metricDesks');
+      var storyMetric = document.getElementById('metricStories');
+      var sourceMetric = document.getElementById('metricSources');
+      var candidateMetric = document.getElementById('metricCandidates');
+      var duplicateMetric = document.getElementById('metricDuplicates');
+      if (deskMetric) deskMetric.textContent = ready + '/4';
+      if (storyMetric) storyMetric.textContent = all.length;
+      if (sourceMetric) sourceMetric.textContent = data ? currentSourceCount(data) : '—';
+      if (candidateMetric) candidateMetric.textContent = all.candidateCount || 0;
+      if (duplicateMetric) duplicateMetric.textContent = all.duplicatesRemoved || 0;
     }
 
     function isDateToday(value) {
@@ -531,6 +825,8 @@
 
     function configurePageShell() {
       if (!fixedSection) return;
+      var overview = document.getElementById('newsroomOverview');
+      if (overview) overview.style.display = 'none';
       document.title = tabLabels[fixedSection] + ' · Market Command';
       var title = document.getElementById('reporterPageTitle');
       var subtitle = document.getElementById('reporterPageSubtitle');
@@ -579,8 +875,9 @@
         '<div class="reporter-unconfigured">' +
         '<strong>Setup required</strong><br>' +
         'Set the <code>OPENAI_API_KEY</code> environment variable on Railway ' +
-        'to enable the Daily News Reporter. The reporter uses GPT-5.5 to generate ' +
-        'structured briefings on crypto, economics, and global markets.</div>';
+        'to enable generation. Saved Reporter Room briefings remain read-only on page load.</div>';
+      renderDeskStatus(null);
+      renderMasterNews(null);
     }
 
     function showEmptyState() {
@@ -589,9 +886,11 @@
       document.getElementById('reporterContent').innerHTML =
         '<div class="reporter-unconfigured">' +
         '<strong>No briefing generated yet</strong><br>' +
-        'Generate today\'s crypto, economics, and markets briefings. Reports are only ' +
+        'Run the four newsroom desks when you need a fresh briefing. Reports are only ' +
         'generated when you ask &mdash; opening this page no longer triggers a generation.' +
         generateCta() + '</div>';
+      renderDeskStatus(reportData);
+      renderMasterNews(reportData);
     }
 
     function showRateLimited(data) {
@@ -630,7 +929,7 @@
     }
 
     function hasContent(data) {
-      return !!(data && (data.crypto || data.economics || data.markets));
+      return !!(data && (data.geopolitics || data.economics || data.markets || data.crypto));
     }
 
     function readLocalLog() {
@@ -863,6 +1162,8 @@
       if (dateEl && data.dateStr) dateEl.textContent = '🗓️ ' + data.dateStr;
 
       renderGenBadge();
+      renderDeskStatus(data);
+      renderMasterNews(data);
 
       renderLog(data.generationLog);
       if (!data[activeTab] && data.latestSection) {
@@ -875,12 +1176,13 @@
     /* Read-only on page load — never triggers a generation. */
     function loadReport() {
       var content = document.getElementById('reporterContent');
-      fetch('/api/daily-report?ttlHours=' + currentTtl())
+      return fetch('/api/daily-report?ttlHours=' + currentTtl())
         .then(readApiJson)
         .then(function (data) {
           if (!data.configured) return showUnconfigured();
           return syncLocalLogToServer(data.generationLog).then(function (syncedData) {
             var resolved = syncedData || data;
+            reportData = resolved;
             renderLog(resolved.generationLog);
             if (resolved.generated === false || !hasContent(resolved)) return showEmptyState();
             applyReport(resolved);
@@ -935,13 +1237,97 @@
         });
     }
 
+    function conciseTime(iso) {
+      if (!iso) return '—';
+      var ts = new Date(iso);
+      if (Number.isNaN(ts.getTime())) return '—';
+      return ts.toLocaleString(undefined, {
+        month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+      });
+    }
+
+    function setShareclawMessage(text, kind) {
+      var el = document.getElementById('shareclawMessage');
+      if (!el) return;
+      el.textContent = text || '';
+      el.className = 'shareclaw-message' + (kind ? ' ' + kind : '');
+    }
+
+    function renderNewsroomHealth(data) {
+      var state = document.getElementById('shareclawState');
+      var stateLabel = state && state.querySelector('span:last-child');
+      if (state) state.classList.add('online');
+      if (stateLabel) stateLabel.textContent = data.status === 'running' ? 'Running' : 'Online';
+
+      var last = data.lastAttemptedCycle;
+      var lastRun = document.getElementById('shareclawLastRun');
+      var nextRun = document.getElementById('shareclawNextRun');
+      var cycles = document.getElementById('metricCycles');
+      if (lastRun) lastRun.textContent = conciseTime(last && (last.completedAt || last.startedAt || last.scheduledAt));
+      if (nextRun) nextRun.textContent = conciseTime(data.nextExpectedRunAt);
+      if (cycles) cycles.textContent = data.counts && data.counts.cyclesInWindow || 0;
+
+      if (data.lastError) {
+        setShareclawMessage('Last run needs attention: ' + (data.lastError.message || data.lastError.phase), 'error');
+      } else if (data.currentCycle) {
+        setShareclawMessage('Collecting and ranking newsroom sections…', '');
+      }
+    }
+
+    function loadNewsroomStatus() {
+      return fetch('/api/newsroom/health')
+        .then(readApiJson)
+        .then(renderNewsroomHealth)
+        .catch(function () {
+          var state = document.getElementById('shareclawState');
+          var label = state && state.querySelector('span:last-child');
+          if (state) state.classList.remove('online');
+          if (label) label.textContent = 'Unavailable';
+        });
+    }
+
+    var runningNewsroom = false;
+    function runNewsroomNow() {
+      if (runningNewsroom) return;
+      runningNewsroom = true;
+      var btn = document.getElementById('shareclawRunBtn');
+      if (btn) { btn.disabled = true; btn.textContent = '⚡ Running…'; }
+      setShareclawMessage('Running all four desks. This can take a few minutes; nothing will be broadcast.', '');
+
+      AdminKey.fetch('/api/newsroom/cycles/run?ttlHours=' + currentTtl(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          trigger: 'manual',
+          deliver: false,
+          cycleKey: 'manual:' + new Date().toISOString()
+        })
+      })
+        .then(readApiJson)
+        .then(function (data) {
+          var cycle = data && data.cycle;
+          if (!cycle || cycle.status === 'preflight_failed' || cycle.status === 'generation_failed') {
+            throw new Error('The newsroom run did not complete. Check the latest status for details.');
+          }
+          setShareclawMessage('Saved all available desk reports. Nothing was broadcast.', 'ok');
+          return Promise.all([loadReport(), loadNewsroomStatus()]);
+        })
+        .catch(function (err) {
+          setShareclawMessage(err.message || 'The newsroom run failed.', 'error');
+          loadNewsroomStatus();
+        })
+        .finally(function () {
+          runningNewsroom = false;
+          if (btn) { btn.disabled = false; btn.textContent = '⚡ Run Now'; }
+        });
+    }
+
     function setActiveTab(tab) {
       activeTab = tab;
       document.querySelectorAll('.reporter-tab').forEach(function (t) {
         t.classList.toggle('active', t.dataset.tab === tab);
-        if (t.dataset.tab === 'crypto') t.textContent = 'Emerging Markets';
-        if (t.dataset.tab === 'economics') t.textContent = 'Economics Top 10';
-        if (t.dataset.tab === 'markets') t.textContent = 'Markets Top 10';
+        var meta = deskMeta[t.dataset.tab];
+        if (meta) t.textContent = meta.icon + ' ' + meta.short;
       });
       if (reportData) renderTab(activeTab);
     }
@@ -956,6 +1342,27 @@
       }
       setActiveTab(btn.dataset.tab);
     });
+
+    var overview = document.getElementById('newsroomOverview');
+    if (overview) overview.addEventListener('click', function (e) {
+      var desk = e.target.closest('[data-desk-section], [data-master-section]');
+      if (desk) {
+        setActiveTab(desk.getAttribute('data-desk-section') || desk.getAttribute('data-master-section'));
+        document.getElementById('reporterTabs').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
+      }
+      var limitButton = e.target.closest('[data-master-limit]');
+      if (limitButton) {
+        masterLimit = Number(limitButton.getAttribute('data-master-limit')) || 5;
+        document.querySelectorAll('[data-master-limit]').forEach(function (button) {
+          button.classList.toggle('active', button === limitButton);
+        });
+        renderMasterNews(reportData);
+      }
+    });
+
+    var shareclawRunBtn = document.getElementById('shareclawRunBtn');
+    if (shareclawRunBtn) shareclawRunBtn.addEventListener('click', runNewsroomNow);
 
     var reporterLog = document.getElementById('reporterLog');
     if (reporterLog) reporterLog.addEventListener('click', function (e) {
@@ -1013,7 +1420,11 @@
     setActiveTab(activeTab);
 
     setInterval(renderGenBadge, 1000);
+    renderDeskStatus(null);
+    renderMasterNews(null);
     loadReport();
+    loadNewsroomStatus();
+    setInterval(loadNewsroomStatus, 30000);
   })();
 </script>
 </body>

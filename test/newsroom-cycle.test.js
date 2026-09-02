@@ -13,7 +13,7 @@ const os = require("node:os");
 const path = require("node:path");
 const fs = require("node:fs");
 
-const { NewsroomService } = require("../src/services/newsroom");
+const { NewsroomService, DEFAULT_SECTIONS } = require("../src/services/newsroom");
 const { NewsroomCycleStore, scheduledCycleKey } = require("../src/services/newsroom-cycles");
 const { ReporterService } = require("../src/services/reporter");
 const { PersistentReporterCache } = require("../src/services/persistent-cache");
@@ -22,6 +22,10 @@ const { classifyFailure } = require("../src/services/failure-classification");
 
 const SCHEDULED_AT = "2026-08-26T13:00:00.000Z";
 const SECTIONS = ["crypto", "economics", "markets"];
+
+test("the default newsroom cycle covers all four Reporter Room desks", () => {
+  assert.deepEqual(DEFAULT_SECTIONS, ["geopolitics", "economics", "markets", "crypto"]);
+});
 
 function tempDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), "md-newsroom-"));

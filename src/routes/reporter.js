@@ -52,7 +52,7 @@ function createReporterRouter({ reporterService, telegramService, broadcastLedge
         res.status(400).json({ error: "Reporter is not configured (set OPENAI_API_KEY)" });
         return;
       }
-      if (!report.crypto && !report.economics && !report.markets) {
+      if (!report.geopolitics && !report.economics && !report.markets && !report.crypto) {
         res.status(400).json({ error: "No report to broadcast yet — generate at least one section first" });
         return;
       }

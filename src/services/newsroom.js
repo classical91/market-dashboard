@@ -34,7 +34,7 @@ const {
 const { scheduledCycleKey, ACTIVE_STATUSES, GENERATED_STATUSES } = require("./newsroom-cycles");
 const { UNCONFIGURED_DETAIL, PASS, WARN, FAIL } = require("./newsroom-agent-preflight");
 
-const DEFAULT_SECTIONS = ["crypto", "economics", "markets"];
+const DEFAULT_SECTIONS = ["geopolitics", "economics", "markets", "crypto"];
 // How long a cycle may sit untouched in an active status before a later
 // invocation treats it as abandoned and resumes it rather than deferring to a
 // run that is no longer happening.

@@ -205,7 +205,7 @@ Most keys are optional. The app is designed to degrade to fallback data where po
 - `BROADCAST_LEDGER_NOTIFICATION_CHAT_IDS` - private Telegram `chatId` or `chatId:threadId` targets for enabled ledger alerts. No alerts are delivered when blank.
 - `OPENAI_API_KEY` - enables report generation.
 - `REPORTER_MODEL` - OpenAI model for reporter generation, defaults to `gpt-5.4-mini`.
-- `NEWSROOM_SECTIONS` - sections one scheduled newsroom cycle is expected to produce. Blank means the reporter's default set (`crypto`, `economics`, `markets`). See [docs/newsroom-cycles.md](docs/newsroom-cycles.md).
+- `NEWSROOM_SECTIONS` - sections one scheduled newsroom cycle is expected to produce. Blank means the reporter's default set (`geopolitics`, `economics`, `markets` (Stocks), `crypto`). See [docs/newsroom-cycles.md](docs/newsroom-cycles.md).
 - `NEWSROOM_EXPECTED_RUN_TIMES_UTC` - optional `HH:MM,HH:MM` in UTC, used only to report the next expected run in `/api/newsroom/health`. The schedule itself lives in the external cron; this app starts no timer for it.
 - `NEWSROOM_CYCLE_HISTORY` - how many newsroom cycles to retain, defaults to `200`. Cycles hold no report text, so history is cheap.
 - `NEWSROOM_ALLOW_PARTIAL_DELIVERY` - set to `true` to deliver the sections that exist when another expected section could not be generated. Off by default; a cycle delivering an incomplete report ends `delivery_partial`, never `completed`, and never sends a section it did not generate itself.
