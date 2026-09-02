@@ -42,7 +42,6 @@ const { createTelegramRouter } = require("./routes/telegram");
 const { createYoutubeRouter } = require("./routes/youtube");
 const { createXFeedRouter } = require("./routes/x-feed");
 const { resolveYoutubeChannels } = require("./config/youtube-channels");
-const { resolveYoutubeThemes } = require("./config/youtube-themes");
 const { XAccountRegistry } = require("./services/x-account-registry");
 const { XTemplateRegistry } = require("./services/x-template-registry");
 const { TOP_TOKENS } = require("./config/market-symbols");
@@ -83,6 +82,7 @@ const { NewsroomService } = require("./services/newsroom");
 const { createAgentRoutePreflight } = require("./services/newsroom-agent-preflight");
 const { TelegramService } = require("./services/telegram");
 const { YouTubeIntelligenceService } = require("./services/youtube");
+const { YoutubeChannelRegistry } = require("./services/youtube-channel-registry");
 const { XFeedService } = require("./services/x-feed");
 const { resolveDataDir } = require("./utils/data-dir");
 const { createRequireAdmin } = require("./middleware/admin-auth");
@@ -171,10 +171,15 @@ function createApp() {
     cache,
     cacheTtlMs: Number(process.env.OVERVIEW_CACHE_MS) || 60_000,
   });
-  const youtubeChannels = resolveYoutubeChannels(config.youtube.channelIds);
-  // Resolved once at boot against the same channel list the service is given,
-  // so a theme can never claim a channel the feed does not fetch.
-  const youtubeThemes = resolveYoutubeThemes(undefined, youtubeChannels);
+  // The tracked channel list is editable at runtime and persisted next to the
+  // feed cache, so add/delete survives a redeploy. The static config in
+  // src/config/youtube-channels.js is now only the first-boot seed.
+  const youtubeChannelRegistry = new YoutubeChannelRegistry({
+    dataDir,
+    seed: resolveYoutubeChannels(config.youtube.channelIds),
+  });
+  youtubeChannelRegistry.ensureSeeded();
+  const youtubeChannels = youtubeChannelRegistry.list();
   const youtubeService = new YouTubeIntelligenceService({
     cache,
     idCache: youtubeIdCache,
@@ -465,7 +470,12 @@ function createApp() {
   app.use("/api/telegram", createTelegramRouter({ telegramService, requireAdmin }));
   app.use(
     "/api/youtube",
-    createYoutubeRouter({ youtubeService, channels: youtubeChannels, themes: youtubeThemes }),
+    createYoutubeRouter({
+      youtubeService,
+      channelRegistry: youtubeChannelRegistry,
+      channelIdOverrides: config.youtube.channelIds,
+      requireAdmin,
+    }),
   );
   app.use(
     "/api/x",

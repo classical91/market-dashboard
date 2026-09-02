@@ -41,13 +41,13 @@
 .x-template-option-count { font-size: 10px; color: var(--muted); }
 .x-template-menu-action { padding: 8px 10px; font-size: 12px; }
 .x-template-menu-divider { height: 1px; margin: 6px 3px; background: var(--border); }
-body[data-x-accent="market"] { --x-accent: var(--purple, #9b7bff); }
-body[data-x-accent="world"] { --x-accent: #d6a760; }
-body[data-x-accent="tech"] { --x-accent: #52c7d9; }
-body[data-x-accent="macro"] { --x-accent: #76a7ff; }
-body[data-x-accent="energy"] { --x-accent: #65c889; }
-body[data-x-accent="relic"] { --x-accent: #c98f5c; }
-body[data-x-accent="neutral"] { --x-accent: #aab3c3; }
+body[data-x-accent="market"] { --x-accent: var(--accent-market); }
+body[data-x-accent="world"] { --x-accent: var(--accent-world); }
+body[data-x-accent="tech"] { --x-accent: var(--accent-tech); }
+body[data-x-accent="macro"] { --x-accent: var(--accent-macro); }
+body[data-x-accent="energy"] { --x-accent: var(--accent-energy); }
+body[data-x-accent="relic"] { --x-accent: var(--accent-relic); }
+body[data-x-accent="neutral"] { --x-accent: var(--accent-neutral); }
 body[data-x-accent] .x-account-card.active,
 body[data-x-accent] .x-account-card--all.active { border-color: var(--x-accent); }
 
@@ -549,136 +549,6 @@ body[data-x-accent] .x-account-card--all.active { border-color: var(--x-accent);
   color: var(--text, inherit);
 }
 
-.x-manage-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 2147483000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  background: rgba(3, 6, 12, 0.66);
-}
-
-.x-manage-box {
-  width: 100%;
-  max-width: 480px;
-  max-height: 82vh;
-  overflow-y: auto;
-  box-sizing: border-box;
-  background: var(--surface, #0f1420);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 20px;
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
-}
-
-.x-manage-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 14px;
-}
-
-.x-manage-title {
-  margin: 0;
-  font-size: 15px;
-}
-
-.x-manage-close {
-  border: none;
-  background: transparent;
-  color: var(--muted);
-  font-size: 22px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.x-manage-form {
-  display: grid;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.x-manage-input {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.04);
-  color: inherit;
-  font: inherit;
-  font-size: 14px;
-}
-
-.x-manage-add {
-  padding: 10px 14px;
-  border: none;
-  border-radius: 8px;
-  background: var(--green, #2ECC71);
-  color: #04122b;
-  font: inherit;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.x-manage-add:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
-.x-manage-status {
-  min-height: 18px;
-  margin-bottom: 10px;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-/* Inline "already tracked" warning under the handle field. */
-.x-manage-hint {
-  margin: -2px 0 0;
-  font-size: 12px;
-  color: var(--coral, var(--red));
-}
-
-.x-manage-status.is-error { color: var(--coral, var(--red)); }
-.x-manage-status.is-ok { color: var(--green, #2ECC71); }
-
-.x-manage-list {
-  display: grid;
-  gap: 6px;
-}
-
-.x-manage-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 8px 10px;
-  border: 0.5px solid var(--border);
-  border-radius: 8px;
-}
-
-.x-manage-row-text { display: grid; gap: 2px; min-width: 0; }
-.x-manage-row-handle { font-size: 13px; }
-.x-manage-row-meta { font-size: 11px; color: var(--muted); }
-
-.x-manage-delete {
-  flex: none;
-  padding: 6px 10px;
-  border: 0.5px solid var(--border);
-  border-radius: 7px;
-  background: transparent;
-  color: var(--coral, var(--red));
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.x-manage-delete:disabled { opacity: 0.5; cursor: default; }
-.x-manage-empty { font-size: 12px; color: var(--muted); }
-
 /* ── Manage Templates ────────────────────────────────────────────────── */
 .x-template-manager { max-width: 920px; max-height: 88vh; }
 .x-template-heading-wrap { display: grid; gap: 4px; }
@@ -751,7 +621,7 @@ body[data-x-accent] .x-account-card--all.active { border-color: var(--x-accent);
 }
 .x-template-member-remove { font-size: 18px; }
 .x-template-add-account { margin-top: 7px; }
-.x-template-add-account .x-manage-input { padding: 7px 9px; font-size: 11px; }
+.x-template-add-account .manage-input { padding: 7px 9px; font-size: 11px; }
 .x-template-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
 .x-template-secondary,
 .x-template-danger {
