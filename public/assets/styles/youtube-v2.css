@@ -353,7 +353,9 @@ body[data-yt-accent] .yt-feed-card:hover { border-color: var(--yt-accent); }
 .ytm-badge { padding: 4px 8px; border-radius: 999px; background: rgba(46, 204, 113, .09); color: #76d99e; font-size: 10px; font-weight: 750; }
 .ytm-link-btn { padding: 6px; border: 0; background: transparent; color: var(--soft); font: inherit; font-size: 11px; cursor: pointer; }
 .ytm-section-copy { margin: 0 0 12px; color: var(--muted); font-size: 12px; }
-.ytm-category-form { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; margin-bottom: 12px; }
+.ytm-category-form { display: grid; grid-template-columns: 1fr auto auto; align-items: end; gap: 8px; margin-bottom: 12px; }
+.ytm-empty { display: grid; justify-items: center; gap: 10px; padding: 22px 10px; text-align: center; }
+.ytm-empty-copy { margin: 0; color: var(--muted); font-size: 12px; }
 .ytm-confirm-shade { position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; padding: 20px; background: rgba(3,6,12,.78); }
 .ytm-confirm { width: min(430px, 100%); padding: 20px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface2); box-shadow: 0 20px 54px rgba(0,0,0,.55); }
 .ytm-confirm-title { margin: 0 0 8px; font-size: 15px; }

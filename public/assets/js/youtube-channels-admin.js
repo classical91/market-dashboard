@@ -45,6 +45,30 @@
       return category.id !== exceptId && categoryKey(category.name) === wanted;
     })[0] || null;
   }
+  /**
+   * The one place the channel form decides what is wrong, in the order the
+   * user can act on it. Returns null when the form is submittable, so the
+   * rule can be tested without a DOM.
+   */
+  function channelFormProblem(input) {
+    var fields = input || {};
+    if (!fields.handle || !fields.handle.ok) return (fields.handle && fields.handle.reason) || "Enter a YouTube handle.";
+    if (!fields.channelId || !fields.channelId.ok) return (fields.channelId && fields.channelId.reason) || "Check the channel ID.";
+    if (fields.duplicate) return duplicateMessage(fields.duplicate);
+    if (fields.creatingCategory) {
+      if (!String(fields.categoryName || "").trim()) return "Enter a name for the new category.";
+      if (fields.categoryClash) return "The category \"" + fields.categoryClash.name + "\" already exists.";
+    }
+    return null;
+  }
+  /** What an empty channel list says, given the filter and search in force. */
+  function emptyChannelsMessage(categories, filterId, search) {
+    var query = String(search || "").trim();
+    var category = (categories || []).filter(function (item) { return item.id === filterId; })[0];
+    if (query) return "No channels match \"" + query + "\"" + (category ? " in " + category.name + "." : ".");
+    if (category) return "No channels in " + category.name + " yet.";
+    return "No channels match this search and category.";
+  }
   function el(doc, tag, className, text) {
     var node = doc.createElement(tag);
     if (className) node.className = className;
@@ -84,7 +108,7 @@
     var close = button(doc, "manage-close", "×", cleanup); close.setAttribute("aria-label", "Close source manager");
     head.appendChild(heading); head.appendChild(close); box.appendChild(head);
     var tabs = el(doc, "div", "ytm-tabs"); tabs.setAttribute("role", "tablist");
-    var content = el(doc, "div", "ytm-content"); var status = el(doc, "div", "manage-status ytm-status"); status.setAttribute("role", "status");
+    var content = el(doc, "div", "ytm-content"); content.id = "ytmPanel"; content.setAttribute("role", "tabpanel"); content.tabIndex = -1; var status = el(doc, "div", "manage-status ytm-status"); status.setAttribute("role", "status");
     box.appendChild(tabs); box.appendChild(status); box.appendChild(content); overlay.appendChild(box); doc.body.appendChild(overlay);
 
     function say(message, tone) { status.textContent = message || ""; status.className = "manage-status ytm-status" + (tone ? " is-" + tone : ""); }
@@ -112,13 +136,34 @@
     function fail(error) { state.busy = false; render(); say(error.message || "The change could not be saved.", "error"); }
     function setTab(name) { state.tab = name; state.editor = null; say(""); render(); }
 
+    var TABS = ["channels", "categories"];
+    // Arrow keys move between tabs and only the selected tab is in the tab
+    // order, which is what makes a tablist usable from the keyboard: Tab
+    // reaches the tab strip once, then Left/Right choose within it.
     function renderTabs() {
       tabs.innerHTML = "";
-      ["channels", "categories"].forEach(function (name) {
-        var tab = button(doc, "ytm-tab" + (state.tab === name ? " active" : ""), name.charAt(0).toUpperCase() + name.slice(1), function () { setTab(name); });
-        tab.setAttribute("role", "tab"); tab.setAttribute("aria-selected", state.tab === name ? "true" : "false");
+      TABS.forEach(function (name, index) {
+        var selected = state.tab === name;
+        var tab = button(doc, "ytm-tab" + (selected ? " active" : ""), name.charAt(0).toUpperCase() + name.slice(1), function () { setTab(name); });
+        tab.id = "ytmTab-" + name;
+        tab.setAttribute("role", "tab");
+        tab.setAttribute("aria-selected", selected ? "true" : "false");
+        tab.setAttribute("aria-controls", "ytmPanel");
+        tab.tabIndex = selected ? 0 : -1;
+        tab.addEventListener("keydown", function (event) {
+          var step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+          if (!step && event.key !== "Home" && event.key !== "End") return;
+          event.preventDefault();
+          var next = event.key === "Home" ? 0
+            : event.key === "End" ? TABS.length - 1
+            : (index + step + TABS.length) % TABS.length;
+          setTab(TABS[next]);
+          var moved = tabs.children[next];
+          if (moved) moved.focus();
+        });
         tabs.appendChild(tab);
       });
+      content.setAttribute("aria-labelledby", "ytmTab-" + state.tab);
     }
     function categorySelect(value, includeCreate) {
       var select = el(doc, "select", "manage-input ytm-select");
@@ -147,24 +192,54 @@
       var label = el(doc, "input", "manage-input"); label.value = channel?.label || "";
       var category = categorySelect(channel?.categoryId, true);
       var channelId = el(doc, "input", "manage-input"); channelId.value = channel?.channelId || "";
+      // Creating a category happens inline rather than by sending the user to
+      // the Categories tab: leaving mid-form would throw away the handle they
+      // just typed, which is the one thing this flow must never do.
+      var newCategory = el(doc, "input", "manage-input"); newCategory.autocomplete = "off";
+      var newCategoryField = labeled(doc, "New category name", newCategory, "Created and assigned when you save.");
+      newCategoryField.hidden = true;
       form.appendChild(labeled(doc, "YouTube handle", handle, "Paste @handle or a YouTube channel URL."));
       form.appendChild(labeled(doc, "Display name", label, "Optional; the handle is used if blank."));
       form.appendChild(labeled(doc, "Category", category));
+      form.appendChild(newCategoryField);
       var details = el(doc, "details", "ytm-advanced"); details.appendChild(el(doc, "summary", "", "Advanced")); details.appendChild(labeled(doc, "Channel ID", channelId, "Optional UC… identifier.")); form.appendChild(details);
       var error = el(doc, "div", "ytm-inline-error"); error.setAttribute("role", "alert"); form.appendChild(error);
       var actions = el(doc, "div", "ytm-actions"); actions.appendChild(button(doc, "ytm-btn", "Cancel", function () { state.editor = null; render(); }));
       var save = el(doc, "button", "ytm-btn primary", editing ? "Save changes" : "Add channel"); save.type = "submit"; actions.appendChild(save); form.appendChild(actions);
-      category.addEventListener("change", function () { if (category.value === "__create__") setTab("categories"); });
+      category.addEventListener("change", function () {
+        var creating = category.value === "__create__";
+        newCategoryField.hidden = !creating;
+        if (creating) newCategory.focus();
+      });
       form.addEventListener("submit", function (event) {
         event.preventDefault(); var checked = validateHandle(handle.value); var id = validateChannelId(channelId.value);
         var duplicate = checked.ok && findDuplicate(state.channels, checked.handle, channel?.handle);
-        if (!checked.ok || !id.ok || duplicate || category.value === "__create__") {
-          error.textContent = !checked.ok ? checked.reason : !id.ok ? id.reason : duplicate ? duplicateMessage(duplicate) : "Choose a category."; return;
-        }
+        var creating = category.value === "__create__";
+        var categoryName = newCategory.value.trim();
+        var problem = channelFormProblem({
+          handle: checked, channelId: id, duplicate: duplicate,
+          creatingCategory: creating, categoryName: categoryName,
+          categoryClash: creating ? categoryDuplicate(state.categories, categoryName) : null,
+        });
+        if (problem) { error.textContent = problem; return; }
+        error.textContent = "";
         state.busy = true; save.disabled = true; save.textContent = editing ? "Saving…" : "Adding…";
-        var payload = { handle: checked.handle, label: label.value.trim(), categoryId: category.value, channelId: id.channelId };
-        api(editing ? "/api/youtube/channels/config/" + encodeURIComponent(channel.handle) : "/api/youtube/channels/config", {
-          method: editing ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+        // The category has to exist before the channel can reference it, so a
+        // new one is created first and its ID — never its name — is what the
+        // channel is saved with.
+        var categoryId = creating
+          ? api("/api/youtube/categories/config", {
+              method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: categoryName }),
+            }).then(function (result) {
+              if (result.categories) state.categories = result.categories;
+              return result.added.id;
+            })
+          : Promise.resolve(category.value);
+        categoryId.then(function (assigned) {
+          var payload = { handle: checked.handle, label: label.value.trim(), categoryId: assigned, channelId: id.channelId };
+          return api(editing ? "/api/youtube/channels/config/" + encodeURIComponent(channel.handle) : "/api/youtube/channels/config", {
+            method: editing ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+          });
         }).then(function (result) { sync(result, editing ? "Channel saved." : "Channel added."); }).catch(fail);
       });
       setTimeout(function () { handle.focus(); }, 0); return form;
@@ -187,8 +262,14 @@
       toolbar.appendChild(search); toolbar.appendChild(filter); toolbar.appendChild(add); wrap.appendChild(toolbar);
       if (state.editor?.type === "channel") wrap.appendChild(renderChannelForm(state.editor.channel));
       var list = el(doc, "div", "manage-list ytm-list"); var shown = state.channels.filter(channelMatches);
-      if (!state.channels.length) list.appendChild(el(doc, "div", "manage-empty", "Add your first YouTube channel to start building intelligence feeds."));
-      else if (!shown.length) list.appendChild(el(doc, "div", "manage-empty", "No channels match this search and category."));
+      function emptyState(message) {
+        var empty = el(doc, "div", "manage-empty ytm-empty");
+        empty.appendChild(el(doc, "p", "ytm-empty-copy", message));
+        empty.appendChild(button(doc, "ytm-btn primary", "Add a channel", function () { state.editor = { type: "channel", channel: null }; render(); }));
+        return empty;
+      }
+      if (!state.channels.length) list.appendChild(emptyState("Add your first YouTube channel to start building intelligence feeds."));
+      else if (!shown.length) list.appendChild(emptyState(emptyChannelsMessage(state.categories, state.filter, state.search)));
       shown.forEach(function (channel) {
         var row = el(doc, "div", "manage-row ytm-channel-row"); var identity = el(doc, "div", "manage-row-text");
         identity.appendChild(el(doc, "strong", "ytm-channel-name", channel.label)); identity.appendChild(el(doc, "span", "manage-row-handle", "@" + channel.handle));
@@ -208,9 +289,10 @@
 
     function categoryForm(category) {
       var form = el(doc, "form", "ytm-category-form"); var input = el(doc, "input", "manage-input");
-      input.placeholder = category ? "Category name" : "New category name"; input.value = category?.name || ""; input.required = true; input.setAttribute("aria-label", input.placeholder);
+      var text = category ? "Category name" : "New category name";
+      input.value = category?.name || ""; input.required = true;
       var save = el(doc, "button", "ytm-btn primary", category ? "Save" : "+ Add Category"); save.type = "submit";
-      form.appendChild(input); form.appendChild(save);
+      form.appendChild(labeled(doc, text, input)); form.appendChild(save);
       form.addEventListener("submit", function (event) {
         event.preventDefault(); var name = input.value.trim(); var duplicate = categoryDuplicate(state.categories, name, category?.id);
         if (!name || duplicate) { say(!name ? "Enter a category name." : "That category already exists.", "error"); input.focus(); return; }
@@ -278,5 +360,6 @@
     validateChannelId: validateChannelId, isDuplicate: isDuplicate,
     findDuplicate: findDuplicate, duplicateMessage: duplicateMessage,
     confirmationMessage: confirmationMessage, categoryDuplicate: categoryDuplicate,
+    channelFormProblem: channelFormProblem, emptyChannelsMessage: emptyChannelsMessage,
   };
 });
