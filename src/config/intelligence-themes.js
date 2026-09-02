@@ -45,6 +45,7 @@ const SHARED_THEMES = [
     description: "Apple, automation, AI models and the people building them",
     accent: "tech",
     sections: [
+      "Tech",
       "Apple & iOS",
       "Shortcuts & Automation",
       "AI Labs",
