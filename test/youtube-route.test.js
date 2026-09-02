@@ -141,6 +141,25 @@ test("channels endpoint returns the full intelligence shape", async () => {
   // on their own, without taking StockMoe down with them.
   assert.equal(body.failedFeeds.length, 3);
   assert.equal(body.videos.length, 1);
+
+  // Themes ride along with the feed so the switcher renders in one round trip.
+  assert.ok(Array.isArray(body.themes), "the payload carries the theme list");
+  assert.equal(body.themes[0].id, "markets");
+  assert.deepEqual(
+    body.themes[0].channels.map((entry) => entry.handle).sort(),
+    body.channels.map((channel) => channel.handle).sort(),
+    "the derived markets theme covers exactly the tracked channels",
+  );
+  for (const theme of body.themes) {
+    // Every membership must name a channel the feed fetched, or the switcher's
+    // count promises videos the page cannot show.
+    for (const member of theme.channels) {
+      assert.ok(
+        body.channels.some((channel) => channel.handle === member.handle),
+        `${theme.id} names an untracked channel: ${member.handle}`,
+      );
+    }
+  }
 });
 
 test("an unknown channel handle is a 404, not a crash", async () => {

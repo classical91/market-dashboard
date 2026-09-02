@@ -42,6 +42,7 @@ const { createTelegramRouter } = require("./routes/telegram");
 const { createYoutubeRouter } = require("./routes/youtube");
 const { createXFeedRouter } = require("./routes/x-feed");
 const { resolveYoutubeChannels } = require("./config/youtube-channels");
+const { resolveYoutubeThemes } = require("./config/youtube-themes");
 const { XAccountRegistry } = require("./services/x-account-registry");
 const { XTemplateRegistry } = require("./services/x-template-registry");
 const { TOP_TOKENS } = require("./config/market-symbols");
@@ -171,6 +172,9 @@ function createApp() {
     cacheTtlMs: Number(process.env.OVERVIEW_CACHE_MS) || 60_000,
   });
   const youtubeChannels = resolveYoutubeChannels(config.youtube.channelIds);
+  // Resolved once at boot against the same channel list the service is given,
+  // so a theme can never claim a channel the feed does not fetch.
+  const youtubeThemes = resolveYoutubeThemes(undefined, youtubeChannels);
   const youtubeService = new YouTubeIntelligenceService({
     cache,
     idCache: youtubeIdCache,
@@ -459,7 +463,10 @@ function createApp() {
     }),
   );
   app.use("/api/telegram", createTelegramRouter({ telegramService, requireAdmin }));
-  app.use("/api/youtube", createYoutubeRouter({ youtubeService, channels: youtubeChannels }));
+  app.use(
+    "/api/youtube",
+    createYoutubeRouter({ youtubeService, channels: youtubeChannels, themes: youtubeThemes }),
+  );
   app.use(
     "/api/x",
     createXFeedRouter({
