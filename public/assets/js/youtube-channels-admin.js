@@ -171,7 +171,12 @@
         var option = el(doc, "option", "", category.name); option.value = category.id; select.appendChild(option);
       });
       if (includeCreate) { var create = el(doc, "option", "", "+ Create new category"); create.value = "__create__"; select.appendChild(create); }
-      select.value = value || (state.categories[0] ? state.categories[0].id : UNCATEGORIZED_ID);
+      // With no categories yet there is nothing to preselect, and defaulting to
+      // an ID with no matching option leaves the select rendering blank. Land on
+      // "+ Create new category" instead: it is the only thing to do from here.
+      var fallback = state.categories[0] ? state.categories[0].id : (includeCreate ? "__create__" : UNCATEGORIZED_ID);
+      select.value = value || fallback;
+      if (select.selectedIndex < 0) select.selectedIndex = 0;
       return select;
     }
     function confirmDialog(titleText, bodyText, actionText, action, extra) {
@@ -206,11 +211,15 @@
       var error = el(doc, "div", "ytm-inline-error"); error.setAttribute("role", "alert"); form.appendChild(error);
       var actions = el(doc, "div", "ytm-actions"); actions.appendChild(button(doc, "ytm-btn", "Cancel", function () { state.editor = null; render(); }));
       var save = el(doc, "button", "ytm-btn primary", editing ? "Save changes" : "Add channel"); save.type = "submit"; actions.appendChild(save); form.appendChild(actions);
-      category.addEventListener("change", function () {
+      function syncCreateField(focusIt) {
         var creating = category.value === "__create__";
         newCategoryField.hidden = !creating;
-        if (creating) newCategory.focus();
-      });
+        if (creating && focusIt) newCategory.focus();
+      }
+      category.addEventListener("change", function () { syncCreateField(true); });
+      // Not only on change: with no categories the select already sits on
+      // "+ Create new category", so the name field has to be there on open.
+      syncCreateField(false);
       form.addEventListener("submit", function (event) {
         event.preventDefault(); var checked = validateHandle(handle.value); var id = validateChannelId(channelId.value);
         var duplicate = checked.ok && findDuplicate(state.channels, checked.handle, channel?.handle);

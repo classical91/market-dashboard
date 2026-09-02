@@ -69,6 +69,26 @@ longer knows. `GET /api/youtube/channels?categoryId=<id>` answers 400 for it, an
 the page treats that specific response as recoverable: it reselects
 `All Categories` and refetches instead of rendering a failed-request message.
 
+## Categories are independent of themes
+
+Categories are created deliberately in the manage panel. The app constructs
+`YoutubeChannelRegistry` with no `categorySeed`, so a first boot gets exactly the
+categories its seeded channels are filed under and nothing else.
+
+It used to pass `categorySeed: themeSections()`, which turned every section the
+theme catalogue names — Archaeology, AI Labs, Apple & iOS — into a YouTube
+category holding no channels, making the filter read as a list of things to fix
+rather than a list of what is tracked. `themeSections()` still reports what the
+catalogue names; it no longer feeds category creation.
+
+The change is not retroactive. A category is not marked with where it came from,
+and once persisted it is user data: an install that already has those empty
+categories keeps them, and can delete them from the Categories tab. Only future
+fresh registries differ. A registry file at version 2 is not rewritten on boot.
+
+`categorySeed` remains a registry constructor option, defaulting to none, so a
+deployment can still ask for categories beyond its channels deliberately.
+
 ## Migration
 
 Version 1 files and legacy channel arrays are migrated in memory by collecting and

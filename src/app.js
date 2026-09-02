@@ -42,7 +42,6 @@ const { createTelegramRouter } = require("./routes/telegram");
 const { createYoutubeRouter } = require("./routes/youtube");
 const { createXFeedRouter } = require("./routes/x-feed");
 const { resolveYoutubeChannels } = require("./config/youtube-channels");
-const { themeSections } = require("./config/youtube-themes");
 const { XAccountRegistry } = require("./services/x-account-registry");
 const { XTemplateRegistry } = require("./services/x-template-registry");
 const { TOP_TOKENS } = require("./config/market-symbols");
@@ -175,10 +174,16 @@ function createApp() {
   // The tracked channel list is editable at runtime and persisted next to the
   // feed cache, so add/delete survives a redeploy. The static config in
   // src/config/youtube-channels.js is now only the first-boot seed.
+  //
+  // No `categorySeed` is passed: a first boot gets exactly the categories its
+  // seeded channels are filed under, and nothing else. Seeding from the theme
+  // catalogue used to turn every section a theme names — Archaeology, AI Labs,
+  // Apple & iOS — into a YouTube category holding no channels, which made the
+  // filter read as a list of things to fix rather than a list of what is
+  // tracked. Themes and YouTube categories are independent now.
   const youtubeChannelRegistry = new YoutubeChannelRegistry({
     dataDir,
     seed: resolveYoutubeChannels(config.youtube.channelIds),
-    categorySeed: themeSections(),
   });
   youtubeChannelRegistry.ensureSeeded();
   const youtubeChannels = youtubeChannelRegistry.list();
