@@ -225,16 +225,21 @@
     }
     function renderCategories() {
       var wrap = el(doc, "div", "ytm-panel");
-      wrap.appendChild(el(doc, "p", "ytm-section-copy", "Categories are reusable. Renaming one updates every assigned channel automatically."));
+      wrap.appendChild(el(doc, "p", "ytm-section-copy", "Categories are reusable. Uncategorized is the protected fallback for channels without an assignment."));
       wrap.appendChild(categoryForm(null));
       var real = state.categories.filter(function (category) { return !category.virtual; });
       if (!real.length) wrap.appendChild(el(doc, "div", "manage-empty", "Create your first category to organize YouTube sources."));
-      real.forEach(function (category) {
+      state.categories.forEach(function (category) {
         if (state.editor?.type === "category" && state.editor.category.id === category.id) { wrap.appendChild(categoryForm(category)); return; }
         var row = el(doc, "div", "manage-row ytm-category-row"); var text = el(doc, "div", "manage-row-text");
         text.appendChild(el(doc, "strong", "ytm-category-name", category.name));
         text.appendChild(el(doc, "span", "manage-row-meta", category.channelCount + (category.channelCount === 1 ? " channel" : " channels")));
-        var actions = el(doc, "div", "ytm-row-actions"); actions.appendChild(button(doc, "ytm-link-btn", "Rename", function () { state.editor = { type: "category", category: category }; render(); }));
+        var actions = el(doc, "div", "ytm-row-actions");
+        if (category.virtual) {
+          actions.appendChild(el(doc, "span", "ytm-system-label", "Protected fallback"));
+          row.appendChild(text); row.appendChild(actions); wrap.appendChild(row); return;
+        }
+        actions.appendChild(button(doc, "ytm-link-btn", "Rename", function () { state.editor = { type: "category", category: category }; render(); }));
         actions.appendChild(button(doc, "ytm-link-btn danger", "Delete", function () {
           var select = null;
           if (category.channelCount) {

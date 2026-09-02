@@ -48,6 +48,18 @@ test("reading the tracked channels needs no key — the panel renders before any
   assert.ok(body.channels.length, "the seed is served");
   assert.ok(Array.isArray(body.categories));
   assert.ok(body.categories.some((category) => category.name === "Archaeology"), "theme sections seed categories");
+  assert.deepEqual(
+    body.categories.find((category) => category.id === "uncategorized"),
+    {
+      id: "uncategorized",
+      name: "Uncategorized",
+      slug: "uncategorized",
+      createdAt: null,
+      channelCount: 0,
+      virtual: true,
+    },
+    "the shared category catalogue includes the protected fallback used by every filter",
+  );
   assert.equal(body.registry.loadState !== "corrupt", true);
 });
 
