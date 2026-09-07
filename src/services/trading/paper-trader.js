@@ -358,6 +358,23 @@ class PaperTradingService {
     return this.getPositions().filter((p) => p.status === "open");
   }
 
+  // Replace the working exit orders on one open position. Candle strategies
+  // with moving native exits (for example a Bollinger midpoint target) call
+  // this only from the isolated replay engine. Persisting both levels in one
+  // write prevents a bar from ever seeing half of an update.
+  replaceExitLevels(positionId, { stopLoss, target }) {
+    const positions = this.getPositions();
+    const pos = positions.find((p) => p.id === positionId && p.status === "open");
+    if (!pos) return null;
+    if (Number.isFinite(stopLoss) && stopLoss > 0) pos.stopLoss = stopLoss;
+    if (Number.isFinite(target) && target > 0) {
+      pos.tp1 = target;
+      pos.tp2 = target;
+    }
+    this.savePositions(positions);
+    return pos;
+  }
+
   getHistory() {
     return this.load(this.historyFile, []);
   }

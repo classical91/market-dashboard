@@ -557,6 +557,7 @@ function createTradingLabRouter({
         // is a 400 from the service rather than a silent fallback.
         executionMode:
           typeof body.executionMode === "string" && body.executionMode ? body.executionMode : "shared",
+        costScenario: typeof body.costScenario === "string" && body.costScenario ? body.costScenario : null,
         // Opt-in: an unrecorded run is the default so that exploring does not
         // fill the research log with noise.
         record: body.record === true || body.record === "true",
@@ -587,6 +588,7 @@ function createTradingLabRouter({
         executionMode:
           typeof body.executionMode === "string" && body.executionMode ? body.executionMode : "shared",
         ...(body.minRankedTrades === undefined ? {} : { minRankedTrades: Number(body.minRankedTrades) }),
+        costScenario: typeof body.costScenario === "string" && body.costScenario ? body.costScenario : null,
       }),
     );
   }));

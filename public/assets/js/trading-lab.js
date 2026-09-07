@@ -25,6 +25,8 @@
   var btStrategy = document.getElementById("tl-bt-strategy");
   var btStrategyNote = document.getElementById("tl-bt-strategy-note");
   var btMode = document.getElementById("tl-bt-mode");
+  var btCosts = document.getElementById("tl-bt-costs");
+  var btOptions = document.getElementById("tl-bt-options");
   var btRunBtn = document.getElementById("tl-bt-run");
   var btCompareBtn = document.getElementById("tl-bt-compare");
   var btResult = document.getElementById("tl-bt-result");
@@ -1327,6 +1329,49 @@
           ? " Dataset: " + ((found.datasetAvailability && found.datasetAvailability.productionStatus) || "event snapshots required") + "."
           : " Needs " + found.requiredWarmupBars + " warmup bars.")
       : "";
+    renderStrategyOptions(found);
+  }
+
+  function renderStrategyOptions(strategy) {
+    var schema = (strategy && strategy.optionSchema) || [];
+    var defaults = (strategy && strategy.defaultOptions) || {};
+    btOptions.hidden = !schema.length;
+    if (!schema.length) {
+      btOptions.innerHTML = "";
+      return;
+    }
+    btOptions.innerHTML = schema.map(function (field) {
+      var id = "tl-bt-option-" + field.key;
+      var value = defaults[field.key];
+      var input;
+      if (field.type === "boolean") {
+        input = '<input id="' + id + '" data-bt-option="' + escapeHtml(field.key) + '" type="checkbox"' + (value ? " checked" : "") + " />";
+      } else if (field.type === "select") {
+        input = '<select class="aia-select" id="' + id + '" data-bt-option="' + escapeHtml(field.key) + '">' +
+          (field.values || []).map(function (choice) {
+            return '<option value="' + escapeHtml(choice) + '"' + (choice === value ? " selected" : "") + ">" + escapeHtml(choice) + "</option>";
+          }).join("") + "</select>";
+      } else {
+        input = '<input class="aia-select tl-input" id="' + id + '" data-bt-option="' + escapeHtml(field.key) + '" data-bt-type="' + escapeHtml(field.type) + '" type="' + (field.type === "text" ? "text" : "number") + '" value="' + escapeHtml(value) + '"' +
+          (field.min == null ? "" : ' min="' + escapeHtml(field.min) + '"') +
+          (field.max == null ? "" : ' max="' + escapeHtml(field.max) + '"') +
+          (field.step == null ? "" : ' step="' + escapeHtml(field.step) + '"') + " />";
+      }
+      return '<label class="tl-inline-label" for="' + id + '">' + escapeHtml(field.label) + " " + input + "</label>";
+    }).join("");
+    if (strategy.id === "bb_mean_reversion_v4") btMode.value = "native";
+  }
+
+  function selectedOptions() {
+    var out = {};
+    btOptions.querySelectorAll("[data-bt-option]").forEach(function (input) {
+      var key = input.getAttribute("data-bt-option");
+      if (input.type === "checkbox") out[key] = input.checked;
+      else if (input.getAttribute("data-bt-type") === "int") out[key] = parseInt(input.value, 10);
+      else if (input.getAttribute("data-bt-type") === "number") out[key] = Number(input.value);
+      else out[key] = input.value;
+    });
+    return out;
   }
 
   // The label rides along on every cell so the table can restack itself as a
@@ -1480,6 +1525,7 @@
       interval: btInterval.value,
       strategies: strategies.map(function (s) { return s.id; }),
       executionMode: btMode.value,
+      costScenario: btCosts.value,
     })
       .then(renderComparison)
       .catch(function (err) {
@@ -1501,6 +1547,8 @@
       interval: btInterval.value,
       strategy: selectedStrategy(),
       executionMode: btMode.value,
+      costScenario: btCosts.value,
+      options: selectedOptions(),
     })
       .then(renderBacktest)
       .catch(function (err) {

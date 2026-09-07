@@ -121,10 +121,16 @@
           <option value="shared" selected>Shared execution</option>
           <option value="native">Native strategy exits</option>
         </select>
+        <select class="aia-select" id="tl-bt-costs" title="Fees and slippage applied to every fill">
+          <option value="baseline" selected>Baseline costs (0.06% fee + 0.02% slippage)</option>
+          <option value="stress">Stress costs (0.10% fee + 0.05% slippage)</option>
+          <option value="frictionless">Frictionless (diagnostic only)</option>
+        </select>
         <button class="aia-run-btn" type="button" id="tl-bt-run">Run backtest</button>
         <button class="aia-run-btn" type="button" id="tl-bt-compare" title="Run every strategy over the same symbol, interval and candles">Compare strategies</button>
       </div>
       <div class="de-card-note" id="tl-bt-strategy-note"></div>
+      <div class="de-toolbar" id="tl-bt-options" hidden></div>
       <div id="tl-bt-result"><div class="de-empty">No backtest run yet.</div></div>
     </div>
 

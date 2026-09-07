@@ -59,6 +59,7 @@ const { smcV1 } = require("./smc-v1");
 const { shadowBananagunV1 } = require("./shadow-bananagun-v1");
 const { donchianBreakoutV1 } = require("./donchian-breakout-v1");
 const { vwapReversionV1 } = require("./vwap-reversion-v1");
+const { bbMeanReversionV4 } = require("./bb-mean-reversion-v4");
 const {
   LIFECYCLE_STATUSES,
   SCANNER_STATUSES,
@@ -77,6 +78,7 @@ const STRATEGIES = [
   shadowBananagunV1,
   donchianBreakoutV1,
   vwapReversionV1,
+  bbMeanReversionV4,
 ].map(assertValidLifecycle);
 
 const BY_ID = new Map(STRATEGIES.map((strategy) => [strategy.id, strategy]));
@@ -87,12 +89,13 @@ const DEFAULT_STRATEGY_ID = "mindset_v1";
 // two real questions callers ask are "what can I backtest?" and "what may the
 // live scanner run?", and answering those by hand at each call site is how
 // capability checks drift apart.
-function listStrategies({ supportsBacktest, supportsLiveScanner, status, scannerEligible, realMoneyEligible } = {}) {
+function listStrategies({ supportsBacktest, supportsLiveScanner, status, liveResearchEligible, scannerEligible, realMoneyEligible } = {}) {
   return STRATEGIES.map(describeStrategy).filter(
     (s) =>
       (supportsBacktest === undefined || s.supportsBacktest === supportsBacktest) &&
       (supportsLiveScanner === undefined || s.supportsLiveScanner === supportsLiveScanner) &&
       (status === undefined || s.status === status) &&
+      (liveResearchEligible === undefined || s.liveResearchEligible === liveResearchEligible) &&
       (scannerEligible === undefined || s.scannerEligible === scannerEligible) &&
       (realMoneyEligible === undefined || s.realMoneyEligible === realMoneyEligible),
   );

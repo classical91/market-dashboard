@@ -233,6 +233,18 @@ test("everything needed to inspect an autonomous account stays visible", () => {
   assert.match(html, /id="tl-activity-shell"/);
 });
 
+test("strategy-specific options are sent only to a single-strategy backtest", () => {
+  const js = read("public/assets/js/trading-lab.js");
+  const compareStart = js.indexOf('btCompareBtn.addEventListener("click"');
+  const singleStart = js.indexOf('btRunBtn.addEventListener("click"');
+  const compare = js.slice(compareStart, singleStart);
+  const single = js.slice(singleStart, js.indexOf("if (regimeBtn)", singleStart));
+
+  assert.ok(compareStart >= 0 && singleStart > compareStart);
+  assert.doesNotMatch(compare, /options:\s*selectedOptions\(\)/);
+  assert.match(single, /options:\s*selectedOptions\(\)/);
+});
+
 test("zero trades can never be confused with a dead runner", () => {
   const js = read("public/assets/js/trading-lab.js");
   const css = read("public/assets/styles/trading-lab.css");
