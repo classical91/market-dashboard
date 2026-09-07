@@ -245,6 +245,15 @@ test("strategy-specific options are sent only to a single-strategy backtest", ()
   assert.match(single, /options:\s*selectedOptions\(\)/);
 });
 
+test("every candle-backtest account offers a Pine Script copy action", () => {
+  const js = read("public/assets/js/trading-lab.js");
+  assert.match(js, /account\.supportsBacktest/);
+  assert.match(js, /data-copy-pine/);
+  assert.match(js, /Copy Pine Script/);
+  assert.match(js, /fetch\("\/pine\/"/);
+  assert.match(js, /navigator\.clipboard\.writeText/);
+});
+
 test("zero trades can never be confused with a dead runner", () => {
   const js = read("public/assets/js/trading-lab.js");
   const css = read("public/assets/styles/trading-lab.css");

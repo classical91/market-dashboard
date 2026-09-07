@@ -1,0 +1,26 @@
+//@version=5
+strategy("Market Dashboard - Mindset v1", overlay=true, initial_capital=10000, commission_type=strategy.commission.percent, commission_value=0.06, slippage=2)
+fastLen = input.int(20, "Fast EMA")
+slowLen = input.int(50, "Slow EMA")
+rsiLen = input.int(14, "RSI length")
+rsiLongMin = input.float(50, "Long RSI minimum")
+rsiLongMax = input.float(75, "Long RSI maximum")
+rsiShortMin = input.float(25, "Short RSI minimum")
+rsiShortMax = input.float(50, "Short RSI maximum")
+atrLen = input.int(14, "ATR length")
+stopAtr = input.float(2.0, "Shared stop ATR")
+rewardR = input.float(3.0, "Shared reward R")
+fast = ta.ema(close, fastLen)
+slow = ta.ema(close, slowLen)
+r = ta.rsi(close, rsiLen)
+a = ta.atr(atrLen)
+longSignal = fast > slow and r > rsiLongMin and r < rsiLongMax
+shortSignal = fast < slow and r < rsiShortMax and r > rsiShortMin
+if longSignal and strategy.position_size <= 0
+    strategy.entry("Long", strategy.long)
+if shortSignal and strategy.position_size >= 0
+    strategy.entry("Short", strategy.short)
+strategy.exit("Long exit", "Long", stop=strategy.position_avg_price-stopAtr*a, limit=strategy.position_avg_price+stopAtr*rewardR*a)
+strategy.exit("Short exit", "Short", stop=strategy.position_avg_price+stopAtr*a, limit=strategy.position_avg_price-stopAtr*rewardR*a)
+plot(fast, "Fast EMA", color=color.teal)
+plot(slow, "Slow EMA", color=color.orange)

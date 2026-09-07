@@ -1,0 +1,42 @@
+//@version=5
+strategy("Market Dashboard - SMC v1", overlay=true, initial_capital=10000, commission_type=strategy.commission.percent, commission_value=0.06, slippage=2)
+wing = input.int(2, "Swing wing", minval=1)
+fastLen = input.int(21, "Trend fast EMA")
+slowLen = input.int(50, "Trend slow EMA")
+atrLen = input.int(14, "ATR length")
+displacementAtr = input.float(1.2, "Displacement ATR")
+stopBufferAtr = input.float(0.25, "Stop buffer ATR")
+rewardR = input.float(2.0, "Fallback reward R")
+fast = ta.ema(close, fastLen)
+slow = ta.ema(close, slowLen)
+a = ta.atr(atrLen)
+swingHigh = ta.valuewhen(not na(ta.pivothigh(high, wing, wing)), high[wing], 0)
+swingLow = ta.valuewhen(not na(ta.pivotlow(low, wing, wing)), low[wing], 0)
+bullBos = ta.crossover(close, swingHigh)
+bearBos = ta.crossunder(close, swingLow)
+var float bullBottom = na
+var float bullTop = na
+var float bearBottom = na
+var float bearTop = na
+if bullBos and high-low >= displacementAtr*a and low > high[2]
+    bullBottom := high[2]
+    bullTop := low
+if bearBos and high-low >= displacementAtr*a and high < low[2]
+    bearBottom := high
+    bearTop := low[2]
+longSignal = fast > slow and not na(bullTop) and low <= bullTop and close > bullBottom
+shortSignal = fast < slow and not na(bearBottom) and high >= bearBottom and close < bearTop
+if longSignal
+    stop = math.min(bullBottom, low)-stopBufferAtr*a
+    strategy.entry("Long", strategy.long)
+    strategy.exit("Long exit", "Long", stop=stop, limit=close+rewardR*(close-stop))
+    bullBottom := na
+    bullTop := na
+if shortSignal
+    stop = math.max(bearTop, high)+stopBufferAtr*a
+    strategy.entry("Short", strategy.short)
+    strategy.exit("Short exit", "Short", stop=stop, limit=close-rewardR*(stop-close))
+    bearBottom := na
+    bearTop := na
+plot(fast, "Fast EMA", color=color.teal)
+plot(slow, "Slow EMA", color=color.orange)
