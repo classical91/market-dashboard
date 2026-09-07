@@ -69,15 +69,6 @@
     return isNaN(d.getTime()) ? "—" : d.toLocaleString();
   }
 
-  // Date only. A chart axis on a phone has room for "1/1/2026" and not for
-  // "1/1/2026, 12:00:00 AM", and the time of day is noise on a run measured
-  // in months.
-  function fmtDay(iso) {
-    if (!iso) return "—";
-    var d = new Date(iso);
-    return isNaN(d.getTime()) ? "—" : d.toLocaleDateString();
-  }
-
   function showError(message) {
     notice.style.display = "block";
     notice.innerHTML = "&#9888;&#65039; " + escapeHtml(message);
@@ -954,56 +945,508 @@
       .join(" ");
   }
 
-  // The main equity chart: the curve, the peak-to-trough shading underneath
-  // it, and a baseline at break-even.
-  //
-  // The drawdown band is the point of the chart. Two runs can finish at the
-  // same equity having felt completely different on the way, and a bare line
-  // hides that — the shaded gap between the running peak and the curve is the
-  // pain the number at the end does not show.
-  function equityChart(curve, id) {
-    if (!curve || curve.length < 2) return '<div class="de-empty tl-chart-empty">No equity curve — this run closed no trades.</div>';
+  /* ── Performance panel ────────────────────────────────────────────────────
 
-    var values = curveValues(curve);
-    var height = 160;
-    var peaks = [];
-    var peak = -Infinity;
-    for (var i = 0; i < values.length; i += 1) {
-      peak = Math.max(peak, values[i]);
-      peaks.push(peak);
+     The post-run panel: headline stats, the strategy equity curve, and the
+     buy-and-hold benchmark for the same symbol, timeframe, window, capital and
+     fees drawn on the same axis.
+
+     The benchmark is the point. A strategy that returned +18% on a symbol that
+     returned +40% by being left alone is a losing strategy, and a lone green
+     line does not say so. Both lines therefore share one y scale, one time
+     axis and one tooltip — see performance-panel.js, which owns all of the
+     arithmetic below the rendering so the zoom, alignment and hover behaviour
+     can be tested without a browser.
+
+     Zoom and pan exist because the interesting part of a several-thousand-bar
+     run is usually one drawdown a few dozen bars wide, and at full extent that
+     is four pixels. Reset Zoom is a visible control rather than a
+     double-click-to-discover gesture, because a reader who has zoomed in and
+     cannot find the way out is stuck looking at a chart they can no longer
+     interpret. */
+
+  var PANEL = typeof window !== "undefined" ? window.PerformancePanel : null;
+
+  var BENCHMARK_COLOR = "#7c9cff";
+
+  // Green or red for the run as a whole. Read once and threaded through the
+  // line, the legend key and the tooltip row, because when each decided for
+  // itself a losing run drew a red line beneath a green legend swatch.
+  function strategyColor(model) {
+    var points = model.points;
+    return points.length > 1 && points[points.length - 1].strategy >= points[0].strategy ? UP : DOWN;
+  }
+
+  function panelSvg(model, geometry) {
+    var w = geometry.width;
+    var h = geometry.height;
+    var grid = geometry.ticks
+      .map(function (tick) {
+        return '<line class="tl-perf-grid" x1="0" y1="' + tick.y.toFixed(1) + '" x2="' + w +
+          '" y2="' + tick.y.toFixed(1) + '" vector-effect="non-scaling-stroke" />';
+      })
+      .join("");
+
+    var baseline = geometry.baselineY === null
+      ? ""
+      : '<line class="tl-chart-base" x1="0" y1="' + geometry.baselineY.toFixed(1) +
+        '" x2="' + w + '" y2="' + geometry.baselineY.toFixed(1) + '" vector-effect="non-scaling-stroke" />';
+
+    function lines(segments, className, color, extra) {
+      return segments
+        .map(function (segment) {
+          return '<polyline class="' + className + '" fill="none" points="' + segment.join(" ") +
+            '" stroke="' + color + '" vector-effect="non-scaling-stroke"' + (extra || "") + " />";
+        })
+        .join("");
     }
 
-    var base = values[0];
-    var all = values.concat(peaks).concat([base]);
-    var min = Math.min.apply(null, all);
-    var max = Math.max.apply(null, all);
-    var span = max - min || 1;
-    // A little headroom so the line never runs along the frame edge.
-    min -= span * 0.06;
-    max += span * 0.06;
-    span = max - min;
-
-    var linePts = pointsFor(values, min, span, CHART_W, height);
-    var peakPts = pointsFor(peaks, min, span, CHART_W, height);
-    // Closed band between the running peak and the equity line.
-    var band = peakPts + " " + linePts.split(" ").reverse().join(" ");
-    var baseY = (height - ((base - min) / span) * height).toFixed(1);
-    var up = values[values.length - 1] >= base;
 
     return (
-      '<div class="tl-chart" data-chart="' + escapeHtml(id) + '">' +
-      '<svg class="tl-chart-plot" viewBox="0 0 ' + CHART_W + " " + height + '" preserveAspectRatio="none" ' +
-      'role="img" aria-label="Equity curve with drawdown from peak shaded">' +
-      '<polygon class="tl-chart-dd" points="' + band + '" />' +
-      '<line class="tl-chart-base" x1="0" y1="' + baseY + '" x2="' + CHART_W + '" y2="' + baseY + '" ' +
-      'vector-effect="non-scaling-stroke" />' +
-      '<polyline class="tl-chart-line" fill="none" points="' + linePts + '" ' +
-      'stroke="' + (up ? UP : DOWN) + '" vector-effect="non-scaling-stroke" />' +
-      '<line class="tl-chart-cursor" x1="0" y1="0" x2="0" y2="' + height + '" ' +
+      '<svg class="tl-perf-plot" viewBox="0 0 ' + w + " " + h + '" preserveAspectRatio="none" ' +
+      'aria-hidden="true" focusable="false">' +
+      grid +
+      baseline +
+      // Benchmark under the strategy line: when they overlap it is the
+      // strategy's own result the reader is here for.
+      lines(geometry.benchmark, "tl-perf-line tl-perf-line--benchmark", BENCHMARK_COLOR, ' stroke-dasharray="5 4"') +
+      lines(geometry.strategy, "tl-perf-line tl-perf-line--strategy", strategyColor(model)) +
+      '<line class="tl-chart-cursor tl-perf-cursor" x1="0" y1="0" x2="0" y2="' + h + '" ' +
       'vector-effect="non-scaling-stroke" style="display:none" />' +
-      "</svg>" +
+      "</svg>"
+    );
+  }
+
+  // The y-axis labels ride as absolutely positioned HTML rather than SVG text:
+  // this viewBox is stretched non-uniformly to the card width, and SVG text
+  // inside it would be squashed with it.
+  function panelAxisLabels(geometry) {
+    return geometry.ticks
+      .map(function (tick) {
+        // Each label is centred on its gridline, so one at the very top or
+        // bottom of the plot hangs half outside it — and the bottom one landed
+        // on the date row beneath the chart. Held just inside the frame
+        // instead: a few pixels of drift from the line is a far smaller lie
+        // than a price sitting on top of a date.
+        var top = Math.min(97, Math.max(3, (tick.y / geometry.height) * 100));
+        return '<span class="tl-perf-ytick" style="top:' + top.toFixed(2) + '%">' +
+          escapeHtml(PANEL.formatUsd(tick.value)) + "</span>";
+      })
+      .join("");
+  }
+
+  function panelStats(model) {
+    var s = model.strategy || {};
+    return (
+      statTile("Net P&L", escapeHtml(PANEL.formatSignedUsd(s.netPnlUsd)), pnlClass(s.netPnlUsd)) +
+      statTile("Return", escapeHtml(PANEL.formatPct(s.returnPct)), pnlClass(s.returnPct)) +
+      // Sign-free by definition, so it is never coloured green: a small
+      // drawdown is still a loss, and tinting it like a gain misreads it.
+      statTile("Max drawdown", escapeHtml((Number(s.maxDrawdownPct) || 0).toFixed(2)) + "%") +
+      statTile("Total trades", escapeHtml(String(s.totalTrades || 0))) +
+      statTile("Win rate", s.totalTrades ? escapeHtml(String(s.winRate)) + "%" : "—") +
+      statTile("Profit factor", escapeHtml(PANEL.formatProfitFactor(s.profitFactor, s.totalTrades)))
+    );
+  }
+
+  // Strategy against buy-and-hold, on the three measures both sides can
+  // honestly answer. Trade counts, win rate and profit factor are deliberately
+  // absent: a buy-and-hold position is one trade that never closed, and
+  // printing "1 trade, 100% win rate" beside a strategy's forty would invite
+  // exactly the comparison that means nothing.
+  function panelComparison(model) {
+    var s = model.strategy || {};
+    var b = model.benchmark || {};
+    if (!b.available) return "";
+
+    function row(label, strategyValue, benchmarkValue, delta) {
+      return (
+        "<tr><th scope=\"row\">" + escapeHtml(label) + "</th>" +
+        '<td data-label="Strategy">' + strategyValue + "</td>" +
+        '<td data-label="Buy &amp; hold">' + benchmarkValue + "</td>" +
+        '<td data-label="Difference">' + delta + "</td></tr>"
+      );
+    }
+
+    function span(value, cls) {
+      return '<span class="' + (cls || "") + '">' + escapeHtml(value) + "</span>";
+    }
+
+    var pnlDelta = (Number(s.netPnlUsd) || 0) - (Number(b.netPnlUsd) || 0);
+    var pctDelta = (Number(s.returnPct) || 0) - (Number(b.returnPct) || 0);
+    // A SMALLER drawdown is the better outcome, so the sign that reads as good
+    // here is the opposite of the one above it. Reported as "strategy minus
+    // benchmark" all the same, and coloured by which side it favours.
+    var ddDelta = (Number(s.maxDrawdownPct) || 0) - (Number(b.maxDrawdownPct) || 0);
+
+    return (
+      '<div class="de-table-wrap"><table class="de-table tl-perf-compare">' +
+      "<thead><tr><th>Measure</th><th>Strategy</th><th>Buy &amp; hold</th><th>Difference</th></tr></thead><tbody>" +
+      row(
+        "Net P&L",
+        span(PANEL.formatSignedUsd(s.netPnlUsd), pnlClass(s.netPnlUsd)),
+        span(PANEL.formatSignedUsd(b.netPnlUsd), pnlClass(b.netPnlUsd)),
+        span(PANEL.formatSignedUsd(pnlDelta), pnlClass(pnlDelta)),
+      ) +
+      row(
+        "Return",
+        span(PANEL.formatPct(s.returnPct), pnlClass(s.returnPct)),
+        span(PANEL.formatPct(b.returnPct), pnlClass(b.returnPct)),
+        span(PANEL.formatPct(pctDelta), pnlClass(pctDelta)),
+      ) +
+      row(
+        "Max drawdown",
+        span((Number(s.maxDrawdownPct) || 0).toFixed(2) + "%"),
+        span((Number(b.maxDrawdownPct) || 0).toFixed(2) + "%"),
+        span((ddDelta > 0 ? "+" : "") + ddDelta.toFixed(2) + "%", pnlClass(-ddDelta)),
+      ) +
+      "</tbody></table></div>"
+    );
+  }
+
+  // What a screen reader gets instead of the curve. A chart with no text
+  // equivalent is not readable at all without sight, and the panel's whole
+  // claim is a comparison that can be stated in one sentence.
+  function panelSummarySentence(model, meta) {
+    var s = model.strategy || {};
+    var b = model.benchmark || {};
+    var head =
+      (meta.symbol || "") + " " + (meta.interval || "") + ": the strategy returned " +
+      PANEL.formatPct(s.returnPct) + " with a maximum drawdown of " +
+      (Number(s.maxDrawdownPct) || 0).toFixed(2) + "% over " + model.points.length + " bars";
+    if (!b.available) return head + ". No buy-and-hold benchmark is available for this run.";
+    return (
+      head + ", against buy-and-hold at " + PANEL.formatPct(b.returnPct) +
+      " with a maximum drawdown of " + (Number(b.maxDrawdownPct) || 0).toFixed(2) + "%."
+    );
+  }
+
+  function panelWarnings(model) {
+    if (!model.warnings.length) return "";
+    return (
+      '<div class="de-warnings" style="display:block">' +
+      model.warnings.map(function (w) { return "<div>" + escapeHtml(w) + "</div>"; }).join("") +
       "</div>"
     );
+  }
+
+  // The three states a card that runs a request must be able to be in. They
+  // live together because the difference between them is what a reader uses to
+  // decide whether to wait, to fix something, or to read the numbers: a failure
+  // rendered in the same grey "de-empty" box as "nothing run yet" is a failure
+  // nobody notices.
+  function btLoading(message) {
+    return (
+      '<div class="tl-perf-loading" role="status" aria-live="polite">' +
+      '<span class="tl-perf-spinner" aria-hidden="true"></span>' +
+      "<span>" + escapeHtml(message) + "</span>" +
+      "</div>" +
+      // Placeholders shaped like the stat tiles they will be replaced by, so
+      // the card does not jump when the result lands.
+      '<div class="tl-stat-grid tl-perf-skeleton" aria-hidden="true">' +
+      "<div></div><div></div><div></div><div></div><div></div><div></div></div>" +
+      '<div class="tl-perf-skeleton-plot" aria-hidden="true"></div>'
+    );
+  }
+
+  function btError(title, detail) {
+    return (
+      '<div class="tl-perf-error" role="alert">' +
+      "<strong>" + escapeHtml(title) + "</strong>" +
+      '<span>' + escapeHtml(detail || "No reason was returned.") + "</span>" +
+      "</div>"
+    );
+  }
+
+  /**
+   * Render the panel into `host` and wire its interactions.
+   *
+   * The whole panel is one function because the chart is re-rendered on every
+   * zoom and pan: the SVG is a projection of (model, view), and keeping that
+   * projection in one place is what stops the crosshair, the tooltip and the
+   * line from ever disagreeing about which bar is under the pointer.
+   */
+  function renderPerformancePanel(host, performance, meta) {
+    var info = meta || {};
+    if (!host) return;
+    if (!PANEL) {
+      host.innerHTML = '<div class="de-empty">The performance panel could not load.</div>';
+      return;
+    }
+    var model = PANEL.buildModel(performance);
+
+    if (!model.available) {
+      host.innerHTML =
+        '<section class="tl-perf tl-perf--empty">' +
+        '<div class="tl-chart-head"><span class="tl-chart-title">Performance</span></div>' +
+        '<div class="de-empty">' + escapeHtml(model.reason) + "</div>" +
+        "</section>";
+      return;
+    }
+
+    var view = PANEL.fullView();
+
+    host.innerHTML =
+      '<section class="tl-perf">' +
+      '<div class="tl-perf-head">' +
+      '<div><div class="tl-chart-title">Performance</div>' +
+      '<div class="tl-perf-sub">' +
+      escapeHtml(info.symbol || "") + " " + escapeHtml(info.interval || "") +
+      " &middot; " + escapeHtml(PANEL.formatDay(info.from)) + " &rarr; " + escapeHtml(PANEL.formatDay(info.to)) +
+      "</div></div>" +
+      '<div class="tl-perf-actions">' +
+      '<span class="tl-perf-hint">Scroll or pinch to zoom &middot; drag to pan</span>' +
+      '<button class="aia-run-btn tl-perf-reset" type="button" data-perf-reset disabled>Reset Zoom</button>' +
+      "</div></div>" +
+
+      '<div class="tl-stat-grid tl-perf-stats">' + panelStats(model) + "</div>" +
+
+      '<div class="tl-perf-legend">' +
+      '<span class="tl-perf-key"><i class="tl-perf-swatch tl-perf-swatch--strategy" ' +
+      'style="border-top-color:' + strategyColor(model) + '"></i>Strategy equity</span>' +
+      (model.hasBenchmark
+        ? '<span class="tl-perf-key"><i class="tl-perf-swatch tl-perf-swatch--benchmark"></i>Buy &amp; hold ' +
+          escapeHtml(info.symbol || "") + "</span>"
+        : "") +
+      '<span class="tl-perf-readout" data-perf-readout role="status" aria-live="polite"></span>' +
+      "</div>" +
+
+      // The chart is focusable, so it has to say what the keys do. The sighted
+      // hint beside Reset Zoom cannot carry that — it is hidden outright on a
+      // phone — so the instructions live in their own always-present
+      // description instead of being inferable only by trying keys.
+      '<span class="tl-perf-sr" id="tl-perf-help">Interactive chart. ' +
+      'Left and right arrows move through the bars and read out each one, ' +
+      'plus and minus zoom, Home or Escape resets the zoom.</span>' +
+      '<div class="tl-perf-chart" data-perf-chart tabindex="0" role="img" ' +
+      'aria-describedby="tl-perf-help" ' +
+      'aria-label="' + escapeHtml(panelSummarySentence(model, info)) + '">' +
+      '<div class="tl-perf-yaxis" data-perf-yaxis aria-hidden="true"></div>' +
+      '<div class="tl-perf-plot-wrap" data-perf-plot></div>' +
+      '<div class="tl-perf-tooltip" data-perf-tooltip hidden></div>' +
+      "</div>" +
+      '<div class="tl-chart-axis"><span data-perf-x-from></span>' +
+      '<span data-perf-x-span></span>' +
+      "<span data-perf-x-to></span></div>" +
+
+      panelComparison(model) +
+      '<div class="tl-bt-meta">Buy &amp; hold buys ' + escapeHtml(info.symbol || "the symbol") +
+      " at the first replayed bar's close with the same starting capital and the same fee and slippage assumptions, " +
+      "and is marked to market at the end rather than charged an exit &mdash; the same treatment a strategy position " +
+      "still open at the end gets. Drawdown is measured on each side's mark-to-market equity curve.</div>" +
+      panelWarnings(model) +
+      "</section>";
+
+    var chart = host.querySelector("[data-perf-chart]");
+    var plot = host.querySelector("[data-perf-plot]");
+    var yaxis = host.querySelector("[data-perf-yaxis]");
+    var tooltip = host.querySelector("[data-perf-tooltip]");
+    var readout = host.querySelector("[data-perf-readout]");
+    var resetBtn = host.querySelector("[data-perf-reset]");
+    var xFrom = host.querySelector("[data-perf-x-from]");
+    var xTo = host.querySelector("[data-perf-x-to]");
+    var xSpan = host.querySelector("[data-perf-x-span]");
+    var geometry = null;
+    var cursor = null;
+    var hoverIndex = null;
+
+    function draw() {
+      geometry = PANEL.buildGeometry(model, view, { width: PANEL.PLOT_W, height: PANEL.PLOT_H });
+      plot.innerHTML = panelSvg(model, geometry);
+      yaxis.innerHTML = panelAxisLabels(geometry);
+      cursor = plot.querySelector(".tl-perf-cursor");
+      resetBtn.disabled = PANEL.isFullView(view);
+      xFrom.textContent = PANEL.formatDay(geometry.points[0].at);
+      xTo.textContent = PANEL.formatDay(geometry.points[geometry.points.length - 1].at);
+      xSpan.textContent =
+        geometry.points.length + " of " + model.points.length + " bars" +
+        (PANEL.isFullView(view) ? "" : " (zoomed)");
+      if (hoverIndex !== null) showAt(hoverIndex);
+    }
+
+    function hide() {
+      hoverIndex = null;
+      if (cursor) cursor.style.display = "none";
+      tooltip.hidden = true;
+      readout.textContent = "";
+    }
+
+    function showAt(index) {
+      if (!geometry || index < geometry.from || index > geometry.to) {
+        hide();
+        return;
+      }
+      hoverIndex = index;
+      var point = model.points[index];
+      var offset = geometry.to === geometry.from ? 0 : (index - geometry.from) / (geometry.to - geometry.from);
+      var x = offset * PANEL.PLOT_W;
+      if (cursor) {
+        cursor.setAttribute("x1", x.toFixed(1));
+        cursor.setAttribute("x2", x.toFixed(1));
+        cursor.style.display = "";
+      }
+
+      tooltip.innerHTML =
+        '<div class="tl-perf-tip-time">' + escapeHtml(PANEL.formatDateTime(point.at)) + "</div>" +
+        '<div class="tl-perf-tip-row"><i class="tl-perf-swatch tl-perf-swatch--strategy" ' +
+        'style="border-top-color:' + strategyColor(model) + '"></i>' +
+        "<span>Strategy</span><strong>" + escapeHtml(PANEL.formatUsd(point.strategy)) + "</strong></div>" +
+        (point.benchmark === null
+          ? ""
+          : '<div class="tl-perf-tip-row"><i class="tl-perf-swatch tl-perf-swatch--benchmark"></i>' +
+            "<span>Buy &amp; hold</span><strong>" + escapeHtml(PANEL.formatUsd(point.benchmark)) +
+            "</strong></div>" +
+            '<div class="tl-perf-tip-diff ' + pnlClass(point.strategy - point.benchmark) + '">' +
+            escapeHtml(PANEL.formatSignedUsd(point.strategy - point.benchmark)) + " vs holding</div>");
+      tooltip.hidden = false;
+      // Flip the tooltip to the other side of the crosshair near the right
+      // edge, so it is never clipped by the card it lives in.
+      tooltip.classList.toggle("tl-perf-tooltip--flip", offset > 0.6);
+      // Set as a custom property rather than as `style.left`: an inline style
+      // outranks a media query, and the mobile rule below 720px pins the
+      // tooltip across the card instead of letting it track the finger off
+      // the right edge.
+      tooltip.style.setProperty("--tl-perf-tip-x", (offset * 100).toFixed(2) + "%");
+
+      readout.textContent =
+        PANEL.formatDateTime(point.at) + " · strategy " + PANEL.formatUsd(point.strategy) +
+        (point.benchmark === null ? "" : " · buy & hold " + PANEL.formatUsd(point.benchmark));
+    }
+
+    function ratioFrom(clientX) {
+      var box = chart.getBoundingClientRect();
+      if (!box.width) return null;
+      return Math.min(1, Math.max(0, (clientX - box.left) / box.width));
+    }
+
+    function hoverAt(clientX) {
+      var ratio = ratioFrom(clientX);
+      if (ratio === null) return;
+      var found = PANEL.pointAtRatio(model, view, ratio);
+      if (found) showAt(found.index);
+    }
+
+    // Active pointers, so a two-finger pinch is distinguishable from a
+    // one-finger pan without a separate touch-event path.
+    var pointers = {};
+    var dragging = null;
+    var pinch = null;
+
+    function pointerList() {
+      return Object.keys(pointers).map(function (id) { return pointers[id]; });
+    }
+
+    chart.addEventListener("pointerdown", function (event) {
+      pointers[event.pointerId] = { x: event.clientX, y: event.clientY };
+      var active = pointerList();
+      if (active.length === 2) {
+        pinch = { distance: Math.abs(active[0].x - active[1].x) || 1, view: { start: view.start, end: view.end } };
+        dragging = null;
+        return;
+      }
+      dragging = { x: event.clientX, moved: false, view: { start: view.start, end: view.end } };
+      if (chart.setPointerCapture) chart.setPointerCapture(event.pointerId);
+    });
+
+    chart.addEventListener("pointermove", function (event) {
+      if (pointers[event.pointerId]) pointers[event.pointerId] = { x: event.clientX, y: event.clientY };
+      var active = pointerList();
+
+      if (pinch && active.length === 2) {
+        var distance = Math.abs(active[0].x - active[1].x) || 1;
+        var box = chart.getBoundingClientRect();
+        var midpoint = box.width ? ((active[0].x + active[1].x) / 2 - box.left) / box.width : 0.5;
+        view = PANEL.zoomView(pinch.view, midpoint, pinch.distance / distance, model.points.length);
+        draw();
+        if (event.cancelable) event.preventDefault();
+        return;
+      }
+
+      if (dragging) {
+        var dx = event.clientX - dragging.x;
+        if (!dragging.moved && Math.abs(dx) < 4) return;
+        dragging.moved = true;
+        var box2 = chart.getBoundingClientRect();
+        if (!box2.width) return;
+        // Drag right, move earlier in time: the chart follows the finger.
+        view = PANEL.panView(dragging.view, -dx / box2.width, model.points.length);
+        draw();
+        if (event.cancelable) event.preventDefault();
+        return;
+      }
+
+      hoverAt(event.clientX);
+      // Only a touch drag needs the page held still; a mouse move must not
+      // swallow the page's own scrolling.
+      if (event.cancelable && event.pointerType === "touch") event.preventDefault();
+    });
+
+    function release(event) {
+      delete pointers[event.pointerId];
+      if (pointerList().length < 2) pinch = null;
+      // A press that never moved is a tap, and a tap on a chart means "read
+      // this bar" — not "pan by zero".
+      if (dragging && !dragging.moved) hoverAt(event.clientX);
+      dragging = null;
+    }
+
+    chart.addEventListener("pointerup", release);
+    chart.addEventListener("pointercancel", function (event) {
+      delete pointers[event.pointerId];
+      if (pointerList().length < 2) pinch = null;
+      dragging = null;
+    });
+    chart.addEventListener("pointerleave", function () {
+      if (!dragging) hide();
+    });
+
+    chart.addEventListener(
+      "wheel",
+      function (event) {
+        var ratio = ratioFrom(event.clientX);
+        if (ratio === null) return;
+        event.preventDefault();
+        view = PANEL.zoomView(view, ratio, event.deltaY > 0 ? 1.2 : 1 / 1.2, model.points.length);
+        draw();
+      },
+      { passive: false },
+    );
+
+    // Keyboard parity for the pointer gestures. A chart that can only be
+    // explored with a mouse is a chart half the numbers are unreachable in.
+    chart.addEventListener("keydown", function (event) {
+      var count = model.points.length;
+      var handled = true;
+      if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
+        var step = event.key === "ArrowRight" ? 1 : -1;
+        var next = hoverIndex === null ? (geometry ? geometry.from : 0) : hoverIndex + step;
+        if (geometry && next < geometry.from) view = PANEL.panView(view, -0.1, count);
+        if (geometry && next > geometry.to) view = PANEL.panView(view, 0.1, count);
+        draw();
+        showAt(Math.min(geometry.to, Math.max(geometry.from, next)));
+      } else if (event.key === "+" || event.key === "=") {
+        view = PANEL.zoomView(view, 0.5, 1 / 1.4, count);
+        draw();
+      } else if (event.key === "-" || event.key === "_") {
+        view = PANEL.zoomView(view, 0.5, 1.4, count);
+        draw();
+      } else if (event.key === "Home" || event.key === "0" || event.key === "Escape") {
+        view = PANEL.fullView();
+        hide();
+        draw();
+      } else {
+        handled = false;
+      }
+      if (handled) event.preventDefault();
+    });
+
+    resetBtn.addEventListener("click", function () {
+      view = PANEL.fullView();
+      draw();
+      chart.focus();
+    });
+
+    draw();
   }
 
   // A facet in the comparison grid. One line, no shading, no axis — it is
@@ -1093,42 +1536,6 @@
       "<span>" + hi + "R</span></div>" +
       "</div>"
     );
-  }
-
-  // The crosshair. An HTML/SVG chart is interactive by default, and on a
-  // phone the readout IS the axis — there is no room for one otherwise.
-  // Pointer events cover mouse and touch in one path.
-  function attachCrosshair(root, curve) {
-    var wrap = root.querySelector(".tl-chart");
-    var readout = root.querySelector(".tl-chart-readout");
-    if (!wrap || !readout || !curve || curve.length < 2) return;
-    var cursor = wrap.querySelector(".tl-chart-cursor");
-    var idle = readout.innerHTML;
-
-    function move(event) {
-      var box = wrap.getBoundingClientRect();
-      if (!box.width) return;
-      var ratio = Math.min(1, Math.max(0, (event.clientX - box.left) / box.width));
-      var point = curve[Math.round(ratio * (curve.length - 1))];
-      if (!point) return;
-      cursor.setAttribute("x1", (ratio * CHART_W).toFixed(1));
-      cursor.setAttribute("x2", (ratio * CHART_W).toFixed(1));
-      cursor.style.display = "";
-      readout.innerHTML =
-        "<strong>" + escapeHtml(fmtUsd(point.equity)) + "</strong> equity &middot; " +
-        escapeHtml(fmtTime(point.at));
-      if (event.cancelable && event.pointerType === "touch") event.preventDefault();
-    }
-
-    function leave() {
-      cursor.style.display = "none";
-      readout.innerHTML = idle;
-    }
-
-    wrap.addEventListener("pointerdown", move);
-    wrap.addEventListener("pointermove", move);
-    wrap.addEventListener("pointerleave", leave);
-    wrap.addEventListener("pointercancel", leave);
   }
 
   // The backtester applies fees, slippage and funding inside the paper trader
@@ -1237,13 +1644,18 @@
     }
     var s = data.stats;
     var m = s.riskMetrics || {};
+    // Net P&L, return, max drawdown, trade count, win rate and profit factor
+    // are the performance panel's, above. Only what the panel does NOT carry
+    // is repeated here — printing the same six numbers twice, with a max
+    // drawdown measured two legitimately different ways, left a reader
+    // reconciling a disagreement instead of reading a result.
     var tiles =
-      statTile("Net P&L", fmtUsd(s.realizedPnl), pnlClass(s.realizedPnl)) +
-      statTile("Closed trades", m.closedTrades || 0) +
-      statTile("Win rate", s.totalTrades ? s.winRate + "%" : "—") +
       statTile("Expectancy", m.closedTrades ? (m.expectancyR > 0 ? "+" : "") + m.expectancyR + "R" : "—", pnlClass(m.expectancyR)) +
-      statTile("Profit factor", m.profitFactor == null ? (m.closedTrades ? "∞" : "—") : m.profitFactor) +
-      statTile("Max drawdown", m.closedTrades ? m.maxDrawdownPct + "%" : "—") +
+      // The closed-trade drawdown, which is NOT the panel's: it walks realised
+      // P&L trade by trade and cannot see an open position's paper loss. Kept,
+      // and labelled for the difference, because it is the figure the
+      // expectancy work and the promotion rules are written in.
+      statTile("Closed-trade drawdown", m.closedTrades ? m.maxDrawdownPct + "%" : "—") +
       statTile("Worst streak", m.worstConsecutiveLosses || 0) +
       statTile("Refused", (data.skipped || []).length);
 
@@ -1253,25 +1665,11 @@
         : [],
     );
 
-    var curve = data.equityCurve || [];
-    var endEquity = curve.length ? curve[curve.length - 1].equity : null;
-
     btResult.innerHTML =
+      // The performance panel mounts into its own node so it can re-render on
+      // zoom without the rest of the result being rebuilt underneath it.
+      '<div class="tl-perf-mount" id="tl-bt-performance"></div>' +
       '<div class="tl-stat-grid">' + tiles + "</div>" +
-      '<div class="tl-chart-block">' +
-      '<div class="tl-chart-head">' +
-      '<span class="tl-chart-title">Equity</span>' +
-      '<span class="tl-chart-note tl-chart-readout">' +
-      (endEquity == null
-        ? "no closed trades"
-        : "ended " + escapeHtml(fmtUsd(endEquity)) + " &middot; shaded band is drawdown from peak") +
-      "</span></div>" +
-      equityChart(curve, "bt-equity") +
-      (curve.length > 1
-        ? '<div class="tl-chart-axis"><span>' + escapeHtml(fmtDay(data.from)) +
-          "</span><span>" + escapeHtml(fmtDay(data.to)) + "</span></div>"
-        : "") +
-      "</div>" +
       rMultipleChart(data.trades) +
       '<div class="tl-bt-meta">' +
       escapeHtml(data.strategyName || data.strategy || "—") +
@@ -1294,7 +1692,15 @@
           "</div>"
         : "");
 
-    attachCrosshair(btResult, curve);
+    // A run from a deployment that predates the panel simply has no
+    // `performance` block. buildModel() turns that into the empty state rather
+    // than an exception, so an older response still renders everything else.
+    renderPerformancePanel(document.getElementById("tl-bt-performance"), data.performance, {
+      symbol: data.symbol,
+      interval: data.interval,
+      from: data.from,
+      to: data.to,
+    });
   }
 
   // The catalogue is public, so the selector fills in on page load whether or
@@ -1522,7 +1928,7 @@
       return;
     }
     btCompareBtn.disabled = true;
-    btCompareResult.innerHTML = '<div class="de-empty">Replaying every strategy&hellip;</div>';
+    btCompareResult.innerHTML = btLoading("Replaying every strategy over " + symbol + " " + btInterval.value + "\u2026");
     postAdmin("/api/trading-lab/backtest/compare", {
       symbol: symbol,
       interval: btInterval.value,
@@ -1532,7 +1938,7 @@
     })
       .then(renderComparison)
       .catch(function (err) {
-        btCompareResult.innerHTML = '<div class="de-empty">Comparison failed: ' + escapeHtml(err.message) + "</div>";
+        btCompareResult.innerHTML = btError("Comparison failed", err.message);
       })
       .then(function () { btCompareBtn.disabled = false; });
   });
@@ -1544,7 +1950,11 @@
       return;
     }
     btRunBtn.disabled = true;
-    btResult.innerHTML = '<div class="de-empty">Replaying bars&hellip;</div>';
+    // A replay of several thousand bars plus a candle fetch takes seconds, and
+    // an unchanged panel during that time reads as a finished run. The skeleton
+    // says which run is in flight, so a reader who changed the symbol and
+    // clicked can tell whether they are looking at the new one yet.
+    btResult.innerHTML = btLoading("Replaying " + symbol + " " + btInterval.value + " bars\u2026");
     postAdmin("/api/trading-lab/backtest", {
       symbol: symbol,
       interval: btInterval.value,
@@ -1555,7 +1965,7 @@
     })
       .then(renderBacktest)
       .catch(function (err) {
-        btResult.innerHTML = '<div class="de-empty">Backtest failed: ' + escapeHtml(err.message) + "</div>";
+        btResult.innerHTML = btError("Backtest failed", err.message);
       })
       .then(function () { btRunBtn.disabled = false; });
   });

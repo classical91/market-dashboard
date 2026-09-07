@@ -43,6 +43,7 @@ const {
   assertValidOptions,
 } = require("./strategies");
 const { summarizeRun, costSummary } = require("./run-summary");
+const { buildPerformancePanel } = require("./benchmark");
 const { getCostScenario, identifyCostScenario, costCaveats } = require("./cost-scenarios");
 const { buildExperimentRecord } = require("./experiment-record");
 const {
@@ -793,6 +794,23 @@ class BacktestService {
       regimeCounts,
       trades: trader.getHistory(),
       openAtEnd,
+      // The post-run performance panel: the strategy and a buy-and-hold
+      // benchmark measured the same way, over the same bars, from the same
+      // capital, under the same friction. Built here rather than in the
+      // browser because every input it needs — the candle array the replay
+      // actually consumed, the warmup barrier, the account's starting balance,
+      // the config's fee rates — lives on this side, and a benchmark
+      // reconstructed downstream from a downsampled curve would be a different
+      // run's answer. See ./benchmark.js.
+      performance: buildPerformancePanel({
+        equityCurve,
+        bars,
+        warmup,
+        startingBalance: account.startingBalance,
+        stats,
+        openAtEnd: openAtEnd.length,
+        costs: costSummary(runConfig),
+      }),
       skipped,
       // Every entry signal the strategy produced, whether or not the
       // gauntlet let it through, with the reasons it fired.
