@@ -1,0 +1,25 @@
+//@version=5
+strategy("Market Dashboard - VWAP Reversion v1", overlay=true, initial_capital=10000, commission_type=strategy.commission.percent, commission_value=0.06, slippage=2)
+adxLen = input.int(14, "ADX length", minval=2)
+atrLen = input.int(14, "ATR length", minval=2)
+maxAdx = input.float(22, "Maximum ADX")
+entryAtr = input.float(1.8, "Entry stretch ATR")
+stopBufferAtr = input.float(0.5, "Stop buffer ATR")
+minRewardR = input.float(1.0, "Minimum reward R")
+[diPlus, diMinus, adx] = ta.dmi(adxLen, adxLen)
+a = ta.atr(atrLen)
+v = ta.vwap(hlc3)
+stretch = (close-v)/a
+longSignal = adx < maxAdx and stretch <= -entryAtr and close > close[1]
+shortSignal = adx < maxAdx and stretch >= entryAtr and close < close[1]
+longStop = low-stopBufferAtr*a
+shortStop = high+stopBufferAtr*a
+longRewardR = (v-close)/math.max(close-longStop, syminfo.mintick)
+shortRewardR = (close-v)/math.max(shortStop-close, syminfo.mintick)
+if longSignal and longRewardR >= minRewardR
+    strategy.entry("Long", strategy.long)
+    strategy.exit("Long exit", "Long", stop=longStop, limit=v)
+if shortSignal and shortRewardR >= minRewardR
+    strategy.entry("Short", strategy.short)
+    strategy.exit("Short exit", "Short", stop=shortStop, limit=v)
+plot(v, "Session VWAP", color=color.purple, linewidth=2)

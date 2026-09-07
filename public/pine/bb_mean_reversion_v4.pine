@@ -1,0 +1,51 @@
+//@version=5
+strategy("Market Dashboard - BB Mean-Reversion + Trend + Volume v4", overlay=true, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=100, commission_type=strategy.commission.percent, commission_value=0.06, slippage=2)
+trendLen = input.int(96, "Local Trend EMA Length", minval=20, maxval=300)
+slopeLen = input.int(5, "EMA Slope Lookback", minval=2, maxval=20)
+bbLen = input.int(20, "Bollinger Length", minval=10, maxval=50)
+bbMult = input.float(2.0, "Bollinger StdDev Mult", minval=1, maxval=3)
+volLen = input.int(20, "Volume MA Length", minval=5, maxval=50)
+volMult = input.float(1.5, "Volume Spike Multiplier", minval=1, maxval=3)
+atrLen = input.int(14, "ATR Length", minval=5, maxval=30)
+atrStopMult = input.float(1.0, "ATR Stop Multiplier", minval=0.3, maxval=3)
+maxBars = input.int(16, "Max Bars in Trade", minval=4, maxval=96)
+allowShorts = input.bool(true, "Allow Shorts")
+adxLen = input.int(14, "ADX Length")
+adxThreshold = input.float(25, "Maximum ADX")
+htf = input.timeframe("D", "Higher Timeframe")
+htfEmaLen = input.int(50, "HTF EMA Length")
+useExhaustion = input.bool(true, "Use Exhaustion Filter")
+rsiLen = input.int(14, "RSI Length")
+rsiOversold = input.float(30, "RSI Oversold")
+rsiOverbought = input.float(70, "RSI Overbought")
+wickRatioMin = input.float(0.3, "Minimum Rejection Wick")
+trend = ta.ema(close, trendLen)
+[mid, upper, lower] = ta.bb(close, bbLen, bbMult)
+volMa = ta.sma(volume, volLen)
+a = ta.atr(atrLen)
+[diPlus, diMinus, adx] = ta.dmi(adxLen, adxLen)
+r = ta.rsi(close, rsiLen)
+htfClose = request.security(syminfo.tickerid, htf, close, lookahead=barmerge.lookahead_off)
+htfTrend = request.security(syminfo.tickerid, htf, ta.ema(close, htfEmaLen), lookahead=barmerge.lookahead_off)
+range = high-low
+lowerWick = range > 0 ? (close-low)/range : 0
+upperWick = range > 0 ? (high-close)/range : 0
+longExhausted = not useExhaustion or (r < rsiOversold and lowerWick > wickRatioMin and close > open)
+shortExhausted = not useExhaustion or (r > rsiOverbought and upperWick > wickRatioMin and close < open)
+longSignal = close > trend and trend > trend[slopeLen] and htfClose > htfTrend and close <= lower and volume > volMa*volMult and adx < adxThreshold and longExhausted
+shortSignal = allowShorts and close < trend and trend < trend[slopeLen] and htfClose < htfTrend and close >= upper and volume > volMa*volMult and adx < adxThreshold and shortExhausted
+var int entryBar = na
+if longSignal and strategy.position_size == 0
+    strategy.entry("Long", strategy.long)
+    entryBar := bar_index
+if shortSignal and strategy.position_size == 0
+    strategy.entry("Short", strategy.short)
+    entryBar := bar_index
+strategy.exit("Long exit", "Long", stop=strategy.position_avg_price-a*atrStopMult, limit=mid)
+strategy.exit("Short exit", "Short", stop=strategy.position_avg_price+a*atrStopMult, limit=mid)
+if strategy.position_size != 0 and not na(entryBar) and bar_index-entryBar+1 >= maxBars
+    strategy.close_all(comment="Time stop")
+plot(trend, "Trend EMA", color=color.orange)
+plot(mid, "BB Mid", color=color.blue)
+plot(upper, "BB Upper", color=color.new(color.blue, 40))
+plot(lower, "BB Lower", color=color.new(color.blue, 40))

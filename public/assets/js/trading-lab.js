@@ -334,6 +334,9 @@
           "</div>" +
           statusPanel(runner) +
           '<div class="tl-acct-updated">Updated ' + escapeHtml(fmtAgo(runner.lastSuccessfulEvaluationAt)) + "</div>" +
+          (account.supportsBacktest
+            ? '<button class="tl-activity-btn" type="button" data-copy-pine="' + escapeHtml(account.id) + '">Copy Pine Script</button>'
+            : "") +
           '<button class="tl-activity-btn" type="button" data-activity-strategy="' + escapeHtml(account.id) + '">' +
           "What is it doing?</button>" +
           "</div></article>"
@@ -1575,7 +1578,50 @@
 
   refreshBtn.addEventListener("click", refresh);
 
+  function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text);
+    var area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.appendChild(area);
+    area.select();
+    var copied = document.execCommand("copy");
+    document.body.removeChild(area);
+    return copied ? Promise.resolve() : Promise.reject(new Error("Clipboard unavailable"));
+  }
+
+  function copyPineScript(button) {
+    var strategyId = button.dataset.copyPine;
+    var original = button.textContent;
+    button.disabled = true;
+    button.textContent = "Copying...";
+    fetch("/pine/" + encodeURIComponent(strategyId) + ".pine", { credentials: "same-origin" })
+      .then(function (response) {
+        if (!response.ok) throw new Error("Pine Script is unavailable for this strategy");
+        return response.text();
+      })
+      .then(copyText)
+      .then(function () { button.textContent = "Copied"; })
+      .catch(function (err) {
+        button.textContent = "Copy failed";
+        showError(err.message);
+      })
+      .then(function () {
+        setTimeout(function () {
+          button.disabled = false;
+          button.textContent = original;
+        }, 1800);
+      });
+  }
+
   strategyAccountsEl.addEventListener("click", function (event) {
+    var pineButton = event.target.closest("[data-copy-pine]");
+    if (pineButton) {
+      copyPineScript(pineButton);
+      return;
+    }
     var activityButton = event.target.closest("[data-activity-strategy]");
     if (activityButton) {
       openAccountActivity(activityButton.dataset.activityStrategy);
