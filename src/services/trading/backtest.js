@@ -408,10 +408,12 @@ function resolveStrategy(strategy) {
 
   return {
     definition,
-    evaluate: ({ bars, index, context, options, symbol }) =>
+    evaluate: ({ bars, index, context, options, symbol, interval, strategyRuntime }) =>
       definition.evaluate(bars, index, {
         options,
         symbol,
+        interval,
+        strategyRuntime,
         // Two separate facts under two separate names. `htfTrendUp` is null in
         // a candle backtest because there is no higher-timeframe feed here;
         // handing a strategy the tested timeframe's own trend under that name
@@ -422,6 +424,11 @@ function resolveStrategy(strategy) {
         close: context.close,
         atr: context.atr,
       }),
+    managePosition:
+      typeof definition.managePosition === "function"
+        ? ({ bars, index, position, options, interval }) =>
+            definition.managePosition(bars, index, position, { options, interval })
+        : null,
   };
 }
 
@@ -635,6 +642,9 @@ class BacktestService {
     // stays the operational one. Keeping both means a promotion rule can be
     // set from evidence later without re-running anything.
     const scored = [];
+    // Run-local state for Pine rules such as direction-specific cooldowns.
+    // Keeping it here prevents comparisons from leaking state between rows.
+    const strategyRuntime = { lastStopBarByDirection: {} };
 
     for (let i = warmup; i < bars.length; i += 1) {
       const bar = bars[i];
@@ -647,14 +657,24 @@ class BacktestService {
       const ordering = replayOrder(trader, bar);
       if (ordering.mixed) mixedDirectionBars += 1;
       for (const price of ordering.prices) {
-        await trader.updatePositions({ [symbol]: price }, { at: bar.closeTime });
+        const events = await trader.updatePositions({ [symbol]: price }, { at: bar.closeTime });
+        for (const event of events) {
+          if (event.type !== "STOP_HIT") continue;
+          const closed = trader.getHistory().find((trade) => trade.id === event.positionId);
+          // The supplied Pine script starts its cooldown only when the bar
+          // CLOSES beyond the prior stop, not merely when a wick touches it.
+          const closedBeyondStop = closed && (closed.direction === "LONG" ? bar.close <= closed.stopLoss : bar.close >= closed.stopLoss);
+          if (closedBeyondStop && closed.meta && closed.meta.strategy === resolved.definition.id) {
+            strategyRuntime.lastStopBarByDirection[closed.direction] = i;
+          }
+        }
       }
 
       // 2. Ask the strategy about the bar that just closed. `bars` is the full
       // array and `i` is the barrier: a registry strategy slices to `index`
       // itself, and the no-lookahead regression tests hold it to that.
       const context = contextAtBar(bars, opts, { index: i, series });
-      const signal = resolved.evaluate({ bars, index: i, context, options: opts, symbol });
+      const signal = resolved.evaluate({ bars, index: i, context, options: opts, symbol, interval, strategyRuntime });
       const direction = signal.signal;
 
       if (direction === "LONG" || direction === "SHORT") {
@@ -666,7 +686,10 @@ class BacktestService {
           regimeCounts[regimeRead.regime] = (regimeCounts[regimeRead.regime] || 0) + 1;
         }
         signals.push({ at: bar.closeTime, signal: direction, price: signal.price ?? context.close, reasons: signal.reasons || [], indicators: signal.indicators || {}, confidence: signal.confidence ?? null, regime: regimeRead.regime, regimeConfidence: regimeRead.confidence });
-        const outcome = this.tryOpen({
+        const alreadyOpen = resolved.definition.singlePositionPerSymbol === true && trader.getOpenPositions().some(
+          (position) => position.symbol === symbol && position.meta && position.meta.strategy === resolved.definition.id,
+        );
+        const outcome = alreadyOpen ? { opened: false, reasons: ["Strategy already has an open position on this symbol"] } : this.tryOpen({
           trader,
           symbol,
           direction,
@@ -680,6 +703,7 @@ class BacktestService {
           marketContext,
           config: runConfig,
           regimeRead,
+          entryBarIndex: i,
         });
         if (outcome.opened) {
           if (outcome.appliedMode === "native") nativeTrades += 1;
@@ -697,6 +721,23 @@ class BacktestService {
             // stopped it.
             reasons: [...(signal.reasons || []), ...outcome.reasons],
           });
+        }
+      }
+
+      // Static strategies never enter this branch. For native strategies with
+      // moving orders, refresh the ATR stop and Bollinger target at the close,
+      // then apply a Pine-style bar-count time stop at that close.
+      if (executionMode === "native" && resolved.managePosition) {
+        const managed = trader.getOpenPositions().filter(
+          (position) => position.meta && position.meta.strategy === resolved.definition.id && position.meta.executionMode === "native",
+        );
+        for (const position of managed) {
+          const update = resolved.managePosition({ bars, index: i, position, options: opts, interval });
+          if (update && update.closeAtMarket) {
+            await trader.closePosition(position.id, { reason: update.closeReason || "TIME_STOP", exitPrice: bar.close });
+          } else if (update) {
+            trader.replaceExitLevels(position.id, { stopLoss: update.stopLoss, target: update.target });
+          }
         }
       }
 
@@ -826,6 +867,7 @@ class BacktestService {
     // The regime read for the deciding bar, from ./regime. Recorded on the
     // trade and used for nothing else — see the meta block below.
     regimeRead = null,
+    entryBarIndex = null,
   }) {
     const runConfig = config || this.config;
     const signalSource = `backtest:${strategyId}:${interval}`;
@@ -925,6 +967,7 @@ class BacktestService {
         // number says which one this was.
         meta: {
           strategy: strategyId,
+          entryBarIndex,
           ...(signal
             ? {
                 strategyConfidence: signal.confidence ?? null,

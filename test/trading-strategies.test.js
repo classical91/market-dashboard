@@ -40,6 +40,7 @@ function wavyUptrend(count, { from = 0 } = {}) {
 test("the registry loads every Trading Lab strategy", () => {
   const ids = listStrategies().map((s) => s.id);
   assert.deepEqual(ids.sort(), [
+    "bb_mean_reversion_v4",
     "donchian_breakout_v1",
     "mindset_v1",
     "shadow_bananagun_v1",

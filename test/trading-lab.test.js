@@ -152,7 +152,7 @@ test("overview reports strategy accounts and archived legacy ledgers", async () 
   const lab = makeLab();
   const overview = await lab.overview();
   assert.equal(overview.mode, "paper");
-  assert.equal(overview.accounts.length, 5);
+  assert.equal(overview.accounts.length, 6);
   assert.deepEqual(overview.books.map((b) => b.id), ["main", "shadow", "alts"]);
   assert.ok(overview.books.every((b) => b.archived === true));
   assert.equal(overview.config.accountSize, 10000);

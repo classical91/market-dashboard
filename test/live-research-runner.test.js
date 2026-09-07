@@ -729,7 +729,7 @@ test("every strategy's real indicators produce a scoreable market state", () => 
   const bars = realisticBars();
   const context = contextAtBar(bars, config, { index: bars.length - 1 });
 
-  for (const meta of listStrategies({ supportsBacktest: true })) {
+  for (const meta of listStrategies({ liveResearchEligible: true })) {
     const evaluation = getLiveResearchStrategy(meta.id).evaluate(bars, bars.length - 1, {});
     const indicators = evaluation.indicators || {};
 

@@ -175,6 +175,9 @@ function generateExperiments(regimeMarkets, { timeframes = ["1h"], includeMismat
       const suited = suitsRegime(strategy, market.regime);
       if (!suited && !includeMismatched) continue;
       for (const timeframe of timeframes) {
+        // A strategy scoped to specific candle intervals must not be queued on
+        // a timeframe its rules were not converted or validated for.
+        if (Array.isArray(strategy.supportedIntervals) && !strategy.supportedIntervals.includes(String(timeframe))) continue;
         candidates.push({
           strategy: strategy.id,
           symbol: market.symbol,

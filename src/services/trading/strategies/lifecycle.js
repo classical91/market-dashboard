@@ -155,6 +155,9 @@ function describeStrategy(strategy) {
     realMoneyEligible: computeRealMoneyEligible(strategy),
     requiredWarmupBars: strategy.requiredWarmupBars,
     datasetAvailability: strategy.datasetAvailability || null,
+    supportedIntervals: strategy.supportedIntervals || null,
+    optionSchema: strategy.optionSchema || null,
+    defaultOptions: strategy.defaultOptions || null,
     rules: typeof strategy.describeRules === "function" ? strategy.describeRules() : null,
   };
 }
