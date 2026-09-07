@@ -401,6 +401,296 @@
   color: var(--dim);
 }
 
+/* ── Performance panel ──────────────────────────────────────
+   The post-run panel: headline stats, the strategy equity curve and the
+   buy-and-hold benchmark on one axis, with zoom, pan and a hover
+   tooltip. Dark, dense and operational like the rest of the board —
+   the chart is the only thing here allowed to take vertical space. */
+
+.tl-perf {
+  display: block;
+  margin: 0 0 18px;
+  padding: 14px 14px 4px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.tl-perf-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.tl-perf-sub {
+  font-size: 11px;
+  color: var(--dim);
+  margin-top: 3px;
+}
+
+.tl-perf-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* The gesture hint is help text, not an instruction anyone must read, so it
+   is the first thing to go when the row gets tight. Reset Zoom never is:
+   a reader who cannot find the way back out of a zoom is stuck. */
+.tl-perf-hint {
+  font-size: 10px;
+  color: var(--dim);
+}
+
+.tl-perf-reset[disabled] {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.tl-perf-stats {
+  margin-bottom: 12px;
+}
+
+.tl-perf-legend {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.tl-perf-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.tl-perf-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 0;
+  border-top-width: 3px;
+  border-top-style: solid;
+  border-radius: 2px;
+  flex: none;
+}
+
+.tl-perf-swatch--strategy  { border-top-color: #00e396; }
+.tl-perf-swatch--benchmark { border-top-color: #7c9cff; border-top-style: dashed; }
+
+/* The live hover readout. It takes the remaining width and is allowed to
+   truncate rather than wrap, because a second line here would push the
+   chart down every time a finger moved across it. */
+.tl-perf-readout {
+  flex: 1 1 180px;
+  min-width: 0;
+  text-align: right;
+  color: var(--soft);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Available to assistive tech, absent from the layout. Used for the chart's
+   keyboard instructions, which the sighted hint beside Reset Zoom cannot
+   carry: that hint is hidden entirely on a phone. */
+.tl-perf-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.tl-perf-chart {
+  position: relative;
+  /* Vertical page scrolling still belongs to the page; horizontal drag
+     belongs to the chart. */
+  touch-action: pan-y;
+  cursor: crosshair;
+  padding-left: 54px;
+}
+
+.tl-perf-chart:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.tl-perf-plot-wrap {
+  position: relative;
+}
+
+.tl-perf-plot {
+  display: block;
+  width: 100%;
+  height: 240px;
+}
+
+.tl-perf-grid {
+  stroke: rgba(255,255,255,0.05);
+  stroke-width: 1;
+}
+
+.tl-perf-line {
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.tl-perf-line--benchmark {
+  stroke-width: 1.75;
+  opacity: 0.9;
+}
+
+.tl-perf-cursor {
+  stroke: rgba(255,255,255,0.45);
+}
+
+/* Y labels sit in the gutter the chart's own left padding reserves, so they
+   cannot overlap the plot at any width. */
+.tl-perf-yaxis {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 54px;
+  pointer-events: none;
+}
+
+.tl-perf-ytick {
+  position: absolute;
+  right: 6px;
+  transform: translateY(-50%);
+  font-size: 9px;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tl-perf-tooltip {
+  position: absolute;
+  top: 8px;
+  left: var(--tl-perf-tip-x, 0);
+  transform: translateX(10px);
+  min-width: 160px;
+  /* Never wider than the plot it sits over, whatever the numbers are. */
+  max-width: min(240px, 60%);
+  padding: 8px 10px;
+  background: rgba(7,10,18,0.94);
+  border: 1px solid var(--border-hover);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  font-size: 11px;
+  /* The tooltip must never eat the pointer events that move it. */
+  pointer-events: none;
+  z-index: 2;
+}
+
+.tl-perf-tooltip--flip {
+  transform: translateX(calc(-100% - 10px));
+}
+
+.tl-perf-tip-time {
+  color: var(--muted);
+  font-size: 10px;
+  margin-bottom: 5px;
+}
+
+.tl-perf-tip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--soft);
+  margin-top: 2px;
+}
+
+.tl-perf-tip-row strong {
+  margin-left: auto;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.tl-perf-tip-diff {
+  margin-top: 6px;
+  padding-top: 5px;
+  border-top: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
+}
+
+.tl-perf-compare th[scope="row"] {
+  text-align: left;
+  font-weight: 600;
+  color: var(--soft);
+}
+
+.tl-perf-mount:empty {
+  display: none;
+}
+
+/* ── Loading and error states ───────────────────────────────
+   Three visually distinct states. A failed run rendered in the same grey
+   box as "nothing run yet" is a failure nobody notices. */
+
+.tl-perf-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--soft);
+  padding: 10px 0 14px;
+}
+
+.tl-perf-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255,255,255,0.15);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: tl-perf-spin 0.8s linear infinite;
+  flex: none;
+}
+
+@keyframes tl-perf-spin { to { transform: rotate(360deg); } }
+
+.tl-perf-skeleton > div {
+  height: 62px;
+  border-radius: var(--radius);
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.05);
+}
+
+.tl-perf-skeleton-plot {
+  height: 240px;
+  border-radius: var(--radius);
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.05);
+}
+
+.tl-perf-error {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--coral-bg);
+  border: 1px solid rgba(255,77,109,0.35);
+  color: var(--text);
+  font-size: 12px;
+}
+
+.tl-perf-error span {
+  color: var(--soft);
+}
+
 @media (max-width: 720px) {
   .tl-account-grid {
     grid-template-columns: 1fr;
@@ -429,6 +719,73 @@
 
   .tl-stat { padding: 8px 10px; }
   .tl-stat-value { font-size: 15px; }
+
+  /* The panel keeps its chart on a phone rather than dropping to a table —
+     the strategy-versus-benchmark shape is the one thing that does not
+     survive being listed as numbers. It just gets shorter, and the y
+     gutter narrows so the plot keeps most of the width. */
+  .tl-perf { padding: 12px 10px 4px; }
+  .tl-perf-plot,
+  .tl-perf-skeleton-plot { height: 180px; }
+  .tl-perf-chart { padding-left: 44px; }
+  .tl-perf-yaxis { width: 44px; }
+  .tl-perf-ytick { right: 4px; font-size: 8px; }
+
+  /* Two facts on one line at 340px is one fact each, unreadable. The hint
+     is the half that is help text rather than data. */
+  .tl-perf-hint { display: none; }
+  .tl-perf-readout {
+    flex-basis: 100%;
+    text-align: left;
+    white-space: normal;
+  }
+
+  /* The tooltip is pinned rather than tracking the crosshair: at this width
+     a 160px box following a finger is off one edge or the other for most of
+     the chart. */
+  .tl-perf-tooltip,
+  .tl-perf-tooltip--flip {
+    left: 0;
+    right: 0;
+    transform: none;
+    min-width: 0;
+    max-width: none;
+  }
+
+  /* The comparison table restacks the same way the strategy table does. */
+  .tl-perf-compare,
+  .tl-perf-compare tbody,
+  .tl-perf-compare tr,
+  .tl-perf-compare th[scope="row"],
+  .tl-perf-compare td {
+    display: block;
+    width: 100%;
+  }
+
+  .tl-perf-compare thead { display: none; }
+
+  .tl-perf-compare tr {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 8px 10px;
+    margin-bottom: 8px;
+  }
+
+  .tl-perf-compare td {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    border: 0;
+    padding: 3px 0;
+  }
+
+  .tl-perf-compare td::before {
+    content: attr(data-label);
+    color: var(--dim);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
 
   /* The eleven-column comparison table restacks as one labelled block per
      strategy. A horizontal scroll here is a table nobody reads on a phone. */
@@ -1063,6 +1420,8 @@
 @keyframes tl-drawer-in { from { opacity: 0; transform: translateX(28px); } }
 
 @media (prefers-reduced-motion: reduce) {
+  .tl-perf-spinner { animation-duration: 2.4s; }
+
   .tl-activity-backdrop,
   .tl-activity-panel { animation: none; }
   .tl-activity-btn { transition: none; }
