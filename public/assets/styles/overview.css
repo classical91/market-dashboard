@@ -160,6 +160,7 @@ body {
   border: 0;
   font: inherit;
   font-size: 14px;
+  text-align: left;
 }
 .nav-caret {
   font-size: 11px;
