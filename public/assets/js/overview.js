@@ -10,14 +10,6 @@
     error: null,
   };
 
-  // Standard session hours in UTC (not adjusted for daylight saving).
-  const TRADING_SESSIONS = [
-    { name: "Sydney", open: 22, close: 7 },
-    { name: "Tokyo", open: 0, close: 9 },
-    { name: "London", open: 8, close: 17 },
-    { name: "New York", open: 13, close: 22 },
-  ];
-
   const els = {};
 
   function $(id) {
@@ -413,38 +405,17 @@
     els.sourceBadge.textContent = "● Error";
   }
 
-  function inSessionWindow(hour, open, close) {
-    // Sessions that wrap past midnight (e.g. Sydney 22:00-07:00) need the
-    // OR form; same-day sessions need the AND form.
-    return open < close ? hour >= open && hour < close : hour >= open || hour < close;
-  }
-
-  function isWeekendClose(day, hour) {
-    // The forex week runs Sunday 22:00 UTC (Sydney open) to Friday 22:00 UTC
-    // (New York close).
-    if (day === 6) return true;
-    if (day === 0 && hour < 22) return true;
-    if (day === 5 && hour >= 22) return true;
-    return false;
-  }
-
   function updateSession() {
     if (!els.session) return;
-    const now = new Date();
-    const day = now.getUTCDay();
-    const hour = now.getUTCHours() + now.getUTCMinutes() / 60;
 
-    if (isWeekendClose(day, hour)) {
-      els.session.className = "chip fallback";
-      els.session.textContent = "● Markets Closed — Weekend";
-      return;
-    }
-
-    // Sydney, Tokyo, London, and New York together span all 24 hours, so
-    // outside the weekend close at least one session is always open.
-    const open = TRADING_SESSIONS.filter((s) => inSessionWindow(hour, s.open, s.close));
-    els.session.className = "chip live";
-    els.session.textContent = `● ${open.map((s) => s.name).join(" + ")} Session${open.length > 1 ? " (Overlap)" : ""}`;
+    // Session hours live in trading-sessions.js, which /api/market-session
+    // loads too — Main Hub's Daily Dashboard shows this same status, and one
+    // set of hours in two places is one set too many. Still computed here
+    // rather than fetched: it is clock arithmetic, and the chip should not need
+    // the network to say what time it is.
+    const session = window.MarketSessions.describeSession();
+    els.session.className = session.open ? "chip live" : "chip fallback";
+    els.session.textContent = `● ${session.label}`;
   }
 
   function money(value) {

@@ -86,6 +86,7 @@ When `MARKET_DASHBOARD_LOGIN_PASSWORD` is set, site auth runs ahead of every rou
 - `GET /api/health` — the minimal deploy probe.
 - `GET /api/decision` — read-only market decision data, polled by the TraderClaw agent, which authenticates no session cookie. This is the exact path only: `/api/decision/journal` and every mutating journal route still require the owner session (and, for writes, `ADMIN_API_KEY`).
 - `/api/broadcast-ledger*` — machine callers that present `BROADCAST_LEDGER_API_KEY` or `ADMIN_API_KEY`; the ledger routes still enforce that key themselves. See [docs/broadcast-ledger.md](docs/broadcast-ledger.md).
+- `GET /api/market-session` — which trading session is open right now, read by Main Hub's Daily Dashboard from its server with no cookie to present. Clock arithmetic over published session hours: no account data, no market data, no credential, and the overview chip already computes the same answer in every visitor's browser. The exact path only, read methods only.
 
 Everything else — including all Trading Lab paper-trade and mutation endpoints, settings, and the rest of `/api/decision/*` — needs a session. The Alpha Team role additionally reaches only the shared `?view=alpha` pages and their read-only data APIs.
 
@@ -353,6 +354,37 @@ market-dashboard/
 - Shared loading, empty, error, badge, and skeleton helpers live in `public/assets/js/ui.js`.
 - Shared visual primitives live in `public/assets/styles/components.css`.
 - Keep pages dashboard-focused: dense, readable, dark-mode friendly, and responsive.
+
+## Market Session
+
+The chip at the top of the overview says which of Sydney, Tokyo, London and New
+York is open, whether they overlap, and whether the forex week is closed. Those
+hours live in `public/assets/js/trading-sessions.js`, loaded two ways on purpose:
+a `<script>` tag ahead of `overview.js`, and a `require()` from
+`src/routes/market-session.js`.
+
+`GET /api/market-session`:
+
+```json
+{
+  "now": "2026-09-10T14:00:00.000Z",
+  "timezone": "UTC",
+  "open": true,
+  "weekend": false,
+  "sessions": ["London", "New York"],
+  "overlap": true,
+  "label": "London + New York Session (Overlap)",
+  "hours": [{ "name": "Sydney", "open": 22, "close": 7 }]
+}
+```
+
+Everything is UTC. A trading session is not on anyone's local clock, and a caller
+that converts it to one is reporting the wrong thing.
+
+The chip still computes its own answer rather than fetching this — it is clock
+arithmetic, and the header should not need the network to say what time it is.
+The endpoint exists so Main Hub's Daily Dashboard does not restate the hours in
+another repository.
 
 ## API Fallback Behavior
 

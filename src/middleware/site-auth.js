@@ -135,6 +135,23 @@ function isLedgerFormPath(req) {
   return req.path === "/api/broadcast-ledger/manual" || req.path === "/api/broadcast-ledger/status";
 }
 
+// GET /api/market-session is clock arithmetic over published session hours:
+// which of Sydney/Tokyo/London/New York is open, and whether it is the weekend
+// close. It carries no account data, no market data and no credential — the
+// overview chip computes the same answer in every visitor's browser already.
+//
+// Main Hub's Daily Dashboard reads it server-to-server with no browser session
+// to present, so site auth would answer `401 Login required` before this route
+// ever ran. The alternative was Main Hub holding this site's password to fetch
+// something nobody needs a password to know.
+//
+// Scoped the same way isPublicDecisionRequest below is: read methods only, the
+// exact path, nothing beneath it.
+function isPublicMarketSessionRequest(req) {
+  if (req.method !== "GET" && req.method !== "HEAD") return false;
+  return req.path === "/api/market-session" || req.path === "/api/market-session/";
+}
+
 function isPublicAuthPath(req) {
   return req.path === "/login"
     || req.path === "/auth/login"
@@ -288,7 +305,12 @@ function createSiteAuth(config) {
     clearSessionCookie,
     classifyPassword,
     requireAccess(req, res, next) {
-      if (!enabled || isPublicAuthPath(req) || isPublicDecisionRequest(req)) {
+      if (
+        !enabled
+        || isPublicAuthPath(req)
+        || isPublicDecisionRequest(req)
+        || isPublicMarketSessionRequest(req)
+      ) {
         next();
         return;
       }
@@ -352,6 +374,7 @@ function createSiteAuth(config) {
 
 module.exports = {
   createSiteAuth,
+  isPublicMarketSessionRequest,
   parseCookies,
   decodeSession,
   encodeSession,

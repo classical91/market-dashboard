@@ -35,6 +35,7 @@ const { createLiveScannerRouter } = require("./routes/live-scanner");
 const { createHealthRouter } = require("./routes/health");
 const { createOnchainRouter } = require("./routes/onchain");
 const { createOverviewRouter } = require("./routes/overview");
+const { createMarketSessionRouter } = require("./routes/market-session");
 const { createBroadcastLedgerRouter } = require("./routes/broadcast-ledger");
 const { createReporterRouter } = require("./routes/reporter");
 const { createNewsroomRouter } = require("./routes/newsroom");
@@ -442,6 +443,7 @@ function createApp() {
   app.use("/api/pattern-tracker", createPatternTrackerRouter({ patternTrackerService }));
   app.use("/api/onchain", createOnchainRouter({ onchainService }));
   app.use("/api/overview", createOverviewRouter({ overviewService }));
+  app.use("/api/market-session", createMarketSessionRouter());
   app.use(
     "/api/broadcast-ledger",
     createBroadcastLedgerRouter({
