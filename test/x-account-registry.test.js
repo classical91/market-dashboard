@@ -16,6 +16,7 @@ const {
   X_ACCOUNTS,
   CONSPIRACY_X_ACCOUNTS,
   CONSPIRACY_FOLLOWER_X_ACCOUNTS,
+  CONSPIRACY_FOLLOWBACK_HANDLES,
 } = require("../src/config/x-accounts");
 const { MemoryCache } = require("../src/services/cache");
 
@@ -36,12 +37,36 @@ test("the static config seeds the persistent registry on first boot", () => {
 
   const stored = JSON.parse(fs.readFileSync(file, "utf8"));
   assert.equal(stored.accounts.length, X_ACCOUNTS.length);
-  assert.deepEqual(stored.seededPacks, ["conspiracy", "conspiracy-followers-2026-09-10"]);
+  assert.deepEqual(stored.seededPacks, [
+    "conspiracy",
+    "conspiracy-followers-2026-09-10",
+    "conspiracy-followback-prune-2026-09-10",
+  ]);
   assert.deepEqual(
     registry.list().map((a) => a.handle),
     X_ACCOUNTS.map((a) => a.handle),
     "seeded order is preserved so the sidebar sections do not reshuffle",
   );
+});
+
+test("the follow-back prune removes accounts that Jason does not follow", () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "md-x-registry-prune-"));
+  const file = path.join(dataDir, "x-accounts.json");
+  const removedAccounts = CONSPIRACY_FOLLOWBACK_HANDLES.map((handle) => ({
+    handle,
+    label: handle,
+    category: "Community Leads",
+  }));
+  fs.writeFileSync(file, JSON.stringify({
+    version: 2,
+    seededPacks: ["conspiracy", "conspiracy-followers-2026-09-10"],
+    accounts: X_ACCOUNTS.concat(removedAccounts),
+  }), "utf8");
+
+  const registry = new XAccountRegistry({ dataDir, logger: quietLogger });
+  assert.equal(registry.ensureSeeded(), true);
+  assert.ok(!registry.list().some((account) => CONSPIRACY_FOLLOWBACK_HANDLES.includes(account.handle)));
+  assert.equal(registry.ensureSeeded(), false);
 });
 
 test("an existing registry receives the conspiracy account packs exactly once", () => {

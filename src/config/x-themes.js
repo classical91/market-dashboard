@@ -27,7 +27,11 @@
  */
 
 const { sharedThemesWithMemberships } = require("./intelligence-themes");
-const { CONSPIRACY_X_ACCOUNTS, CONSPIRACY_FOLLOWER_X_ACCOUNTS } = require("./x-accounts");
+const {
+  CONSPIRACY_X_ACCOUNTS,
+  CONSPIRACY_FOLLOWER_X_ACCOUNTS,
+  CONSPIRACY_FOLLOWBACK_HANDLES,
+} = require("./x-accounts");
 
 const ALL_CONSPIRACY_X_ACCOUNTS = CONSPIRACY_X_ACCOUNTS.concat(CONSPIRACY_FOLLOWER_X_ACCOUNTS);
 
@@ -65,6 +69,11 @@ const X_TEMPLATE_MEMBERSHIP_PACKS = [{
     handle: account.handle,
     section: account.category,
   })),
+}, {
+  id: "conspiracy-followback-prune-2026-09-10",
+  templateId: "conspiracy",
+  removeHandles: CONSPIRACY_FOLLOWBACK_HANDLES,
+  memberships: [],
 }];
 
 module.exports = { BUILT_IN_THEMES, X_TEMPLATE_MEMBERSHIP_PACKS };

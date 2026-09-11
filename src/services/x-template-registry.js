@@ -313,6 +313,12 @@ class XTemplateRegistry {
         if (installedPacks.has(pack.id)) continue;
         const template = templates.concat(added).find((entry) => entry.id === pack.templateId);
         if (template) {
+          const removeHandles = new Set((pack.removeHandles || []).map((handle) => normalizeHandle(handle).toLowerCase()));
+          if (removeHandles.size) {
+            template.memberships = template.memberships.filter(
+              (entry) => !removeHandles.has(entry.handle.toLowerCase()),
+            );
+          }
           for (const membership of pack.memberships) {
             if (!template.sections.includes(membership.section)) template.sections.push(membership.section);
             if (!template.memberships.some((entry) => sameHandle(entry.handle, membership.handle))) {

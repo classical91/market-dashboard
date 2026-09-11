@@ -289,6 +289,10 @@ class XAccountRegistry {
 
       const next = accounts.slice();
       for (const pack of pending) {
+        for (const handle of pack.removeHandles || []) {
+          const index = next.findIndex((existing) => sameHandle(existing.handle, handle));
+          if (index >= 0) next.splice(index, 1);
+        }
         for (const account of pack.accounts || []) {
           if (next.some((existing) => sameHandle(existing.handle, account.handle))) continue;
           if (next.length >= MAX_ACCOUNTS) break;

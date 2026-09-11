@@ -12,7 +12,11 @@ const {
   BUILT_IN_THEMES,
   normalizeTemplate,
 } = require("../src/services/x-template-registry");
-const { X_ACCOUNTS, CONSPIRACY_FOLLOWER_X_ACCOUNTS } = require("../src/config/x-accounts");
+const {
+  X_ACCOUNTS,
+  CONSPIRACY_FOLLOWER_X_ACCOUNTS,
+  CONSPIRACY_FOLLOWBACK_HANDLES,
+} = require("../src/config/x-accounts");
 
 const quietLogger = { warn() {}, error() {}, log() {} };
 
@@ -271,9 +275,28 @@ test("an existing conspiracy theme receives the screenshot follower pack exactly
   assert.equal(reopened.ensureSeeded(), true);
   const updated = reopened.get("conspiracy");
   assert.equal(updated.memberships.length, 6 + CONSPIRACY_FOLLOWER_X_ACCOUNTS.length);
-  assert.ok(updated.sections.includes("Occult & Symbols"));
   assert.ok(updated.sections.includes("UFOs & Paranormal"));
   assert.ok(updated.sections.includes("Community Leads"));
+  assert.equal(reopened.ensureSeeded(), false);
+});
+
+test("an existing conspiracy theme prunes screenshot accounts marked Follow back", () => {
+  const { dataDir, registry, file } = tempRegistry();
+  registry.ensureSeeded();
+  const stored = JSON.parse(fs.readFileSync(file, "utf8"));
+  stored.seededMembershipPacks = ["conspiracy-followers-2026-09-10"];
+  const conspiracy = stored.templates.find((template) => template.id === "conspiracy");
+  conspiracy.memberships.push(...CONSPIRACY_FOLLOWBACK_HANDLES.map((handle) => ({
+    handle,
+    section: "Community Leads",
+  })));
+  fs.writeFileSync(file, JSON.stringify(stored), "utf8");
+
+  const reopened = new XTemplateRegistry({ dataDir, seedAccounts: X_ACCOUNTS, logger: quietLogger });
+  assert.equal(reopened.ensureSeeded(), true);
+  assert.ok(!reopened.get("conspiracy").memberships.some(
+    (membership) => CONSPIRACY_FOLLOWBACK_HANDLES.includes(membership.handle),
+  ));
   assert.equal(reopened.ensureSeeded(), false);
 });
 

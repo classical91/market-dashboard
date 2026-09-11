@@ -11,23 +11,26 @@ const CONSPIRACY_FOLLOWER_X_ACCOUNTS = [
   { handle: "odigdeeperDTRH", label: "Ghost Writer", category: "Community Leads" },
   { handle: "PaulJamesOBrie1", label: "Paul James O'Brien", category: "Community Leads" },
   { handle: "JamesWe70210481", label: "James West", category: "Deep State" },
-  { handle: "WarriorDwarves", label: "Warrior Dwarves", category: "Community Leads" },
-  { handle: "elcinbtmn", label: "Nancy W", category: "Community Leads" },
-  { handle: "illuminati81841", label: "illuminatibot", category: "Occult & Symbols" },
-  { handle: "paddyp155", label: "Patrick McLaughlin+44", category: "Occult & Symbols" },
-  { handle: "kangspace589_", label: "KANG SPACE", category: "QAnon" },
-  { handle: "TerteighthDEwF", label: "Terteighth", category: "Community Leads" },
-  { handle: "NirwriNNkn", label: "Nirwri", category: "Community Leads" },
-  { handle: "MpismearcA5V", label: "Mpismearc", category: "Community Leads" },
-  { handle: "ThoythadrnKqw0", label: "Thoythadr", category: "Community Leads" },
-  { handle: "shimomiyar72712", label: "Lilly", category: "Community Leads" },
-  { handle: "Dathoos135863", label: "Fiona", category: "Community Leads" },
-  { handle: "76s1dXRcZ50jA", label: "ClaraWood", category: "Community Leads" },
   { handle: "Anamkarananda", label: "Schellhase, Hermann", category: "Community Leads" },
-  { handle: "Soughez192851", label: "Soughez", category: "Community Leads" },
   { handle: "Billy79799168", label: "Not_Billy", category: "Community Leads" },
   { handle: "Jr17Jfk", label: "John. Jr", category: "QAnon" },
   { handle: "RedCollie1", label: "Red Collie (Dr. Horace Drew)", category: "UFOs & Paranormal" },
+];
+
+const CONSPIRACY_FOLLOWBACK_HANDLES = [
+  "WarriorDwarves",
+  "elcinbtmn",
+  "illuminati81841",
+  "paddyp155",
+  "kangspace589_",
+  "TerteighthDEwF",
+  "NirwriNNkn",
+  "MpismearcA5V",
+  "ThoythadrnKqw0",
+  "shimomiyar72712",
+  "Dathoos135863",
+  "76s1dXRcZ50jA",
+  "Soughez192851",
 ];
 
 const X_ACCOUNTS = [
@@ -63,11 +66,13 @@ const X_ACCOUNTS = [
 const X_ACCOUNT_PACKS = [
   { id: "conspiracy", accounts: CONSPIRACY_X_ACCOUNTS },
   { id: "conspiracy-followers-2026-09-10", accounts: CONSPIRACY_FOLLOWER_X_ACCOUNTS },
+  { id: "conspiracy-followback-prune-2026-09-10", removeHandles: CONSPIRACY_FOLLOWBACK_HANDLES },
 ];
 
 module.exports = {
   X_ACCOUNTS,
   CONSPIRACY_X_ACCOUNTS,
   CONSPIRACY_FOLLOWER_X_ACCOUNTS,
+  CONSPIRACY_FOLLOWBACK_HANDLES,
   X_ACCOUNT_PACKS,
 };
