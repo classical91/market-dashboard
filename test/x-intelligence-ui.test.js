@@ -46,3 +46,11 @@ test("the account panel starts collapsed on mobile and opens from its toggle", (
   assert.match(html, /class="x-account-panel is-collapsed"/);
   assert.match(html, /id="xAccountToggle"[\s\S]*?aria-controls="xAccountList"/);
 });
+
+test("the account selector count uses theme accounts rather than post volume", () => {
+  const js = read("public/assets/js/x-intelligence.js");
+
+  assert.match(js, /function visibleAccountCount\(\)/);
+  assert.match(js, /accountsOf\(state\.feedData\)\.length/);
+  assert.doesNotMatch(js, /visiblePostCount/);
+});

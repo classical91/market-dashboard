@@ -216,19 +216,18 @@
       if (panelToggle) panelToggle.setAttribute("aria-expanded", open ? "true" : "false");
     }
 
-    function visiblePostCount() {
-      var posts = state.feedData.posts || [];
-      if (state.mode === ALL_MODE) return posts.length;
-      return posts.filter(function (p) { return p.handle === state.handle; }).length;
+    function visibleAccountCount() {
+      if (state.mode === ALL_MODE) return accountsOf(state.feedData).length;
+      return state.handle ? 1 : 0;
     }
 
-    // Reads e.g. "Accounts · All Accounts (147)" — the count makes it obvious
-    // that a single handle is a much smaller slice than the full feed.
+    // Reads e.g. "Accounts · All Accounts (13)". This is an account selector,
+    // so its count describes the selected theme's accounts, not its posts.
     function syncPanelLabel() {
       if (!panelToggleLabel) return;
       var selection = state.mode === ALL_MODE ? "All Accounts" : "@" + state.handle;
       panelToggleLabel.textContent =
-        "Accounts · " + selection + (state.loaded ? " (" + visiblePostCount() + ")" : "");
+        "Accounts · " + selection + (state.loaded ? " (" + visibleAccountCount() + ")" : "");
     }
 
     if (panelToggle && panel) {
