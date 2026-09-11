@@ -7,6 +7,12 @@
 })(typeof window !== "undefined" ? window : null, function () {
   "use strict";
 
+  /* Every accent x-intelligence.css defines a [data-x-accent] rule for. The
+     list was missing "conspiracy", so opening that theme showed "Market"
+     selected and saving silently repainted it — the select is the only way to
+     set an accent, so anything absent here is unreachable and lossy. */
+  var ACCENTS = ["market", "world", "tech", "relic", "macro", "energy", "neutral", "conspiracy"];
+
   function slugify(value) {
     return String(value == null ? "" : value)
       .trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
@@ -16,9 +22,9 @@
     return JSON.parse(JSON.stringify(value));
   }
 
-  /* One handle, one membership — X handles are case-insensitive, and a
-     template holding an account twice would list it twice in the sidebar and
-     double every one of its posts in the feed. Mirrors the server rule in
+  /* One handle, one entry — X handles are case-insensitive, and a template
+     holding an account twice would list it twice in the sidebar and double
+     every one of its posts in the feed. Mirrors the server rule in
      src/services/x-template-registry.js. */
   function sameHandle(a, b) {
     return String(a == null ? "" : a).trim().replace(/^@+/, "").toLowerCase()
@@ -26,8 +32,8 @@
   }
 
   function isMember(draft, handle) {
-    return ((draft && draft.memberships) || []).some(function (member) {
-      return sameHandle(member.handle, handle);
+    return ((draft && draft.handles) || []).some(function (entry) {
+      return sameHandle(entry, handle);
     });
   }
 
@@ -51,29 +57,23 @@
     return window.AdminKey.fetchOrSession(url, options || {}).then(readJson);
   }
 
+  /* A template is a name, a look and a flat list of handles. Sections are
+     gone: the page's switcher is the only filter, and the account sidebar
+     renders this list in order. */
   function normalizeDraft(draft) {
-    var sections = [];
-    (draft.sections || []).forEach(function (name) {
-      name = String(name || "").trim().slice(0, 60);
-      if (name && !sections.some(function (entry) { return entry.toLowerCase() === name.toLowerCase(); })) {
-        sections.push(name);
-      }
-    });
-    var memberships = [];
-    (draft.memberships || []).forEach(function (entry) {
-      var canonicalSection = sections.find(function (name) { return name.toLowerCase() === String(entry.section).toLowerCase(); });
-      if (!entry.handle || !canonicalSection) return;
-      if (!memberships.some(function (item) { return sameHandle(item.handle, entry.handle); })) {
-        memberships.push({ handle: entry.handle, section: canonicalSection });
-      }
+    var handles = [];
+    ((draft && draft.handles) || []).forEach(function (entry) {
+      var handle = String(entry == null ? "" : entry).trim().replace(/^@+/, "");
+      if (!handle) return;
+      if (handles.some(function (item) { return sameHandle(item, handle); })) return;
+      handles.push(handle);
     });
     return {
       id: slugify(draft.id || draft.name),
       name: String(draft.name || "").trim().slice(0, 60),
       description: String(draft.description || "").trim().slice(0, 240),
       accent: slugify(draft.accent || "market") || "market",
-      sections: sections,
-      memberships: memberships,
+      handles: handles,
     };
   }
 
@@ -88,7 +88,7 @@
     var head = el(doc, "div", "manage-head");
     head.appendChild(el(doc, "div", "x-template-heading-wrap"));
     head.firstChild.appendChild(el(doc, "h2", "manage-title", "Manage Templates"));
-    head.firstChild.appendChild(el(doc, "p", "x-template-help", "Organize global X accounts into reusable intelligence workspaces."));
+    head.firstChild.appendChild(el(doc, "p", "x-template-help", "Group global X accounts into reusable intelligence workspaces."));
     var close = el(doc, "button", "manage-close", "×");
     close.type = "button";
     close.setAttribute("aria-label", "Close");
@@ -129,7 +129,7 @@
     function resetDraft(template) {
       state.creating = !template;
       state.draft = template ? copy(template) : {
-        id: "", name: "", description: "", accent: "world", sections: [], memberships: [],
+        id: "", name: "", description: "", accent: "world", handles: [],
       };
     }
 
@@ -230,7 +230,7 @@
       descriptionInput.placeholder = "What this workspace monitors";
       descriptionInput.addEventListener("input", function () { draft.description = descriptionInput.value; });
       var accentInput = el(doc, "select", "manage-input");
-      ["market", "world", "tech", "relic", "macro", "energy", "neutral"].forEach(function (accent) {
+      ACCENTS.forEach(function (accent) {
         var option = el(doc, "option", "", accent.charAt(0).toUpperCase() + accent.slice(1));
         option.value = accent;
         option.selected = accent === draft.accent;
@@ -242,112 +242,83 @@
       basics.appendChild(field("Accent", accentInput));
       editor.appendChild(basics);
 
-      var sectionHead = el(doc, "div", "x-template-section-head");
-      sectionHead.appendChild(el(doc, "h3", "x-template-section-title", "Sections & accounts"));
-      var addSection = el(doc, "button", "x-template-secondary", "+ Add Section");
-      addSection.type = "button";
-      addSection.addEventListener("click", function () {
-        var count = draft.sections.length + 1;
-        draft.sections.push("New Section " + count);
-        renderEditor();
-      });
-      sectionHead.appendChild(addSection);
-      editor.appendChild(sectionHead);
+      var listHead = el(doc, "div", "x-template-section-head");
+      listHead.appendChild(el(doc, "h3", "x-template-section-title", "Accounts"));
+      listHead.appendChild(el(doc, "span", "x-template-help", "Shown in this order"));
+      editor.appendChild(listHead);
 
-      var sectionsRoot = el(doc, "div", "x-template-sections");
-      if (!draft.sections.length) sectionsRoot.appendChild(el(doc, "div", "manage-empty", "Add a section, then assign tracked accounts."));
-      draft.sections.forEach(function (section, sectionIndex) {
-        var sectionBox = el(doc, "section", "x-template-section");
-        var sectionToolbar = el(doc, "div", "x-template-section-toolbar");
-        var sectionName = el(doc, "input", "x-template-section-name");
-        sectionName.value = section;
-        sectionName.setAttribute("aria-label", "Section name");
-        sectionName.addEventListener("change", function () {
-          var nextName = sectionName.value.trim();
-          if (!nextName) { sectionName.value = section; return; }
-          draft.sections[sectionIndex] = nextName;
-          draft.memberships.forEach(function (member) { if (member.section === section) member.section = nextName; });
-          renderEditor();
-        });
-        sectionToolbar.appendChild(sectionName);
+      var accountsRoot = el(doc, "div", "x-template-accounts");
+      if (!draft.handles.length) {
+        accountsRoot.appendChild(
+          el(doc, "div", "manage-empty", "No accounts yet — add a tracked account below.")
+        );
+      }
+      draft.handles.forEach(function (handle, index) {
+        var account = state.accounts.find(function (entry) { return sameHandle(entry.handle, handle); });
+        var row = el(doc, "div", "x-template-member");
+        row.appendChild(el(
+          doc, "span", "x-template-member-name",
+          "@" + handle + (account && account.label !== account.handle ? " · " + account.label : "")
+        ));
+        var controls = el(doc, "span", "x-template-order-controls");
+        // Order is the only arrangement a template has now, and it is what the
+        // account sidebar renders, so moving a row is a real edit rather than
+        // cosmetic.
         [["↑", -1], ["↓", 1]].forEach(function (entry) {
           var move = el(doc, "button", "x-template-order", entry[0]);
           move.type = "button";
-          move.disabled = entry[1] < 0 ? sectionIndex === 0 : sectionIndex === draft.sections.length - 1;
+          move.disabled = entry[1] < 0 ? index === 0 : index === draft.handles.length - 1;
+          move.setAttribute("aria-label", "Move @" + handle + (entry[1] < 0 ? " up" : " down"));
           move.addEventListener("click", function () {
-            var moved = draft.sections.splice(sectionIndex, 1)[0];
-            draft.sections.splice(sectionIndex + entry[1], 0, moved);
+            var moved = draft.handles.splice(index, 1)[0];
+            draft.handles.splice(index + entry[1], 0, moved);
             renderEditor();
           });
-          sectionToolbar.appendChild(move);
+          controls.appendChild(move);
         });
-        var removeSection = el(doc, "button", "x-template-delete-link", "Remove section");
-        removeSection.type = "button";
-        removeSection.addEventListener("click", function () {
-          draft.sections.splice(sectionIndex, 1);
-          draft.memberships = draft.memberships.filter(function (member) { return member.section !== section; });
+        row.appendChild(controls);
+        var removeMember = el(doc, "button", "x-template-member-remove", "×");
+        removeMember.type = "button";
+        removeMember.setAttribute("aria-label", "Remove @" + handle + " from template");
+        removeMember.addEventListener("click", function () {
+          draft.handles = draft.handles.filter(function (entry) { return !sameHandle(entry, handle); });
           renderEditor();
         });
-        sectionToolbar.appendChild(removeSection);
-        sectionBox.appendChild(sectionToolbar);
-
-        draft.memberships.filter(function (member) { return member.section === section; }).forEach(function (member) {
-          var account = state.accounts.find(function (entry) { return entry.handle.toLowerCase() === member.handle.toLowerCase(); });
-          var row = el(doc, "div", "x-template-member");
-          row.appendChild(el(doc, "span", "x-template-member-name", "@" + member.handle + (account && account.label !== account.handle ? " · " + account.label : "")));
-          var sectionSelect = el(doc, "select", "x-template-member-section");
-          draft.sections.forEach(function (name) {
-            var option = el(doc, "option", "", name);
-            option.value = name;
-            option.selected = name === member.section;
-            sectionSelect.appendChild(option);
-          });
-          sectionSelect.addEventListener("change", function () { member.section = sectionSelect.value; renderEditor(); });
-          row.appendChild(sectionSelect);
-          var removeMember = el(doc, "button", "x-template-member-remove", "×");
-          removeMember.type = "button";
-          removeMember.setAttribute("aria-label", "Remove @" + member.handle + " from template");
-          removeMember.addEventListener("click", function () {
-            draft.memberships = draft.memberships.filter(function (entry) { return entry !== member; });
-            renderEditor();
-          });
-          row.appendChild(removeMember);
-          sectionBox.appendChild(row);
-        });
-
-        var available = state.accounts.filter(function (account) {
-          return !isMember(draft, account.handle);
-        });
-        if (available.length) {
-          var addRow = el(doc, "div", "x-template-add-account");
-          var accountSelect = el(doc, "select", "manage-input");
-          var placeholder = el(doc, "option", "", "Add tracked account…");
-          placeholder.value = "";
-          accountSelect.appendChild(placeholder);
-          available.forEach(function (account) {
-            var option = el(doc, "option", "", "@" + account.handle + " · " + account.label);
-            option.value = account.handle;
-            accountSelect.appendChild(option);
-          });
-          accountSelect.addEventListener("change", function () {
-            if (!accountSelect.value) return;
-            // The picker already hides accounts this template holds; this
-            // guards the case where the draft moved on since it was rendered,
-            // so one account can never land in two sections.
-            if (isMember(draft, accountSelect.value)) {
-              say("@" + accountSelect.value + " is already in this template.", "error");
-              accountSelect.value = "";
-              return;
-            }
-            draft.memberships.push({ handle: accountSelect.value, section: section });
-            renderEditor();
-          });
-          addRow.appendChild(accountSelect);
-          sectionBox.appendChild(addRow);
-        }
-        sectionsRoot.appendChild(sectionBox);
+        row.appendChild(removeMember);
+        accountsRoot.appendChild(row);
       });
-      editor.appendChild(sectionsRoot);
+
+      var available = state.accounts.filter(function (account) {
+        return !isMember(draft, account.handle);
+      });
+      if (available.length) {
+        var addRow = el(doc, "div", "x-template-add-account");
+        var accountSelect = el(doc, "select", "manage-input");
+        var placeholder = el(doc, "option", "", "Add tracked account…");
+        placeholder.value = "";
+        accountSelect.appendChild(placeholder);
+        available.forEach(function (account) {
+          var option = el(doc, "option", "", "@" + account.handle + " · " + account.label);
+          option.value = account.handle;
+          accountSelect.appendChild(option);
+        });
+        accountSelect.addEventListener("change", function () {
+          if (!accountSelect.value) return;
+          // The picker already hides accounts this template holds; this guards
+          // the case where the draft moved on since it was rendered, so one
+          // account can never be listed twice.
+          if (isMember(draft, accountSelect.value)) {
+            say("@" + accountSelect.value + " is already in this template.", "error");
+            accountSelect.value = "";
+            return;
+          }
+          draft.handles.push(accountSelect.value);
+          renderEditor();
+        });
+        addRow.appendChild(accountSelect);
+        accountsRoot.appendChild(addRow);
+      }
+      editor.appendChild(accountsRoot);
 
       var actions = el(doc, "div", "x-template-actions");
       var save = el(doc, "button", "manage-add", state.creating ? "Create Template" : "Save Changes");
@@ -434,6 +405,7 @@
 
   return {
     open: open,
+    ACCENTS: ACCENTS,
     slugify: slugify,
     normalizeDraft: normalizeDraft,
     sameHandle: sameHandle,

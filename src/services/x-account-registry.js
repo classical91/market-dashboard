@@ -338,7 +338,6 @@ class XAccountRegistry {
         // in the default one. Absent, the hook falls back to the default.
         this._membershipHooks.onAdd?.(stored, {
           templateId: clamp(input?.template, MAX_TEMPLATE_ID_LEN) || null,
-          section: account.category,
         });
       } catch (err) {
         this._logger.warn?.(`[XAccounts] Account saved but could not add it to a template: ${err.message}`);

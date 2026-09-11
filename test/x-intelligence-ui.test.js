@@ -67,6 +67,57 @@ test("the account panel is opened against the theme selected on the page", () =>
   assert.match(call, /template: activeTemplate\(\)/);
 });
 
+test("the account sidebar is a flat list in template order, with no section headings", () => {
+  const js = read("public/assets/js/x-intelligence.js");
+  const css = read("public/assets/styles/x-intelligence.css");
+
+  // Templates are the only filter now. The sidebar used to group accounts
+  // under headings taken from each template's sections; nothing derives a
+  // grouping any more, so neither the grouper nor its heading style remains.
+  assert.doesNotMatch(js, /groupAccounts/);
+  assert.doesNotMatch(js, /x-account-group-title/);
+  assert.doesNotMatch(css, /\.x-account-group-title/);
+
+  // The render walks accounts directly rather than groups of them.
+  assert.match(js, /function renderList\(root, accounts,/);
+  assert.match(js, /renderList\(listRoot, accountsOf\(state\.feedData\)/);
+});
+
+/* Source with comments removed. These guards are about what the code does,
+   and "section" and "membership" are still ordinary words to use in a comment
+   explaining why they are gone. */
+function codeOf(source) {
+  return source.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/.*$/gm, "$1");
+}
+
+test("a template is a flat list of handles, with no sections anywhere in the X stack", () => {
+  for (const file of [
+    "public/assets/js/x-intelligence.js",
+    "public/assets/js/x-templates-admin.js",
+    "public/assets/js/x-accounts-admin.js",
+    "src/services/x-template-registry.js",
+    "src/config/x-themes.js",
+  ]) {
+    const source = codeOf(read(file));
+    // Field access and object keys only — "membership" and "section" are still
+    // fair words to use in a comment, and the registry still reads the old
+    // `memberships` field to upgrade a file written before the change.
+    const readsLegacyShape = file.endsWith("x-template-registry.js");
+    if (!readsLegacyShape) {
+      assert.doesNotMatch(source, /\.memberships\b/, file + " must not read memberships");
+      assert.doesNotMatch(source, /\bmemberships:/, file + " must not write memberships");
+    }
+    assert.doesNotMatch(source, /\.sections\b/, file + " must not read sections");
+    assert.doesNotMatch(source, /\bsections:/, file + " must not write sections");
+    assert.doesNotMatch(source, /\bsection:/, file + " must not write a section");
+  }
+});
+
+test("the switcher counts a theme by its handles", () => {
+  const js = read("public/assets/js/x-intelligence.js");
+  assert.match(js, /\(template\.handles \|\| \[\]\)\.length \+ " accounts"/);
+});
+
 test("the panel sends the theme with an add, and can edit one membership at a time", () => {
   const js = read("public/assets/js/x-accounts-admin.js");
 
@@ -90,4 +141,18 @@ test("removing from a theme and untracking an account are distinct actions", () 
   assert.match(js, /function removeAccount\(/);
   assert.match(js, /removeFromThemeMessage/);
   assert.match(js, /confirmationMessage/);
+});
+
+test("the template editor offers every accent the stylesheet defines", () => {
+  const css = read("public/assets/styles/x-intelligence.css");
+  const templatesAdmin = require("../public/assets/js/x-templates-admin");
+
+  const styled = [...new Set(
+    [...css.matchAll(/data-x-accent="([a-z]+)"/g)].map((match) => match[1]),
+  )].sort();
+
+  // The select is the only way to set an accent, so an accent the stylesheet
+  // supports but the list omits is both unreachable and lossy: the Conspiracy
+  // theme opened showing "Market" and saving repainted it.
+  assert.deepEqual(templatesAdmin.ACCENTS.slice().sort(), styled);
 });

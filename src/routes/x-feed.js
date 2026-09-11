@@ -99,8 +99,8 @@ function describeAccount(account, feed) {
 
 function assertKnownTemplateHandles(input, accountRegistry) {
   const known = new Set(accountRegistry.list().map((account) => account.handle.toLowerCase()));
-  const unknown = (Array.isArray(input?.memberships) ? input.memberships : [])
-    .map((entry) => String(entry?.handle || "").replace(/^@+/, "").toLowerCase())
+  const unknown = (Array.isArray(input?.handles) ? input.handles : [])
+    .map((entry) => String(entry || "").replace(/^@+/, "").toLowerCase())
     .filter((handle) => handle && !known.has(handle));
   if (unknown.length) {
     throw createServiceError(`Template references untracked X account @${unknown[0]}`, 400);
@@ -231,9 +231,9 @@ function createXFeedRouter({ xFeedService, accountRegistry, templateRegistry, re
     // already-tracked handle into the theme on screen without sending back a
     // whole template body. Editing the template wholesale through PUT
     // /templates/:id is still how the template manager saves; these exist
-    // because a one-account change should not have to round-trip sections it
-    // is not touching, which is also how two admins editing one theme lose
-    // each other's work.
+    // because a one-account change should not have to round-trip the rest of
+    // the list, which is also how two admins editing one theme lose each
+    // other's work.
     router.post(
       "/templates/:id/accounts",
       requireAdmin,
@@ -247,9 +247,7 @@ function createXFeedRouter({ xFeedService, accountRegistry, templateRegistry, re
           throw createServiceError(`@${handle} is not a tracked X account`, 400);
         }
         const template = templateRegistry.get(req.params.id);
-        const section =
-          String(req.body?.section || "").trim() || template.sections[0] || tracked.category;
-        const added = templateRegistry.addHandleToTemplate(template.id, tracked.handle, section);
+        const added = templateRegistry.addHandleToTemplate(template.id, tracked.handle);
         res.status(added ? 201 : 200).json({
           added,
           handle: tracked.handle,

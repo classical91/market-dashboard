@@ -3,9 +3,11 @@
 /**
  * Persistent X Intelligence template registry.
  *
- * Templates organize references to globally tracked X handles. Account
- * metadata remains owned by XAccountRegistry, so one handle can be reused by
- * several templates without duplicating feed work or cached data.
+ * A template is a named, flat list of globally tracked X handles — the filter
+ * the page's switcher selects. It has no sections: the account sidebar renders
+ * the list in order. Account metadata remains owned by XAccountRegistry, so
+ * one handle can be reused by several templates without duplicating feed work
+ * or cached data.
  *
  * Templates come from two places. Admins create their own through the API, and
  * the built-in themes in src/config/x-themes.js ship with the dashboard. The
@@ -26,14 +28,18 @@ const { createServiceError } = require("../utils/errors");
 
 // 2 added the seededThemes roster. A version 1 file predates every built-in
 // theme but markets, so it is read as having seeded none of them and the
-// backfill installs them once.
-const REGISTRY_VERSION = 3;
+// backfill installs them once. 4 replaced each template's sections and
+// sectioned memberships with a flat `handles` list; a version 3 file still
+// reads, because normalizeTemplate accepts both shapes.
+const REGISTRY_VERSION = 4;
 const DEFAULT_TEMPLATE_ID = "markets";
 const MAX_TEMPLATES = 50;
-const MAX_SECTIONS = 40;
+const MAX_HANDLES = 200;
 const MAX_NAME_LEN = 60;
 const MAX_DESCRIPTION_LEN = 240;
-const MAX_SECTION_LEN = 60;
+// Bounds the roster strings in the stored file (theme ids, pack ids), not
+// anything a template shows.
+const MAX_ID_LEN = 60;
 const MAX_ACCENT_LEN = 24;
 const ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,39}$/;
 
@@ -64,6 +70,23 @@ function uniqueStrings(values, max, limit) {
 }
 
 /**
+ * The handles a template holds, from either shape this file has ever stored.
+ *
+ * Current shape is `handles: ["Barchart", ...]`. Templates written before
+ * sections were removed carry `memberships: [{ handle, section }]` instead;
+ * they are read here by taking the handles and discarding the sections, so an
+ * existing install upgrades on first read and persists the flat shape on its
+ * next write. No separate migration step, because normalizeTemplate is the
+ * only way a stored template enters the process.
+ */
+function readHandles(input) {
+  const source = Array.isArray(input?.handles)
+    ? input.handles
+    : (Array.isArray(input?.memberships) ? input.memberships : []);
+  return source.map((entry) => (typeof entry === "string" ? entry : entry?.handle));
+}
+
+/**
  * Validates and normalizes one template.
  *
  * `strict` is used for anything that arrives from the API: a payload naming
@@ -81,29 +104,20 @@ function normalizeTemplate(input, { requireId = true, strict = false } = {}) {
   const name = clamp(input?.name, MAX_NAME_LEN);
   if (!name) throw createServiceError("A template name is required", 400);
 
-  const sections = uniqueStrings(input?.sections, MAX_SECTION_LEN, MAX_SECTIONS);
-  const memberships = [];
-  for (const entry of Array.isArray(input?.memberships) ? input.memberships : []) {
-    const handle = normalizeHandle(entry?.handle);
-    const section = clamp(entry?.section, MAX_SECTION_LEN);
-    if (!handle || !section) continue;
-    let canonicalSection = sections.find((name) => name.toLowerCase() === section.toLowerCase());
-    if (!canonicalSection) {
-      if (sections.length >= MAX_SECTIONS) continue;
-      sections.push(section);
-      canonicalSection = section;
-    }
-    const duplicate = memberships.find((member) => sameHandle(member.handle, handle));
-    if (duplicate) {
+  const handles = [];
+  for (const entry of readHandles(input)) {
+    const handle = normalizeHandle(entry);
+    if (!handle) continue;
+    if (handles.some((existing) => sameHandle(existing, handle))) {
+      // One handle, one entry: a template holding an account twice would list
+      // it twice in the sidebar and double every one of its posts.
       if (strict) {
-        throw createServiceError(
-          `@${duplicate.handle} is already in this template (under ${duplicate.section})`,
-          409,
-        );
+        throw createServiceError(`@${handle} is already in this template`, 409);
       }
       continue;
     }
-    memberships.push({ handle, section: canonicalSection });
+    handles.push(handle);
+    if (handles.length >= MAX_HANDLES) break;
   }
 
   return {
@@ -111,26 +125,17 @@ function normalizeTemplate(input, { requireId = true, strict = false } = {}) {
     name,
     description: clamp(input?.description, MAX_DESCRIPTION_LEN),
     accent: slugify(input?.accent || "market").slice(0, MAX_ACCENT_LEN) || "market",
-    sections,
-    memberships,
+    handles,
   };
 }
 
 function seedMarkets(accounts) {
-  const sections = [];
-  const memberships = [];
-  for (const account of accounts || []) {
-    const section = clamp(account.category || "Other", MAX_SECTION_LEN) || "Other";
-    if (!sections.includes(section)) sections.push(section);
-    memberships.push({ handle: normalizeHandle(account.handle), section });
-  }
   return normalizeTemplate({
     id: DEFAULT_TEMPLATE_ID,
     name: "Crypto & Stocks",
     description: "Crypto, stocks, macro and technical analysis",
     accent: "market",
-    sections,
-    memberships,
+    handles: (accounts || []).map((account) => account.handle),
   });
 }
 
@@ -194,12 +199,12 @@ class XTemplateRegistry {
       // any theme but markets existed, so none of the rest count as installed.
       this._seededThemes = uniqueStrings(
         Array.isArray(parsed?.seededThemes) ? parsed.seededThemes.map(slugify) : [],
-        MAX_SECTION_LEN,
+        MAX_ID_LEN,
         MAX_TEMPLATES,
       );
       this._seededMembershipPacks = uniqueStrings(
         Array.isArray(parsed?.seededMembershipPacks) ? parsed.seededMembershipPacks : [],
-        MAX_SECTION_LEN,
+        MAX_ID_LEN,
         100,
       );
       const templates = [];
@@ -270,7 +275,7 @@ class XTemplateRegistry {
    * that has ever booted would keep only the themes that existed the first
    * time. It runs at most once per theme — the id is recorded whether or not
    * the template survives — so deleting a theme is permanent, and an admin who
-   * renamed or re-sectioned one keeps their version.
+   * renamed or re-listed one keeps their version.
    *
    * Returns true when the file was written.
    */
@@ -315,14 +320,13 @@ class XTemplateRegistry {
         if (template) {
           const removeHandles = new Set((pack.removeHandles || []).map((handle) => normalizeHandle(handle).toLowerCase()));
           if (removeHandles.size) {
-            template.memberships = template.memberships.filter(
-              (entry) => !removeHandles.has(entry.handle.toLowerCase()),
+            template.handles = template.handles.filter(
+              (handle) => !removeHandles.has(handle.toLowerCase()),
             );
           }
-          for (const membership of pack.memberships) {
-            if (!template.sections.includes(membership.section)) template.sections.push(membership.section);
-            if (!template.memberships.some((entry) => sameHandle(entry.handle, membership.handle))) {
-              template.memberships.push({ ...membership });
+          for (const handle of pack.handles || []) {
+            if (!template.handles.some((entry) => sameHandle(entry, handle))) {
+              template.handles.push(normalizeHandle(handle));
             }
           }
           this._seededMembershipPacks.push(pack.id);
@@ -346,8 +350,7 @@ class XTemplateRegistry {
   list() {
     return this._read().map((template) => ({
       ...template,
-      sections: template.sections.slice(),
-      memberships: template.memberships.map((entry) => ({ ...entry })),
+      handles: template.handles.slice(),
     }));
   }
 
@@ -435,40 +438,33 @@ class XTemplateRegistry {
   }
 
   /**
-   * Adds a globally tracked handle to one template's section.
+   * Adds a globally tracked handle to one template.
    *
    * This is what "manage accounts for the theme I am looking at" resolves to.
-   * The section is created if the template does not already have it: an
-   * account arriving from the page carries the category the admin typed, and
-   * refusing it because the theme has no such section would leave the add
-   * with nowhere to land.
    *
-   * Returns true when the membership was written, false when the template
-   * already held the handle. Absent templates throw, because a caller naming
-   * a template that is not there has a real bug — only the default-template
-   * convenience wrapper below tolerates that, for the pre-template callers it
-   * still serves.
+   * Returns true when the handle was added, false when the template already
+   * held it. Absent templates throw, because a caller naming a template that
+   * is not there has a real bug — only the default-template convenience
+   * wrapper below tolerates that, for the pre-template callers it still serves.
    */
-  addHandleToTemplate(templateId, handle, section = "Other") {
+  addHandleToTemplate(templateId, handle) {
     return this._withLock(() => {
       const wanted = slugify(templateId || DEFAULT_TEMPLATE_ID);
       const templates = this._read();
       const index = templates.findIndex((entry) => entry.id === wanted);
       if (index < 0) throw createServiceError(`X template "${wanted}" was not found`, 404);
-      if (templates[index].memberships.some((entry) => sameHandle(entry.handle, handle))) return false;
+      if (templates[index].handles.some((entry) => sameHandle(entry, handle))) return false;
       const next = templates.slice();
-      const updated = normalizeTemplate({
+      next[index] = normalizeTemplate({
         ...templates[index],
-        sections: templates[index].sections.concat(section),
-        memberships: templates[index].memberships.concat({ handle, section }),
+        handles: templates[index].handles.concat(handle),
       });
-      next[index] = updated;
       if (!this._write(next)) throw createServiceError("Could not update the template", 500);
       return true;
     });
   }
 
-  addHandleToDefault(handle, section = "Other") {
+  addHandleToDefault(handle) {
     // Kept tolerant of a missing default template: it is the fallback path for
     // an add that named no theme, and a 404 there would fail the whole add.
     try {
@@ -476,7 +472,7 @@ class XTemplateRegistry {
     } catch (err) {
       return false;
     }
-    return this.addHandleToTemplate(DEFAULT_TEMPLATE_ID, handle, section);
+    return this.addHandleToTemplate(DEFAULT_TEMPLATE_ID, handle);
   }
 
   /**
@@ -490,15 +486,10 @@ class XTemplateRegistry {
       const templates = this._read();
       const index = templates.findIndex((entry) => entry.id === wanted);
       if (index < 0) throw createServiceError(`X template "${wanted}" was not found`, 404);
-      const memberships = templates[index].memberships.filter(
-        (entry) => !sameHandle(entry.handle, handle),
-      );
-      if (memberships.length === templates[index].memberships.length) return false;
+      const handles = templates[index].handles.filter((entry) => !sameHandle(entry, handle));
+      if (handles.length === templates[index].handles.length) return false;
       const next = templates.slice();
-      // Sections are left in place on purpose: an emptied section is still a
-      // drop target the admin arranged, and silently deleting it would make
-      // removing the last account destroy the theme's layout.
-      next[index] = { ...templates[index], memberships };
+      next[index] = { ...templates[index], handles };
       if (!this._write(next)) throw createServiceError("Could not update the template", 500);
       return true;
     });
@@ -509,22 +500,30 @@ class XTemplateRegistry {
       const templates = this._read();
       let changed = false;
       const next = templates.map((template) => {
-        const memberships = template.memberships.filter((entry) => !sameHandle(entry.handle, handle));
-        if (memberships.length === template.memberships.length) return template;
+        const handles = template.handles.filter((entry) => !sameHandle(entry, handle));
+        if (handles.length === template.handles.length) return template;
         changed = true;
-        return { ...template, memberships };
+        return { ...template, handles };
       });
       if (changed && !this._write(next)) throw createServiceError("Could not remove the account from templates", 500);
       return changed;
     });
   }
 
+  /**
+   * The tracked accounts this template shows, in the order it lists them.
+   *
+   * Each account keeps its own category: the sidebar renders a flat list now,
+   * so the category is descriptive metadata rather than a grouping key. A
+   * handle naming an account that is no longer tracked is dropped — it would
+   * otherwise be a row whose feed can never fill.
+   */
   resolveAccounts(id, accounts) {
     const template = this.get(id);
     const byHandle = new Map((accounts || []).map((account) => [account.handle.toLowerCase(), account]));
-    return template.memberships.flatMap((membership) => {
-      const account = byHandle.get(membership.handle.toLowerCase());
-      return account ? [{ ...account, category: membership.section }] : [];
+    return template.handles.flatMap((handle) => {
+      const account = byHandle.get(handle.toLowerCase());
+      return account ? [{ ...account }] : [];
     });
   }
 

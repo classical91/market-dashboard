@@ -174,34 +174,27 @@ test("templates are public, default to markets, and mutations are admin-gated", 
   assert.equal(listed.status, 200);
   assert.equal(listed.body.defaultTemplateId, "markets");
   assert.equal(listed.body.templates[0].name, "Crypto & Stocks");
-  assert.equal(listed.body.templates[0].memberships.length, X_ACCOUNTS.length);
+  assert.equal(listed.body.templates[0].handles.length, X_ACCOUNTS.length);
 
   const rejected = await send("/api/x/templates", "POST", {
-    id: "wars", name: "Wars & Geopolitics", sections: [], memberships: [],
+    id: "wars", name: "Wars & Geopolitics", handles: [],
   });
   assert.equal(rejected.status, 401);
 
   const unknownAccount = await send("/api/x/templates", "POST", {
     id: "invalid-template",
     name: "Invalid",
-    sections: ["Unknown"],
-    memberships: [{ handle: "nottracked", section: "Unknown" }],
+    handles: ["nottracked"],
   }, ADMIN);
   assert.equal(unknownAccount.status, 400);
 });
 
-test("a template scopes accounts, posts, counts, failures, and sections", async () => {
+test("a template scopes accounts, posts, counts and failures", async () => {
   mockUpstream(() => healthySearchResponse());
   const created = await send(
     "/api/x/templates",
     "POST",
-    {
-      id: "tech",
-      name: "Tech & AI",
-      accent: "tech",
-      sections: ["Researchers"],
-      memberships: [{ handle: "TechDev_52", section: "Researchers" }],
-    },
+    { id: "tech", name: "Tech & AI", accent: "tech", handles: ["TechDev_52"] },
     ADMIN,
   );
   assert.equal(created.status, 201);
@@ -211,7 +204,9 @@ test("a template scopes accounts, posts, counts, failures, and sections", async 
   assert.equal(scoped.body.template.id, "tech");
   assert.equal(scoped.body.accounts.length, 1);
   assert.equal(scoped.body.accounts[0].handle, "TechDev_52");
-  assert.equal(scoped.body.accounts[0].category, "Researchers");
+  // The account's own category travels with it as metadata; the template has
+  // no section to override it with, and the sidebar renders a flat list.
+  assert.equal(scoped.body.accounts[0].category, "Crypto Traders");
   assert.equal(scoped.body.posts.length, 1);
   assert.equal(Object.values(scoped.body.counts).reduce((sum, count) => sum + count, 0), 1);
   assert.ok(scoped.body.failedFeeds.every((account) => account.handle === "TechDev_52"));
@@ -229,8 +224,7 @@ test("template duplicate, update, reorder, and safe delete APIs persist", async 
     name: "Wars & Geopolitics",
     description: "Conflict intelligence",
     accent: "world",
-    sections: ["Official Sources"],
-    memberships: [{ handle: "Barchart", section: "Official Sources" }],
+    handles: ["Barchart"],
   }, ADMIN);
   assert.equal(updated.status, 200);
   assert.equal(updated.body.template.name, "Wars & Geopolitics");
@@ -252,11 +246,7 @@ test("a template payload naming one account twice is refused with a 409", async 
   const duplicateMembership = await send("/api/x/templates", "POST", {
     id: "doubled",
     name: "Doubled",
-    sections: ["Left", "Right"],
-    memberships: [
-      { handle: "Barchart", section: "Left" },
-      { handle: "@barchart", section: "Right" },
-    ],
+    handles: ["Barchart", "@barchart"],
   }, ADMIN);
 
   assert.equal(duplicateMembership.status, 409);
@@ -369,7 +359,7 @@ test("an add naming no theme still lands in the default one", async () => {
   assert.equal(added.status, 201);
   assert.ok(
     added.body.templates.some((t) => t.id === "markets"
-      && t.memberships.some((m) => m.handle === "defaultbound")),
+      && t.handles.includes("defaultbound")),
     "the response carries the templates, so the panel can see where it landed",
   );
 
@@ -385,26 +375,22 @@ test("an already-tracked account can be pulled into a theme without being re-add
   const joined = await send(
     "/api/x/templates/conspiracy/accounts",
     "POST",
-    { handle: "@Barchart", section: "Deep State" },
+    { handle: "@Barchart" },
     ADMIN,
   );
   assert.equal(joined.status, 201);
   assert.equal(joined.body.added, true);
-  assert.equal(
-    joined.body.template.memberships.find((m) => m.handle === "Barchart").section,
-    "Deep State",
-  );
+  assert.ok(joined.body.template.handles.includes("Barchart"));
 
   const feed = await getJson("/api/x/accounts?template=conspiracy");
   const row = feed.body.accounts.find((a) => a.handle === "Barchart");
   assert.ok(row, "the theme's feed now fetches it");
-  assert.equal(row.category, "Deep State", "grouped by this theme's section");
 
   // Idempotent rather than an error: one handle, one membership.
   const again = await send(
     "/api/x/templates/conspiracy/accounts",
     "POST",
-    { handle: "barchart", section: "Medical" },
+    { handle: "barchart" },
     ADMIN,
   );
   assert.equal(again.status, 200);
@@ -454,7 +440,7 @@ test("membership endpoints refuse untracked handles and unknown themes", async (
   const untracked = await send(
     "/api/x/templates/conspiracy/accounts",
     "POST",
-    { handle: "neverheardofthis", section: "Deep State" },
+    { handle: "neverheardofthis" },
     ADMIN,
   );
   assert.equal(untracked.status, 400, "a template must not reference an untracked account");
@@ -462,7 +448,7 @@ test("membership endpoints refuse untracked handles and unknown themes", async (
   const noTheme = await send(
     "/api/x/templates/no-such-theme/accounts",
     "POST",
-    { handle: "Barchart", section: "Deep State" },
+    { handle: "Barchart" },
     ADMIN,
   );
   assert.equal(noTheme.status, 404);
@@ -470,7 +456,7 @@ test("membership endpoints refuse untracked handles and unknown themes", async (
   const noHandle = await send(
     "/api/x/templates/conspiracy/accounts",
     "POST",
-    { section: "Deep State" },
+    {},
     ADMIN,
   );
   assert.equal(noHandle.status, 400);
@@ -480,7 +466,7 @@ test("membership changes are admin-gated like every other mutation", async () =>
   const add = await send(
     "/api/x/templates/conspiracy/accounts",
     "POST",
-    { handle: "Barchart", section: "Deep State" },
+    { handle: "Barchart" },
   );
   assert.equal(add.status, 401);
 

@@ -10,7 +10,7 @@
    So there are two scopes here, and the panel opens on the first:
 
      - In this theme: the accounts the selected filter resolves to, in
-       membership order, with the section each sits in.
+       the order the template lists them.
      - All tracked: every account the dashboard fetches, whichever themes use
        it, so an existing handle can be pulled into this theme.
 
@@ -79,66 +79,34 @@
     return Boolean(findDuplicate(accounts, handle));
   }
 
-  /* The membership this template holds for a handle, or null. Kept separate
-     from findDuplicate because "tracked" and "in this theme" are different
-     questions, and conflating them is what made an already-tracked handle
-     un-addable to the theme being viewed. */
-  function findMembership(template, handle) {
-    var wanted = canonicalHandle(handle);
-    if (!wanted) return null;
-    var match = ((template && template.memberships) || []).filter(function (entry) {
-      return canonicalHandle(entry && entry.handle) === wanted;
-    });
-    return match.length ? match[0] : null;
-  }
-
+  /* Whether this template lists the handle. Kept separate from findDuplicate
+     because "tracked" and "in this theme" are different questions, and
+     conflating them is what made an already-tracked handle un-addable to the
+     theme being viewed. */
   function isMember(template, handle) {
-    return Boolean(findMembership(template, handle));
+    var wanted = canonicalHandle(handle);
+    if (!wanted) return false;
+    return ((template && template.handles) || []).some(function (entry) {
+      return canonicalHandle(entry) === wanted;
+    });
   }
 
-  /* The accounts this theme actually resolves to: membership order, each
-     carrying the section it sits in rather than its global category — that is
-     what the sidebar groups by, so it is what the panel must show.
+  /* The accounts this theme actually resolves to, in the order the template
+     lists them — which is the order the page's sidebar renders.
 
-     A membership pointing at an account that is no longer tracked is dropped,
-     matching resolveAccounts on the server. Showing it would offer a row whose
-     feed can never fill. */
+     A handle naming an account that is no longer tracked is dropped, matching
+     resolveAccounts on the server. Showing it would offer a row whose feed can
+     never fill. */
   function accountsInTemplate(accounts, template) {
     var byHandle = {};
     (accounts || []).forEach(function (account) {
       byHandle[canonicalHandle(account && account.handle)] = account;
     });
-    return ((template && template.memberships) || []).reduce(function (rows, entry) {
-      var account = byHandle[canonicalHandle(entry && entry.handle)];
-      if (account) {
-        rows.push({
-          handle: account.handle,
-          label: account.label,
-          category: entry.section || account.category,
-          section: entry.section,
-        });
-      }
+    return ((template && template.handles) || []).reduce(function (rows, handle) {
+      var account = byHandle[canonicalHandle(handle)];
+      if (account) rows.push(account);
       return rows;
     }, []);
-  }
-
-  /* What the section box offers: this theme's own sections first, because the
-     account is being added to this theme and its sections are the drop targets
-     that exist, then the global categories that are not already among them. A
-     typed value that matches neither is still accepted — the sidebar builds
-     its groups from whatever comes back, and the server creates the section. */
-  function sectionOptions(template, categories) {
-    var options = [];
-    var seen = {};
-    function push(name) {
-      var value = String(name == null ? "" : name).trim();
-      if (!value || seen[value.toLowerCase()]) return;
-      seen[value.toLowerCase()] = true;
-      options.push(value);
-    }
-    ((template && template.sections) || []).forEach(push);
-    (categories || []).forEach(push);
-    return options;
   }
 
   function themeName(template) {
@@ -164,11 +132,7 @@
   }
 
   function alreadyInThemeMessage(account, template) {
-    var membership = findMembership(template, account.handle);
-    return (
-      "@" + account.handle + " is already in " + themeName(template) +
-      (membership && membership.section ? " under " + membership.section : "") + "."
-    );
+    return "@" + account.handle + " is already in " + themeName(template) + ".";
   }
 
   function confirmationMessage(handle) {
@@ -251,8 +215,8 @@
 
     var categoryInput = el(doc, "input", "manage-input");
     categoryInput.type = "text";
-    categoryInput.placeholder = "Section";
-    categoryInput.setAttribute("aria-label", "Section");
+    categoryInput.placeholder = "Category";
+    categoryInput.setAttribute("aria-label", "Category");
     categoryInput.setAttribute("list", "xManageCategories");
     categoryInput.autocomplete = "off";
 
@@ -339,15 +303,16 @@
       submit.textContent = "Add to " + template.name;
     }
 
-    function syncSectionOptions() {
+    /* The account's own category — descriptive metadata the registry requires,
+       not a second filter. Templates have no sections to file it under. */
+    function syncCategoryOptions() {
       categoryList.innerHTML = "";
-      var options = sectionOptions(template, categories);
-      options.forEach(function (name) {
+      (categories || []).forEach(function (name) {
         var option = doc.createElement("option");
         option.value = name;
         categoryList.appendChild(option);
       });
-      if (!categoryInput.value && options.length) categoryInput.value = options[0];
+      if (!categoryInput.value && categories.length) categoryInput.value = categories[0];
     }
 
     /* Keeps the duplicate warning, the adopt button and the Add button in step
@@ -389,7 +354,7 @@
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ handle: handle, section: categoryInput.value.trim() }),
+          body: JSON.stringify({ handle: handle }),
         }
       )
         .then(readJson)
@@ -504,7 +469,7 @@
     function renderList() {
       listRoot.innerHTML = "";
       syncHead();
-      syncSectionOptions();
+      syncCategoryOptions();
       refreshDuplicateHint();
       var rows = scope === THEME_SCOPE && template
         ? accountsInTemplate(accounts, template)
@@ -559,7 +524,7 @@
       }
       var category = categoryInput.value.trim();
       if (!category) {
-        say("Choose or type a section.", "error");
+        say("Choose or type a category.", "error");
         return;
       }
 
@@ -653,10 +618,8 @@
     validateHandle: validateHandle,
     isDuplicate: isDuplicate,
     findDuplicate: findDuplicate,
-    findMembership: findMembership,
     isMember: isMember,
     accountsInTemplate: accountsInTemplate,
-    sectionOptions: sectionOptions,
     duplicateMessage: duplicateMessage,
     trackedElsewhereMessage: trackedElsewhereMessage,
     alreadyInThemeMessage: alreadyInThemeMessage,

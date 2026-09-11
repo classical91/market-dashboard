@@ -216,8 +216,8 @@ function createApp() {
     // the Conspiracy filter never appeared in it.
     onAdd: (account, options) =>
       (options && options.templateId
-        ? xTemplateRegistry.addHandleToTemplate(options.templateId, account.handle, account.category)
-        : xTemplateRegistry.addHandleToDefault(account.handle, account.category)),
+        ? xTemplateRegistry.addHandleToTemplate(options.templateId, account.handle)
+        : xTemplateRegistry.addHandleToDefault(account.handle)),
     onRemove: (account) => xTemplateRegistry.removeHandle(account.handle),
   });
   const aiAnalysisService = new AIAnalysisService({

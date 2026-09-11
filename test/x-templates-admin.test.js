@@ -10,33 +10,27 @@ test("template ids are bookmark-safe slugs", () => {
   assert.equal(templatesAdmin.slugify("Tech / AI"), "tech-ai");
 });
 
-test("template drafts retain ordered sections and unique account memberships", () => {
+test("template drafts keep their account order and drop repeats", () => {
   const draft = templatesAdmin.normalizeDraft({
     name: "Wars & Geopolitics",
     accent: "World",
-    sections: ["Official Sources", "official sources", "Conflict Monitors"],
-    memberships: [
-      { handle: "Barchart", section: "official sources" },
-      { handle: "barchart", section: "Conflict Monitors" },
-      { handle: "TechDev_52", section: "Conflict Monitors" },
-    ],
+    // Order is the only arrangement a template has, so it must survive
+    // normalization exactly as given.
+    handles: ["Barchart", "@barchart", "TechDev_52", " jasonpizzino "],
   });
 
   assert.equal(draft.id, "wars-geopolitics");
   assert.equal(draft.accent, "world");
-  assert.deepEqual(draft.sections, ["Official Sources", "Conflict Monitors"]);
-  assert.deepEqual(draft.memberships, [
-    { handle: "Barchart", section: "Official Sources" },
-    { handle: "TechDev_52", section: "Conflict Monitors" },
-  ]);
+  assert.deepEqual(draft.handles, ["Barchart", "TechDev_52", "jasonpizzino"]);
+  assert.equal("sections" in draft, false, "templates have no sections");
 });
 
 test("an account already in the draft is recognized however its handle is written", () => {
-  const draft = { memberships: [{ handle: "Barchart", section: "Market Data" }] };
+  const draft = { handles: ["Barchart"] };
 
   for (const typed of ["Barchart", "barchart", "@BARCHART", " @BarChart "]) {
     assert.equal(templatesAdmin.isMember(draft, typed), true, typed);
   }
   assert.equal(templatesAdmin.isMember(draft, "TechDev_52"), false);
-  assert.equal(templatesAdmin.isMember({ memberships: [] }, "Barchart"), false);
+  assert.equal(templatesAdmin.isMember({ handles: [] }, "Barchart"), false);
 });
