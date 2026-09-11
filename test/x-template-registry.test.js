@@ -34,7 +34,8 @@ test("the current account layout seeds Crypto & Stocks without changing its orde
   const template = registry.get();
   assert.equal(template.id, DEFAULT_TEMPLATE_ID);
   assert.equal(template.name, "Crypto & Stocks");
-  assert.deepEqual(template.sections, ["Market Data", "Crypto Traders", "TA & Signals"]);
+  assert.deepEqual(template.sections.slice(0, 3), ["Market Data", "Crypto Traders", "TA & Signals"]);
+  assert.ok(template.sections.includes("QAnon"));
   assert.deepEqual(
     template.memberships.map((entry) => entry.handle),
     X_ACCOUNTS.map((account) => account.handle),
@@ -229,7 +230,7 @@ test("a fresh install seeds every built-in theme alongside Crypto & Stocks", () 
   for (const theme of BUILT_IN_THEMES) {
     const template = registry.get(theme.id);
     assert.deepEqual(template.sections, theme.sections, `${theme.id} keeps its section layout`);
-    assert.deepEqual(template.memberships, [], `${theme.id} ships unpopulated`);
+    assert.deepEqual(template.memberships, theme.memberships, `${theme.id} keeps its built-in memberships`);
     assert.equal(template.accent, theme.accent);
   }
 
@@ -238,6 +239,22 @@ test("a fresh install seeds every built-in theme alongside Crypto & Stocks", () 
     stored.seededThemes,
     [DEFAULT_TEMPLATE_ID].concat(BUILT_IN_THEMES.map((theme) => theme.id)),
   );
+});
+
+test("the conspiracy theme groups its six tracked accounts into narrative sections", () => {
+  const { registry } = tempRegistry();
+  registry.ensureSeeded();
+  const theme = registry.get("conspiracy");
+
+  assert.equal(theme.memberships.length, 6);
+  assert.deepEqual(theme.memberships, [
+    { handle: "RealAlexJones", section: "Deep State" },
+    { handle: "MattWallace888", section: "Epstein & Elites" },
+    { handle: "VigilantFox", section: "Medical" },
+    { handle: "dom_lucre", section: "Epstein & Elites" },
+    { handle: "ShadowofEzra", section: "QAnon" },
+    { handle: "WarClandestine", section: "Geopolitics" },
+  ]);
 });
 
 test("a registry written before the themes existed has them backfilled once", () => {

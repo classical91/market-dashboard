@@ -1,3 +1,12 @@
+const CONSPIRACY_X_ACCOUNTS = [
+  { handle: "RealAlexJones", label: "Alex Jones", category: "Deep State" },
+  { handle: "MattWallace888", label: "Matt Wallace", category: "Epstein & Elites" },
+  { handle: "VigilantFox", label: "The Vigilant Fox", category: "Medical" },
+  { handle: "dom_lucre", label: "Dom Lucre", category: "Epstein & Elites" },
+  { handle: "ShadowofEzra", label: "Shadow of Ezra", category: "QAnon" },
+  { handle: "WarClandestine", label: "Clandestine", category: "Geopolitics" },
+];
+
 const X_ACCOUNTS = [
   { handle: "Barchart", label: "Barchart", category: "Market Data" },
 
@@ -23,6 +32,12 @@ const X_ACCOUNTS = [
   { handle: "CryptoCaesarTA", label: "CryptoCaesarTA", category: "TA & Signals" },
   { handle: "cryptic_heych", label: "cryptic_heych", category: "TA & Signals" },
   { handle: "CharTTrapperZ", label: "CharTTrapperZ", category: "TA & Signals" },
+
+  ...CONSPIRACY_X_ACCOUNTS,
 ];
 
-module.exports = { X_ACCOUNTS };
+const X_ACCOUNT_PACKS = [
+  { id: "conspiracy", accounts: CONSPIRACY_X_ACCOUNTS },
+];
+
+module.exports = { X_ACCOUNTS, CONSPIRACY_X_ACCOUNTS, X_ACCOUNT_PACKS };

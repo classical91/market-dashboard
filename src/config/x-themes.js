@@ -27,11 +27,24 @@
  */
 
 const { sharedThemesWithMemberships } = require("./intelligence-themes");
+const { CONSPIRACY_X_ACCOUNTS } = require("./x-accounts");
 
 // X templates carry a `memberships` list of X handles, so the catalogue's
 // themes arrive with an empty one. Identity — name, description, accent and
 // sections — is the catalogue's, shared with YouTube Intelligence so the two
 // pages cannot drift into offering different versions of the same theme.
-const BUILT_IN_THEMES = sharedThemesWithMemberships("memberships");
+const CONSPIRACY_THEME = {
+  id: "conspiracy",
+  name: "Conspiracy",
+  description: "Narrative monitoring for unverified hidden-truth and cover-up claims",
+  accent: "conspiracy",
+  sections: ["Deep State", "Geopolitics", "Epstein & Elites", "Medical", "QAnon"],
+  memberships: CONSPIRACY_X_ACCOUNTS.map((account) => ({
+    handle: account.handle,
+    section: account.category,
+  })),
+};
+
+const BUILT_IN_THEMES = sharedThemesWithMemberships("memberships").concat(CONSPIRACY_THEME);
 
 module.exports = { BUILT_IN_THEMES };

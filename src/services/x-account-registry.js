@@ -17,7 +17,7 @@
  * storage technology.
  *
  * File shape:
- *   { "version": 1, "accounts": [ { handle, label, category, addedAt } ] }
+ *   { "version": 2, "seededPacks": ["conspiracy"], "accounts": [ { handle, label, category, addedAt } ] }
  *
  * Adding an account never calls X. Format is the only thing validated, so a
  * rejected bearer token or a rate-limited provider can neither block account
@@ -34,10 +34,10 @@ const fs = require("fs");
 const path = require("path");
 
 const { withExclusiveLock, writeJsonAtomic } = require("./json-file-lock");
-const { X_ACCOUNTS } = require("../config/x-accounts");
+const { X_ACCOUNTS, X_ACCOUNT_PACKS } = require("../config/x-accounts");
 const { createServiceError } = require("../utils/errors");
 
-const REGISTRY_VERSION = 1;
+const REGISTRY_VERSION = 2;
 const MAX_ACCOUNTS = 200;
 // X handles are 1-15 characters of [A-Za-z0-9_]. Enforced before persistence
 // so a typo cannot become a permanently failing account in the feed.
@@ -128,6 +128,10 @@ class XAccountRegistry {
     this._lockState = { depth: 0 };
     this._logger = logger;
     this._seed = seed;
+    // Explicit custom seeds are used heavily by tests and embedders; only the
+    // dashboard's canonical seed receives versioned built-in account packs.
+    this._accountPacks = seed === X_ACCOUNTS ? X_ACCOUNT_PACKS : [];
+    this._seededPacks = [];
     // Used to drop a removed account's cached feed state, so a delete cannot
     // be undone by a cache entry outliving it.
     this._cache = cache;
@@ -157,6 +161,7 @@ class XAccountRegistry {
       if (err.code === "ENOENT") {
         this._loadState = "seeded";
         this._loadError = null;
+        this._seededPacks = this._accountPacks.map((pack) => pack.id);
         return this._seed.map((account) => normalizeAccount(account));
       }
       this._loadState = "unreadable";
@@ -169,6 +174,9 @@ class XAccountRegistry {
       const parsed = JSON.parse(raw);
       const accounts = Array.isArray(parsed) ? parsed : parsed?.accounts;
       if (!Array.isArray(accounts)) throw new SyntaxError("no accounts array");
+      this._seededPacks = Array.isArray(parsed?.seededPacks)
+        ? parsed.seededPacks.map((id) => String(id).trim()).filter(Boolean)
+        : [];
 
       const valid = [];
       let malformed = 0;
@@ -202,6 +210,7 @@ class XAccountRegistry {
     } catch (err) {
       this._loadState = "corrupt";
       this._loadError = err.message;
+      this._seededPacks = this._accountPacks.map((pack) => pack.id);
       this._logger.error?.(
         `[XAccounts] ${this._file} is unreadable (${err.message}); serving the seed list instead`,
       );
@@ -234,7 +243,11 @@ class XAccountRegistry {
 
     const written = writeJsonAtomic(
       this._file,
-      { version: REGISTRY_VERSION, accounts: unique.slice(0, MAX_ACCOUNTS) },
+      {
+        version: REGISTRY_VERSION,
+        seededPacks: this._seededPacks.slice(),
+        accounts: unique.slice(0, MAX_ACCOUNTS),
+      },
       this._logger,
       "[XAccounts]",
     );
@@ -256,14 +269,34 @@ class XAccountRegistry {
     return this._read().map(({ handle, label, category }) => ({ handle, label, category }));
   }
 
-  /** Writes the seed out on first boot so the file exists to be edited. */
+  /**
+   * Writes the seed on first boot and installs each later built-in account pack
+   * exactly once. Recording the pack id means an account an admin removes after
+   * installation stays removed on every later boot.
+   */
   ensureSeeded() {
     return this._withLock(() => {
-      if (fs.existsSync(this._file)) {
-        this._read();
-        return false;
+      if (!fs.existsSync(this._file)) {
+        this._write(this._read());
+        return true;
       }
-      this._write(this._read());
+
+      const accounts = this._read();
+      if (this._loadState === "corrupt") return false;
+      const installed = new Set(this._seededPacks);
+      const pending = this._accountPacks.filter((pack) => !installed.has(pack.id));
+      if (!pending.length) return false;
+
+      const next = accounts.slice();
+      for (const pack of pending) {
+        for (const account of pack.accounts || []) {
+          if (next.some((existing) => sameHandle(existing.handle, account.handle))) continue;
+          if (next.length >= MAX_ACCOUNTS) break;
+          next.push({ ...normalizeAccount(account), addedAt: null });
+        }
+        this._seededPacks.push(pack.id);
+      }
+      if (!this._write(next)) throw createServiceError("Could not install built-in X accounts", 500);
       return true;
     });
   }

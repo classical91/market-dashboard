@@ -12,7 +12,7 @@ const os = require("node:os");
 const path = require("node:path");
 
 const { XAccountRegistry } = require("../src/services/x-account-registry");
-const { X_ACCOUNTS } = require("../src/config/x-accounts");
+const { X_ACCOUNTS, CONSPIRACY_X_ACCOUNTS } = require("../src/config/x-accounts");
 const { MemoryCache } = require("../src/services/cache");
 
 const quietLogger = { warn() {}, error() {}, log() {} };
@@ -32,11 +32,30 @@ test("the static config seeds the persistent registry on first boot", () => {
 
   const stored = JSON.parse(fs.readFileSync(file, "utf8"));
   assert.equal(stored.accounts.length, X_ACCOUNTS.length);
+  assert.deepEqual(stored.seededPacks, ["conspiracy"]);
   assert.deepEqual(
     registry.list().map((a) => a.handle),
     X_ACCOUNTS.map((a) => a.handle),
     "seeded order is preserved so the sidebar sections do not reshuffle",
   );
+});
+
+test("an existing registry receives the conspiracy account pack exactly once", () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "md-x-registry-v1-"));
+  const file = path.join(dataDir, "x-accounts.json");
+  fs.writeFileSync(file, JSON.stringify({ version: 1, accounts: X_ACCOUNTS.slice(0, 2) }), "utf8");
+
+  const registry = new XAccountRegistry({ dataDir, logger: quietLogger });
+  assert.equal(registry.ensureSeeded(), true);
+  assert.deepEqual(
+    registry.list().slice(-CONSPIRACY_X_ACCOUNTS.length).map((account) => account.handle),
+    CONSPIRACY_X_ACCOUNTS.map((account) => account.handle),
+  );
+
+  registry.remove("RealAlexJones");
+  const reopened = new XAccountRegistry({ dataDir, logger: quietLogger });
+  assert.equal(reopened.ensureSeeded(), false, "the pack is not installed twice");
+  assert.ok(!reopened.list().some((account) => account.handle === "RealAlexJones"));
 });
 
 test("seeding is idempotent and never overwrites an edited registry", () => {

@@ -48,6 +48,7 @@ body[data-x-accent="macro"] { --x-accent: var(--accent-macro); }
 body[data-x-accent="energy"] { --x-accent: var(--accent-energy); }
 body[data-x-accent="relic"] { --x-accent: var(--accent-relic); }
 body[data-x-accent="neutral"] { --x-accent: var(--accent-neutral); }
+body[data-x-accent="conspiracy"] { --x-accent: var(--accent-conspiracy); }
 body[data-x-accent] .x-account-card.active,
 body[data-x-accent] .x-account-card--all.active { border-color: var(--x-accent); }
 
