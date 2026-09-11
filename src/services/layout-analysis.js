@@ -84,14 +84,18 @@ class LayoutAnalysisService {
     fs.unlink(filePath, () => {});
   }
 
-  async _analyzeChart(chartUrl) {
+  async _analyzeChart(buffer) {
+    // Send the captured image inline. The dashboard is site-authenticated, so
+    // an externally fetched /layout-screenshots URL redirects OpenAI to the
+    // login page instead of returning the PNG.
+    const imageUrl = `data:image/png;base64,${buffer.toString("base64")}`;
     const res = await this._client.responses.create({
       model: this._model,
       input: [
         {
           role: "user",
           content: [
-            { type: "input_image", image_url: chartUrl },
+            { type: "input_image", image_url: imageUrl },
             { type: "input_text", text: ANALYSIS_PROMPT },
           ],
         },
@@ -173,7 +177,7 @@ class LayoutAnalysisService {
     try {
       const screenshot = await this._captureService.capture(layout.url);
       const { filePath, chartUrl } = await this._saveScreenshot(id, screenshot, publicBaseUrl);
-      const rawAnalysis = await this._analyzeChart(chartUrl);
+      const rawAnalysis = await this._analyzeChart(screenshot);
       const verdict = extractVerdict(rawAnalysis);
       const analysis = truncateWords(rawAnalysis, MAX_ANALYSIS_WORDS);
       const generatedAt = new Date().toISOString();
