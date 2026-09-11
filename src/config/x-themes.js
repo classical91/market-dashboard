@@ -27,7 +27,9 @@
  */
 
 const { sharedThemesWithMemberships } = require("./intelligence-themes");
-const { CONSPIRACY_X_ACCOUNTS } = require("./x-accounts");
+const { CONSPIRACY_X_ACCOUNTS, CONSPIRACY_FOLLOWER_X_ACCOUNTS } = require("./x-accounts");
+
+const ALL_CONSPIRACY_X_ACCOUNTS = CONSPIRACY_X_ACCOUNTS.concat(CONSPIRACY_FOLLOWER_X_ACCOUNTS);
 
 // X templates carry a `memberships` list of X handles, so the catalogue's
 // themes arrive with an empty one. Identity — name, description, accent and
@@ -38,8 +40,17 @@ const CONSPIRACY_THEME = {
   name: "Conspiracy",
   description: "Narrative monitoring for unverified hidden-truth and cover-up claims",
   accent: "conspiracy",
-  sections: ["Deep State", "Geopolitics", "Epstein & Elites", "Medical", "QAnon"],
-  memberships: CONSPIRACY_X_ACCOUNTS.map((account) => ({
+  sections: [
+    "Deep State",
+    "Geopolitics",
+    "Epstein & Elites",
+    "Medical",
+    "QAnon",
+    "Occult & Symbols",
+    "UFOs & Paranormal",
+    "Community Leads",
+  ],
+  memberships: ALL_CONSPIRACY_X_ACCOUNTS.map((account) => ({
     handle: account.handle,
     section: account.category,
   })),
@@ -47,4 +58,13 @@ const CONSPIRACY_THEME = {
 
 const BUILT_IN_THEMES = sharedThemesWithMemberships("memberships").concat(CONSPIRACY_THEME);
 
-module.exports = { BUILT_IN_THEMES };
+const X_TEMPLATE_MEMBERSHIP_PACKS = [{
+  id: "conspiracy-followers-2026-09-10",
+  templateId: "conspiracy",
+  memberships: CONSPIRACY_FOLLOWER_X_ACCOUNTS.map((account) => ({
+    handle: account.handle,
+    section: account.category,
+  })),
+}];
+
+module.exports = { BUILT_IN_THEMES, X_TEMPLATE_MEMBERSHIP_PACKS };

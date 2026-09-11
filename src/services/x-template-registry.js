@@ -21,13 +21,13 @@ const path = require("path");
 
 const { withExclusiveLock, writeJsonAtomic } = require("./json-file-lock");
 const { normalizeHandle, sameHandle } = require("./x-account-registry");
-const { BUILT_IN_THEMES } = require("../config/x-themes");
+const { BUILT_IN_THEMES, X_TEMPLATE_MEMBERSHIP_PACKS } = require("../config/x-themes");
 const { createServiceError } = require("../utils/errors");
 
 // 2 added the seededThemes roster. A version 1 file predates every built-in
 // theme but markets, so it is read as having seeded none of them and the
 // backfill installs them once.
-const REGISTRY_VERSION = 2;
+const REGISTRY_VERSION = 3;
 const DEFAULT_TEMPLATE_ID = "markets";
 const MAX_TEMPLATES = 50;
 const MAX_SECTIONS = 40;
@@ -154,6 +154,7 @@ class XTemplateRegistry {
     // Which built-in theme ids this file has already been given. Read from the
     // file, so a theme an admin deleted is not handed back on the next boot.
     this._seededThemes = [];
+    this._seededMembershipPacks = [];
   }
 
   _seed() {
@@ -174,11 +175,13 @@ class XTemplateRegistry {
         this._loadState = "seeded";
         this._loadError = null;
         this._seededThemes = allThemeIds();
+        this._seededMembershipPacks = X_TEMPLATE_MEMBERSHIP_PACKS.map((pack) => pack.id);
         return this._seed();
       }
       this._loadState = "unreadable";
       this._loadError = err.message;
       this._seededThemes = allThemeIds();
+      this._seededMembershipPacks = X_TEMPLATE_MEMBERSHIP_PACKS.map((pack) => pack.id);
       this._logger.error?.(`[XTemplates] Could not read ${this._file}: ${err.message}`);
       return this._seed();
     }
@@ -193,6 +196,11 @@ class XTemplateRegistry {
         Array.isArray(parsed?.seededThemes) ? parsed.seededThemes.map(slugify) : [],
         MAX_SECTION_LEN,
         MAX_TEMPLATES,
+      );
+      this._seededMembershipPacks = uniqueStrings(
+        Array.isArray(parsed?.seededMembershipPacks) ? parsed.seededMembershipPacks : [],
+        MAX_SECTION_LEN,
+        100,
       );
       const templates = [];
       let dropped = 0;
@@ -213,6 +221,7 @@ class XTemplateRegistry {
       this._loadState = "corrupt";
       this._loadError = err.message;
       this._seededThemes = allThemeIds();
+      this._seededMembershipPacks = X_TEMPLATE_MEMBERSHIP_PACKS.map((pack) => pack.id);
       this._logger.error?.(`[XTemplates] ${this._file} is unreadable; serving the built-in themes`);
       return this._seed();
     }
@@ -234,6 +243,7 @@ class XTemplateRegistry {
         // Carried through every write, not just the seeding one: losing it
         // would make the next boot reinstall a theme the admin deleted.
         seededThemes: this._seededThemes.slice(),
+        seededMembershipPacks: this._seededMembershipPacks.slice(),
         templates: templates.slice(0, MAX_TEMPLATES),
       },
       this._logger,
@@ -268,6 +278,7 @@ class XTemplateRegistry {
     return this._withLock(() => {
       if (!fs.existsSync(this._file)) {
         this._seededThemes = allThemeIds();
+        this._seededMembershipPacks = X_TEMPLATE_MEMBERSHIP_PACKS.map((pack) => pack.id);
         this._write(this._seed());
         return true;
       }
@@ -279,8 +290,6 @@ class XTemplateRegistry {
       // still recorded: an admin's own "stack" template is theirs to keep, and
       // overwriting it with the built-in would be the one destructive outcome.
       const pending = BUILT_IN_THEMES.filter((theme) => !known.has(theme.id));
-      if (!pending.length) return false;
-
       const added = [];
       const installed = [];
       let room = MAX_TEMPLATES - templates.length;
@@ -297,9 +306,24 @@ class XTemplateRegistry {
         installed.push(theme.id);
         room -= 1;
       }
-      if (!installed.length) return false;
       this._seededThemes = this._seededThemes.concat(installed);
 
+      const installedPacks = new Set(this._seededMembershipPacks);
+      for (const pack of X_TEMPLATE_MEMBERSHIP_PACKS) {
+        if (installedPacks.has(pack.id)) continue;
+        const template = templates.concat(added).find((entry) => entry.id === pack.templateId);
+        if (template) {
+          for (const membership of pack.memberships) {
+            if (!template.sections.includes(membership.section)) template.sections.push(membership.section);
+            if (!template.memberships.some((entry) => sameHandle(entry.handle, membership.handle))) {
+              template.memberships.push({ ...membership });
+            }
+          }
+          this._seededMembershipPacks.push(pack.id);
+        }
+      }
+
+      if (!installed.length && this._seededMembershipPacks.length === installedPacks.size) return false;
       if (!this._write(templates.concat(added))) {
         this._logger.error?.(`[XTemplates] Could not install ${installed.length} built-in theme(s)`);
         return false;

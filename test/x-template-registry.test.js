@@ -12,7 +12,7 @@ const {
   BUILT_IN_THEMES,
   normalizeTemplate,
 } = require("../src/services/x-template-registry");
-const { X_ACCOUNTS } = require("../src/config/x-accounts");
+const { X_ACCOUNTS, CONSPIRACY_FOLLOWER_X_ACCOUNTS } = require("../src/config/x-accounts");
 
 const quietLogger = { warn() {}, error() {}, log() {} };
 
@@ -241,13 +241,13 @@ test("a fresh install seeds every built-in theme alongside Crypto & Stocks", () 
   );
 });
 
-test("the conspiracy theme groups its six tracked accounts into narrative sections", () => {
+test("the conspiracy theme groups its tracked accounts into narrative sections", () => {
   const { registry } = tempRegistry();
   registry.ensureSeeded();
   const theme = registry.get("conspiracy");
 
-  assert.equal(theme.memberships.length, 6);
-  assert.deepEqual(theme.memberships, [
+  assert.equal(theme.memberships.length, 6 + CONSPIRACY_FOLLOWER_X_ACCOUNTS.length);
+  assert.deepEqual(theme.memberships.slice(0, 6), [
     { handle: "RealAlexJones", section: "Deep State" },
     { handle: "MattWallace888", section: "Epstein & Elites" },
     { handle: "VigilantFox", section: "Medical" },
@@ -255,6 +255,26 @@ test("the conspiracy theme groups its six tracked accounts into narrative sectio
     { handle: "ShadowofEzra", section: "QAnon" },
     { handle: "WarClandestine", section: "Geopolitics" },
   ]);
+});
+
+test("an existing conspiracy theme receives the screenshot follower pack exactly once", () => {
+  const { dataDir, registry, file } = tempRegistry();
+  registry.ensureSeeded();
+  const stored = JSON.parse(fs.readFileSync(file, "utf8"));
+  stored.seededMembershipPacks = [];
+  const conspiracy = stored.templates.find((template) => template.id === "conspiracy");
+  conspiracy.memberships = conspiracy.memberships.slice(0, 6);
+  conspiracy.sections = conspiracy.sections.slice(0, 5);
+  fs.writeFileSync(file, JSON.stringify(stored), "utf8");
+
+  const reopened = new XTemplateRegistry({ dataDir, seedAccounts: X_ACCOUNTS, logger: quietLogger });
+  assert.equal(reopened.ensureSeeded(), true);
+  const updated = reopened.get("conspiracy");
+  assert.equal(updated.memberships.length, 6 + CONSPIRACY_FOLLOWER_X_ACCOUNTS.length);
+  assert.ok(updated.sections.includes("Occult & Symbols"));
+  assert.ok(updated.sections.includes("UFOs & Paranormal"));
+  assert.ok(updated.sections.includes("Community Leads"));
+  assert.equal(reopened.ensureSeeded(), false);
 });
 
 test("a registry written before the themes existed has them backfilled once", () => {
