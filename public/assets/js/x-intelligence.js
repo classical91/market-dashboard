@@ -3,23 +3,12 @@
 
   /* The tracked accounts are no longer hard-coded here. They come from
      /api/x/accounts, which reads the persistent registry, so adding or
-     deleting one takes effect without a redeploy. Sections are derived from
-     the categories the API returns, in the order it returns them. */
-  function groupAccounts(accounts) {
-    var order = [];
-    var byCategory = {};
-    (accounts || []).forEach(function (account) {
-      var category = account.category || "Other";
-      if (!byCategory[category]) {
-        byCategory[category] = [];
-        order.push(category);
-      }
-      byCategory[category].push(account);
-    });
-    return order.map(function (category) {
-      return { label: category, accounts: byCategory[category] };
-    });
-  }
+     deleting one takes effect without a redeploy.
+
+     The list is flat, in the order the selected template lists its handles.
+     It used to be grouped under headings taken from each template's sections;
+     templates have no sections now, so the template itself is the only filter
+     and its order is the only order. */
 
   // Bumped to :v2 to drop selections saved under the old default, where an
   // unset mode meant "first account" — devices that had never explicitly
@@ -116,7 +105,7 @@
   /* Manage Accounts is not rendered here: it lives in the panel, outside this
      list, because the list collapses on mobile and add/remove has to stay
      reachable while it is folded away. */
-  function renderList(root, groups, activeMode, activeHandle, handlers) {
+  function renderList(root, accounts, activeMode, activeHandle, handlers) {
     root.innerHTML = "";
 
     var allCard = document.createElement("button");
@@ -126,34 +115,27 @@
     allCard.addEventListener("click", handlers.onSelectAll);
     root.appendChild(allCard);
 
-    if (!groups.length) {
+    if (!accounts.length) {
       var empty = document.createElement("div");
-      empty.className = "x-account-group-title";
-      empty.textContent = handlers.loaded ? "No accounts assigned." : "Loading accounts\u2026";
+      empty.className = "x-account-empty";
+      empty.textContent = handlers.loaded ? "No accounts in this theme." : "Loading accounts\u2026";
       root.appendChild(empty);
       return;
     }
 
-    groups.forEach(function (group) {
-      var heading = document.createElement("div");
-      heading.className = "x-account-group-title";
-      heading.textContent = group.label;
-      root.appendChild(heading);
-
-      group.accounts.forEach(function (account) {
-        var handle = account.handle;
-        var card = document.createElement("button");
-        card.type = "button";
-        card.className = "x-account-card" + (activeMode !== ALL_MODE && handle === activeHandle ? " active" : "");
-        card.innerHTML =
-          '<span class="x-account-handle">@' + handle + "</span>" +
-          '<a class="x-account-open" href="https://x.com/' + handle + '" target="_blank" rel="noopener">Open &#8599;</a>';
-        card.addEventListener("click", function (e) {
-          if (e.target && e.target.classList.contains("x-account-open")) return;
-          handlers.onSelect(handle);
-        });
-        root.appendChild(card);
+    accounts.forEach(function (account) {
+      var handle = account.handle;
+      var card = document.createElement("button");
+      card.type = "button";
+      card.className = "x-account-card" + (activeMode !== ALL_MODE && handle === activeHandle ? " active" : "");
+      card.innerHTML =
+        '<span class="x-account-handle">@' + handle + "</span>" +
+        '<a class="x-account-open" href="https://x.com/' + handle + '" target="_blank" rel="noopener">Open &#8599;</a>';
+      card.addEventListener("click", function (e) {
+        if (e.target && e.target.classList.contains("x-account-open")) return;
+        handlers.onSelect(handle);
       });
+      root.appendChild(card);
     });
   }
 
@@ -296,7 +278,7 @@
         option.className = "x-template-option" + (template.id === state.templateId ? " active" : "");
         option.innerHTML = '<span class="x-template-option-name"></span><span class="x-template-option-count"></span>';
         option.firstChild.textContent = template.name;
-        option.lastChild.textContent = (template.memberships || []).length + " accounts";
+        option.lastChild.textContent = (template.handles || []).length + " accounts";
         option.addEventListener("click", function () { selectTemplate(template.id); });
         templateMenu.appendChild(option);
       });
@@ -372,9 +354,9 @@
         return;
       }
       if (state.mode === ALL_MODE) {
-        // A theme that ships with sections but no accounts is the normal state
-        // of a newly installed one, not a failed fetch. Saying "no posts" there
-        // reads as an outage and hides the one thing that would fix it.
+        // A theme with no accounts in it yet is the normal state of a newly
+        // installed one, not a failed fetch. Saying "no posts" there reads as
+        // an outage and hides the one thing that would fix it.
         // The server-resolved account list, not the template's own membership
         // count: it is what the feed actually ran against, so it stays right
         // when a membership points at an account that no longer exists.
@@ -406,7 +388,7 @@
     }
 
     function refreshList() {
-      renderList(listRoot, groupAccounts(accountsOf(state.feedData)), state.mode, state.handle, {
+      renderList(listRoot, accountsOf(state.feedData), state.mode, state.handle, {
         loaded: state.loaded,
         onSelectAll: selectAll,
         onSelect: selectHandle,
@@ -563,7 +545,7 @@
     loadTemplates().then(start).catch(function () {
       start({
         defaultTemplateId: "markets",
-        templates: [{ id: "markets", name: "Crypto & Stocks", description: "Crypto, stocks, macro and technical analysis", accent: "market", memberships: [] }],
+        templates: [{ id: "markets", name: "Crypto & Stocks", description: "Crypto, stocks, macro and technical analysis", accent: "market", handles: [] }],
       });
     });
   }

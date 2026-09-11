@@ -9,20 +9,23 @@
  * editing two files and keeping them in agreement by hand; the first time they
  * disagreed, one page would quietly be a theme behind the other.
  *
- * A theme's identity lives here. What differs between the pages is only how
- * membership is expressed — X templates carry `memberships` of X handles,
- * YouTube themes carry `channels` of YouTube handles — so each config adds its
- * own empty membership field on top of these definitions rather than the whole
- * theme.
+ * A theme's identity lives here — name, description and accent. What differs
+ * between the pages is how membership is expressed, and each config adds that
+ * on top of these definitions rather than restating the whole theme.
+ *
+ * Sections belong to YouTube alone. There, a theme's sections ARE the category
+ * names a channel joins the theme through, so they are part of its identity.
+ * X Intelligence has no sections: an X template is a flat list of handles, and
+ * x-themes.js drops the field when it reads this catalogue.
  *
  * Not every theme belongs here. A theme that only makes sense on one page (the
  * YouTube markets theme, derived from its channel list) stays local to it.
  * This is for the ones both pages are meant to keep identical.
  *
- * Adding a theme here gives it to both pages at once. Sections ship populated
- * and memberships empty on purpose: which accounts or channels belong under
- * "Lost Civilizations" is a judgement call for whoever runs the dashboard, and
- * inventing handles would point the feeds at accounts that may not exist.
+ * Adding a theme here gives it to both pages at once, with no accounts or
+ * channels in it: which ones belong to "Dig Site" is a judgement call for
+ * whoever runs the dashboard, and inventing handles would point the feeds at
+ * accounts that may not exist.
  */
 
 const SHARED_THEMES = [
@@ -72,19 +75,4 @@ function sharedThemes() {
   }));
 }
 
-/**
- * The catalogue with an empty membership list under `membershipKey`.
- *
- * X templates carry `memberships` of X handles; anything else that needs a
- * per-page membership field asks for it by name. `membershipKey` must not be
- * "sections" — that would blank the section layout it is meant to sit beside —
- * so it is refused rather than silently producing an empty theme.
- */
-function sharedThemesWithMemberships(membershipKey) {
-  if (membershipKey === "sections") {
-    throw new Error("membershipKey must not be \"sections\"");
-  }
-  return sharedThemes().map((theme) => ({ ...theme, [membershipKey]: [] }));
-}
-
-module.exports = { SHARED_THEMES, sharedThemes, sharedThemesWithMemberships };
+module.exports = { SHARED_THEMES, sharedThemes };

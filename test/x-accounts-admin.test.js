@@ -54,8 +54,7 @@ test("deleting an account says what else goes with it", () => {
 const CONSPIRACY = {
   id: "conspiracy",
   name: "Conspiracy",
-  sections: ["Deep State", "Medical"],
-  memberships: [{ handle: "VigilantFox", section: "Medical" }],
+  handles: ["VigilantFox"],
 };
 
 test("membership is a separate question from being tracked", () => {
@@ -73,32 +72,23 @@ test("theme membership is matched however the handle is written", () => {
     assert.equal(accountsAdmin.isMember(CONSPIRACY, typed), true, typed);
   }
   assert.equal(accountsAdmin.isMember(CONSPIRACY, ""), false, "an empty box is not a member");
-  assert.equal(accountsAdmin.isMember({ memberships: [] }, "VigilantFox"), false);
-  assert.equal(accountsAdmin.findMembership(CONSPIRACY, "@vigilantfox").section, "Medical");
+  assert.equal(accountsAdmin.isMember({ handles: [] }, "VigilantFox"), false);
 });
 
-test("the theme scope lists membership order and the section, not the global category", () => {
+test("the theme scope lists the template's accounts in the order it lists them", () => {
   const tracked = [
     { handle: "Barchart", label: "Barchart", category: "Market Data" },
     { handle: "VigilantFox", label: "The Vigilant Fox", category: "Medical" },
     { handle: "dom_lucre", label: "Dom Lucre", category: "Epstein & Elites" },
   ];
-  const template = {
-    id: "conspiracy",
-    name: "Conspiracy",
-    sections: ["Deep State", "Medical"],
-    memberships: [
-      { handle: "dom_lucre", section: "Deep State" },
-      { handle: "VigilantFox", section: "Medical" },
-    ],
-  };
+  // Deliberately not the tracked-list order: the template's order is what the
+  // page's sidebar renders, so it is what the panel must show.
+  const template = { id: "conspiracy", name: "Conspiracy", handles: ["dom_lucre", "VigilantFox"] };
 
   const rows = accountsAdmin.accountsInTemplate(tracked, template);
   assert.deepEqual(rows.map((row) => row.handle), ["dom_lucre", "VigilantFox"]);
-  // The sidebar groups by section, so the panel must show the section rather
-  // than the account's global category — here they disagree on purpose.
-  assert.equal(rows[0].category, "Deep State");
   assert.equal(rows[0].label, "Dom Lucre");
+  assert.equal(rows[0].category, "Epstein & Elites", "the account's own category, as metadata");
   assert.equal(
     rows.some((row) => row.handle === "Barchart"),
     false,
@@ -106,29 +96,15 @@ test("the theme scope lists membership order and the section, not the global cat
   );
 });
 
-test("a membership pointing at an untracked account is dropped, not shown as a dead row", () => {
+test("a handle naming an untracked account is dropped, not shown as a dead row", () => {
   const rows = accountsAdmin.accountsInTemplate(TRACKED, {
     name: "Conspiracy",
-    memberships: [
-      { handle: "Barchart", section: "Deep State" },
-      { handle: "DeletedAccount", section: "Deep State" },
-    ],
+    handles: ["Barchart", "DeletedAccount"],
   });
 
   // Matches resolveAccounts on the server: a row whose feed can never fill
-  // would read as a broken account rather than a stale membership.
+  // would read as a broken account rather than a stale reference.
   assert.deepEqual(rows.map((row) => row.handle), ["Barchart"]);
-});
-
-test("the section box offers the theme's own sections before the global categories", () => {
-  const options = accountsAdmin.sectionOptions(CONSPIRACY, ["Market Data", "medical"]);
-
-  // The account is joining this theme, so its sections are the drop targets
-  // that exist. "medical" is dropped as a case variant of a section already
-  // offered rather than listed twice.
-  assert.deepEqual(options, ["Deep State", "Medical", "Market Data"]);
-  assert.deepEqual(accountsAdmin.sectionOptions(null, ["Market Data"]), ["Market Data"]);
-  assert.deepEqual(accountsAdmin.sectionOptions({ sections: [] }, []), []);
 });
 
 test("a handle tracked but missing from this theme is told so, and pointed at the fix", () => {
@@ -143,14 +119,15 @@ test("a handle tracked but missing from this theme is told so, and pointed at th
   assert.match(message, /Add it to this theme/);
 });
 
-test("an account already in this theme is reported against the theme, with its section", () => {
+test("an account already in this theme is reported against the theme", () => {
   const message = accountsAdmin.alreadyInThemeMessage(
     { handle: "VigilantFox", category: "Medical" },
     CONSPIRACY,
   );
 
   assert.match(message, /already in Conspiracy/);
-  assert.match(message, /under Medical/);
+  // No section to name any more — a template is a flat list.
+  assert.doesNotMatch(message, /under/);
 });
 
 test("the two removals are worded by blast radius, not interchangeably", () => {

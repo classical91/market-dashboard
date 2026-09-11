@@ -38,52 +38,55 @@ test("the current account layout seeds Crypto & Stocks without changing its orde
   const template = registry.get();
   assert.equal(template.id, DEFAULT_TEMPLATE_ID);
   assert.equal(template.name, "Crypto & Stocks");
-  assert.deepEqual(template.sections.slice(0, 3), ["Market Data", "Crypto Traders", "TA & Signals"]);
-  assert.ok(template.sections.includes("QAnon"));
-  assert.deepEqual(
-    template.memberships.map((entry) => entry.handle),
-    X_ACCOUNTS.map((account) => account.handle),
-  );
+  assert.deepEqual(template.handles, X_ACCOUNTS.map((account) => account.handle));
+  assert.equal("sections" in template, false, "a template is a flat list of handles");
   assert.ok(fs.existsSync(file));
 });
 
-test("templates persist, preserve empty sections, and allow one handle in several templates", () => {
+test("templates persist and allow one handle in several templates", () => {
   const { dataDir, registry } = tempRegistry();
   registry.ensureSeeded();
-  registry.create({
-    id: "macro",
-    name: "Macro",
-    sections: ["Data", "Official Sources"],
-    memberships: [{ handle: "Barchart", section: "Data" }],
-  });
+  registry.create({ id: "macro", name: "Macro", handles: ["Barchart"] });
 
   const reopened = new XTemplateRegistry({ dataDir, seedAccounts: [], logger: quietLogger });
-  const markets = reopened.get("markets");
-  const macro = reopened.get("macro");
-  assert.ok(markets.memberships.some((entry) => entry.handle === "Barchart"));
-  assert.ok(macro.memberships.some((entry) => entry.handle === "Barchart"));
-  assert.deepEqual(macro.sections, ["Data", "Official Sources"]);
+  // One account feeding two templates is the point: metadata and cached feed
+  // data stay owned by the account registry, so neither is duplicated.
+  assert.ok(reopened.get("markets").handles.includes("Barchart"));
+  assert.deepEqual(reopened.get("macro").handles, ["Barchart"]);
 });
 
-test("template updates support section and membership reordering", () => {
+test("an empty template persists as empty rather than being dropped", () => {
+  const { dataDir, registry } = tempRegistry();
+  registry.ensureSeeded();
+  registry.create({ id: "wars", name: "Wars", handles: [] });
+
+  const reopened = new XTemplateRegistry({ dataDir, seedAccounts: [], logger: quietLogger });
+  // A newly created template is empty, and that is the normal state it opens
+  // in — not a malformed row for the reader to skip.
+  assert.deepEqual(reopened.get("wars").handles, []);
+});
+
+test("template updates carry the account order the admin arranged", () => {
   const { registry } = tempRegistry();
   registry.ensureSeeded();
-  registry.create({ id: "wars", name: "Wars", sections: [], memberships: [] });
+  registry.create({ id: "wars", name: "Wars", handles: [] });
 
   const updated = registry.update("wars", {
     name: "Wars & Geopolitics",
     description: "Conflict intelligence",
     accent: "world",
-    sections: ["Official Sources", "Conflict Monitors"],
-    memberships: [
-      { handle: "Barchart", section: "Conflict Monitors" },
-      { handle: "TechDev_52", section: "Official Sources" },
-    ],
+    handles: ["Barchart", "TechDev_52"],
   });
-
   assert.equal(updated.name, "Wars & Geopolitics");
-  assert.deepEqual(updated.sections, ["Official Sources", "Conflict Monitors"]);
-  assert.deepEqual(updated.memberships.map((entry) => entry.handle), ["Barchart", "TechDev_52"]);
+  assert.deepEqual(updated.handles, ["Barchart", "TechDev_52"]);
+
+  // Order is the only arrangement a template has, and the sidebar renders it,
+  // so a reorder is a real edit that must persist.
+  const reordered = registry.update("wars", {
+    name: "Wars & Geopolitics",
+    handles: ["TechDev_52", "Barchart"],
+  });
+  assert.deepEqual(reordered.handles, ["TechDev_52", "Barchart"]);
 });
 
 test("duplicating and deleting templates never delete or mutate accounts", () => {
@@ -93,7 +96,7 @@ test("duplicating and deleting templates never delete or mutate accounts", () =>
 
   const duplicate = registry.duplicate("markets", { name: "Tech & AI", id: "tech" });
   assert.equal(duplicate.id, "tech");
-  assert.equal(duplicate.memberships.length, X_ACCOUNTS.length);
+  assert.equal(duplicate.handles.length, X_ACCOUNTS.length);
   registry.remove("tech");
 
   assert.deepEqual(registry.list().map((entry) => entry.id), SEEDED_IDS);
@@ -104,16 +107,11 @@ test("duplicating and deleting templates never delete or mutate accounts", () =>
 test("global account deletion cascades across every template", () => {
   const { registry } = tempRegistry();
   registry.ensureSeeded();
-  registry.create({
-    id: "macro",
-    name: "Macro",
-    sections: ["Data"],
-    memberships: [{ handle: "Barchart", section: "Data" }],
-  });
+  registry.create({ id: "macro", name: "Macro", handles: ["Barchart"] });
 
   assert.equal(registry.removeHandle("barchart"), true);
   for (const template of registry.list()) {
-    assert.ok(!template.memberships.some((entry) => entry.handle.toLowerCase() === "barchart"));
+    assert.ok(!template.handles.some((handle) => handle.toLowerCase() === "barchart"));
   }
 });
 
@@ -123,71 +121,62 @@ test("resolved accounts use template sections and ignore dead references", () =>
   registry.create({
     id: "tech",
     name: "Tech & AI",
-    sections: ["Researchers"],
-    memberships: [
-      { handle: "TechDev_52", section: "Researchers" },
-      { handle: "missing", section: "Researchers" },
-    ],
+    handles: ["TechDev_52", "missing"],
   });
 
   const resolved = registry.resolveAccounts("tech", X_ACCOUNTS);
+  // "missing" is not a tracked account, so it resolves to nothing rather than
+  // a row whose feed can never fill.
   assert.deepEqual(resolved.map((account) => account.handle), ["TechDev_52"]);
-  assert.equal(resolved[0].category, "Researchers");
+  // The account keeps its own category: with the sidebar flat, the category is
+  // descriptive metadata rather than a grouping key the template overrides.
+  assert.equal(resolved[0].category, "Crypto Traders");
 });
 
-test("normalization rejects nameless templates and removes duplicate membership handles", () => {
+test("normalization rejects nameless templates and removes duplicate handles", () => {
   assert.throws(() => normalizeTemplate({ id: "empty" }), /name is required/);
   const template = normalizeTemplate({
     id: "clean",
     name: "Clean",
-    sections: ["One", "one", "Two"],
-    memberships: [
-      { handle: "Barchart", section: "One" },
-      { handle: "barchart", section: "Two" },
-    ],
+    handles: ["Barchart", "barchart", "@TechDev_52"],
   });
-  assert.deepEqual(template.sections, ["One", "Two"]);
-  assert.equal(template.memberships.length, 1);
+  assert.deepEqual(template.handles, ["Barchart", "TechDev_52"]);
 });
 
 test("a template that names one account twice is refused rather than quietly trimmed", () => {
   const { registry } = tempRegistry();
   registry.ensureSeeded();
 
-  const payload = {
-    id: "wars",
-    name: "Wars",
-    sections: ["Official Sources", "Conflict Monitors"],
-    memberships: [
-      { handle: "Barchart", section: "Official Sources" },
-      { handle: "@BARCHART", section: "Conflict Monitors" },
-    ],
-  };
+  const payload = { id: "wars", name: "Wars", handles: ["Barchart", "@BARCHART"] };
 
-  assert.throws(() => registry.create(payload), /@Barchart is already in this template/);
+  assert.throws(() => registry.create(payload), /@BARCHART is already in this template/);
   assert.deepEqual(registry.list().map((entry) => entry.id), SEEDED_IDS, "nothing was saved");
 
-  registry.create({ id: "wars", name: "Wars", sections: [], memberships: [] });
+  registry.create({ id: "wars", name: "Wars", handles: [] });
   assert.throws(() => registry.update("wars", payload), /already in this template/);
-  assert.equal(registry.get("wars").memberships.length, 0, "the rejected update changed nothing");
+  assert.equal(registry.get("wars").handles.length, 0, "the rejected update changed nothing");
 });
 
-test("a stored template naming one account twice still loads, with the repeat merged", () => {
-  // Strict on the way in, lenient on the way out: a file written by an older
-  // build must not take the switcher down.
+test("a sectioned file from an older build upgrades to a flat handle list", () => {
+  // Strict on the way in, lenient on the way out: a file written before
+  // sections were removed must not take the switcher down. Its handles are
+  // kept in order and its sections discarded.
   const { dataDir, registry, file } = tempRegistry();
   registry.ensureSeeded();
   fs.writeFileSync(
     file,
     JSON.stringify({
-      version: 1,
+      version: 3,
+      seededThemes: ["markets"],
       templates: [
         {
           id: "markets",
           name: "Crypto & Stocks",
           sections: ["Market Data", "Crypto Traders"],
           memberships: [
+            { handle: "TechDev_52", section: "Crypto Traders" },
             { handle: "Barchart", section: "Market Data" },
+            // A repeat an older build could store; merged rather than fatal.
             { handle: "barchart", section: "Crypto Traders" },
           ],
         },
@@ -198,17 +187,48 @@ test("a stored template naming one account twice still loads, with the repeat me
 
   const reopened = new XTemplateRegistry({ dataDir, seedAccounts: [], logger: quietLogger });
   const markets = reopened.get("markets");
-  assert.deepEqual(markets.memberships, [{ handle: "Barchart", section: "Market Data" }]);
+  assert.deepEqual(markets.handles, ["TechDev_52", "Barchart"]);
+  assert.equal("sections" in markets, false);
+  assert.equal("memberships" in markets, false);
+});
+
+test("the upgraded shape is what gets written back", () => {
+  const { dataDir, registry, file } = tempRegistry();
+  registry.ensureSeeded();
+  fs.writeFileSync(
+    file,
+    JSON.stringify({
+      version: 3,
+      seededThemes: ["markets"],
+      templates: [{
+        id: "markets",
+        name: "Crypto & Stocks",
+        sections: ["Market Data"],
+        memberships: [{ handle: "Barchart", section: "Market Data" }],
+      }],
+    }),
+    "utf8",
+  );
+
+  // Any write persists the flat shape, so the migration is a one-way door
+  // rather than something re-done on every read forever.
+  const reopened = new XTemplateRegistry({ dataDir, seedAccounts: [], logger: quietLogger });
+  reopened.create({ id: "wars", name: "Wars", handles: [] });
+  const stored = JSON.parse(fs.readFileSync(file, "utf8"));
+  assert.equal(stored.version, 4);
+  const markets = stored.templates.find((entry) => entry.id === "markets");
+  assert.deepEqual(markets.handles, ["Barchart"]);
+  assert.equal("sections" in markets, false);
 });
 
 test("adding an already tracked handle to the default template is a no-op", () => {
   const { registry } = tempRegistry();
   registry.ensureSeeded();
 
-  assert.equal(registry.addHandleToDefault("@barchart", "Somewhere Else"), false);
+  assert.equal(registry.addHandleToDefault("@barchart"), false);
   const markets = registry.get("markets");
   assert.equal(
-    markets.memberships.filter((entry) => entry.handle.toLowerCase() === "barchart").length,
+    markets.handles.filter((handle) => handle.toLowerCase() === "barchart").length,
     1,
   );
 });
@@ -219,32 +239,19 @@ test("an account joins the named theme rather than always the default one", () =
 
   // The bug this guards: every add landed in markets, so a handle added while
   // the Conspiracy filter was selected was tracked but never shown by it.
-  assert.equal(registry.addHandleToTemplate("conspiracy", "NewWatcher", "Deep State"), true);
+  assert.equal(registry.addHandleToTemplate("conspiracy", "NewWatcher"), true);
 
   const conspiracy = registry.get("conspiracy");
-  assert.deepEqual(
-    conspiracy.memberships.filter((entry) => entry.handle === "NewWatcher"),
-    [{ handle: "NewWatcher", section: "Deep State" }],
+  assert.ok(conspiracy.handles.includes("NewWatcher"));
+  assert.equal(
+    conspiracy.handles[conspiracy.handles.length - 1],
+    "NewWatcher",
+    "appended, so an add does not reshuffle the order the sidebar renders",
   );
   assert.equal(
-    registry.get("markets").memberships.some((entry) => entry.handle === "NewWatcher"),
+    registry.get("markets").handles.includes("NewWatcher"),
     false,
     "the theme that was not named must be left alone",
-  );
-});
-
-test("a section the theme does not have yet is created for the account", () => {
-  const { registry } = tempRegistry();
-  registry.ensureSeeded();
-
-  // An admin types the section they want; refusing it because the theme has no
-  // such section would leave the add with nowhere to land.
-  assert.equal(registry.addHandleToTemplate("conspiracy", "NewWatcher", "Banking Cartels"), true);
-  const conspiracy = registry.get("conspiracy");
-  assert.ok(conspiracy.sections.includes("Banking Cartels"));
-  assert.equal(
-    conspiracy.memberships.find((entry) => entry.handle === "NewWatcher").section,
-    "Banking Cartels",
   );
 });
 
@@ -252,15 +259,15 @@ test("one handle can be added to several themes, and is de-duplicated within eac
   const { registry } = tempRegistry();
   registry.ensureSeeded();
 
-  assert.equal(registry.addHandleToTemplate("conspiracy", "Barchart", "Deep State"), true);
+  assert.equal(registry.addHandleToTemplate("conspiracy", "Barchart"), true);
   // Already tracked by markets from the seed, and now by conspiracy too: one
   // account feeding two themes is the point of the membership model.
-  assert.equal(registry.get("markets").memberships.some((e) => e.handle === "Barchart"), true);
-  assert.equal(registry.addHandleToTemplate("conspiracy", "@barchart", "Medical"), false);
+  assert.equal(registry.get("markets").handles.includes("Barchart"), true);
+  assert.equal(registry.addHandleToTemplate("conspiracy", "@barchart"), false);
   assert.equal(
-    registry.get("conspiracy").memberships.filter((e) => e.handle.toLowerCase() === "barchart").length,
+    registry.get("conspiracy").handles.filter((h) => h.toLowerCase() === "barchart").length,
     1,
-    "a second membership would list the account twice and double its posts",
+    "a second entry would list the account twice and double its posts",
   );
 });
 
@@ -268,56 +275,57 @@ test("naming a theme that does not exist fails rather than writing somewhere els
   const { registry } = tempRegistry();
   registry.ensureSeeded();
 
-  assert.throws(() => registry.addHandleToTemplate("no-such-theme", "NewWatcher", "Deep State"), /not found/);
+  assert.throws(() => registry.addHandleToTemplate("no-such-theme", "NewWatcher"), /not found/);
   assert.throws(() => registry.removeHandleFromTemplate("no-such-theme", "Barchart"), /not found/);
 });
 
 test("removing an account from one theme leaves it tracked by the others", () => {
   const { registry } = tempRegistry();
   registry.ensureSeeded();
-  registry.addHandleToTemplate("conspiracy", "Barchart", "Deep State");
+  registry.addHandleToTemplate("conspiracy", "Barchart");
 
   assert.equal(registry.removeHandleFromTemplate("conspiracy", "@BarChart"), true);
+  assert.equal(registry.get("conspiracy").handles.includes("Barchart"), false);
   assert.equal(
-    registry.get("conspiracy").memberships.some((e) => e.handle === "Barchart"),
-    false,
-  );
-  assert.equal(
-    registry.get("markets").memberships.some((e) => e.handle === "Barchart"),
+    registry.get("markets").handles.includes("Barchart"),
     true,
     "dropping one membership is not untracking the account",
   );
   assert.equal(registry.removeHandleFromTemplate("conspiracy", "Barchart"), false, "idempotent");
 });
 
-test("emptying a section by removing its last account keeps the section", () => {
+test("removing an account leaves the rest of the template's order intact", () => {
   const { registry } = tempRegistry();
   registry.ensureSeeded();
   registry.create({
     id: "macro",
     name: "Macro",
-    sections: ["Data", "Official Sources"],
-    memberships: [{ handle: "Barchart", section: "Data" }],
+    handles: ["Barchart", "TechDev_52", "jasonpizzino"],
   });
 
+  registry.removeHandleFromTemplate("macro", "TechDev_52");
+  assert.deepEqual(registry.get("macro").handles, ["Barchart", "jasonpizzino"]);
+});
+
+test("removing the last account leaves an empty template, not a deleted one", () => {
+  const { registry } = tempRegistry();
+  registry.ensureSeeded();
+  registry.create({ id: "macro", name: "Macro", handles: ["Barchart"] });
+
   registry.removeHandleFromTemplate("macro", "Barchart");
-  // The section is a drop target the admin arranged. Deleting it here would
-  // make removing an account quietly destroy the theme's layout.
-  assert.deepEqual(registry.get("macro").sections, ["Data", "Official Sources"]);
+  const macro = registry.get("macro");
+  assert.deepEqual(macro.handles, []);
+  assert.equal(macro.name, "Macro", "the template itself survives being emptied");
 });
 
 test("removeHandle still clears the account from every theme, unlike the per-theme removal", () => {
   const { registry } = tempRegistry();
   registry.ensureSeeded();
-  registry.addHandleToTemplate("conspiracy", "Barchart", "Deep State");
+  registry.addHandleToTemplate("conspiracy", "Barchart");
 
   assert.equal(registry.removeHandle("Barchart"), true);
   for (const id of ["markets", "conspiracy"]) {
-    assert.equal(
-      registry.get(id).memberships.some((e) => e.handle === "Barchart"),
-      false,
-      id,
-    );
+    assert.equal(registry.get(id).handles.includes("Barchart"), false, id);
   }
 });
 
@@ -353,20 +361,21 @@ test("a fresh install seeds every built-in theme alongside Crypto & Stocks", () 
   );
 });
 
-test("the conspiracy theme groups its tracked accounts into narrative sections", () => {
+test("the conspiracy theme ships its tracked accounts as one flat list", () => {
   const { registry } = tempRegistry();
   registry.ensureSeeded();
   const theme = registry.get("conspiracy");
 
-  assert.equal(theme.memberships.length, 6 + CONSPIRACY_FOLLOWER_X_ACCOUNTS.length);
-  assert.deepEqual(theme.memberships.slice(0, 6), [
-    { handle: "RealAlexJones", section: "Deep State" },
-    { handle: "MattWallace888", section: "Epstein & Elites" },
-    { handle: "VigilantFox", section: "Medical" },
-    { handle: "dom_lucre", section: "Epstein & Elites" },
-    { handle: "ShadowofEzra", section: "QAnon" },
-    { handle: "WarClandestine", section: "Geopolitics" },
+  assert.equal(theme.handles.length, 6 + CONSPIRACY_FOLLOWER_X_ACCOUNTS.length);
+  assert.deepEqual(theme.handles.slice(0, 6), [
+    "RealAlexJones",
+    "MattWallace888",
+    "VigilantFox",
+    "dom_lucre",
+    "ShadowofEzra",
+    "WarClandestine",
   ]);
+  assert.equal("sections" in theme, false);
 });
 
 test("an existing conspiracy theme receives the screenshot follower pack exactly once", () => {
@@ -375,16 +384,16 @@ test("an existing conspiracy theme receives the screenshot follower pack exactly
   const stored = JSON.parse(fs.readFileSync(file, "utf8"));
   stored.seededMembershipPacks = [];
   const conspiracy = stored.templates.find((template) => template.id === "conspiracy");
-  conspiracy.memberships = conspiracy.memberships.slice(0, 6);
-  conspiracy.sections = conspiracy.sections.slice(0, 5);
+  conspiracy.handles = conspiracy.handles.slice(0, 6);
   fs.writeFileSync(file, JSON.stringify(stored), "utf8");
 
   const reopened = new XTemplateRegistry({ dataDir, seedAccounts: X_ACCOUNTS, logger: quietLogger });
   assert.equal(reopened.ensureSeeded(), true);
   const updated = reopened.get("conspiracy");
-  assert.equal(updated.memberships.length, 6 + CONSPIRACY_FOLLOWER_X_ACCOUNTS.length);
-  assert.ok(updated.sections.includes("UFOs & Paranormal"));
-  assert.ok(updated.sections.includes("Community Leads"));
+  assert.equal(updated.handles.length, 6 + CONSPIRACY_FOLLOWER_X_ACCOUNTS.length);
+  for (const account of CONSPIRACY_FOLLOWER_X_ACCOUNTS) {
+    assert.ok(updated.handles.includes(account.handle), account.handle);
+  }
   assert.equal(reopened.ensureSeeded(), false);
 });
 
@@ -394,16 +403,13 @@ test("an existing conspiracy theme prunes screenshot accounts marked Follow back
   const stored = JSON.parse(fs.readFileSync(file, "utf8"));
   stored.seededMembershipPacks = ["conspiracy-followers-2026-09-10"];
   const conspiracy = stored.templates.find((template) => template.id === "conspiracy");
-  conspiracy.memberships.push(...CONSPIRACY_FOLLOWBACK_HANDLES.map((handle) => ({
-    handle,
-    section: "Community Leads",
-  })));
+  conspiracy.handles.push(...CONSPIRACY_FOLLOWBACK_HANDLES);
   fs.writeFileSync(file, JSON.stringify(stored), "utf8");
 
   const reopened = new XTemplateRegistry({ dataDir, seedAccounts: X_ACCOUNTS, logger: quietLogger });
   assert.equal(reopened.ensureSeeded(), true);
-  assert.ok(!reopened.get("conspiracy").memberships.some(
-    (membership) => CONSPIRACY_FOLLOWBACK_HANDLES.includes(membership.handle),
+  assert.ok(!reopened.get("conspiracy").handles.some(
+    (handle) => CONSPIRACY_FOLLOWBACK_HANDLES.includes(handle),
   ));
   assert.equal(reopened.ensureSeeded(), false);
 });
@@ -451,15 +457,14 @@ test("an admin's edits to a built-in theme survive the next boot", () => {
   registry.update(theme.id, {
     name: "My Dig",
     accent: "neutral",
-    sections: ["Only This One"],
-    memberships: [],
+    handles: ["Barchart"],
   });
 
   const reopened = new XTemplateRegistry({ dataDir, seedAccounts: [], logger: quietLogger });
   reopened.ensureSeeded();
   const stored = reopened.get(theme.id);
   assert.equal(stored.name, "My Dig");
-  assert.deepEqual(stored.sections, ["Only This One"]);
+  assert.deepEqual(stored.handles, ["Barchart"]);
 });
 
 test("a template an admin already named after a theme is never overwritten", () => {
@@ -471,8 +476,8 @@ test("a template an admin already named after a theme is never overwritten", () 
     JSON.stringify({
       version: 1,
       templates: [
-        { id: "markets", name: "Crypto & Stocks", accent: "market", sections: ["Market Data"], memberships: [] },
-        { id: theme.id, name: "Mine", accent: "world", sections: ["Mine"], memberships: [] },
+        { id: "markets", name: "Crypto & Stocks", accent: "market", handles: [] },
+        { id: theme.id, name: "Mine", accent: "world", handles: ["Barchart"] },
       ],
     }),
   );
@@ -481,7 +486,7 @@ test("a template an admin already named after a theme is never overwritten", () 
   registry.ensureSeeded();
   const kept = registry.get(theme.id);
   assert.equal(kept.name, "Mine", "the admin's template is left alone");
-  assert.deepEqual(kept.sections, ["Mine"]);
+  assert.deepEqual(kept.handles, ["Barchart"]);
   assert.equal(
     registry.list().filter((entry) => entry.id === theme.id).length,
     1,
