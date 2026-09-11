@@ -220,17 +220,19 @@ function createApp() {
         : xTemplateRegistry.addHandleToDefault(account.handle)),
     onRemove: (account) => xTemplateRegistry.removeHandle(account.handle),
   });
+  const aiAnalysisScreenshotsDir = path.join(dataDir, "ai-analysis-screenshots");
+  const layoutScreenshotsDir = path.join(dataDir, "layout-screenshots");
+  const layoutCaptureService = new LayoutCaptureService({ timeoutMs: config.layoutAnalysis.timeoutMs });
   const aiAnalysisService = new AIAnalysisService({
     cache: aiAnalysisCache,
     dataDir,
     openaiApiKey: config.aiAnalysis.openaiApiKey,
-    chartImgApiKey: config.aiAnalysis.chartImgApiKey,
-    chartImgBaseUrl: config.aiAnalysis.chartImgBaseUrl,
     model: config.aiAnalysis.model,
     presets: config.aiAnalysis.presets,
+    captureService: layoutCaptureService,
+    screenshotDir: aiAnalysisScreenshotsDir,
+    screenshotUrlPrefix: "/ai-analysis-screenshots",
   });
-  const layoutScreenshotsDir = path.join(dataDir, "layout-screenshots");
-  const layoutCaptureService = new LayoutCaptureService({ timeoutMs: config.layoutAnalysis.timeoutMs });
   const layoutAnalysisService = new LayoutAnalysisService({
     cache: layoutAnalysisCache,
     dataDir,
@@ -410,6 +412,7 @@ function createApp() {
     },
   }));
   app.use("/layout-screenshots", express.static(layoutScreenshotsDir));
+  app.use("/ai-analysis-screenshots", express.static(aiAnalysisScreenshotsDir));
 
   app.get(["/emerging-markets.html", "/economics-top-10.html", "/markets-top-10.html"], (req, res) => {
     res.setHeader("Cache-Control", "no-store");

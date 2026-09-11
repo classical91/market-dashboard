@@ -14,7 +14,7 @@ const TOP_TOKENS = [
 
 // Dominance / aggregate market-cap charts. These are synthetic TradingView
 // indices (CRYPTOCAP:*) with no Binance OHLCV data, so they can't go through
-// the Binance-based scanners — they're for the chart-img/TradingView-driven
+// the Binance-based scanners — they're for the TradingView-driven
 // AI Analysis presets.
 const DOMINANCE_PRESETS = [
   { symbol: "CRYPTOCAP:BTC.D", label: "BTC.D", interval: "4h" },

@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────────────────
-   AI Analysis — chart snapshot (chart-img.com) + OpenAI
+   AI Analysis — Playwright chart snapshot + OpenAI
    vision verdict, one card per tracked symbol
 ───────────────────────────────────────────────────────── */
 
@@ -285,7 +285,7 @@
   overflow: hidden;
 }
 /* Layout captures include stacked panes (price + volume, sometimes more)
-   rather than chart-img's clean fixed 16:9 export, so forcing the same
+   rather than a fixed 16:9 export, so forcing the same
    ratio + object-fit:cover crops off real chart content. Let the box grow
    to the image's real shape instead. */
 .aia-chart--full {

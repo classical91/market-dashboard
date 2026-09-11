@@ -1,4 +1,4 @@
-// Free alternative to chart-img.com: screenshots a public TradingView chart
+// Screenshots a public TradingView chart
 // URL — a live layout (tradingview.com/chart/<id>/?symbol=...) or a static
 // snapshot (tradingview.com/x/<id>/) — directly with a headless browser
 // instead of paying a third-party rendering API. More fragile than a

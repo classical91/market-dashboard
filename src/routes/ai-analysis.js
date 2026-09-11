@@ -8,6 +8,10 @@ function createAIAnalysisRouter({ aiAnalysisService, telegramService, requireAdm
     return minutes * 60 * 1000;
   }
 
+  function publicBaseUrl(req) {
+    return `${req.protocol}://${req.get("host")}`;
+  }
+
   // Read-only: returns cached analyses for every configured symbol, never generates.
   router.get("/", (req, res) => {
     res.json({
@@ -46,7 +50,7 @@ function createAIAnalysisRouter({ aiAnalysisService, telegramService, requireAdm
         res.status(400).json({ error: "symbol and interval are required" });
         return;
       }
-      const result = await aiAnalysisService.generate(symbol, interval, resolveTtlMs(req));
+      const result = await aiAnalysisService.generate(symbol, interval, resolveTtlMs(req), publicBaseUrl(req));
       res.json(result);
     } catch (err) {
       next(err);
