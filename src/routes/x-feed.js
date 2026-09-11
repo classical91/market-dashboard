@@ -227,6 +227,58 @@ function createXFeedRouter({ xFeedService, accountRegistry, templateRegistry, re
       }),
     );
 
+    // Membership-only endpoints, so the page's account panel can put an
+    // already-tracked handle into the theme on screen without sending back a
+    // whole template body. Editing the template wholesale through PUT
+    // /templates/:id is still how the template manager saves; these exist
+    // because a one-account change should not have to round-trip sections it
+    // is not touching, which is also how two admins editing one theme lose
+    // each other's work.
+    router.post(
+      "/templates/:id/accounts",
+      requireAdmin,
+      asyncRoute(async (req, res) => {
+        const handle = String(req.body?.handle || "").replace(/^@+/, "").trim();
+        if (!handle) throw createServiceError("An X handle is required", 400);
+        const tracked = accountRegistry
+          .list()
+          .find((account) => account.handle.toLowerCase() === handle.toLowerCase());
+        if (!tracked) {
+          throw createServiceError(`@${handle} is not a tracked X account`, 400);
+        }
+        const template = templateRegistry.get(req.params.id);
+        const section =
+          String(req.body?.section || "").trim() || template.sections[0] || tracked.category;
+        const added = templateRegistry.addHandleToTemplate(template.id, tracked.handle, section);
+        res.status(added ? 201 : 200).json({
+          added,
+          handle: tracked.handle,
+          template: templateRegistry.get(template.id),
+          templates: templateRegistry.list(),
+          accounts: accountRegistry.list(),
+        });
+      }),
+    );
+
+    router.delete(
+      "/templates/:id/accounts/:handle",
+      requireAdmin,
+      asyncRoute(async (req, res) => {
+        const template = templateRegistry.get(req.params.id);
+        const removed = templateRegistry.removeHandleFromTemplate(template.id, req.params.handle);
+        // The global account is deliberately untouched: removing an account
+        // from one theme must not delete it from the others or drop its
+        // cached feed data.
+        res.json({
+          removed,
+          handle: String(req.params.handle || "").replace(/^@+/, ""),
+          template: templateRegistry.get(template.id),
+          templates: templateRegistry.list(),
+          accounts: accountRegistry.list(),
+        });
+      }),
+    );
+
     router.post(
       "/templates/:id/duplicate",
       requireAdmin,
@@ -249,8 +301,21 @@ function createXFeedRouter({ xFeedService, accountRegistry, templateRegistry, re
       "/accounts/config",
       requireAdmin,
       asyncRoute(async (req, res) => {
+        // Validated before the account is written, because the membership is
+        // added by a hook whose failure is only logged: an id that names no
+        // theme would otherwise leave the account tracked and in no theme at
+        // all, which looks exactly like the bug this endpoint now fixes.
+        if (req.body?.template) templateRegistry.get(req.body.template);
         const account = accountRegistry.add(req.body || {});
-        res.status(201).json({ added: account, accounts: accountRegistry.list() });
+        // Templates travel with the response because the add also wrote a
+        // membership — into the theme the body named, or the default one.
+        // Without them the panel would have to re-fetch to learn where the
+        // account actually landed.
+        res.status(201).json({
+          added: account,
+          accounts: accountRegistry.list(),
+          templates: templateRegistry.list(),
+        });
       }),
     );
 
@@ -259,7 +324,13 @@ function createXFeedRouter({ xFeedService, accountRegistry, templateRegistry, re
       requireAdmin,
       asyncRoute(async (req, res) => {
         const removed = accountRegistry.remove(req.params.handle);
-        res.json({ removed, accounts: accountRegistry.list() });
+        // A global delete drops the handle from every template, so the
+        // caller's template copies are stale as of this response.
+        res.json({
+          removed,
+          accounts: accountRegistry.list(),
+          templates: templateRegistry.list(),
+        });
       }),
     );
   }

@@ -434,11 +434,27 @@ class XTemplateRegistry {
     });
   }
 
-  addHandleToDefault(handle, section = "Other") {
+  /**
+   * Adds a globally tracked handle to one template's section.
+   *
+   * This is what "manage accounts for the theme I am looking at" resolves to.
+   * The section is created if the template does not already have it: an
+   * account arriving from the page carries the category the admin typed, and
+   * refusing it because the theme has no such section would leave the add
+   * with nowhere to land.
+   *
+   * Returns true when the membership was written, false when the template
+   * already held the handle. Absent templates throw, because a caller naming
+   * a template that is not there has a real bug — only the default-template
+   * convenience wrapper below tolerates that, for the pre-template callers it
+   * still serves.
+   */
+  addHandleToTemplate(templateId, handle, section = "Other") {
     return this._withLock(() => {
+      const wanted = slugify(templateId || DEFAULT_TEMPLATE_ID);
       const templates = this._read();
-      const index = templates.findIndex((entry) => entry.id === DEFAULT_TEMPLATE_ID);
-      if (index < 0) return false;
+      const index = templates.findIndex((entry) => entry.id === wanted);
+      if (index < 0) throw createServiceError(`X template "${wanted}" was not found`, 404);
       if (templates[index].memberships.some((entry) => sameHandle(entry.handle, handle))) return false;
       const next = templates.slice();
       const updated = normalizeTemplate({
@@ -447,7 +463,43 @@ class XTemplateRegistry {
         memberships: templates[index].memberships.concat({ handle, section }),
       });
       next[index] = updated;
-      if (!this._write(next)) throw createServiceError("Could not update the default template", 500);
+      if (!this._write(next)) throw createServiceError("Could not update the template", 500);
+      return true;
+    });
+  }
+
+  addHandleToDefault(handle, section = "Other") {
+    // Kept tolerant of a missing default template: it is the fallback path for
+    // an add that named no theme, and a 404 there would fail the whole add.
+    try {
+      this.get(DEFAULT_TEMPLATE_ID);
+    } catch (err) {
+      return false;
+    }
+    return this.addHandleToTemplate(DEFAULT_TEMPLATE_ID, handle, section);
+  }
+
+  /**
+   * Drops a handle from one template, leaving the global account and every
+   * other template alone. The counterpart to removeHandle, which is for an
+   * account being deleted everywhere.
+   */
+  removeHandleFromTemplate(templateId, handle) {
+    return this._withLock(() => {
+      const wanted = slugify(templateId || DEFAULT_TEMPLATE_ID);
+      const templates = this._read();
+      const index = templates.findIndex((entry) => entry.id === wanted);
+      if (index < 0) throw createServiceError(`X template "${wanted}" was not found`, 404);
+      const memberships = templates[index].memberships.filter(
+        (entry) => !sameHandle(entry.handle, handle),
+      );
+      if (memberships.length === templates[index].memberships.length) return false;
+      const next = templates.slice();
+      // Sections are left in place on purpose: an emptied section is still a
+      // drop target the admin arranged, and silently deleting it would make
+      // removing the last account destroy the theme's layout.
+      next[index] = { ...templates[index], memberships };
+      if (!this._write(next)) throw createServiceError("Could not update the template", 500);
       return true;
     });
   }

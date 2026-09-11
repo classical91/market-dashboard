@@ -183,12 +183,55 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 14px;
+  gap: 10px;
+  margin-bottom: 12px;
 }
+
+.manage-head-text { min-width: 0; }
 
 .manage-title {
   margin: 0;
   font-size: 15px;
+}
+
+/* Names the theme being edited. The panel is scoped to the filter on screen,
+   and a title alone reads as global. */
+.manage-subtitle {
+  margin: 3px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* "In <Theme> (n)" / "All tracked (n)". Two scopes, because which accounts
+   this filter shows and which the dashboard tracks are different questions. */
+.manage-scope {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.manage-scope-tab {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 7px 10px;
+  border: 0.5px solid var(--border);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.manage-scope-tab.active {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: var(--accent, var(--green, #2ECC71));
+  color: inherit;
+  font-weight: 700;
 }
 
 .manage-close {
@@ -264,9 +307,13 @@
   padding: 8px 10px;
   border: 0.5px solid var(--border);
   border-radius: 8px;
+  /* Wraps rather than breaking at a fixed width: the actions carry the theme
+     name, so how much room they need depends on the theme, and a breakpoint
+     tuned to "Conspiracy" would still overlap on a longer one. */
+  flex-wrap: wrap;
 }
 
-.manage-row-text { display: grid; gap: 2px; min-width: 0; }
+.manage-row-text { display: grid; gap: 2px; min-width: 0; flex: 1 1 12ch; }
 .manage-row-handle { font-size: 13px; }
 .manage-row-meta { font-size: 11px; color: var(--muted); }
 
@@ -284,6 +331,58 @@
 
 .manage-delete:disabled { opacity: 0.5; cursor: default; }
 .manage-empty { font-size: 12px; color: var(--muted); }
+
+/* Row actions wrap rather than squeeze: "Remove from <Theme>" carries the
+   theme name, so the pair is wider than a phone row on most themes. */
+.manage-row-actions {
+  /* Grows to a full-width line of its own once the row wraps. */
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* Membership actions. Neutral and green against .manage-delete's red: adding
+   to or dropping from one theme is reversible, untracking the account is not. */
+.manage-row-add,
+.manage-row-remove {
+  flex: none;
+  max-width: 100%;
+  padding: 6px 10px;
+  border: 0.5px solid var(--border);
+  border-radius: 7px;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.manage-row-add { color: var(--green, #2ECC71); }
+.manage-row-remove { color: var(--muted); }
+.manage-row-add:disabled,
+.manage-row-remove:disabled { opacity: 0.5; cursor: default; }
+
+/* The one-click "this handle is tracked but not in this theme" fix, sitting
+   directly under the hint that says so. */
+.manage-adopt {
+  justify-self: start;
+  padding: 7px 11px;
+  border: 0.5px solid var(--green, #2ECC71);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--green, #2ECC71);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.manage-adopt:disabled { opacity: 0.5; cursor: default; }
 
 /* ─────────────────────────────────────────────────────────
    Intelligence theme accents — one definition of each colour,
