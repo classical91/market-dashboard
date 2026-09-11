@@ -44,6 +44,9 @@ const MAX_ACCOUNTS = 200;
 const HANDLE_PATTERN = /^[A-Za-z0-9_]{1,15}$/;
 const MAX_LABEL_LEN = 60;
 const MAX_CATEGORY_LEN = 40;
+// Only bounds the string before it reaches the template registry, which is the
+// component that decides whether the id names a template that exists.
+const MAX_TEMPLATE_ID_LEN = 40;
 
 // Offered by the UI. Not a whitelist — a custom category groups itself in the
 // sidebar, which builds its sections from whatever categories come back.
@@ -330,9 +333,15 @@ class XAccountRegistry {
         throw createServiceError("Could not save the account registry", 500);
       }
       try {
-        this._membershipHooks.onAdd?.(stored);
+        // The theme the admin was looking at when they added the account, so
+        // the account lands in the feed they were filtering rather than always
+        // in the default one. Absent, the hook falls back to the default.
+        this._membershipHooks.onAdd?.(stored, {
+          templateId: clamp(input?.template, MAX_TEMPLATE_ID_LEN) || null,
+          section: account.category,
+        });
       } catch (err) {
-        this._logger.warn?.(`[XAccounts] Account saved but could not add it to the default template: ${err.message}`);
+        this._logger.warn?.(`[XAccounts] Account saved but could not add it to a template: ${err.message}`);
       }
       return stored;
     });

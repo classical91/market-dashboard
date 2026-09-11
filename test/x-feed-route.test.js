@@ -324,6 +324,173 @@ test("an added account appears in the feed, and a deleted one disappears from it
   );
 });
 
+// The account panel on the page is scoped to the theme selected in the
+// switcher, so these are the endpoints behind "manage the accounts this filter
+// shows". Before them, every add went into the default template: an account
+// added while the Conspiracy filter was selected was tracked, fetched, and
+// invisible in the feed that was on screen.
+
+test("an account added under a theme joins that theme's feed, not the default one", async () => {
+  mockUpstream(() => healthySearchResponse());
+
+  const added = await send(
+    "/api/x/accounts/config",
+    "POST",
+    { handle: "@themedaccount", label: "Themed", category: "Deep State", template: "conspiracy" },
+    ADMIN,
+  );
+  assert.equal(added.status, 201);
+
+  const conspiracy = await getJson("/api/x/accounts?template=conspiracy");
+  assert.ok(
+    conspiracy.body.accounts.some((a) => a.handle === "themedaccount"),
+    "the account must appear in the feed that was on screen when it was added",
+  );
+  const markets = await getJson("/api/x/accounts?template=markets");
+  assert.ok(
+    !markets.body.accounts.some((a) => a.handle === "themedaccount"),
+    "and must not be dropped into the default theme instead",
+  );
+
+  await send("/api/x/accounts/config/themedaccount", "DELETE", undefined, ADMIN);
+});
+
+test("an add naming no theme still lands in the default one", async () => {
+  mockUpstream(() => healthySearchResponse());
+
+  // The pre-existing contract: the page always names a theme now, but the
+  // endpoint is public API and a body without one must keep working.
+  const added = await send(
+    "/api/x/accounts/config",
+    "POST",
+    { handle: "defaultbound", category: "Crypto Traders" },
+    ADMIN,
+  );
+  assert.equal(added.status, 201);
+  assert.ok(
+    added.body.templates.some((t) => t.id === "markets"
+      && t.memberships.some((m) => m.handle === "defaultbound")),
+    "the response carries the templates, so the panel can see where it landed",
+  );
+
+  await send("/api/x/accounts/config/defaultbound", "DELETE", undefined, ADMIN);
+});
+
+test("an already-tracked account can be pulled into a theme without being re-added", async () => {
+  mockUpstream(() => healthySearchResponse());
+
+  // Barchart is tracked and seeded into markets. From the Conspiracy filter it
+  // used to be a dead end: the add was refused as a duplicate, and there was
+  // no way to put it in the theme being viewed.
+  const joined = await send(
+    "/api/x/templates/conspiracy/accounts",
+    "POST",
+    { handle: "@Barchart", section: "Deep State" },
+    ADMIN,
+  );
+  assert.equal(joined.status, 201);
+  assert.equal(joined.body.added, true);
+  assert.equal(
+    joined.body.template.memberships.find((m) => m.handle === "Barchart").section,
+    "Deep State",
+  );
+
+  const feed = await getJson("/api/x/accounts?template=conspiracy");
+  const row = feed.body.accounts.find((a) => a.handle === "Barchart");
+  assert.ok(row, "the theme's feed now fetches it");
+  assert.equal(row.category, "Deep State", "grouped by this theme's section");
+
+  // Idempotent rather than an error: one handle, one membership.
+  const again = await send(
+    "/api/x/templates/conspiracy/accounts",
+    "POST",
+    { handle: "barchart", section: "Medical" },
+    ADMIN,
+  );
+  assert.equal(again.status, 200);
+  assert.equal(again.body.added, false);
+
+  const removed = await send(
+    "/api/x/templates/conspiracy/accounts/Barchart",
+    "DELETE",
+    undefined,
+    ADMIN,
+  );
+  assert.equal(removed.status, 200);
+  assert.equal(removed.body.removed, true);
+
+  // The narrow removal must not untrack the account or empty the theme it
+  // came from.
+  const config = await getJson("/api/x/accounts/config");
+  assert.ok(
+    config.body.accounts.some((a) => a.handle === "Barchart"),
+    "removing a membership is not deleting the account",
+  );
+  const stillMarkets = await getJson("/api/x/accounts?template=markets");
+  assert.ok(stillMarkets.body.accounts.some((a) => a.handle === "Barchart"));
+});
+
+test("an add naming a theme that does not exist is refused before anything is written", async () => {
+  const bad = await send(
+    "/api/x/accounts/config",
+    "POST",
+    { handle: "orphanaccount", category: "Crypto Traders", template: "no-such-theme" },
+    ADMIN,
+  );
+  assert.equal(bad.status, 404);
+
+  // The membership is written by a hook whose failure is only logged, so
+  // without the up-front check this account would be tracked and in no theme
+  // — invisible in every filter, which is the bug being fixed.
+  const config = await getJson("/api/x/accounts/config");
+  assert.equal(
+    config.body.accounts.some((a) => a.handle === "orphanaccount"),
+    false,
+    "a rejected add must not leave the account behind",
+  );
+});
+
+test("membership endpoints refuse untracked handles and unknown themes", async () => {
+  const untracked = await send(
+    "/api/x/templates/conspiracy/accounts",
+    "POST",
+    { handle: "neverheardofthis", section: "Deep State" },
+    ADMIN,
+  );
+  assert.equal(untracked.status, 400, "a template must not reference an untracked account");
+
+  const noTheme = await send(
+    "/api/x/templates/no-such-theme/accounts",
+    "POST",
+    { handle: "Barchart", section: "Deep State" },
+    ADMIN,
+  );
+  assert.equal(noTheme.status, 404);
+
+  const noHandle = await send(
+    "/api/x/templates/conspiracy/accounts",
+    "POST",
+    { section: "Deep State" },
+    ADMIN,
+  );
+  assert.equal(noHandle.status, 400);
+});
+
+test("membership changes are admin-gated like every other mutation", async () => {
+  const add = await send(
+    "/api/x/templates/conspiracy/accounts",
+    "POST",
+    { handle: "Barchart", section: "Deep State" },
+  );
+  assert.equal(add.status, 401);
+
+  const remove = await send(
+    "/api/x/templates/conspiracy/accounts/Barchart",
+    "DELETE",
+  );
+  assert.equal(remove.status, 401);
+});
+
 test("diagnostics report registry health alongside provider health", async () => {
   const { body } = await getJson("/api/x/diagnostics", ADMIN);
   assert.ok(body.registry.file.endsWith("x-accounts.json"));

@@ -383,7 +383,7 @@
           pane,
           state.feedData.posts,
           unpopulated
-            ? "No accounts in this theme yet \u2014 add some from Manage accounts."
+            ? "No accounts in this theme yet \u2014 add some from Manage Accounts."
             : state.transport.ok ? "No posts found yet." : "Couldn't load posts."
         );
         renderFeedError(pane, state.feedData.failedFeeds);
@@ -435,9 +435,21 @@
       pane.insertBefore(liveRoot, pane.firstChild ? pane.firstChild.nextSibling : null);
     }
 
+    /* The panel is scoped to the theme on screen, so the active template goes
+       with it. Without it the panel edited the global tracked list blind and
+       every add landed in the default theme, whichever filter was selected. */
     function openManager() {
       window.XAccountsAdmin.open({
+        template: activeTemplate(),
         onChange: function (accounts, change) {
+          // Membership may have changed, so the switcher's per-theme counts
+          // and this page's copy of the template are both stale.
+          if (change && change.template) {
+            state.templates = state.templates.map(function (template) {
+              return template.id === change.template.id ? change.template : template;
+            });
+            renderTemplateSwitcher();
+          }
           // The selected account may have just been deleted; fall back to the
           // full feed rather than leaving a selection nothing can fill.
           var stillTracked = (accounts || []).some(function (a) { return a.handle === state.handle; });

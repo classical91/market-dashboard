@@ -54,3 +54,40 @@ test("the account selector count uses theme accounts rather than post volume", (
   assert.match(js, /accountsOf\(state\.feedData\)\.length/);
   assert.doesNotMatch(js, /visiblePostCount/);
 });
+
+test("the account panel is opened against the theme selected on the page", () => {
+  const js = read("public/assets/js/x-intelligence.js");
+
+  // The regression this guards: the panel was opened with no template, so it
+  // edited the global tracked list blind and the server put every add into the
+  // default theme — whichever filter was on screen.
+  const openAt = js.indexOf("window.XAccountsAdmin.open({");
+  assert.ok(openAt > 0, "the page is what opens the panel");
+  const call = js.slice(openAt, openAt + 200);
+  assert.match(call, /template: activeTemplate\(\)/);
+});
+
+test("the panel sends the theme with an add, and can edit one membership at a time", () => {
+  const js = read("public/assets/js/x-accounts-admin.js");
+
+  // The account add names the theme, so the server writes the membership there
+  // rather than into the default template.
+  assert.match(js, /template: template \? template\.id : undefined/);
+
+  // And membership-only edits go to the per-theme endpoints, so pulling an
+  // account into a theme or dropping it from one neither re-adds the account
+  // nor rewrites the whole template.
+  assert.match(js, /"\/api\/x\/templates\/" \+ encodeURIComponent\(template\.id\) \+ "\/accounts"/);
+  assert.match(js, /method: "DELETE"/);
+});
+
+test("removing from a theme and untracking an account are distinct actions", () => {
+  const js = read("public/assets/js/x-accounts-admin.js");
+
+  // Two verbs with different blast radius. Collapsing them would make tidying
+  // one theme delete the account out of every other theme that uses it.
+  assert.match(js, /function removeMember\(/);
+  assert.match(js, /function removeAccount\(/);
+  assert.match(js, /removeFromThemeMessage/);
+  assert.match(js, /confirmationMessage/);
+});

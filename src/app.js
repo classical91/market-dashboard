@@ -211,7 +211,13 @@ function createApp() {
   });
   xTemplateRegistry.ensureSeeded();
   xAccountRegistry.setMembershipHooks({
-    onAdd: (account) => xTemplateRegistry.addHandleToDefault(account.handle, account.category),
+    // An account added while a theme is selected joins that theme. Adding it
+    // to the default one regardless was the reason a handle added from, say,
+    // the Conspiracy filter never appeared in it.
+    onAdd: (account, options) =>
+      (options && options.templateId
+        ? xTemplateRegistry.addHandleToTemplate(options.templateId, account.handle, account.category)
+        : xTemplateRegistry.addHandleToDefault(account.handle, account.category)),
     onRemove: (account) => xTemplateRegistry.removeHandle(account.handle),
   });
   const aiAnalysisService = new AIAnalysisService({

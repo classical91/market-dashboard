@@ -213,6 +213,114 @@ test("adding an already tracked handle to the default template is a no-op", () =
   );
 });
 
+test("an account joins the named theme rather than always the default one", () => {
+  const { registry } = tempRegistry();
+  registry.ensureSeeded();
+
+  // The bug this guards: every add landed in markets, so a handle added while
+  // the Conspiracy filter was selected was tracked but never shown by it.
+  assert.equal(registry.addHandleToTemplate("conspiracy", "NewWatcher", "Deep State"), true);
+
+  const conspiracy = registry.get("conspiracy");
+  assert.deepEqual(
+    conspiracy.memberships.filter((entry) => entry.handle === "NewWatcher"),
+    [{ handle: "NewWatcher", section: "Deep State" }],
+  );
+  assert.equal(
+    registry.get("markets").memberships.some((entry) => entry.handle === "NewWatcher"),
+    false,
+    "the theme that was not named must be left alone",
+  );
+});
+
+test("a section the theme does not have yet is created for the account", () => {
+  const { registry } = tempRegistry();
+  registry.ensureSeeded();
+
+  // An admin types the section they want; refusing it because the theme has no
+  // such section would leave the add with nowhere to land.
+  assert.equal(registry.addHandleToTemplate("conspiracy", "NewWatcher", "Banking Cartels"), true);
+  const conspiracy = registry.get("conspiracy");
+  assert.ok(conspiracy.sections.includes("Banking Cartels"));
+  assert.equal(
+    conspiracy.memberships.find((entry) => entry.handle === "NewWatcher").section,
+    "Banking Cartels",
+  );
+});
+
+test("one handle can be added to several themes, and is de-duplicated within each", () => {
+  const { registry } = tempRegistry();
+  registry.ensureSeeded();
+
+  assert.equal(registry.addHandleToTemplate("conspiracy", "Barchart", "Deep State"), true);
+  // Already tracked by markets from the seed, and now by conspiracy too: one
+  // account feeding two themes is the point of the membership model.
+  assert.equal(registry.get("markets").memberships.some((e) => e.handle === "Barchart"), true);
+  assert.equal(registry.addHandleToTemplate("conspiracy", "@barchart", "Medical"), false);
+  assert.equal(
+    registry.get("conspiracy").memberships.filter((e) => e.handle.toLowerCase() === "barchart").length,
+    1,
+    "a second membership would list the account twice and double its posts",
+  );
+});
+
+test("naming a theme that does not exist fails rather than writing somewhere else", () => {
+  const { registry } = tempRegistry();
+  registry.ensureSeeded();
+
+  assert.throws(() => registry.addHandleToTemplate("no-such-theme", "NewWatcher", "Deep State"), /not found/);
+  assert.throws(() => registry.removeHandleFromTemplate("no-such-theme", "Barchart"), /not found/);
+});
+
+test("removing an account from one theme leaves it tracked by the others", () => {
+  const { registry } = tempRegistry();
+  registry.ensureSeeded();
+  registry.addHandleToTemplate("conspiracy", "Barchart", "Deep State");
+
+  assert.equal(registry.removeHandleFromTemplate("conspiracy", "@BarChart"), true);
+  assert.equal(
+    registry.get("conspiracy").memberships.some((e) => e.handle === "Barchart"),
+    false,
+  );
+  assert.equal(
+    registry.get("markets").memberships.some((e) => e.handle === "Barchart"),
+    true,
+    "dropping one membership is not untracking the account",
+  );
+  assert.equal(registry.removeHandleFromTemplate("conspiracy", "Barchart"), false, "idempotent");
+});
+
+test("emptying a section by removing its last account keeps the section", () => {
+  const { registry } = tempRegistry();
+  registry.ensureSeeded();
+  registry.create({
+    id: "macro",
+    name: "Macro",
+    sections: ["Data", "Official Sources"],
+    memberships: [{ handle: "Barchart", section: "Data" }],
+  });
+
+  registry.removeHandleFromTemplate("macro", "Barchart");
+  // The section is a drop target the admin arranged. Deleting it here would
+  // make removing an account quietly destroy the theme's layout.
+  assert.deepEqual(registry.get("macro").sections, ["Data", "Official Sources"]);
+});
+
+test("removeHandle still clears the account from every theme, unlike the per-theme removal", () => {
+  const { registry } = tempRegistry();
+  registry.ensureSeeded();
+  registry.addHandleToTemplate("conspiracy", "Barchart", "Deep State");
+
+  assert.equal(registry.removeHandle("Barchart"), true);
+  for (const id of ["markets", "conspiracy"]) {
+    assert.equal(
+      registry.get(id).memberships.some((e) => e.handle === "Barchart"),
+      false,
+      id,
+    );
+  }
+});
+
 test("template order is persistent and must name every template exactly once", () => {
   const { registry } = tempRegistry();
   registry.ensureSeeded();
