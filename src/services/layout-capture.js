@@ -1,4 +1,4 @@
-// Free alternative to chart-img.com: screenshots a public TradingView chart
+// Screenshots a public TradingView chart
 // URL — a live layout (tradingview.com/chart/<id>/?symbol=...) or a static
 // snapshot (tradingview.com/x/<id>/) — directly with a headless browser
 // instead of paying a third-party rendering API. More fragile than a
@@ -82,6 +82,41 @@ class LayoutCaptureService {
         }
       }
       return await target.screenshot({ type: "png" });
+    } finally {
+      await context.close();
+    }
+  }
+
+  /**
+   * Render a deterministic TradingView widget with the indicators required by
+   * preset AI analysis. This avoids depending on a user's saved chart state.
+   */
+  async captureTradingView({ symbol, interval, studies }) {
+    const browser = await this._getBrowser();
+    const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+    const page = await context.newPage();
+    try {
+      const config = JSON.stringify({
+        autosize: true,
+        symbol,
+        interval,
+        timezone: "Etc/UTC",
+        theme: "dark",
+        style: "1",
+        locale: "en",
+        allow_symbol_change: false,
+        save_image: false,
+        calendar: false,
+        support_host: "https://www.tradingview.com",
+        studies,
+      }).replace(/</g, "\\u003c");
+      await page.setContent(
+        `<!doctype html><html><head><style>html,body,.tradingview-widget-container,.tradingview-widget-container__widget{width:100%;height:100%;margin:0;background:#0b0e11;overflow:hidden}</style></head><body><div class="tradingview-widget-container"><div class="tradingview-widget-container__widget"></div><script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>${config}</script></div></body></html>`,
+        { waitUntil: "domcontentloaded", timeout: this._timeoutMs },
+      );
+      await page.waitForSelector("iframe", { timeout: this._timeoutMs });
+      await page.waitForTimeout(this._settleMs);
+      return await page.screenshot({ type: "png" });
     } finally {
       await context.close();
     }

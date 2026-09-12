@@ -481,7 +481,7 @@
       .then(function (data) {
         if (!data.configured) {
           notice.style.display = 'block';
-          notice.innerHTML = '&#9888;&#65039; AI Analysis is not fully configured on the server. Set <code>OPENAI_API_KEY</code> and <code>CHART_IMG_API_KEY</code> to enable it.';
+          notice.innerHTML = '&#9888;&#65039; AI Analysis is not fully configured on the server. Set <code>OPENAI_API_KEY</code> to enable it.';
         }
         availableIntervals = data.availableIntervals || ['4h'];
         var presets = data.presets || [];

@@ -191,14 +191,11 @@ const config = {
   aiAnalysis: {
     openaiApiKey: process.env.OPENAI_API_KEY || "",
     model: process.env.AI_ANALYSIS_MODEL || process.env.REPORTER_MODEL || "gpt-5.4-mini",
-    chartImgApiKey: process.env.CHART_IMG_API_KEY || "",
-    chartImgBaseUrl:
-      process.env.CHART_IMG_BASE_URL || "https://api.chart-img.com/v2/tradingview/advanced-chart/storage",
     cacheMs: parseNumber(process.env.AI_ANALYSIS_CACHE_MS, 30 * 60 * 1000),
     presets: parseJsonArray(process.env.AI_ANALYSIS_SYMBOLS),
   },
   layoutAnalysis: {
-    // Free alternative to the chart-img presets above: screenshots your own
+    // Screenshots your own
     // saved/shared TradingView layouts (tradingview.com/x/<id>/) with a
     // headless browser instead of a paid chart-rendering API. Configure as
     // AI_ANALYSIS_LAYOUTS='[{"id":"btc-4h","label":"BTC 4h Setup","url":"https://www.tradingview.com/x/XXXXXXXX/"}]'

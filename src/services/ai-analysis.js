@@ -4,19 +4,13 @@ const OpenAI = require("openai");
 const { resolveDataDir } = require("../utils/data-dir");
 const { ANALYSIS_PROMPT, MAX_ANALYSIS_WORDS, PERSIST_TTL_MS, extractVerdict, truncateWords } = require("./analysis-prompt");
 
-const DEFAULT_STUDIES = [
-  { name: "Volume", forceOverlay: true },
-  { name: "MACD" },
-  { name: "Relative Strength Index" },
-];
-
-// Dominance/market-cap indices (CRYPTOCAP:*) have no volume series, so
-// requesting the Volume study on them just renders an empty pane.
-const INDEX_STUDIES = [{ name: "MACD" }, { name: "Relative Strength Index" }];
-const NO_VOLUME_SYMBOL_PREFIXES = ["CRYPTOCAP:", "TVC:", "SP:", "CBOE:", "FX:", "OANDA:"];
-
 // Selectable timeframes for the per-card dropdown, roughly low-to-high.
 const AVAILABLE_INTERVALS = ["15m", "1h", "4h", "1D", "1W", "1M"];
+const TV_INTERVALS = { "15m": "15", "1h": "60", "4h": "240", "1D": "D", "1W": "W", "1M": "M" };
+// The Advanced Chart widget includes Volume by default; add MACD and RSI panes.
+const DEFAULT_STUDIES = ["STD;MACD", "STD;RSI"];
+const INDEX_STUDIES = ["STD;MACD", "STD;RSI"];
+const NO_VOLUME_SYMBOL_PREFIXES = ["CRYPTOCAP:", "TVC:", "SP:", "CBOE:", "FX:", "OANDA:"];
 
 const { DOMINANCE_PRESETS } = require("../config/market-symbols");
 
@@ -32,10 +26,6 @@ const DEFAULT_PRESETS = [
   { symbol: "CBOE:VIX", label: "VIX", interval: "4h" },
   { symbol: "FX:EURUSD", label: "EUR/USD", interval: "4h" },
 ];
-
-function studiesForSymbol(symbol) {
-  return NO_VOLUME_SYMBOL_PREFIXES.some((prefix) => symbol.startsWith(prefix)) ? INDEX_STUDIES : DEFAULT_STUDIES;
-}
 
 function normalizePresets(presets) {
   if (!Array.isArray(presets) || !presets.length) return DEFAULT_PRESETS;
@@ -54,14 +44,15 @@ function presetKey(symbol, interval) {
 }
 
 class AIAnalysisService {
-  constructor({ cache, dataDir, openaiApiKey, chartImgApiKey, chartImgBaseUrl, model, presets }) {
+  constructor({ cache, dataDir, openaiApiKey, model, presets, captureService, screenshotDir, screenshotUrlPrefix }) {
     this._cache = cache;
-    this._chartImgApiKey = chartImgApiKey || "";
-    this._chartImgBaseUrl = chartImgBaseUrl || "https://api.chart-img.com/v2/tradingview/advanced-chart/storage";
     this._client = openaiApiKey ? new OpenAI({ apiKey: openaiApiKey }) : null;
     this._model = model || "gpt-5.4-mini";
     this._presets = normalizePresets(presets);
     this._logFile = path.join(dataDir || resolveDataDir(), "ai-analysis-log.json");
+    this._captureService = captureService;
+    this._screenshotDir = screenshotDir;
+    this._screenshotUrlPrefix = screenshotUrlPrefix || "/ai-analysis-screenshots";
     this._rateLimitedUntil = new Map();
   }
 
@@ -87,7 +78,7 @@ class AIAnalysisService {
   }
 
   isConfigured() {
-    return Boolean(this._client && this._chartImgApiKey);
+    return Boolean(this._client && this._captureService);
   }
 
   _latestCacheKey(symbol, interval) {
@@ -119,56 +110,32 @@ class AIAnalysisService {
     this._writeLog(log);
   }
 
-  async _fetchChartUrl(symbol, interval) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 20000);
-    try {
-      const response = await fetch(this._chartImgBaseUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": this._chartImgApiKey,
-        },
-        body: JSON.stringify({
-          theme: "dark",
-          interval,
-          symbol,
-          studies: studiesForSymbol(symbol),
-        }),
-        signal: controller.signal,
-      });
-      const text = await response.text();
-      let payload = null;
-      if (text) {
-        try {
-          payload = JSON.parse(text);
-        } catch {
-          payload = null;
-        }
-      }
-      if (!response.ok) {
-        const detail = payload?.message || payload?.error || text.slice(0, 200) || response.statusText;
-        const error = new Error(`chart-img HTTP ${response.status} ${detail}`);
-        error.statusCode = response.status;
-        throw error;
-      }
-      if (!payload?.url) {
-        throw new Error("chart-img response did not include an image url");
-      }
-      return payload.url;
-    } finally {
-      clearTimeout(timer);
-    }
+  _studiesForSymbol(symbol) {
+    return NO_VOLUME_SYMBOL_PREFIXES.some((prefix) => symbol.startsWith(prefix)) ? INDEX_STUDIES : DEFAULT_STUDIES;
   }
 
-  async _analyzeChart(chartUrl) {
+  async _saveScreenshot(symbol, interval, buffer, publicBaseUrl) {
+    if (!fs.existsSync(this._screenshotDir)) fs.mkdirSync(this._screenshotDir, { recursive: true });
+    const safeName = `${symbol}-${interval}`.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    const filename = `${safeName}-${Date.now()}.png`;
+    const filePath = path.join(this._screenshotDir, filename);
+    fs.writeFileSync(filePath, buffer);
+    return { filePath, chartUrl: `${publicBaseUrl}${this._screenshotUrlPrefix}/${filename}` };
+  }
+
+  _deleteScreenshot(filePath) {
+    if (filePath) fs.unlink(filePath, () => {});
+  }
+
+  async _analyzeChart(buffer) {
+    const imageUrl = `data:image/png;base64,${buffer.toString("base64")}`;
     const res = await this._client.responses.create({
       model: this._model,
       input: [
         {
           role: "user",
           content: [
-            { type: "input_image", image_url: chartUrl },
+            { type: "input_image", image_url: imageUrl },
             { type: "input_text", text: ANALYSIS_PROMPT },
           ],
         },
@@ -189,7 +156,8 @@ class AIAnalysisService {
   peekAll() {
     return this._presets.map((preset) => {
       const cached = this._cache.get(this._latestCacheKey(preset.symbol, preset.interval));
-      return { ...preset, ...(cached || {}) };
+      const { screenshotPath, ...rest } = cached || {};
+      return { ...preset, ...rest };
     });
   }
 
@@ -218,7 +186,9 @@ class AIAnalysisService {
       label: this._labelForSymbol(symbol),
     };
     const cached = this._cache.get(this._latestCacheKey(symbol, interval));
-    return cached ? { ...preset, ...cached } : null;
+    if (!cached) return null;
+    const { screenshotPath, ...rest } = cached;
+    return { ...preset, ...rest };
   }
 
   /**
@@ -232,12 +202,9 @@ class AIAnalysisService {
   /**
    * Generate (or reuse a cached) analysis for one symbol/interval preset.
    */
-  async generate(symbol, interval, ttlMs) {
+  async generate(symbol, interval, ttlMs, publicBaseUrl) {
     if (!this._client) {
       return { configured: false, reason: "OPENAI_API_KEY is not set" };
-    }
-    if (!this._chartImgApiKey) {
-      return { configured: false, reason: "CHART_IMG_API_KEY is not set" };
     }
 
     const preset = this._presets.find((p) => p.symbol === symbol && p.interval === interval) || {
@@ -248,14 +215,16 @@ class AIAnalysisService {
     const key = this._latestCacheKey(symbol, interval);
     const cached = this._cache.get(key);
     if (cached && cached.generatedAt && Date.now() - new Date(cached.generatedAt).getTime() < ttlMs) {
-      return { ...preset, ...cached, generationSkipped: true, generationSkippedReason: "cached" };
+      const { screenshotPath, ...rest } = cached;
+      return { ...preset, ...rest, generationSkipped: true, generationSkippedReason: "cached" };
     }
 
     const cooldown = this._rateLimitedUntil.get(key) || 0;
     if (cooldown > Date.now()) {
+      const { screenshotPath, ...rest } = cached || {};
       return {
         ...preset,
-        ...(cached || {}),
+        ...rest,
         rateLimited: true,
         rateLimitedUntil: new Date(cooldown).toISOString(),
         error: "Rate-limited. Showing the last saved analysis instead of retrying immediately.",
@@ -263,22 +232,30 @@ class AIAnalysisService {
     }
 
     try {
-      const chartUrl = await this._fetchChartUrl(symbol, interval);
-      const rawAnalysis = await this._analyzeChart(chartUrl);
+      const screenshot = await this._captureService.captureTradingView({
+        symbol,
+        interval: TV_INTERVALS[interval] || "D",
+        studies: this._studiesForSymbol(symbol),
+      });
+      const { filePath, chartUrl } = await this._saveScreenshot(symbol, interval, screenshot, publicBaseUrl);
+      const rawAnalysis = await this._analyzeChart(screenshot);
       const verdict = extractVerdict(rawAnalysis);
       const analysis = truncateWords(rawAnalysis, MAX_ANALYSIS_WORDS);
       const generatedAt = new Date().toISOString();
-      const result = { chartUrl, analysis, verdict, model: this._model, generatedAt };
+      const result = { chartUrl, analysis, verdict, model: this._model, generatedAt, screenshotPath: filePath };
+      this._deleteScreenshot(cached && cached.screenshotPath);
       this._cache.set(key, result, PERSIST_TTL_MS);
-      this._logGeneration({ symbol, interval, label: preset.label, ...result });
-      return { ...preset, ...result };
+      const { screenshotPath, ...publicResult } = result;
+      this._logGeneration({ symbol, interval, label: preset.label, ...publicResult });
+      return { ...preset, ...publicResult };
     } catch (err) {
       if (this._isRateLimitError(err)) {
         const untilMs = Date.now() + 5 * 60 * 1000;
         this._rateLimitedUntil.set(key, untilMs);
+        const { screenshotPath, ...rest } = cached || {};
         return {
           ...preset,
-          ...(cached || {}),
+          ...rest,
           rateLimited: true,
           rateLimitedUntil: new Date(untilMs).toISOString(),
           error: "Rate-limited. Showing any saved analysis instead of retrying immediately.",
