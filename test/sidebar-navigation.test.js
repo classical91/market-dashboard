@@ -11,7 +11,7 @@ test("primary sidebar order and removed links stay exact", () => {
   const labels = [
     "Terminal Suite",
     "Overview",
-    "AI Analysis",
+    "Presets",
     "Reporter",
     "Market Intel Links",
     "YouTube",
@@ -31,8 +31,8 @@ test("primary sidebar order and removed links stay exact", () => {
   }
 });
 
-test("AI Analysis excludes tools that moved to the bottom section", () => {
-  const start = sidebar.indexOf('label: "AI Analysis"');
+test("Presets excludes tools that moved to the bottom section", () => {
+  const start = sidebar.indexOf('label: "Presets"');
   const end = sidebar.indexOf('label: "Reporter"', start);
   const menu = sidebar.slice(start, end);
   assert.doesNotMatch(menu, /Decision Engine|Backtest Lab/);

@@ -45,9 +45,9 @@
       ],
     },
     {
-      label: "AI Analysis",
+      label: "Presets",
       children: [
-        { href: "/ai-analysis.html", label: "AI Analysis" },
+        { href: "/ai-analysis.html", label: "Presets" },
         { href: "/layout-analysis.html", label: "My Layouts" },
         { href: "/pattern-scanner.html", label: "Pattern Scanner" },
         { href: "/pattern-scanner-trades.html", label: "My Trades" },
