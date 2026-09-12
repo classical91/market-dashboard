@@ -11,7 +11,7 @@ test("preset analysis captures TradingView with Playwright and sends PNG bytes i
   t.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
 
   const screenshot = Buffer.from("png fixture");
-  let capturedUrl;
+  let captureOptions;
   let request;
   let cached;
   const service = new AIAnalysisService({
@@ -22,7 +22,7 @@ test("preset analysis captures TradingView with Playwright and sends PNG bytes i
     dataDir,
     openaiApiKey: "test-key",
     presets: [{ symbol: "BINANCE:BTCUSDT", label: "BTCUSDT", interval: "4h" }],
-    captureService: { async capture(url) { capturedUrl = url; return screenshot; } },
+    captureService: { async captureTradingView(options) { captureOptions = options; return screenshot; } },
     screenshotDir: path.join(dataDir, "screenshots"),
   });
   service._client = {
@@ -36,7 +36,11 @@ test("preset analysis captures TradingView with Playwright and sends PNG bytes i
 
   const result = await service.generate("BINANCE:BTCUSDT", "4h", 1000, "https://dashboard.example");
 
-  assert.equal(capturedUrl, "https://www.tradingview.com/chart/?symbol=BINANCE%3ABTCUSDT&interval=240");
+  assert.deepEqual(captureOptions, {
+    symbol: "BINANCE:BTCUSDT",
+    interval: "240",
+    studies: ["STD;MACD", "STD;RSI"],
+  });
   const image = request.input[0].content.find((item) => item.type === "input_image");
   assert.equal(image.image_url, `data:image/png;base64,${screenshot.toString("base64")}`);
   assert.match(result.chartUrl, /^https:\/\/dashboard\.example\/ai-analysis-screenshots\//);

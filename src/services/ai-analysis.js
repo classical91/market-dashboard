@@ -7,6 +7,10 @@ const { ANALYSIS_PROMPT, MAX_ANALYSIS_WORDS, PERSIST_TTL_MS, extractVerdict, tru
 // Selectable timeframes for the per-card dropdown, roughly low-to-high.
 const AVAILABLE_INTERVALS = ["15m", "1h", "4h", "1D", "1W", "1M"];
 const TV_INTERVALS = { "15m": "15", "1h": "60", "4h": "240", "1D": "D", "1W": "W", "1M": "M" };
+// The Advanced Chart widget includes Volume by default; add MACD and RSI panes.
+const DEFAULT_STUDIES = ["STD;MACD", "STD;RSI"];
+const INDEX_STUDIES = ["STD;MACD", "STD;RSI"];
+const NO_VOLUME_SYMBOL_PREFIXES = ["CRYPTOCAP:", "TVC:", "SP:", "CBOE:", "FX:", "OANDA:"];
 
 const { DOMINANCE_PRESETS } = require("../config/market-symbols");
 
@@ -106,9 +110,8 @@ class AIAnalysisService {
     this._writeLog(log);
   }
 
-  _tradingViewUrl(symbol, interval) {
-    const params = new URLSearchParams({ symbol, interval: TV_INTERVALS[interval] || "D" });
-    return `https://www.tradingview.com/chart/?${params}`;
+  _studiesForSymbol(symbol) {
+    return NO_VOLUME_SYMBOL_PREFIXES.some((prefix) => symbol.startsWith(prefix)) ? INDEX_STUDIES : DEFAULT_STUDIES;
   }
 
   async _saveScreenshot(symbol, interval, buffer, publicBaseUrl) {
@@ -229,7 +232,11 @@ class AIAnalysisService {
     }
 
     try {
-      const screenshot = await this._captureService.capture(this._tradingViewUrl(symbol, interval));
+      const screenshot = await this._captureService.captureTradingView({
+        symbol,
+        interval: TV_INTERVALS[interval] || "D",
+        studies: this._studiesForSymbol(symbol),
+      });
       const { filePath, chartUrl } = await this._saveScreenshot(symbol, interval, screenshot, publicBaseUrl);
       const rawAnalysis = await this._analyzeChart(screenshot);
       const verdict = extractVerdict(rawAnalysis);
