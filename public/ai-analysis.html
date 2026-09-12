@@ -31,7 +31,7 @@
 
     <div class="aia-notice" id="aia-notice" style="display:none"></div>
 
-    <div class="aia-grid" id="aia-grid"></div>
+    <div class="aia-groups" id="aia-grid"></div>
 
     <div class="aia-log-section">
       <div class="aia-log-head">
@@ -206,6 +206,44 @@
             '<div class="aia-meta" data-role="meta"></div>' +
           '</div>' +
         '</div>'
+      );
+    }
+
+    // Presets arrive as one flat list with a category on each entry; the page
+    // shows them as three labelled bands (crypto pairs, dominance ratios,
+    // stocks/macro) so a BTC.D chart is never mistaken for a price chart.
+    // Server-declared category order wins; anything with an unknown category
+    // still gets its own band at the end rather than silently disappearing.
+    function groupPresets(presets, categories) {
+      var groups = [];
+      var byKey = {};
+      function ensureGroup(key, label, description) {
+        if (!byKey[key]) {
+          byKey[key] = { key: key, label: label || key, description: description || '', items: [] };
+          groups.push(byKey[key]);
+        }
+        return byKey[key];
+      }
+      (categories || []).forEach(function (category) {
+        ensureGroup(category.key, category.label, category.description);
+      });
+      presets.forEach(function (preset) {
+        var key = preset.category || 'other';
+        ensureGroup(key, key, '').items.push(preset);
+      });
+      return groups.filter(function (group) { return group.items.length; });
+    }
+
+    function renderGroup(group) {
+      return (
+        '<section class="aia-group" data-category="' + escapeHtml(group.key) + '">' +
+          '<div class="aia-group-head">' +
+            '<span class="aia-group-title">' + escapeHtml(group.label) + '</span>' +
+            '<span class="aia-group-count">' + group.items.length + '</span>' +
+            (group.description ? '<span class="aia-group-desc">' + escapeHtml(group.description) + '</span>' : '') +
+          '</div>' +
+          '<div class="aia-grid">' + group.items.map(renderCard).join('') + '</div>' +
+        '</section>'
       );
     }
 
@@ -486,7 +524,7 @@
         }
         availableIntervals = data.availableIntervals || ['4h'];
         var presets = data.presets || [];
-        grid.innerHTML = presets.map(renderCard).join('');
+        grid.innerHTML = groupPresets(presets, data.categories).map(renderGroup).join('');
         presets.forEach(function (preset) {
           var id = cardId(preset.symbol);
           cardState[id] = { symbol: preset.symbol, label: preset.label, interval: preset.interval, data: preset };

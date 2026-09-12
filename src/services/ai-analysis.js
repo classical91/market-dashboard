@@ -12,19 +12,23 @@ const DEFAULT_STUDIES = ["STD;MACD", "STD;RSI"];
 const INDEX_STUDIES = ["STD;MACD", "STD;RSI"];
 const NO_VOLUME_SYMBOL_PREFIXES = ["CRYPTOCAP:", "TVC:", "SP:", "CBOE:", "FX:", "OANDA:"];
 
-const { DOMINANCE_PRESETS } = require("../config/market-symbols");
+const {
+  DOMINANCE_PRESETS,
+  PRESET_CATEGORIES,
+  resolvePresetCategory,
+} = require("../config/market-symbols");
 
 const DEFAULT_PRESETS = [
-  { symbol: "BINANCE:BTCUSDT", label: "BTCUSDT", interval: "4h" },
-  { symbol: "BINANCE:ETHUSDT", label: "ETHUSDT", interval: "4h" },
-  { symbol: "BINANCE:SOLUSDT", label: "SOLUSDT", interval: "4h" },
+  { symbol: "BINANCE:BTCUSDT", label: "BTCUSDT", interval: "4h", category: "crypto" },
+  { symbol: "BINANCE:ETHUSDT", label: "ETHUSDT", interval: "4h", category: "crypto" },
+  { symbol: "BINANCE:SOLUSDT", label: "SOLUSDT", interval: "4h", category: "crypto" },
   ...DOMINANCE_PRESETS,
-  { symbol: "TVC:DXY", label: "DXY", interval: "4h" },
-  { symbol: "SP:SPX", label: "S&P 500", interval: "4h" },
-  { symbol: "OANDA:XAUUSD", label: "Gold", interval: "4h" },
-  { symbol: "TVC:US02Y", label: "US 2Y", interval: "4h" },
-  { symbol: "CBOE:VIX", label: "VIX", interval: "4h" },
-  { symbol: "FX:EURUSD", label: "EUR/USD", interval: "4h" },
+  { symbol: "TVC:DXY", label: "DXY", interval: "4h", category: "stocks" },
+  { symbol: "SP:SPX", label: "S&P 500", interval: "4h", category: "stocks" },
+  { symbol: "OANDA:XAUUSD", label: "Gold", interval: "4h", category: "stocks" },
+  { symbol: "TVC:US02Y", label: "US 2Y", interval: "4h", category: "stocks" },
+  { symbol: "CBOE:VIX", label: "VIX", interval: "4h", category: "stocks" },
+  { symbol: "FX:EURUSD", label: "EUR/USD", interval: "4h", category: "stocks" },
 ];
 
 function normalizePresets(presets) {
@@ -34,6 +38,9 @@ function normalizePresets(presets) {
       symbol: String(preset.symbol || "").trim(),
       label: String(preset.label || preset.symbol || "").trim(),
       interval: String(preset.interval || "4h").trim(),
+      // Overrides may omit the category; infer it from the symbol so a custom
+      // preset list still lands under the right heading.
+      category: resolvePresetCategory(preset.category, preset.symbol),
     }))
     .filter((preset) => preset.symbol);
   return normalized.length ? normalized : DEFAULT_PRESETS;
@@ -65,6 +72,13 @@ class AIAnalysisService {
   }
 
   /**
+   * The category headings, in display order, that the page groups cards under.
+   */
+  get categories() {
+    return PRESET_CATEGORIES;
+  }
+
+  /**
    * Labels are defined per default preset (e.g. "BINANCE:BTCUSDT" -> "BTCUSDT").
    * A symbol analyzed at a timeframe outside its default preset still deserves
    * the same friendly label, so look it up by symbol alone before falling
@@ -75,6 +89,16 @@ class AIAnalysisService {
     if (match) return match.label;
     const idx = symbol.indexOf(":");
     return idx === -1 ? symbol : symbol.slice(idx + 1);
+  }
+
+  /**
+   * Same idea as _labelForSymbol: a symbol analyzed at a non-default timeframe
+   * keeps the category its preset declared, and an off-list symbol falls back
+   * to what its exchange prefix implies.
+   */
+  _categoryForSymbol(symbol) {
+    const match = this._presets.find((p) => p.symbol === symbol);
+    return resolvePresetCategory(match && match.category, symbol);
   }
 
   isConfigured() {
@@ -184,6 +208,7 @@ class AIAnalysisService {
       symbol,
       interval,
       label: this._labelForSymbol(symbol),
+      category: this._categoryForSymbol(symbol),
     };
     const cached = this._cache.get(this._latestCacheKey(symbol, interval));
     if (!cached) return null;
@@ -211,6 +236,7 @@ class AIAnalysisService {
       symbol,
       interval,
       label: this._labelForSymbol(symbol),
+      category: this._categoryForSymbol(symbol),
     };
     const key = this._latestCacheKey(symbol, interval);
     const cached = this._cache.get(key);

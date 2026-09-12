@@ -17,6 +17,7 @@ function createAIAnalysisRouter({ aiAnalysisService, telegramService, requireAdm
     res.json({
       configured: aiAnalysisService.isConfigured(),
       presets: aiAnalysisService.peekAll(),
+      categories: aiAnalysisService.categories,
       availableIntervals: aiAnalysisService.availableIntervals,
     });
   });

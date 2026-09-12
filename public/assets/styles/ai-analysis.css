@@ -57,6 +57,58 @@
   margin-bottom: 20px;
 }
 
+/* Preset cards are banded into three categories (crypto pairs, dominance
+   ratios, stocks/macro). Each band carries its own accent colour, applied to
+   the heading rule and to the left edge of every card inside it, so the kind
+   of chart you're looking at reads before the ticker does. */
+.aia-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.aia-group {
+  --aia-group-accent: var(--blue);
+}
+.aia-group[data-category="dominance"] { --aia-group-accent: var(--purple); }
+.aia-group[data-category="stocks"]    { --aia-group-accent: var(--amber); }
+
+.aia-group-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding-left: 10px;
+  border-left: 3px solid var(--aia-group-accent);
+}
+
+.aia-group-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--aia-group-accent);
+}
+
+.aia-group-count {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--soft);
+  background: rgba(255,255,255,0.06);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+
+.aia-group-desc {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.aia-group .aia-card {
+  border-left: 3px solid var(--aia-group-accent);
+}
+
 .aia-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
