@@ -156,3 +156,45 @@ test("the template editor offers every accent the stylesheet defines", () => {
   // theme opened showing "Market" and saving repainted it.
   assert.deepEqual(templatesAdmin.ACCENTS.slice().sort(), styled);
 });
+
+test("a post card cannot grow wider than the pane it sits in", () => {
+  const css = read("public/assets/styles/x-intelligence.css");
+  const command = read("public/assets/styles/command.css");
+
+  // What broke: a grid item's automatic minimum size is its min-content
+  // width, and the widest thing on a card is the permalink — an unbroken URL
+  // with white-space: nowrap. On a phone that made the card wider than the
+  // pane, and because command.css sets overflow-x: hidden on the body the
+  // overhang was clipped rather than scrollable: every line of post text
+  // ended mid-word at the screen edge with no way to reach the rest.
+  assert.match(command, /body \{[^}]*overflow-x: hidden;/s, "the clipping this guards against");
+
+  const grid = css.match(/\.x-post-grid \{[^}]*\}/s)[0];
+  assert.match(
+    grid,
+    /minmax\(min\(260px, 100%\), 1fr\)/,
+    "the track floor must collapse below 260px rather than force the container wider",
+  );
+
+  const card = css.match(/\.x-post-card \{[^}]*\}/s)[0];
+  assert.match(card, /min-width: 0;/, "opts the card out of the min-content minimum");
+  assert.match(card, /max-width: 100%;/);
+
+  // And the two children with the widest intrinsic content stay breakable or
+  // clamped, so neither can set the card's width on its own.
+  const text = css.match(/\.x-post-text \{[^}]*\}/s)[0];
+  assert.match(text, /overflow-wrap: anywhere;/, "bare t.co links must break");
+  const image = css.match(/\.x-post-image \{[^}]*\}/s)[0];
+  assert.match(image, /max-width: 100%;/);
+});
+
+test("iOS is not left to pick its own text sizes", () => {
+  const command = read("public/assets/styles/command.css");
+
+  // Safari on iOS inflates text in narrow blocks unless the adjustment is
+  // pinned, which rendered the cards a size or two above what the layout was
+  // measured against and was what pushed them past the viewport.
+  const html = command.match(/html \{[^}]*\}/s)[0];
+  assert.match(html, /-webkit-text-size-adjust: 100%;/);
+  assert.match(html, /\btext-size-adjust: 100%;/);
+});
