@@ -1,3 +1,5 @@
+const { resolveBroadcastChannels } = require("../services/x-broadcast-channels");
+
 const DEFAULT_TRACKED_TOKENS = [
   {
     symbol: "USDC",
@@ -231,6 +233,16 @@ const config = {
     botToken: process.env.TELEGRAM_BOT_TOKEN || "",
     chatIds: parseList(process.env.TELEGRAM_CHAT_IDS),
     dashboardUrl: String(process.env.MARKET_DASHBOARD_URL || "").replace(/\/+$/, ""),
+  },
+  // Per-post broadcasting from X Intelligence. The channels the picker offers
+  // are labelled destinations; when this is unset they are derived from
+  // TELEGRAM_CHAT_IDS so an existing deploy needs no new configuration.
+  // See src/services/x-broadcast-channels.js for the accepted shape.
+  xBroadcast: {
+    channels: resolveBroadcastChannels({
+      channelsJson: process.env.X_BROADCAST_CHANNELS || "",
+      chatIds: parseList(process.env.TELEGRAM_CHAT_IDS),
+    }),
   },
   newsTelegram: {
     botToken: process.env.NEWS_TELEGRAM_BOT_TOKEN || "",

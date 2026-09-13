@@ -317,7 +317,8 @@ body[data-x-accent] .x-account-card--all.active { border-color: var(--x-accent);
 }
 
 .x-post-open,
-.x-post-copy {
+.x-post-copy,
+.x-post-broadcast {
   min-height: 30px;
   border-radius: 9px;
   border: 1px solid var(--border);
@@ -355,10 +356,122 @@ body[data-x-accent] .x-account-card--all.active { border-color: var(--x-accent);
 }
 
 .x-post-copy:focus-visible,
-.x-post-open:focus-visible {
+.x-post-open:focus-visible,
+.x-post-broadcast:focus-visible {
   outline: 2px solid var(--blue);
   outline-offset: 2px;
 }
+
+/* The primary action on a card: reads as a send, not as another link
+   affordance sitting next to Open and Copy link. */
+.x-post-broadcast {
+  cursor: pointer;
+  padding: 8px 11px;
+  border-color: rgba(46, 204, 113, 0.42);
+  background: rgba(46, 204, 113, 0.12);
+  color: var(--text);
+}
+
+.x-post-broadcast:hover:not(:disabled) {
+  border-color: var(--green, #2ECC71);
+  background: rgba(46, 204, 113, 0.2);
+}
+
+.x-post-broadcast:disabled {
+  cursor: wait;
+  color: var(--muted);
+  opacity: 0.82;
+}
+
+/* ── Broadcast picker ────────────────────────────────────────────────────
+   Uses the shared .manage-overlay / .manage-box shell from components.css;
+   only what is specific to picking channels lives here. */
+
+.x-broadcast-preview {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.x-broadcast-preview-text {
+  font-size: 13px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.x-broadcast-preview-link,
+.x-broadcast-preview-note {
+  font-size: 11px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.x-broadcast-channels {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.x-broadcast-channel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+}
+
+.x-broadcast-channel:hover { border-color: rgba(77, 163, 255, 0.42); }
+
+.x-broadcast-channel input { flex: 0 0 auto; }
+
+.x-broadcast-channel-text {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  min-width: 0;
+}
+
+.x-broadcast-channel-label {
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.x-broadcast-channel-meta {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.x-broadcast-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.x-broadcast-toggle-all {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+/* The send button carries the count, so it must be free to wrap onto its own
+   line rather than squeezing "Broadcast to 3 channels" off a narrow phone. */
+.x-broadcast-send { flex: 0 1 auto; }
 
 .x-empty {
   font-size: 13px;

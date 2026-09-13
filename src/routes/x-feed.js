@@ -2,6 +2,7 @@ const express = require("express");
 const { DATA_STATES, worstDataState, safeDataState } = require("../services/x-feed");
 const { DEFAULT_CATEGORIES } = require("../services/x-account-registry");
 const { DEFAULT_TEMPLATE_ID } = require("../services/x-template-registry");
+const { selectTargets } = require("../services/x-broadcast-channels");
 const { createServiceError } = require("../utils/errors");
 
 function asyncRoute(handler) {
@@ -107,7 +108,14 @@ function assertKnownTemplateHandles(input, accountRegistry) {
   }
 }
 
-function createXFeedRouter({ xFeedService, accountRegistry, templateRegistry, requireAdmin }) {
+function createXFeedRouter({
+  xFeedService,
+  accountRegistry,
+  templateRegistry,
+  requireAdmin,
+  telegramService = null,
+  broadcastChannels = [],
+}) {
   const router = express.Router();
 
   router.get(
@@ -328,6 +336,89 @@ function createXFeedRouter({ xFeedService, accountRegistry, templateRegistry, re
           removed,
           accounts: accountRegistry.list(),
           templates: templateRegistry.list(),
+        });
+      }),
+    );
+  }
+
+  /* ── Broadcasting a post to Telegram ──────────────────────────────────
+
+     The dashboard could already send an X post somewhere: by hand, by copying
+     the link off the card and pasting it into a room. What it could not do is
+     say *which* rooms, which is the whole reason the copy-and-paste survived.
+
+     Both endpoints are admin-gated. The channel list is not secret in the way
+     the bot token is, but it names private chat and topic ids, and
+     /api/telegram/diagnose is already guarded for exactly that reason —
+     serving the same detail unguarded here would be a way around it. */
+  if (requireAdmin) {
+    router.get(
+      "/broadcast/channels",
+      requireAdmin,
+      asyncRoute(async (req, res) => {
+        res.json({
+          // Two separate failures, reported separately: no bot to send with,
+          // and nowhere configured to send to. A picker that just says
+          // "unavailable" leaves the operator guessing which one to fix.
+          configured: Boolean(telegramService && telegramService._botToken && broadcastChannels.length),
+          botConfigured: Boolean(telegramService && telegramService._botToken),
+          channels: broadcastChannels,
+        });
+      }),
+    );
+
+    router.post(
+      "/broadcast",
+      requireAdmin,
+      asyncRoute(async (req, res) => {
+        const body = req.body || {};
+        const text = typeof body.text === "string" ? body.text.trim() : "";
+        const url = typeof body.url === "string" ? body.url.trim() : "";
+        if (!text && !url) {
+          throw createServiceError("Nothing to broadcast: the post has no text or link", 400);
+        }
+        if (url && !/^https?:\/\//i.test(url)) {
+          throw createServiceError("url must be an http(s) link", 400);
+        }
+
+        // Telegram fetches this itself, so a non-http value would either be
+        // rejected upstream or point the API at something that is not a
+        // picture. Dropped rather than refused: a post is still worth sending
+        // without its image.
+        const image = typeof body.image === "string" ? body.image.trim() : "";
+        const photoUrl = /^https?:\/\//i.test(image) ? image : "";
+
+        const selection = selectTargets(broadcastChannels, body.channels);
+        if (!selection.ok) throw createServiceError(selection.reason, 400);
+
+        if (!telegramService || !telegramService._botToken) {
+          throw createServiceError("Telegram is not configured (set TELEGRAM_BOT_TOKEN)", 400);
+        }
+
+        const result = await telegramService.postXPost(
+          { handle: body.handle, text, url, image: photoUrl },
+          { targets: selection.targets },
+        );
+
+        // Labels, not chat ids, so the page can name what it reached in the
+        // same words the picker offered.
+        const byTarget = new Map(selection.channels.map((channel) => [
+          `${channel.chatId}:${channel.threadId || ""}`,
+          channel,
+        ]));
+        res.json({
+          ok: true,
+          sent: result.posted,
+          failed: result.failed,
+          destinations: result.destinations.map((destination) => {
+            const channel = byTarget.get(`${destination.chatId}:${destination.threadId || ""}`);
+            return {
+              id: channel ? channel.id : null,
+              label: channel ? channel.label : destination.chatId,
+              status: destination.status,
+              error: destination.error,
+            };
+          }),
         });
       }),
     );
