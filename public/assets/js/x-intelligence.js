@@ -36,6 +36,25 @@
   var decideRefresh = window.XFreshness.decideRefresh;
   var computeStatus = window.XFreshness.describeStatus;
 
+  /* Every card gets a Broadcast button, wired by x-broadcast.js. Guarded on
+     the module being present so the page still renders if that script fails
+     to load — a post you cannot broadcast beats a feed that does not draw. */
+  // The argument order is deliberately flipped here: the renderer hands back
+  // (post, button), and bindBroadcastButton takes the button first to match
+  // bindCopyLinkButton next to it. Passing the function straight through is
+  // what broke the button the first time.
+  var cardOptions = window.XBroadcast
+    ? {
+      onBroadcast: function (post, button) {
+        window.XBroadcast.bindBroadcastButton(button, post);
+      },
+    }
+    : null;
+
+  function showPosts(root, posts, emptyText) {
+    renderPostCards(root, posts, emptyText, cardOptions);
+  }
+
   function dropLegacyCaches() {
     legacyFeedKeys.forEach(function (key) {
       try { localStorage.removeItem(key); } catch (err) {}
@@ -350,7 +369,7 @@
     function renderPane() {
       syncPanelLabel();
       if (!state.loaded) {
-        renderPostCards(pane, [], "Loading latest posts…");
+        showPosts(pane, [], "Loading latest posts…");
         return;
       }
       if (state.mode === ALL_MODE) {
@@ -361,7 +380,7 @@
         // count: it is what the feed actually ran against, so it stays right
         // when a membership points at an account that no longer exists.
         var unpopulated = state.transport.ok && !(state.feedData.accounts || []).length;
-        renderPostCards(
+        showPosts(
           pane,
           state.feedData.posts,
           unpopulated
@@ -376,7 +395,7 @@
       var handlePosts = state.feedData.posts.filter(function (p) { return p.handle === state.handle; });
       var failed = (state.feedData.failedFeeds || []).some(function (a) { return a.handle === state.handle; });
       var stale = (state.feedData.staleFeeds || []).filter(function (a) { return a.handle === state.handle; });
-      renderPostCards(
+      showPosts(
         pane,
         handlePosts,
         failed || !state.transport.ok
@@ -412,7 +431,7 @@
       window.XLiveReference.render(liveRoot, state.handle, meta);
       // Keep the live X timeline in the same reading flow as the freshness
       // banner: LIVE first, X's timeline second, captured post cards after it.
-      // renderPostCards clears the pane on refresh, so reinsert this node each
+      // showPosts clears the pane on refresh, so reinsert this node each
       // time instead of maintaining a separate side column.
       pane.insertBefore(liveRoot, pane.firstChild ? pane.firstChild.nextSibling : null);
     }

@@ -502,6 +502,11 @@ function createApp() {
       accountRegistry: xAccountRegistry,
       templateRegistry: xTemplateRegistry,
       requireAdmin: requireXAdmin,
+      // The general sender, not the news one: an X post broadcast goes where
+      // the operator ticked, and carries no category for news routing to act
+      // on.
+      telegramService,
+      broadcastChannels: config.xBroadcast.channels,
     }),
   );
 

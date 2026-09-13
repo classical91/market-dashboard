@@ -122,6 +122,59 @@ function groupSafeStatus(status) {
   return normalized.toUpperCase();
 }
 
+/**
+ * Escape `raw` so the result is at most `maxLength` characters.
+ *
+ * Cutting before escaping is the part that matters — slicing an already
+ * escaped string can leave a half-written "&amp;", which makes Telegram
+ * reject the whole message with "can't parse entities". But a raw cut alone
+ * does not bound the result: escaping expands, and "&" becomes five
+ * characters, so a post dense in "&", "<" and ">" can blow a fixed safety
+ * margin. So the escaped length is measured rather than estimated, and the
+ * raw budget is pulled in until it actually fits. Each pass shrinks the
+ * budget by at least one character, so it always terminates.
+ */
+function truncateEscaped(raw, maxLength) {
+  if (maxLength <= 0) return "";
+  let budget = maxLength;
+  let escaped = escapeHtml(truncate(raw, budget));
+  while (escaped.length > maxLength && budget > 0) {
+    budget = Math.min(budget - 1, Math.floor((budget * maxLength) / escaped.length));
+    escaped = escapeHtml(truncate(raw, budget));
+  }
+  return escaped;
+}
+
+/**
+ * One captured X post, as it should read in Telegram.
+ *
+ * The body is escaped rather than run through formatForTelegram(): an X post
+ * is somebody else's prose, and its "**" is two asterisks they typed, not
+ * markup we should promote to bold.
+ *
+ * `maxLength` differs by delivery — a caption on a photo has a fraction of a
+ * message's budget. The heading and the permalink are measured after escaping
+ * and subtracted from the budget, so the body is the only part that can be
+ * cut: a post is still worth reading truncated, and worth nothing at all
+ * without the link back to it.
+ */
+function formatXPost({ handle, text, url } = {}, { maxLength = MAX_MSG_LEN } = {}) {
+  const link = String(url || "").trim();
+  const footer = link ? `\n\n${escapeHtml(link)}` : "";
+  const heading = handle ? `\u{1D54F} <b>@${escapeHtml(String(handle).replace(/^@+/, ""))}</b>\n\n` : "";
+  // Ordered by what a reader loses least by losing: the body can be cut, the
+  // heading dropped, and only a budget too small for the permalink itself —
+  // which no real Telegram limit is — forces a blind slice.
+  const header = heading.length + footer.length <= maxLength ? heading : "";
+  const body = truncateEscaped(String(text || "").trim(), Math.max(0, maxLength - header.length - footer.length));
+  const message = (header + body + footer).trim();
+  // Only reachable if the permalink alone outruns the budget, which no real
+  // Telegram limit does. Blind-slicing there would cut an escaped entity in
+  // half and get the message rejected, so it reports "nothing to send"
+  // instead and the caller refuses it outright.
+  return message.length <= maxLength ? message : "";
+}
+
 function dashboardLink(baseUrl, path) {
   if (!baseUrl) return null;
   return `${String(baseUrl).replace(/\/+$/, "")}${path}?view=alpha`;
@@ -251,7 +304,13 @@ class TelegramService {
         threadId: target.threadId ? String(target.threadId) : null,
       };
       try {
-        const response = await this._send(target, text, options);
+        // A post with a picture goes as a photo with the message as its
+        // caption, so the card the reader sees in Telegram is the card they
+        // saw on the dashboard. Both calls answer with the same
+        // {result:{message_id}} shape, so the receipt below is unaffected.
+        const response = options && options.photoUrl
+          ? await this._sendPhoto(target, options.photoUrl, text)
+          : await this._send(target, text, options);
         results.push({
           ...base,
           status: "posted",
@@ -339,6 +398,43 @@ class TelegramService {
     const body = String(text || "").trim();
     if (!body) throw createServiceError("Nothing to send: text is empty", 400);
     return this._postPreformatted(parseMode === "HTML" ? formatForTelegram(body) : body, { parseMode, targets });
+  }
+
+  /**
+   * Broadcast one captured X post to an explicit list of destinations.
+   *
+   * Unlike every other sender here, the targets are the point: they are the
+   * channels a reader ticked for this post, so they are never widened to the
+   * configured chat list. An empty selection is refused rather than quietly
+   * treated as "all", which is the one mistake this path must not make.
+   *
+   * `configured` is not the gate either — it requires TELEGRAM_CHAT_IDS, and a
+   * deploy can legitimately configure X_BROADCAST_CHANNELS alone. A bot token
+   * and somewhere to send it are the real requirements.
+   */
+  async postXPost(post, { targets = null } = {}) {
+    if (!this._botToken) throw createServiceError("Telegram bot token is not configured", 400);
+    const destinations = (targets || []).map(normalizeTarget).filter((target) => target && target.chatId);
+    if (!destinations.length) throw createServiceError("Select at least one channel to broadcast to", 400);
+
+    const photoUrl = String((post && post.image) || "").trim() || null;
+    const message = formatXPost(post, { maxLength: photoUrl ? MAX_CAPTION_LEN : MAX_MSG_LEN });
+    if (!message) throw createServiceError("Nothing to send: the post has no text or link", 400);
+
+    const results = await this._sendToAllSettled(message, { parseMode: "HTML", photoUrl }, destinations);
+    const posted = results.filter((result) => result.status === "posted").length;
+
+    // Same contract as _postPreformatted: nothing landing anywhere is an
+    // error, a partial delivery is a result the caller reports per channel.
+    if (posted === 0) {
+      const error = createServiceError(
+        `Telegram send failed for all ${results.length} destination(s): ${results[0].error || "unknown error"}`,
+        502,
+      );
+      error.destinations = results;
+      throw error;
+    }
+    return { destinations: results, posted, failed: results.length - posted };
   }
 
   /**
@@ -549,4 +645,4 @@ class TelegramService {
   }
 }
 
-module.exports = { TelegramService, AI_ANALYSIS_TELEGRAM_WORD_LIMIT, countWords };
+module.exports = { TelegramService, AI_ANALYSIS_TELEGRAM_WORD_LIMIT, countWords, formatXPost };

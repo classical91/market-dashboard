@@ -471,7 +471,12 @@
     }, 1800);
   }
 
-  function renderPostCards(root, posts, emptyText) {
+  /* `options.onBroadcast(post, button)` adds a Broadcast action to every card.
+     Optional, and injected rather than imported, so this renderer keeps
+     knowing nothing about Telegram — and a page that has no business
+     broadcasting simply does not pass it. */
+  function renderPostCards(root, posts, emptyText, options) {
+    var onBroadcast = options && typeof options.onBroadcast === "function" ? options.onBroadcast : null;
     root.innerHTML = "";
     root.classList.toggle("is-empty", !posts.length);
     var grid = document.createElement("div");
@@ -537,6 +542,19 @@
 
       actions.appendChild(openLink);
       actions.appendChild(copyButton);
+
+      // Last, so the primary action sits at the end of a row that is
+      // right-aligned — and after Copy link, which is what it replaces for
+      // anyone who was pasting posts into Telegram by hand.
+      if (onBroadcast) {
+        var broadcastButton = document.createElement("button");
+        broadcastButton.type = "button";
+        broadcastButton.className = "x-post-broadcast";
+        broadcastButton.textContent = "Broadcast";
+        broadcastButton.title = "Send this post to selected Telegram channels";
+        onBroadcast(post, broadcastButton);
+        actions.appendChild(broadcastButton);
+      }
       card.appendChild(actions);
       grid.appendChild(card);
     });

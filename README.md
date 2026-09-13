@@ -25,6 +25,7 @@ The app is intentionally lightweight: no bundler, no frontend framework, and no 
 - `/decision.html` - Decision Engine: multi-asset regime score (BTC, breadth, SPY, QQQ, DXY, VIX, gold, oil, optional US10Y), asset-class rotation board, setup-quality ranking layered over the signal screener, execution levels (trigger / invalidation / target / R:R with explicit "do not trade" reasons), and a trading journal that grades whether the engine's calls were right.
 - `/trading-lab.html` - Trading Lab: paper execution with real TP1/TP2 scale-outs, ATR risk sizing, kill switches, a historical edge gate that scores every Decision Engine plan against how setups like it have actually performed, and bar-replay backtesting over the same engine. See [docs/trading-lab.md](docs/trading-lab.md).
 - `/youtube-v2.html` - YouTube Intelligence: live streams, scheduled streams, and latest uploads from tracked channels.
+- `/x-intelligence.html` - X Intelligence: curated X feeds per theme, with a per-post **Broadcast** button that sends the post (and its picture) to chosen Telegram channels. See [X Intelligence broadcasting](#x-intelligence-broadcasting).
 - `/indicators.html` - Trading and market glossary.
 - `/reporter.html` - Daily report generation workflow.
 - `/api/newsroom` - newsroom cycle records and health for the scheduled reporting run: one durable cycle per run, linking generated sections to broadcast receipts and Telegram message ids. See [docs/newsroom-cycles.md](docs/newsroom-cycles.md).
@@ -292,6 +293,31 @@ YOUTUBE_API_KEY=... node scripts/resolve-youtube-channels.js
 It prints both a `src/config/youtube-channels.js` snippet and a ready-to-paste `YOUTUBE_CHANNEL_IDS` value.
 
 See `.env.example` for the full list.
+
+### X Intelligence broadcasting
+
+Each post card on `/x-intelligence.html` carries a **Broadcast** button. It opens a picker of Telegram channels, sends the post — heading, text, permalink, and its picture as a photo caption when it has one — to exactly the ones ticked, and reports per channel what landed.
+
+The channels are ticked rather than assumed, which is the one difference from the farm bot's equivalent button. This dashboard's rooms are not interchangeable: the finance desk and the war room should not both receive every post.
+
+- `X_BROADCAST_CHANNELS` - optional JSON array of labelled destinations:
+
+  ```
+  X_BROADCAST_CHANNELS=[{"label":"Market Desk","chatId":"-1001841650798","threadId":"6297"},{"label":"War Room","chatId":"-1001841650798","threadId":"75972"}]
+  ```
+
+  `threadId` targets a forum topic and is optional. When this is unset the picker falls back to `TELEGRAM_CHAT_IDS`, so an existing deploy gets a working button with no new configuration — the labels are just the raw ids until someone names them.
+
+- `TELEGRAM_BOT_TOKEN` is what actually sends. `TELEGRAM_CHAT_IDS` is *not* required when `X_BROADCAST_CHANNELS` is set.
+
+Both endpoints (`GET /api/x/broadcast/channels`, `POST /api/x/broadcast`) are admin-gated, for the same reason `/api/telegram/diagnose` is: the channel list names private chat and topic ids.
+
+Two behaviours are worth knowing before relying on it:
+
+- **A channel id names a destination, not a position or a label.** The browser remembers the last ticked channels, so relabelling "Market Desk" or reordering the list keeps each tick pointed at the same room.
+- **A request naming a channel the server does not offer sends nothing at all**, rather than delivering to the rest. Reaching two rooms out of three silently is the failure this feature exists to prevent. A genuine partial delivery — Telegram accepting one and rejecting another — is reported per channel instead, with the failed one named.
+
+Sends are not written to the Broadcast Ledger: it is built around news categories, per-category duplicate windows and receipts, and an X post carries none of those. The card remembers which posts this browser has already broadcast and marks them, but that is a convenience, not a guard — a deliberate resend into a second channel is a real thing to want, so the server does not refuse repeats.
 
 ### Railway Deployment
 
