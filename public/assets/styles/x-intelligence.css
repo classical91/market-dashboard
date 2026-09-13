@@ -231,9 +231,14 @@ body[data-x-accent] .x-account-card--all.active { border-color: var(--x-accent);
   margin: 0;
 }
 
+/* min() on the track floor, min-width on the card: a grid item's automatic
+   minimum is its min-content width, which here is the permalink's unbroken
+   URL. Left to itself that made the card wider than the pane on a phone —
+   and since body sets overflow-x: hidden, the overhang was cut off rather
+   than scrollable, so post text ended mid-word at the screen edge. */
 .x-post-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
   gap: 10px;
   margin-bottom: 8px;
 }
@@ -242,6 +247,8 @@ body[data-x-accent] .x-account-card--all.active { border-color: var(--x-accent);
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-width: 0;
+  max-width: 100%;
   background:
     linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015)),
     var(--surface);
@@ -260,10 +267,13 @@ body[data-x-accent] .x-account-card--all.active { border-color: var(--x-accent);
 .x-post-meta {
   font-size: 11px;
   color: var(--dim);
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .x-post-image {
   width: 100%;
+  max-width: 100%;
   max-height: 220px;
   object-fit: cover;
   border-radius: 10px;
@@ -285,6 +295,10 @@ body[data-x-accent] .x-account-card--all.active { border-color: var(--x-accent);
   font-size: 13px;
   color: var(--text);
   line-height: 1.5;
+  min-width: 0;
+  /* Tweets carry bare t.co links and unspaced tickers; breaking them keeps a
+     single token from setting the card's width. */
+  overflow-wrap: anywhere;
   overflow: hidden;
   text-overflow: ellipsis;
   display: -webkit-box;
@@ -296,6 +310,7 @@ body[data-x-accent] .x-account-card--all.active { border-color: var(--x-accent);
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: auto;
   padding-top: 2px;
@@ -669,6 +684,8 @@ body[data-x-accent] .x-account-card--all.active { border-color: var(--x-accent);
 .x-post-link {
   display: block;
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   padding: 0;
   overflow: hidden;
   white-space: nowrap;

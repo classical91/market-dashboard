@@ -36,6 +36,16 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* iOS Safari inflates the text of narrow blocks on its own unless the
+   adjustment is pinned, so a 13px card rendered at 16-17px on an iPhone and
+   nothing below it fitted the width it was laid out for. Everything here is
+   sized for the viewport already; opting out keeps the phone showing the
+   sizes the layout was measured against. */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   min-height: 100vh;
   max-width: none;
