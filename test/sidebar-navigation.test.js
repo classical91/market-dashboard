@@ -11,11 +11,10 @@ test("primary sidebar order and removed links stay exact", () => {
   const labels = [
     "Terminal Suite",
     "Overview",
-    "Presets",
+    "AI Analysis",
     "Reporter",
     "Market Intel Links",
     "YouTube",
-    "AI Portal",
     "𝕏",
     "Open WorldMonitor.com",
     "Open TradingView.com",
@@ -26,13 +25,13 @@ test("primary sidebar order and removed links stay exact", () => {
     assert.ok(next > cursor, `${label} is missing or out of order`);
     cursor = next;
   }
-  for (const obsolete of ["Open ImageQueue", "AI Market Trader", "Image Converter", "AI Apps"]) {
+  for (const obsolete of ["Open ImageQueue", "AI Market Trader", "Image Converter", "AI Apps", "AI Portal"]) {
     assert.doesNotMatch(sidebar, new RegExp(obsolete), `${obsolete} should not remain in navigation`);
   }
 });
 
-test("Presets excludes tools that moved to the bottom section", () => {
-  const start = sidebar.indexOf('label: "Presets"');
+test("AI Analysis excludes tools that moved to the bottom section", () => {
+  const start = sidebar.indexOf('label: "AI Analysis"');
   const end = sidebar.indexOf('label: "Reporter"', start);
   const menu = sidebar.slice(start, end);
   assert.doesNotMatch(menu, /Decision Engine|Backtest Lab/);
