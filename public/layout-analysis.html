@@ -31,6 +31,24 @@
     </div>
     <p class="aia-mode-help"><strong>My Layouts</strong> captures your saved TradingView layout—including its indicators and drawings—then generates a TA read.</p>
 
+    <details class="aia-how" id="aia-how">
+      <summary>&#8505;&#65039; How this page works</summary>
+      <div class="aia-how-body">
+        <ol class="aia-how-steps">
+          <li><strong>Pick a layout.</strong> The Layout dropdown lists the shared TradingView links configured in <code>AI_ANALYSIS_LAYOUTS</code> &mdash; charts saved in your own account.</li>
+          <li><strong>Capture &amp; Analyze.</strong> A headless browser opens that layout exactly as you saved it &mdash; your indicators, drawings, and timeframe &mdash; waits for the chart to finish painting, and screenshots the chart pane.</li>
+          <li><strong>Read.</strong> The screenshot goes to an OpenAI vision model, which answers in short bullets (Trend, Levels, Momentum, Risk, Final call) and ends on BUY, SELL, or HOLD. That last word becomes the coloured verdict chip.</li>
+          <li><strong>Broadcast.</strong> Optional &mdash; pushes the chart image and the read to your Telegram groups. A capture can only be sent once; capture again to re-arm the button.</li>
+        </ol>
+        <ul class="aia-how-notes">
+          <li>Difference from <strong>Presets</strong>: Presets builds a standard chart (Volume, MACD, RSI) for a symbol you choose, while My Layouts reads your own chart, drawings and all.</li>
+          <li>Opening this page costs nothing: it only replays the last saved capture per layout. Only Capture &amp; Analyze calls the model, and re-running it within 30 minutes reuses the cached result.</li>
+          <li>A green &#10003; badge means the layout was captured today; grey means an older day. If OpenAI rate-limits a request, the card shows &#8987; and keeps the previous read for about five minutes before retrying.</li>
+          <li>Capture &amp; Analyze and Broadcast ask for the admin key. Each verdict is a model's read of a single chart image &mdash; a prompt to look closer, not financial advice.</li>
+        </ul>
+      </div>
+    </details>
+
     <div class="aia-notice" id="aia-notice" style="display:none"></div>
 
     <div class="aia-grid" id="aia-grid"></div>
@@ -53,6 +71,15 @@
   (function () {
     document.getElementById('aia-mode-select').addEventListener('change', function (e) {
       window.location.href = e.target.value;
+    });
+
+    // Open on a first visit, then however it was last left. Shares its key
+    // with the Presets page: same feature, explained twice.
+    var howEl = document.getElementById('aia-how');
+    var HOW_KEY = 'aia_how_open';
+    try { howEl.open = localStorage.getItem(HOW_KEY) !== 'closed'; } catch { howEl.open = true; }
+    howEl.addEventListener('toggle', function () {
+      try { localStorage.setItem(HOW_KEY, howEl.open ? 'open' : 'closed'); } catch {}
     });
 
     var grid = document.getElementById('aia-grid');
