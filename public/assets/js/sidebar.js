@@ -45,7 +45,7 @@
       ],
     },
     {
-      label: "Presets",
+      label: "AI Analysis",
       children: [
         { href: "/ai-analysis.html", label: "Presets" },
         { href: "/layout-analysis.html", label: "My Layouts" },
@@ -133,10 +133,6 @@
           label: "YouTube Summarizer",
         },
       ],
-    },
-    {
-      href: "https://main-page-production-9927.up.railway.app/ai.html",
-      label: "AI Portal",
     },
     {
       label: "𝕏",
