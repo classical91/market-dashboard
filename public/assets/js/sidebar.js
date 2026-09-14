@@ -124,7 +124,8 @@
       ],
     },
     {
-      label: "YouTube",
+      label: "YouTube Intelligence",
+      featured: "youtube",
       children: [
         { href: "/youtube-v2.html", label: "YouTube Intelligence" },
         { href: "https://www.youtube.com/", label: "YouTube.com" },
@@ -135,19 +136,22 @@
       ],
     },
     {
-      label: "𝕏",
+      label: "X Intelligence",
+      featured: "x",
       children: [
         { href: "https://x.com/", label: "Open X.com" },
         { href: "/x-intelligence.html", label: "X Intelligence" },
         { href: "/x-search.html", label: "Search X" },
       ],
     },
+  ];
+
+  var other = [
     {
       href: "https://www.worldmonitor.app/dashboard?lat=168.3787&lon=-46.4780&zoom=2.50&view=america&timeRange=48h&layers=conflicts%2Chotspots%2Csanctions%2Cweather%2Coutages%2Cnatural%2CiranAttacks",
       label: "Open WorldMonitor.com",
-      featured: "worldmonitor",
     },
-    { href: "https://www.tradingview.com/", label: "Open TradingView.com", featured: "tradingview" },
+    { href: "https://www.tradingview.com/", label: "Open TradingView.com" },
   ];
 
   var tools = [
@@ -298,6 +302,9 @@
     var id = prefix + "apps-menu-" + instance;
     var storageKey = dropdownKey(item, mode);
     var active = item.children.some(hasActiveDescendant);
+    var featuredClass = item.featured
+      ? " " + prefix + "nav-item--featured " + prefix + "nav-item--" + item.featured
+      : "";
     var storedState = getStoredDropdownState(storageKey);
     var open = storedState ? storedState === "open" : active;
     var children = item.children.map(function (child, index) {
@@ -308,7 +315,7 @@
 
     return (
       '<div class="' + prefix + 'nav-dropdown' + (nested ? " " + prefix + "nav-subdropdown" : "") + (open ? " open" : "") + '" data-dropdown-key="' + storageKey + '">' +
-      '<button class="' + prefix + 'nav-item ' + (nested ? prefix + "nav-subitem " : "") + prefix + 'nav-dropdown-toggle' + (active ? " active" : "") +
+      '<button class="' + prefix + 'nav-item ' + (nested ? prefix + "nav-subitem " : "") + prefix + 'nav-dropdown-toggle' + featuredClass + (active ? " active" : "") +
       '" type="button" aria-expanded="' + (open ? "true" : "false") + '" aria-controls="' + id + '">' +
       '<span class="' + prefix + 'nav-text">' + item.label + '</span>' +
       '<span class="' + prefix + 'nav-caret" aria-hidden="true">&#9656;</span></button>' +
@@ -321,6 +328,9 @@
     var workspaceHtml = workspace.map(function (item, index) {
       return item.children ? dropdown(item, mode, instance + "-" + index) : navItem(item, mode);
     }).join("");
+    var otherHtml = other.map(function (item, index) {
+      return item.children ? dropdown(item, mode, instance + "-other-" + index) : navItem(item, mode);
+    }).join("");
     var toolsHtml = tools.map(function (item, index) {
       return item.children ? dropdown(item, mode, instance + "-tools-" + index) : navItem(item, mode);
     }).join("");
@@ -330,6 +340,7 @@
       '<div class="' + prefix + 'brand-text"><h1>Market Command</h1><span>Live dashboard system</span></div></a>' +
       accountHtml(mode) + '<div class="' + prefix + 'account-divider"></div>' +
       '<nav class="' + prefix + 'nav-primary" aria-label="Market Command">' + workspaceHtml + '</nav>' +
+      '<nav class="' + prefix + 'nav-other" aria-label="Other"><div class="' + prefix + 'nav-label">Other</div>' + otherHtml + '</nav>' +
       '<nav class="' + prefix + 'nav-tools" aria-label="Trading and tools"><div class="' + prefix + 'nav-label">Trading &amp; Tools</div>' + toolsHtml + '</nav>'
     );
   }
