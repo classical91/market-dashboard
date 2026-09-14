@@ -14,10 +14,8 @@ test("primary sidebar order and removed links stay exact", () => {
     "AI Analysis",
     "Reporter",
     "Market Intel Links",
-    "YouTube",
-    "𝕏",
-    "Open WorldMonitor.com",
-    "Open TradingView.com",
+    "YouTube Intelligence",
+    "X Intelligence",
   ];
   let cursor = sidebar.indexOf("var workspace");
   for (const label of labels) {
@@ -35,6 +33,28 @@ test("AI Analysis excludes tools that moved to the bottom section", () => {
   const end = sidebar.indexOf('label: "Reporter"', start);
   const menu = sidebar.slice(start, end);
   assert.doesNotMatch(menu, /Decision Engine|Backtest Lab/);
+});
+
+test("Other section holds the external sites above Trading and tools", () => {
+  const start = sidebar.indexOf("var other");
+  const end = sidebar.indexOf("var tools", start);
+  assert.ok(start > sidebar.indexOf("var workspace"), "Other must come after the primary nav");
+  assert.ok(end > start, "Trading & Tools must come after Other");
+  const menu = sidebar.slice(start, end);
+  for (const label of ["Open WorldMonitor.com", "Open TradingView.com"]) {
+    assert.match(menu, new RegExp(`label: "${label}"`), `${label} belongs in the Other section`);
+  }
+  assert.doesNotMatch(menu, /featured/, "Other links are no longer colour-featured");
+  assert.match(sidebar, /'nav-other" aria-label="Other"/);
+});
+
+test("the intelligence menus are the colour-featured tabs", () => {
+  for (const [label, featured] of [["YouTube Intelligence", "youtube"], ["X Intelligence", "x"]]) {
+    const start = sidebar.indexOf(`label: "${label}"`);
+    assert.ok(start > 0, `${label} is missing`);
+    assert.match(sidebar.slice(start, start + 120), new RegExp(`featured: "${featured}"`));
+  }
+  assert.doesNotMatch(sidebar, /featured: "(worldmonitor|tradingview)"/);
 });
 
 test("Trading and tools section has one copy of every item in the requested order", () => {
