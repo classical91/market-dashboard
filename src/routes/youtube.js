@@ -3,6 +3,7 @@ const express = require("express");
 const { resolveYoutubeChannels } = require("../config/youtube-channels");
 const { resolveYoutubeThemes } = require("../config/youtube-themes");
 const { UNCATEGORIZED_ID } = require("../services/youtube-channel-registry");
+const { narrowLiveFeed } = require("../services/youtube-live-feed");
 
 function asyncRoute(handler) {
   return (req, res, next) => {
@@ -33,6 +34,31 @@ function createYoutubeRouter({ youtubeService, channelRegistry, channelIdOverrid
       : channels.filter((channel) => channel.categoryId === selected);
     return resolveYoutubeChannels(channelIdOverrides, filtered);
   }
+
+  // The Live Now widget on Main Hub's Media page.
+  //
+  // Same ingestion as /channels — one `getIntelligence` call over every tracked
+  // channel, sharing the same caches, so this costs no extra YouTube quota. The
+  // difference is entirely in what comes back: /channels serves the whole feed
+  // to a page that renders the whole feed, and this serves the live and
+  // upcoming subsets to a widget that renders a player. See
+  // services/youtube-live-feed.js for what is dropped and why.
+  //
+  // Read-only and unauthenticated by design, which is why it is narrowed
+  // upstream of the response rather than in the page: site-auth exempts this
+  // exact path (isPublicYoutubeLiveRequest), so whatever this returns is
+  // public. It returns which public YouTube streams are live right now — a fact
+  // youtube.com will tell anyone who asks.
+  router.get(
+    "/live",
+    asyncRoute(async (req, res) => {
+      const payload = await youtubeService.getIntelligence(feedChannels("all"));
+      // Two minutes is the live-state TTL the service already keeps, so a
+      // shorter cache here would only serve the same answer twice.
+      res.set("Cache-Control", "public, max-age=60");
+      res.json(narrowLiveFeed(payload));
+    }),
+  );
 
   router.get(
     "/channels",

@@ -97,3 +97,30 @@ IDs, and assigning each valid channel to the corresponding ID. Custom categories
 including a category named `Test`, are treated as ordinary user data. The migrated
 version 2 document is written on the next registry mutation, preserving existing
 channels and their timestamps.
+
+## The Live Now feed
+
+`GET /api/youtube/live` serves Main Hub's Media page the live and upcoming
+subsets of the same ingestion `/api/youtube/channels` uses. It makes no
+additional YouTube call: both routes go through one `getIntelligence` pass over
+the tracked channels and share its caches, so the widget costs no extra quota.
+
+The response is narrowed in `src/services/youtube-live-feed.js` rather than
+spread from the feed payload. Each field is named there on purpose, so a field
+added to the feed cannot start travelling to another origin by accident. Video
+IDs, titles, channel names, thumbnails, start times and viewer counts go; the
+API key, per-channel failure reasons, quota state and the wider video feed stay.
+
+`meta.liveDetection` travels because the widget's empty state depends on it:
+`api` means we checked and nothing is live, `degraded` means the status lookup
+failed so an empty list proves nothing, and `unavailable` means there is no API
+key and live state was never knowable. A widget that cannot tell those apart
+will confidently claim an empty sky.
+
+The route is exempt from site auth via `isPublicYoutubeLiveRequest` in
+`src/middleware/site-auth.js`, scoped exactly as the `/api/market-session` and
+`/api/decision` bypasses are: GET and HEAD only, that one path, nothing beneath
+it. Main Hub reads it from its Node process with no browser session to present;
+the alternative was Main Hub holding this site's password to read which public
+YouTube streams are live. `/api/youtube/channels` and every channel and category
+mutation stay behind the session cookie and `ADMIN_API_KEY`.
