@@ -152,6 +152,29 @@ function isPublicMarketSessionRequest(req) {
   return req.path === "/api/market-session" || req.path === "/api/market-session/";
 }
 
+// GET /api/youtube/live is the Live Now widget on Main Hub's Media page: which
+// of the tracked channels are streaming right now, and what is scheduled next.
+//
+// Main Hub reads it server-to-server from its own Node process, with no browser
+// session to present, so site auth would answer `401 Login required` before the
+// YouTube router ever ran — the same caller shape isPublicMarketSessionRequest
+// above exists for, and the same reasoning applies: the alternative was Main
+// Hub holding this site's password to read which public YouTube streams are
+// live, which youtube.com will tell anyone who asks.
+//
+// What travels is narrowed in services/youtube-live-feed.js before it reaches
+// the response: video IDs, titles, channel names, thumbnails, start times and
+// viewer counts. No API key, no per-channel failure reasons, no quota state,
+// and nothing about this server's own configuration.
+//
+// Scoped exactly as the two bypasses above are: read methods only, this one
+// path, nothing beneath it. /api/youtube/channels and every channel and
+// category mutation stay behind the session cookie and ADMIN_API_KEY.
+function isPublicYoutubeLiveRequest(req) {
+  if (req.method !== "GET" && req.method !== "HEAD") return false;
+  return req.path === "/api/youtube/live" || req.path === "/api/youtube/live/";
+}
+
 function isPublicAuthPath(req) {
   return req.path === "/login"
     || req.path === "/auth/login"
@@ -310,6 +333,7 @@ function createSiteAuth(config) {
         || isPublicAuthPath(req)
         || isPublicDecisionRequest(req)
         || isPublicMarketSessionRequest(req)
+        || isPublicYoutubeLiveRequest(req)
       ) {
         next();
         return;
@@ -375,6 +399,7 @@ function createSiteAuth(config) {
 module.exports = {
   createSiteAuth,
   isPublicMarketSessionRequest,
+  isPublicYoutubeLiveRequest,
   parseCookies,
   decodeSession,
   encodeSession,
