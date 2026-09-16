@@ -45,14 +45,24 @@
       ],
     },
     {
-      label: "AI Analysis",
+      label: "TradeHunter",
       children: [
-        { href: "/ai-analysis.html", label: "Presets" },
-        { href: "/layout-analysis.html", label: "My Layouts" },
         { href: "/pattern-scanner.html", label: "Pattern Scanner" },
         { href: "/pattern-scanner-trades.html", label: "My Trades" },
         { href: "/pattern-scanner-stats.html", label: "Track Record" },
         { href: "/signal-screener.html", label: "Signal Screener" },
+        {
+          href: "https://trading-strategy-production-1b41.up.railway.app/",
+          label: "Decision Engine",
+        },
+      ],
+    },
+    {
+      label: "AI Analysis",
+      children: [
+        { href: "/ai-analysis.html", label: "Presets" },
+        { href: "/layout-analysis.html", label: "My Layouts" },
+        { href: "/trading-lab.html", label: "Trading Lab Backtest" },
         { href: "/signal-diagnostics.html", label: "Signal Diagnostics" },
       ],
     },
@@ -151,7 +161,6 @@
       href: "https://www.worldmonitor.app/dashboard?lat=168.3787&lon=-46.4780&zoom=2.50&view=america&timeRange=48h&layers=conflicts%2Chotspots%2Csanctions%2Cweather%2Coutages%2Cnatural%2CiranAttacks",
       label: "Open WorldMonitor.com",
     },
-    { href: "https://www.tradingview.com/", label: "Open TradingView.com" },
   ];
 
   var tools = [
@@ -159,15 +168,10 @@
       href: "https://t.me/tesr56788",
       label: "Trader Lab Telegram",
     },
-    { href: "/trading-lab.html", label: "Trading Lab Backtest" },
     {
       href: "https://market-dashboard-production-b2f4.up.railway.app/bot-commands.html",
       label: "Bot Commands",
       newTab: false,
-    },
-    {
-      href: "https://trading-strategy-production-1b41.up.railway.app/",
-      label: "Decision Engine",
     },
     { href: "/indicators.html", label: "Indicators Glossary" },
     { href: "/settings.html", label: "Settings" },

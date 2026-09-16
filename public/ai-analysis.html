@@ -29,24 +29,6 @@
     </div>
     <p class="aia-mode-help"><strong>Presets</strong> builds a standard chart for the selected market and timeframe with Volume, MACD, and RSI.</p>
 
-    <details class="aia-how" id="aia-how">
-      <summary>&#8505;&#65039; How this page works</summary>
-      <div class="aia-how-body">
-        <ol class="aia-how-steps">
-          <li><strong>Pick a card and timeframe.</strong> Every card is one TradingView symbol, banded into crypto pairs, dominance ratios, and stocks/macro. The dropdown on the card sets its timeframe (15m through 1M).</li>
-          <li><strong>Analyze.</strong> The server renders that symbol as a standard dark TradingView chart &mdash; candles plus Volume, MACD, and RSI &mdash; in a headless browser and screenshots it.</li>
-          <li><strong>Read.</strong> The screenshot goes to an OpenAI vision model, which answers in short bullets (Trend, Levels, Momentum, Risk, Final call) and ends on BUY, SELL, or HOLD. That last word becomes the coloured verdict chip.</li>
-          <li><strong>Broadcast.</strong> Optional &mdash; pushes the chart image and the read to your Telegram groups. A generation can only be sent once; run Analyze again to re-arm the button.</li>
-        </ol>
-        <ul class="aia-how-notes">
-          <li>Opening this page costs nothing: it only replays the last saved result per symbol and timeframe. Only Analyze calls the model, and re-running it within 30 minutes reuses the cached result.</li>
-          <li>A green &#10003; badge means the read was generated today; grey means an older day. If OpenAI rate-limits a request, the card shows &#8987; and keeps the previous read for about five minutes before retrying.</li>
-          <li>Analyze and Broadcast ask for the admin key. Everything else on the page is read-only.</li>
-          <li>Each verdict is a model's read of a single chart image &mdash; a prompt to look closer, not financial advice.</li>
-        </ul>
-      </div>
-    </details>
-
     <div class="aia-notice" id="aia-notice" style="display:none"></div>
 
     <div class="aia-groups" id="aia-grid"></div>
@@ -58,6 +40,25 @@
       </div>
       <div class="aia-log" id="aia-log"></div>
     </div>
+
+    <details class="aia-how aia-how--footer" id="aia-how">
+      <summary>&#8505;&#65039; How this page works</summary>
+      <div class="aia-how-body">
+        <ol class="aia-how-steps">
+          <li><strong>Pick a card and timeframe.</strong> Every card is one TradingView symbol, banded into crypto pairs, dominance ratios, and stocks/macro. The dropdown on the card sets its timeframe (15m through 1M).</li>
+          <li><strong>Analyze.</strong> The server renders that symbol as a standard dark TradingView chart &mdash; candles plus Volume, MACD, and RSI &mdash; in a headless browser and screenshots it.</li>
+          <li><strong>Read.</strong> The screenshot goes to an OpenAI vision model, which answers in short bullets (Trend, Levels, Momentum, Risk, Final call) and ends on BUY, SELL, or HOLD. That last word becomes the coloured verdict chip.</li>
+          <li><strong>Broadcast.</strong> Optional &mdash; pushes the chart image and the read to your Telegram groups. A generation can only be sent once; run Analyze again to re-arm the button.</li>
+        </ol>
+        <ul class="aia-how-notes">
+          <li><strong>AI use: Yes.</strong> Analyze sends the rendered chart screenshot to an OpenAI vision model for the written read and verdict.</li>
+          <li>Opening this page costs nothing: it only replays the last saved result per symbol and timeframe. Only Analyze calls the model, and re-running it within 30 minutes reuses the cached result.</li>
+          <li>A green &#10003; badge means the read was generated today; grey means an older day. If OpenAI rate-limits a request, the card shows &#8987; and keeps the previous read for about five minutes before retrying.</li>
+          <li>Analyze and Broadcast ask for the admin key. Everything else on the page is read-only.</li>
+          <li>Each verdict is a model's read of a single chart image &mdash; a prompt to look closer, not financial advice.</li>
+        </ul>
+      </div>
+    </details>
 
     <footer>AI Analysis &mdash; <a href="/">Overview</a> &mdash; <a href="/crypto.html">Crypto Hub</a></footer>
 
