@@ -24,12 +24,6 @@
 
     <div class="aia-notice" id="tl-notice" style="display:none"></div>
 
-    <div class="tl-concepts">
-      <div><strong>Strategy account</strong> — the isolated performance of one strategy, with its own balance and history.</div>
-      <div><strong>Live demo research</strong> — continuous simulated evidence collection. It does not promote a strategy or make it scanner-eligible.</div>
-      <div><strong>Backtest</strong> — a historical replay. It runs on a disposable ledger and never changes a persistent balance.</div>
-    </div>
-
     <div class="de-card">
       <div class="de-card-title">Strategy Paper Accounts</div>
       <div class="de-card-note">Every candle strategy is a first-class demo trader: one $10,000 account each, watching the same top-20 market universe on 1h, executing its own signals. Research status and demo trading state are separate fields &mdash; a backtest-status strategy trades its demo account on equal terms and still gains no scanner or real-money eligibility from it. Each account shows what its runner has actually done, so an empty account can be read as &ldquo;the strategy found no setup&rdquo; rather than mistaken for a dead loop.</div>
@@ -175,6 +169,20 @@
         </table>
       </div>
     </div>
+
+    <details class="aia-how aia-how--footer" open>
+      <summary>&#8505;&#65039; How this page works</summary>
+      <div class="aia-how-body">
+        <ol class="aia-how-steps">
+          <li><strong>Choose a strategy account.</strong> Each strategy has an isolated $10,000 demo balance, positions, activity, and closed-trade history.</li>
+          <li><strong>Review its evidence.</strong> Market environment, regime results, metrics, and account activity show how the strategy is behaving in forward simulation.</li>
+          <li><strong>Run a backtest or comparison.</strong> Historical replays use disposable ledgers, so they never change demo balances or live-scanner eligibility.</li>
+        </ol>
+        <ul class="aia-how-notes">
+          <li><strong>AI use: No.</strong> Strategy signals, account metrics, regime tables, and backtests are produced by deterministic rules and calculations.</li>
+        </ul>
+      </div>
+    </details>
 
     <footer>Trading Lab &mdash; <a href="/decision.html">Decision Engine</a> &mdash; <a href="/signal-screener.html">Signal Screener</a> &mdash; <a href="/">Overview</a></footer>
 

@@ -58,6 +58,10 @@
   border-radius: 13px;
 }
 
+.aia-how--footer {
+  margin-top: 28px;
+}
+
 .aia-how > summary {
   display: flex;
   align-items: center;

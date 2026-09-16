@@ -24,11 +24,6 @@
 
     <div class="aia-notice" id="sd-notice" style="display:none"></div>
 
-    <div class="tl-concepts">
-      <div>These panels moved out of the <strong>Backtest Lab</strong> because none of them serve a demo account. They are observation surfaces: signal sources, loop health, and read-only history.</div>
-      <div>Nothing here can open a position or write to a strategy ledger. The Decision Engine's plans are scored in an unattributed, non-persistent context; the Signal Bot has no registered strategy identity at all.</div>
-    </div>
-
     <div class="de-toolbar">
       <label class="tl-inline-label" for="sd-interval">Decision Engine timeframe</label>
       <select class="aia-select" id="sd-interval">
@@ -83,6 +78,20 @@
       <summary>Legacy Paper History</summary>
       <div class="de-card-note">Archived reference only. Main, Shadow SMC and Alts are the retired TraderClaw books &mdash; read-only, receiving no new positions, marks, closes or resets. Kept because deleting them would destroy history that is still true.</div>
       <div id="sd-legacy-books"><div class="de-empty">Loading&hellip;</div></div>
+    </details>
+
+    <details class="aia-how aia-how--footer" open>
+      <summary>&#8505;&#65039; How this page works</summary>
+      <div class="aia-how-body">
+        <ol class="aia-how-steps">
+          <li><strong>Refresh a timeframe.</strong> Decision Engine candidates show scored plans in a non-persistent analysis context.</li>
+          <li><strong>Check signal plumbing.</strong> Live Scanner status and Signal Bot decisions show whether each source is running and what it would have done.</li>
+          <li><strong>Use history for diagnosis only.</strong> Everything here is observational or archived; nothing can open a position or write to a strategy ledger.</li>
+        </ol>
+        <ul class="aia-how-notes">
+          <li><strong>AI use: No.</strong> This page displays existing plans, loop state, bridge decisions, and ledger records without calling an AI model.</li>
+        </ul>
+      </div>
     </details>
 
   </main>
