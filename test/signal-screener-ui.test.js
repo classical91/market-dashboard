@@ -16,7 +16,7 @@ test("Signal Screener exposes directional and local-extreme engines as separate 
 
 test("Local Extremes keeps bottom and top scores independent and explains confirmation", () => {
   assert.match(page, /<th>Bottom<\/th><th>Top<\/th>/);
-  assert.match(page, /A high bottom score can coexist with a strong SHORT signal/);
+  assert.match(page, /A high bottom score can coexist with a strong BEARISH bias/);
   assert.match(page, /A candidate has exhaustion evidence/);
   assert.doesNotMatch(page, /combined extreme score/i);
 });
@@ -40,9 +40,41 @@ test("Signal Screener fits a phone: signal columns tighten, extremes restack as 
 });
 
 test("Extremes cells carry the labels the phone layout renders, and the chart link keeps a name without its text", () => {
-  ["Price", "Signal", "Bottom", "Top", "Extreme state", "EMA200", "Reasons"].forEach((label) => {
+  ["Price", "Bias", "Bottom", "Top", "Extreme state", "EMA200", "Reasons"].forEach((label) => {
     assert.match(page, new RegExp('data-label="' + label + '"'));
   });
   assert.match(page, /aria-label="'\s*\+\s*label/);
   assert.match(page, /class="ss-chart-link-text">Chart</);
+});
+
+test("Directional scores read as bias, not as an entry instruction", () => {
+  // LONG 67 looked like "go long now"; it is four of six checks agreeing.
+  assert.match(page, /var BIAS_LABELS = \{ LONG: 'BULLISH', SHORT: 'BEARISH', FLAT: 'NEUTRAL' \}/);
+  assert.match(page, /biasLabel\(entry\.signal\)/);
+  assert.match(page, /<th>Directional bias<\/th>/);
+  assert.doesNotMatch(page, />\s*Signal confluence\s*</);
+});
+
+test("The API's own LONG/SHORT values are untouched — the rename is display only", () => {
+  // Grouping, row colour and the panels still switch on the wire values, so
+  // the bot, the decision engine and the alerts keep working unchanged.
+  assert.match(page, /r\.signal === 'LONG'/);
+  assert.match(page, /r\.signal === 'SHORT'/);
+  assert.match(page, /entry\.signal === 'LONG' \? 'ss-row--long'/);
+});
+
+test("Bias and extreme stay independent: neither one rewrites the other", () => {
+  // All four bias/extreme pairings must remain renderable — a BULLISH bias
+  // with TOP CONFIRMED is information, not a contradiction to be corrected.
+  assert.match(page, /all four combinations are legitimate/);
+  assert.doesNotMatch(page, /dominant === 'top'[^\n]*(BEARISH|SHORT)/);
+  assert.doesNotMatch(page, /dominant === 'bottom'[^\n]*(BULLISH|LONG)/);
+  // extremeStateLabel reads only the extreme; signalBadge reads only the bias.
+  const stateLabel = page.slice(page.indexOf("function extremeStateLabel"), page.indexOf("function renderExtremeRow"));
+  assert.doesNotMatch(stateLabel, /entry\.signal|BIAS_LABELS/);
+});
+
+test("LONG/SHORT stay reserved for pages that publish an actual setup", () => {
+  assert.match(page, /LONG \/ SHORT stay reserved for pages that publish an actual setup/);
+  assert.match(page, /Bias is not an entry/);
 });
