@@ -29,6 +29,7 @@ const INTERVAL_MAP = {
 // Shared top-tokens universe (spot equivalents of the original screener's
 // USDT-perpetual list, extended to 25).
 const { TOP_TOKENS: DEFAULT_TOKENS } = require("../config/market-symbols");
+const { calculateLocalExtremes } = require("./local-extreme-engine");
 
 // Binance's last kline row is the live, still-open candle. Scoring it makes
 // borderline tokens whipsaw: on 1D the candle mutates all day, so a token
@@ -265,6 +266,7 @@ class SignalScreenerService {
       adx: adx[last] != null ? Number(adx[last].toFixed(1)) : null,
       price: closes[last],
       trendRegime,
+      extreme: calculateLocalExtremes(candles),
       indicators: {
         rsi: Number(r.toFixed(1)),
         adx: adx[last] != null ? Number(adx[last].toFixed(1)) : null,

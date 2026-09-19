@@ -167,6 +167,10 @@ test("SignalScreenerService.scanToken reports a LONG signal for a strong steady 
     assert.equal(result.symbol, "BTCUSDT");
     assert.equal(result.signal, "LONG");
     assert.ok(result.score >= 50);
+    assert.equal(typeof result.extreme.bottom.score, "number");
+    assert.equal(typeof result.extreme.top.score, "number");
+    assert.ok(result.extreme.bottom.score >= 0 && result.extreme.bottom.score <= 100);
+    assert.ok(result.extreme.top.score >= 0 && result.extreme.top.score <= 100);
   } finally {
     global.fetch = originalFetch;
   }

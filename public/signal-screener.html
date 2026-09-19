@@ -19,7 +19,7 @@
     <div class="cmd-page-header">
       <div>
         <div class="cmd-page-title">&#9889; Signal Screener</div>
-        <div class="cmd-page-subtitle">Multi-check confluence (RSI, MACD, VWAP, volume, EMA trend, HTF) across 20 tokens &mdash; a screener, not a signal to trade blindly</div>
+        <div class="cmd-page-subtitle">Directional confluence and independent local-extreme scoring across the shared 25-token universe &mdash; context, not certainty</div>
       </div>
     </div>
 
@@ -41,58 +41,81 @@
       <span class="ss-updated" id="ss-updated"></span>
     </div>
 
-    <div class="ss-summary-strip" id="ss-summary-strip"></div>
-
-    <div class="ss-split">
-      <div class="ss-panel ss-panel--bullish">
-        <div class="ss-panel-head">
-          <span class="ss-panel-title">&#128994; Bullish</span>
-          <span class="ss-panel-count" id="ss-bull-count"></span>
-        </div>
-        <div class="ss-table-wrap">
-          <table class="ss-table">
-            <thead><tr><th>Token</th><th>Price</th><th>Score</th><th>RSI</th><th>ADX</th></tr></thead>
-            <tbody id="ss-tbody-long"></tbody>
-          </table>
-        </div>
-      </div>
-      <div class="ss-panel ss-panel--bearish">
-        <div class="ss-panel-head">
-          <span class="ss-panel-title">&#128308; Bearish</span>
-          <span class="ss-panel-count" id="ss-bear-count"></span>
-        </div>
-        <div class="ss-table-wrap">
-          <table class="ss-table">
-            <thead><tr><th>Token</th><th>Price</th><th>Score</th><th>RSI</th><th>ADX</th></tr></thead>
-            <tbody id="ss-tbody-short"></tbody>
-          </table>
-        </div>
-      </div>
+    <div class="ss-view-tabs" role="tablist" aria-label="Screener engine">
+      <button class="ss-view-tab is-active" type="button" role="tab" id="ss-tab-signals" aria-selected="true" aria-controls="ss-view-signals">Signal confluence</button>
+      <button class="ss-view-tab" type="button" role="tab" id="ss-tab-extremes" aria-selected="false" aria-controls="ss-view-extremes">Local extremes</button>
     </div>
 
-    <div class="ss-panel ss-panel--flat">
-      <div class="ss-panel-head">
-        <span class="ss-panel-title">&#9898; Flat / No signal</span>
-        <span class="ss-panel-count" id="ss-flat-count"></span>
+    <section class="ss-view is-active" id="ss-view-signals" role="tabpanel" aria-labelledby="ss-tab-signals">
+      <div class="ss-summary-strip" id="ss-summary-strip"></div>
+
+      <div class="ss-split">
+        <div class="ss-panel ss-panel--bullish">
+          <div class="ss-panel-head">
+            <span class="ss-panel-title">&#128994; Bullish</span>
+            <span class="ss-panel-count" id="ss-bull-count"></span>
+          </div>
+          <div class="ss-table-wrap">
+            <table class="ss-table">
+              <thead><tr><th>Token</th><th>Price</th><th>Score</th><th>RSI</th><th>ADX</th></tr></thead>
+              <tbody id="ss-tbody-long"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="ss-panel ss-panel--bearish">
+          <div class="ss-panel-head">
+            <span class="ss-panel-title">&#128308; Bearish</span>
+            <span class="ss-panel-count" id="ss-bear-count"></span>
+          </div>
+          <div class="ss-table-wrap">
+            <table class="ss-table">
+              <thead><tr><th>Token</th><th>Price</th><th>Score</th><th>RSI</th><th>ADX</th></tr></thead>
+              <tbody id="ss-tbody-short"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="ss-panel ss-panel--flat">
+        <div class="ss-panel-head">
+          <span class="ss-panel-title">&#9898; Flat / No signal</span>
+          <span class="ss-panel-count" id="ss-flat-count"></span>
+        </div>
+        <div class="ss-table-wrap">
+          <table class="ss-table">
+            <thead><tr><th>Token</th><th>Price</th><th>Score</th><th>RSI</th><th>ADX</th></tr></thead>
+            <tbody id="ss-tbody-flat"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="ss-view" id="ss-view-extremes" role="tabpanel" aria-labelledby="ss-tab-extremes" hidden>
+      <div class="ss-summary-strip ss-summary-strip--extremes" id="ss-extreme-summary"></div>
+      <div class="ss-extreme-intro">
+        <strong>Exhaustion is not direction.</strong>
+        <span>A high bottom score can coexist with a strong SHORT signal; use it as a warning not to chase price into a stretched move.</span>
       </div>
       <div class="ss-table-wrap">
-        <table class="ss-table">
-          <thead><tr><th>Token</th><th>Price</th><th>Score</th><th>RSI</th><th>ADX</th></tr></thead>
-          <tbody id="ss-tbody-flat"></tbody>
+        <table class="ss-table ss-extreme-table">
+          <thead><tr><th>Token</th><th>Price</th><th>Signal</th><th>Bottom</th><th>Top</th><th>Extreme state</th><th>EMA200 context</th><th>Main reasons</th></tr></thead>
+          <tbody id="ss-tbody-extremes"></tbody>
         </table>
       </div>
-    </div>
+    </section>
 
     <details class="aia-how aia-how--footer" open>
       <summary>&#8505;&#65039; How this page works</summary>
       <div class="aia-how-body">
         <ol class="aia-how-steps">
-          <li><strong>Choose a timeframe and minimum checks.</strong> The threshold controls how many RSI, MACD, VWAP, volume, EMA-trend, and higher-timeframe checks must agree.</li>
-          <li><strong>Rescan.</strong> The screener evaluates the configured token universe and separates bullish, bearish, and flat results.</li>
-          <li><strong>Confirm before acting.</strong> Scores summarize confluence, not certainty; open the chart and check structure, liquidity, and risk before making a trade decision.</li>
+          <li><strong>Choose a timeframe and rescan.</strong> Both engines evaluate the same closed candles, shared token universe, and cache.</li>
+          <li><strong>Use Signal confluence for direction.</strong> Its score measures agreement across RSI, MACD, VWAP, volume, EMA trend, and EMA200.</li>
+          <li><strong>Use Local extremes for exhaustion.</strong> Bottom and top scores remain separate and combine Bollinger stretch, RSI extreme, regular divergence, liquidity sweep, volume climax, and reversal confirmation.</li>
+          <li><strong>Separate candidates from confirmation.</strong> A candidate has exhaustion evidence; confirming and confirmed states also require a Bollinger reclaim or micro-structure break.</li>
         </ol>
         <ul class="aia-how-notes">
-          <li><strong>AI use: No.</strong> Signals and scores come from fixed indicator checks; this page does not call an AI model.</li>
+          <li><strong>AI use: No.</strong> Both scores come from fixed, inspectable indicator rules; this page does not call an AI model.</li>
+          <li><strong>Probability, not certainty.</strong> Even a 100 score means all configured evidence is present, not that price must reverse.</li>
         </ul>
       </div>
     </details>
@@ -116,6 +139,10 @@
     var refreshBtn = document.getElementById('ss-refresh-btn');
     var intervalSelect = document.getElementById('ss-interval');
     var minChecksSelect = document.getElementById('ss-min-checks');
+    var extremeTbody = document.getElementById('ss-tbody-extremes');
+    var extremeSummary = document.getElementById('ss-extreme-summary');
+    var viewTabs = Array.prototype.slice.call(document.querySelectorAll('.ss-view-tab'));
+    var views = Array.prototype.slice.call(document.querySelectorAll('.ss-view'));
 
     function escapeHtml(str) {
       return String(str || '').replace(/[&<>"']/g, function (ch) {
@@ -135,6 +162,91 @@
       if (score >= 65) return 'ss-score--mid';
       if (score >= 50) return 'ss-score--neutral';
       return 'ss-score--low';
+    }
+
+    function clampScore(score) {
+      return Math.max(0, Math.min(100, Number(score) || 0));
+    }
+
+    function extremeMeter(score, side) {
+      var value = clampScore(score);
+      return (
+        '<span class="ss-extreme-meter ss-extreme-meter--' + side + '">' +
+          '<strong>' + value + '</strong>' +
+          '<span class="ss-extreme-track" aria-hidden="true"><span style="width:' + value + '%"></span></span>' +
+        '</span>'
+      );
+    }
+
+    function signalBadge(entry) {
+      var css = entry.signal === 'LONG' ? 'ss-signal--long' : entry.signal === 'SHORT' ? 'ss-signal--short' : 'ss-signal--flat';
+      return '<span class="' + css + '">' + escapeHtml(entry.signal || '—') + ' ' + clampScore(entry.score) + '</span>';
+    }
+
+    function extremeStateLabel(extreme) {
+      if (!extreme || !extreme.dominant) return '<span class="ss-extreme-state ss-extreme-state--none">NONE</span>';
+      var side = extreme.dominant.toUpperCase();
+      var state = extreme.state || 'NONE';
+      return '<span class="ss-extreme-state ss-extreme-state--' + state.toLowerCase() + '">' + side + ' ' + escapeHtml(state.replace('_', ' ')) + '</span>';
+    }
+
+    function renderExtremeRow(entry) {
+      if (entry.error || !entry.extreme || entry.extreme.error) {
+        return '<tr class="ss-error-row"><td>' + escapeHtml(entry.symbol) + '</td><td colspan="7">' +
+          escapeHtml(entry.error || entry.extreme.error || 'Local-extreme data unavailable') + '</td></tr>';
+      }
+      var extreme = entry.extreme;
+      var dominant = extreme.dominant ? extreme[extreme.dominant] : null;
+      var reasons = dominant && dominant.reasons.length
+        ? dominant.reasons.slice(0, 3).map(function (reason) { return reason.label; }).join(' · ')
+        : 'No active extreme';
+      var context = extreme.context || {};
+      var contextText = context.trend === 'UNKNOWN' ? 'Warming up' : context.trend + (context.setupType && context.setupType !== 'none' ? ' · ' + context.setupType : '');
+      return (
+        '<tr class="ss-extreme-row ss-extreme-row--' + (extreme.dominant || 'none') + '">' +
+          '<td>' + tickerLink(entry.symbol) + '</td>' +
+          '<td>' + fmtPrice(entry.price) + '</td>' +
+          '<td>' + signalBadge(entry) + '</td>' +
+          '<td>' + extremeMeter(extreme.bottom.score, 'bottom') + '</td>' +
+          '<td>' + extremeMeter(extreme.top.score, 'top') + '</td>' +
+          '<td>' + extremeStateLabel(extreme) + '</td>' +
+          '<td class="ss-context-cell">' + escapeHtml(contextText) + '</td>' +
+          '<td class="ss-reasons-cell" title="' + escapeHtml(reasons) + '">' + escapeHtml(reasons) + '</td>' +
+        '</tr>'
+      );
+    }
+
+    function renderExtremes(results) {
+      var ranked = results.slice().sort(function (a, b) {
+        var aScore = a.extreme && !a.extreme.error ? Math.max(a.extreme.bottom.score, a.extreme.top.score) : -1;
+        var bScore = b.extreme && !b.extreme.error ? Math.max(b.extreme.bottom.score, b.extreme.top.score) : -1;
+        return bScore - aScore;
+      });
+      extremeTbody.innerHTML = ranked.length ? ranked.map(renderExtremeRow).join('') : '<tr><td colspan="8" class="ss-empty-row">No scan results yet.</td></tr>';
+      var usable = results.filter(function (entry) { return entry.extreme && !entry.extreme.error; });
+      var bottomLeads = usable.filter(function (entry) { return entry.extreme.dominant === 'bottom'; }).length;
+      var topLeads = usable.filter(function (entry) { return entry.extreme.dominant === 'top'; }).length;
+      var confirmed = usable.filter(function (entry) { return entry.extreme.state === 'CONFIRMED'; }).length;
+      var active = usable.filter(function (entry) { return entry.extreme.state !== 'NONE'; }).length;
+      extremeSummary.innerHTML = (
+        '<span>' + active + ' active extremes</span>' +
+        '<span class="ss-summary-bottom">&#8595; ' + bottomLeads + ' bottom-led</span>' +
+        '<span class="ss-summary-top">&#8593; ' + topLeads + ' top-led</span>' +
+        '<span>' + confirmed + ' confirmed</span>'
+      );
+    }
+
+    function selectView(viewName) {
+      viewTabs.forEach(function (tab) {
+        var active = tab.id === 'ss-tab-' + viewName;
+        tab.classList.toggle('is-active', active);
+        tab.setAttribute('aria-selected', active ? 'true' : 'false');
+      });
+      views.forEach(function (view) {
+        var active = view.id === 'ss-view-' + viewName;
+        view.hidden = !active;
+        view.classList.toggle('is-active', active);
+      });
     }
 
     function rsiClass(rsi) {
@@ -252,6 +364,7 @@
         .then(function (res) { return res.json(); })
         .then(function (data) {
           renderSplit(data.results || []);
+          renderExtremes(data.results || []);
           lastScanAt = new Date();
           renderUpdated();
         })
@@ -268,6 +381,9 @@
     refreshBtn.addEventListener('click', function () { load(true); });
     intervalSelect.addEventListener('change', function () { load(false); });
     minChecksSelect.addEventListener('change', function () { load(false); });
+    viewTabs.forEach(function (tab) {
+      tab.addEventListener('click', function () { selectView(tab.id.replace('ss-tab-', '')); });
+    });
     load(false);
   })();
 </script>
