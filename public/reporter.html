@@ -261,6 +261,51 @@
       font-size: 12px;
       padding: 2px 0 0;
     }
+    .reporter-draft-list {
+      display: grid;
+      gap: 12px;
+    }
+    .reporter-draft-entry {
+      background: rgba(255,255,255,0.025);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+    }
+    .reporter-draft-head {
+      align-items: baseline;
+      display: flex;
+      gap: 10px;
+      justify-content: space-between;
+    }
+    .reporter-draft-head strong { color: var(--text); }
+    .reporter-draft-head time { color: var(--dim); font-size: 10px; }
+    .reporter-draft-entry textarea,
+    .reporter-draft-entry input {
+      background: rgba(0,0,0,0.22);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      color: var(--text);
+      font: inherit;
+      line-height: 1.55;
+      padding: 10px;
+      resize: vertical;
+      width: 100%;
+    }
+    .reporter-draft-entry input { resize: none; }
+    .reporter-draft-entry textarea:focus-visible,
+    .reporter-draft-entry input:focus-visible {
+      border-color: var(--blue);
+      outline: 2px solid rgba(91,156,246,0.32);
+      outline-offset: 1px;
+    }
+    .reporter-draft-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .reporter-draft-actions .open-all-btn { margin: 0; }
 
     /* ── Tabs ─────────────────────────────────────────────── */
     .reporter-tabs {
@@ -513,10 +558,10 @@
       <div class="reporter-date-badge" id="reporterDate"></div>
       <div class="reporter-gen-badge" id="reporterGen"></div>
       <div class="reporter-actions" style="margin-left:auto">
-        <button class="open-all-btn" id="reporterBroadcastBtn" type="button">&#128226; Broadcast</button>
+        <button class="open-all-btn" id="reporterBroadcastBtn" type="button">&#128221; Queue Editable Drafts</button>
         <button class="open-all-btn reporter-generate-cta" id="reporterRegenBtn" type="button">&#9889; Regenerate</button>
       </div>
-      <span class="reporter-broadcast-status" id="reporterBroadcastStatus" style="display:none"></span>
+      <span class="reporter-broadcast-status" id="reporterBroadcastStatus" role="status" aria-live="polite" style="display:none"></span>
     </div>
 
     <!-- Tabs -->
@@ -538,6 +583,7 @@
     </div>
 
     <section class="reporter-log" id="reporterLog" aria-label="Saved generation log"></section>
+    <section class="reporter-log" id="reporterDraftQueue" aria-label="Broadcast draft queue"></section>
 
     <footer>Market Command &mdash; AI-generated content based on model knowledge</footer>
 
@@ -594,7 +640,9 @@
       return String(s)
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
     }
 
     function applyBold(text) {
@@ -1377,7 +1425,77 @@
     var regenBtn = document.getElementById('reporterRegenBtn');
     if (regenBtn) regenBtn.addEventListener('click', function () { generateReport(); });
 
-    /* Broadcast — sends whichever sections have saved content to Telegram. */
+    /* Draft queue — local and editable; this action never publishes. */
+    var BROADCAST_DRAFTS_KEY = 'reporter:broadcast-drafts:v1';
+    function loadBroadcastDrafts() {
+      try {
+        var value = JSON.parse(localStorage.getItem(BROADCAST_DRAFTS_KEY) || '[]');
+        return Array.isArray(value) ? value.filter(function (draft) {
+          return draft && typeof draft === 'object' && draft.id && draft.text != null;
+        }) : [];
+      }
+      catch (err) { return []; }
+    }
+    function saveBroadcastDrafts(value) {
+      try { localStorage.setItem(BROADCAST_DRAFTS_KEY, JSON.stringify(value)); return true; }
+      catch (err) { return false; }
+    }
+    function draftFingerprint(text) {
+      var hash = 2166136261;
+      String(text || '').split('').forEach(function (char) {
+        hash ^= char.charCodeAt(0);
+        hash = Math.imul(hash, 16777619);
+      });
+      return (hash >>> 0).toString(36);
+    }
+    function renderBroadcastDrafts() {
+      var root = document.getElementById('reporterDraftQueue');
+      if (!root) return;
+      var drafts = loadBroadcastDrafts();
+      root.style.display = drafts.length ? 'block' : 'none';
+      if (!drafts.length) { root.innerHTML = ''; return; }
+      root.innerHTML = '<div class="reporter-log-title">Broadcast draft queue (' + drafts.length + ')</div>' +
+        '<div class="reporter-draft-list">' + drafts.map(function (draft) {
+          var created = draft.createdAt ? new Date(draft.createdAt) : null;
+          var when = created && !Number.isNaN(created.getTime()) ? created.toLocaleString(undefined, {
+            month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+          }) : 'Saved locally';
+          var label = draft.label || draft.section || 'Reporter';
+          return '<article class="reporter-draft-entry" data-draft-id="' + esc(draft.id) + '">' +
+            '<div class="reporter-draft-head"><strong>' + esc(label) + ' draft</strong><time>' + esc(when) +
+            '</time></div><textarea class="draft-text" rows="8" aria-label="Edit ' + esc(label) + ' post text">' + esc(draft.text) +
+            '</textarea><input class="draft-image" type="url" value="' + esc(draft.imageUrl || '') +
+            '" placeholder="Image URL (optional)" aria-label="' + esc(label) + ' draft image URL"><div class="reporter-draft-actions">' +
+            '<button class="open-all-btn draft-save" type="button">Save draft</button>' +
+            '<button class="open-all-btn draft-remove" type="button">Remove</button></div></article>';
+        }).join('') + '</div>';
+    }
+    document.getElementById('reporterDraftQueue').addEventListener('click', function (event) {
+      var card = event.target.closest('[data-draft-id]');
+      if (!card) return;
+      var drafts = loadBroadcastDrafts();
+      var index = drafts.findIndex(function (draft) { return draft.id === card.getAttribute('data-draft-id'); });
+      if (index < 0) return;
+      if (event.target.closest('.draft-save')) {
+        drafts[index].text = card.querySelector('.draft-text').value;
+        drafts[index].imageUrl = card.querySelector('.draft-image').value.trim();
+        drafts[index].updatedAt = new Date().toISOString();
+        if (saveBroadcastDrafts(drafts)) {
+          showBroadcastStatus('Draft saved locally. Nothing was broadcast.', 'ok');
+        } else {
+          showBroadcastStatus('This browser could not save the draft. Check local storage and try again.', 'error');
+        }
+      } else if (event.target.closest('.draft-remove')) {
+        if (!window.confirm('Remove this local draft?')) return;
+        drafts.splice(index, 1);
+        if (saveBroadcastDrafts(drafts)) {
+          renderBroadcastDrafts();
+          showBroadcastStatus('Draft removed. Nothing was broadcast.', 'ok');
+        } else {
+          showBroadcastStatus('This browser could not remove the draft. Check local storage and try again.', 'error');
+        }
+      }
+    });
     var broadcasting = false;
     var broadcastBtn = document.getElementById('reporterBroadcastBtn');
     var broadcastStatusEl = document.getElementById('reporterBroadcastStatus');
@@ -1391,29 +1509,41 @@
       if (broadcasting) return;
       broadcasting = true;
       broadcastBtn.disabled = true;
-      broadcastBtn.textContent = 'Sending…';
+      broadcastBtn.textContent = 'Preparing drafts...';
       showBroadcastStatus('', '');
-      AdminKey.fetch('/api/daily-report/broadcast?ttlHours=' + currentTtl(), { method: 'POST' })
-        .then(function (res) {
-          return res.json().then(function (body) { return { ok: res.ok, status: res.status, body: body }; });
-        })
-        .then(function (result) {
-          if (result.ok) {
-            showBroadcastStatus('✅ Sent to ' + result.body.channelCount + ' channel' + (result.body.channelCount === 1 ? '' : 's') + '.', 'ok');
-          } else if (result.body && result.body.alreadyBroadcast) {
-            showBroadcastStatus('Already broadcast — generate a new section first to send again.', 'error');
-          } else {
-            showBroadcastStatus(result.body && result.body.error ? result.body.error : 'Broadcast failed.', 'error');
-          }
-        })
-        .catch(function (err) {
-          showBroadcastStatus('Broadcast request failed: ' + err.message, 'error');
-        })
-        .finally(function () {
-          broadcasting = false;
-          broadcastBtn.disabled = false;
-          broadcastBtn.textContent = '📣 Broadcast';
+      var sections = ['geopolitics', 'economics', 'markets', 'crypto'].filter(function (section) {
+        return reportData && hasContent(reportData[section]);
+      });
+      if (!sections.length) {
+        showBroadcastStatus('No saved posts are available to queue.', 'error');
+      } else if (window.confirm('Warning: this will add ' + sections.length + ' editable post' +
+        (sections.length === 1 ? '' : 's') + ' to the broadcast draft queue. Nothing will be published or broadcast. Continue?')) {
+        var drafts = loadBroadcastDrafts();
+        var added = 0;
+        sections.forEach(function (section) {
+          var generatedAt = reportData.generatedAtBySection && reportData.generatedAtBySection[section] || reportData.generatedAt || '';
+          var text = String(reportData[section] || '');
+          var sourceKey = section + '|' + (generatedAt || draftFingerprint(text));
+          if (drafts.some(function (draft) { return draft.sourceKey === sourceKey; })) return;
+          drafts.push({ id: 'reporter-' + Date.now() + '-' + section, source: 'reporter-room', sourceKey: sourceKey,
+            section: section, label: tabLabels[section] || section, text: text, imageUrl: '',
+            status: 'draft', createdAt: new Date().toISOString() });
+          added += 1;
         });
+        if (!added) {
+          showBroadcastStatus('Those report versions are already in the draft queue.', '');
+        } else if (saveBroadcastDrafts(drafts)) {
+          renderBroadcastDrafts();
+          showBroadcastStatus(added + ' editable draft' + (added === 1 ? '' : 's') + ' queued locally. Nothing was broadcast.', 'ok');
+        } else {
+          showBroadcastStatus('This browser could not save the drafts. Check local storage and try again.', 'error');
+        }
+      } else {
+        showBroadcastStatus('Queueing cancelled. Nothing was changed.', '');
+      }
+      broadcasting = false;
+      broadcastBtn.disabled = false;
+      broadcastBtn.textContent = 'Queue Editable Drafts';
     });
 
     configurePageShell();
@@ -1422,6 +1552,7 @@
     setInterval(renderGenBadge, 1000);
     renderDeskStatus(null);
     renderMasterNews(null);
+    renderBroadcastDrafts();
     loadReport();
     loadNewsroomStatus();
     setInterval(loadNewsroomStatus, 30000);
