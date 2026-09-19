@@ -205,13 +205,13 @@
       return (
         '<tr class="ss-extreme-row ss-extreme-row--' + (extreme.dominant || 'none') + '">' +
           '<td>' + tickerLink(entry.symbol) + '</td>' +
-          '<td>' + fmtPrice(entry.price) + '</td>' +
-          '<td>' + signalBadge(entry) + '</td>' +
-          '<td>' + extremeMeter(extreme.bottom.score, 'bottom') + '</td>' +
-          '<td>' + extremeMeter(extreme.top.score, 'top') + '</td>' +
-          '<td>' + extremeStateLabel(extreme) + '</td>' +
-          '<td class="ss-context-cell">' + escapeHtml(contextText) + '</td>' +
-          '<td class="ss-reasons-cell" title="' + escapeHtml(reasons) + '">' + escapeHtml(reasons) + '</td>' +
+          '<td data-label="Price">' + fmtPrice(entry.price) + '</td>' +
+          '<td data-label="Signal">' + signalBadge(entry) + '</td>' +
+          '<td data-label="Bottom">' + extremeMeter(extreme.bottom.score, 'bottom') + '</td>' +
+          '<td data-label="Top">' + extremeMeter(extreme.top.score, 'top') + '</td>' +
+          '<td data-label="Extreme state">' + extremeStateLabel(extreme) + '</td>' +
+          '<td class="ss-context-cell" data-label="EMA200">' + escapeHtml(contextText) + '</td>' +
+          '<td class="ss-reasons-cell" data-label="Reasons" title="' + escapeHtml(reasons) + '">' + escapeHtml(reasons) + '</td>' +
         '</tr>'
       );
     }
@@ -294,11 +294,15 @@
     function tickerLink(symbol) {
       var url = 'https://www.tradingview.com/chart/?symbol=' + encodeURIComponent('BINANCE:' + symbol) +
         '&interval=' + encodeURIComponent(TV_INTERVALS[intervalSelect.value] || '240');
+      // The label carries the whole meaning on a phone, where the link
+      // narrows to its icon.
+      var label = 'Open ' + escapeHtml(symbol) + ' ' + escapeHtml(intervalSelect.value) + ' on TradingView';
       return (
         '<span class="ss-ticker-cell">' +
           '<span class="ss-ticker-label">' + escapeHtml(symbol) + '</span>' +
-          '<a class="ss-chart-link" href="' + url + '" target="_blank" rel="noopener" title="Open ' +
-          escapeHtml(symbol) + ' ' + escapeHtml(intervalSelect.value) + ' on TradingView">&#128200; Chart</a>' +
+          '<a class="ss-chart-link" href="' + url + '" target="_blank" rel="noopener" title="' + label + '" aria-label="' + label + '">' +
+            '<span aria-hidden="true">&#128200;</span><span class="ss-chart-link-text">Chart</span>' +
+          '</a>' +
         '</span>'
       );
     }
