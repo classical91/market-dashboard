@@ -42,11 +42,11 @@
     </div>
 
     <div class="ss-view-tabs" role="tablist" aria-label="Screener engine">
-      <button class="ss-view-tab is-active" type="button" role="tab" id="ss-tab-signals" aria-selected="true" aria-controls="ss-view-signals">Directional bias</button>
-      <button class="ss-view-tab" type="button" role="tab" id="ss-tab-extremes" aria-selected="false" aria-controls="ss-view-extremes">Local extremes</button>
+      <button class="ss-view-tab" type="button" role="tab" id="ss-tab-signals" aria-selected="false" aria-controls="ss-view-signals">Directional bias</button>
+      <button class="ss-view-tab is-active" type="button" role="tab" id="ss-tab-extremes" aria-selected="true" aria-controls="ss-view-extremes">Local extremes</button>
     </div>
 
-    <section class="ss-view is-active" id="ss-view-signals" role="tabpanel" aria-labelledby="ss-tab-signals">
+    <section class="ss-view" id="ss-view-signals" role="tabpanel" aria-labelledby="ss-tab-signals" hidden>
       <div class="ss-summary-strip" id="ss-summary-strip"></div>
 
       <div class="ss-split">
@@ -90,7 +90,7 @@
       </div>
     </section>
 
-    <section class="ss-view" id="ss-view-extremes" role="tabpanel" aria-labelledby="ss-tab-extremes" hidden>
+    <section class="ss-view is-active" id="ss-view-extremes" role="tabpanel" aria-labelledby="ss-tab-extremes">
       <div class="ss-summary-strip ss-summary-strip--extremes" id="ss-extreme-summary"></div>
       <div class="ss-extreme-intro">
         <strong>Exhaustion is not direction.</strong>
@@ -109,8 +109,8 @@
       <div class="aia-how-body">
         <ol class="aia-how-steps">
           <li><strong>Choose a timeframe and rescan.</strong> Both engines evaluate the same closed candles, shared token universe, and cache.</li>
-          <li><strong>Use Directional bias for the environment.</strong> BULLISH / BEARISH / NEUTRAL plus a score measuring agreement across RSI, MACD, VWAP, volume, EMA trend, and EMA200.</li>
-          <li><strong>Use Local extremes for exhaustion.</strong> Bottom and top scores remain separate and combine Bollinger stretch, RSI extreme, regular divergence, liquidity sweep, volume climax, and reversal confirmation.</li>
+          <li><strong>Start with Local extremes for exhaustion.</strong> Bottom and top scores remain separate and combine Bollinger stretch, RSI extreme, regular divergence, liquidity sweep, volume climax, and reversal confirmation.</li>
+          <li><strong>Switch to Directional bias for the environment.</strong> BULLISH / BEARISH / NEUTRAL plus a score measuring agreement across RSI, MACD, VWAP, volume, EMA trend, and EMA200.</li>
           <li><strong>Separate candidates from confirmation.</strong> A candidate has exhaustion evidence; confirming and confirmed states also require a Bollinger reclaim or micro-structure break.</li>
         </ol>
         <ul class="aia-how-notes">
