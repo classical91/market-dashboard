@@ -13,6 +13,8 @@
 // only thing added on top is a context state — whether the engines currently
 // agree — and that state never becomes an instruction to buy or sell.
 
+const { assessFreshness } = require("./data-freshness");
+
 // The bias engine speaks in LONG / SHORT / FLAT on the wire; the dashboards
 // read it as BULLISH / BEARISH / NEUTRAL.
 const BIAS_LABELS = { LONG: "BULLISH", SHORT: "BEARISH", FLAT: "NEUTRAL" };
@@ -220,7 +222,38 @@ function classifyContext({ directionalBias, extremes, patterns }) {
   };
 }
 
-function buildCard({ item, screenerRow, patternRow }) {
+/**
+ * How current the evidence on this card is, per engine.
+ *
+ * The bias and the extremes are two readings of one screener row, so they
+ * share one clock; the pattern scan keeps its own. Freshness is reported
+ * beside the context state and never folded into it — whether the engines
+ * agree and whether they are looking at current data are separate questions,
+ * and a stale ALIGNED card must not read as a weaker ALIGNED.
+ */
+function buildFreshness({ item, screenerRow, patternRow, now }) {
+  return assessFreshness({
+    interval: item.interval,
+    sources: [
+      {
+        key: "screener",
+        label: "Bias & extremes",
+        candleCloseTime: screenerRow ? screenerRow.candleCloseTime : null,
+        computedAt: screenerRow ? screenerRow.computedAt : null,
+        error: !screenerRow || Boolean(screenerRow.error),
+      },
+      {
+        key: "patterns",
+        label: "Pattern scan",
+        candleCloseTime: patternRow ? patternRow.candleCloseTime : null,
+        computedAt: patternRow ? patternRow.scannedAt : null,
+        error: !patternRow || Boolean(patternRow.error),
+      },
+    ],
+  }, now);
+}
+
+function buildCard({ item, screenerRow, patternRow, now = Date.now() }) {
   const directionalBias = buildDirectionalBias(screenerRow);
   const extremes = buildExtremes(screenerRow);
   const patterns = buildPatterns(patternRow);
@@ -238,6 +271,7 @@ function buildCard({ item, screenerRow, patternRow }) {
     patterns,
     evidence: buildEvidence({ directionalBias, extremes, patterns }),
     context: classifyContext({ directionalBias, extremes, patterns }),
+    freshness: buildFreshness({ item, screenerRow, patternRow, now }),
     // A card renders on whatever came back; a dead engine is reported here
     // rather than blanking the pair.
     errors,
@@ -262,6 +296,9 @@ class TradeContextService {
     const items = this._watchlist.list();
     if (!items.length) return { items: [], cards: [] };
 
+    // One clock for the whole request, so two cards that were computed at the
+    // same moment never report ages a second apart.
+    const now = Date.now();
     const cards = await Promise.all(items.map(async (item) => {
       const [screener, pattern] = await Promise.allSettled([
         this._screener.scanToken(item.symbol, item.interval, undefined, { force }),
@@ -269,6 +306,7 @@ class TradeContextService {
       ]);
       return buildCard({
         item,
+        now,
         screenerRow: screener.status === "fulfilled" ? screener.value : { error: screener.reason?.message || "Directional engine failed" },
         patternRow: pattern.status === "fulfilled" ? pattern.value : { error: pattern.reason?.message || "Pattern engine failed" },
       });
@@ -281,6 +319,7 @@ class TradeContextService {
 module.exports = {
   TradeContextService,
   buildCard,
+  buildFreshness,
   classifyContext,
   buildEvidence,
   BIAS_LABELS,
