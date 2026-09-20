@@ -298,6 +298,24 @@
 
     var lastContext = null;
 
+    // What has actually triggered outranks what is merely stretched: a
+    // CANDIDATE 90 has exhaustion evidence but no confirmation, while a
+    // CONFIRMED 85 has turned back inside the band or broken structure.
+    // Score breaks ties inside a tier.
+    var STATE_RANK = { CONFIRMED: 4, CONFIRMING: 3, CANDIDATE: 2, WATCH: 1, NONE: 0 };
+
+    function stateRank(entry) {
+      if (!entry.extreme || entry.extreme.error) return -1;
+      var rank = STATE_RANK[entry.extreme.state];
+      return rank == null ? 0 : rank;
+    }
+
+    function peakScore(entry) {
+      return entry.extreme && !entry.extreme.error
+        ? Math.max(entry.extreme.bottom.score, entry.extreme.top.score)
+        : -1;
+    }
+
     function renderExtremes(results, context) {
       lastResults = results;
       lastContext = context;
@@ -309,9 +327,7 @@
         })
         .filter(Boolean);
       var ranked = results.filter(function (entry) { return !isPinned(entry.symbol); }).sort(function (a, b) {
-        var aScore = a.extreme && !a.extreme.error ? Math.max(a.extreme.bottom.score, a.extreme.top.score) : -1;
-        var bScore = b.extreme && !b.extreme.error ? Math.max(b.extreme.bottom.score, b.extreme.top.score) : -1;
-        return bScore - aScore;
+        return stateRank(b) - stateRank(a) || peakScore(b) - peakScore(a);
       });
       var rows = pinned.map(function (entry) { return renderExtremeRow(entry, null); })
         .concat([renderDominanceRow(context && context.usdtDominance)])
@@ -327,7 +343,8 @@
         '<span>' + active + ' active extremes</span>' +
         '<span class="ss-summary-bottom">&#8595; ' + bottomLeads + ' bottom-led</span>' +
         '<span class="ss-summary-top">&#8593; ' + topLeads + ' top-led</span>' +
-        '<span>' + confirmed + ' confirmed</span>'
+        '<span>' + confirmed + ' confirmed</span>' +
+        '<span class="ss-summary-tf">' + escapeHtml(intervalSelect.value) + '</span>'
       );
     }
 
@@ -406,6 +423,7 @@
         .then(function () {
           if (tracked) delete trackedKeys[key];
           else trackedKeys[key] = true;
+          renderSplit(lastResults);
           renderExtremes(lastResults, lastContext);
         })
         .catch(function () { /* leave the star as-is; the user can retry */ })
@@ -437,6 +455,24 @@
       }
     }
 
+    // The selection survives a reload: coming back to a page silently reset
+    // to 4h, with no visual difference from the 1D you left it on, is the
+    // kind of staleness that gets read as live.
+    var INTERVAL_STORAGE_KEY = 'signalScreenerInterval';
+
+    function restoreInterval() {
+      try {
+        var saved = localStorage.getItem(INTERVAL_STORAGE_KEY);
+        if (saved && Array.prototype.some.call(intervalSelect.options, function (o) { return o.value === saved; })) {
+          intervalSelect.value = saved;
+        }
+      } catch (e) { /* private mode: the default stands */ }
+    }
+
+    function rememberInterval() {
+      try { localStorage.setItem(INTERVAL_STORAGE_KEY, intervalSelect.value); } catch (e) { /* nothing to persist */ }
+    }
+
     var TV_INTERVALS = { '1h': '60', '4h': '240', '1D': 'D' };
 
     // A plain (non-link) label plus an always-visible, clearly-a-button chart
@@ -461,14 +497,15 @@
     function renderRow(entry) {
       if (entry.error) {
         return (
-          '<tr class="ss-error-row"><td>' + escapeHtml(entry.symbol) + '</td><td colspan="4">' +
+          '<tr class="ss-error-row"><td><span class="ss-token-head">' + escapeHtml(entry.symbol) +
+          trackButton(entry.symbol) + '</span></td><td colspan="4">' +
           escapeHtml(entry.error) + '</td></tr>'
         );
       }
       var rowClass = entry.signal === 'LONG' ? 'ss-row--long' : entry.signal === 'SHORT' ? 'ss-row--short' : 'ss-row--flat';
       return (
         '<tr class="' + rowClass + '">' +
-          '<td>' + tickerLink(entry.symbol) + '</td>' +
+          '<td><span class="ss-token-head">' + tickerLink(entry.symbol) + trackButton(entry.symbol) + '</span></td>' +
           '<td>' + fmtPrice(entry.price) + '</td>' +
           '<td><span class="ss-badge ' + scoreClass(entry.score) + '">' + entry.score + '%</span></td>' +
           '<td><span class="ss-badge ' + rsiClass(entry.rsi) + '">' + entry.rsi + '</span></td>' +
@@ -482,6 +519,7 @@
     }
 
     function renderSplit(results) {
+      lastResults = results;
       var errors = results.filter(function (r) { return r.error; });
       var longRows = results.filter(function (r) { return r.signal === 'LONG'; });
       var shortRows = results.filter(function (r) { return r.signal === 'SHORT'; });
@@ -503,7 +541,8 @@
       summaryStrip.innerHTML = (
         '<span>' + (longRows.length + shortRows.length) + ' with a directional bias</span>' +
         '<span>&#9650; ' + longRows.length + '&nbsp;&nbsp;&#9660; ' + shortRows.length + '</span>' +
-        '<span class="' + biasClass + '">' + bias + '</span>'
+        '<span class="' + biasClass + '">' + bias + '</span>' +
+        '<span class="ss-summary-tf">' + escapeHtml(intervalSelect.value) + '</span>'
       );
     }
 
@@ -534,19 +573,22 @@
     }
 
     refreshBtn.addEventListener('click', function () { load(true); });
-    intervalSelect.addEventListener('change', function () { load(false); });
+    intervalSelect.addEventListener('change', function () { rememberInterval(); load(false); });
     minChecksSelect.addEventListener('change', function () { load(false); });
     viewTabs.forEach(function (tab) {
       tab.addEventListener('click', function () { selectView(tab.id.replace('ss-tab-', '')); });
     });
 
-    extremeTbody.addEventListener('click', function (e) {
-      var btn = e.target.closest('[data-role="track-btn"]');
-      if (btn) toggleTrack(btn);
+    [extremeTbody, tbodyLong, tbodyShort, tbodyFlat].forEach(function (tbody) {
+      tbody.addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-role="track-btn"]');
+        if (btn) toggleTrack(btn);
+      });
     });
 
     // The watchlist is read first so the stars are already correct on the
     // first paint rather than filling in a moment later.
+    restoreInterval();
     loadTracked().then(function () { load(false); });
   })();
 </script>

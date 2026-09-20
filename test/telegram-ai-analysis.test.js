@@ -145,3 +145,30 @@ test("Pattern Scanner alerts link only to the available dashboard page", async (
     global.fetch = originalFetch;
   }
 });
+
+test("signal alerts report a bias, not an entry instruction", async () => {
+  // "Bias: LONG" in a phone notification reads as "go long now". The wire
+  // value is unchanged — only what the message says.
+  const originalFetch = global.fetch;
+  let sent = "";
+  global.fetch = async (url, options) => {
+    sent = JSON.parse(options.body).text;
+    return { ok: true, json: async () => ({ ok: true }), text: async () => "" };
+  };
+
+  try {
+    const telegram = new TelegramService({ botToken: "123456:test-token", chatIds: ["-100123"] });
+    await telegram.postSignalAlerts([
+      { symbol: "BTCUSDT", interval: "4h", from: "FLAT", to: "LONG", score: 83, price: 81280.38, trendRegime: "TREND_UP" },
+      { symbol: "ETHUSDT", interval: "4h", from: "LONG", to: "SHORT", score: 67, price: 2636.05, trendRegime: "TREND_DOWN" },
+      { symbol: "TRXUSDT", interval: "1h", from: "LONG", to: "FLAT", score: 50, price: 0.34, trendRegime: "MIXED" },
+    ]);
+
+    assert.match(sent, /Bias: <b>BULLISH<\/b>/);
+    assert.match(sent, /Bias: <b>BEARISH<\/b>/);
+    assert.match(sent, /Bias: <b>NEUTRAL<\/b>/);
+    assert.doesNotMatch(sent, /Bias: <b>(LONG|SHORT|FLAT)<\/b>/);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
