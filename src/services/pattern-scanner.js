@@ -319,7 +319,18 @@ class PatternScannerService {
             : null,
         };
       }
-      return { detection, divergence, chart, scannedAt: new Date().toISOString(), candleCount: candles.length };
+      return {
+        detection,
+        divergence,
+        chart,
+        scannedAt: new Date().toISOString(),
+        // The closed candle the detection ran on, so a reader can separate a
+        // quiet scan from one whose feed stopped advancing.
+        candleCloseTime: candles.length && Number.isFinite(candles[candles.length - 1].closeTime)
+          ? candles[candles.length - 1].closeTime
+          : null,
+        candleCount: candles.length,
+      };
     };
     try {
       const result = force ? await this._cache.set(key, await load(), this._cacheMs) : await this._cache.getOrLoad(key, this._cacheMs, load);
@@ -336,6 +347,7 @@ class PatternScannerService {
         divergence: result.divergence ? divergencePublic : null,
         chart: result.chart || null,
         scannedAt: result.scannedAt,
+        candleCloseTime: Number.isFinite(result.candleCloseTime) ? result.candleCloseTime : null,
       };
     } catch (err) {
       return { symbol: pair, label, interval, pattern: null, divergence: null, error: err.message };

@@ -40,9 +40,11 @@
           <li><strong>Star a setup in Pattern Scanner.</strong> This page collects those saved symbol/timeframe pairs and reports the full state of each one.</li>
           <li><strong>Read the three engines separately.</strong> Directional bias is the environment, local extremes are where price sits inside it, and the pattern is the structure forming &mdash; they measure different things and are never merged.</li>
           <li><strong>Use the context strip for agreement, not instruction.</strong> ALIGNED, MIXED, CONFLICT, QUIET and PARTIAL describe whether the engines currently point the same way &mdash; PARTIAL means an engine is down and there is too little left to compare. Deciding what to do with any of it is yours.</li>
+          <li><strong>Check the DATA line before you trust the card.</strong> It reports how long ago the newest closed candle closed and how long ago each engine last recalculated. A card flagged STALE is showing evidence the feed or the cache has stopped advancing &mdash; the numbers are real, but they are not now.</li>
           <li><strong>Unstar to remove it.</strong> This is a research watchlist; it does not place, manage, or close trades.</li>
         </ol>
         <ul class="aia-how-notes">
+          <li><strong>Candle age is not the same as staleness.</strong> On a 4h card the newest closed candle is normally anything up to four hours old &mdash; that is the timeframe, not a fault. STALE appears only once the age runs past a whole bar plus half a bar of slack, which means the feed is behind rather than simply mid-bar.</li>
           <li><strong>No combined score.</strong> Averaging direction, exhaustion and structure into one number would hide exactly the disagreement worth seeing &mdash; a BULLISH bias beside a confirmed top is information, not an error.</li>
           <li><strong>AI use: No.</strong> Every number here comes from the same fixed indicator rules the Signal Screener and Pattern Scanner already run; this page only assembles them.</li>
         </ul>
@@ -152,6 +154,33 @@
       return rows;
     }
 
+    // Age of the data behind the card, not the age of the page load. Without
+    // it a cached BULLISH 67 and a live one are indistinguishable, so a stale
+    // engine reads as current market context.
+    function freshnessLine(freshness) {
+      if (!freshness) return '';
+      var reasons = freshness.staleReasons || [];
+      return (
+        '<div class="tc-data tc-data--' + escapeHtml(String(freshness.state || 'unknown').toLowerCase()) + '">' +
+          '<span class="tc-data-label">DATA</span>' +
+          '<span class="tc-data-summary">' + escapeHtml(freshness.summary || '') + '</span>' +
+          (reasons.length
+            ? '<span class="tc-data-reason">' + escapeHtml(reasons.join(' · ')) + '</span>'
+            : '') +
+        '</div>'
+      );
+    }
+
+    function freshnessBadge(freshness) {
+      if (!freshness || freshness.state === 'FRESH') return '';
+      var stale = freshness.state === 'STALE';
+      var title = stale
+        ? (freshness.staleReasons || []).join(' · ')
+        : 'No data age reported by the engines behind this card';
+      return '<span class="tc-stale tc-stale--' + (stale ? 'stale' : 'unknown') + '" title="' + escapeHtml(title) + '">' +
+        (stale ? '&#9888;&#65039; STALE' : 'AGE UNKNOWN') + '</span>';
+    }
+
     function renderCard(card, index) {
       var context = card.context || { state: 'QUIET', summary: '' };
       return (
@@ -161,9 +190,11 @@
             '<span class="tc-interval">' + escapeHtml(card.interval) + '</span>' +
             chartLink(card.symbol, card.interval) +
             '<span class="tc-price">' + fmtPrice(card.price) + '</span>' +
+            freshnessBadge(card.freshness) +
             '<button class="tc-untrack" type="button" data-role="untrack" data-symbol="' + escapeHtml(card.symbol) +
               '" data-interval="' + escapeHtml(card.interval) + '" title="Remove from My Trades">&#9733; Untrack</button>' +
           '</div>' +
+          freshnessLine(card.freshness) +
           '<div class="tc-section"><div class="tc-section-label">Directional bias</div>' + biasSection(card.directionalBias) + '</div>' +
           '<div class="tc-section"><div class="tc-section-label">Local extremes</div>' + extremesSection(card.extremes) + '</div>' +
           '<div class="tc-section"><div class="tc-section-label">Pattern scanner</div>' + patternsSection(card.patterns) + '</div>' +
@@ -218,8 +249,13 @@
       fetch('/api/trade-context')
         .then(function (res) { return res.json(); })
         .then(function (data) {
-          render(data.cards || []);
-          updatedEl.textContent = 'Updated ' + new Date().toLocaleTimeString();
+          var cards = data.cards || [];
+          render(cards);
+          // "Page refreshed" rather than "updated": the data's own age lives
+          // on each card and can be far older than this timestamp.
+          var stale = data.stale || 0;
+          updatedEl.textContent = 'Page refreshed ' + new Date().toLocaleTimeString() +
+            (stale ? ' · ' + stale + ' card' + (stale === 1 ? '' : 's') + ' on stale data' : '');
         })
         .catch(function (err) {
           notice.style.display = 'block';

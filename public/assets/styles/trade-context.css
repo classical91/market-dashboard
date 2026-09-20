@@ -20,10 +20,15 @@
 .tc-head {
   display: flex;
   align-items: center;
+  /* The freshness badge is one more item competing for a narrow card head, so
+     the row wraps as a row rather than breaking words inside the chart link. */
+  flex-wrap: wrap;
   gap: 8px;
   padding: 12px 14px;
   border-bottom: 1px solid rgba(42, 42, 74, 0.7);
 }
+
+.tc-head > * { white-space: nowrap; }
 
 .tc-symbol { font-size: 15px; font-weight: 800; color: #fff; }
 .tc-interval {
@@ -36,6 +41,45 @@
   letter-spacing: 0.04em;
 }
 .tc-price { margin-left: auto; color: #c9d4e8; font-size: 13px; font-variant-numeric: tabular-nums; }
+
+/* Freshness sits directly under the head, above every number it qualifies:
+   how old the evidence is has to be read before the evidence, not after. */
+.tc-data {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 7px 14px;
+  border-bottom: 1px solid rgba(42, 42, 74, 0.7);
+  background: rgba(137, 146, 166, 0.05);
+  font-size: 10px;
+}
+
+.tc-data-label {
+  flex: 0 0 auto;
+  color: #8892a6;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+.tc-data-summary { color: #a8b6cf; font-variant-numeric: tabular-nums; }
+.tc-data-reason { color: #ffb55f; }
+
+.tc-data--stale { background: rgba(255, 181, 95, 0.09); }
+.tc-data--stale .tc-data-label { color: #ffb55f; }
+.tc-data--unknown .tc-data-summary { color: #8892a6; }
+
+/* The badge repeats the DATA line's verdict where the eye lands first, so a
+   stale card is caught before its scores are read. */
+.tc-stale {
+  flex: 0 0 auto;
+  padding: 3px 7px;
+  border-radius: 5px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+.tc-stale--stale { color: #ffb55f; background: rgba(255, 181, 95, 0.16); border: 1px solid rgba(255, 181, 95, 0.4); }
+.tc-stale--unknown { color: #8892a6; background: rgba(137, 146, 166, 0.14); border: 1px solid rgba(137, 146, 166, 0.3); }
 
 .tc-untrack {
   border: 1px solid rgba(255, 93, 93, 0.35);
@@ -157,7 +201,9 @@
 
 @media (max-width: 720px) {
   .tc-grid { grid-template-columns: 1fr; gap: 12px; }
-  .tc-head { flex-wrap: wrap; }
-  .tc-price { margin-left: 0; flex-basis: 100%; }
+  /* The price and the freshness badge share the wrapped row rather than each
+     claiming one, so the head stays two lines on a phone. */
+  .tc-price { margin-left: 0; flex: 1 1 auto; }
+  .tc-data { font-size: 9px; }
   .tc-context { flex-direction: column; gap: 6px; }
 }

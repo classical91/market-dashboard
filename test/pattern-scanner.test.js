@@ -202,3 +202,25 @@ test("classifyWindow returns null for a flat, non-converging channel", () => {
   });
   assert.equal(result, null);
 });
+
+test("a scan reports the closed candle it ran on alongside when it ran", async () => {
+  // scannedAt alone cannot distinguish a quiet scan from one whose feed has
+  // stopped advancing; the candle it saw can.
+  const originalFetch = global.fetch;
+  const rows = [];
+  for (let i = 0; i < 90; i++) {
+    rows.push([i * 3600000, "100", "100.3", "99.7", "100", "100", i * 3600000 + 3599999]);
+  }
+  const lastClosed = 89 * 3600000 + 3599999;
+  rows.push([90 * 3600000, "100", "100.3", "99.7", "100", "100", Date.now() + 3600000]);
+
+  global.fetch = async () => ({ ok: true, json: async () => rows });
+  try {
+    const service = new PatternScannerService({ cache: new MemoryCache(), tokens: ["BTCUSDT"] });
+    const result = await service.scanToken("BTCUSDT", "1h");
+    assert.equal(result.candleCloseTime, lastClosed, "the unclosed candle is dropped from the scan and from its timestamp");
+    assert.ok(Date.parse(result.scannedAt) > 0);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});

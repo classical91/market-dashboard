@@ -175,3 +175,36 @@ test("SignalScreenerService.scanToken reports a LONG signal for a strong steady 
     global.fetch = originalFetch;
   }
 });
+
+test("a scanned row says which closed candle it ran on and when it was computed", async () => {
+  // A cached row is indistinguishable from a fresh one without these, so the
+  // dashboards cannot tell current context from a stalled feed.
+  const rows = [];
+  for (let i = 0; i < 500; i++) {
+    const price = 100 + i * 0.3;
+    rows.push([i * 3600000, String(price), String(price + 1), String(price - 1), String(price), "1000", i * 3600000 + 3599999]);
+  }
+  const lastClosed = 499 * 3600000 + 3599999;
+  // Still open, so the signal ignores it — and so does the reported candle time.
+  rows.push([500 * 3600000, "250", "251", "249", "250", "1000", Date.now() + 3600000]);
+
+  const originalFetch = global.fetch;
+  global.fetch = async () => ({ ok: true, json: async () => rows });
+  try {
+    const cache = new MemoryCache();
+    const service = new SignalScreenerService({ cache, tokens: ["BTCUSDT"] });
+    const before = Date.now();
+    const result = await service.scanToken("BTCUSDT", "1h", 4);
+
+    assert.equal(result.candleCloseTime, lastClosed, "the unclosed candle must not be reported as the confirmed one");
+    assert.ok(Date.parse(result.computedAt) >= before);
+
+    // The stamp is cached with the payload: a later read reports when the row
+    // was computed, not when it was read back out.
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const cached = await service.scanToken("BTCUSDT", "1h", 4);
+    assert.equal(cached.computedAt, result.computedAt);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});

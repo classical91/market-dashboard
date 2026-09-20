@@ -265,6 +265,10 @@ class SignalScreenerService {
       rsi: Number(r.toFixed(1)),
       adx: adx[last] != null ? Number(adx[last].toFixed(1)) : null,
       price: closes[last],
+      // Which closed candle these checks were confirmed on. Cached rows are
+      // indistinguishable from fresh ones without it, so callers that display
+      // a row cannot tell a current read from a stalled feed.
+      candleCloseTime: Number.isFinite(candles[last].closeTime) ? candles[last].closeTime : null,
       trendRegime,
       extreme: calculateLocalExtremes(candles),
       indicators: {
@@ -293,6 +297,9 @@ class SignalScreenerService {
       // Signal checks confirm on closed candles, but the displayed price
       // should still be current, not up to a full bar stale.
       if (!result.error && livePrice != null) result.price = livePrice;
+      // Stamped inside the loader so it is cached with the payload: this is
+      // when the row was computed, not when it was read back out.
+      result.computedAt = new Date().toISOString();
       return result;
     };
     try {
