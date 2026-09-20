@@ -125,3 +125,30 @@ test("Local extremes is the view the page opens on", () => {
   assert.match(page, /id="ss-tab-signals" aria-selected="false"/);
   assert.match(page, /<section class="ss-view" id="ss-view-signals"[^>]*hidden>/);
 });
+
+test("Local extremes rows can be starred into My Trades, like Pattern Scanner", () => {
+  assert.match(page, /<script src="\/assets\/js\/admin-key\.js"><\/script>/, "mutation needs the admin-key helper");
+  assert.match(page, /data-role="track-btn"/);
+  assert.match(page, /AdminKey\.fetch\('\/api\/watchlist'/);
+  assert.match(page, /method: tracked \? 'DELETE' : 'POST'/, "the same star toggles both ways");
+  // The row renders the star beside the chart link.
+  assert.match(page, /tickerLink\(entry\.symbol\) \+ trackButton\(entry\.symbol\)/);
+  assert.match(css, /\.ss-track-btn--active \{ color: #f5c542/);
+});
+
+test("Tracking is keyed by symbol and timeframe, and read before the first paint", () => {
+  // The same token on 4h and on 1D are two separate watchlist entries, so the
+  // star must reflect the timeframe currently on screen.
+  assert.match(page, /function trackKey\(symbol, interval\) \{\s*return symbol \+ ':' \+ interval;/);
+  assert.match(page, /trackedKeys\[trackKey\(symbol, intervalSelect\.value\)\]/);
+  assert.match(page, /data-interval="' \+ escapeHtml\(intervalSelect\.value\)/);
+  // Stars are correct on the first render rather than filling in a beat later.
+  assert.match(page, /loadTracked\(\)\.then\(function \(\) \{ load\(false\); \}\)/);
+});
+
+test("The USDT.D context row carries no star: My Trades cannot scan it", () => {
+  // It has no OHLCV, so a tracked entry would produce a card neither engine
+  // could fill. The dominance row is built without a track button.
+  const dominanceRow = page.slice(page.indexOf("function renderDominanceRow"), page.indexOf("function renderExtremes"));
+  assert.doesNotMatch(dominanceRow, /track-btn|trackButton/);
+});
