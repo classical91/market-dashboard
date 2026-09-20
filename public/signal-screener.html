@@ -204,9 +204,34 @@
       return '<span class="ss-extreme-state ss-extreme-state--' + state.toLowerCase() + '">' + side + ' ' + escapeHtml(state.replace('_', ' ')) + '</span>';
     }
 
-    function renderExtremeRow(entry) {
+    // BTC sets the weather for everything else on the board, so it is read as
+    // context rather than as one more ranked candidate: pinned to the top,
+    // never consuming a rank, and tinted by its own extreme state. Ranks below
+    // it start at #1, so the first altcoin reads as the first candidate.
+    var PINNED_SYMBOLS = ['BTCUSDT'];
+
+    function isPinned(symbol) {
+      return PINNED_SYMBOLS.indexOf(symbol) !== -1;
+    }
+
+    // The tint tracks the extreme state, never the bias: a green BTC card
+    // whenever bias is bullish would rebuild the LONG-67-with-a-confirmed-top
+    // confusion this page exists to avoid.
+    function pinStateClass(extreme) {
+      var state = extreme && extreme.state ? extreme.state : 'NONE';
+      return 'ss-pin-state--' + state.toLowerCase();
+    }
+
+    function rowMarker(rank) {
+      return rank == null
+        ? '<span class="ss-pin-tag">Context</span>'
+        : '<span class="ss-rank">#' + rank + '</span>';
+    }
+
+    function renderExtremeRow(entry, rank) {
       if (entry.error || !entry.extreme || entry.extreme.error) {
-        return '<tr class="ss-error-row"><td>' + escapeHtml(entry.symbol) + '</td><td colspan="7">' +
+        return '<tr class="ss-error-row' + (rank == null ? ' ss-extreme-row--pinned' : '') + '"><td>' +
+          '<span class="ss-token-head">' + rowMarker(rank) + '<span>' + escapeHtml(entry.symbol) + '</span></span></td><td colspan="7">' +
           escapeHtml(entry.error || entry.extreme.error || 'Local-extreme data unavailable') + '</td></tr>';
       }
       var extreme = entry.extreme;
@@ -216,9 +241,11 @@
         : 'No active extreme';
       var context = extreme.context || {};
       var contextText = context.trend === 'UNKNOWN' ? 'Warming up' : context.trend + (context.setupType && context.setupType !== 'none' ? ' · ' + context.setupType : '');
+      var pinned = rank == null;
       return (
-        '<tr class="ss-extreme-row ss-extreme-row--' + (extreme.dominant || 'none') + '">' +
-          '<td>' + tickerLink(entry.symbol) + '</td>' +
+        '<tr class="ss-extreme-row ss-extreme-row--' + (extreme.dominant || 'none') +
+          (pinned ? ' ss-extreme-row--pinned ' + pinStateClass(extreme) : '') + '">' +
+          '<td><span class="ss-token-head">' + rowMarker(rank) + tickerLink(entry.symbol) + '</span></td>' +
           '<td data-label="Price">' + fmtPrice(entry.price) + '</td>' +
           '<td data-label="Bias">' + signalBadge(entry) + '</td>' +
           '<td data-label="Bottom">' + extremeMeter(extreme.bottom.score, 'bottom') + '</td>' +
@@ -231,12 +258,21 @@
     }
 
     function renderExtremes(results) {
-      var ranked = results.slice().sort(function (a, b) {
+      // Pinned rows are lifted out before the sort, so the ranking algorithm
+      // itself is untouched and the first ranked row is #1.
+      var pinned = PINNED_SYMBOLS
+        .map(function (symbol) {
+          return results.filter(function (entry) { return entry.symbol === symbol; })[0];
+        })
+        .filter(Boolean);
+      var ranked = results.filter(function (entry) { return !isPinned(entry.symbol); }).sort(function (a, b) {
         var aScore = a.extreme && !a.extreme.error ? Math.max(a.extreme.bottom.score, a.extreme.top.score) : -1;
         var bScore = b.extreme && !b.extreme.error ? Math.max(b.extreme.bottom.score, b.extreme.top.score) : -1;
         return bScore - aScore;
       });
-      extremeTbody.innerHTML = ranked.length ? ranked.map(renderExtremeRow).join('') : '<tr><td colspan="8" class="ss-empty-row">No scan results yet.</td></tr>';
+      var rows = pinned.map(function (entry) { return renderExtremeRow(entry, null); })
+        .concat(ranked.map(function (entry, index) { return renderExtremeRow(entry, index + 1); }));
+      extremeTbody.innerHTML = rows.length ? rows.join('') : '<tr><td colspan="8" class="ss-empty-row">No scan results yet.</td></tr>';
       var usable = results.filter(function (entry) { return entry.extreme && !entry.extreme.error; });
       var bottomLeads = usable.filter(function (entry) { return entry.extreme.dominant === 'bottom'; }).length;
       var topLeads = usable.filter(function (entry) { return entry.extreme.dominant === 'top'; }).length;

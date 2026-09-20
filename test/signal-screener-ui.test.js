@@ -78,3 +78,24 @@ test("LONG/SHORT stay reserved for pages that publish an actual setup", () => {
   assert.match(page, /LONG \/ SHORT stay reserved for pages that publish an actual setup/);
   assert.match(page, /Bias is not an entry/);
 });
+
+test("BTC is pinned as market context and never consumes a rank", () => {
+  assert.match(page, /var PINNED_SYMBOLS = \['BTCUSDT'\]/);
+  // Pinned rows are lifted out before the sort, so the comparator is untouched
+  // and the first ranked row is #1 rather than #2.
+  assert.match(page, /results\.filter\(function \(entry\) \{ return !isPinned\(entry\.symbol\); \}\)\.sort/);
+  assert.match(page, /ranked\.map\(function \(entry, index\) \{ return renderExtremeRow\(entry, index \+ 1\); \}\)/);
+  assert.match(page, /renderExtremeRow\(entry, null\)/);
+  assert.match(page, /'<span class="ss-rank">#' \+ rank/);
+});
+
+test("The pinned card is tinted by extreme state, never by bias", () => {
+  // A card that goes green whenever bias is bullish would rebuild the
+  // LONG-67-with-a-confirmed-top confusion the bias rename removed.
+  const pinState = page.slice(page.indexOf("function pinStateClass"), page.indexOf("function rowMarker"));
+  assert.match(pinState, /extreme\.state/);
+  assert.doesNotMatch(pinState, /signal|BIAS_LABELS|bias/i);
+  assert.match(css, /\.ss-extreme-row--pinned\.ss-pin-state--confirmed \{ --pin-alpha/);
+  assert.match(css, /\.ss-extreme-row--pinned\.ss-extreme-row--top \{ --pin-rgb: 255, 93, 93/);
+  assert.match(css, /\.ss-extreme-row--pinned\.ss-extreme-row--bottom \{ --pin-rgb: 0, 184, 148/);
+});
