@@ -117,3 +117,11 @@ test("A missing or failed dominance read drops the row instead of faking one", (
   assert.match(page, /if \(!dominance \|\| dominance\.percent == null\) return ''/);
   assert.match(page, /renderExtremes\(data\.results \|\| \[\], data\.context \|\| null\)/);
 });
+
+test("Local extremes is the view the page opens on", () => {
+  assert.match(page, /class="ss-view-tab is-active"[^>]+id="ss-tab-extremes" aria-selected="true"/);
+  assert.match(page, /<section class="ss-view is-active" id="ss-view-extremes"/);
+  // The bias view must be both inert and hidden, or its panels render beneath.
+  assert.match(page, /id="ss-tab-signals" aria-selected="false"/);
+  assert.match(page, /<section class="ss-view" id="ss-view-signals"[^>]*hidden>/);
+});
