@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="/assets/styles/command.css" />
   <link rel="stylesheet" href="/assets/styles/ai-analysis.css" />
   <link rel="stylesheet" href="/assets/styles/pattern-scanner.css" />
+  <link rel="stylesheet" href="/assets/styles/trade-context.css" />
 </head>
 <body>
 <div class="app">
@@ -17,35 +18,38 @@
     <div class="cmd-page-header">
       <div>
         <div class="cmd-page-title">&#9733; My Trades</div>
-        <div class="cmd-page-subtitle">Tokens you've starred on Pattern Scanner &mdash; their live pattern/divergence status, so you can keep up with what you're actually trading</div>
+        <div class="cmd-page-subtitle">The pairs you've starred, each with its directional bias, local extremes and pattern status side by side &mdash; context on what you're following, not a recommendation</div>
       </div>
     </div>
 
-    <div class="aia-notice" id="ps-notice" style="display:none"></div>
+    <div class="aia-notice" id="tc-notice" style="display:none"></div>
 
     <div class="ps-toolbar">
-      <button class="aia-run-btn" type="button" id="ps-refresh-btn">Refresh</button>
+      <button class="aia-run-btn" type="button" id="tc-refresh-btn">Refresh</button>
       <a class="aia-run-btn ps-trades-link" href="/pattern-scanner.html">&#128200; Pattern Scanner</a>
-      <span class="ps-updated" id="ps-updated"></span>
+      <a class="aia-run-btn ps-trades-link" href="/signal-screener.html">&#9889; Signal Screener</a>
+      <span class="ps-updated" id="tc-updated"></span>
     </div>
 
-    <div class="ps-grid" id="ps-grid"></div>
+    <div class="tc-grid" id="tc-grid"></div>
 
     <details class="aia-how aia-how--footer" open>
       <summary>&#8505;&#65039; How this page works</summary>
       <div class="aia-how-body">
         <ol class="aia-how-steps">
-          <li><strong>Star a setup in Pattern Scanner.</strong> This page collects those saved symbol/timeframe pairs into one focused watchlist.</li>
-          <li><strong>Refresh for current context.</strong> Each card shows the latest pattern or divergence status, even when the original setup is no longer active.</li>
+          <li><strong>Star a setup in Pattern Scanner.</strong> This page collects those saved symbol/timeframe pairs and reports the full state of each one.</li>
+          <li><strong>Read the three engines separately.</strong> Directional bias is the environment, local extremes are where price sits inside it, and the pattern is the structure forming &mdash; they measure different things and are never merged.</li>
+          <li><strong>Use the context strip for agreement, not instruction.</strong> ALIGNED, MIXED, CONFLICT, QUIET and PARTIAL describe whether the engines currently point the same way &mdash; PARTIAL means an engine is down and there is too little left to compare. Deciding what to do with any of it is yours.</li>
           <li><strong>Unstar to remove it.</strong> This is a research watchlist; it does not place, manage, or close trades.</li>
         </ol>
         <ul class="aia-how-notes">
-          <li><strong>AI use: No.</strong> This page displays saved watchlist items and rules-based Pattern Scanner results without calling an AI model.</li>
+          <li><strong>No combined score.</strong> Averaging direction, exhaustion and structure into one number would hide exactly the disagreement worth seeing &mdash; a BULLISH bias beside a confirmed top is information, not an error.</li>
+          <li><strong>AI use: No.</strong> Every number here comes from the same fixed indicator rules the Signal Screener and Pattern Scanner already run; this page only assembles them.</li>
         </ul>
       </div>
     </details>
 
-    <footer>My Trades &mdash; <a href="/pattern-scanner.html">Pattern Scanner</a> &mdash; <a href="/ai-analysis.html">AI Analysis</a> &mdash; <a href="/">Overview</a></footer>
+    <footer>My Trades &mdash; <a href="/pattern-scanner.html">Pattern Scanner</a> &mdash; <a href="/signal-screener.html">Signal Screener</a> &mdash; <a href="/">Overview</a></footer>
 
   </main>
 </div>
@@ -54,75 +58,167 @@
 <script src="/assets/js/pattern-render.js"></script>
 <script>
   (function () {
-    var grid = document.getElementById('ps-grid');
-    var notice = document.getElementById('ps-notice');
-    var updatedEl = document.getElementById('ps-updated');
-    var refreshBtn = document.getElementById('ps-refresh-btn');
-
+    var grid = document.getElementById('tc-grid');
+    var notice = document.getElementById('tc-notice');
+    var updatedEl = document.getElementById('tc-updated');
+    var refreshBtn = document.getElementById('tc-refresh-btn');
     var escapeHtml = PatternRender.escapeHtml;
-    var renderCard = PatternRender.renderCard;
-    var drawChart = PatternRender.drawChart;
 
-    // Untracking here always removes (there's no "add" state on this page),
-    // so the star only ever needs to go one direction.
-    function toggleTrack(btn) {
-      var symbol = btn.getAttribute('data-symbol');
-      var interval = btn.getAttribute('data-interval');
+    var TV_INTERVALS = { '15m': '15', '1h': '60', '4h': '240', '1D': 'D', '1W': 'W' };
+
+    function fmtPrice(px) {
+      if (px == null) return '—';
+      if (px >= 1000) return px.toLocaleString(undefined, { maximumFractionDigits: 2 });
+      if (px >= 1) return px.toFixed(4);
+      return px.toFixed(6);
+    }
+
+    function clampScore(score) {
+      return Math.max(0, Math.min(100, Number(score) || 0));
+    }
+
+    function stateClass(state) {
+      return 'tc-pill--' + String(state || 'none').toLowerCase().replace(/[^a-z]/g, '');
+    }
+
+    function chartLink(symbol, interval) {
+      var url = 'https://www.tradingview.com/chart/?symbol=' + encodeURIComponent('BINANCE:' + symbol) +
+        '&interval=' + encodeURIComponent(TV_INTERVALS[interval] || '240');
+      var label = 'Open ' + escapeHtml(symbol) + ' ' + escapeHtml(interval) + ' on TradingView';
+      return '<a class="ss-chart-link" href="' + url + '" target="_blank" rel="noopener" title="' + label + '" aria-label="' + label + '">' +
+        '<span aria-hidden="true">&#128200;</span> Chart</a>';
+    }
+
+    // Each engine renders its own section and says so when it has nothing —
+    // an absent pattern and a failed scan must not look alike.
+    function biasSection(bias) {
+      if (bias.error) return '<div class="tc-muted">' + escapeHtml(bias.error) + '</div>';
+      var css = bias.bias === 'BULLISH' ? 'bullish' : bias.bias === 'BEARISH' ? 'bearish' : 'neutral';
+      var regime = bias.trendRegime ? String(bias.trendRegime).replace('TREND_', '').replace('_', ' ') : null;
+      return (
+        '<div class="tc-row">' +
+          '<span class="tc-bias tc-bias--' + css + '">' + escapeHtml(bias.bias) + ' ' + clampScore(bias.score) + '</span>' +
+          (regime ? '<span class="tc-meta">Trend: ' + escapeHtml(regime) + '</span>' : '') +
+        '</div>' +
+        (bias.rsi != null || bias.adx != null
+          ? '<div class="tc-row"><span class="tc-meta" style="margin-left:0">RSI ' + (bias.rsi == null ? '—' : bias.rsi) +
+            ' · ADX ' + (bias.adx == null ? '—' : bias.adx) + '</span></div>'
+          : '')
+      );
+    }
+
+    function meter(side, score) {
+      var value = clampScore(score);
+      return (
+        '<div class="tc-extreme tc-extreme--' + side + '">' +
+          '<div class="tc-extreme-label">' + (side === 'bottom' ? 'Bottom' : 'Top') + '</div>' +
+          '<div class="tc-extreme-value">' + (score == null ? '—' : value) + '</div>' +
+          '<div class="tc-extreme-track"><span style="width:' + value + '%"></span></div>' +
+        '</div>'
+      );
+    }
+
+    function extremesSection(extremes) {
+      if (extremes.error) return '<div class="tc-muted">' + escapeHtml(extremes.error) + '</div>';
+      var state = extremes.state || 'NONE';
+      var label = extremes.dominant ? extremes.dominant.toUpperCase() + ' ' + state : state;
+      return (
+        '<div class="tc-extremes">' + meter('bottom', extremes.bottomScore) + meter('top', extremes.topScore) + '</div>' +
+        '<div class="tc-row" style="margin-top:8px">' +
+          '<span class="tc-pill ' + stateClass(state) + '">' + escapeHtml(label) + '</span>' +
+          (extremes.setupType && extremes.setupType !== 'none'
+            ? '<span class="tc-meta">' + escapeHtml(extremes.setupType) + '</span>' : '') +
+        '</div>'
+      );
+    }
+
+    function patternsSection(patterns) {
+      if (patterns.error) return '<div class="tc-muted">' + escapeHtml(patterns.error) + '</div>';
+      if (!patterns.pattern && !patterns.divergence) {
+        return '<div class="tc-muted">No pattern or divergence detected right now.</div>';
+      }
+      var rows = '';
+      if (patterns.divergence) {
+        rows += '<div class="tc-row"><span class="tc-pattern tc-pattern--' + escapeHtml(patterns.divergenceBias || 'neutral') + '">' +
+          (patterns.divergenceBias === 'bullish' ? '&#128994; ' : '&#128308; ') + escapeHtml(patterns.divergence) + ' divergence</span>' +
+          (patterns.divergenceBarsAgo != null ? '<span class="tc-meta">' + patterns.divergenceBarsAgo + (patterns.divergenceBarsAgo === 1 ? ' bar' : ' bars') + ' ago</span>' : '') + '</div>';
+      }
+      if (patterns.pattern) {
+        rows += '<div class="tc-row"><span class="tc-pattern tc-pattern--' + escapeHtml(patterns.patternBias || 'neutral') + '">' +
+          escapeHtml(patterns.pattern) + '</span>' +
+          '<span class="tc-meta">' + escapeHtml(patterns.status || '—') +
+          (patterns.patternScore != null ? ' · ' + clampScore(patterns.patternScore) : '') + '</span></div>';
+      }
+      return rows;
+    }
+
+    function renderCard(card, index) {
+      var context = card.context || { state: 'QUIET', summary: '' };
+      return (
+        '<div class="tc-card">' +
+          '<div class="tc-head">' +
+            '<span class="tc-symbol">' + escapeHtml(card.symbol) + '</span>' +
+            '<span class="tc-interval">' + escapeHtml(card.interval) + '</span>' +
+            chartLink(card.symbol, card.interval) +
+            '<span class="tc-price">' + fmtPrice(card.price) + '</span>' +
+            '<button class="tc-untrack" type="button" data-role="untrack" data-symbol="' + escapeHtml(card.symbol) +
+              '" data-interval="' + escapeHtml(card.interval) + '" title="Remove from My Trades">&#9733; Untrack</button>' +
+          '</div>' +
+          '<div class="tc-section"><div class="tc-section-label">Directional bias</div>' + biasSection(card.directionalBias) + '</div>' +
+          '<div class="tc-section"><div class="tc-section-label">Local extremes</div>' + extremesSection(card.extremes) + '</div>' +
+          '<div class="tc-section"><div class="tc-section-label">Pattern scanner</div>' + patternsSection(card.patterns) + '</div>' +
+          (card.evidence && card.evidence.length
+            ? '<div class="tc-section"><div class="tc-section-label">Evidence</div><ul class="tc-evidence">' +
+              card.evidence.map(function (line) { return '<li>' + escapeHtml(line) + '</li>'; }).join('') + '</ul></div>'
+            : '') +
+          (card.chart ? '<canvas class="tc-chart" data-chart-index="' + index + '"></canvas>' : '') +
+          '<div class="tc-context tc-context--' + escapeHtml(String(context.state).toLowerCase()) + '">' +
+            '<span class="tc-context-state">' + escapeHtml(context.state) + '</span>' +
+            '<span class="tc-context-summary">' + escapeHtml(context.summary || '') + '</span>' +
+          '</div>' +
+          (card.errors && card.errors.length
+            ? '<div class="tc-error">&#9888;&#65039; ' + escapeHtml(card.errors.join(' · ')) + '</div>'
+            : '') +
+        '</div>'
+      );
+    }
+
+    function render(cards) {
+      if (!cards.length) {
+        grid.innerHTML = '<div class="tc-empty">Nothing tracked yet. Star a card on <a href="/pattern-scanner.html">Pattern Scanner</a> to follow it here.</div>';
+        return;
+      }
+      grid.innerHTML = cards.map(renderCard).join('');
+      grid.querySelectorAll('canvas[data-chart-index]').forEach(function (canvas) {
+        var card = cards[Number(canvas.getAttribute('data-chart-index'))];
+        if (card && card.chart) PatternRender.drawChart(canvas, card.chart);
+      });
+    }
+
+    function untrack(btn) {
       btn.disabled = true;
       AdminKey.fetch('/api/watchlist', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ symbol: symbol, interval: interval })
+        body: JSON.stringify({ symbol: btn.getAttribute('data-symbol'), interval: btn.getAttribute('data-interval') })
       })
         .then(function () { load(); })
         .catch(function () { btn.disabled = false; });
     }
 
     grid.addEventListener('click', function (e) {
-      if (e.target.closest('[data-role="ticker-link"], .ps-ticker-link')) return;
-      var trackBtn = e.target.closest('[data-role="track-btn"]');
-      if (trackBtn) { toggleTrack(trackBtn); return; }
-      var head = e.target.closest('[data-role="head"]');
-      if (!head) return;
-      head.closest('.ps-card').classList.toggle('collapsed');
+      var btn = e.target.closest('[data-role="untrack"]');
+      if (btn) untrack(btn);
     });
-
-    function render(items, scanByKey) {
-      if (!items.length) {
-        grid.innerHTML = '<div class="ps-empty">Nothing tracked yet. Star a card on <a href="/pattern-scanner.html">Pattern Scanner</a> to follow it here.</div>';
-        return;
-      }
-      var entries = items.map(function (item) {
-        var key = item.symbol + ':' + item.interval;
-        var scan = scanByKey[key];
-        if (scan) return scan;
-        // Not in the current scan result (e.g. scan failed for it, or it's
-        // simply not flagged with a pattern/divergence right now) — still
-        // show it, just with nothing detected.
-        return { symbol: item.symbol, interval: item.interval, label: item.label || item.symbol, pattern: null, divergence: null };
-      });
-      grid.innerHTML = entries.map(function (entry, i) {
-        return renderCard(entry, i, { collapsed: false, tracked: true });
-      }).join('');
-      grid.querySelectorAll('canvas[data-chart-index]').forEach(function (canvas) {
-        var entry = entries[Number(canvas.getAttribute('data-chart-index'))];
-        if (entry && entry.chart) drawChart(canvas, entry.chart);
-      });
-    }
 
     function load() {
       refreshBtn.disabled = true;
       refreshBtn.textContent = 'Loading…';
-      Promise.all([
-        fetch('/api/watchlist').then(function (res) { return res.json(); }),
-        fetch('/api/pattern-scanner').then(function (res) { return res.json(); })
-      ])
-        .then(function (results) {
-          var items = results[0].items || [];
-          var scanResults = results[1].results || [];
-          var scanByKey = {};
-          scanResults.forEach(function (r) { scanByKey[r.symbol + ':' + r.interval] = r; });
-          render(items, scanByKey);
+      notice.style.display = 'none';
+      fetch('/api/trade-context')
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          render(data.cards || []);
           updatedEl.textContent = 'Updated ' + new Date().toLocaleTimeString();
         })
         .catch(function (err) {
