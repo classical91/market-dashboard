@@ -109,6 +109,12 @@
 
     function trackKey(symbol, interval) { return symbol + ':' + interval; }
 
+    // Any BTC detection (on any timeframe) is pinned to the top of the scan.
+    function isPinned(entry) {
+      var base = String((entry && entry.label) || (entry && entry.symbol) || '').toUpperCase();
+      return /^BTC(USD|USDT|USDC|PERP)?$/.test(base);
+    }
+
     function loadWatchlist() {
       return fetch('/api/watchlist')
         .then(function (res) { return res.json(); })
@@ -125,7 +131,13 @@
       lastResults = results;
       var hits = results.filter(function (r) { return r.pattern || r.divergence; });
       var errors = results.filter(function (r) { return r.error; });
+      // BTC leads the market, so any BTC hit is pinned above the rest of the
+      // scan regardless of its pattern score; within each group the usual
+      // highest-score-first order still applies.
       hits.sort(function (a, b) {
+        var pinA = isPinned(a) ? 1 : 0;
+        var pinB = isPinned(b) ? 1 : 0;
+        if (pinA !== pinB) return pinB - pinA;
         var scoreA = (a.pattern && a.pattern.score) || 0;
         var scoreB = (b.pattern && b.pattern.score) || 0;
         return scoreB - scoreA;
@@ -133,7 +145,11 @@
       var scannedNote = '<div class="ps-empty">Scanned ' + results.length + ' token/timeframe combos &mdash; ' + hits.length + ' with a pattern or divergence.</div>';
       grid.innerHTML = scannedNote +
         hits.map(function (entry, i) {
-          return renderCard(entry, i, { collapsed: !allExpanded, tracked: !!trackedKeys[trackKey(entry.symbol, entry.interval)] });
+          return renderCard(entry, i, {
+            collapsed: !allExpanded,
+            tracked: !!trackedKeys[trackKey(entry.symbol, entry.interval)],
+            pinned: isPinned(entry)
+          });
         }).join('') +
         errors.map(function (entry) { return renderCard(entry, -1, {}); }).join('');
       grid.querySelectorAll('canvas[data-chart-index]').forEach(function (canvas) {

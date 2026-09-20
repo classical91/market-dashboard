@@ -180,6 +180,17 @@
   padding: 2px 6px;
 }
 
+.ps-pin {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #f2b134;
+  background: rgba(242,177,52,0.12);
+  border: 1px solid rgba(242,177,52,0.4);
+  border-radius: 6px;
+  padding: 2px 6px;
+}
+
 .ps-bias {
   font-size: 10px;
   font-weight: 700;
