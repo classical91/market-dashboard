@@ -29,6 +29,7 @@ const { createSignalScreenerRouter } = require("./routes/signal-screener");
 const { createStrategyEngineRouter } = require("./routes/strategy-engine");
 const { createTradingLabRouter } = require("./routes/trading-lab");
 const { createWatchlistRouter } = require("./routes/watchlist");
+const { createTradeContextRouter } = require("./routes/trade-context");
 const { createBotCommandsRouter } = require("./routes/bot-commands");
 const { createPatternTrackerRouter } = require("./routes/pattern-tracker");
 const { createLiveScannerRouter } = require("./routes/live-scanner");
@@ -65,6 +66,7 @@ const { ResearchQueue } = require("./services/trading/research-queue");
 const { LiveScannerService } = require("./services/trading/live-scanner");
 const { LiveResearchService } = require("./services/trading/live-research-runner");
 const { WatchlistService } = require("./services/watchlist");
+const { TradeContextService } = require("./services/trade-context");
 const { BotCommandsService } = require("./services/bot-commands");
 const { PatternTrackerService } = require("./services/pattern-tracker");
 const { MemoryCache } = require("./services/cache");
@@ -249,6 +251,13 @@ function createApp() {
   const usdtDominanceService = new UsdtDominanceService({ marketDataService, dataDir });
   const strategyEngineService = new StrategyEngineService({ signalScreenerService });
   const watchlistService = new WatchlistService({ dataDir });
+  // Pure aggregation over the engines above — it owns no indicator maths and
+  // asks both scanners per tracked symbol rather than for the full universe.
+  const tradeContextService = new TradeContextService({
+    watchlistService,
+    signalScreenerService,
+    patternScannerService,
+  });
   const botCommandsService = new BotCommandsService({ dataDir });
   const patternTrackerService = new PatternTrackerService({ dataDir, fetchPrice: fetchBinancePrice });
   const signalActionStore = new SignalActionStore({ dataDir });
@@ -450,6 +459,7 @@ function createApp() {
   app.use("/api/trading-lab", createTradingLabRouter({ tradingLabService, backtestService, signalActionStore, experimentStore, researchQueue, signalScreenerService, tradeJournalService, requireAdmin }));
   app.use("/api/live-scanner", createLiveScannerRouter({ liveScannerService, requireAdmin }));
   app.use("/api/watchlist", createWatchlistRouter({ watchlistService, requireAdmin }));
+  app.use("/api/trade-context", createTradeContextRouter({ tradeContextService }));
   app.use("/api/bot-commands", createBotCommandsRouter({ botCommandsService }));
   app.use("/api/pattern-tracker", createPatternTrackerRouter({ patternTrackerService }));
   app.use("/api/onchain", createOnchainRouter({ onchainService }));

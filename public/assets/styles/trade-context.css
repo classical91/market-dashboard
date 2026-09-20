@@ -1,0 +1,163 @@
+/* ─────────────────────────────────────────────────────────
+   My Trades — one tracked pair, one card, three engines kept
+   visually separate so none of them reads as the verdict.
+───────────────────────────────────────────────────────── */
+
+.tc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 14px;
+}
+
+.tc-card {
+  min-width: 0;
+  border: 1px solid rgba(74, 74, 170, 0.32);
+  border-radius: var(--radius);
+  background: #0a0a14;
+  overflow: hidden;
+}
+
+.tc-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(42, 42, 74, 0.7);
+}
+
+.tc-symbol { font-size: 15px; font-weight: 800; color: #fff; }
+.tc-interval {
+  padding: 2px 7px;
+  border: 1px solid rgba(137, 146, 166, 0.35);
+  border-radius: 5px;
+  color: #8892a6;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.tc-price { margin-left: auto; color: #c9d4e8; font-size: 13px; font-variant-numeric: tabular-nums; }
+
+.tc-untrack {
+  border: 1px solid rgba(255, 93, 93, 0.35);
+  border-radius: 6px;
+  padding: 4px 8px;
+  background: rgba(255, 93, 93, 0.1);
+  color: #ff8b7b;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.tc-untrack:hover { background: rgba(255, 93, 93, 0.2); }
+.tc-untrack:disabled { opacity: 0.5; cursor: default; }
+
+.tc-section { padding: 10px 14px; border-bottom: 1px solid rgba(42, 42, 74, 0.45); }
+.tc-section:last-child { border-bottom: 0; }
+
+.tc-section-label {
+  margin-bottom: 6px;
+  color: #6f7a91;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.tc-row { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.tc-row + .tc-row { margin-top: 5px; }
+.tc-meta { margin-left: auto; color: #8892a6; font-size: 10px; }
+
+.tc-bias { font-size: 14px; font-weight: 800; letter-spacing: 0.02em; }
+.tc-bias--bullish { color: #00e676; }
+.tc-bias--bearish { color: #ff1744; }
+.tc-bias--neutral { color: #9e9e9e; }
+
+/* Bottom and top sit side by side and always both render: seeing 15 next to
+   100 is the whole point of keeping the two scores independent. */
+.tc-extremes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tc-extreme-label { color: #6f7a91; font-size: 9px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.tc-extreme-value { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.tc-extreme--bottom .tc-extreme-value { color: #45d6b5; }
+.tc-extreme--top .tc-extreme-value { color: #ff8b7b; }
+.tc-extreme-track { height: 4px; margin-top: 4px; border-radius: 999px; background: rgba(255, 255, 255, 0.09); overflow: hidden; }
+.tc-extreme-track span { display: block; height: 100%; border-radius: inherit; }
+.tc-extreme--bottom .tc-extreme-track span { background: #00b894; }
+.tc-extreme--top .tc-extreme-track span { background: #ff5d5d; }
+
+.tc-pill {
+  display: inline-block;
+  padding: 3px 7px;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+.tc-pill--none { color: #8892a6; background: rgba(137, 146, 166, 0.12); }
+.tc-pill--watch { color: #ffd166; background: rgba(255, 209, 102, 0.12); }
+.tc-pill--candidate { color: #ffb55f; background: rgba(255, 181, 95, 0.14); }
+.tc-pill--confirming { color: #73d7ff; background: rgba(115, 215, 255, 0.14); }
+.tc-pill--confirmed { color: #79f2c0; background: rgba(121, 242, 192, 0.15); }
+
+.tc-pattern { color: #e8eefb; font-size: 12px; font-weight: 700; }
+.tc-pattern--bullish { color: #00e676; }
+.tc-pattern--bearish { color: #ff1744; }
+.tc-muted { color: #6f7a91; font-size: 11px; font-style: italic; }
+
+.tc-evidence { margin: 0; padding-left: 16px; color: #c9d4e8; font-size: 11px; line-height: 1.7; }
+.tc-evidence li::marker { color: #4da3ff; }
+
+/* The context strip is the only synthesis on the card, and it says whether
+   the engines agree — never what to do about it. */
+.tc-context {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px 14px;
+  border-top: 1px solid rgba(42, 42, 74, 0.7);
+  background: rgba(137, 146, 166, 0.06);
+}
+
+.tc-context-state {
+  flex: 0 0 auto;
+  padding: 3px 8px;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+.tc-context-summary { color: #a8b6cf; font-size: 11px; line-height: 1.5; }
+
+.tc-context--aligned { background: rgba(0, 184, 148, 0.08); }
+.tc-context--aligned .tc-context-state { color: #79f2c0; background: rgba(121, 242, 192, 0.16); }
+.tc-context--mixed { background: rgba(255, 181, 95, 0.08); }
+.tc-context--mixed .tc-context-state { color: #ffb55f; background: rgba(255, 181, 95, 0.16); }
+.tc-context--conflict { background: rgba(255, 93, 93, 0.09); }
+.tc-context--conflict .tc-context-state { color: #ff8b7b; background: rgba(255, 93, 93, 0.18); }
+.tc-context--partial { background: rgba(115, 215, 255, 0.07); }
+.tc-context--partial .tc-context-state { color: #73d7ff; background: rgba(115, 215, 255, 0.16); }
+.tc-context--quiet .tc-context-state { color: #8892a6; background: rgba(137, 146, 166, 0.14); }
+
+.tc-error {
+  padding: 7px 14px;
+  border-top: 1px solid rgba(255, 93, 93, 0.25);
+  color: #ff8b7b;
+  font-size: 10px;
+}
+
+.tc-chart { display: block; width: 100%; height: 120px; background: #06060f; }
+
+.tc-empty {
+  padding: 22px;
+  border: 1px dashed rgba(137, 146, 166, 0.3);
+  border-radius: var(--radius);
+  color: #8892a6;
+  font-size: 13px;
+  text-align: center;
+}
+
+@media (max-width: 720px) {
+  .tc-grid { grid-template-columns: 1fr; gap: 12px; }
+  .tc-head { flex-wrap: wrap; }
+  .tc-price { margin-left: 0; flex-basis: 100%; }
+  .tc-context { flex-direction: column; gap: 6px; }
+}
