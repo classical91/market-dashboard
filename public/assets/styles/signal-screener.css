@@ -220,6 +220,54 @@
 .ss-extreme-row--bottom { background: rgba(0, 180, 150, 0.075); }
 .ss-extreme-row--top { background: rgba(255, 93, 93, 0.075); }
 
+/* ── Pinned context row ───────────────────────────────────────────────────
+   BTC is read as the weather for the board rather than as a candidate, so its
+   row sits above the ranking with a heavier tint and a left accent. The hue
+   follows the dominant side and the alpha follows the state, so the colour
+   says "how far along is this extreme", never "is the bias bullish".
+───────────────────────────────────────────────────────────────────────── */
+.ss-extreme-row--pinned {
+  --pin-rgb: 137, 146, 166;
+  --pin-alpha: 0.10;
+  background: rgba(var(--pin-rgb), var(--pin-alpha));
+  box-shadow: inset 4px 0 rgb(var(--pin-rgb));
+}
+
+.ss-extreme-row--pinned td { border-bottom-color: rgba(var(--pin-rgb), 0.35); }
+.ss-extreme-row--pinned.ss-extreme-row--bottom { --pin-rgb: 0, 184, 148; }
+.ss-extreme-row--pinned.ss-extreme-row--top { --pin-rgb: 255, 93, 93; }
+.ss-extreme-row--pinned.ss-pin-state--watch { --pin-alpha: 0.12; }
+.ss-extreme-row--pinned.ss-pin-state--candidate { --pin-alpha: 0.18; }
+.ss-extreme-row--pinned.ss-pin-state--confirming { --pin-alpha: 0.24; }
+.ss-extreme-row--pinned.ss-pin-state--confirmed { --pin-alpha: 0.32; }
+.ss-extreme-row--pinned:hover { background: rgba(var(--pin-rgb), calc(var(--pin-alpha) + 0.06)); }
+
+.ss-token-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ss-rank {
+  min-width: 26px;
+  color: #8892a6;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.ss-pin-tag {
+  padding: 2px 6px;
+  border: 1px solid rgba(var(--pin-rgb, 137, 146, 166), 0.55);
+  border-radius: 5px;
+  color: #e8eefb;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
 .ss-extreme-meter {
   display: inline-grid;
   grid-template-columns: 24px 56px;
@@ -353,6 +401,9 @@
     letter-spacing: 0.06em;
     text-transform: uppercase;
   }
+
+  .ss-extreme-row--pinned { box-shadow: inset 4px 0 rgb(var(--pin-rgb)); }
+  .ss-rank { min-width: 0; }
 
   .ss-extreme-table tbody td:first-child {
     padding-bottom: 7px;
