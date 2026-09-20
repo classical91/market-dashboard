@@ -126,6 +126,7 @@
   </main>
 </div>
 <script src="/assets/js/sidebar.js"></script>
+<script src="/assets/js/admin-key.js"></script>
 <script>
   (function () {
     renderUpdated();
@@ -231,7 +232,8 @@
     function renderExtremeRow(entry, rank) {
       if (entry.error || !entry.extreme || entry.extreme.error) {
         return '<tr class="ss-error-row' + (rank == null ? ' ss-extreme-row--pinned' : '') + '"><td>' +
-          '<span class="ss-token-head">' + rowMarker(rank) + '<span>' + escapeHtml(entry.symbol) + '</span></span></td><td colspan="7">' +
+          '<span class="ss-token-head">' + rowMarker(rank) + '<span>' + escapeHtml(entry.symbol) + '</span>' +
+          trackButton(entry.symbol) + '</span></td><td colspan="7">' +
           escapeHtml(entry.error || entry.extreme.error || 'Local-extreme data unavailable') + '</td></tr>';
       }
       var extreme = entry.extreme;
@@ -245,7 +247,7 @@
       return (
         '<tr class="ss-extreme-row ss-extreme-row--' + (extreme.dominant || 'none') +
           (pinned ? ' ss-extreme-row--pinned ' + pinStateClass(extreme) : '') + '">' +
-          '<td><span class="ss-token-head">' + rowMarker(rank) + tickerLink(entry.symbol) + '</span></td>' +
+          '<td><span class="ss-token-head">' + rowMarker(rank) + tickerLink(entry.symbol) + trackButton(entry.symbol) + '</span></td>' +
           '<td data-label="Price">' + fmtPrice(entry.price) + '</td>' +
           '<td data-label="Bias">' + signalBadge(entry) + '</td>' +
           '<td data-label="Bottom">' + extremeMeter(extreme.bottom.score, 'bottom') + '</td>' +
@@ -294,7 +296,11 @@
       );
     }
 
+    var lastContext = null;
+
     function renderExtremes(results, context) {
+      lastResults = results;
+      lastContext = context;
       // Pinned rows are lifted out before the sort, so the ranking algorithm
       // itself is untouched and the first ranked row is #1.
       var pinned = PINNED_SYMBOLS
@@ -349,6 +355,62 @@
     }
 
     var lastScanAt = null;
+    // Starring works the same way it does on Pattern Scanner: the watchlist is
+    // keyed by symbol *and* timeframe, so the same token tracked on 4h and on
+    // 1D is two entries — and the star reflects the timeframe on screen.
+    var trackedKeys = {};
+    var lastResults = [];
+
+    function trackKey(symbol, interval) {
+      return symbol + ':' + interval;
+    }
+
+    function isTracked(symbol) {
+      return Boolean(trackedKeys[trackKey(symbol, intervalSelect.value)]);
+    }
+
+    function trackButton(symbol) {
+      var tracked = isTracked(symbol);
+      return (
+        '<button class="ss-track-btn' + (tracked ? ' ss-track-btn--active' : '') + '" type="button" data-role="track-btn" ' +
+        'data-symbol="' + escapeHtml(symbol) + '" data-interval="' + escapeHtml(intervalSelect.value) + '" ' +
+        'data-label="' + escapeHtml(symbol.replace(/USDT$/, '')) + '" ' +
+        'title="' + (tracked ? 'Remove from My Trades' : 'Add to My Trades') + '" ' +
+        'aria-label="' + (tracked ? 'Remove ' : 'Add ') + escapeHtml(symbol) + ' ' + escapeHtml(intervalSelect.value) +
+        (tracked ? ' from' : ' to') + ' My Trades">' + (tracked ? '&#9733;' : '&#9734;') + '</button>'
+      );
+    }
+
+    function loadTracked() {
+      return fetch('/api/watchlist')
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          trackedKeys = {};
+          (data.items || []).forEach(function (item) { trackedKeys[trackKey(item.symbol, item.interval)] = true; });
+        })
+        .catch(function () { /* anonymous or offline: stars stay unfilled */ });
+    }
+
+    function toggleTrack(btn) {
+      var symbol = btn.getAttribute('data-symbol');
+      var interval = btn.getAttribute('data-interval');
+      var key = trackKey(symbol, interval);
+      var tracked = Boolean(trackedKeys[key]);
+      btn.disabled = true;
+      AdminKey.fetch('/api/watchlist', {
+        method: tracked ? 'DELETE' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbol: symbol, interval: interval, label: btn.getAttribute('data-label') })
+      })
+        .then(function (res) { return res.json(); })
+        .then(function () {
+          if (tracked) delete trackedKeys[key];
+          else trackedKeys[key] = true;
+          renderExtremes(lastResults, lastContext);
+        })
+        .catch(function () { /* leave the star as-is; the user can retry */ })
+        .finally(function () { btn.disabled = false; });
+    }
 
     // Calendar-day difference, not a 24h rolling window — a scan at 11:58pm
     // read the next morning should say "yesterday", not "0 days ago".
@@ -477,7 +539,15 @@
     viewTabs.forEach(function (tab) {
       tab.addEventListener('click', function () { selectView(tab.id.replace('ss-tab-', '')); });
     });
-    load(false);
+
+    extremeTbody.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-role="track-btn"]');
+      if (btn) toggleTrack(btn);
+    });
+
+    // The watchlist is read first so the stars are already correct on the
+    // first paint rather than filling in a moment later.
+    loadTracked().then(function () { load(false); });
   })();
 </script>
 </body>
