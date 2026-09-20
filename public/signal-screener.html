@@ -257,7 +257,44 @@
       );
     }
 
-    function renderExtremes(results) {
+    // USDT.D cannot be scored: it is a CRYPTOCAP index with no candles and no
+    // volume, so the bias and extreme engines have nothing to run on. The row
+    // reports what is actually sourceable — the current level, and a direction
+    // once the server has accumulated enough of its own snapshots — and leaves
+    // the scored columns visibly empty rather than filling them with zeros.
+    function renderDominanceRow(dominance) {
+      if (!dominance || dominance.percent == null) return '';
+      var direction = dominance.direction;
+      var change = (dominance.changes && (dominance.changes.h24 || dominance.changes.h4)) || null;
+      var window = dominance.changes && dominance.changes.h24 ? '24h' : '4h';
+      var readout = direction
+        ? '<span class="ss-dom-direction ss-dom-direction--' + direction.toLowerCase() + '">' + direction +
+            (change ? ' <span class="ss-dom-delta">' + (change.delta > 0 ? '+' : '') + change.delta.toFixed(2) + 'pp/' + window + '</span>' : '') +
+          '</span>'
+        : '<span class="ss-dom-direction ss-dom-direction--pending" title="Direction needs snapshots spanning at least 4h; the server is collecting them">BUILDING HISTORY</span>';
+      var unscored = '<span class="ss-dom-na" title="Not scored — USDT.D has no OHLCV, so the candle-based engines cannot run on it">&mdash;</span>';
+      var note = dominance.live === false
+        ? 'Provider offline &middot; last known level'
+        : 'Stablecoin share of total market cap &middot; ' + escapeHtml(dominance.source || 'unknown');
+      return (
+        '<tr class="ss-extreme-row ss-extreme-row--pinned ss-extreme-row--dominance">' +
+          '<td><span class="ss-token-head">' + rowMarker(null) +
+            '<span class="ss-ticker-cell"><span class="ss-ticker-label">USDT.D</span>' +
+            '<a class="ss-chart-link" href="https://www.tradingview.com/chart/?symbol=CRYPTOCAP%3AUSDT.D" target="_blank" rel="noopener" ' +
+            'title="Open USDT.D on TradingView" aria-label="Open USDT.D on TradingView">' +
+            '<span aria-hidden="true">&#128200;</span><span class="ss-chart-link-text">Chart</span></a></span></span></td>' +
+          '<td data-label="Level">' + dominance.percent.toFixed(2) + '%</td>' +
+          '<td data-label="Direction">' + readout + '</td>' +
+          '<td data-label="Bottom">' + unscored + '</td>' +
+          '<td data-label="Top">' + unscored + '</td>' +
+          '<td data-label="Extreme state"><span class="ss-extreme-state ss-extreme-state--none" title="Not scored — no candle data for a CRYPTOCAP index">NOT SCORED</span></td>' +
+          '<td class="ss-context-cell" data-label="EMA200">No candle data</td>' +
+          '<td class="ss-reasons-cell" data-label="Reasons">' + note + '</td>' +
+        '</tr>'
+      );
+    }
+
+    function renderExtremes(results, context) {
       // Pinned rows are lifted out before the sort, so the ranking algorithm
       // itself is untouched and the first ranked row is #1.
       var pinned = PINNED_SYMBOLS
@@ -271,6 +308,8 @@
         return bScore - aScore;
       });
       var rows = pinned.map(function (entry) { return renderExtremeRow(entry, null); })
+        .concat([renderDominanceRow(context && context.usdtDominance)])
+        .filter(Boolean)
         .concat(ranked.map(function (entry, index) { return renderExtremeRow(entry, index + 1); }));
       extremeTbody.innerHTML = rows.length ? rows.join('') : '<tr><td colspan="8" class="ss-empty-row">No scan results yet.</td></tr>';
       var usable = results.filter(function (entry) { return entry.extreme && !entry.extreme.error; });
@@ -418,7 +457,7 @@
         .then(function (res) { return res.json(); })
         .then(function (data) {
           renderSplit(data.results || []);
-          renderExtremes(data.results || []);
+          renderExtremes(data.results || [], data.context || null);
           lastScanAt = new Date();
           renderUpdated();
         })

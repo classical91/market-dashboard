@@ -55,6 +55,7 @@ const { LayoutAnalysisService } = require("./services/layout-analysis");
 const { LayoutCaptureService } = require("./services/layout-capture");
 const { PatternScannerService } = require("./services/pattern-scanner");
 const { SignalScreenerService } = require("./services/signal-screener");
+const { UsdtDominanceService } = require("./services/usdt-dominance");
 const { StrategyEngineService } = require("./services/strategy-engine");
 const { SignalBotService } = require("./services/signal-bot");
 const { SignalTradeBridge } = require("./services/trading/signal-bridge");
@@ -245,6 +246,7 @@ function createApp() {
   });
   const patternScannerService = new PatternScannerService({ cache, tokens: TOP_TOKENS });
   const signalScreenerService = new SignalScreenerService({ cache });
+  const usdtDominanceService = new UsdtDominanceService({ marketDataService, dataDir });
   const strategyEngineService = new StrategyEngineService({ signalScreenerService });
   const watchlistService = new WatchlistService({ dataDir });
   const botCommandsService = new BotCommandsService({ dataDir });
@@ -435,7 +437,7 @@ function createApp() {
     createLayoutAnalysisRouter({ layoutAnalysisService, telegramService, requireAdmin }),
   );
   app.use("/api/pattern-scanner", createPatternScannerRouter({ patternScannerService }));
-  app.use("/api/signal-screener", createSignalScreenerRouter({ signalScreenerService }));
+  app.use("/api/signal-screener", createSignalScreenerRouter({ signalScreenerService, usdtDominanceService }));
   app.use("/api/strategy-engine", createStrategyEngineRouter({ strategyEngineService }));
   app.use(
     "/api/decision",

@@ -268,6 +268,22 @@
   white-space: nowrap;
 }
 
+/* The dominance row is context with no score behind it, so it reads in a
+   neutral blue rather than the teal/red of a scored extreme — the colour must
+   not suggest a bottom or a top the engine never computed. */
+.ss-extreme-row--dominance {
+  --pin-rgb: 77, 163, 255;
+  --pin-alpha: 0.10;
+}
+
+.ss-dom-direction { font-weight: 800; font-size: 11px; letter-spacing: 0.03em; }
+.ss-dom-direction--rising { color: #ffb55f; }
+.ss-dom-direction--falling { color: #79f2c0; }
+.ss-dom-direction--flat { color: #8892a6; }
+.ss-dom-direction--pending { color: #8892a6; font-size: 9px; font-weight: 700; }
+.ss-dom-delta { color: #a8b6cf; font-size: 10px; font-weight: 600; }
+.ss-dom-na { color: #55607a; }
+
 .ss-extreme-meter {
   display: inline-grid;
   grid-template-columns: 24px 56px;

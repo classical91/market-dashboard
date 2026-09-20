@@ -99,3 +99,21 @@ test("The pinned card is tinted by extreme state, never by bias", () => {
   assert.match(css, /\.ss-extreme-row--pinned\.ss-extreme-row--top \{ --pin-rgb: 255, 93, 93/);
   assert.match(css, /\.ss-extreme-row--pinned\.ss-extreme-row--bottom \{ --pin-rgb: 0, 184, 148/);
 });
+
+test("USDT.D renders as context with its scored columns visibly empty", () => {
+  // It is a CRYPTOCAP index: no candles, no volume, so bias and extreme have
+  // nothing to run on. Empty must read as "not scored", never as a zero.
+  assert.match(page, /function renderDominanceRow\(dominance\)/);
+  assert.match(page, /NOT SCORED/);
+  assert.match(page, /Not scored — USDT\.D has no OHLCV/);
+  assert.match(page, /ss-extreme-row--dominance/);
+  // Its own vocabulary, kept distinct from the six-check bias.
+  assert.match(page, /BUILDING HISTORY/);
+  assert.match(page, /ss-dom-direction--/);
+  assert.doesNotMatch(page.slice(page.indexOf("function renderDominanceRow"), page.indexOf("function renderExtremes")), /BULLISH|BEARISH/);
+});
+
+test("A missing or failed dominance read drops the row instead of faking one", () => {
+  assert.match(page, /if \(!dominance \|\| dominance\.percent == null\) return ''/);
+  assert.match(page, /renderExtremes\(data\.results \|\| \[\], data\.context \|\| null\)/);
+});
