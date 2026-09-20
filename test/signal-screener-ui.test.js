@@ -152,3 +152,27 @@ test("The USDT.D context row carries no star: My Trades cannot scan it", () => {
   const dominanceRow = page.slice(page.indexOf("function renderDominanceRow"), page.indexOf("function renderExtremes"));
   assert.doesNotMatch(dominanceRow, /track-btn|trackButton/);
 });
+
+test("Extremes rank by state first, so a confirmed turn outranks a stretched candidate", () => {
+  assert.match(page, /var STATE_RANK = \{ CONFIRMED: 4, CONFIRMING: 3, CANDIDATE: 2, WATCH: 1, NONE: 0 \}/);
+  // Score only breaks ties inside a tier.
+  assert.match(page, /stateRank\(b\) - stateRank\(a\) \|\| peakScore\(b\) - peakScore\(a\)/);
+});
+
+test("The timeframe travels with the numbers and survives a reload", () => {
+  // A card scrolled below the selector still says which clock produced it.
+  assert.match(page, /<span class="ss-summary-tf">' \+ escapeHtml\(intervalSelect\.value\)/);
+  assert.match(css, /\.ss-summary-tf \{/);
+  assert.match(page, /var INTERVAL_STORAGE_KEY = 'signalScreenerInterval'/);
+  assert.match(page, /function restoreInterval\(\)/);
+  assert.match(page, /intervalSelect\.addEventListener\('change', function \(\) \{ rememberInterval\(\); load\(false\); \}\)/);
+});
+
+test("Directional bias rows can be starred too, and both views share one listener", () => {
+  assert.match(page, /'<td><span class="ss-token-head">' \+ tickerLink\(entry\.symbol\) \+ trackButton\(entry\.symbol\)/);
+  assert.match(page, /\[extremeTbody, tbodyLong, tbodyShort, tbodyFlat\]\.forEach\(function \(tbody\)/);
+  // A star toggled in one view must repaint the other.
+  assert.match(page, /renderSplit\(lastResults\);\s*\n\s*renderExtremes\(lastResults, lastContext\);/);
+  // Six columns still fit a 320px screen: the star gives up the most room.
+  assert.match(css, /\.ss-track-btn \{ padding: 2px 3px; font-size: 11px; \}/);
+});

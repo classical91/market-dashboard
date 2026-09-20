@@ -180,6 +180,16 @@ function dashboardLink(baseUrl, path) {
   return `${String(baseUrl).replace(/\/+$/, "")}${path}?view=alpha`;
 }
 
+// The screener's LONG / SHORT / FLAT is a directional bias — six indicator
+// checks agreeing — not an entry trigger, and "Bias: LONG" in a phone
+// notification reads as an instruction. The alert says what the dashboards
+// say; the wire values, the bot's state and the trade bridge are unchanged.
+const ALERT_BIAS_LABELS = { LONG: "BULLISH", SHORT: "BEARISH", FLAT: "NEUTRAL" };
+
+function alertBiasLabel(signal) {
+  return ALERT_BIAS_LABELS[signal] || String(signal || "NEUTRAL");
+}
+
 function formatSignalAlert(transition, actions, dashboardUrl = "") {
   const action = actionForTransition(actions, transition);
   const pattern = patternLabel(transition);
@@ -196,7 +206,7 @@ function formatSignalAlert(transition, actions, dashboardUrl = "") {
 
   return [
     `<b>SIGNAL</b> | <b>${escapeHtml(transition.symbol)}</b> ${escapeHtml(transition.interval)} | ${escapeHtml(pattern)}`,
-    `Bias: <b>${escapeHtml(transition.to)}</b>${price ? ` near ${escapeHtml(price)}` : ""} (${escapeHtml(score)})`,
+    `Bias: <b>${escapeHtml(alertBiasLabel(transition.to))}</b>${price ? ` near ${escapeHtml(price)}` : ""} (${escapeHtml(score)})`,
     `Regime: ${escapeHtml(trend)}`,
     `Evidence: ${escapeHtml(evidence)}`,
     decision || confidence ? [decision, confidence].filter(Boolean).join(" | ") : null,
@@ -546,7 +556,7 @@ class TelegramService {
     const rows = events.map((e) => {
       const biasEmoji = e.bias === "bullish" ? "🟢" : "🔴";
       if (e.kind === "breakout") {
-        const bias = e.bias === "bullish" ? "LONG watch" : "SHORT watch";
+        const bias = e.bias === "bullish" ? "Bullish watch" : "Bearish watch";
         return [
           `${biasEmoji} <b>WATCH</b> | <b>${escapeHtml(e.symbol)}</b> ${escapeHtml(e.interval)} | ${escapeHtml(e.name)} breakout`,
           `Bias: ${escapeHtml(bias)} (${escapeHtml(String(e.score ?? "n/a"))})`,
