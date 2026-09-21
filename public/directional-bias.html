@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Directional Bias · Market Command</title>
+  <script>try{if(new URLSearchParams(location.search).get("view")==="alpha")document.documentElement.classList.add("alpha-gate-active")}catch(e){}</script>
+  <script src="/assets/js/settings.js"></script>
+  <link rel="stylesheet" href="/assets/styles/command.css" />
+  <link rel="stylesheet" href="/assets/styles/ai-analysis.css" />
+  <link rel="stylesheet" href="/assets/styles/signal-screener.css" />
+  <link rel="stylesheet" href="/assets/styles/directional-bias.css" />
+  <script defer src="/assets/js/alpha-access.js"></script>
+</head>
+<body>
+<div class="app">
+  <aside class="cmd-sidebar"></aside>
+  <main class="cmd-main">
+
+    <div class="cmd-page-header">
+      <div>
+        <div class="cmd-page-title">&#9889; Directional Bias</div>
+        <div class="cmd-page-subtitle">Where trend and momentum are leaning across the shared 25-token universe &mdash; direction, not an entry</div>
+      </div>
+    </div>
+
+    <div class="db-explainer">
+      <p><strong>Directional Bias measures where trend and momentum are currently leaning. It does not represent an automatic trade entry.</strong></p>
+      <p>The score counts how many of six checks &mdash; RSI, MACD, VWAP, volume, EMA20/50 structure and price against EMA200 &mdash; agree. It is confidence, not desirability: a BEARISH 83 is exactly as well evidenced as a BULLISH 83. For where price sits <em>inside</em> that move, see <a href="/local-extremes.html">Local Extremes</a>.</p>
+    </div>
+
+    <div class="aia-notice" id="db-notice" style="display:none"></div>
+
+    <div class="ss-toolbar">
+      <select class="aia-select" id="db-interval" aria-label="Timeframe">
+        <option value="1h">1h</option>
+        <option value="4h" selected>4h</option>
+        <option value="1D">1D</option>
+      </select>
+      <select class="aia-select" id="db-min-checks" aria-label="Minimum agreeing checks">
+        <option value="3">Min checks: 3</option>
+        <option value="4" selected>Min checks: 4</option>
+        <option value="5">Min checks: 5</option>
+        <option value="6">Min checks: 6</option>
+      </select>
+      <input class="aia-select db-search" type="search" id="db-search" placeholder="Search pair…" aria-label="Search pair" />
+      <button class="aia-run-btn" type="button" id="db-refresh-btn">Rescan</button>
+      <span class="ss-updated" id="db-updated"></span>
+    </div>
+
+    <div class="db-filters" id="db-bias-filters" role="group" aria-label="Filter by bias">
+      <button class="db-filter is-active" type="button" data-filter="ALL" aria-pressed="true">All</button>
+      <button class="db-filter" type="button" data-filter="BULLISH" aria-pressed="false">Bullish</button>
+      <button class="db-filter" type="button" data-filter="BEARISH" aria-pressed="false">Bearish</button>
+      <button class="db-filter" type="button" data-filter="NEUTRAL" aria-pressed="false">Neutral</button>
+    </div>
+
+    <div class="db-filters db-filters--secondary" id="db-strength-filters" role="group" aria-label="Filter by trend strength">
+      <button class="db-filter is-active" type="button" data-filter="ALL" aria-pressed="true">Any strength</button>
+      <button class="db-filter" type="button" data-filter="TRENDING" aria-pressed="false">Trending</button>
+      <button class="db-filter" type="button" data-filter="STRONG_ADX" aria-pressed="false">Strong ADX</button>
+      <button class="db-filter" type="button" data-filter="WEAK_TREND" aria-pressed="false">Weak trend</button>
+    </div>
+
+    <div class="ss-summary-strip" id="db-summary"></div>
+
+    <div class="ss-table-wrap">
+      <table class="ss-table db-table">
+        <thead>
+          <tr>
+            <th>Pair</th>
+            <th>Price</th>
+            <th>Directional bias</th>
+            <th>Score</th>
+            <th>Trend regime</th>
+            <th>RSI</th>
+            <th>ADX</th>
+            <th>EMA</th>
+            <th>VWAP</th>
+            <th>MACD</th>
+            <th>Volume</th>
+            <th>Timeframe</th>
+            <th>Freshness</th>
+          </tr>
+        </thead>
+        <tbody id="db-tbody"></tbody>
+      </table>
+    </div>
+
+    <details class="aia-how aia-how--footer" open>
+      <summary>&#8505;&#65039; How this page works</summary>
+      <div class="aia-how-body">
+        <ol class="aia-how-steps">
+          <li><strong>Choose a timeframe and rescan.</strong> Every row is scored on closed candles from the shared token universe, and the same cached scan feeds <a href="/local-extremes.html">Local Extremes</a> &mdash; the two pages always describe the same candles.</li>
+          <li><strong>Read the bias, then the score.</strong> BULLISH / BEARISH / NEUTRAL says which way the environment leans; the score says how much of the six-check evidence agrees.</li>
+          <li><strong>Use the component columns to see why.</strong> EMA structure, VWAP, MACD and volume are shown individually, so a row carried by one strong check is distinguishable from one where everything agrees.</li>
+          <li><strong>Check freshness before trusting a row.</strong> FRESH, STALE and UNAVAILABLE come from the shared freshness rules; STALE means the feed or the cache has stopped advancing, so the numbers are real but not now.</li>
+        </ol>
+        <ul class="aia-how-notes">
+          <li><strong>Bias is not an entry.</strong> BULLISH 67 means four of six checks lean bullish, not &ldquo;go long now&rdquo;. LONG / SHORT stay reserved for pages that publish an actual setup with an entry, stop, and target, such as the <a href="/decision.html">Decision Engine</a>.</li>
+          <li><strong>Direction is not location.</strong> A bullish bias says nothing about whether price is already stretched; that is what <a href="/local-extremes.html">Local Extremes</a> answers, and <a href="/pattern-scanner-trades.html">My Trades</a> is where the two are read together.</li>
+          <li><strong>AI use: No.</strong> Every score comes from fixed, inspectable indicator rules; this page does not call an AI model.</li>
+          <li><strong>Probability, not certainty.</strong> A 100 score means all configured evidence agrees, not that price must follow.</li>
+        </ul>
+      </div>
+    </details>
+
+    <footer>Directional Bias &mdash; <a href="/local-extremes.html">Local Extremes</a> &mdash; <a href="/pattern-scanner.html">Pattern Scanner</a> &mdash; <a href="/pattern-scanner-trades.html">My Trades</a> &mdash; <a href="/">Overview</a></footer>
+
+  </main>
+</div>
+<script src="/assets/js/sidebar.js"></script>
+<script src="/assets/js/admin-key.js"></script>
+<script src="/assets/js/screener-ui.js"></script>
+<script src="/assets/js/directional-bias.js"></script>
+</body>
+</html>

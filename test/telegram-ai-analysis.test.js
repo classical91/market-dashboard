@@ -100,7 +100,9 @@ test("signal alerts include Alpha Team pattern evidence and Trading Lab verdict"
     assert.match(text, /Bullish checks 5\/6/);
     assert.match(text, /Verdict: REVIEW/);
     assert.match(text, /Setup passed review/);
-    assert.match(text, /Visit: https:\/\/market-dashboard\.example\/signal-screener\.html\?view=alpha/);
+    // The alert reports a directional transition, so its Visit: link opens the
+    // page that shows one. Links already sent still resolve, by redirect.
+    assert.match(text, /Visit: https:\/\/market-dashboard\.example\/directional-bias\.html\?view=alpha/);
     assert.doesNotMatch(text, /Readme:/i);
     assert.doesNotMatch(text, /dry-run/i);
     assert.doesNotMatch(text, /Would open/i);

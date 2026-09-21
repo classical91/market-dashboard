@@ -26,6 +26,8 @@ const { createDecisionRouter } = require("./routes/decision");
 const { createLayoutAnalysisRouter } = require("./routes/layout-analysis");
 const { createPatternScannerRouter } = require("./routes/pattern-scanner");
 const { createSignalScreenerRouter } = require("./routes/signal-screener");
+const { createDirectionalBiasRouter } = require("./routes/directional-bias");
+const { createLocalExtremesRouter } = require("./routes/local-extremes");
 const { createStrategyEngineRouter } = require("./routes/strategy-engine");
 const { createTradingLabRouter } = require("./routes/trading-lab");
 const { createWatchlistRouter } = require("./routes/watchlist");
@@ -415,6 +417,14 @@ function createApp() {
   app.get(["/overview-v2.html", "/overview-hybrid.html"], (req, res) => {
     res.redirect(301, "/");
   });
+  // The Signal Screener's two tabs are now two pages. Every old link — the
+  // Telegram alerts already sent, a bookmarked ?view=alpha review link, the
+  // footers on other pages — lands on the directional half it named, with its
+  // query string intact so an alpha review link stays an alpha review link.
+  app.get(["/signal-screener", "/signal-screener.html"], (req, res) => {
+    const query = req.originalUrl.slice(req.path.length);
+    res.redirect(301, `/directional-bias.html${query}`);
+  });
   app.use(express.static(path.join(__dirname, "..", "public"), {
     setHeaders(res, filePath) {
       if (filePath.endsWith("reporter.html")) {
@@ -447,6 +457,11 @@ function createApp() {
   );
   app.use("/api/pattern-scanner", createPatternScannerRouter({ patternScannerService }));
   app.use("/api/signal-screener", createSignalScreenerRouter({ signalScreenerService, usdtDominanceService }));
+  // Two views of the screener above, one engine behind both: direction and
+  // location are separate questions and now separate pages, but they share a
+  // single cached scan per symbol + interval.
+  app.use("/api/directional-bias", createDirectionalBiasRouter({ signalScreenerService, usdtDominanceService }));
+  app.use("/api/local-extremes", createLocalExtremesRouter({ signalScreenerService }));
   app.use("/api/strategy-engine", createStrategyEngineRouter({ strategyEngineService }));
   app.use(
     "/api/decision",

@@ -36,7 +36,7 @@ test("TradeHunter sits above AI Analysis and owns the scanner workflow", () => {
 
   assert.ok(tradeHunterStart > -1, "TradeHunter is missing");
   assert.ok(aiAnalysisStart > tradeHunterStart, "TradeHunter must sit above AI Analysis");
-  const labels = ["Pattern Scanner", "My Trades", "Track Record", "Signal Screener", "Decision Engine"];
+  const labels = ["Screeners", "Directional Bias", "Local Extremes", "Pattern Scanner", "My Trades", "Track Record", "Decision Engine"];
   let cursor = -1;
   for (const label of labels) {
     const next = tradeHunter.indexOf(`label: "${label}"`, cursor + 1);
@@ -44,6 +44,36 @@ test("TradeHunter sits above AI Analysis and owns the scanner workflow", () => {
     cursor = next;
     assert.equal(sidebar.match(new RegExp(`label: "${label}"`, "g")).length, 1, `${label} is duplicated`);
   }
+});
+
+// Each screener answers one question, so each gets its own entry. The old
+// combined Signal Screener link is gone from navigation; /signal-screener.html
+// itself still resolves, by redirect (see screener-split-compat.test.js).
+test("the Screeners group holds one entry per screener and no combined page", () => {
+  const start = sidebar.indexOf('label: "Screeners"');
+  const end = sidebar.indexOf('label: "Track Record"', start);
+  const menu = sidebar.slice(start, end);
+
+  assert.ok(start > -1, "the Screeners group is missing");
+  assert.match(menu, /href: "\/directional-bias\.html"/);
+  assert.match(menu, /href: "\/local-extremes\.html"/);
+  assert.match(menu, /href: "\/pattern-scanner\.html"/);
+  assert.match(menu, /href: "\/pattern-scanner-trades\.html"/);
+  assert.doesNotMatch(sidebar, /label: "Signal Screener"/);
+  // Future screeners join this group; none of them may ship as a dead link yet.
+  for (const unbuilt of ["Derivatives", "Volatility", "Relative Strength"]) {
+    assert.doesNotMatch(menu, new RegExp(`label: "${unbuilt}"`), `${unbuilt} is not built yet`);
+  }
+});
+
+// Alpha Team review mode renders everything else as a disabled BETA item, so
+// the list of review-able pages has to follow the split.
+test("both screener pages are available in Alpha review mode", () => {
+  const start = sidebar.indexOf("function isAlphaAvailable");
+  const body = sidebar.slice(start, sidebar.indexOf("function alphaHref"));
+  assert.match(body, /"\/directional-bias\.html"/);
+  assert.match(body, /"\/local-extremes\.html"/);
+  assert.match(body, /"\/pattern-scanner\.html"/);
 });
 
 test("AI Analysis owns presets, layouts, Backtest, and Signal Diagnostics", () => {

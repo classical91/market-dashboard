@@ -17,7 +17,8 @@ const pages = [
   ["public/pattern-scanner.html", 'class="ps-beta-section"'],
   ["public/pattern-scanner-trades.html", 'id="ps-grid"'],
   ["public/pattern-scanner-stats.html", 'id="ts-recent"'],
-  ["public/signal-screener.html", 'id="ss-tbody-flat"'],
+  ["public/directional-bias.html", 'id="db-tbody"'],
+  ["public/local-extremes.html", 'id="lx-tbody"'],
 ];
 
 test("AI Analysis and TradeHunter pages explain themselves at the bottom", () => {

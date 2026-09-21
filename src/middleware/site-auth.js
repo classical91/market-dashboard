@@ -6,16 +6,27 @@ const { isAdminRequest } = require("./admin-auth");
 
 const COOKIE_NAME = "market_dashboard_session";
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+// Alpha Team is a read-only review role: the shared screener pages and the
+// read APIs behind them, and nothing else. The Signal Screener's two halves
+// are now two pages, so both are listed; /signal-screener.html stays here so
+// an already-shared review link still resolves through its redirect.
 const ALPHA_PAGES = new Set([
+  "/directional-bias.html",
+  "/local-extremes.html",
   "/signal-screener.html",
   "/pattern-scanner.html",
   "/alpha-team.html",
 ]);
+// GET only — see isAlphaReadApi. /api/watchlist is readable so the review
+// pages can show which pairs are starred; every mutation on it still fails
+// for this role, which is what site-auth.test.js pins.
 const ALPHA_READ_APIS = [
   "/api/alpha-team/access",
   "/api/health",
   "/api/pattern-scanner",
   "/api/signal-screener",
+  "/api/directional-bias",
+  "/api/local-extremes",
   "/api/watchlist",
 ];
 
@@ -383,7 +394,7 @@ function createSiteAuth(config) {
         return;
       }
       setSessionCookie(res, req, role, config);
-      res.redirect(303, role === "alpha" && !returnTo.includes("view=alpha") ? "/signal-screener.html?view=alpha" : returnTo);
+      res.redirect(303, role === "alpha" && !returnTo.includes("view=alpha") ? "/directional-bias.html?view=alpha" : returnTo);
     },
     logout(req, res) {
       clearSessionCookie(res);

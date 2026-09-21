@@ -80,13 +80,14 @@ test("the Lab is renamed and points at where the moved panels went", () => {
   assert.match(html, /signal-diagnostics\.html/);
 });
 
-test("Signal Diagnostics is reachable from the sidebar under Signal Screener", () => {
+test("Signal Diagnostics is reachable from the sidebar under the screeners", () => {
   const sidebar = read("public/assets/js/sidebar.js");
-  const screener = sidebar.indexOf('/signal-screener.html');
+  const screener = sidebar.indexOf('/directional-bias.html');
   const diagnostics = sidebar.indexOf('/signal-diagnostics.html');
 
+  assert.ok(screener > -1, "Directional Bias is not in the sidebar");
   assert.ok(diagnostics > -1, "the page is not in the sidebar");
-  assert.ok(diagnostics > screener, "it should sit under Signal Screener");
+  assert.ok(diagnostics > screener, "it should sit below the screeners");
 });
 
 test("the Lab offers the timeframes the screener can actually fetch", () => {

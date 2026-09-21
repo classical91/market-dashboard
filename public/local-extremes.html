@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Local Extremes · Market Command</title>
+  <script>try{if(new URLSearchParams(location.search).get("view")==="alpha")document.documentElement.classList.add("alpha-gate-active")}catch(e){}</script>
+  <script src="/assets/js/settings.js"></script>
+  <link rel="stylesheet" href="/assets/styles/command.css" />
+  <link rel="stylesheet" href="/assets/styles/ai-analysis.css" />
+  <link rel="stylesheet" href="/assets/styles/signal-screener.css" />
+  <link rel="stylesheet" href="/assets/styles/local-extremes.css" />
+  <script defer src="/assets/js/alpha-access.js"></script>
+</head>
+<body>
+<div class="app">
+  <aside class="cmd-sidebar"></aside>
+  <main class="cmd-main">
+
+    <div class="cmd-page-header">
+      <div>
+        <div class="cmd-page-title">&#9878;&#65039; Local Extremes</div>
+        <div class="cmd-page-subtitle">Whether price is stretched near a possible local top or bottom across the shared 25-token universe &mdash; location, not direction</div>
+      </div>
+    </div>
+
+    <div class="lx-explainer">
+      <p><strong>Local Extremes measures whether price appears stretched near a possible local top or bottom. A confirmed extreme can occur inside a larger trend.</strong></p>
+      <p>Bottom and top are scored independently from Bollinger excursion, RSI extreme, regular divergence, liquidity sweep, volume climax and reversal confirmation. Both scores are shown, always: <em>Bottom 45 / Top 75</em> is the reading, and the weaker side building is information too.</p>
+    </div>
+
+    <div class="lx-distinction">
+      <p><strong>A bullish trend and a confirmed local top can both be true.</strong></p>
+      <p><a href="/directional-bias.html">Directional Bias</a> = direction. Local Extremes = location within the move. A top or bottom here is market context, never an automatic entry &mdash; nothing on this page means BUY, SELL, LONG or SHORT.</p>
+    </div>
+
+    <div class="aia-notice" id="lx-notice" style="display:none"></div>
+
+    <div class="ss-toolbar">
+      <select class="aia-select" id="lx-interval" aria-label="Timeframe">
+        <option value="1h">1h</option>
+        <option value="4h" selected>4h</option>
+        <option value="1D">1D</option>
+      </select>
+      <input class="aia-select lx-search" type="search" id="lx-search" placeholder="Search pair…" aria-label="Search pair" />
+      <button class="aia-run-btn" type="button" id="lx-refresh-btn">Rescan</button>
+      <label class="lx-toggle"><input type="checkbox" id="lx-hide-none" checked /> Hide NONE</label>
+      <span class="ss-updated" id="lx-updated"></span>
+    </div>
+
+    <div class="lx-filters" id="lx-filters" role="group" aria-label="Filter local extremes">
+      <button class="lx-filter is-active" type="button" data-filter="ALL" aria-pressed="true">All</button>
+      <button class="lx-filter" type="button" data-filter="BOTTOMS" aria-pressed="false">Bottoms</button>
+      <button class="lx-filter" type="button" data-filter="TOPS" aria-pressed="false">Tops</button>
+      <button class="lx-filter" type="button" data-filter="CONFIRMED" aria-pressed="false">Confirmed</button>
+      <button class="lx-filter" type="button" data-filter="CONFIRMING" aria-pressed="false">Confirming</button>
+      <button class="lx-filter" type="button" data-filter="CANDIDATES" aria-pressed="false">Candidates</button>
+    </div>
+
+    <div class="ss-summary-strip ss-summary-strip--extremes" id="lx-summary"></div>
+
+    <div class="ss-table-wrap">
+      <table class="ss-table lx-table">
+        <thead>
+          <tr>
+            <th>Pair</th>
+            <th>Price</th>
+            <th>Bottom</th>
+            <th>Top</th>
+            <th>Extreme</th>
+            <th>State</th>
+            <th>Setup</th>
+            <th>Trend</th>
+            <th>RSI</th>
+            <th>Evidence</th>
+            <th>Timeframe</th>
+            <th>Freshness</th>
+          </tr>
+        </thead>
+        <tbody id="lx-tbody"></tbody>
+      </table>
+    </div>
+
+    <details class="aia-how aia-how--footer" open>
+      <summary>&#8505;&#65039; How this page works</summary>
+      <div class="aia-how-body">
+        <ol class="aia-how-steps">
+          <li><strong>Choose a timeframe and rescan.</strong> Rows are scored on closed candles from the shared token universe, and the same cached scan feeds <a href="/directional-bias.html">Directional Bias</a> &mdash; the two pages always describe the same candles.</li>
+          <li><strong>Read both scores, not just the leader.</strong> Bottom and top stay independent; the Extreme column only names which side currently leads.</li>
+          <li><strong>Separate candidates from confirmation.</strong> A candidate has exhaustion evidence; confirming and confirmed states also require a Bollinger reclaim or a micro-structure break. Rows rank CONFIRMED, CONFIRMING, CANDIDATE, WATCH, NONE, with the leading score breaking ties.</li>
+          <li><strong>Check freshness before trusting a row.</strong> FRESH, STALE and UNAVAILABLE come from the shared freshness rules; STALE means the feed or the cache has stopped advancing.</li>
+        </ol>
+        <ul class="aia-how-notes">
+          <li><strong>An extreme is a location, not an entry.</strong> TOP CONFIRMED says price is stretched and has begun to turn, not &ldquo;sell now&rdquo;. Setups with an entry, stop and target belong to the <a href="/decision.html">Decision Engine</a>.</li>
+          <li><strong>Exhaustion is not direction.</strong> A high bottom score can coexist with a strong BEARISH bias, and a high top score with a BULLISH one &mdash; all four combinations are legitimate. Use the disagreement as a warning not to chase price into a stretched move; <a href="/pattern-scanner-trades.html">My Trades</a> reads both together.</li>
+          <li><strong>AI use: No.</strong> Every score comes from fixed, inspectable indicator rules; this page does not call an AI model.</li>
+          <li><strong>Probability, not certainty.</strong> Even a 100 score means all configured evidence is present, not that price must reverse.</li>
+        </ul>
+      </div>
+    </details>
+
+    <footer>Local Extremes &mdash; <a href="/directional-bias.html">Directional Bias</a> &mdash; <a href="/pattern-scanner.html">Pattern Scanner</a> &mdash; <a href="/pattern-scanner-trades.html">My Trades</a> &mdash; <a href="/">Overview</a></footer>
+
+  </main>
+</div>
+<script src="/assets/js/sidebar.js"></script>
+<script src="/assets/js/admin-key.js"></script>
+<script src="/assets/js/screener-ui.js"></script>
+<script src="/assets/js/local-extremes.js"></script>
+</body>
+</html>

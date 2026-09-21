@@ -47,10 +47,20 @@
     {
       label: "TradeHunter",
       children: [
-        { href: "/pattern-scanner.html", label: "Pattern Scanner" },
-        { href: "/pattern-scanner-trades.html", label: "My Trades" },
+        // Each screener answers one question — direction, location, structure
+        // — and My Trades is where the three are read together. Future
+        // screeners (Derivatives, Volatility, Relative Strength) join this
+        // group rather than the level above it.
+        {
+          label: "Screeners",
+          children: [
+            { href: "/directional-bias.html", label: "Directional Bias" },
+            { href: "/local-extremes.html", label: "Local Extremes" },
+            { href: "/pattern-scanner.html", label: "Pattern Scanner" },
+            { href: "/pattern-scanner-trades.html", label: "My Trades" },
+          ],
+        },
         { href: "/pattern-scanner-stats.html", label: "Track Record" },
-        { href: "/signal-screener.html", label: "Signal Screener" },
         {
           href: "https://trading-strategy-production-1b41.up.railway.app/",
           label: "Decision Engine",
@@ -204,7 +214,14 @@
 
   function isAlphaAvailable(href) {
     var path = alphaReviewPath(href);
-    return path === "/signal-screener.html" || path === "/pattern-scanner.html" || path === "/signal-diagnostics.html";
+    // The Alpha Team review surface: the two screener pages the old Signal
+    // Screener split into, the pattern scanner, and diagnostics. Everything
+    // else renders as a disabled BETA item in review mode.
+    return path === "/directional-bias.html"
+      || path === "/local-extremes.html"
+      || path === "/signal-screener.html"
+      || path === "/pattern-scanner.html"
+      || path === "/signal-diagnostics.html";
   }
 
   function alphaHref(href) {
