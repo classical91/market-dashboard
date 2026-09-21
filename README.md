@@ -22,6 +22,8 @@ The app is intentionally lightweight: no bundler, no frontend framework, and no 
 - `/on-chain.html` - Curated on-chain tools hub.
 - `/onchain.html` - API-backed on-chain analytics dashboard.
 - `/ai-analysis.html` - TradingView chart snapshots with AI reads for crypto plus BTC-correlated macro tickers.
+- `/directional-bias.html` - Directional Bias screener: which way trend and momentum are leaning across the shared 25-token universe, scored by how many of six checks (RSI, MACD, VWAP, volume, EMA20/50, price vs EMA200) agree. BTC and USDT.D ride along as market context. Reads `BULLISH / BEARISH / NEUTRAL`; `LONG / SHORT` stay on the wire and on pages that publish an actual setup.
+- `/local-extremes.html` - Local Extremes screener: whether price is stretched toward a possible local top or bottom, with bottom and top scored independently from Bollinger excursion, RSI extreme, divergence, liquidity sweep, volume climax and reversal confirmation. Direction and location are separate questions — a bullish bias and a confirmed local top are both legitimate at once. `/signal-screener.html` redirected here and to Directional Bias when the combined page was split.
 - `/decision.html` - Decision Engine: multi-asset regime score (BTC, breadth, SPY, QQQ, DXY, VIX, gold, oil, optional US10Y), asset-class rotation board, setup-quality ranking layered over the signal screener, execution levels (trigger / invalidation / target / R:R with explicit "do not trade" reasons), and a trading journal that grades whether the engine's calls were right.
 - `/trading-lab.html` - Trading Lab: paper execution with real TP1/TP2 scale-outs, ATR risk sizing, kill switches, a historical edge gate that scores every Decision Engine plan against how setups like it have actually performed, and bar-replay backtesting over the same engine. See [docs/trading-lab.md](docs/trading-lab.md).
 - `/youtube-v2.html` - YouTube Intelligence: live streams, scheduled streams, and latest uploads from tracked channels.
@@ -67,7 +69,7 @@ npm run parity -- --traderclaw ../traderclaw
 
 ## Access Control
 
-Website access is optional but recommended for deploys. Set `MARKET_DASHBOARD_LOGIN_PASSWORD` to put the dashboard behind `/login`. That owner password unlocks the full website. Set `ALPHA_TEAM_ACCESS_CODE` to give the Alpha Team a separate read-only password for shared `?view=alpha` pages; that role can open the shared Signal Screener and Pattern Scanner review pages plus their read-only data APIs, but it cannot reach the rest of the dashboard or any mutation/broadcast endpoint. When both website passwords are blank, local/dev behavior stays open.
+Website access is optional but recommended for deploys. Set `MARKET_DASHBOARD_LOGIN_PASSWORD` to put the dashboard behind `/login`. That owner password unlocks the full website. Set `ALPHA_TEAM_ACCESS_CODE` to give the Alpha Team a separate read-only password for shared `?view=alpha` pages; that role can open the shared Directional Bias, Local Extremes and Pattern Scanner review pages plus their read-only data APIs (`GET /api/directional-bias`, `GET /api/local-extremes`, `GET /api/signal-screener`, `GET /api/pattern-scanner`, `GET /api/watchlist`), but it cannot reach the rest of the dashboard, the Trading Lab, admin actions, broadcast endpoints or any journal/watchlist mutation. When both website passwords are blank, local/dev behavior stays open.
 
 Action/mutation endpoints are guarded by a shared secret so a public deploy cannot let anonymous visitors spend API credits or send Telegram messages. Set `ADMIN_API_KEY` on the server to enable them; while it is blank these endpoints return `503`:
 
@@ -89,7 +91,7 @@ When `MARKET_DASHBOARD_LOGIN_PASSWORD` is set, site auth runs ahead of every rou
 - `/api/broadcast-ledger*` — machine callers that present `BROADCAST_LEDGER_API_KEY` or `ADMIN_API_KEY`; the ledger routes still enforce that key themselves. See [docs/broadcast-ledger.md](docs/broadcast-ledger.md).
 - `GET /api/market-session` — which trading session is open right now, read by Main Hub's Daily Dashboard from its server with no cookie to present. Clock arithmetic over published session hours: no account data, no market data, no credential, and the overview chip already computes the same answer in every visitor's browser. The exact path only, read methods only.
 
-Everything else — including all Trading Lab paper-trade and mutation endpoints, settings, and the rest of `/api/decision/*` — needs a session. The Alpha Team role additionally reaches only the shared `?view=alpha` pages and their read-only data APIs.
+Everything else — including all Trading Lab paper-trade and mutation endpoints, settings, and the rest of `/api/decision/*` — needs a session. The Alpha Team role additionally reaches only the shared `?view=alpha` pages (Directional Bias, Local Extremes, Pattern Scanner) and their read-only data APIs; every write on those APIs, including starring a pair into My Trades, still answers `403` for that role.
 
 Verify this model against a running deploy with `npm run smoke:decision` (see [Production smoke check](#production-smoke-check)).
 
@@ -332,6 +334,7 @@ market-dashboard/
     assets/
       js/
         sidebar.js        shared navigation
+        screener-ui.js    shared chrome for the screener pages
         sections.js       collapsible section behavior
         ui.js             reusable UI HTML helpers
         overview.js       main dashboard renderer
@@ -343,7 +346,13 @@ market-dashboard/
     app.js                Express app composition
     config/env.js         environment parsing
     routes/               API routers
+      directional-bias.js one screener projection: direction
+      local-extremes.js   the other: location/exhaustion
     services/             provider clients and aggregation
+      signal-screener.js  the confluence engine behind both screener pages
+      local-extreme-engine.js  independent local top/bottom scoring
+      screener-projections.js  reshapes one cached scan for either page
+      trade-context.js    combines bias + extremes + patterns per tracked pair
       trading/            Trading Lab engines (ported from TraderClaw)
         config.js         risk policy, kill-switch thresholds, live-mode gates
         round.js          Python-compatible half-to-even rounding

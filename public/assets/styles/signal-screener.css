@@ -1,5 +1,8 @@
 /* ─────────────────────────────────────────────────────────
-   Signal Screener — Razor Phantom style multi-token table
+   Shared screener chrome — the multi-token table, token cell, badges and
+   score meters used by the Directional Bias and Local Extremes pages (and
+   the Pattern Scanner's Track Record table). Page-specific styling lives in
+   directional-bias.css and local-extremes.css.
 ───────────────────────────────────────────────────────── */
 
 .ss-toolbar {
@@ -485,3 +488,19 @@
   .ss-extreme-row,
   .ss-extreme-track span { transition: none; }
 }
+
+/* Data freshness, shared by both screener pages. The states come from
+   src/services/data-freshness.js; UNKNOWN is shown as UNAVAILABLE, because a
+   row reporting no age at all must not read as a current one. */
+.ss-fresh {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.ss-fresh--fresh { background: rgba(0, 184, 148, 0.14); color: #00d3a7; }
+.ss-fresh--stale { background: rgba(255, 176, 32, 0.16); color: #ffc45c; }
+.ss-fresh--unknown { background: rgba(137, 146, 166, 0.14); color: #9aa4bb; }

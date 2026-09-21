@@ -30,6 +30,7 @@ const INTERVAL_MAP = {
 // USDT-perpetual list, extended to 25).
 const { TOP_TOKENS: DEFAULT_TOKENS } = require("../config/market-symbols");
 const { calculateLocalExtremes } = require("./local-extreme-engine");
+const { toDirectionalBias, toLocalExtremes } = require("./screener-projections");
 
 // Binance's last kline row is the live, still-open candle. Scoring it makes
 // borderline tokens whipsaw: on 1D the candle mutates all day, so a token
@@ -312,6 +313,25 @@ class SignalScreenerService {
 
   async scanAll(interval, minChecks, { force } = {}) {
     return Promise.all(this._tokens.map((symbol) => this.scanToken(symbol, interval, minChecks, { force })));
+  }
+
+  // Two projections of the scan above, for the Directional Bias and Local
+  // Extremes pages. Both go through scanAll(), so the pair costs one cached
+  // universe scan rather than two upstream Binance passes for the same
+  // symbol + interval, and both pages always describe the same candles.
+  // No indicator is recomputed here — see services/screener-projections.js.
+  async scanDirectionalBias(interval, minChecks, { force } = {}) {
+    const rows = await this.scanAll(interval, minChecks, { force });
+    // One clock for the whole scan, so two rows computed in the same pass
+    // never report ages a second apart.
+    const now = Date.now();
+    return rows.map((row) => toDirectionalBias(row, interval, now));
+  }
+
+  async scanLocalExtremes(interval, minChecks, { force } = {}) {
+    const rows = await this.scanAll(interval, minChecks, { force });
+    const now = Date.now();
+    return rows.map((row) => toLocalExtremes(row, interval, now));
   }
 
   // Raw candles for callers that need levels (swing highs/lows, ATR) rather

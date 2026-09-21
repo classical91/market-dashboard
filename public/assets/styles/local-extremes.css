@@ -1,0 +1,208 @@
+/* ─────────────────────────────────────────────────────────
+   Local Extremes — page-specific chrome.
+
+   The table, token cell, score meters and freshness badge come from
+   signal-screener.css, which both screener pages share.
+───────────────────────────────────────────────────────── */
+
+.lx-explainer,
+.lx-distinction {
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(137, 146, 166, 0.22);
+  border-radius: 8px;
+  background: #0a0a18;
+}
+
+.lx-explainer { border-left: 3px solid #f5c542; }
+/* The distinction between direction and location is the whole point of
+   splitting these pages, so it gets its own block rather than a footnote. */
+.lx-distinction { border-left: 3px solid #4da3ff; margin-bottom: 16px; }
+
+.lx-explainer p,
+.lx-distinction p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: #9aa4bb;
+}
+
+.lx-explainer p + p,
+.lx-distinction p + p { margin-top: 7px; }
+.lx-explainer strong,
+.lx-distinction strong { color: #e8edf5; }
+.lx-explainer a,
+.lx-distinction a { color: #4da3ff; }
+
+.lx-search { min-width: 150px; }
+
+.lx-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #9aa4bb;
+  cursor: pointer;
+}
+
+.lx-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.lx-filter {
+  border: 1px solid rgba(137, 146, 166, 0.22);
+  border-radius: 999px;
+  padding: 5px 12px;
+  background: #0a0a18;
+  color: #8892a6;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: color 140ms ease, background-color 140ms ease, border-color 140ms ease;
+}
+
+.lx-filter:hover { color: #fff; }
+.lx-filter.is-active { color: #fff; background: #242451; border-color: #3d3d7a; }
+.lx-filter:focus-visible { outline: 2px solid #4da3ff; outline-offset: 2px; }
+
+/* Same reason as the bias table: the row's freshness must stay on screen, so
+   the cells tighten rather than the table scrolling sideways on a laptop. */
+.lx-table th,
+.lx-table td { padding: 7px 7px; }
+
+/* State carries the strongest colour on the page: it is what the ranking is
+   built on. The tint tracks how far the evidence has got, never a direction
+   to trade — BOTTOM CONFIRMED and TOP CONFIRMED share one intensity. */
+.lx-state {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.lx-state--confirmed { background: rgba(245, 197, 66, 0.2); color: #ffd76a; }
+.lx-state--confirming { background: rgba(245, 197, 66, 0.12); color: #e0bd63; }
+.lx-state--candidate { background: rgba(77, 163, 255, 0.14); color: #7cc0ff; }
+.lx-state--watch { background: rgba(137, 146, 166, 0.14); color: #9aa4bb; }
+.lx-state--none { background: rgba(137, 146, 166, 0.08); color: #6f7789; }
+
+.lx-side {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.lx-side--bottom { background: rgba(0, 184, 148, 0.14); color: #00d3a7; }
+.lx-side--top { background: rgba(255, 93, 93, 0.14); color: #ff7b7b; }
+.lx-side--none { background: rgba(137, 146, 166, 0.1); color: #6f7789; }
+
+.lx-trend {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.lx-trend--up { color: #00d3a7; }
+.lx-trend--down { color: #ff7b7b; }
+.lx-trend--flat { color: #9aa4bb; }
+
+.lx-setup {
+  max-width: 96px;
+  font-size: 11px;
+  line-height: 1.3;
+  color: #9aa4bb;
+  text-transform: capitalize;
+  /* "Trend-pullback bottom" wraps rather than stretching the column: the
+     evidence beside it is what the row is scanned for. */
+  white-space: normal;
+}
+
+.lx-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-bottom: 3px;
+}
+
+.lx-chip {
+  padding: 1px 4px;
+  border: 1px solid rgba(137, 146, 166, 0.2);
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #5d6478;
+}
+
+.lx-chip--on { border-color: rgba(245, 197, 66, 0.4); background: rgba(245, 197, 66, 0.12); color: #ffd76a; }
+
+.lx-evidence { max-width: 320px; }
+
+.lx-reasons {
+  display: block;
+  max-width: 190px;
+  font-size: 11px;
+  color: #9aa4bb;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lx-row--pinned { background: rgba(77, 163, 255, 0.05); }
+
+/* Phone: the table restacks as labelled cards rather than scrolling sideways,
+   the same way the extremes table always has. */
+@media (max-width: 720px) {
+  .lx-table { min-width: 0; }
+  .lx-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .lx-table tr {
+    display: block;
+    margin-bottom: 10px;
+    border: 1px solid rgba(137, 146, 166, 0.22);
+    border-radius: 8px;
+    padding: 6px 8px;
+  }
+  .lx-table td {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    border: 0;
+    padding: 3px 0;
+  }
+  .lx-table td[data-label]::before {
+    content: attr(data-label);
+    color: #6f7789;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .lx-evidence { max-width: none; flex-direction: column; align-items: flex-start; }
+  .lx-reasons { white-space: normal; }
+  .lx-filter { padding: 5px 10px; font-size: 10px; }
+}
+
+/* Below a wide desktop the chart link drops its word and keeps its icon: the
+   columns that say what the row means, and how current it is, matter more
+   than four letters of a link label. */
+@media (max-width: 1500px) {
+  .lx-table .ss-chart-link-text { display: none; }
+}

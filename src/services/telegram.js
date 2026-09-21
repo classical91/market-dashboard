@@ -202,7 +202,7 @@ function formatSignalAlert(transition, actions, dashboardUrl = "") {
     : "WATCH: Trading Lab verdict pending";
   const decision = action && action.decision ? `Checklist: ${action.decision}` : null;
   const confidence = action && action.confidenceScore != null ? `Confidence: ${action.confidenceScore}` : null;
-  const view = dashboardLink(dashboardUrl, "/signal-screener.html");
+  const view = dashboardLink(dashboardUrl, "/directional-bias.html");
 
   return [
     `<b>SIGNAL</b> | <b>${escapeHtml(transition.symbol)}</b> ${escapeHtml(transition.interval)} | ${escapeHtml(pattern)}`,
