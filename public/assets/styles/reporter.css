@@ -462,3 +462,199 @@ body.crypto-bg {
 
 /* App content sits above the fixed decor layer. */
 .app { position: relative; z-index: 1; }
+
+/* ── Reporter intelligence — shared section + panel shell ─*/
+/* Every dashboard module on the page is one .intel-section with a collapsing
+   header and a body of .intel-panel cards, so a new module never needs its
+   own one-off layout CSS. Accent colour is set per section and inherited by
+   everything inside it. */
+.reporter-intel {
+  display: grid;
+  gap: 22px;
+  margin: 0 0 26px;
+}
+
+.intel-section {
+  --intel-accent: var(--blue);
+  --intel-accent-bg: var(--blue-bg);
+  display: block;
+}
+.intel-section[data-intel-accent="blue"]   { --intel-accent: var(--blue);   --intel-accent-bg: var(--blue-bg); }
+.intel-section[data-intel-accent="purple"] { --intel-accent: var(--purple); --intel-accent-bg: var(--purple-bg); }
+.intel-section[data-intel-accent="teal"]   { --intel-accent: var(--teal);   --intel-accent-bg: var(--teal-bg); }
+.intel-section[data-intel-accent="amber"]  { --intel-accent: var(--amber);  --intel-accent-bg: var(--amber-bg); }
+.intel-section[data-intel-accent="green"]  { --intel-accent: var(--green);  --intel-accent-bg: var(--green-bg); }
+
+.intel-section-header {
+  appearance: none;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 11px 15px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--intel-accent);
+  border-radius: 13px;
+  background: var(--surface2);
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition: background 0.15s, border-color 0.15s;
+}
+.intel-section-header:hover { background: var(--intel-accent-bg); border-color: var(--border-hover); }
+.intel-section-header:focus-visible { outline: 2px solid var(--intel-accent); outline-offset: 2px; }
+
+.intel-section-title {
+  color: var(--intel-accent);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.intel-section-sub {
+  color: var(--muted);
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0;
+  margin-top: 3px;
+  text-transform: none;
+}
+.intel-section-note {
+  color: var(--dim);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  margin-left: auto;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.intel-section-chevron {
+  color: var(--soft);
+  flex: 0 0 auto;
+  font-size: 12px;
+  margin-left: auto;
+  transition: transform 0.2s ease;
+}
+.intel-section-note + .intel-section-chevron { margin-left: 0; }
+.intel-section.collapsed .intel-section-chevron { transform: rotate(-90deg); }
+
+.intel-section-body { margin-top: 12px; }
+
+.intel-grid { display: grid; gap: 14px; }
+.intel-grid--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+.intel-panel {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.012)),
+    var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+.intel-panel-head {
+  align-items: baseline;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 12px;
+  padding: 12px 15px;
+}
+.intel-panel-title {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.intel-panel-note {
+  color: var(--muted);
+  font-size: 10.5px;
+  margin-left: auto;
+  text-align: right;
+}
+
+/* ── Reporter intelligence — third-party widget frames ────*/
+/* The frame owns the height. The embed and every state render on top of it,
+   so swapping a placeholder for a widget never moves the page. */
+.intel-widget {
+  height: var(--intel-widget-h, 380px);
+  position: relative;
+  width: 100%;
+}
+.intel-widget .tradingview-widget-container {
+  height: 100%;
+  inset: 0;
+  position: absolute;
+  width: 100%;
+}
+.intel-widget .tradingview-widget-container__widget { height: 100%; }
+.intel-widget iframe { border: 0; display: block; }
+
+.intel-widget-state {
+  align-content: center;
+  color: var(--muted);
+  display: grid;
+  font-size: 12.5px;
+  gap: 4px;
+  inset: 0;
+  justify-items: center;
+  padding: 20px;
+  position: absolute;
+  text-align: center;
+}
+.intel-widget-state .spinner { margin: 0 0 12px; }
+.intel-widget-state--error { background: var(--surface); position: static; }
+/* A panel whose provider is down should not hold 400px of empty page open. */
+.intel-widget[data-intel-state="error"] { height: auto; min-height: 170px; }
+.intel-widget-state-title {
+  color: var(--soft);
+  font-size: 13px;
+  font-weight: 800;
+}
+.intel-widget-state-note {
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.5;
+  max-width: 280px;
+}
+.intel-widget-state-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 10px;
+}
+.intel-widget-retry,
+.intel-widget-source {
+  border: 1px solid var(--border-hover);
+  border-radius: 10px;
+  background: rgba(255,255,255,0.04);
+  color: var(--soft);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 7px 13px;
+  text-decoration: none;
+}
+.intel-widget-retry:hover,
+.intel-widget-source:hover { background: var(--intel-accent-bg); color: var(--text); }
+.intel-widget-retry:focus-visible,
+.intel-widget-source:focus-visible { outline: 2px solid var(--intel-accent); outline-offset: 2px; }
+
+/* ── Reporter intelligence — responsive ───────────────────*/
+@media (max-width: 1100px) {
+  .intel-grid--2 { grid-template-columns: 1fr; }
+}
+@media (max-width: 620px) {
+  .reporter-intel { gap: 18px; }
+  .intel-widget { height: var(--intel-widget-h-sm, var(--intel-widget-h, 340px)); }
+  .intel-section-header { gap: 10px; padding: 10px 12px; }
+  .intel-section-note { display: none; }
+  .intel-panel-head { padding: 10px 12px; }
+  .intel-panel-note { display: none; }
+}

@@ -20,6 +20,49 @@
       </div>
     </div>
 
+    <!-- ── Reporter Intelligence ─────────────────────────────
+         Market context above the AI synthesis: what is happening now,
+         then where markets are moving, then what the desks made of it.
+         Removed entirely on the fixed desk pages (see configurePageShell).
+    -->
+    <div class="reporter-intel" id="reporterIntel">
+
+      <section class="intel-section" data-intel-section="live-intelligence" data-intel-accent="purple">
+        <button class="intel-section-header" type="button" aria-expanded="true">
+          <span>
+            <span class="intel-section-title">📰 Live Intelligence</span>
+            <span class="intel-section-sub">Scheduled events and breaking market news</span>
+          </span>
+          <span class="intel-section-note">Provider refreshed</span>
+          <span class="intel-section-chevron" aria-hidden="true">▾</span>
+        </button>
+        <div class="intel-section-body">
+          <div class="intel-grid intel-grid--2">
+
+            <article class="intel-panel">
+              <div class="intel-panel-head">
+                <span class="intel-panel-title">Economic Calendar</span>
+                <span class="intel-panel-note">US · EU · UK · JP · CN</span>
+              </div>
+              <div class="intel-widget" data-intel-widget="economicCalendar"
+                   style="--intel-widget-h:420px;--intel-widget-h-sm:360px"></div>
+            </article>
+
+            <article class="intel-panel">
+              <div class="intel-panel-head">
+                <span class="intel-panel-title">Top Stories</span>
+                <span class="intel-panel-note">All markets</span>
+              </div>
+              <div class="intel-widget" data-intel-widget="topStories"
+                   style="--intel-widget-h:420px;--intel-widget-h-sm:360px"></div>
+            </article>
+
+          </div>
+        </div>
+      </section>
+
+    </div>
+
     <section class="newsroom-overview" id="newsroomOverview" aria-label="Reporter Room overview">
       <div class="newsroom-main">
         <div class="newsroom-section-head">
@@ -385,6 +428,11 @@
       if (!fixedSection) return;
       var overview = document.getElementById('newsroomOverview');
       if (overview) overview.style.display = 'none';
+      // Drop the dashboard rather than hiding it: a hidden widget still
+      // counts as declared, and these pages should fetch no third-party
+      // panels at all.
+      var intel = document.getElementById('reporterIntel');
+      if (intel && intel.parentNode) intel.parentNode.removeChild(intel);
       document.title = tabLabels[fixedSection] + ' · Market Command';
       var title = document.getElementById('reporterPageTitle');
       var subtitle = document.getElementById('reporterPageSubtitle');
@@ -989,6 +1037,10 @@
     loadNewsroomStatus();
     setInterval(loadNewsroomStatus, 30000);
   })();
+</script>
+<script src="/assets/js/reporter-widgets.js"></script>
+<script>
+  if (window.ReporterWidgets) window.ReporterWidgets.init();
 </script>
 </body>
 </html>
