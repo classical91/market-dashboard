@@ -30,7 +30,10 @@
       <div class="intel-status-strip" id="intelStatusStrip" aria-label="Market status" aria-live="polite">
         <div class="intel-strip-empty">Reading market context&hellip;</div>
       </div>
-      <div class="intel-quality" id="intelDataQuality" aria-live="polite"></div>
+      <div class="intel-strip-footer">
+        <span class="intel-quality" id="intelDataQuality" aria-live="polite"></span>
+        <a class="intel-jump" href="#newsroomSection">Skip to AI Newsroom ↓</a>
+      </div>
 
 
       <section class="intel-section" data-intel-section="live-intelligence" data-intel-accent="purple">
@@ -365,6 +368,16 @@
 
     </div>
 
+    <section class="intel-section intel-section--static" id="newsroomSection" data-intel-accent="amber">
+      <div class="intel-section-header intel-section-header--static">
+        <span>
+          <span class="intel-section-title">🤖 AI Newsroom</span>
+          <span class="intel-section-sub">What the four desks made of the day</span>
+        </span>
+        <span class="intel-section-note">Read-only on load</span>
+      </div>
+      <div class="intel-section-body">
+
     <section class="newsroom-overview" id="newsroomOverview" aria-label="Reporter Room overview">
       <div class="newsroom-main">
         <div class="newsroom-section-head">
@@ -388,9 +401,12 @@
         </div>
       </div>
 
-      <aside class="shareclaw-panel" aria-label="ShareClaw status">
+      <aside class="shareclaw-panel" aria-label="Newsroom status and controls">
         <div class="shareclaw-head">
-          <div class="shareclaw-title">🤖 ShareClaw</div>
+          <div>
+            <div class="shareclaw-title">Newsroom Status</div>
+            <div class="shareclaw-subtitle">ShareClaw operations</div>
+          </div>
           <div class="shareclaw-state" id="shareclawState"><span class="shareclaw-dot"></span><span>Checking</span></div>
         </div>
         <div class="shareclaw-times">
@@ -405,10 +421,17 @@
           <div class="shareclaw-metric"><div class="shareclaw-metric-value" id="metricDesks">0/4</div><div class="shareclaw-metric-label">Desks ready</div></div>
           <div class="shareclaw-metric"><div class="shareclaw-metric-value" id="metricCycles">0</div><div class="shareclaw-metric-label">Runs tracked</div></div>
         </div>
-        <button class="open-all-btn shareclaw-run" id="shareclawRunBtn" type="button">⚡ Run Now</button>
-        <div class="shareclaw-note">Generates and saves all desks. It never broadcasts.</div>
+        <div class="shareclaw-actions">
+          <button class="open-all-btn shareclaw-run" id="shareclawRunBtn" type="button">⚡ Run Now</button>
+          <button class="open-all-btn shareclaw-run" id="reporterBroadcastBtn" type="button" disabled>📣 Broadcast</button>
+        </div>
+        <div class="shareclaw-note">Run Now generates and saves all desks; it never broadcasts. Broadcast sends the saved desks to Telegram.</div>
         <div class="shareclaw-message" id="shareclawMessage" aria-live="polite"></div>
+        <div class="reporter-broadcast-status" id="reporterBroadcastStatus" style="display:none"></div>
       </aside>
+    </section>
+
+      </div>
     </section>
 
     <!-- Date + generated-at badges -->
@@ -416,10 +439,8 @@
       <div class="reporter-date-badge" id="reporterDate"></div>
       <div class="reporter-gen-badge" id="reporterGen"></div>
       <div class="reporter-actions" style="margin-left:auto">
-        <button class="open-all-btn" id="reporterBroadcastBtn" type="button">&#128226; Broadcast</button>
         <button class="open-all-btn reporter-generate-cta" id="reporterRegenBtn" type="button">&#9889; Regenerate</button>
       </div>
-      <span class="reporter-broadcast-status" id="reporterBroadcastStatus" style="display:none"></span>
     </div>
 
     <!-- Tabs -->
@@ -576,7 +597,11 @@
       var candidates = [];
       for (var rank = 0; rank < 10; rank += 1) {
         sectionOrder.forEach(function (section) {
-          if (byDesk[section][rank]) candidates.push({ section: section, block: byDesk[section][rank] });
+          if (byDesk[section][rank]) {
+            // deskRank is the story's position within its own desk, which is
+            // how per-story metadata is addressed (see storyMeta).
+            candidates.push({ section: section, block: byDesk[section][rank], deskRank: rank });
+          }
         });
       }
       var stories = [];
@@ -611,6 +636,64 @@
       }).join('');
     }
 
+    /* Cited sources per desk, counted only for the generation that produced
+       the report currently on screen. */
+    function sourceCountBySection(data) {
+      var times = data && data.generatedAtBySection || {};
+      var seen = {};
+      var counts = {};
+      (data && data.generationLog || []).forEach(function (entry) {
+        if (!entry || !entry.section || times[entry.section] !== entry.generatedAt) return;
+        seen[entry.section] = seen[entry.section] || {};
+        (entry.sources || []).forEach(function (source) {
+          var key = source && (source.url || source.title);
+          if (key) seen[entry.section][key] = true;
+        });
+      });
+      Object.keys(seen).forEach(function (section) {
+        counts[section] = Object.keys(seen[section]).length;
+      });
+      return counts;
+    }
+
+    /**
+     * Presentation metadata for one Master News story.
+     *
+     * Desk, desk update time and desk source count come from the saved report
+     * as it exists today. Impact, affected assets and themes are read from an
+     * optional `storyMetaBySection[section][deskRank]` block, so when the
+     * Reporter starts classifying stories the labels appear here without the
+     * card needing to be rebuilt. Nothing is inferred locally: a field the
+     * report does not carry simply does not render.
+     */
+    function storyMeta(story, data, sourceCounts) {
+      var bySection = data && data.storyMetaBySection;
+      var extra = (bySection && bySection[story.section] && bySection[story.section][story.deskRank]) || {};
+      return {
+        desk: deskMeta[story.section] ? deskMeta[story.section].short : story.section,
+        updatedAt: data && data.generatedAtBySection ? data.generatedAtBySection[story.section] : null,
+        sourceCount: sourceCounts[story.section] || 0,
+        impact: typeof extra.impact === 'string' ? extra.impact : '',
+        assets: Array.isArray(extra.assets) ? extra.assets : [],
+        themes: Array.isArray(extra.themes) ? extra.themes : []
+      };
+    }
+
+    function impactClass(impact) {
+      var key = String(impact || '').toLowerCase();
+      if (key === 'critical' || key === 'high') return 'master-tag--impact high';
+      if (key === 'medium') return 'master-tag--impact medium';
+      if (key === 'low') return 'master-tag--impact low';
+      return 'master-tag--impact';
+    }
+
+    function storyTime(iso) {
+      if (!iso) return '';
+      var ts = new Date(iso);
+      if (Number.isNaN(ts.getTime())) return '';
+      return ts.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    }
+
     function currentSourceCount(data) {
       var times = data && data.generatedAtBySection || {};
       var urls = {};
@@ -632,12 +715,35 @@
       if (!stories.length) {
         el.innerHTML = '<div class="master-empty">Master News appears when saved desk reports are available.</div>';
       } else {
+        var sourceCounts = sourceCountBySection(data);
         el.innerHTML = stories.map(function (story, index) {
-          var meta = deskMeta[story.section];
+          var meta = storyMeta(story, data, sourceCounts);
+          var tags = '<span class="master-tag master-tag--desk">' + esc(meta.desk) + '</span>';
+          if (meta.impact) {
+            tags += '<span class="master-tag ' + impactClass(meta.impact) + '">' +
+              esc(meta.impact) + ' impact</span>';
+          }
+          meta.assets.forEach(function (asset) {
+            tags += '<span class="master-tag master-tag--asset">' + esc(asset) + '</span>';
+          });
+          meta.themes.forEach(function (theme) {
+            tags += '<span class="master-tag master-tag--theme">' + esc(theme) + '</span>';
+          });
+
+          var facts = [];
+          var when = storyTime(meta.updatedAt);
+          if (when) facts.push('Updated ' + when);
+          if (meta.sourceCount) {
+            facts.push(meta.sourceCount + ' desk source' + (meta.sourceCount === 1 ? '' : 's'));
+          }
+
           return '<button class="master-story" type="button" data-master-section="' + story.section + '">' +
             '<span class="master-rank">' + String(index + 1).padStart(2, '0') + '</span>' +
+            '<span class="master-story-main">' +
             '<span class="master-story-title">' + applyBold(storyTitle(story.block)) + '</span>' +
-            '<span class="master-story-desk">' + esc(meta.short) + '</span></button>';
+            '<span class="master-story-tags">' + tags + '</span>' +
+            (facts.length ? '<span class="master-story-facts">' + esc(facts.join(' · ')) + '</span>' : '') +
+            '</span></button>';
         }).join('');
       }
       var ready = sectionOrder.filter(function (section) { return Boolean(data && data[section]); }).length;
@@ -728,6 +834,8 @@
 
     function configurePageShell() {
       if (!fixedSection) return;
+      var newsroom = document.getElementById('newsroomSection');
+      if (newsroom) newsroom.style.display = 'none';
       var overview = document.getElementById('newsroomOverview');
       if (overview) overview.style.display = 'none';
       // Drop the dashboard rather than hiding it: a hidden widget still
@@ -786,6 +894,7 @@
         'to enable generation. Saved Reporter Room briefings remain read-only on page load.</div>';
       renderDeskStatus(null);
       renderMasterNews(null);
+      syncBroadcastAvailability();
     }
 
     function showEmptyState() {
@@ -799,6 +908,7 @@
         generateCta() + '</div>';
       renderDeskStatus(reportData);
       renderMasterNews(reportData);
+      syncBroadcastAvailability();
     }
 
     function showRateLimited(data) {
@@ -843,6 +953,17 @@
 
     function hasContent(data) {
       return !!(data && (data.geopolitics || data.economics || data.markets || data.crypto));
+    }
+
+    /* Broadcast now sits in the newsroom operations panel, which is on screen
+       from the first paint — so it stays disabled until a saved report
+       actually exists to send. */
+    function syncBroadcastAvailability() {
+      var btn = document.getElementById('reporterBroadcastBtn');
+      if (!btn || btn.dataset.busy === 'true') return;
+      var ready = hasContent(reportData);
+      btn.disabled = !ready;
+      btn.title = ready ? '' : 'Generate or run a desk first — there is no saved report to broadcast.';
     }
 
     function readLocalLog() {
@@ -1077,6 +1198,7 @@
       renderGenBadge();
       renderDeskStatus(data);
       renderMasterNews(data);
+      syncBroadcastAvailability();
 
       renderLog(data.generationLog);
       if (!data[activeTab] && data.latestSection) {
@@ -1303,6 +1425,7 @@
     if (broadcastBtn) broadcastBtn.addEventListener('click', function () {
       if (broadcasting) return;
       broadcasting = true;
+      broadcastBtn.dataset.busy = 'true';
       broadcastBtn.disabled = true;
       broadcastBtn.textContent = 'Sending…';
       showBroadcastStatus('', '');
@@ -1324,8 +1447,9 @@
         })
         .finally(function () {
           broadcasting = false;
-          broadcastBtn.disabled = false;
           broadcastBtn.textContent = '📣 Broadcast';
+          delete broadcastBtn.dataset.busy;
+          syncBroadcastAvailability();
         });
     });
 
@@ -1335,6 +1459,7 @@
     setInterval(renderGenBadge, 1000);
     renderDeskStatus(null);
     renderMasterNews(null);
+    syncBroadcastAvailability();
     loadReport();
     loadNewsroomStatus();
     setInterval(loadNewsroomStatus, 30000);

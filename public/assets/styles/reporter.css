@@ -113,13 +113,36 @@
 .master-news-list { display: grid; gap: 2px; margin-top: 10px; }
 .master-story {
   appearance: none; background: transparent; border: 0; border-radius: 9px;
-  color: inherit; cursor: pointer; display: grid; grid-template-columns: 24px minmax(0,1fr) auto;
-  gap: 9px; align-items: start; padding: 8px; text-align: left; transition: background 0.15s;
+  color: inherit; cursor: pointer; display: grid; grid-template-columns: 26px minmax(0,1fr);
+  gap: 9px; align-items: start; padding: 9px 8px; text-align: left; transition: background 0.15s;
 }
+.master-story:focus-visible { outline: 2px solid var(--amber); outline-offset: 1px; }
+.master-story-main { display: grid; gap: 5px; min-width: 0; }
 .master-story:hover { background: rgba(245,197,66,0.06); }
 .master-rank { color: var(--amber); font-size: 11px; font-weight: 900; padding-top: 1px; }
 .master-story-title { color: var(--soft); font-size: 12px; font-weight: 650; line-height: 1.4; }
-.master-story-desk { color: var(--muted); font-size: 9px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+/* The tag row is the slot future Reporter metadata lands in: desk today,
+   plus impact, affected assets and themes as soon as the saved report
+   carries them. Each tag renders only when its field exists. */
+.master-story-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+.master-tag {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  padding: 2px 6px;
+  text-transform: uppercase;
+}
+.master-tag--desk { background: var(--amber-bg); border-color: rgba(245,197,66,0.25); color: var(--amber); }
+.master-tag--asset { background: var(--teal-bg); border-color: rgba(0,227,150,0.22); color: var(--teal); }
+.master-tag--theme { color: var(--soft); }
+.master-tag--impact.high { background: var(--red-bg); border-color: rgba(255,77,109,0.3); color: var(--red); }
+.master-tag--impact.medium { background: var(--amber-bg); border-color: rgba(245,197,66,0.25); color: var(--amber); }
+.master-tag--impact.low { color: var(--dim); }
+.master-story-facts { color: var(--dim); font-size: 10px; }
 .master-empty { color: var(--muted); font-size: 12px; padding: 14px 8px 4px; }
 
 /* ── Reporter ShareClaw panel ────────────────────────────*/
@@ -917,4 +940,58 @@ body.crypto-bg {
 @media (max-width: 760px) {
   .intel-macro-grid { grid-template-columns: 1fr; }
   .intel-macro-card-note { display: none; }
+}
+
+/* ── Reporter intelligence — AI Newsroom shell + operations ─*/
+/* The newsroom keeps the dashboard's section language so it reads as part of
+   the same page, but its header does not collapse: there is nothing below it
+   to lazy-load, and hiding the desks is not a thing anyone wants. */
+.intel-section-header--static { cursor: default; }
+.intel-section-header--static:hover { background: var(--surface2); border-color: var(--border); }
+.intel-section--static .intel-section-note { margin-left: auto; }
+
+.intel-strip-footer {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  justify-content: space-between;
+  margin: 7px 2px 0;
+}
+.intel-strip-footer .intel-quality { margin: 0; }
+.intel-jump {
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+}
+.intel-jump:hover { color: var(--blue); }
+.intel-jump:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+.shareclaw-subtitle {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  margin-top: 2px;
+  text-transform: uppercase;
+}
+.shareclaw-actions { display: grid; gap: 8px; }
+.shareclaw-actions .shareclaw-run { margin: 0; width: 100%; }
+.shareclaw-run:disabled { cursor: not-allowed; opacity: 0.45; }
+.shareclaw-panel .reporter-broadcast-status {
+  flex-basis: auto;
+  font-size: 11px;
+  line-height: 1.45;
+  margin-top: 6px;
+}
+
+@media (max-width: 900px) {
+  /* The ops panel goes two-up on tablets; the button row should not be split
+     across its columns. */
+  .shareclaw-panel .shareclaw-actions,
+  .shareclaw-panel .shareclaw-note,
+  .shareclaw-panel .shareclaw-message,
+  .shareclaw-panel .reporter-broadcast-status { grid-column: 1 / -1; }
 }
