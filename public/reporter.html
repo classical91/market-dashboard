@@ -340,34 +340,187 @@
       return esc(text).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     }
 
-    function parseToStories(text, sectionClass) {
-      /* Split on blank lines → individual story cards */
-      var blocks = text.split(/\n{2,}/);
+    /* The desks are asked for "**#N [REGION] — [HEADLINE]**" followed by hyphen
+       bullets. Pulling that heading apart is what lets a briefing read as
+       ranked stories instead of a wall of bold paragraphs — and when a
+       generation does not follow the format, every piece simply comes back
+       empty and the block still renders as a titled card. */
+    function parseStoryBlock(block) {
+      var lines = String(block || '').split('\n')
+        .map(function (line) { return line.trim(); })
+        .filter(Boolean);
+
+      var points = [];
+      var paragraphs = [];
+      var headingLine = '';
+
+      lines.forEach(function (line) {
+        if (line.indexOf('- ') === 0) { points.push(line.slice(2)); return; }
+        if (!headingLine) { headingLine = line; return; }
+        paragraphs.push(line);
+      });
+
+      var heading = headingLine.replace(/^\*\*|\*\*$/g, '').replace(/^#+\s*/, '').trim();
+
+      var rank = '';
+      var rankMatch = heading.match(/^#?(\d{1,2})[.)\s]\s*/);
+      if (rankMatch) {
+        rank = rankMatch[1];
+        heading = heading.slice(rankMatch[0].length).trim();
+      }
+
+      // "UNITED STATES — Fed signals…" splits into a kicker and a headline;
+      // a long left-hand side is just a title containing a dash, so it stays.
+      var kicker = '';
+      var parts = heading.split(/\s+[—–]\s+|\s+-\s+/);
+      if (parts.length > 1 && parts[0].length <= 42) {
+        kicker = parts[0].trim();
+        heading = parts.slice(1).join(' — ').trim();
+      }
+
+      return {
+        rank: rank,
+        kicker: kicker,
+        title: heading,
+        points: points,
+        paragraphs: paragraphs
+      };
+    }
+
+    /* Plain text for the clipboard: what a reporter actually pastes into a
+       channel, with the markdown asterisks taken back out. */
+    function storyPlainText(story) {
+      var lines = [];
+      var head = (story.rank ? '#' + story.rank + ' ' : '') +
+        (story.kicker ? story.kicker + ' — ' : '') + story.title;
+      lines.push(head.replace(/\*\*/g, ''));
+      story.points.forEach(function (point) { lines.push('- ' + point.replace(/\*\*/g, '')); });
+      story.paragraphs.forEach(function (para) { lines.push(para.replace(/\*\*/g, '')); });
+      return lines.join('\n');
+    }
+
+    var currentStories = [];
+
+    function storyCardHtml(story, index, sectionClass) {
       var cardClass = 'story' + (sectionClass ? ' story--' + sectionClass : '');
-      return blocks
-        .map(function (b) { return b.trim(); })
-        .filter(Boolean)
-        .map(function (block) {
-          var lines = block.split('\n');
-          var html = '';
-          var inList = false;
+      var html = '<article class="' + cardClass + '" data-story-index="' + index + '">' +
+        '<div class="story-head">' +
+        '<span class="story-rank">' +
+        (story.rank ? esc(String(story.rank).padStart(2, '0')) : '&bull;') +
+        '</span><div class="story-heading">';
+      if (story.kicker) html += '<span class="story-kicker">' + applyBold(story.kicker) + '</span>';
+      html += '<h3 class="story-title">' + applyBold(story.title || 'Saved story') + '</h3>';
+      html += '</div><button class="story-copy" type="button" data-copy-story="' + index +
+        '" title="Copy this story">Copy</button></div>';
 
-          lines.forEach(function (line) {
-            var t = line.trim();
-            if (!t) return;
-            if (t.startsWith('- ')) {
-              if (!inList) { html += '<ul>'; inList = true; }
-              html += '<li>' + applyBold(t.slice(2)) + '</li>';
-            } else {
-              if (inList) { html += '</ul>'; inList = false; }
-              html += '<p>' + applyBold(t) + '</p>';
-            }
-          });
+      if (story.points.length) {
+        html += '<ul class="story-points">' + story.points.map(function (point) {
+          return '<li>' + applyBold(point) + '</li>';
+        }).join('') + '</ul>';
+      }
+      story.paragraphs.forEach(function (para) {
+        html += '<p class="story-note">' + applyBold(para) + '</p>';
+      });
+      return html + '</article>';
+    }
 
-          if (inList) html += '</ul>';
-          return '<div class="' + cardClass + '">' + html + '</div>';
-        })
-        .join('');
+    function renderStories(text, sectionClass) {
+      currentStories = splitStoryBlocks(text).map(parseStoryBlock);
+      if (!currentStories.length) return '';
+      return '<div class="stories">' + currentStories.map(function (story, index) {
+        return storyCardHtml(story, index, sectionClass);
+      }).join('') + '</div>';
+    }
+
+    /* Cited sources are already captured per generation and already travel in
+       the payload — they were only ever counted, never shown. A briefing you
+       cannot trace is a briefing you cannot file. */
+    function sourcesForSection(section) {
+      if (!reportData) return [];
+      var times = reportData.generatedAtBySection || {};
+      var entry = (reportData.generationLog || []).filter(function (row) {
+        return row && row.section === section && row.generatedAt === times[section];
+      })[0];
+      return (entry && entry.sources) || [];
+    }
+
+    function sourceHost(url) {
+      try {
+        return new URL(url).hostname.replace(/^www\./, '');
+      } catch (err) {
+        return String(url || '').slice(0, 60);
+      }
+    }
+
+    function renderSourcesHtml(sources) {
+      var rows = (sources || []).filter(function (source) {
+        return source && (source.url || source.title);
+      });
+      if (!rows.length) return '';
+      return '<section class="report-sources">' +
+        '<button class="report-sources-toggle" type="button" aria-expanded="false">' +
+        '<span class="report-sources-label">Cited sources</span>' +
+        '<span class="report-sources-count">' + rows.length + '</span>' +
+        '<span class="report-sources-chevron" aria-hidden="true">&#9662;</span></button>' +
+        '<ol class="report-sources-list" hidden>' + rows.map(function (source) {
+          var title = source.title || (source.url ? sourceHost(source.url) : 'Source');
+          if (!source.url) {
+            return '<li><span class="report-source-title">' + esc(title) + '</span></li>';
+          }
+          return '<li><a href="' + esc(source.url) + '" target="_blank" rel="noopener">' +
+            '<span class="report-source-title">' + esc(title) + '</span>' +
+            '<span class="report-source-host">' + esc(sourceHost(source.url)) + ' &#8599;</span>' +
+            '</a></li>';
+        }).join('') + '</ol></section>';
+    }
+
+    function reportMetaHtml(label, storyCount, sourceCount, generatedAt) {
+      var facts = [storyCount + (storyCount === 1 ? ' story' : ' stories')];
+      if (sourceCount) facts.push(sourceCount + (sourceCount === 1 ? ' source' : ' sources'));
+      var when = storyTime(generatedAt);
+      if (when) facts.push('updated ' + when);
+      return '<div class="report-meta">' +
+        '<span class="report-meta-label">' + esc(label) + '</span>' +
+        '<span class="report-meta-facts">' + esc(facts.join(' \u00b7 ')) + '</span>' +
+        '<button class="story-copy" type="button" data-copy-report="1" ' +
+        'title="Copy every story in this briefing">Copy all</button></div>';
+    }
+
+    /* navigator.clipboard is unavailable over plain http, which is how this
+       page is often opened on a LAN box, so the textarea path is a real
+       fallback rather than legacy politeness. */
+    function copyToClipboard(text) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        return navigator.clipboard.writeText(text);
+      }
+      return new Promise(function (resolve, reject) {
+        try {
+          var area = document.createElement('textarea');
+          area.value = text;
+          area.setAttribute('readonly', '');
+          area.style.position = 'fixed';
+          area.style.top = '-1000px';
+          area.style.opacity = '0';
+          document.body.appendChild(area);
+          area.select();
+          var ok = document.execCommand('copy');
+          document.body.removeChild(area);
+          if (ok) resolve(); else reject(new Error('copy refused'));
+        } catch (err) {
+          reject(err);
+        }
+      });
+    }
+
+    function flashCopyButton(button, message) {
+      var original = button.dataset.label || button.textContent;
+      button.dataset.label = original;
+      button.textContent = message;
+      button.classList.add('copied');
+      setTimeout(function () {
+        button.textContent = button.dataset.label || original;
+        button.classList.remove('copied');
+      }, 1600);
     }
 
     function splitStoryBlocks(text) {
@@ -381,6 +534,14 @@
         return item.trim();
       }).find(function (item) { return item && !item.startsWith('- '); }) || 'Saved story';
       return line.replace(/^\*\*|\*\*$/g, '').replace(/^#+\s*/, '').slice(0, 150);
+    }
+
+    /* storyTitle keeps the raw heading, which the dedupe compares on. For
+       display the rank belongs in the rank chip, not in the headline. */
+    function masterStoryTitle(block) {
+      var parsed = parseStoryBlock(block);
+      if (!parsed.title) return storyTitle(block);
+      return parsed.kicker ? parsed.kicker + ' — ' + parsed.title : parsed.title;
     }
 
     function titleTokens(block) {
@@ -555,7 +716,7 @@
           return '<button class="master-story" type="button" data-master-section="' + story.section + '">' +
             '<span class="master-rank">' + String(index + 1).padStart(2, '0') + '</span>' +
             '<span class="master-story-main">' +
-            '<span class="master-story-title">' + applyBold(storyTitle(story.block)) + '</span>' +
+            '<span class="master-story-title">' + applyBold(masterStoryTitle(story.block)) + '</span>' +
             '<span class="master-story-tags">' + tags + '</span>' +
             (facts.length ? '<span class="master-story-facts">' + esc(facts.join(' · ')) + '</span>' : '') +
             '</span></button>';
@@ -635,7 +796,13 @@
       }
       var generatedAt = reportData.generatedAtBySection && reportData.generatedAtBySection[tab];
       var sectionClass = isDateToday(generatedAt) ? tab : '';
-      content.innerHTML = '<div class="stories">' + parseToStories(text, sectionClass) + '</div>';
+      var sources = sourcesForSection(tab);
+      // renderStories fills currentStories, which the meta line counts and the
+      // copy buttons read, so it has to run first.
+      var stories = renderStories(text, sectionClass);
+      content.innerHTML =
+        reportMetaHtml(tabLabels[tab] || 'Report', currentStories.length, sources.length, generatedAt) +
+        stories + renderSourcesHtml(sources);
     }
 
     function currentTtl() {
@@ -996,10 +1163,13 @@
       }
 
       var sectionClass = isDateToday(entry.generatedAt) ? entry.section : '';
+      var stories = renderStories(entry.content, sectionClass);
       content.innerHTML = '<div class="reporter-unconfigured" style="margin-bottom:12px">' +
         '<strong>Saved ' + esc(label) + '</strong><br>' +
         esc(when) + (entry.model ? ' &middot; ' + esc(entry.model) : '') +
-        '</div><div class="stories">' + parseToStories(entry.content, sectionClass) + '</div>';
+        '</div>' +
+        reportMetaHtml(label, currentStories.length, (entry.sources || []).length, entry.generatedAt) +
+        stories + renderSourcesHtml(entry.sources || []);
     }
 
     function applyReport(data) {
@@ -1249,7 +1419,35 @@
     });
 
     document.getElementById('reporterContent').addEventListener('click', function (e) {
-      if (e.target.closest('.reporter-generate-cta')) generateReport();
+      if (e.target.closest('.reporter-generate-cta')) { generateReport(); return; }
+
+      var sourcesToggle = e.target.closest('.report-sources-toggle');
+      if (sourcesToggle) {
+        var list = sourcesToggle.parentNode.querySelector('.report-sources-list');
+        var open = sourcesToggle.getAttribute('aria-expanded') === 'true';
+        sourcesToggle.setAttribute('aria-expanded', open ? 'false' : 'true');
+        if (list) list.hidden = open;
+        return;
+      }
+
+      var storyBtn = e.target.closest('[data-copy-story]');
+      if (storyBtn) {
+        var story = currentStories[Number(storyBtn.getAttribute('data-copy-story'))];
+        if (!story) return;
+        copyToClipboard(storyPlainText(story))
+          .then(function () { flashCopyButton(storyBtn, 'Copied'); })
+          .catch(function () { flashCopyButton(storyBtn, 'Copy failed'); });
+        return;
+      }
+
+      var reportBtn = e.target.closest('[data-copy-report]');
+      if (reportBtn) {
+        if (!currentStories.length) return;
+        var text = currentStories.map(storyPlainText).join('\n\n');
+        copyToClipboard(text)
+          .then(function () { flashCopyButton(reportBtn, 'Copied ' + currentStories.length); })
+          .catch(function () { flashCopyButton(reportBtn, 'Copy failed'); });
+      }
     });
     var regenBtn = document.getElementById('reporterRegenBtn');
     if (regenBtn) regenBtn.addEventListener('click', function () { generateReport(); });

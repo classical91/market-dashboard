@@ -76,6 +76,11 @@ test("the tab swaps the two views and leaves mounted panels alone", () => {
   // Hiding, not tearing down: returning to the workspace must not re-fetch
   // every embed.
   assert.doesNotMatch(page, /workspace\.innerHTML = ''/);
+  // The hidden attribute only works if the stylesheet lets it. `.news-intel`
+  // declares display:grid, which outranks the UA's `[hidden] {display:none}`,
+  // so the workspace stayed on screen under a desk report until this rule
+  // existed. Without it the tab switch silently does nothing visible.
+  assert.match(css, /\.news-intel\[hidden\] \{ display: none; \}/);
 });
 
 test("the workspace runs raw news, then reaction, then reporter output", () => {
@@ -219,6 +224,30 @@ test("the fixed desk pages open straight into their report", () => {
   assert.match(page, /workspace\.parentNode\.removeChild\(workspace\)/);
   assert.match(page, /\.reporter-tab\[data-tab="news"\]/);
   assert.match(page, /if \(report\) report\.hidden = false;/);
+});
+
+test("a desk report reads as ranked stories with traceable sources", () => {
+  // The desks emit "**#N [REGION] — [HEADLINE]**" plus hyphen bullets; the
+  // heading is split so the rank, kicker and headline can be styled apart.
+  assert.match(page, /function parseStoryBlock\(block\)/);
+  assert.match(page, /rank: rank,\s*\n\s*kicker: kicker,\s*\n\s*title: heading,/);
+  assert.match(page, /class="story-rank"/);
+  assert.match(page, /class="story-title"/);
+
+  // Cited sources already travelled in the payload and were only counted.
+  assert.match(page, /function sourcesForSection\(section\)/);
+  assert.match(page, /class="report-sources"/);
+
+  // A reporter pastes stories into a channel, so copy is plain text with the
+  // markdown taken back out, and works without a secure context.
+  assert.match(page, /function storyPlainText\(story\)/);
+  assert.match(page, /replace\(\/\\\*\\\*\/g, ''\)/);
+  assert.match(page, /data-copy-story=/);
+  assert.match(page, /data-copy-report=/);
+  assert.match(page, /document\.execCommand\('copy'\)/);
+
+  // Master News shows the headline, not the raw "#1 " the rank chip repeats.
+  assert.match(page, /function masterStoryTitle\(block\)/);
 });
 
 test("existing Reporter behaviour is untouched", () => {
