@@ -197,7 +197,8 @@ body {
   color: var(--soft);
   transition: transform 0.2s ease;
 }
-.nav-dropdown.open .nav-caret {
+.nav-dropdown.open > .nav-dropdown-toggle .nav-caret,
+.nav-dropdown.open > .nav-split .nav-caret {
   transform: rotate(90deg);
 }
 .nav-dropdown-menu {
@@ -206,9 +207,42 @@ body {
   padding-left: 8px;
   border-left: 1px solid var(--border);
 }
-.nav-dropdown.open .nav-dropdown-menu {
+.nav-dropdown.open > .nav-dropdown-menu {
   display: block;
 }
+.nav-subdropdown .nav-dropdown-menu {
+  margin-left: 14px;
+}
+/* Split dropdown: the label opens its page, the caret expands the menu. */
+.nav-item.nav-split {
+  padding: 0;
+  gap: 0;
+}
+.nav-split-link {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-width: 0;
+  padding: 11px 6px 11px 14px;
+  border-radius: 15px 0 0 15px;
+  color: inherit;
+  text-decoration: none;
+}
+.nav-subitem.nav-split .nav-split-link { padding: 9px 6px 9px 12px; }
+.nav-split-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.nav-dropdown-toggle.nav-split-toggle {
+  width: auto;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 14px;
+  border-radius: 0 15px 15px 0;
+  color: inherit;
+  cursor: pointer;
+}
+.nav-split-toggle:hover { background: var(--accent-bg); }
+.nav-split-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .nav-subitem {
   font-size: 13.5px;
   font-weight: 500;

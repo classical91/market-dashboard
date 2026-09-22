@@ -22,21 +22,36 @@
   var workspace = [
     { href: "/terminal-suite.html", label: "Terminal Suite" },
     {
+      // The label itself opens Overview; the caret beside it expands the
+      // widget jump links and the Heatmaps page.
+      href: "/",
       label: "Overview",
       children: [
-        { href: "/", label: "Top" },
-        { href: "/#ticker", label: "Ticker" },
-        { href: "/#kpiGrid", label: "Key Indicators" },
-        { href: "/#market-pulse", label: "Market Pulse" },
-        { href: "/#market-heatmap", label: "Market Heatmap" },
-        { href: "/#risk-meter", label: "Risk Meter" },
-        { href: "/#watchlist", label: "Watchlist" },
-        { href: "/#alerts", label: "Alerts" },
-        { href: "/#ovh-market-overview", label: "TV Market Overview" },
-        { href: "/#ovh-technical-analysis", label: "Technical Analysis" },
-        { href: "/#ovh-derivatives", label: "Derivatives & Positioning" },
-        { href: "/#ovh-liquidity", label: "Liquidity & Volatility" },
-        { href: "/#ovh-heatmap", label: "Crypto Heatmap" },
+        {
+          label: "Widgets",
+          children: [
+            { href: "/#ticker", label: "Ticker" },
+            { href: "/#kpiGrid", label: "Key Indicators" },
+            { href: "/#market-pulse", label: "Market Pulse" },
+            { href: "/#risk-meter", label: "Risk Meter" },
+            { href: "/#watchlist", label: "Watchlist" },
+            { href: "/#alerts", label: "Alerts" },
+            { href: "/#ovh-market-overview", label: "TV Market Overview" },
+            { href: "/#ovh-technical-analysis", label: "Technical Analysis" },
+            { href: "/#ovh-derivatives", label: "Derivatives & Positioning" },
+            { href: "/#ovh-liquidity", label: "Liquidity & Volatility" },
+          ],
+        },
+        {
+          href: "/heatmaps.html",
+          label: "Heatmaps",
+          children: [
+            { href: "/heatmaps.html#market-heatmap", label: "Market Heatmap" },
+            { href: "/heatmaps.html#crypto-heatmap", label: "Crypto Heatmap" },
+            { href: "/heatmaps.html#stock-heatmap", label: "Stock Heatmap" },
+            { href: "/heatmaps.html#forex-heatmap", label: "Forex Heatmap" },
+          ],
+        },
       ],
     },
     {
@@ -334,7 +349,7 @@
     var prefix = mode === "command" ? "cmd-" : "";
     var id = prefix + "apps-menu-" + instance;
     var storageKey = dropdownKey(item, mode);
-    var active = item.children.some(hasActiveDescendant);
+    var active = isActive(item.href) || item.children.some(hasActiveDescendant);
     var featuredClass = item.featured
       ? " " + prefix + "nav-item--featured " + prefix + "nav-item--" + item.featured
       : "";
@@ -346,13 +361,32 @@
         : subNavItem(child, mode);
     }).join("");
 
+    var caret = '<span class="' + prefix + 'nav-caret" aria-hidden="true">&#9656;</span>';
+    var menu = '<div class="' + prefix + 'nav-dropdown-menu" id="' + id + '">' + children + "</div></div>";
+    var rootOpen =
+      '<div class="' + prefix + 'nav-dropdown' + (nested ? " " + prefix + "nav-subdropdown" : "") + (open ? " open" : "") + '" data-dropdown-key="' + storageKey + '">';
+
+    // A dropdown with its own page splits in two: the label is a link that
+    // opens the page, and only the caret expands the menu.
+    if (item.href) {
+      var selfActive = isActive(item.href);
+      return (
+        rootOpen +
+        '<div class="' + prefix + 'nav-item ' + (nested ? prefix + "nav-subitem " : "") + prefix + 'nav-split' + featuredClass + (active ? " active" : "") + '">' +
+        '<a class="' + prefix + 'nav-split-link" href="' + alphaHref(item.href) + '" data-nav-href="' + item.href + '"' +
+        (selfActive ? ' aria-current="page"' : "") + '><span class="' + prefix + 'nav-text">' + item.label + '</span></a>' +
+        '<button class="' + prefix + 'nav-dropdown-toggle ' + prefix + 'nav-split-toggle" type="button" aria-expanded="' + (open ? "true" : "false") +
+        '" aria-controls="' + id + '" aria-label="Show ' + item.label + ' sections">' + caret + '</button></div>' +
+        menu
+      );
+    }
+
     return (
-      '<div class="' + prefix + 'nav-dropdown' + (nested ? " " + prefix + "nav-subdropdown" : "") + (open ? " open" : "") + '" data-dropdown-key="' + storageKey + '">' +
+      rootOpen +
       '<button class="' + prefix + 'nav-item ' + (nested ? prefix + "nav-subitem " : "") + prefix + 'nav-dropdown-toggle' + featuredClass + (active ? " active" : "") +
       '" type="button" aria-expanded="' + (open ? "true" : "false") + '" aria-controls="' + id + '">' +
-      '<span class="' + prefix + 'nav-text">' + item.label + '</span>' +
-      '<span class="' + prefix + 'nav-caret" aria-hidden="true">&#9656;</span></button>' +
-      '<div class="' + prefix + 'nav-dropdown-menu" id="' + id + '">' + children + "</div></div>"
+      '<span class="' + prefix + 'nav-text">' + item.label + '</span>' + caret + '</button>' +
+      menu
     );
   }
 
@@ -381,7 +415,7 @@
   function wireDropdowns(root) {
     root.querySelectorAll(".nav-dropdown-toggle, .cmd-nav-dropdown-toggle").forEach(function (toggle) {
       toggle.addEventListener("click", function () {
-        var dropdownRoot = toggle.parentElement;
+        var dropdownRoot = toggle.closest(".nav-dropdown, .cmd-nav-dropdown");
         var open = dropdownRoot.classList.toggle("open");
         toggle.setAttribute("aria-expanded", open ? "true" : "false");
         setStoredDropdownState(dropdownRoot.getAttribute("data-dropdown-key"), open);
@@ -438,11 +472,14 @@
       var storedState = getStoredDropdownState(dropdownRoot.getAttribute("data-dropdown-key"));
       var open = storedState ? storedState === "open" : active;
       var toggle = dropdownRoot.querySelector(".nav-dropdown-toggle, .cmd-nav-dropdown-toggle");
+      var split = dropdownRoot.querySelector(".nav-split, .cmd-nav-split");
       dropdownRoot.classList.toggle("open", open);
-      if (toggle) {
+      if (split && split.parentElement === dropdownRoot) {
+        split.classList.toggle("active", active);
+      } else if (toggle) {
         toggle.classList.toggle("active", active);
-        toggle.setAttribute("aria-expanded", open ? "true" : "false");
       }
+      if (toggle) toggle.setAttribute("aria-expanded", open ? "true" : "false");
     });
   }
 

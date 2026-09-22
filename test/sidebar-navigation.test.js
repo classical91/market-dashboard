@@ -148,3 +148,21 @@ test("shared account UI uses the existing auth endpoints", () => {
   assert.match(sidebar, /action="\/auth\/logout"/);
   assert.match(sidebar, /href="\/login\?returnTo=/);
 });
+
+test("Overview opens its page directly and nests Widgets and Heatmaps", () => {
+  const start = sidebar.indexOf('label: "Overview"');
+  const menu = sidebar.slice(sidebar.lastIndexOf("{", start), sidebar.indexOf('label: "TradeHunter"'));
+  // The label itself is a link; the caret expands the sub-menus.
+  assert.match(menu, /href: "\/",\s*label: "Overview"/);
+  const widgets = menu.indexOf('label: "Widgets"');
+  const heatmaps = menu.indexOf('label: "Heatmaps"');
+  assert.ok(widgets > -1 && heatmaps > widgets, "Widgets then Heatmaps sit under Overview");
+  assert.match(menu, /href: "\/heatmaps\.html",\s*label: "Heatmaps"/);
+  for (const anchor of ["market-heatmap", "crypto-heatmap", "stock-heatmap", "forex-heatmap"]) {
+    assert.match(menu.slice(heatmaps), new RegExp(`href: "/heatmaps\\.html#${anchor}"`));
+  }
+  assert.doesNotMatch(menu, /href: "\/#(market-heatmap|ovh-heatmap)"/, "heatmap anchors left Overview");
+  // A dropdown with its own href renders as a split link + caret button.
+  assert.match(sidebar, /nav-split-link/);
+  assert.match(sidebar, /nav-split-toggle/);
+});

@@ -341,7 +341,8 @@ body {
   margin-left: auto; color: var(--soft); font-size: 11px;
   transition: transform 0.18s ease;
 }
-.cmd-nav-dropdown.open .cmd-nav-caret { transform: rotate(90deg); }
+.cmd-nav-dropdown.open > .cmd-nav-dropdown-toggle .cmd-nav-caret,
+.cmd-nav-dropdown.open > .cmd-nav-split .cmd-nav-caret { transform: rotate(90deg); }
 .cmd-nav-dropdown-menu {
   display: none; margin: 2px 0 2px 17px; padding-left: 8px;
   border-left: 1px solid var(--border);
@@ -353,6 +354,24 @@ body {
 .cmd-nav-subdropdown .cmd-nav-dropdown-menu {
   margin-left: 14px;
 }
+/* Split dropdown: the label opens its page, the caret expands the menu. */
+.cmd-nav-item.cmd-nav-split { padding: 0; gap: 0; }
+.cmd-nav-split-link {
+  display: flex; flex: 1; align-items: center; min-width: 0;
+  padding: 11px 6px 11px 14px; border-radius: 15px 0 0 15px;
+  color: inherit; text-decoration: none;
+}
+.cmd-nav-subitem.cmd-nav-split .cmd-nav-split-link { padding: 9px 6px 9px 11px; }
+.cmd-nav-split-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cmd-nav-dropdown-toggle.cmd-nav-split-toggle {
+  width: auto; align-self: stretch;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 14px; border-radius: 0 15px 15px 0;
+  color: inherit; cursor: pointer;
+}
+.cmd-nav-split-toggle:hover { background: var(--accent-bg); }
+.cmd-nav-split-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.cmd-nav-split-toggle .cmd-nav-caret { margin-left: 0; }
 .cmd-nav-subitem {
   padding: 9px 11px; font-size: 13.5px; font-weight: 500;
   color: var(--soft);
