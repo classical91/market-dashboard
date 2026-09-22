@@ -28,3 +28,12 @@ test("the heatmaps live on the Heatmaps page, not on Overview", () => {
   assert.match(heatmapsJs, /fetch\("\/api\/overview/);
   assert.match(heatmapsJs, /function renderHeatmap/);
 });
+
+test("Overview no longer carries its own Watchlist; Terminal Suite still reads the feed", () => {
+  assert.ok(!overviewPage.includes('id="watchlist"'), "the Watchlist card left Overview");
+  assert.ok(!overviewPage.includes('id="watchlistBody"'));
+  assert.doesNotMatch(overviewJs, /renderWatchlist|els\.watchlistBody/);
+  assert.doesNotMatch(read("public/assets/js/sidebar.js"), /href: "\/#watchlist"/);
+  // The payload field stays: Cross-Asset · I on the Terminal Suite uses it.
+  assert.match(read("public/assets/js/terminal-suite.js"), /data\.watchlist/);
+});

@@ -34,7 +34,6 @@
       pulseStatus: $("pulseStatus"),
       pulseVolatility: $("pulseVolatility"),
       pulseChange: $("pulseChange"),
-      watchlistBody: $("watchlistBody"),
       riskBox: $("riskBox"),
       alerts: $("alertsFeed"),
       chart: $("marketChart"),
@@ -86,7 +85,6 @@
     renderTicker(data);
     renderKpis(data);
     renderPulse(data);
-    renderWatchlist();
     renderRiskBox(data);
     renderAlerts(data);
     drawChart(data);
@@ -175,28 +173,6 @@
     const change = Number(data.marketPulse?.changePercent || 0);
     els.pulseChange.textContent = `${change > 0 ? "+" : ""}${change.toFixed(2)}%`;
     els.pulseChange.className = change > 0 ? "up" : change < 0 ? "down" : "flat";
-  }
-
-  function renderWatchlist() {
-    const data = state.overview;
-    if (!data) return;
-    const rows = data.watchlist || [];
-    if (!rows.length) {
-      els.watchlistBody.innerHTML = `<tr><td colspan="4">${ui().emptyState("No watchlist data", "Symbols will appear once the feed loads.")}</td></tr>`;
-      return;
-    }
-    els.watchlistBody.innerHTML = rows
-      .map(
-        (s) => `
-        <tr>
-          <td><span class="symbol-pill"><span class="asset-dot ${escapeHtml(s.type || "")}"></span>
-            <span><strong>${escapeHtml(s.symbol)}</strong><br>${escapeHtml(s.name || "")}</span></span></td>
-          <td>${money(s.price)}</td>
-          <td>${pct(s.changePercent)}</td>
-          <td>${escapeHtml(String(s.volume || "-"))}</td>
-        </tr>`,
-      )
-      .join("");
   }
 
   function renderRiskBox(data) {
@@ -307,7 +283,6 @@
       .map(() => ui().skeletonCard(3))
       .join("");
     els.ticker.innerHTML = `<div class="ticker-item"><span class="skeleton">Loading market data...</span></div>`;
-    els.watchlistBody.innerHTML = `<tr><td colspan="4">${ui().emptyState("Loading watchlist", "Fetching current market rows.")}</td></tr>`;
     els.alerts.innerHTML = ui().emptyState("Loading alerts", "Checking live conditions.");
   }
 
@@ -323,7 +298,6 @@
       )
       .join("");
     els.ticker.innerHTML = `<div class="ticker-item"><span class="skeleton">Loading market data…</span></div>`;
-    els.watchlistBody.innerHTML = `<tr><td colspan="4"><div class="empty-state">Loading…</div></td></tr>`;
     els.alerts.innerHTML = `<div class="empty-state">Loading alerts…</div>`;
   }
 

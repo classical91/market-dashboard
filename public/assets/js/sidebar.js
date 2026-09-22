@@ -34,7 +34,6 @@
             { href: "/#kpiGrid", label: "Key Indicators" },
             { href: "/#market-pulse", label: "Market Pulse" },
             { href: "/#risk-meter", label: "Risk Meter" },
-            { href: "/#watchlist", label: "Watchlist" },
             { href: "/#alerts", label: "Alerts" },
             { href: "/#ovh-market-overview", label: "TV Market Overview" },
             { href: "/#ovh-technical-analysis", label: "Technical Analysis" },
