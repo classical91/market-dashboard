@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Heatmaps — Market Command</title>
+    <link rel="stylesheet" href="/assets/styles/overview.css" />
+    <link rel="stylesheet" href="/assets/styles/components.css" />
+    <script src="/assets/js/settings.js"></script>
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar"></aside>
+
+      <main class="main">
+        <section class="topbar">
+          <span id="sourceBadge" class="chip fallback" title="Data source status">● Loading…</span>
+        </section>
+
+        <div id="statusBanner" class="banner" role="status" aria-live="polite"></div>
+
+        <!-- MARKET HEATMAP (moved from Overview; /api/overview data) -->
+        <section class="overview-grid" aria-label="Market heatmap">
+          <article class="card" id="market-heatmap">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Market Heatmap</div>
+                <div class="card-subtitle">Fast visual scan by asset</div>
+              </div>
+            </div>
+            <div class="heatmap" id="heatmap"></div>
+          </article>
+        </section>
+
+        <!-- CRYPTO HEATMAP (moved from Overview) -->
+        <div class="section-header ovh-accent-green" data-section="crypto-heatmap">
+          <span class="section-label"><span class="section-icon">&#127777;&#65039;</span>Crypto Heatmap</span>
+        </div>
+        <div class="ovh-widget-panel" id="crypto-heatmap">
+          <div class="ovh-widget-body ovh-widget-body--tall">
+            <div class="tradingview-widget-container">
+              <div class="tradingview-widget-container__widget"></div>
+              <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-crypto-coins-heatmap.js" async>
+              {
+                "dataSource": "Crypto",
+                "blockSize": "market_cap_calc",
+                "blockColor": "change",
+                "locale": "en",
+                "symbolUrl": "",
+                "colorTheme": "dark",
+                "hasTopBar": false,
+                "isDataSetEnabled": false,
+                "isZoomEnabled": true,
+                "hasSymbolTooltip": true,
+                "isMonoSize": false,
+                "width": "100%",
+                "height": "100%"
+              }
+              </script>
+            </div>
+          </div>
+        </div>
+
+        <!-- STOCK HEATMAP (traditional markets: S&P 500 by sector) -->
+        <div class="section-header ovh-accent-purple" data-section="stock-heatmap">
+          <span class="section-label"><span class="section-icon">&#127963;&#65039;</span>Stock Heatmap</span>
+        </div>
+        <p class="ovh-section-sub">S&amp;P 500 grouped by sector, sized by market cap</p>
+        <div class="ovh-widget-panel" id="stock-heatmap">
+          <div class="ovh-widget-body ovh-widget-body--tall">
+            <div class="tradingview-widget-container">
+              <div class="tradingview-widget-container__widget"></div>
+              <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-stock-heatmap.js" async>
+              {
+                "dataSource": "SPX500",
+                "blockSize": "market_cap_basic",
+                "blockColor": "change",
+                "grouping": "sector",
+                "locale": "en",
+                "symbolUrl": "",
+                "colorTheme": "dark",
+                "hasTopBar": false,
+                "isDataSetEnabled": false,
+                "isZoomEnabled": true,
+                "hasSymbolTooltip": true,
+                "isMonoSize": false,
+                "width": "100%",
+                "height": "100%"
+              }
+              </script>
+            </div>
+          </div>
+        </div>
+
+        <!-- FOREX HEATMAP (traditional markets: major currency crosses) -->
+        <div class="section-header ovh-accent-yellow" data-section="forex-heatmap">
+          <span class="section-label"><span class="section-icon">&#128177;</span>Forex Heatmap</span>
+        </div>
+        <p class="ovh-section-sub">Major currency crosses — relative strength at a glance</p>
+        <div class="ovh-widget-panel" id="forex-heatmap">
+          <div class="ovh-widget-body">
+            <div class="tradingview-widget-container">
+              <div class="tradingview-widget-container__widget"></div>
+              <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-forex-heat-map.js" async>
+              {
+                "currencies": ["EUR", "USD", "JPY", "GBP", "CHF", "AUD", "CAD", "NZD"],
+                "isTransparent": true,
+                "colorTheme": "dark",
+                "locale": "en",
+                "width": "100%",
+                "height": "100%"
+              }
+              </script>
+            </div>
+          </div>
+        </div>
+
+        <!-- HEATMAP TOOLS (external) -->
+        <div class="section-header ovh-accent-blue" data-section="heatmap-tools">
+          <span class="section-label"><span class="section-icon">&#128279;</span>Heatmap Tools</span>
+        </div>
+        <div class="ovh-link-grid" id="heatmap-tools">
+          <a class="tool-card" href="https://www.coinglass.com/pro/futures/LiquidationHeatMap" target="_blank" rel="noopener">
+            <div class="tool-card-top"><span class="tool-badge" style="background:rgba(77,163,255,0.16);color:var(--blue)">HEATMAP</span><span class="tool-arrow">&#8599;</span></div>
+            <div class="tool-name">Liquidation Heatmap</div>
+            <div class="tool-src">coinglass.com</div>
+          </a>
+        </div>
+
+        <p class="footer-note">Market Command — heatmaps via /api/overview + TradingView widgets</p>
+      </main>
+    </div>
+
+    <script src="/assets/js/ui.js"></script>
+    <script src="/assets/js/sidebar.js"></script>
+    <script src="/assets/js/heatmaps.js"></script>
+  </body>
+</html>

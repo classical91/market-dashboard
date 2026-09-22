@@ -192,18 +192,6 @@
 
         </section>
 
-        <section class="overview-grid" aria-label="Market heatmap">
-          <article class="card" id="market-heatmap">
-            <div class="card-header">
-              <div>
-                <div class="card-title">Market Heatmap</div>
-                <div class="card-subtitle">Fast visual scan by asset</div>
-              </div>
-            </div>
-            <div class="heatmap" id="heatmap"></div>
-          </article>
-        </section>
-
         <!-- TECHNICAL ANALYSIS -->
         <div class="section-header ovh-accent-purple" data-section="ovh-technical-analysis">
           <span class="section-label"><span class="section-icon">&#128200;</span>Technical Analysis</span>
@@ -317,11 +305,6 @@
           <span class="section-label"><span class="section-icon">&#128167;</span>Liquidity &amp; Volatility</span>
         </div>
         <div class="ovh-link-grid" id="ovh-liquidity">
-          <a class="tool-card" href="https://www.coinglass.com/pro/futures/LiquidationHeatMap" target="_blank" rel="noopener">
-            <div class="tool-card-top"><span class="tool-badge" style="background:rgba(77,163,255,0.16);color:var(--blue)">HEATMAP</span><span class="tool-arrow">&#8599;</span></div>
-            <div class="tool-name">Liquidation Heatmap</div>
-            <div class="tool-src">coinglass.com</div>
-          </a>
           <a class="tool-card" href="https://www.coinglass.com/liquidations" target="_blank" rel="noopener">
             <div class="tool-card-top"><span class="tool-badge" style="background:rgba(77,163,255,0.16);color:var(--blue)">LIVE LIQS</span><span class="tool-arrow">&#8599;</span></div>
             <div class="tool-name">Crypto Liquidations</div>
@@ -337,35 +320,6 @@
             <div class="tool-name">Crypto Market News</div>
             <div class="tool-src">tradingview.com</div>
           </a>
-        </div>
-
-        <!-- CRYPTO HEATMAP -->
-        <div class="section-header ovh-accent-green" data-section="ovh-heatmap">
-          <span class="section-label"><span class="section-icon">&#127777;&#65039;</span>Crypto Heatmap</span>
-        </div>
-        <div class="ovh-widget-panel" id="ovh-heatmap">
-          <div class="ovh-widget-body ovh-widget-body--tall">
-            <div class="tradingview-widget-container">
-              <div class="tradingview-widget-container__widget"></div>
-              <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-crypto-coins-heatmap.js" async>
-              {
-                "dataSource": "Crypto",
-                "blockSize": "market_cap_calc",
-                "blockColor": "change",
-                "locale": "en",
-                "symbolUrl": "",
-                "colorTheme": "dark",
-                "hasTopBar": false,
-                "isDataSetEnabled": false,
-                "isZoomEnabled": true,
-                "hasSymbolTooltip": true,
-                "isMonoSize": false,
-                "width": "100%",
-                "height": "100%"
-              }
-              </script>
-            </div>
-          </div>
         </div>
 
         <p class="footer-note">Market Command — live data via /api/overview + TradingView widgets</p>

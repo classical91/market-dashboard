@@ -34,7 +34,6 @@
       pulseStatus: $("pulseStatus"),
       pulseVolatility: $("pulseVolatility"),
       pulseChange: $("pulseChange"),
-      heatmap: $("heatmap"),
       watchlistBody: $("watchlistBody"),
       riskBox: $("riskBox"),
       alerts: $("alertsFeed"),
@@ -87,7 +86,6 @@
     renderTicker(data);
     renderKpis(data);
     renderPulse(data);
-    renderHeatmap(data);
     renderWatchlist();
     renderRiskBox(data);
     renderAlerts(data);
@@ -177,24 +175,6 @@
     const change = Number(data.marketPulse?.changePercent || 0);
     els.pulseChange.textContent = `${change > 0 ? "+" : ""}${change.toFixed(2)}%`;
     els.pulseChange.className = change > 0 ? "up" : change < 0 ? "down" : "flat";
-  }
-
-  function renderHeatmap(data) {
-    const tiles = data.heatmap || [];
-    if (!tiles.length) {
-      els.heatmap.innerHTML = ui().emptyState("No heatmap data", "Asset performance tiles will appear after data loads.");
-      return;
-    }
-    els.heatmap.innerHTML = tiles
-      .map((d) => {
-        const change = Number(d.value) || 0;
-        return `<div class="heat-tile" style="background:${heatColor(change)}">
-          <strong>${escapeHtml(d.label)}</strong>
-          <span>${change > 0 ? "+" : ""}${change.toFixed(2)}%</span>
-          <small>${escapeHtml(d.category || "")}</small>
-        </div>`;
-      })
-      .join("");
   }
 
   function renderWatchlist() {
@@ -328,7 +308,6 @@
       .join("");
     els.ticker.innerHTML = `<div class="ticker-item"><span class="skeleton">Loading market data...</span></div>`;
     els.watchlistBody.innerHTML = `<tr><td colspan="4">${ui().emptyState("Loading watchlist", "Fetching current market rows.")}</td></tr>`;
-    els.heatmap.innerHTML = ui().emptyState("Loading heatmap", "Preparing the asset performance scan.");
     els.alerts.innerHTML = ui().emptyState("Loading alerts", "Checking live conditions.");
   }
 
@@ -345,7 +324,6 @@
       .join("");
     els.ticker.innerHTML = `<div class="ticker-item"><span class="skeleton">Loading market data…</span></div>`;
     els.watchlistBody.innerHTML = `<tr><td colspan="4"><div class="empty-state">Loading…</div></td></tr>`;
-    els.heatmap.innerHTML = `<div class="empty-state">Loading heatmap…</div>`;
     els.alerts.innerHTML = `<div class="empty-state">Loading alerts…</div>`;
   }
 
@@ -382,13 +360,6 @@
     const cls = n > 0 ? "up" : n < 0 ? "down" : "flat";
     const sign = n > 0 ? "+" : "";
     return `<span class="${cls}">${sign}${n.toFixed(2)}%</span>`;
-  }
-
-  function heatColor(v) {
-    const intensity = Math.min(Math.abs(v) / 4, 1);
-    return v >= 0
-      ? `rgba(0,227,150,${0.18 + intensity * 0.58})`
-      : `rgba(255,77,109,${0.18 + intensity * 0.58})`;
   }
 
   function escapeHtml(value) {
