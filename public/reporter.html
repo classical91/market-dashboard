@@ -919,10 +919,15 @@
       applyReport(data);
       var label = tabLabels[data && data.generatedSection] || tabLabels[activeTab] || 'Reporter';
       var next = data && data.nextGenerationDate ? ' New generation unlocks on ' + esc(data.nextGenerationDate) + '.' : '';
+      // The server refuses a regeneration for as many days as the Refresh
+      // Frequency setting asks for, so the heading has to say which window
+      // was hit rather than always claiming "today".
+      var days = data && data.refreshCooldownDays;
+      var window = days > 1 ? 'already generated in the last ' + days + ' days' : 'already generated today';
       document.getElementById('reporterContent').insertAdjacentHTML(
         'afterbegin',
         '<div class="reporter-unconfigured" style="margin-bottom:12px">' +
-        '<strong>' + esc(label) + ' already generated today</strong><br>' +
+        '<strong>' + esc(label) + ' ' + esc(window) + '</strong><br>' +
         'Showing the saved report. No new OpenAI API call was made.' + next +
         '</div>'
       );
