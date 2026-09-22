@@ -80,6 +80,8 @@ const { DefiLlamaService } = require("./services/defillama");
 const { EtherscanService } = require("./services/etherscan");
 const { MarketDataService } = require("./services/market-data");
 const { OnchainService } = require("./services/onchain");
+const { OnchainIntelligenceService } = require("./services/onchain-intelligence/service");
+const { DefiLlamaOnchainProvider } = require("./services/onchain-intelligence/defillama-provider");
 const { OverviewService } = require("./services/overview");
 const { BroadcastIngestService } = require("./services/broadcast-ingest");
 const { BroadcastLedgerStore } = require("./services/broadcast-ledger");
@@ -117,6 +119,13 @@ function createApp() {
     defillamaService,
     etherscanService,
     covalentService,
+  });
+  const onchainIntelligenceService = new OnchainIntelligenceService({
+    provider: new DefiLlamaOnchainProvider(config.onchainIntelligence),
+    cache,
+    store: new PersistentReporterCache(path.join(dataDir, "onchain-intelligence.json")),
+    cacheTtlMs: config.onchainIntelligence.cacheTtlMs,
+    staleAfterMs: config.onchainIntelligence.staleAfterMs,
   });
   const telegramService = new TelegramService(config.telegram);
   // The ledger/Shortcut news route is deliberately isolated from the shared
@@ -501,7 +510,7 @@ function createApp() {
   app.use("/api/trade-context", createTradeContextRouter({ tradeContextService }));
   app.use("/api/bot-commands", createBotCommandsRouter({ botCommandsService }));
   app.use("/api/pattern-tracker", createPatternTrackerRouter({ patternTrackerService }));
-  app.use("/api/onchain", createOnchainRouter({ onchainService }));
+  app.use("/api/onchain", createOnchainRouter({ onchainService, onchainIntelligenceService }));
   app.use("/api/overview", createOverviewRouter({ overviewService }));
   app.use("/api/market-session", createMarketSessionRouter());
   app.use(

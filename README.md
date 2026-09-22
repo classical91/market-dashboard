@@ -15,7 +15,7 @@ The app is intentionally lightweight: no bundler, no frontend framework, and no 
 
 ## Main Surfaces
 
-- `/` - Market Command overview dashboard: live ticker, KPIs, chart, heatmap, watchlist, alerts, calendar, and news, plus TradingView market overview, technical analysis, and heatmap widgets.
+- `/` - Market Command overview dashboard: live ticker, KPIs, chart, heatmap, watchlist, alerts, calendar, and news, plus TradingView market overview, technical analysis, and heatmap widgets, and the **On-Chain Intelligence** card (see [On-Chain Intelligence](#on-chain-intelligence)).
 - `/crypto.html` - Crypto research and market links.
 - `/market-intel.html` - Cross-asset and macro research links.
 - `/traditional.html` - Traditional market research links.
@@ -356,6 +356,14 @@ Strategy-account GETs are observational: they read the runner's last persisted m
 - `ONCHAIN_MODE` - `cheap` (default), `normal`, or `deep`; presets Covalent page counts/sizes, lookback, and cache TTL so overview refreshes don't burn credits. Individual `ONCHAIN_*` vars override the preset.
 - `ONCHAIN_COOLDOWN_CACHE_MS` - how long to serve the cached overview while Covalent cools down after a 402/429. During that window tracked-token flows fall back to Etherscan when `ETHERSCAN_API_KEY` is set.
 - `ONCHAIN_*` tuning values for lookbacks, page sizes, row counts, thresholds, and cache TTLs.
+- `DEFILLAMA_TVL_API_BASE_URL` (default `https://api.llama.fi/`), `ONCHAIN_INTEL_CACHE_MS` (default 10 min), `ONCHAIN_INTEL_STALE_AFTER_MS` (default 1 h), `ONCHAIN_INTEL_REQUEST_TIMEOUT_MS` (default 15 s) - optional tuning for the On-Chain Intelligence card. No key is needed.
+
+#### On-Chain Intelligence
+
+The Overview card reads `GET /api/onchain/intelligence`, which wraps DefiLlama's free, keyless public endpoints (chain TVL history, stablecoin supply, DEX volume summaries) behind a provider adapter in `src/services/onchain-intelligence/`. The response is our own normalized schema, so a paid provider can be added later as another adapter without touching the UI. The existing `/api/onchain/overview` (transfer/wallet feed for `/onchain.html`) is unchanged.
+
+- **Pulse** - deterministic, rules in `scoring.js` and echoed in the payload: stablecoin supply 7D (±0.5% / ±1.5%), DeFi TVL 7D (±3% / ±8%) and DEX volume 7D-over-prior-7D (±10% / ±25%) each score 0 / ±1 / ±2; the sum maps to Strong Expansion (≥4), Expansion (≥2), Neutral, Contraction (≤−2), Strong Contraction (≤−4). Needs at least two components. Context only; it never says LONG or SHORT.
+- **Status** - `LIVE` (latest refresh succeeded), `CACHED` (refresh failed, serving a copy younger than `ONCHAIN_INTEL_STALE_AFTER_MS`), `STALE` (older), `UNAVAILABLE` (never fetched). The last good dataset is kept per section in `DATA_DIR/onchain-intelligence.json`, so it survives restarts. Missing values render `—`, never zero.
 
 ### YouTube Intelligence
 
@@ -511,6 +519,7 @@ another repository.
 
 - `/api/overview` still returns fallback data when market providers are missing or rate-limited.
 - On-chain overview degrades when Covalent is unavailable.
+- On-Chain Intelligence serves its last good dataset (CACHED/STALE) when DefiLlama is down, and an UNAVAILABLE card, never a broken Overview, when it has none.
 - Wallet/token detail endpoints require valid provider keys and should return clear service errors when unavailable.
 - YouTube Intelligence prefers the YouTube Data API, falls back to RSS when the key is missing, rejected or out of quota, and serves the last known good feed when both are down. Live/upcoming detection needs the API key; without one the page shows uploads and says so.
 

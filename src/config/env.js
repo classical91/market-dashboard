@@ -309,6 +309,15 @@ const config = {
     chain: process.env.DEFILLAMA_CHAIN || "Ethereum",
     coinChain: process.env.DEFILLAMA_COIN_CHAIN || "ethereum",
   },
+  // On-Chain Intelligence card on Overview. DefiLlama's free, keyless public
+  // endpoints only — no paid provider and no API key.
+  onchainIntelligence: {
+    tvlBaseUrl: process.env.DEFILLAMA_TVL_API_BASE_URL || "https://api.llama.fi/",
+    stablecoinsBaseUrl: process.env.DEFILLAMA_API_BASE_URL || "https://stablecoins.llama.fi/",
+    cacheTtlMs: parseNumber(process.env.ONCHAIN_INTEL_CACHE_MS, 10 * 60 * 1000),
+    staleAfterMs: parseNumber(process.env.ONCHAIN_INTEL_STALE_AFTER_MS, 60 * 60 * 1000),
+    requestTimeoutMs: parseNumber(process.env.ONCHAIN_INTEL_REQUEST_TIMEOUT_MS, 15000),
+  },
   etherscan: {
     apiKey: process.env.ETHERSCAN_API_KEY || process.env.ETHERSCAN_KEY || "",
     baseUrl: process.env.ETHERSCAN_API_BASE_URL || "https://api.etherscan.io",

@@ -1,0 +1,217 @@
+/* On-Chain Intelligence card (Overview). Uses the overview.css tokens. */
+.oci-card {
+  margin-bottom: 18px;
+}
+.oci-title {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 14px;
+}
+.oci-status {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.oci-status-live {
+  color: var(--green);
+  border-color: rgba(0, 227, 150, 0.3);
+}
+.oci-status-cached {
+  color: var(--blue);
+  border-color: rgba(77, 163, 255, 0.3);
+}
+.oci-status-stale {
+  color: var(--yellow);
+  border-color: rgba(245, 197, 66, 0.3);
+}
+.oci-status-unavailable {
+  color: var(--red);
+  border-color: rgba(255, 77, 109, 0.3);
+}
+.oci-body {
+  padding: 14px 18px 18px;
+}
+
+.oci-headline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px 24px;
+  margin-bottom: 14px;
+}
+.oci-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.oci-up {
+  color: var(--green);
+}
+.oci-down {
+  color: var(--red);
+}
+.oci-neutral {
+  color: var(--yellow);
+}
+.oci-pulse-score,
+.oci-regimes {
+  color: var(--muted);
+  font-size: 13px;
+}
+.oci-pulse-score strong {
+  color: var(--text);
+  margin-left: 4px;
+}
+.oci-regimes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-left: auto;
+}
+.oci-regimes strong {
+  margin-left: 6px;
+}
+
+.oci-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.oci-panel {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 12px 14px;
+  min-width: 0;
+}
+.oci-panel-title {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.oci-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 0.8fr) 20px;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 0;
+  font-size: 13px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  font-variant-numeric: tabular-nums;
+}
+.oci-row:last-child {
+  border-bottom: 0;
+}
+.oci-row > :not(:first-child) {
+  text-align: right;
+}
+.oci-row-head {
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.oci-arrow {
+  font-weight: 800;
+}
+.oci-carried {
+  color: var(--yellow);
+}
+.oci-subline {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.oci-subline strong {
+  color: var(--text);
+}
+.oci-muted {
+  color: var(--muted);
+}
+
+.oci-details {
+  margin-top: 12px;
+  font-size: 13px;
+}
+.oci-details summary {
+  cursor: pointer;
+  color: var(--blue);
+  font-weight: 700;
+  width: fit-content;
+}
+.oci-details summary:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+.oci-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 10px;
+}
+.oci-detail-grid h4 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: var(--soft);
+}
+.oci-detail-grid p {
+  font-size: 12px;
+  margin: 8px 0 0;
+}
+.oci-detail-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.oci-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.oci-footer a {
+  color: var(--soft);
+}
+
+@media (max-width: 900px) {
+  .oci-grid,
+  .oci-detail-grid {
+    grid-template-columns: 1fr;
+  }
+  .oci-regimes {
+    margin-left: 0;
+  }
+}
+@media (max-width: 480px) {
+  .oci-row {
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 0.9fr) minmax(0, 0.9fr) 16px;
+    font-size: 12px;
+    gap: 6px;
+  }
+  .oci-state {
+    font-size: 19px;
+  }
+}
