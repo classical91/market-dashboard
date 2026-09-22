@@ -106,6 +106,7 @@ test("scoring rules are deterministic and symmetric", () => {
 
   const up = computePulse({ stablecoins: { change7d: 2 }, tvl: { change7d: 10 }, dex: { change7d: 30 } });
   assert.equal(up.score, 6);
+  assert.equal(up.maxScore, 6);
   assert.equal(up.label, "Strong Expansion");
   assert.equal(up.state, "EXPANDING");
 
@@ -118,9 +119,11 @@ test("scoring rules are deterministic and symmetric", () => {
 
   const flat = computePulse({ stablecoins: { change7d: 0.1 }, tvl: { change7d: -1 }, dex: null });
   assert.equal(flat.label, "Neutral");
+  assert.equal(flat.maxScore, 4, "max scales with the components actually scored");
 
   const thin = computePulse({ stablecoins: { change7d: 5 }, tvl: null, dex: null });
   assert.equal(thin.label, null, "one component is not enough for a pulse");
+  assert.equal(thin.maxScore, null);
 });
 
 test("liquidity regime falls back to 30D when 7D is missing", () => {
