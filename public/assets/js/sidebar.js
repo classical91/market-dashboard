@@ -121,6 +121,10 @@
           children: [
             { href: "/market-intel.html#cross-asset-overview", label: "Cross-Asset Overview" },
             { href: "/market-intel.html#macro-indicators", label: "Macro Indicators" },
+            // Futures across every asset class, so it lives with the macro
+            // pages rather than under Crypto. The crypto OI screener is a
+            // separate page with a separate purpose.
+            { href: "/cross-market-oi.html", label: "Cross-Market Open Interest" },
           ],
         },
         {

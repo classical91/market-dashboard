@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cross-Market Open Interest · Market Command</title>
+  <script src="/assets/js/settings.js"></script>
+  <link rel="stylesheet" href="/assets/styles/command.css" />
+  <link rel="stylesheet" href="/assets/styles/ai-analysis.css" />
+  <link rel="stylesheet" href="/assets/styles/cross-market-oi.css" />
+</head>
+<body>
+<div class="app">
+  <aside class="cmd-sidebar"></aside>
+  <main class="cmd-main">
+
+    <div class="cmd-page-header">
+      <div>
+        <div class="cmd-page-title">Open Interest</div>
+        <div class="cmd-page-subtitle">Cross-market futures &mdash; indexes, FX, metals, energy, rates and crypto on one elliptical scale</div>
+      </div>
+    </div>
+
+    <div class="xoi-controls" role="group" aria-label="Comparison controls">
+      <div class="xoi-seg" role="group" aria-label="Metric" id="xoi-metric">
+        <button type="button" data-metric="OI" aria-pressed="true" class="is-active">Open interest</button>
+        <button type="button" data-metric="COT_NET_SPEC" aria-pressed="false">COT positioning</button>
+      </div>
+      <div class="xoi-seg" role="group" aria-label="Timeframe" id="xoi-timeframe">
+        <button type="button" data-tf="D" disabled aria-disabled="true" title="No free, licensed daily open-interest feed for CME / ICE / COMEX / NYMEX. CFTC data is weekly.">Daily</button>
+        <button type="button" data-tf="W" aria-pressed="true" class="is-active">Weekly</button>
+      </div>
+      <div class="xoi-seg" role="group" aria-label="Lookback" id="xoi-lookback">
+        <button type="button" data-lookback="1w" aria-pressed="true" class="is-active">&Delta; 1W</button>
+        <button type="button" data-lookback="4w" aria-pressed="false">&Delta; 4W</button>
+      </div>
+      <button type="button" class="xoi-refresh" id="xoi-refresh">Refresh</button>
+    </div>
+
+    <div class="xoi-classes" role="group" aria-label="Asset class" id="xoi-classes"></div>
+
+    <div class="aia-notice xoi-notice" id="xoi-notice" style="display:none" role="status"></div>
+
+    <section class="xoi-stage" aria-label="Cross-market open interest comparison">
+      <div class="xoi-table" id="xoi-table" role="list" aria-label="Instruments in this comparison"></div>
+      <div class="xoi-plot-wrap">
+        <div class="xoi-plot" id="xoi-plot"></div>
+        <div class="xoi-tooltip" id="xoi-tooltip" role="tooltip" hidden></div>
+      </div>
+      <div class="xoi-detail" id="xoi-detail" aria-live="polite"></div>
+      <div class="xoi-source" id="xoi-source"></div>
+    </section>
+
+    <details class="xoi-edit" id="xoi-edit">
+      <summary>Edit comparison <span class="xoi-edit-count" id="xoi-edit-count"></span></summary>
+      <div class="xoi-edit-body">
+        <p class="xoi-muted" id="xoi-edit-hint"></p>
+        <div class="xoi-edit-groups" id="xoi-edit-groups"></div>
+        <button type="button" class="xoi-refresh" id="xoi-edit-reset">Reset to reference six</button>
+      </div>
+    </details>
+
+    <details class="aia-how aia-how--footer">
+      <summary>&#8505;&#65039; How this page works</summary>
+      <div class="aia-how-body">
+        <ol class="aia-how-steps">
+          <li><strong>Source.</strong> The CFTC&rsquo;s weekly Commitments of Traders report (Legacy, futures only) from publicreporting.cftc.gov. It&rsquo;s free and public domain. Positions are as of Tuesday and published Friday at 3:30pm ET. The server fetches it once an hour at most and keeps the last good report if the CFTC is unreachable.</li>
+          <li><strong>Open interest</strong> plots the % change in total open interest over the lookback (1 or 4 weekly reports). Contract counts are never plotted directly: a Bitcoin contract and a Natural Gas contract share no unit.</li>
+          <li><strong>COT positioning</strong> plots net non-commercial (large speculator) longs minus shorts as a % of open interest. That&rsquo;s the direction of the speculative crowd, a different quantity from OI. Every row is labelled with the metric it shows.</li>
+          <li><strong>The ellipse.</strong> Rings are value bands from the inner ring (&minus;scale) through the dashed ring (0) to the outer ring (+scale). The geometry follows the reference Pine script&rsquo;s <code>sqrt(1 &minus; x&sup2;)</code> half-ellipse, mirrored.</li>
+          <li><strong>ROLL</strong> marks quarterly contracts within three weeks of a March/June/September/December expiry. Large OI swings there are usually contracts rolling, not new positioning.</li>
+        </ol>
+        <ul class="aia-how-notes">
+          <li><strong>Daily is unavailable.</strong> No free, licensed daily open-interest feed exists for these exchanges.</li>
+          <li><strong>Not LuxAlgo&rsquo;s formula.</strong> The reference indicator&rsquo;s calculation isn&rsquo;t public, so this page doesn&rsquo;t claim to reproduce its numbers.</li>
+          <li><strong>Missing is missing.</strong> A market absent from the report shows &mdash; and leaves a gap in the shape. It is never plotted as 0.</li>
+        </ul>
+      </div>
+    </details>
+
+    <footer>Cross-Market Open Interest &mdash; <a href="/open-interest.html">Crypto Open Interest</a> &mdash; <a href="/market-intel.html">Market Intel</a> &mdash; <a href="/">Overview</a></footer>
+
+  </main>
+</div>
+<script src="/assets/js/sidebar.js"></script>
+<script src="/assets/js/ui.js"></script>
+<script src="/assets/js/cross-market-oi.js"></script>
+</body>
+</html>

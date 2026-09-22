@@ -167,3 +167,11 @@ test("Overview opens its page directly and nests Widgets and Heatmaps", () => {
   assert.match(sidebar, /nav-split-link/);
   assert.match(sidebar, /nav-split-toggle/);
 });
+
+test("Cross-Market Open Interest sits with the macro pages, apart from the crypto OI screener", () => {
+  const start = sidebar.indexOf('label: "Market Intel Links"');
+  const marketIntel = sidebar.slice(start, sidebar.indexOf('label: "Crypto"', start));
+  assert.match(marketIntel, /href: "\/cross-market-oi\.html", label: "Cross-Market Open Interest"/);
+  // Both OI pages stay reachable.
+  assert.match(sidebar, /href: "\/open-interest\.html", label: "Open Interest"/);
+});
