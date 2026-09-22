@@ -76,6 +76,105 @@
         displayMode: 'regular'
       },
       narrow: { displayMode: 'compact' }
+    },
+
+    worldMarkets: {
+      script: 'embed-widget-market-quotes.js',
+      source: 'https://www.tradingview.com/markets/indices/quotes-major/',
+      sourceLabel: 'TradingView world indices',
+      config: {
+        showSymbolLogo: true,
+        backgroundColor: 'rgba(0, 0, 0, 0)',
+        symbolsGroups: [
+          {
+            name: 'Americas',
+            symbols: [
+              { name: 'FOREXCOM:SPXUSD', displayName: 'S&P 500' },
+              { name: 'FOREXCOM:NSXUSD', displayName: 'Nasdaq 100' },
+              { name: 'FOREXCOM:DJI', displayName: 'Dow 30' },
+              { name: 'FOREXCOM:RUTUSD', displayName: 'Russell 2000' }
+            ]
+          },
+          {
+            name: 'Europe',
+            symbols: [
+              { name: 'INDEX:DEU40', displayName: 'DAX' },
+              { name: 'FOREXCOM:UKXGBP', displayName: 'FTSE 100' },
+              { name: 'INDEX:CAC40', displayName: 'CAC 40' },
+              { name: 'INDEX:SMI', displayName: 'SMI' }
+            ]
+          },
+          {
+            name: 'Asia-Pacific',
+            symbols: [
+              { name: 'INDEX:NKY', displayName: 'Nikkei 225' },
+              { name: 'INDEX:HSI', displayName: 'Hang Seng' },
+              { name: 'NSE:NIFTY', displayName: 'Nifty 50' },
+              { name: 'ASX:XJO', displayName: 'ASX 200' }
+            ]
+          }
+        ]
+      }
+    },
+
+    globalEquityMap: {
+      script: 'embed-widget-stock-heatmap.js',
+      source: 'https://www.tradingview.com/heatmap/stock/',
+      sourceLabel: 'TradingView stock heatmap',
+      config: {
+        dataSource: 'AllWorld',
+        blockSize: 'market_cap_basic',
+        blockColor: 'change',
+        grouping: 'country',
+        hasTopBar: false,
+        isDataSetEnabled: false,
+        isZoomEnabled: true,
+        hasSymbolTooltip: true,
+        isMonoSize: false,
+        symbolUrl: ''
+      },
+      narrow: { isZoomEnabled: false, hasSymbolTooltip: false }
+    },
+
+    forexHeatmap: {
+      script: 'embed-widget-forex-heatmap.js',
+      source: 'https://www.tradingview.com/markets/currencies/forex-heat-map/',
+      sourceLabel: 'TradingView forex heatmap',
+      config: {
+        currencies: ['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD', 'NZD'],
+        backgroundColor: 'rgba(0, 0, 0, 0)'
+      },
+      narrow: { currencies: ['USD', 'EUR', 'GBP', 'JPY', 'AUD'] }
+    },
+
+    ratesMonitor: {
+      script: 'embed-widget-market-quotes.js',
+      source: 'https://www.tradingview.com/markets/bonds/prices-major/',
+      sourceLabel: 'TradingView bond yields',
+      config: {
+        showSymbolLogo: false,
+        backgroundColor: 'rgba(0, 0, 0, 0)',
+        symbolsGroups: [
+          {
+            name: 'US curve',
+            symbols: [
+              { name: 'TVC:US02Y', displayName: 'US 2Y' },
+              { name: 'TVC:US10Y', displayName: 'US 10Y' },
+              { name: 'TVC:US30Y', displayName: 'US 30Y' },
+              { name: 'FRED:T10Y2Y', displayName: '2s10s spread' },
+              { name: 'FRED:FEDFUNDS', displayName: 'Fed funds' }
+            ]
+          },
+          {
+            name: 'Global 10Y',
+            symbols: [
+              { name: 'TVC:DE10Y', displayName: 'Germany 10Y' },
+              { name: 'TVC:GB10Y', displayName: 'UK 10Y' },
+              { name: 'TVC:JP10Y', displayName: 'Japan 10Y' }
+            ]
+          }
+        ]
+      }
     }
   };
 
