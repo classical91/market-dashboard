@@ -6,7 +6,14 @@ const { Router } = require("express");
 // confluence maths; this route asks it for the projection and answers with the
 // dashboard's vocabulary (BULLISH / BEARISH / NEUTRAL) already applied
 // server-side, so every front end says the same thing about the same row.
-function createDirectionalBiasRouter({ signalScreenerService, usdtDominanceService = null }) {
+function createDirectionalBiasRouter({
+  signalScreenerService,
+  usdtDominanceService = null,
+  // Which tokens this screener scans, set from the Settings page. Optional so
+  // an embedder (and every existing test) still gets the screener's own
+  // default universe when no store is wired up.
+  screenerSettingsService = null,
+}) {
   const router = Router();
 
   // Read-only, unauthenticated — the same public market data /api/signal-screener
@@ -16,7 +23,14 @@ function createDirectionalBiasRouter({ signalScreenerService, usdtDominanceServi
       const interval = typeof req.query.interval === "string" ? req.query.interval : "4h";
       const minChecks = Math.min(Math.max(parseInt(req.query.minChecks, 10) || 4, 3), 6);
       const force = req.query.force === "true" || req.query.force === "1";
-      const results = await signalScreenerService.scanDirectionalBias(interval, minChecks, { force });
+      // Read per request, not per boot: the universe is editable at runtime,
+      // and a list captured at construction would go stale the moment it was
+      // saved. Local Extremes reads its own list the same way — the two share
+      // one engine and one candle cache, but not one universe.
+      const symbols = screenerSettingsService
+        ? screenerSettingsService.getUniverse("directionalBias")
+        : undefined;
+      const results = await signalScreenerService.scanDirectionalBias(interval, minChecks, { force, symbols });
       // USDT.D rides along as market context, the way it does on the screener:
       // the page makes one request, and a dominance provider outage degrades
       // the context row rather than the scan it sits above.

@@ -205,6 +205,90 @@
       .ledger-destination-row { grid-template-columns: 1fr; }
     }
 
+    /* ── Screener token matrix ──────────────────────────── */
+    .screener-counts { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+    .screener-count {
+      display: inline-flex; align-items: baseline; gap: 7px;
+      padding: 7px 13px; border-radius: 11px;
+      border: 1px solid var(--border); background: rgba(255,255,255,0.04);
+      font-size: 12px; color: var(--muted);
+    }
+    .screener-count strong { color: var(--text); font-size: 14px; font-variant-numeric: tabular-nums; }
+    /* An empty universe is a legitimate saved state, not a loading glitch —
+       it has to look deliberate and slightly alarming rather than blank. */
+    .screener-count.empty { border-color: rgba(245,197,66,0.34); background: rgba(245,197,66,0.1); }
+    .screener-count.empty strong { color: var(--amber); }
+
+    .screener-toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 16px; }
+    .screener-search {
+      flex: 1 1 200px; min-width: 0; max-width: 320px;
+      border: 1px solid var(--border); border-radius: 11px;
+      padding: 9px 12px; background: rgba(255,255,255,0.04);
+      color: var(--text); font: inherit; font-size: 13px;
+    }
+    .screener-search:focus {
+      outline: none; border-color: rgba(77,163,255,0.42); box-shadow: 0 0 0 3px var(--blue-bg);
+    }
+
+    .screener-matrix { margin-top: 14px; overflow-x: auto; }
+    .screener-grid { min-width: 520px; }
+    .screener-row {
+      display: grid;
+      grid-template-columns: minmax(104px, 1.5fr) repeat(4, minmax(74px, 1fr)) 30px;
+      gap: 8px; align-items: center;
+      padding: 7px 0; border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+    .screener-row.head {
+      position: sticky; top: 0; z-index: 1;
+      align-items: end; padding-bottom: 10px;
+      background: var(--surface);
+      border-bottom-color: var(--border-hover, var(--border));
+    }
+    .screener-col-head {
+      display: flex; flex-direction: column; gap: 5px; align-items: center; text-align: center;
+    }
+    .screener-col-name {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--muted); line-height: 1.3;
+    }
+    .screener-col-tools { display: flex; gap: 3px; }
+    .screener-mini {
+      border: 1px solid var(--border); background: rgba(255,255,255,0.04);
+      color: var(--muted); border-radius: 7px; padding: 3px 6px;
+      font-size: 10px; font-weight: 700; cursor: pointer; font-family: inherit;
+      transition: 0.15s;
+    }
+    .screener-mini:hover { background: rgba(255,255,255,0.09); color: var(--text); }
+    .screener-token { display: flex; align-items: baseline; gap: 7px; min-width: 0; }
+    .screener-token-label { font-weight: 700; color: var(--text); }
+    .screener-token-quote { font-size: 10px; color: var(--muted); letter-spacing: 0.06em; }
+    .screener-cell { display: flex; justify-content: center; }
+    .screener-cell input { width: 16px; height: 16px; cursor: pointer; accent-color: var(--blue); }
+    .screener-remove {
+      border: none; background: transparent; color: var(--muted);
+      cursor: pointer; font-size: 14px; line-height: 1; padding: 4px; border-radius: 6px;
+    }
+    .screener-remove:hover { color: var(--red, #ff5c5c); background: rgba(255,255,255,0.06); }
+    .screener-empty { padding: 18px 2px; font-size: 13px; color: var(--muted); }
+
+    .screener-add { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 16px; }
+    .screener-add input {
+      flex: 1 1 200px; min-width: 0; max-width: 260px;
+      border: 1px solid var(--border); border-radius: 11px;
+      padding: 9px 12px; background: rgba(255,255,255,0.04);
+      color: var(--text); font: inherit; font-size: 13px; text-transform: uppercase;
+    }
+    .screener-add input:focus {
+      outline: none; border-color: rgba(77,163,255,0.42); box-shadow: 0 0 0 3px var(--blue-bg);
+    }
+    .screener-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 18px; }
+    .screener-note { font-size: 12px; color: var(--muted); line-height: 1.5; }
+    .screener-note.error { color: var(--amber); }
+    @media (max-width: 640px) {
+      .screener-row { grid-template-columns: minmax(84px, 1.3fr) repeat(4, minmax(56px, 1fr)) 26px; gap: 6px; }
+    }
+
     /* ── Saved toast ────────────────────────────────────── */
     .toast {
       position: fixed; bottom: 28px; right: 28px;
@@ -246,6 +330,46 @@
           every hover and active state. &ldquo;Theme&rdquo; keeps each theme&rsquo;s own accent.
         </div>
         <div class="accent-grid" id="accentGrid"></div>
+      </div>
+    </div>
+
+    <!-- Screeners -->
+    <div class="settings-section">
+      <div class="settings-label">Screeners</div>
+      <div class="settings-card">
+        <div class="settings-row">
+          <div>
+            <div class="settings-row-label">Token Universe</div>
+            <div class="settings-row-sub">
+              Which tokens each screener scans. Saved on the server, so the scanners and the
+              signal bot follow it too &mdash; not just this browser.
+              <strong>USDT.D</strong> is not listed: it has no Binance candles to scan and
+              already rides along with Directional Bias as market context.
+            </div>
+          </div>
+        </div>
+
+        <div class="screener-counts" id="screenerCounts"></div>
+
+        <div class="screener-toolbar">
+          <input class="screener-search" id="screenerSearch" type="search" placeholder="Search tokens…" aria-label="Search tokens" />
+        </div>
+
+        <div class="screener-matrix">
+          <div class="screener-grid" id="screenerGrid"></div>
+        </div>
+
+        <div class="screener-add">
+          <input id="screenerAddInput" type="text" placeholder="RENDERUSDT" aria-label="Add a Binance USDT pair" autocomplete="off" spellcheck="false" />
+          <button class="settings-action-btn" id="screenerAddBtn" type="button">Add Token</button>
+          <span class="screener-note" id="screenerAddNote">Verified against Binance before it is saved, then enabled on all three screeners.</span>
+        </div>
+
+        <div class="screener-actions">
+          <button class="settings-action-btn primary" id="screenerSave" type="button">Save Universes</button>
+          <button class="settings-action-btn" id="screenerResetAll" type="button">Reset All to Defaults</button>
+          <span class="screener-note" id="screenerStatus">Loading…</span>
+        </div>
       </div>
     </div>
 
@@ -359,7 +483,7 @@
       </div>
     </div>
 
-    <footer>Market Command — settings are saved locally in your browser</footer>
+    <footer>Market Command — appearance and reporter preferences are saved in this browser; screener, ledger and Telegram settings are saved on the server</footer>
   </main>
 </div>
 
@@ -477,6 +601,346 @@
     });
 
     loadPrompt();
+  })();
+
+  /* ── Screener token universes ───────────────────────── */
+  (function () {
+    var API = '/api/screener-settings';
+    var countsEl = document.getElementById('screenerCounts');
+    var gridEl = document.getElementById('screenerGrid');
+    var searchEl = document.getElementById('screenerSearch');
+    var addInput = document.getElementById('screenerAddInput');
+    var addBtn = document.getElementById('screenerAddBtn');
+    var addNote = document.getElementById('screenerAddNote');
+    var saveBtn = document.getElementById('screenerSave');
+    var resetBtn = document.getElementById('screenerResetAll');
+    var statusEl = document.getElementById('screenerStatus');
+
+    // Server truth (last loaded/saved snapshot) and the working copy the
+    // checkboxes edit. Keeping them apart is what makes "unsaved changes"
+    // answerable, and what a failed save falls back to.
+    var snapshot = null;
+    var selection = {};
+    var dirty = false;
+    var ADD_HINT = 'Verified against Binance before it is saved, then enabled on all three screeners.';
+
+    function keys() {
+      return snapshot ? snapshot.screeners.map(function (s) { return s.key; }) : [];
+    }
+
+    function setStatus(message, isError) {
+      statusEl.textContent = message;
+      statusEl.className = 'screener-note' + (isError ? ' error' : '');
+    }
+
+    function setAddNote(message, isError) {
+      addNote.textContent = message || ADD_HINT;
+      addNote.className = 'screener-note' + (isError ? ' error' : '');
+    }
+
+    function markDirty() {
+      dirty = true;
+      setStatus('Unsaved changes.');
+    }
+
+    function adopt(data) {
+      snapshot = data;
+      selection = {};
+      data.screeners.forEach(function (screener) {
+        selection[screener.key] = new Set(data.universes[screener.key] || []);
+      });
+      dirty = false;
+      render();
+    }
+
+    function renderCounts() {
+      countsEl.innerHTML = '';
+      snapshot.screeners.forEach(function (screener) {
+        var size = selection[screener.key].size;
+        var pill = document.createElement('span');
+        pill.className = 'screener-count' + (size === 0 ? ' empty' : '');
+        pill.title = screener.description;
+        var strong = document.createElement('strong');
+        strong.textContent = String(size);
+        pill.appendChild(document.createTextNode(screener.label + ' '));
+        pill.appendChild(strong);
+        pill.appendChild(document.createTextNode(size === 1 ? ' token' : ' tokens'));
+        countsEl.appendChild(pill);
+      });
+    }
+
+    function columnTools(key) {
+      var tools = document.createElement('div');
+      tools.className = 'screener-col-tools';
+      [
+        ['All', function () { snapshot.catalog.forEach(function (t) { selection[key].add(t.symbol); }); }],
+        ['None', function () { selection[key].clear(); }],
+        // Per-column reset is the shipped default catalog for that column
+        // only, and stays local until Save — unlike "Reset All to Defaults",
+        // which is a server write across all three.
+        ['Reset', function () { selection[key] = new Set(snapshot.defaults); }]
+      ].forEach(function (entry) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'screener-mini';
+        btn.textContent = entry[0];
+        btn.addEventListener('click', function () { entry[1](); markDirty(); render(); });
+        tools.appendChild(btn);
+      });
+      return tools;
+    }
+
+    function headCell(name, tools) {
+      var cell = document.createElement('div');
+      cell.className = 'screener-col-head';
+      var label = document.createElement('div');
+      label.className = 'screener-col-name';
+      label.textContent = name;
+      cell.appendChild(label);
+      if (tools) cell.appendChild(tools);
+      return cell;
+    }
+
+    function renderHead() {
+      var row = document.createElement('div');
+      row.className = 'screener-row head';
+      var token = document.createElement('div');
+      token.className = 'screener-col-name';
+      token.textContent = 'Token';
+      row.appendChild(token);
+      // "All" has no column of its own on the server — it is a write across
+      // the other three, so it gets bulk buttons that fan out to each.
+      var allTools = document.createElement('div');
+      allTools.className = 'screener-col-tools';
+      [
+        ['All', function (key) { snapshot.catalog.forEach(function (t) { selection[key].add(t.symbol); }); }],
+        ['None', function (key) { selection[key].clear(); }],
+        ['Reset', function (key) { selection[key] = new Set(snapshot.defaults); }]
+      ].forEach(function (entry) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'screener-mini';
+        btn.textContent = entry[0];
+        btn.addEventListener('click', function () {
+          keys().forEach(function (key) { entry[1](key); });
+          markDirty();
+          render();
+        });
+        allTools.appendChild(btn);
+      });
+      row.appendChild(headCell('All', allTools));
+      snapshot.screeners.forEach(function (screener) {
+        row.appendChild(headCell(screener.label, columnTools(screener.key)));
+      });
+      row.appendChild(document.createElement('div'));
+      gridEl.appendChild(row);
+    }
+
+    function checkboxCell(symbol, key) {
+      var cell = document.createElement('div');
+      cell.className = 'screener-cell';
+      var input = document.createElement('input');
+      input.type = 'checkbox';
+      input.checked = selection[key].has(symbol);
+      input.setAttribute('aria-label', symbol + ' — ' + key);
+      input.addEventListener('change', function () {
+        if (input.checked) selection[key].add(symbol);
+        else selection[key].delete(symbol);
+        markDirty();
+        render();
+      });
+      cell.appendChild(input);
+      return cell;
+    }
+
+    function allCell(symbol) {
+      var cell = document.createElement('div');
+      cell.className = 'screener-cell';
+      var input = document.createElement('input');
+      input.type = 'checkbox';
+      var on = keys().filter(function (key) { return selection[key].has(symbol); });
+      input.checked = on.length === keys().length;
+      // Some-but-not-all reads as neither on nor off, so the row says what is
+      // true rather than rounding to one of the two.
+      input.indeterminate = on.length > 0 && on.length < keys().length;
+      input.setAttribute('aria-label', symbol + ' — all screeners');
+      input.addEventListener('change', function () {
+        keys().forEach(function (key) {
+          if (input.checked) selection[key].add(symbol);
+          else selection[key].delete(symbol);
+        });
+        markDirty();
+        render();
+      });
+      cell.appendChild(input);
+      return cell;
+    }
+
+    function tokenRow(token) {
+      var row = document.createElement('div');
+      row.className = 'screener-row';
+
+      var name = document.createElement('div');
+      name.className = 'screener-token';
+      var label = document.createElement('span');
+      label.className = 'screener-token-label';
+      label.textContent = token.label;
+      var quote = document.createElement('span');
+      quote.className = 'screener-token-quote';
+      quote.textContent = 'USDT';
+      name.appendChild(label);
+      name.appendChild(quote);
+      row.appendChild(name);
+
+      row.appendChild(allCell(token.symbol));
+      snapshot.screeners.forEach(function (screener) {
+        row.appendChild(checkboxCell(token.symbol, screener.key));
+      });
+
+      var trailing = document.createElement('div');
+      // Only an operator-added pair can leave the catalog. A shipped default
+      // is unchecked instead, so "Reset" always has the same list to restore.
+      if (!token.isDefault) {
+        var remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'screener-remove';
+        remove.textContent = '\u00d7';
+        remove.title = 'Remove ' + token.symbol + ' from the catalog';
+        remove.setAttribute('aria-label', 'Remove ' + token.symbol);
+        remove.addEventListener('click', function () { removeToken(token.symbol); });
+        trailing.appendChild(remove);
+      }
+      row.appendChild(trailing);
+      return row;
+    }
+
+    function render() {
+      if (!snapshot) return;
+      renderCounts();
+      gridEl.innerHTML = '';
+      renderHead();
+      var query = searchEl.value.trim().toUpperCase();
+      var visible = snapshot.catalog.filter(function (token) {
+        return !query || token.symbol.indexOf(query) !== -1;
+      });
+      if (!visible.length) {
+        var empty = document.createElement('div');
+        empty.className = 'screener-empty';
+        empty.textContent = query
+          ? 'No token in the catalog matches "' + query + '".'
+          : 'The token catalog is empty.';
+        gridEl.appendChild(empty);
+        return;
+      }
+      visible.forEach(function (token) { gridEl.appendChild(tokenRow(token)); });
+    }
+
+    function failure(res) {
+      return res.json().catch(function () { return {}; }).then(function (body) {
+        throw new Error(body.error || ('Request failed (HTTP ' + res.status + ')'));
+      });
+    }
+
+    // Writes carry the owner session first and fall back to the admin key
+    // prompt, the same order the ledger controls on this page use.
+    function write(url, options) {
+      return AdminKey.fetchOrSession(url, options).then(function (res) {
+        if (!res.ok) return failure(res);
+        return res.json();
+      });
+    }
+
+    function load() {
+      setStatus('Loading…');
+      return fetch(API, { credentials: 'same-origin' })
+        .then(function (res) { return res.ok ? res.json() : failure(res); })
+        .then(function (data) {
+          adopt(data);
+          if (data.status && data.status.state === 'corrupt') {
+            setStatus('\u26a0 The saved universes could not be read; showing the defaults. Saving will replace them.', true);
+          } else {
+            setStatus('Saved.');
+          }
+        })
+        .catch(function (err) {
+          gridEl.innerHTML = '';
+          setStatus('\u26a0 ' + err.message, true);
+        });
+    }
+
+    searchEl.addEventListener('input', render);
+
+    saveBtn.addEventListener('click', function () {
+      if (!snapshot) return;
+      var universes = {};
+      keys().forEach(function (key) { universes[key] = Array.from(selection[key]); });
+      saveBtn.disabled = true;
+      setStatus('Saving…');
+      write(API, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ universes: universes })
+      }).then(function (data) {
+        adopt(data);
+        setStatus('Saved. The screeners pick this up on their next refresh.');
+        showToast();
+      }).catch(function (err) {
+        setStatus('\u26a0 ' + err.message, true);
+      }).finally(function () { saveBtn.disabled = false; });
+    });
+
+    resetBtn.addEventListener('click', function () {
+      if (!window.confirm('Scan every default token on all three screeners? Tokens you added stay in the list but are switched off.')) return;
+      resetBtn.disabled = true;
+      setStatus('Resetting…');
+      write(API + '/reset', { method: 'POST' }).then(function (data) {
+        adopt(data);
+        setStatus('Reset to defaults.');
+        showToast();
+      }).catch(function (err) {
+        setStatus('\u26a0 ' + err.message, true);
+      }).finally(function () { resetBtn.disabled = false; });
+    });
+
+    function addToken() {
+      var symbol = addInput.value.trim().toUpperCase();
+      if (!symbol) { setAddNote('Enter a Binance USDT pair, e.g. RENDERUSDT.', true); return; }
+      if (dirty && !window.confirm('Adding a token reloads the table and discards your unsaved checkbox changes. Continue?')) return;
+      addBtn.disabled = true;
+      setAddNote('Checking ' + symbol + ' against Binance…');
+      write(API + '/tokens', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbol: symbol })
+      }).then(function (data) {
+        adopt(data);
+        addInput.value = '';
+        setAddNote(symbol + ' added and enabled on all three screeners.');
+        setStatus('Saved.');
+        showToast();
+      }).catch(function (err) {
+        setAddNote('\u26a0 ' + err.message, true);
+      }).finally(function () { addBtn.disabled = false; });
+    }
+
+    function removeToken(symbol) {
+      if (!window.confirm('Remove ' + symbol + ' from the catalog and every screener?')) return;
+      setStatus('Removing ' + symbol + '…');
+      write(API + '/tokens/' + encodeURIComponent(symbol), { method: 'DELETE' })
+        .then(function (data) {
+          adopt(data);
+          setStatus(symbol + ' removed.');
+          showToast();
+        })
+        .catch(function (err) { setStatus('\u26a0 ' + err.message, true); });
+    }
+
+    addBtn.addEventListener('click', addToken);
+    addInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); addToken(); }
+    });
+
+    load();
   })();
 
   /* ── Broadcast ledger status ────────────────────────── */

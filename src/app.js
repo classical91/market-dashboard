@@ -28,6 +28,7 @@ const { createPatternScannerRouter } = require("./routes/pattern-scanner");
 const { createSignalScreenerRouter } = require("./routes/signal-screener");
 const { createDirectionalBiasRouter } = require("./routes/directional-bias");
 const { createLocalExtremesRouter } = require("./routes/local-extremes");
+const { createScreenerSettingsRouter } = require("./routes/screener-settings");
 const { createStrategyEngineRouter } = require("./routes/strategy-engine");
 const { createTradingLabRouter } = require("./routes/trading-lab");
 const { createWatchlistRouter } = require("./routes/watchlist");
@@ -58,6 +59,7 @@ const { LayoutAnalysisService } = require("./services/layout-analysis");
 const { LayoutCaptureService } = require("./services/layout-capture");
 const { PatternScannerService } = require("./services/pattern-scanner");
 const { SignalScreenerService } = require("./services/signal-screener");
+const { ScreenerSettingsService } = require("./services/screener-settings");
 const { UsdtDominanceService } = require("./services/usdt-dominance");
 const { StrategyEngineService } = require("./services/strategy-engine");
 const { SignalBotService } = require("./services/signal-bot");
@@ -248,6 +250,13 @@ function createApp() {
     screenshotDir: layoutScreenshotsDir,
     screenshotUrlPrefix: "/layout-screenshots",
   });
+  // Which tokens each screener scans, editable from the Settings page and
+  // persisted under DATA_DIR. TOP_TOKENS stays the default catalog the store
+  // seeds itself from on first boot (and restores on a reset), so behaviour
+  // out of the box is exactly what it was when the routes read that list
+  // directly — but it is no longer the active configuration.
+  const screenerSettingsService = new ScreenerSettingsService({ dataDir });
+  screenerSettingsService.ensureSeeded();
   const patternScannerService = new PatternScannerService({ cache, tokens: TOP_TOKENS });
   const signalScreenerService = new SignalScreenerService({ cache });
   const usdtDominanceService = new UsdtDominanceService({ marketDataService, dataDir });
@@ -307,6 +316,11 @@ function createApp() {
     signalScreenerService,
     patternScannerService,
     patternTrackerService,
+    // The bot is the Directional Bias and Pattern Scanner screeners on a
+    // timer, so it watches the same universes those pages show. Without this
+    // an operator who unchecked a token would keep receiving Telegram alerts
+    // for a row the dashboard no longer displays.
+    screenerSettingsService,
     telegramService,
     tradeBridge: signalTradeBridge,
     stateCache: new PersistentReporterCache(path.join(dataDir, "signal-bot-state.json")),
@@ -455,13 +469,23 @@ function createApp() {
     "/api/layout-analysis",
     createLayoutAnalysisRouter({ layoutAnalysisService, telegramService, requireAdmin }),
   );
-  app.use("/api/pattern-scanner", createPatternScannerRouter({ patternScannerService }));
+  app.use("/api/pattern-scanner", createPatternScannerRouter({ patternScannerService, screenerSettingsService }));
   app.use("/api/signal-screener", createSignalScreenerRouter({ signalScreenerService, usdtDominanceService }));
   // Two views of the screener above, one engine behind both: direction and
   // location are separate questions and now separate pages, but they share a
   // single cached scan per symbol + interval.
-  app.use("/api/directional-bias", createDirectionalBiasRouter({ signalScreenerService, usdtDominanceService }));
-  app.use("/api/local-extremes", createLocalExtremesRouter({ signalScreenerService }));
+  app.use(
+    "/api/directional-bias",
+    createDirectionalBiasRouter({ signalScreenerService, usdtDominanceService, screenerSettingsService }),
+  );
+  app.use("/api/local-extremes", createLocalExtremesRouter({ signalScreenerService, screenerSettingsService }));
+  // Settings owns the universes above. Reads are open like the screeners
+  // themselves; writes take the browser-management guard (owner session or
+  // admin key), the same one the X Intelligence registry uses.
+  app.use(
+    "/api/screener-settings",
+    createScreenerSettingsRouter({ screenerSettingsService, requireAdmin: requireXAdmin }),
+  );
   app.use("/api/strategy-engine", createStrategyEngineRouter({ strategyEngineService }));
   app.use(
     "/api/decision",

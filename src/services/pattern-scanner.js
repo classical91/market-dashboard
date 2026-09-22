@@ -358,9 +358,34 @@ class PatternScannerService {
     return SCAN_INTERVALS;
   }
 
-  async scanAll({ force } = {}) {
+  /**
+   * The universe one scan should cover. The Pattern Scanner route reads its
+   * configured list from the screener settings store and passes it per call,
+   * because the list is operator-editable at runtime and a value captured at
+   * construction would go stale the moment it was saved. Omitting it keeps
+   * the constructor's list, which is what the signal bot's default still
+   * wants. Cache keys are per symbol + interval either way, so a symbol this
+   * scanner shares with an earlier pass is not re-fetched.
+   */
+  _resolveSymbols(symbols) {
+    if (!Array.isArray(symbols)) return this._tokens;
+    const seen = new Set();
+    const resolved = [];
+    for (const entry of symbols) {
+      const symbol = String(entry == null ? "" : entry).trim().toUpperCase();
+      if (!symbol || seen.has(symbol)) continue;
+      seen.add(symbol);
+      resolved.push(symbol);
+    }
+    // An explicitly empty array means "scan nothing", not "fall back to the
+    // defaults": an operator who cleared this screener's universe gets an
+    // empty page rather than the list the page no longer claims to show.
+    return resolved;
+  }
+
+  async scanAll({ force, symbols } = {}) {
     const jobs = [];
-    for (const pair of this._tokens) {
+    for (const pair of this._resolveSymbols(symbols)) {
       for (const interval of SCAN_INTERVALS) {
         jobs.push(this.scanToken(pair, interval, { force }));
       }
