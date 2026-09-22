@@ -32,6 +32,7 @@
           children: [
             { href: "/#ticker", label: "Ticker" },
             { href: "/#kpiGrid", label: "Key Indicators" },
+            { href: "/#onchain-intelligence", label: "On-Chain Intelligence" },
             { href: "/#market-pulse", label: "Market Pulse" },
             { href: "/#risk-meter", label: "Risk Meter" },
             { href: "/#alerts", label: "Alerts" },
