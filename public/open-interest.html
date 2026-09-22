@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Open Interest · Market Command</title>
+  <script src="/assets/js/settings.js"></script>
+  <link rel="stylesheet" href="/assets/styles/command.css" />
+  <link rel="stylesheet" href="/assets/styles/ai-analysis.css" />
+  <link rel="stylesheet" href="/assets/styles/signal-screener.css" />
+  <link rel="stylesheet" href="/assets/styles/open-interest.css" />
+</head>
+<body>
+<div class="app">
+  <aside class="cmd-sidebar"></aside>
+  <main class="cmd-main">
+
+    <div class="cmd-page-header">
+      <div>
+        <div class="cmd-page-title">&#128202; Open Interest Intelligence</div>
+        <div class="cmd-page-subtitle">Is money entering or leaving futures positions, where is it happening, and does OI confirm or contradict price?</div>
+      </div>
+    </div>
+
+    <div class="oi-explainer">
+      <p><strong>Open interest is the number of futures positions still open.</strong> Rising OI means new positions are being opened; falling OI means positions are being closed or liquidated. Read against price, the change describes <em>how</em> the market is positioning &mdash; it is an interpretation of positioning, never a trade signal.</p>
+    </div>
+
+    <div class="aia-notice" id="oi-notice" style="display:none" role="status"></div>
+
+    <div class="ss-toolbar">
+      <label class="oi-field">Horizon
+        <select class="aia-select" id="oi-horizon" aria-label="Interpretation horizon">
+          <option value="15m">15m</option>
+          <option value="1h" selected>1H</option>
+          <option value="4h">4H</option>
+          <option value="24h">24H</option>
+        </select>
+      </label>
+      <label class="oi-field">Confluence
+        <select class="aia-select" id="oi-confluence" aria-label="Confluence timeframe">
+          <option value="1h">1h</option>
+          <option value="4h" selected>4h</option>
+          <option value="1D">1D</option>
+        </select>
+      </label>
+      <input class="aia-select oi-search" type="search" id="oi-search" placeholder="Search asset…" aria-label="Search asset" />
+      <button class="aia-run-btn" type="button" id="oi-refresh-btn">Rescan</button>
+      <span class="ss-updated" id="oi-updated"></span>
+    </div>
+
+    <!-- 1. Market summary -->
+    <section class="oi-kpis" id="oi-kpis" aria-label="Market open interest summary"></section>
+    <div class="oi-sources" id="oi-sources" aria-label="Data sources and freshness"></div>
+
+    <!-- 5. Leaders -->
+    <section class="oi-leaders" aria-label="OI leaders">
+      <article class="oi-card">
+        <div class="oi-card-head"><span class="oi-card-title">OI Expansion</span><span class="oi-card-tag" data-role="horizon-tag"></span></div>
+        <ol class="oi-rank" id="oi-expansion"></ol>
+      </article>
+      <article class="oi-card">
+        <div class="oi-card-head"><span class="oi-card-title">OI Contraction</span><span class="oi-card-tag" data-role="horizon-tag"></span></div>
+        <ol class="oi-rank" id="oi-contraction"></ol>
+      </article>
+      <article class="oi-card">
+        <div class="oi-card-head"><span class="oi-card-title">OI Spikes</span><span class="oi-card-tag">1H vs own history</span></div>
+        <ul class="oi-rank oi-rank--plain" id="oi-spikes"></ul>
+      </article>
+    </section>
+
+    <!-- 2 + 4. Screener: Table | Heatmap | Radar -->
+    <div class="ss-view-tabs" role="tablist" aria-label="Open interest view">
+      <button class="ss-view-tab is-active" type="button" role="tab" aria-selected="true" data-view="table">Table</button>
+      <button class="ss-view-tab" type="button" role="tab" aria-selected="false" data-view="heatmap">Heatmap</button>
+      <button class="ss-view-tab" type="button" role="tab" aria-selected="false" data-view="radar">Radar</button>
+    </div>
+
+    <div class="ss-view is-active" data-view-panel="table">
+      <div class="ss-table-wrap">
+        <table class="ss-table oi-table">
+          <thead>
+            <tr>
+              <th>Asset</th>
+              <th>Price</th>
+              <th>OI</th>
+              <th>OI 15m</th>
+              <th>OI 1H</th>
+              <th>OI 4H</th>
+              <th>OI 24H</th>
+              <th>Price <span data-role="horizon-tag"></span></th>
+              <th>Interpretation</th>
+              <th>Confluence</th>
+              <th>Source</th>
+              <th>Freshness</th>
+            </tr>
+          </thead>
+          <tbody id="oi-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="ss-view" data-view-panel="heatmap" hidden>
+      <div class="oi-card">
+        <div class="oi-card-head"><span class="oi-card-title">OI Change Map</span><span class="oi-card-tag">sorted by |OI &Delta;| on the selected horizon</span></div>
+        <div class="oi-heatmap" id="oi-heatmap"></div>
+        <div class="oi-legend" aria-hidden="true"><span>OI falling</span><span class="oi-legend-bar"></span><span>OI rising</span></div>
+      </div>
+    </div>
+
+    <div class="ss-view" data-view-panel="radar" hidden>
+      <div class="oi-card">
+        <div class="oi-card-head"><span class="oi-card-title">OI Radar &mdash; top 8 by open interest</span><span class="oi-card-tag">dashed ring = 0%</span></div>
+        <div class="oi-radar" id="oi-radar"></div>
+      </div>
+    </div>
+
+    <!-- 7. Detail -->
+    <section class="oi-card oi-detail" id="oi-detail" aria-label="Asset open interest detail">
+      <div class="oi-card-head oi-detail-head">
+        <span class="oi-card-title" id="oi-detail-title">BTC Open Interest</span>
+        <div class="oi-detail-controls">
+          <select class="aia-select" id="oi-detail-symbol" aria-label="Detail asset"></select>
+          <div class="ss-view-tabs oi-interval-tabs" role="tablist" aria-label="Detail timeframe" id="oi-detail-intervals">
+            <button class="ss-view-tab" type="button" data-interval="15m">15m</button>
+            <button class="ss-view-tab is-active" type="button" data-interval="1h">1H</button>
+            <button class="ss-view-tab" type="button" data-interval="4h">4H</button>
+            <button class="ss-view-tab" type="button" data-interval="1d">1D</button>
+          </div>
+        </div>
+      </div>
+      <div class="oi-detail-body">
+        <div class="oi-charts" id="oi-charts"></div>
+        <div class="oi-stats" id="oi-stats"></div>
+      </div>
+      <div class="oi-detail-foot" id="oi-detail-foot"></div>
+    </section>
+
+    <!-- 3. Cheat sheet -->
+    <section class="oi-card oi-cheats" aria-label="Price and OI interpretation">
+      <div class="oi-card-head"><span class="oi-card-title">Price &times; OI &mdash; how each row is read</span></div>
+      <div class="oi-cheat-grid">
+        <div class="oi-cheat"><span class="oi-state oi-state--bull">Long buildup</span><p>Price &uarr; + OI &uarr; &mdash; new positions entering with price: bullish participation.</p></div>
+        <div class="oi-cheat"><span class="oi-state oi-state--bear">Short buildup</span><p>Price &darr; + OI &uarr; &mdash; new positions entering against price: bearish participation.</p></div>
+        <div class="oi-cheat"><span class="oi-state oi-state--cover">Short covering</span><p>Price &uarr; + OI &darr; &mdash; shorts closing; leverage leaving.</p></div>
+        <div class="oi-cheat"><span class="oi-state oi-state--unwind">Long unwind</span><p>Price &darr; + OI &darr; &mdash; longs closing or being liquidated.</p></div>
+        <div class="oi-cheat"><span class="oi-state oi-state--watch">Leverage building</span><p>OI &uarr; with price flat &mdash; positions opening before a direction shows.</p></div>
+        <div class="oi-cheat"><span class="oi-state oi-state--quiet">Quiet / leaving</span><p>OI change below the horizon&rsquo;s noise floor, or falling with price flat.</p></div>
+      </div>
+    </section>
+
+    <details class="aia-how aia-how--footer">
+      <summary>&#8505;&#65039; How this page works</summary>
+      <div class="aia-how-body">
+        <ol class="aia-how-steps">
+          <li><strong>One server contract.</strong> The page reads <code>/api/open-interest</code> and <code>/api/open-interest/:symbol</code>. The server asks public, keyless futures endpoints &mdash; Binance USD&#9416;-M first, then Bybit, OKX and Bitget &mdash; and the first venue that lists an asset serves its whole row. Venues are never summed for one asset.</li>
+          <li><strong>OI change is measured in coins, not dollars,</strong> so a price move alone never reads as leverage entering. Price comes from the dashboard&rsquo;s shared Binance spot candles.</li>
+          <li><strong>Missing is missing.</strong> A venue that publishes no history (Bitget) or an asset no venue lists shows &mdash;, never 0%. Totals and breadth say how many assets they cover.</li>
+          <li><strong>Confluence reuses the screeners.</strong> Directional Bias and Local Extremes come from the same cached scan those pages use, on the Confluence timeframe you pick.</li>
+          <li><strong>Spikes</strong> compare the latest 1H OI change with the asset&rsquo;s own recent 1H changes (z-score &ge; 2.5 and at least 1%).</li>
+        </ol>
+        <ul class="aia-how-notes">
+          <li><strong>Positioning, not signals.</strong> Nothing here means BUY or SELL.</li>
+          <li><strong>Universe:</strong> the Open Interest column in <a href="/settings.html">Settings &rarr; Screeners</a>.</li>
+          <li><strong>AI use: No.</strong> Every label comes from fixed rules.</li>
+        </ul>
+      </div>
+    </details>
+
+    <footer>Open Interest &mdash; <a href="/directional-bias.html">Directional Bias</a> &mdash; <a href="/local-extremes.html">Local Extremes</a> &mdash; <a href="/crypto.html#open-interest">External OI research</a> &mdash; <a href="/">Overview</a></footer>
+
+  </main>
+</div>
+<script src="/assets/js/sidebar.js"></script>
+<script src="/assets/js/ui.js"></script>
+<script src="/assets/js/screener-ui.js"></script>
+<script src="/assets/js/open-interest.js"></script>
+</body>
+</html>

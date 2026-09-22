@@ -309,6 +309,17 @@ const config = {
     chain: process.env.DEFILLAMA_CHAIN || "Ethereum",
     coinChain: process.env.DEFILLAMA_COIN_CHAIN || "ethereum",
   },
+  // Open Interest Intelligence page. Public, keyless futures endpoints only,
+  // called server-side. The provider list is the fallback order per asset.
+  openInterest: {
+    providers: parseList(process.env.OPEN_INTEREST_PROVIDERS).length
+      ? parseList(process.env.OPEN_INTEREST_PROVIDERS)
+      : ["binance", "bybit", "okx", "bitget"],
+    cacheTtlMs: parseNumber(process.env.OPEN_INTEREST_CACHE_MS, 2 * 60 * 1000),
+    staleAfterMs: parseNumber(process.env.OPEN_INTEREST_STALE_AFTER_MS, 45 * 60 * 1000),
+    requestTimeoutMs: parseNumber(process.env.OPEN_INTEREST_REQUEST_TIMEOUT_MS, 8000),
+    venueCooldownMs: parseNumber(process.env.OPEN_INTEREST_VENUE_COOLDOWN_MS, 5 * 60 * 1000),
+  },
   // On-Chain Intelligence card on Overview. DefiLlama's free, keyless public
   // endpoints only — no paid provider and no API key.
   onchainIntelligence: {

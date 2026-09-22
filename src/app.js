@@ -28,6 +28,7 @@ const { createPatternScannerRouter } = require("./routes/pattern-scanner");
 const { createSignalScreenerRouter } = require("./routes/signal-screener");
 const { createDirectionalBiasRouter } = require("./routes/directional-bias");
 const { createLocalExtremesRouter } = require("./routes/local-extremes");
+const { createOpenInterestRouter } = require("./routes/open-interest");
 const { createScreenerSettingsRouter } = require("./routes/screener-settings");
 const { createStrategyEngineRouter } = require("./routes/strategy-engine");
 const { createTradingLabRouter } = require("./routes/trading-lab");
@@ -59,6 +60,8 @@ const { LayoutAnalysisService } = require("./services/layout-analysis");
 const { LayoutCaptureService } = require("./services/layout-capture");
 const { PatternScannerService } = require("./services/pattern-scanner");
 const { SignalScreenerService } = require("./services/signal-screener");
+const { OpenInterestService } = require("./services/open-interest/service");
+const { createProviders: createOpenInterestProviders } = require("./services/open-interest/providers");
 const { ScreenerSettingsService } = require("./services/screener-settings");
 const { UsdtDominanceService } = require("./services/usdt-dominance");
 const { StrategyEngineService } = require("./services/strategy-engine");
@@ -268,6 +271,20 @@ function createApp() {
   screenerSettingsService.ensureSeeded();
   const patternScannerService = new PatternScannerService({ cache, tokens: TOP_TOKENS });
   const signalScreenerService = new SignalScreenerService({ cache });
+  // Open Interest Intelligence. Its universe is the "openInterest" screener
+  // in the settings store; price and confluence come from the screener engine
+  // above rather than a second candle fetcher.
+  const openInterestService = new OpenInterestService({
+    providers: createOpenInterestProviders(config.openInterest.providers, {
+      timeoutMs: config.openInterest.requestTimeoutMs,
+    }),
+    signalScreenerService,
+    screenerSettingsService,
+    cache,
+    cacheTtlMs: config.openInterest.cacheTtlMs,
+    staleAfterMs: config.openInterest.staleAfterMs,
+    venueCooldownMs: config.openInterest.venueCooldownMs,
+  });
   const usdtDominanceService = new UsdtDominanceService({ marketDataService, dataDir });
   const strategyEngineService = new StrategyEngineService({ signalScreenerService });
   const watchlistService = new WatchlistService({ dataDir });
@@ -488,6 +505,7 @@ function createApp() {
     createDirectionalBiasRouter({ signalScreenerService, usdtDominanceService, screenerSettingsService }),
   );
   app.use("/api/local-extremes", createLocalExtremesRouter({ signalScreenerService, screenerSettingsService }));
+  app.use("/api/open-interest", createOpenInterestRouter({ openInterestService }));
   // Settings owns the universes above. Reads are open like the screeners
   // themselves; writes take the browser-management guard (owner session or
   // admin key), the same one the X Intelligence registry uses.

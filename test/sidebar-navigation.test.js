@@ -52,7 +52,7 @@ test("TradeHunter sits above AI Analysis and owns the scanner workflow", () => {
 
   assert.ok(tradeHunterStart > -1, "TradeHunter is missing");
   assert.ok(aiAnalysisStart > tradeHunterStart, "TradeHunter must sit above AI Analysis");
-  const labels = ["Screeners", "Directional Bias", "Local Extremes", "Pattern Scanner", "My Trades", "Track Record", "Decision Engine"];
+  const labels = ["Screeners", "Directional Bias", "Local Extremes", "Pattern Scanner", "Open Interest", "My Trades", "Track Record", "Decision Engine"];
   let cursor = -1;
   for (const label of labels) {
     const next = tradeHunter.indexOf(`label: "${label}"`, cursor + 1);
@@ -74,6 +74,7 @@ test("the Screeners group holds one entry per screener and no combined page", ()
   assert.match(menu, /href: "\/directional-bias\.html"/);
   assert.match(menu, /href: "\/local-extremes\.html"/);
   assert.match(menu, /href: "\/pattern-scanner\.html"/);
+  assert.match(menu, /href: "\/open-interest\.html", label: "Open Interest"/);
   assert.match(menu, /href: "\/pattern-scanner-trades\.html"/);
   assert.doesNotMatch(sidebar, /label: "Signal Screener"/);
   // Future screeners join this group; none of them may ship as a dead link yet.
