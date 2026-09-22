@@ -27,6 +27,12 @@
     -->
     <div class="reporter-intel" id="reporterIntel">
 
+      <div class="intel-status-strip" id="intelStatusStrip" aria-label="Market status" aria-live="polite">
+        <div class="intel-strip-empty">Reading market context&hellip;</div>
+      </div>
+      <div class="intel-quality" id="intelDataQuality" aria-live="polite"></div>
+
+
       <section class="intel-section" data-intel-section="live-intelligence" data-intel-accent="purple">
         <button class="intel-section-header" type="button" aria-expanded="true">
           <span>
@@ -57,6 +63,22 @@
                    style="--intel-widget-h:420px;--intel-widget-h-sm:360px"></div>
             </article>
 
+          </div>
+        </div>
+      </section>
+
+      <section class="intel-section" data-intel-section="cross-asset" data-intel-accent="teal">
+        <button class="intel-section-header" type="button" aria-expanded="true">
+          <span>
+            <span class="intel-section-title">📊 Cross-Asset Monitor</span>
+            <span class="intel-section-sub">Where the major asset classes are moving today</span>
+          </span>
+          <span class="intel-section-note">Live · 90s</span>
+          <span class="intel-section-chevron" aria-hidden="true">▾</span>
+        </button>
+        <div class="intel-section-body">
+          <div class="intel-asset-grid" id="crossAssetGrid">
+            <div class="intel-empty">Loading cross-asset prices&hellip;</div>
           </div>
         </div>
       </section>
@@ -1038,9 +1060,12 @@
     setInterval(loadNewsroomStatus, 30000);
   })();
 </script>
+<script src="/assets/js/trading-sessions.js"></script>
 <script src="/assets/js/reporter-widgets.js"></script>
+<script src="/assets/js/reporter-market.js"></script>
 <script>
   if (window.ReporterWidgets) window.ReporterWidgets.init();
+  if (window.ReporterMarket) window.ReporterMarket.init();
 </script>
 </body>
 </html>

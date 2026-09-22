@@ -470,6 +470,10 @@ body.crypto-bg {
    everything inside it. */
 .reporter-intel {
   display: grid;
+  /* minmax(0, ...) rather than a bare 1fr: an auto track is floored at the
+     min-content width of its contents, and the market strip's non-wrapping
+     rail would then widen the whole page instead of scrolling inside it. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 22px;
   margin: 0 0 26px;
 }
@@ -657,4 +661,183 @@ body.crypto-bg {
   .intel-section-note { display: none; }
   .intel-panel-head { padding: 10px 12px; }
   .intel-panel-note { display: none; }
+}
+
+/* ── Reporter intelligence — market status strip ──────────*/
+/* Compact pills, not widgets: the top of the page should read in a glance
+   and cost nothing but the /api/overview call the hub already makes. */
+.intel-status-strip {
+  align-items: center;
+  min-width: 0;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.012)),
+    var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  justify-content: space-between;
+  padding: 11px 15px;
+}
+.intel-strip-rail,
+.intel-strip-meta {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  min-width: 0;
+}
+.intel-strip-empty { color: var(--muted); font-size: 12px; }
+
+.intel-pill {
+  align-items: baseline;
+  border-radius: 9px;
+  display: inline-flex;
+  gap: 7px;
+  white-space: nowrap;
+}
+.intel-pill-label {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.intel-pill-value {
+  color: var(--text);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+.intel-pill-change {
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+.intel-pill-proxy,
+.intel-asset-proxy {
+  background: rgba(255,255,255,0.06);
+  border-radius: 5px;
+  color: var(--dim);
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  padding: 1px 4px;
+  text-transform: uppercase;
+}
+.intel-pill--muted .intel-pill-value { color: var(--dim); font-weight: 700; }
+.intel-pill--regime,
+.intel-pill--session {
+  border: 1px solid var(--border);
+  padding: 4px 10px;
+}
+.intel-pill--regime.up   { background: var(--green-bg); border-color: rgba(0,227,150,0.28); }
+.intel-pill--regime.up   .intel-pill-value { color: var(--green); }
+.intel-pill--regime.down { background: var(--red-bg); border-color: rgba(255,77,109,0.28); }
+.intel-pill--regime.down .intel-pill-value { color: var(--red); }
+.intel-pill--session.open .intel-pill-value { color: var(--green); }
+
+.intel-quality {
+  color: var(--dim);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  margin: 7px 2px 0;
+}
+.intel-quality--live { color: var(--green); }
+.intel-quality--partial { color: var(--amber); }
+.intel-quality--fallback { color: var(--muted); }
+
+.up   { color: var(--green); }
+.down { color: var(--red); }
+.flat { color: var(--muted); }
+
+/* ── Reporter intelligence — cross-asset monitor ──────────*/
+.intel-asset-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+.intel-asset {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.01)),
+    var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  display: grid;
+  gap: 2px;
+  padding: 12px 13px 11px;
+}
+.intel-asset.up   { border-color: rgba(0,227,150,0.24); }
+.intel-asset.down { border-color: rgba(255,77,109,0.24); }
+.intel-asset-symbol {
+  align-items: center;
+  color: var(--text);
+  display: flex;
+  font-size: 12px;
+  font-weight: 800;
+  gap: 6px;
+  letter-spacing: 0.08em;
+}
+.intel-asset-name {
+  color: var(--muted);
+  font-size: 10.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.intel-asset-value {
+  color: var(--text);
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  margin-top: 5px;
+}
+.intel-asset-change {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+.intel-asset-bar {
+  background: rgba(255,255,255,0.06);
+  border-radius: 99px;
+  height: 3px;
+  margin-top: 8px;
+  overflow: hidden;
+}
+.intel-asset-bar-fill {
+  background: var(--muted);
+  display: block;
+  height: 100%;
+  transition: width 0.3s ease;
+}
+.intel-asset.up   .intel-asset-bar-fill { background: var(--green); }
+.intel-asset.down .intel-asset-bar-fill { background: var(--red); }
+.intel-asset--empty .intel-asset-value { color: var(--dim); font-size: 13px; font-weight: 700; }
+.intel-asset-hint { color: var(--dim); font-size: 9.5px; line-height: 1.4; margin-top: 4px; }
+
+.intel-empty {
+  color: var(--muted);
+  font-size: 12px;
+  grid-column: 1 / -1;
+  padding: 18px 4px;
+}
+
+@media (max-width: 620px) {
+  .intel-status-strip { gap: 8px 12px; padding: 10px 12px; }
+  /* The strip is the one thing allowed to scroll sideways on a phone —
+     everything else on the page wraps. */
+  .intel-strip-rail {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .intel-strip-rail::-webkit-scrollbar { display: none; }
+  .intel-asset-grid { grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); }
+  .intel-asset-value { font-size: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .intel-asset-bar-fill { transition: none; }
 }
