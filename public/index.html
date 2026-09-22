@@ -6,6 +6,7 @@
     <title>Market Command Dashboard</title>
     <link rel="stylesheet" href="/assets/styles/overview.css" />
     <link rel="stylesheet" href="/assets/styles/components.css" />
+    <link rel="stylesheet" href="/assets/styles/onchain-intelligence.css" />
     <script src="/assets/js/settings.js"></script>
   </head>
   <body>
@@ -164,6 +165,20 @@
 
         <section class="kpi-grid" id="kpiGrid" aria-label="Key market indicators"></section>
 
+        <!-- ON-CHAIN INTELLIGENCE — chain liquidity & activity context via /api/onchain/intelligence -->
+        <article class="card oci-card" id="onchain-intelligence" aria-labelledby="ociTitle">
+          <div class="card-header">
+            <div>
+              <div class="card-title oci-title" id="ociTitle">On-Chain Intelligence</div>
+              <div class="card-subtitle">Stablecoin liquidity, DeFi TVL and DEX activity — context, not trade signals</div>
+            </div>
+            <span id="ociStatus" class="oci-status" title="Data status">Loading…</span>
+          </div>
+          <div class="oci-body" id="ociBody" aria-live="polite">
+            <div class="empty-state">Loading on-chain data…</div>
+          </div>
+        </article>
+
         <!-- TECHNICAL ANALYSIS -->
         <div class="section-header ovh-accent-purple" data-section="ovh-technical-analysis">
           <span class="section-label"><span class="section-icon">&#128200;</span>Technical Analysis</span>
@@ -294,7 +309,7 @@
           </a>
         </div>
 
-        <p class="footer-note">Market Command — live data via /api/overview + TradingView widgets</p>
+        <p class="footer-note">Market Command — live data via /api/overview + TradingView widgets · on-chain data via DefiLlama</p>
       </main>
     </div>
 
@@ -303,6 +318,7 @@
     <!-- Session hours, shared with /api/market-session. Must load before overview.js. -->
     <script src="/assets/js/trading-sessions.js"></script>
     <script src="/assets/js/overview.js"></script>
+    <script src="/assets/js/onchain-intelligence.js"></script>
     <script src="/assets/js/tools.js"></script>
     <script src="/assets/js/sections.js"></script>
   </body>

@@ -8,8 +8,19 @@ function asyncRoute(handler) {
   };
 }
 
-function createOnchainRouter({ onchainService }) {
+function createOnchainRouter({ onchainService, onchainIntelligenceService = null }) {
   const router = express.Router();
+
+  // Chain-level liquidity and activity for the Overview card. Separate from
+  // /overview, which serves the transfer/wallet feed behind /onchain.html.
+  if (onchainIntelligenceService) {
+    router.get(
+      "/intelligence",
+      asyncRoute(async (req, res) => {
+        res.json(await onchainIntelligenceService.getIntelligence());
+      }),
+    );
+  }
 
   router.get(
     "/overview",
