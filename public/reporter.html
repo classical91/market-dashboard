@@ -149,6 +149,52 @@
       .desk-status { grid-template-columns: 26px minmax(0,1fr); }
       .desk-status-state { grid-column: 2; }
     }
+
+    /* ── Live market news ─────────────────────────────────── */
+    .reporter-live-news {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+      margin: 0 0 24px;
+    }
+    .reporter-live-column { min-width: 0; }
+    .reporter-live-heading {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--soft);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.11em;
+      margin: 0 0 10px 2px;
+      text-transform: uppercase;
+    }
+    .reporter-live-heading.calendar { color: var(--blue); }
+    .reporter-live-heading.stories { color: var(--purple); }
+    .reporter-live-panel {
+      background: rgba(9,14,24,0.72);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      backdrop-filter: blur(14px);
+    }
+    .reporter-live-body {
+      height: 380px;
+      min-height: 320px;
+    }
+    .reporter-live-body .tradingview-widget-container,
+    .reporter-live-body .tradingview-widget-container__widget {
+      width: 100%;
+      height: 100%;
+    }
+    @media (max-width: 900px) {
+      .reporter-live-news { grid-template-columns: 1fr; }
+      .reporter-live-body { height: 360px; }
+    }
+    @media (max-width: 620px) {
+      .reporter-live-news { margin-left: -4px; margin-right: -4px; }
+      .reporter-live-body { height: 330px; }
+    }
     .reporter-log {
       display: none;
       margin: 18px 0 0;
@@ -508,6 +554,52 @@
       </aside>
     </section>
 
+    <section class="reporter-live-news" id="reporterLiveNews" aria-label="Live economic calendar and top stories">
+      <div class="reporter-live-column">
+        <div class="reporter-live-heading calendar"><span aria-hidden="true">📅</span> Economic Calendar</div>
+        <div class="reporter-live-panel">
+          <div class="reporter-live-body">
+            <div class="tradingview-widget-container">
+              <div class="tradingview-widget-container__widget"></div>
+              <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-events.js" async>
+              {
+                "colorTheme": "dark",
+                "isTransparent": true,
+                "width": "100%",
+                "height": "100%",
+                "locale": "en",
+                "importanceFilter": "-1,0,1",
+                "countryFilter": "us,eu,gb,jp,cn"
+              }
+              </script>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="reporter-live-column">
+        <div class="reporter-live-heading stories"><span aria-hidden="true">📰</span> Top Stories</div>
+        <div class="reporter-live-panel">
+          <div class="reporter-live-body">
+            <div class="tradingview-widget-container">
+              <div class="tradingview-widget-container__widget"></div>
+              <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-timeline.js" async>
+              {
+                "feedMode": "all_symbols",
+                "colorTheme": "dark",
+                "isTransparent": true,
+                "displayMode": "regular",
+                "width": "100%",
+                "height": "100%",
+                "locale": "en"
+              }
+              </script>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- Date + generated-at badges -->
     <div class="reporter-header-row" id="reporterHeaderRow" style="display:none">
       <div class="reporter-date-badge" id="reporterDate"></div>
@@ -827,6 +919,8 @@
       if (!fixedSection) return;
       var overview = document.getElementById('newsroomOverview');
       if (overview) overview.style.display = 'none';
+      var liveNews = document.getElementById('reporterLiveNews');
+      if (liveNews) liveNews.style.display = 'none';
       document.title = tabLabels[fixedSection] + ' · Market Command';
       var title = document.getElementById('reporterPageTitle');
       var subtitle = document.getElementById('reporterPageSubtitle');
