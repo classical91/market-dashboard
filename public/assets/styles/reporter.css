@@ -1,0 +1,997 @@
+/* ─────────────────────────────────────────────────────────
+   Reporter Room — page-specific styles
+   Loaded after command.css on /reporter.html and on the
+   fixed desk pages that share the same template
+   (/emerging-markets.html, /economics-top-10.html,
+   /markets-top-10.html).
+
+   Shared Market Command primitives stay in command.css.
+───────────────────────────────────────────────────────── */
+
+/* ── Reporter shell — header row, badges, actions ────────*/
+.reporter-header-row {
+  display: flex; align-items: center; gap: 16px;
+  margin-bottom: 18px; flex-wrap: wrap;
+}
+.reporter-date-badge {
+  font-size: 12px; font-weight: 700; letter-spacing: 0.07em;
+  color: var(--blue);
+  background: var(--blue-bg);
+  border: 1px solid rgba(77,163,255,0.22);
+  padding: 6px 14px; border-radius: 10px;
+}
+.reporter-gen-badge {
+  font-size: 11px; color: var(--muted);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  padding: 5px 12px; border-radius: 10px;
+}
+.reporter-gen-badge--fresh { color: var(--green); }
+.reporter-gen-badge--stale { color: var(--red); font-weight: 700; }
+.reporter-broadcast-status {
+  font-size: 11px; color: var(--muted);
+  flex-basis: 100%;
+}
+.reporter-broadcast-status.error { color: var(--red); }
+.reporter-broadcast-status.ok { color: var(--green); }
+.reporter-actions {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+
+/* ── Reporter newsroom — desks overview ──────────────────*/
+.newsroom-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 18px;
+  margin: 0 0 24px;
+  animation: newsroom-enter 0.35s ease-out both;
+}
+.newsroom-main,
+.shareclaw-panel {
+  background: rgba(9,14,24,0.72);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  backdrop-filter: blur(14px);
+}
+.newsroom-main { padding: 18px; }
+.newsroom-section-head,
+.shareclaw-head,
+.master-news-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.newsroom-kicker {
+  color: var(--amber);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+.newsroom-heading {
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 800;
+  margin-top: 3px;
+}
+.newsroom-read-note { color: var(--muted); font-size: 11px; text-align: right; }
+.desk-status-list { display: grid; margin-top: 14px; }
+.desk-status {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--border);
+  color: inherit;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: 28px minmax(120px, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 11px 2px;
+  text-align: left;
+  transition: background 0.15s ease, padding 0.15s ease;
+}
+.desk-status:first-child { border-top: 0; }
+.desk-status:hover { background: rgba(255,255,255,0.035); padding-left: 8px; padding-right: 8px; }
+.desk-status-icon { font-size: 17px; text-align: center; }
+.desk-status-name { color: var(--text); display: block; font-size: 13px; font-weight: 700; }
+.desk-status-meta { color: var(--muted); display: block; font-size: 11px; margin-top: 2px; }
+.desk-status-state { color: var(--dim); font-size: 11px; font-weight: 700; white-space: nowrap; }
+.desk-status-state.ready { color: var(--green); }
+
+/* ── Reporter master news ────────────────────────────────*/
+.master-news { border-top: 1px solid var(--border); margin-top: 8px; padding-top: 17px; }
+.master-news-title { color: var(--text); font-size: 15px; font-weight: 800; }
+.master-news-title span { color: var(--amber); }
+.master-toggle { display: inline-flex; gap: 3px; padding: 3px; border: 1px solid var(--border); border-radius: 10px; }
+.master-toggle button {
+  background: transparent; border: 0; border-radius: 7px; color: var(--muted);
+  cursor: pointer; font: inherit; font-size: 10px; font-weight: 800; padding: 5px 8px;
+}
+.master-toggle button.active { background: var(--amber-bg); color: var(--amber); }
+.master-news-list { display: grid; gap: 2px; margin-top: 10px; }
+.master-story {
+  appearance: none; background: transparent; border: 0; border-radius: 9px;
+  color: inherit; cursor: pointer; display: grid; grid-template-columns: 26px minmax(0,1fr);
+  gap: 9px; align-items: start; padding: 9px 8px; text-align: left; transition: background 0.15s;
+}
+.master-story:focus-visible { outline: 2px solid var(--amber); outline-offset: 1px; }
+.master-story-main { display: grid; gap: 5px; min-width: 0; }
+.master-story:hover { background: rgba(245,197,66,0.06); }
+.master-rank { color: var(--amber); font-size: 11px; font-weight: 900; padding-top: 1px; }
+.master-story-title { color: var(--soft); font-size: 12px; font-weight: 650; line-height: 1.4; }
+/* The tag row is the slot future Reporter metadata lands in: desk today,
+   plus impact, affected assets and themes as soon as the saved report
+   carries them. Each tag renders only when its field exists. */
+.master-story-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+.master-tag {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  padding: 2px 6px;
+  text-transform: uppercase;
+}
+.master-tag--desk { background: var(--amber-bg); border-color: rgba(245,197,66,0.25); color: var(--amber); }
+.master-tag--asset { background: var(--teal-bg); border-color: rgba(0,227,150,0.22); color: var(--teal); }
+.master-tag--theme { color: var(--soft); }
+.master-tag--impact.high { background: var(--red-bg); border-color: rgba(255,77,109,0.3); color: var(--red); }
+.master-tag--impact.medium { background: var(--amber-bg); border-color: rgba(245,197,66,0.25); color: var(--amber); }
+.master-tag--impact.low { color: var(--dim); }
+.master-story-facts { color: var(--dim); font-size: 10px; }
+.master-empty { color: var(--muted); font-size: 12px; padding: 14px 8px 4px; }
+
+/* ── Reporter ShareClaw panel ────────────────────────────*/
+.shareclaw-panel { padding: 18px; align-self: start; }
+.shareclaw-title { color: var(--text); font-size: 15px; font-weight: 800; }
+.shareclaw-state { color: var(--muted); display: flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 700; }
+.shareclaw-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dim); }
+.shareclaw-state.online { color: var(--green); }
+.shareclaw-state.online .shareclaw-dot { background: var(--green); box-shadow: 0 0 0 4px rgba(0,227,150,0.1); animation: status-pulse 2.4s ease-out infinite; }
+.shareclaw-times { display: grid; gap: 8px; border-top: 1px solid var(--border); margin-top: 14px; padding-top: 14px; }
+.shareclaw-time { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 11px; }
+.shareclaw-time strong { color: var(--soft); font-weight: 700; text-align: right; }
+.shareclaw-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 17px 0; }
+.shareclaw-metric { border-left: 1px solid var(--border); padding-left: 10px; }
+.shareclaw-metric-value { color: var(--text); font-size: 18px; font-weight: 800; }
+.shareclaw-metric-label { color: var(--muted); font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; }
+.shareclaw-run { width: 100%; justify-content: center; margin: 0; }
+.shareclaw-note { color: var(--muted); font-size: 10px; line-height: 1.5; margin-top: 9px; text-align: center; }
+.shareclaw-message { color: var(--muted); font-size: 11px; line-height: 1.45; margin-top: 10px; min-height: 16px; }
+.shareclaw-message.error { color: var(--red); }
+.shareclaw-message.ok { color: var(--green); }
+
+/* ── Reporter newsroom responsive + motion ───────────────*/
+@keyframes newsroom-enter { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes status-pulse { 0%, 100% { box-shadow: 0 0 0 4px rgba(0,227,150,0.08); } 50% { box-shadow: 0 0 0 7px rgba(0,227,150,0); } }
+@media (max-width: 900px) {
+  .newsroom-overview { grid-template-columns: 1fr; }
+  .shareclaw-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; }
+  .shareclaw-head { grid-column: 1 / -1; }
+}
+@media (max-width: 620px) {
+  .newsroom-overview { margin-left: -4px; margin-right: -4px; }
+  .newsroom-main, .shareclaw-panel { padding: 14px; }
+  .shareclaw-panel { display: block; }
+  .newsroom-read-note { display: none; }
+  .desk-status { grid-template-columns: 26px minmax(0,1fr); }
+  .desk-status-state { grid-column: 2; }
+}
+
+/* ── Reporter saved-report log ───────────────────────────*/
+.reporter-log {
+  display: none;
+  margin: 18px 0 0;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.012)),
+    var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  padding: 14px 16px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.reporter-log-title {
+  color: var(--soft);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+}
+.reporter-log-list {
+  display: grid;
+  gap: 14px;
+}
+.reporter-log-group {
+  display: grid;
+  gap: 8px;
+}
+.reporter-log-group-title {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.reporter-log-item {
+  appearance: none;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0 0;
+  text-align: left;
+  font: inherit;
+  border-top: 1px solid var(--border);
+  transition: color 0.15s, background 0.15s;
+}
+.reporter-log-item:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.reporter-log-item:hover {
+  color: var(--soft);
+}
+.reporter-log-item.past {
+  opacity: 0.62;
+  filter: grayscale(0.4);
+}
+.reporter-log-item.past .reporter-log-label,
+.reporter-log-item.past .reporter-log-time,
+.reporter-log-item.past .reporter-log-read {
+  color: var(--muted);
+}
+.reporter-log-item.past .reporter-log-status {
+  color: var(--dim);
+}
+.reporter-log-item.past:hover {
+  opacity: 0.82;
+  filter: grayscale(0.2);
+}
+.reporter-log-item[aria-disabled="true"] {
+  cursor: default;
+}
+.reporter-log-item.crypto .reporter-log-label { color: var(--purple); }
+.reporter-log-item.geopolitics .reporter-log-label { color: var(--amber); }
+.reporter-log-item.economics .reporter-log-label { color: var(--blue); }
+.reporter-log-item.markets .reporter-log-label { color: var(--teal); }
+.reporter-log-name {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.reporter-log-label {
+  color: var(--text);
+  font-weight: 700;
+}
+.reporter-log-status {
+  color: var(--muted);
+  font-size: 11px;
+}
+.reporter-log-time {
+  color: var(--muted);
+  flex: 0 0 auto;
+  text-align: right;
+}
+.reporter-log-read {
+  color: var(--blue);
+  display: block;
+  font-size: 11px;
+  margin-top: 2px;
+}
+.reporter-log-empty {
+  color: var(--dim);
+  font-size: 12px;
+  padding: 2px 0 0;
+}
+
+/* ── Reporter desk tabs ──────────────────────────────────*/
+
+.reporter-tabs {
+  display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;
+}
+.reporter-tab {
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.04);
+  color: var(--muted);
+  padding: 10px 20px; border-radius: 14px;
+  font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: 0.18s;
+  font-family: inherit; white-space: nowrap;
+}
+.reporter-tab.active {
+  background: rgba(77,163,255,0.16);
+  color: var(--text);
+  border-color: rgba(77,163,255,0.36);
+}
+.reporter-tab:hover:not(.active) {
+  background: rgba(255,255,255,0.08);
+  color: var(--soft);
+  border-color: var(--border-hover);
+}
+.reporter-link-row {
+  display: none;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: -6px 0 20px;
+}
+.reporter-link-row a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.04);
+  color: var(--soft);
+  text-decoration: none;
+  padding: 9px 14px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.reporter-link-row a:hover {
+  background: rgba(255,255,255,0.08);
+  color: var(--text);
+  border-color: var(--border-hover);
+}
+/* ── Reporter loading / error states ─────────────────────*/
+
+.reporter-loading {
+  text-align: center; padding: 56px 20px;
+  color: var(--muted); font-size: 14px;
+}
+.spinner {
+  display: block; width: 28px; height: 28px;
+  margin: 0 auto 16px;
+  border: 3px solid rgba(77,163,255,0.18);
+  border-top-color: var(--blue);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.reporter-error {
+  background: rgba(255,77,109,0.07);
+  border: 1px solid rgba(255,77,109,0.2);
+  border-radius: 14px; padding: 18px 20px;
+  color: #ff8fa0; font-size: 13.5px; line-height: 1.6;
+}
+.reporter-error code {
+  background: rgba(255,255,255,0.08);
+  padding: 2px 6px; border-radius: 5px;
+  font-size: 12px;
+}
+.reporter-unconfigured {
+  background: rgba(77,163,255,0.06);
+  border: 1px solid rgba(77,163,255,0.2);
+  border-radius: 14px; padding: 24px 22px;
+  font-size: 14px; line-height: 1.65; color: var(--soft);
+}
+.reporter-unconfigured strong { color: var(--text); }
+.reporter-unconfigured code {
+  background: rgba(255,255,255,0.08);
+  padding: 2px 7px; border-radius: 5px;
+  font-size: 12.5px; color: var(--blue);
+}
+
+/* ── Reporter story cards ────────────────────────────────*/
+
+.stories { display: grid; gap: 10px; }
+
+.story {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015)),
+    var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 15px; padding: 15px 18px;
+  transition: border-color 0.15s;
+}
+.story:hover { border-color: rgba(77,163,255,0.28); }
+
+/* One accent color per report category, applied only to reports saved today. */
+.story--crypto {
+  background: linear-gradient(180deg, var(--purple-bg), rgba(155,123,255,0.03)), var(--surface);
+  border-color: rgba(155,123,255,0.3);
+}
+.story--geopolitics {
+  background: linear-gradient(180deg, var(--amber-bg), rgba(245,197,66,0.025)), var(--surface);
+  border-color: rgba(245,197,66,0.28);
+}
+.story--economics {
+  background: linear-gradient(180deg, var(--blue-bg), rgba(77,163,255,0.03)), var(--surface);
+  border-color: rgba(77,163,255,0.3);
+}
+.story--markets {
+  background: linear-gradient(180deg, var(--teal-bg), rgba(0,227,150,0.03)), var(--surface);
+  border-color: rgba(0,227,150,0.3);
+}
+
+.story p {
+  color: var(--text); font-size: 14px;
+  line-height: 1.5; margin-bottom: 6px;
+}
+.story p:last-child { margin-bottom: 0; }
+
+.story ul {
+  list-style: none; padding: 0; margin: 4px 0 0;
+}
+.story li {
+  color: var(--soft); font-size: 13px; line-height: 1.55;
+  padding-left: 16px; position: relative; margin-bottom: 3px;
+}
+.story li:last-child { margin-bottom: 0; }
+.story li::before {
+  content: "–"; position: absolute; left: 0; color: var(--muted);
+}
+.story strong { color: var(--text); }
+
+/* Crypto-themed background, added only to the Emerging Markets page
+   (see configurePageShell) — the Economics/Markets pages share this
+   same template and stay on the plain default background. */
+body.crypto-bg {
+  background:
+    radial-gradient(circle at 12% 18%, rgba(247,147,26,0.16), transparent 30%),
+    radial-gradient(circle at 85% 12%, rgba(98,126,234,0.14), transparent 32%),
+    radial-gradient(circle at 20% 85%, rgba(0,227,150,0.12), transparent 34%),
+    radial-gradient(circle at 90% 80%, rgba(155,123,255,0.13), transparent 32%),
+    linear-gradient(135deg, #050711, #08101e 45%, #050711);
+  background-size: 140% 140%, 140% 140%, 140% 140%, 140% 140%, 100% 100%;
+  animation: crypto-bg-drift 26s ease-in-out infinite;
+}
+@keyframes crypto-bg-drift {
+  0%   { background-position: 0% 0%, 100% 0%, 0% 100%, 100% 100%, 0 0; }
+  50%  { background-position: 10% 8%, 90% 10%, 8% 92%, 92% 88%, 0 0; }
+  100% { background-position: 0% 0%, 100% 0%, 0% 100%, 100% 100%, 0 0; }
+}
+
+.crypto-bg-decor {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.crypto-bg-decor span {
+  position: absolute;
+  font-size: 64px;
+  opacity: 0.05;
+  filter: blur(0.3px);
+  animation: crypto-float 18s ease-in-out infinite;
+}
+.crypto-bg-decor span:nth-child(1) { top: 8%;  left: 6%;  font-size: 88px; animation-duration: 22s; }
+.crypto-bg-decor span:nth-child(2) { top: 62%; left: 4%;  font-size: 60px; animation-duration: 19s; animation-delay: -4s; }
+.crypto-bg-decor span:nth-child(3) { top: 20%; left: 88%; font-size: 70px; animation-duration: 24s; animation-delay: -9s; }
+.crypto-bg-decor span:nth-child(4) { top: 78%; left: 85%; font-size: 56px; animation-duration: 20s; animation-delay: -2s; }
+.crypto-bg-decor span:nth-child(5) { top: 45%; left: 46%; font-size: 48px; animation-duration: 26s; animation-delay: -13s; }
+@keyframes crypto-float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50%      { transform: translateY(-22px) rotate(6deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.crypto-bg { animation: none; }
+  .crypto-bg-decor span { animation: none; }
+  .newsroom-overview, .shareclaw-state.online .shareclaw-dot { animation: none; }
+}
+
+/* App content sits above the fixed decor layer. */
+.app { position: relative; z-index: 1; }
+
+/* ── Reporter intelligence — shared section + panel shell ─*/
+/* Every dashboard module on the page is one .intel-section with a collapsing
+   header and a body of .intel-panel cards, so a new module never needs its
+   own one-off layout CSS. Accent colour is set per section and inherited by
+   everything inside it. */
+.reporter-intel {
+  display: grid;
+  /* minmax(0, ...) rather than a bare 1fr: an auto track is floored at the
+     min-content width of its contents, and the market strip's non-wrapping
+     rail would then widen the whole page instead of scrolling inside it. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 22px;
+  margin: 0 0 26px;
+}
+
+.intel-section {
+  --intel-accent: var(--blue);
+  --intel-accent-bg: var(--blue-bg);
+  display: block;
+}
+.intel-section[data-intel-accent="blue"]   { --intel-accent: var(--blue);   --intel-accent-bg: var(--blue-bg); }
+.intel-section[data-intel-accent="purple"] { --intel-accent: var(--purple); --intel-accent-bg: var(--purple-bg); }
+.intel-section[data-intel-accent="teal"]   { --intel-accent: var(--teal);   --intel-accent-bg: var(--teal-bg); }
+.intel-section[data-intel-accent="amber"]  { --intel-accent: var(--amber);  --intel-accent-bg: var(--amber-bg); }
+.intel-section[data-intel-accent="green"]  { --intel-accent: var(--green);  --intel-accent-bg: var(--green-bg); }
+
+.intel-section-header {
+  appearance: none;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 11px 15px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--intel-accent);
+  border-radius: 13px;
+  background: var(--surface2);
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition: background 0.15s, border-color 0.15s;
+}
+.intel-section-header:hover { background: var(--intel-accent-bg); border-color: var(--border-hover); }
+.intel-section-header:focus-visible { outline: 2px solid var(--intel-accent); outline-offset: 2px; }
+
+.intel-section-title {
+  color: var(--intel-accent);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.intel-section-sub {
+  color: var(--muted);
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0;
+  margin-top: 3px;
+  text-transform: none;
+}
+.intel-section-note {
+  color: var(--dim);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  margin-left: auto;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.intel-section-chevron {
+  color: var(--soft);
+  flex: 0 0 auto;
+  font-size: 12px;
+  margin-left: auto;
+  transition: transform 0.2s ease;
+}
+.intel-section-note + .intel-section-chevron { margin-left: 0; }
+.intel-section.collapsed .intel-section-chevron { transform: rotate(-90deg); }
+
+.intel-section-body { margin-top: 12px; }
+
+.intel-grid { display: grid; gap: 14px; }
+.intel-grid--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+.intel-panel {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.012)),
+    var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+.intel-panel-head {
+  align-items: baseline;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 12px;
+  padding: 12px 15px;
+}
+.intel-panel-title {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.intel-panel-note {
+  color: var(--muted);
+  font-size: 10.5px;
+  margin-left: auto;
+  text-align: right;
+}
+
+/* ── Reporter intelligence — third-party widget frames ────*/
+/* The frame owns the height. The embed and every state render on top of it,
+   so swapping a placeholder for a widget never moves the page. */
+.intel-widget {
+  height: var(--intel-widget-h, 380px);
+  position: relative;
+  width: 100%;
+}
+.intel-widget .tradingview-widget-container {
+  height: 100%;
+  inset: 0;
+  position: absolute;
+  width: 100%;
+}
+.intel-widget .tradingview-widget-container__widget { height: 100%; }
+.intel-widget iframe { border: 0; display: block; }
+
+.intel-widget-state {
+  align-content: center;
+  color: var(--muted);
+  display: grid;
+  font-size: 12.5px;
+  gap: 4px;
+  inset: 0;
+  justify-items: center;
+  padding: 20px;
+  position: absolute;
+  text-align: center;
+}
+.intel-widget-state .spinner { margin: 0 0 12px; }
+.intel-widget-state--error { background: var(--surface); position: static; }
+/* A panel whose provider is down should not hold 400px of empty page open. */
+.intel-widget[data-intel-state="error"] { height: auto; min-height: 170px; }
+.intel-widget-state-title {
+  color: var(--soft);
+  font-size: 13px;
+  font-weight: 800;
+}
+.intel-widget-state-note {
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.5;
+  max-width: 280px;
+}
+.intel-widget-state-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 10px;
+}
+.intel-widget-retry,
+.intel-widget-source {
+  border: 1px solid var(--border-hover);
+  border-radius: 10px;
+  background: rgba(255,255,255,0.04);
+  color: var(--soft);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 7px 13px;
+  text-decoration: none;
+}
+.intel-widget-retry:hover,
+.intel-widget-source:hover { background: var(--intel-accent-bg); color: var(--text); }
+.intel-widget-retry:focus-visible,
+.intel-widget-source:focus-visible { outline: 2px solid var(--intel-accent); outline-offset: 2px; }
+
+/* ── Reporter intelligence — responsive ───────────────────*/
+@media (max-width: 1100px) {
+  .intel-grid--2 { grid-template-columns: 1fr; }
+}
+@media (max-width: 620px) {
+  .reporter-intel { gap: 18px; }
+  .intel-widget { height: var(--intel-widget-h-sm, var(--intel-widget-h, 340px)); }
+  .intel-section-header { gap: 10px; padding: 10px 12px; }
+  .intel-section-note { display: none; }
+  .intel-panel-head { padding: 10px 12px; }
+  .intel-panel-note { display: none; }
+}
+
+/* ── Reporter intelligence — market status strip ──────────*/
+/* Compact pills, not widgets: the top of the page should read in a glance
+   and cost nothing but the /api/overview call the hub already makes. */
+.intel-status-strip {
+  align-items: center;
+  min-width: 0;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.012)),
+    var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  justify-content: space-between;
+  padding: 11px 15px;
+}
+.intel-strip-rail,
+.intel-strip-meta {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  min-width: 0;
+}
+.intel-strip-empty { color: var(--muted); font-size: 12px; }
+
+.intel-pill {
+  align-items: baseline;
+  border-radius: 9px;
+  display: inline-flex;
+  gap: 7px;
+  white-space: nowrap;
+}
+.intel-pill-label {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.intel-pill-value {
+  color: var(--text);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+.intel-pill-change {
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+.intel-pill-proxy,
+.intel-asset-proxy {
+  background: rgba(255,255,255,0.06);
+  border-radius: 5px;
+  color: var(--dim);
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  padding: 1px 4px;
+  text-transform: uppercase;
+}
+.intel-pill--muted .intel-pill-value { color: var(--dim); font-weight: 700; }
+.intel-pill--regime,
+.intel-pill--session {
+  border: 1px solid var(--border);
+  padding: 4px 10px;
+}
+.intel-pill--regime.up   { background: var(--green-bg); border-color: rgba(0,227,150,0.28); }
+.intel-pill--regime.up   .intel-pill-value { color: var(--green); }
+.intel-pill--regime.down { background: var(--red-bg); border-color: rgba(255,77,109,0.28); }
+.intel-pill--regime.down .intel-pill-value { color: var(--red); }
+.intel-pill--session.open .intel-pill-value { color: var(--green); }
+
+.intel-quality {
+  color: var(--dim);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  margin: 7px 2px 0;
+}
+.intel-quality--live { color: var(--green); }
+.intel-quality--partial { color: var(--amber); }
+.intel-quality--fallback { color: var(--muted); }
+
+.up   { color: var(--green); }
+.down { color: var(--red); }
+.flat { color: var(--muted); }
+
+/* ── Reporter intelligence — cross-asset monitor ──────────*/
+.intel-asset-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+.intel-asset {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.01)),
+    var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  display: grid;
+  gap: 2px;
+  padding: 12px 13px 11px;
+}
+.intel-asset.up   { border-color: rgba(0,227,150,0.24); }
+.intel-asset.down { border-color: rgba(255,77,109,0.24); }
+.intel-asset-symbol {
+  align-items: center;
+  color: var(--text);
+  display: flex;
+  font-size: 12px;
+  font-weight: 800;
+  gap: 6px;
+  letter-spacing: 0.08em;
+}
+.intel-asset-name {
+  color: var(--muted);
+  font-size: 10.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.intel-asset-value {
+  color: var(--text);
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  margin-top: 5px;
+}
+.intel-asset-change {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+.intel-asset-bar {
+  background: rgba(255,255,255,0.06);
+  border-radius: 99px;
+  height: 3px;
+  margin-top: 8px;
+  overflow: hidden;
+}
+.intel-asset-bar-fill {
+  background: var(--muted);
+  display: block;
+  height: 100%;
+  transition: width 0.3s ease;
+}
+.intel-asset.up   .intel-asset-bar-fill { background: var(--green); }
+.intel-asset.down .intel-asset-bar-fill { background: var(--red); }
+.intel-asset--empty .intel-asset-value { color: var(--dim); font-size: 13px; font-weight: 700; }
+.intel-asset-hint { color: var(--dim); font-size: 9.5px; line-height: 1.4; margin-top: 4px; }
+
+.intel-empty {
+  color: var(--muted);
+  font-size: 12px;
+  grid-column: 1 / -1;
+  padding: 18px 4px;
+}
+
+@media (max-width: 620px) {
+  .intel-status-strip { gap: 8px 12px; padding: 10px 12px; }
+  /* The strip is the one thing allowed to scroll sideways on a phone —
+     everything else on the page wraps. */
+  .intel-strip-rail {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .intel-strip-rail::-webkit-scrollbar { display: none; }
+  .intel-asset-grid { grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); }
+  .intel-asset-value { font-size: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .intel-asset-bar-fill { transition: none; }
+}
+
+/* ── Reporter intelligence — macro data tabs ──────────────*/
+.intel-macro {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.012)),
+    var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  padding: 13px;
+}
+.intel-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 13px;
+}
+.intel-tab {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 8px 16px;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.intel-tab:hover { background: rgba(255,255,255,0.08); color: var(--soft); }
+.intel-tab.active {
+  background: var(--intel-accent-bg);
+  border-color: var(--intel-accent);
+  color: var(--text);
+}
+.intel-tab:focus-visible { outline: 2px solid var(--intel-accent); outline-offset: 2px; }
+
+.intel-macro-grid {
+  display: grid;
+  gap: 11px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.intel-macro-card {
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  min-width: 0;
+  overflow: hidden;
+}
+.intel-macro-card-head {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  padding: 10px 12px 8px;
+}
+.intel-macro-card-title {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 800;
+}
+.intel-macro-card-note {
+  color: var(--muted);
+  font-size: 10px;
+  margin-left: auto;
+  text-align: right;
+}
+.intel-macro-footnote {
+  color: var(--dim);
+  font-size: 10.5px;
+  line-height: 1.5;
+  margin-top: 11px;
+}
+
+@media (max-width: 760px) {
+  .intel-macro-grid { grid-template-columns: 1fr; }
+  .intel-macro-card-note { display: none; }
+}
+
+/* ── Reporter intelligence — AI Newsroom shell + operations ─*/
+/* The newsroom keeps the dashboard's section language so it reads as part of
+   the same page, but its header does not collapse: there is nothing below it
+   to lazy-load, and hiding the desks is not a thing anyone wants. */
+.intel-section-header--static { cursor: default; }
+.intel-section-header--static:hover { background: var(--surface2); border-color: var(--border); }
+.intel-section--static .intel-section-note { margin-left: auto; }
+
+.intel-strip-footer {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  justify-content: space-between;
+  margin: 7px 2px 0;
+}
+.intel-strip-footer .intel-quality { margin: 0; }
+.intel-jump {
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+}
+.intel-jump:hover { color: var(--blue); }
+.intel-jump:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+.shareclaw-subtitle {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  margin-top: 2px;
+  text-transform: uppercase;
+}
+.shareclaw-actions { display: grid; gap: 8px; }
+.shareclaw-actions .shareclaw-run { margin: 0; width: 100%; }
+.shareclaw-run:disabled { cursor: not-allowed; opacity: 0.45; }
+.shareclaw-panel .reporter-broadcast-status {
+  flex-basis: auto;
+  font-size: 11px;
+  line-height: 1.45;
+  margin-top: 6px;
+}
+
+@media (max-width: 900px) {
+  /* The ops panel goes two-up on tablets; the button row should not be split
+     across its columns. */
+  .shareclaw-panel .shareclaw-actions,
+  .shareclaw-panel .shareclaw-note,
+  .shareclaw-panel .shareclaw-message,
+  .shareclaw-panel .reporter-broadcast-status { grid-column: 1 / -1; }
+}
