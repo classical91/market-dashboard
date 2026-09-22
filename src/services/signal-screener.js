@@ -311,25 +311,56 @@ class SignalScreenerService {
     }
   }
 
-  async scanAll(interval, minChecks, { force } = {}) {
-    return Promise.all(this._tokens.map((symbol) => this.scanToken(symbol, interval, minChecks, { force })));
+  /**
+   * The universe one scan should cover. Callers that own a configured list
+   * (the Directional Bias and Local Extremes routes read theirs from the
+   * screener settings store) pass it per call rather than per instance,
+   * because one service instance serves universes that differ per screener.
+   * Omitting it keeps the constructor's list, which is what every other
+   * caller — the signal bot's default, the decision engine — still wants.
+   *
+   * Note what this does *not* change: the per-symbol cache key. A symbol in
+   * two universes on the same interval is still fetched and scored once.
+   */
+  _resolveSymbols(symbols) {
+    if (!Array.isArray(symbols)) return this._tokens;
+    const seen = new Set();
+    const resolved = [];
+    for (const entry of symbols) {
+      const symbol = String(entry == null ? "" : entry).trim().toUpperCase();
+      if (!symbol || seen.has(symbol)) continue;
+      seen.add(symbol);
+      resolved.push(symbol);
+    }
+    // An explicitly empty array means "scan nothing" — an operator who
+    // cleared a screener's universe gets an empty page, not the full default
+    // list the page no longer claims to show.
+    return resolved;
+  }
+
+  async scanAll(interval, minChecks, { force, symbols } = {}) {
+    const universe = this._resolveSymbols(symbols);
+    return Promise.all(universe.map((symbol) => this.scanToken(symbol, interval, minChecks, { force })));
   }
 
   // Two projections of the scan above, for the Directional Bias and Local
-  // Extremes pages. Both go through scanAll(), so the pair costs one cached
-  // universe scan rather than two upstream Binance passes for the same
-  // symbol + interval, and both pages always describe the same candles.
+  // Extremes pages. Both go through scanAll(), so a symbol the two pages
+  // share costs one cached scan rather than two upstream Binance passes for
+  // the same symbol + interval, and both pages always describe the same
+  // candles. The two universes are configured independently — see
+  // services/screener-settings.js — but they remain one engine over one
+  // cache; the only thing that differs is which symbols are asked for.
   // No indicator is recomputed here — see services/screener-projections.js.
-  async scanDirectionalBias(interval, minChecks, { force } = {}) {
-    const rows = await this.scanAll(interval, minChecks, { force });
+  async scanDirectionalBias(interval, minChecks, { force, symbols } = {}) {
+    const rows = await this.scanAll(interval, minChecks, { force, symbols });
     // One clock for the whole scan, so two rows computed in the same pass
     // never report ages a second apart.
     const now = Date.now();
     return rows.map((row) => toDirectionalBias(row, interval, now));
   }
 
-  async scanLocalExtremes(interval, minChecks, { force } = {}) {
-    const rows = await this.scanAll(interval, minChecks, { force });
+  async scanLocalExtremes(interval, minChecks, { force, symbols } = {}) {
+    const rows = await this.scanAll(interval, minChecks, { force, symbols });
     const now = Date.now();
     return rows.map((row) => toLocalExtremes(row, interval, now));
   }

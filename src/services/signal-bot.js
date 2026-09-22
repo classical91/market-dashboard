@@ -26,6 +26,11 @@ class SignalBotService {
     intervalMs,
     timeframes,
     minChecks,
+    // Optional. When wired, the bot watches the same token universes the
+    // Settings page configures for the Directional Bias and Pattern Scanner
+    // pages, so an alert can never name a row the dashboard stopped showing.
+    // Without it both scanners keep their own default lists.
+    screenerSettingsService,
   }) {
     this._screener = signalScreenerService;
     this._patternScanner = patternScannerService;
@@ -36,6 +41,7 @@ class SignalBotService {
     this._intervalMs = intervalMs || 15 * 60 * 1000;
     this._timeframes = timeframes && timeframes.length ? timeframes : ["4h", "1D"];
     this._minChecks = minChecks || 4;
+    this._screenerSettings = screenerSettingsService || null;
     this._timer = null;
     this._running = false;
   }
@@ -72,10 +78,19 @@ class SignalBotService {
     this._timer = null;
   }
 
+  // Read per cycle rather than cached on the instance: the universes are
+  // edited from Settings while the bot is running, and the next scan should
+  // already respect the change. `undefined` leaves each scanner on its own
+  // default list.
+  _universe(screener) {
+    return this._screenerSettings ? this._screenerSettings.getUniverse(screener) : undefined;
+  }
+
   async _scanScreener(next) {
     const transitions = [];
+    const symbols = this._universe("directionalBias");
     for (const interval of this._timeframes) {
-      const results = await this._screener.scanAll(interval, this._minChecks);
+      const results = await this._screener.scanAll(interval, this._minChecks, { symbols });
       for (const result of results) {
         if (result.error || !result.signal) continue;
         const key = `${result.symbol}:${interval}`;
@@ -107,7 +122,7 @@ class SignalBotService {
     if (!this._patternScanner) return [];
     const events = [];
     const detectedAt = new Date().toISOString();
-    const results = await this._patternScanner.scanAll();
+    const results = await this._patternScanner.scanAll({ symbols: this._universe("patternScanner") });
     for (const result of results) {
       if (result.error) continue;
       const seenBefore = Object.prototype.hasOwnProperty.call(known, `pattern:${result.symbol}:${result.interval}`);

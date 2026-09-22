@@ -22,12 +22,13 @@ The app is intentionally lightweight: no bundler, no frontend framework, and no 
 - `/on-chain.html` - Curated on-chain tools hub.
 - `/onchain.html` - API-backed on-chain analytics dashboard.
 - `/ai-analysis.html` - TradingView chart snapshots with AI reads for crypto plus BTC-correlated macro tickers.
-- `/directional-bias.html` - Directional Bias screener: which way trend and momentum are leaning across the shared 25-token universe, scored by how many of six checks (RSI, MACD, VWAP, volume, EMA20/50, price vs EMA200) agree. BTC and USDT.D ride along as market context. Reads `BULLISH / BEARISH / NEUTRAL`; `LONG / SHORT` stay on the wire and on pages that publish an actual setup.
+- `/directional-bias.html` - Directional Bias screener: which way trend and momentum are leaning across the token universe configured in Settings (all 25 defaults out of the box), scored by how many of six checks (RSI, MACD, VWAP, volume, EMA20/50, price vs EMA200) agree. BTC and USDT.D ride along as market context. Reads `BULLISH / BEARISH / NEUTRAL`; `LONG / SHORT` stay on the wire and on pages that publish an actual setup.
 - `/local-extremes.html` - Local Extremes screener: whether price is stretched toward a possible local top or bottom, with bottom and top scored independently from Bollinger excursion, RSI extreme, divergence, liquidity sweep, volume climax and reversal confirmation. Direction and location are separate questions — a bullish bias and a confirmed local top are both legitimate at once. `/signal-screener.html` redirected here and to Directional Bias when the combined page was split.
 - `/decision.html` - Decision Engine: multi-asset regime score (BTC, breadth, SPY, QQQ, DXY, VIX, gold, oil, optional US10Y), asset-class rotation board, setup-quality ranking layered over the signal screener, execution levels (trigger / invalidation / target / R:R with explicit "do not trade" reasons), and a trading journal that grades whether the engine's calls were right.
 - `/trading-lab.html` - Trading Lab: paper execution with real TP1/TP2 scale-outs, ATR risk sizing, kill switches, a historical edge gate that scores every Decision Engine plan against how setups like it have actually performed, and bar-replay backtesting over the same engine. See [docs/trading-lab.md](docs/trading-lab.md).
 - `/youtube-v2.html` - YouTube Intelligence: live streams, scheduled streams, and latest uploads from tracked channels.
 - `/x-intelligence.html` - X Intelligence: curated X feeds per theme, with a per-post **Broadcast** button that sends the post (and its picture) to chosen Telegram channels. See [X Intelligence broadcasting](#x-intelligence-broadcasting).
+- `/settings.html` - Appearance, reporter preferences, and **Screeners -> Token Universe**: a matrix that decides which tokens Directional Bias, Local Extremes and Pattern Scanner each scan. Saved on the server under `DATA_DIR/screener-settings.json`, so the scanners and the signal bot follow it rather than the browser. Binance USDT pairs can be added (verified against Binance first) beyond the shipped defaults. USDT.D is deliberately not in the matrix: it has no Binance candles to scan and already rides along with Directional Bias as market context.
 - `/indicators.html` - Trading and market glossary.
 - `/reporter.html` - Daily report generation workflow.
 - `/api/newsroom` - newsroom cycle records and health for the scheduled reporting run: one durable cycle per run, linking generated sections to broadcast receipts and Telegram message ids. See [docs/newsroom-cycles.md](docs/newsroom-cycles.md).
@@ -348,8 +349,10 @@ market-dashboard/
     routes/               API routers
       directional-bias.js one screener projection: direction
       local-extremes.js   the other: location/exhaustion
+      screener-settings.js  read the token matrix; admin-gated writes
     services/             provider clients and aggregation
       signal-screener.js  the confluence engine behind both screener pages
+      screener-settings.js  which tokens each screener scans (DATA_DIR-backed)
       local-extreme-engine.js  independent local top/bottom scoring
       screener-projections.js  reshapes one cached scan for either page
       trade-context.js    combines bias + extremes + patterns per tracked pair
