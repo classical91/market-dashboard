@@ -38,8 +38,6 @@
       watchlistBody: $("watchlistBody"),
       riskBox: $("riskBox"),
       alerts: $("alertsFeed"),
-      calendar: $("calendarList"),
-      news: $("newsFeed"),
       chart: $("marketChart"),
     });
 
@@ -93,8 +91,6 @@
     renderWatchlist();
     renderRiskBox(data);
     renderAlerts(data);
-    renderCalendar(data);
-    renderNews(data);
     drawChart(data);
   }
 
@@ -263,47 +259,6 @@
       .join("");
   }
 
-  function renderCalendar(data) {
-    const events = data.calendar || [];
-    if (!events.length) {
-      els.calendar.innerHTML = ui().emptyState("No scheduled events", "Macro events will appear here when configured.");
-      return;
-    }
-    els.calendar.innerHTML = events
-      .map((e) => {
-        const impactCls = e.impact?.toLowerCase().startsWith("h")
-          ? "high"
-          : e.impact?.toLowerCase().startsWith("m")
-            ? "med"
-            : "low";
-        return `<div class="event">
-          <div class="event-time">${escapeHtml(e.time || "")}</div>
-          <div>${escapeHtml(e.title || "")}</div>
-          <div class="impact ${impactCls}">${escapeHtml(e.impact || "")}</div>
-        </div>`;
-      })
-      .join("");
-  }
-
-  function renderNews(data) {
-    const news = data.news || [];
-    if (!news.length) {
-      els.news.innerHTML = ui().emptyState("No news available", "Connect MARKET_NEWS_URL for live headlines.");
-      return;
-    }
-    els.news.innerHTML = news
-      .map((n) => {
-        const time = n.publishedAt ? timeAgo(n.publishedAt) : "";
-        const inner = `
-          <h4>${escapeHtml(n.title || "")}</h4>
-          <div class="feed-meta"><span>${escapeHtml(n.source || "")}</span><span>${escapeHtml(time)}</span></div>`;
-        return n.url
-          ? `<a class="feed-item" href="${escapeAttr(n.url)}" target="_blank" rel="noopener">${inner}</a>`
-          : `<div class="feed-item">${inner}</div>`;
-      })
-      .join("");
-  }
-
   function drawChart(data) {
     const points = data.marketPulse?.points || [];
     const canvas = els.chart;
@@ -375,8 +330,6 @@
     els.watchlistBody.innerHTML = `<tr><td colspan="4">${ui().emptyState("Loading watchlist", "Fetching current market rows.")}</td></tr>`;
     els.heatmap.innerHTML = ui().emptyState("Loading heatmap", "Preparing the asset performance scan.");
     els.alerts.innerHTML = ui().emptyState("Loading alerts", "Checking live conditions.");
-    els.calendar.innerHTML = ui().emptyState("Loading calendar", "Preparing upcoming market events.");
-    els.news.innerHTML = ui().emptyState("Loading news", "Fetching market headlines.");
   }
 
   function renderSkeletons() {
@@ -394,8 +347,6 @@
     els.watchlistBody.innerHTML = `<tr><td colspan="4"><div class="empty-state">Loading…</div></td></tr>`;
     els.heatmap.innerHTML = `<div class="empty-state">Loading heatmap…</div>`;
     els.alerts.innerHTML = `<div class="empty-state">Loading alerts…</div>`;
-    els.calendar.innerHTML = `<div class="empty-state">Loading calendar…</div>`;
-    els.news.innerHTML = `<div class="empty-state">Loading news…</div>`;
   }
 
   function renderError(message) {
@@ -438,18 +389,6 @@
     return v >= 0
       ? `rgba(0,227,150,${0.18 + intensity * 0.58})`
       : `rgba(255,77,109,${0.18 + intensity * 0.58})`;
-  }
-
-  function timeAgo(iso) {
-    const then = new Date(iso).getTime();
-    if (!Number.isFinite(then)) return "";
-    const diff = Date.now() - then;
-    const minutes = Math.floor(diff / 60_000);
-    if (minutes < 1) return "just now";
-    if (minutes < 60) return `${minutes}m ago`;
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours}h ago`;
-    return `${Math.floor(hours / 24)}d ago`;
   }
 
   function escapeHtml(value) {

@@ -18,6 +18,10 @@ const page = read("public/reporter.html");
 const widgets = read("public/assets/js/reporter-widgets.js");
 const market = read("public/assets/js/reporter-market.js");
 const css = read("public/assets/styles/reporter.css");
+const overviewPage = read("public/index.html");
+const overviewJs = read("public/assets/js/overview.js");
+const sidebar = read("public/assets/js/sidebar.js");
+const indicators = read("public/assets/js/indicators.js");
 
 test("the page loads the assets it references, and they all exist", () => {
   for (const asset of [
@@ -248,6 +252,79 @@ test("a desk report reads as ranked stories with traceable sources", () => {
 
   // Master News shows the headline, not the raw "#1 " the rank chip repeats.
   assert.match(page, /function masterStoryTitle\(block\)/);
+});
+
+test("the newsroom feeds live in the newsroom, not on Overview", () => {
+  // Overview was carrying the economic calendar, top stories, the macro
+  // calendar, Calendars & Tools and News Pulse — all newsroom inputs, and all
+  // duplicated by or belonging in the Reporter Room.
+  for (const id of [
+    'id="calendarList"',
+    'id="newsFeed"',
+    'id="calendars-tools"',
+    'id="macro-calendar"',
+    'id="news-pulse"',
+    'id="ovh-econ-calendar"',
+    'id="ovh-top-stories"',
+  ]) {
+    assert.ok(!overviewPage.includes(id), `${id} should no longer be on Overview`);
+  }
+  // Their renderers went with them rather than being left as dead guarded code.
+  assert.doesNotMatch(overviewJs, /els\.calendar|els\.news\b|renderCalendar|renderNews/);
+
+  // And they are all here, reachable by the anchors that used to point at
+  // Overview.
+  for (const id of [
+    'id="economic-calendar"',
+    'id="top-stories"',
+    'id="news-pulse"',
+    'id="macro-calendar"',
+    'id="calendars-tools"',
+    'id="newsFeed"',
+    'id="catalystList"',
+  ]) {
+    assert.ok(page.includes(id), `${id} must be in the Reporter Room`);
+  }
+});
+
+test("the moved deep links point at the Reporter Room, not dead anchors", () => {
+  for (const dead of [
+    '"/#calendars-tools"',
+    '"/#macro-calendar"',
+    '"/#news-pulse"',
+    '"/#ovh-econ-calendar"',
+    '"/#ovh-top-stories"',
+  ]) {
+    assert.ok(!sidebar.includes(dead), `${dead} no longer exists on Overview`);
+  }
+  for (const live of [
+    "/reporter.html#economic-calendar",
+    "/reporter.html#top-stories",
+    "/reporter.html#news-pulse",
+    "/reporter.html#macro-calendar",
+    "/reporter.html#calendars-tools",
+  ]) {
+    assert.ok(sidebar.includes(live), `${live} must be linked from the sidebar`);
+  }
+  // The indicators glossary cross-referenced the old Overview anchor.
+  assert.doesNotMatch(indicators, /"\/#calendars-tools"/);
+  assert.match(indicators, /\/reporter\.html#calendars-tools/);
+
+  // A deep link into a collapsed section has to open it, or it scrolls to
+  // nothing.
+  assert.match(widgets, /function reveal\(id\)/);
+  assert.match(page, /function openHashTarget\(\)/);
+  assert.match(page, /window\.addEventListener\('hashchange', openHashTarget\)/);
+});
+
+test("News Pulse and the tool grid add no requests of their own", () => {
+  // Same /api/overview payload as the reaction strip and the catalysts.
+  assert.match(market, /state\.news = Array\.isArray\(payload\.news\)/);
+  assert.match(market, /function renderNewsPulse\(\)/);
+  assert.equal((market.match(/fetch\(/g) || []).length, 1, "one request feeds every panel");
+  // Open All reuses the existing tools.js rather than a second implementation.
+  assert.match(page, /src="\/assets\/js\/tools\.js"/);
+  assert.match(page, /id="toolsOpenAll"/);
 });
 
 test("existing Reporter behaviour is untouched", () => {
