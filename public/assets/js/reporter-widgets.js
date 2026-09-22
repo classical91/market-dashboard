@@ -136,6 +136,44 @@
       narrow: { isZoomEnabled: false, hasSymbolTooltip: false }
     },
 
+    sectorHeatmap: {
+      script: 'embed-widget-stock-heatmap.js',
+      source: 'https://www.tradingview.com/heatmap/stock/',
+      sourceLabel: 'TradingView stock heatmap',
+      config: {
+        dataSource: 'SPX500',
+        blockSize: 'market_cap_basic',
+        blockColor: 'change',
+        grouping: 'sector',
+        hasTopBar: false,
+        isDataSetEnabled: false,
+        isZoomEnabled: true,
+        hasSymbolTooltip: true,
+        isMonoSize: false,
+        symbolUrl: ''
+      },
+      narrow: { isZoomEnabled: false, hasSymbolTooltip: false }
+    },
+
+    etfHeatmap: {
+      script: 'embed-widget-etf-heatmap.js',
+      source: 'https://www.tradingview.com/heatmap/etf/',
+      sourceLabel: 'TradingView ETF heatmap',
+      config: {
+        dataSource: 'AllUSEtf',
+        blockSize: 'aum',
+        blockColor: 'change',
+        grouping: 'asset_class',
+        hasTopBar: false,
+        isDataSetEnabled: false,
+        isZoomEnabled: true,
+        hasSymbolTooltip: true,
+        isMonoSize: false,
+        symbolUrl: ''
+      },
+      narrow: { isZoomEnabled: false, hasSymbolTooltip: false }
+    },
+
     forexHeatmap: {
       script: 'embed-widget-forex-heatmap.js',
       source: 'https://www.tradingview.com/markets/currencies/forex-heat-map/',
