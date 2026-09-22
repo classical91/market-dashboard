@@ -11,6 +11,8 @@
  *   |change| ≥ strong           → ±2
  * The pulse is the sum across available components (max ±6). At least two
  * components must be present, or the pulse is reported as unavailable.
+ * `maxScore` is the ceiling for the components actually scored (2 per
+ * component), so a pulse built from two components reads out of ±4.
  */
 
 const RULES = {
@@ -29,6 +31,7 @@ const RULES = {
     { min: -Infinity, label: "Strong Contraction", state: "CONTRACTING" },
   ],
   minComponents: 2,
+  maxComponentScore: 2,
 };
 
 function scoreChange(change, { neutral, strong }) {
@@ -88,11 +91,12 @@ function computePulse({ stablecoins, tvl, dex }) {
   });
   const scored = components.filter((component) => component.score !== null);
   if (scored.length < RULES.minComponents) {
-    return { score: null, label: null, state: null, components };
+    return { score: null, maxScore: null, label: null, state: null, components };
   }
   const score = scored.reduce((sum, component) => sum + component.score, 0);
+  const maxScore = scored.length * RULES.maxComponentScore;
   const band = RULES.pulse.find((entry) => score >= entry.min);
-  return { score, label: band.label, state: band.state, components };
+  return { score, maxScore, label: band.label, state: band.state, components };
 }
 
 module.exports = { RULES, scoreChange, trend, liquidityRegime, activityLabel, computePulse };

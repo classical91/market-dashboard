@@ -70,6 +70,36 @@
   color: var(--text);
   margin-left: 4px;
 }
+.oci-pulse-max {
+  color: var(--muted);
+}
+.oci-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: -6px 0 14px;
+  padding: 0;
+  list-style: none;
+}
+.oci-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  cursor: help;
+}
+.oci-chip-label {
+  color: var(--muted);
+}
+.oci-chip-score {
+  min-width: 1.5em;
+  text-align: right;
+}
 .oci-regimes {
   display: flex;
   flex-wrap: wrap;

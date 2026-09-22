@@ -69,14 +69,15 @@
           <span class="oci-state-label">${esc(pulse.label || "Insufficient data")}</span>
           <span class="oci-state-arrow" aria-hidden="true">${stateArrow(data.state)}</span>
         </div>
-        <div class="oci-pulse-score" title="Sum of component scores, range −6 to +6">
-          Pulse score <strong>${Number.isFinite(pulse.score) ? signed(pulse.score, 0) : "—"}</strong>
+        <div class="oci-pulse-score" title="${esc(pulseScoreTitle(pulse))}">
+          Pulse score <strong>${Number.isFinite(pulse.score) ? signed(pulse.score, 0) : "—"}</strong>${Number.isFinite(pulse.maxScore) ? `<span class="oci-pulse-max"> / ${pulse.maxScore}</span>` : ""}
         </div>
         <div class="oci-regimes">
           <span>Liquidity <strong class="${regimeClass(liquidity.regime)}">${esc(liquidity.regime || "—")}</strong></span>
           <span>Activity <strong class="${activityClass(data.activity)}">${esc(data.activity || "—")}</strong></span>
         </div>
       </div>
+      ${pulseBreakdown(pulse, data.rules || {})}
 
       <div class="oci-grid">
         <section class="oci-panel" aria-label="DeFi activity">
@@ -118,6 +119,36 @@
         <span>Data: <a href="${esc(data.attribution?.url || "https://defillama.com")}" target="_blank" rel="noopener">${esc(data.attribution?.name || "DefiLlama")}</a> · free public API</span>
         <span title="${esc(data.dataAsOf || data.updatedAt || "")}">Data as of ${esc(timeAgo(data.dataAsOf || data.updatedAt))}</span>
       </div>`;
+  }
+
+  // Short names for the headline breakdown; the full labels stay in details.
+  const COMPONENT_SHORT = { liquidity: "Stablecoins", tvl: "DeFi TVL", activity: "DEX volume" };
+
+  function pulseScoreTitle(pulse) {
+    if (!Number.isFinite(pulse.maxScore)) return "Sum of component scores; needs at least two components";
+    return `Sum of ${pulse.maxScore / 2} component scores, range −${pulse.maxScore} to +${pulse.maxScore}`;
+  }
+
+  // One chip per component so the score is never a mystery number:
+  // what moved, by how much, and what it contributed.
+  function pulseBreakdown(pulse, rules) {
+    const components = pulse.components || [];
+    if (!components.length) return "";
+    const chips = components
+      .map((c) => {
+        const rule = rules.components?.[c.key] || {};
+        const scoreText = c.score === null ? "—" : c.score === 0 ? "0" : signed(c.score, 0);
+        const scoreCls = c.score > 0 ? "up" : c.score < 0 ? "down" : "oci-muted";
+        const title = `${c.label}: ${Number.isFinite(c.change) ? signed(c.change, 2) + "%" : "no data"}. `
+          + `Under ±${rule.neutral}% scores 0, ±${rule.neutral}% scores ±1, ±${rule.strong}% or more scores ±2.`;
+        return `<li class="oci-chip" title="${esc(title)}">
+          <span class="oci-chip-label">${esc(COMPONENT_SHORT[c.key] || c.label)} 7D</span>
+          ${pctHtml(c.change)}
+          <strong class="oci-chip-score ${scoreCls}">${scoreText}</strong>
+        </li>`;
+      })
+      .join("");
+    return `<ul class="oci-breakdown" aria-label="Pulse score breakdown">${chips}</ul>`;
   }
 
   function metricRow(label, value, change1d, change7d, trend) {
@@ -163,7 +194,7 @@
               </div>`;
             })
             .join("")}
-          <p class="oci-muted">Bands: ${bands}. Needs at least ${esc(rules.minComponents ?? 2)} components.</p>
+          <p class="oci-muted">Bands: ${bands}. Each component scores −${esc(rules.maxComponentScore ?? 2)} to +${esc(rules.maxComponentScore ?? 2)}; needs at least ${esc(rules.minComponents ?? 2)} components.</p>
         </div>
         <div>
           <h4>Section status</h4>

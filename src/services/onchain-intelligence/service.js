@@ -201,6 +201,7 @@ function serializeRules() {
     liquidity30d: RULES.liquidity30d,
     pulse: RULES.pulse.map((band) => ({ ...band, min: Number.isFinite(band.min) ? band.min : null })),
     minComponents: RULES.minComponents,
+    maxComponentScore: RULES.maxComponentScore,
   };
 }
 
