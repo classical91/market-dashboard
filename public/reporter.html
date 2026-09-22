@@ -185,6 +185,184 @@
         </div>
       </section>
 
+      <section class="intel-section" data-intel-section="macro-data" data-intel-accent="amber">
+        <button class="intel-section-header" type="button" aria-expanded="true">
+          <span>
+            <span class="intel-section-title">📉 Macro Data</span>
+            <span class="intel-section-sub">The conditions every desk is writing against</span>
+          </span>
+          <span class="intel-section-note">FRED · monthly</span>
+          <span class="intel-section-chevron" aria-hidden="true">▾</span>
+        </button>
+        <div class="intel-section-body">
+          <div class="intel-macro" data-intel-tabs="macro-data">
+            <div class="intel-tabs" role="tablist" aria-label="Macro data category">
+            <button class="intel-tab" type="button" role="tab" data-intel-tab="inflation"
+                    aria-selected="true" aria-controls="macro-panel-inflation">Inflation</button>
+            <button class="intel-tab" type="button" role="tab" data-intel-tab="labor"
+                    aria-selected="false" aria-controls="macro-panel-labor">Labor</button>
+            <button class="intel-tab" type="button" role="tab" data-intel-tab="rates"
+                    aria-selected="false" aria-controls="macro-panel-rates">Rates</button>
+            <button class="intel-tab" type="button" role="tab" data-intel-tab="liquidity"
+                    aria-selected="false" aria-controls="macro-panel-liquidity">Liquidity</button>
+            </div>
+          <div class="intel-macro-panel" role="tabpanel" id="macro-panel-inflation"
+               data-intel-tab-panel="inflation" aria-label="Inflation" hidden>
+            <div class="intel-macro-grid">
+              <article class="intel-macro-card">
+                <div class="intel-macro-card-head">
+                  <span class="intel-macro-card-title">CPI index</span>
+                  <span class="intel-macro-card-note">Headline consumer price index</span>
+                </div>
+                <div class="intel-widget" data-intel-widget="macroChart"
+                     data-intel-symbol="FRED:CPIAUCSL" style="--intel-widget-h:190px"></div>
+              </article>
+              <article class="intel-macro-card">
+                <div class="intel-macro-card-head">
+                  <span class="intel-macro-card-title">Core CPI index</span>
+                  <span class="intel-macro-card-note">Ex food and energy</span>
+                </div>
+                <div class="intel-widget" data-intel-widget="macroChart"
+                     data-intel-symbol="FRED:CPILFESL" style="--intel-widget-h:190px"></div>
+              </article>
+              <article class="intel-macro-card">
+                <div class="intel-macro-card-head">
+                  <span class="intel-macro-card-title">10Y breakeven</span>
+                  <span class="intel-macro-card-note">Market-implied 10Y inflation</span>
+                </div>
+                <div class="intel-widget" data-intel-widget="macroChart"
+                     data-intel-symbol="FRED:T10YIE" style="--intel-widget-h:190px"></div>
+              </article>
+              <article class="intel-macro-card">
+                <div class="intel-macro-card-head">
+                  <span class="intel-macro-card-title">5Y5Y forward</span>
+                  <span class="intel-macro-card-note">Market-implied forward inflation</span>
+                </div>
+                <div class="intel-widget" data-intel-widget="macroChart"
+                     data-intel-symbol="FRED:T5YIFR" style="--intel-widget-h:190px"></div>
+              </article>
+            </div>
+          </div>
+          <div class="intel-macro-panel" role="tabpanel" id="macro-panel-labor"
+               data-intel-tab-panel="labor" aria-label="Labor" hidden>
+            <div class="intel-macro-grid">
+              <article class="intel-macro-card">
+                <div class="intel-macro-card-head">
+                  <span class="intel-macro-card-title">Unemployment rate</span>
+                  <span class="intel-macro-card-note">Headline U-3, percent</span>
+                </div>
+                <div class="intel-widget" data-intel-widget="macroChart"
+                     data-intel-symbol="FRED:UNRATE" style="--intel-widget-h:190px"></div>
+              </article>
+              <article class="intel-macro-card">
+                <div class="intel-macro-card-head">
+                  <span class="intel-macro-card-title">Initial claims</span>
+                  <span class="intel-macro-card-note">Weekly, seasonally adjusted</span>
+                </div>
+                <div class="intel-widget" data-intel-widget="macroChart"
+                     data-intel-symbol="FRED:ICSA" style="--intel-widget-h:190px"></div>
+              </article>
+              <article class="intel-macro-card">
+                <div class="intel-macro-card-head">
+                  <span class="intel-macro-card-title">Nonfarm payrolls</span>
+                  <span class="intel-macro-card-note">Total employment level</span>
+                </div>
+                <div class="intel-widget" data-intel-widget="macroChart"
+                     data-intel-symbol="FRED:PAYEMS" style="--intel-widget-h:190px"></div>
+              </article>
+              <article class="intel-macro-card">
+                <div class="intel-macro-card-head">
+                  <span class="intel-macro-card-title">Participation rate</span>
+                  <span class="intel-macro-card-note">Civilian labor force, percent</span>
+                </div>
+                <div class="intel-widget" data-intel-widget="macroChart"
+                     data-intel-symbol="FRED:CIVPART" style="--intel-widget-h:190px"></div>
+              </article>
+            </div>
+          </div>
+          <div class="intel-macro-panel" role="tabpanel" id="macro-panel-rates"
+               data-intel-tab-panel="rates" aria-label="Rates" hidden>
+            <div class="intel-macro-grid">
+              <article class="intel-macro-card">
+                <div class="intel-macro-card-head">
+                  <span class="intel-macro-card-title">Fed funds rate</span>
+                  <span class="intel-macro-card-note">Effective policy rate</span>
+                </div>
+                <div class="intel-widget" data-intel-widget="macroChart"
+                     data-intel-symbol="FRED:FEDFUNDS" style="--intel-widget-h:190px"></div>
+              </article>
+              <article class="intel-macro-card">
+                <div class="intel-macro-card-head">
+                  <span class="intel-macro-card-title">US 2Y</span>
+                  <span class="intel-macro-card-note">Policy expectations</span>
+                </div>
+                <div class="intel-widget" data-intel-widget="macroChart"
+                     data-intel-symbol="TVC:US02Y" style="--intel-widget-h:190px"></div>
+              </article>
+              <article class="intel-macro-card">
+                <div class="intel-macro-card-head">
+                  <span class="intel-macro-card-title">US 10Y</span>
+                  <span class="intel-macro-card-note">Long-end benchmark</span>
+                </div>
+                <div class="intel-widget" data-intel-widget="macroChart"
+                     data-intel-symbol="TVC:US10Y" style="--intel-widget-h:190px"></div>
+              </article>
+              <article class="intel-macro-card">
+                <div class="intel-macro-card-head">
+                  <span class="intel-macro-card-title">2s10s spread</span>
+                  <span class="intel-macro-card-note">Curve slope, percentage points</span>
+                </div>
+                <div class="intel-widget" data-intel-widget="macroChart"
+                     data-intel-symbol="FRED:T10Y2Y" style="--intel-widget-h:190px"></div>
+              </article>
+            </div>
+          </div>
+          <div class="intel-macro-panel" role="tabpanel" id="macro-panel-liquidity"
+               data-intel-tab-panel="liquidity" aria-label="Liquidity" hidden>
+            <div class="intel-macro-grid">
+              <article class="intel-macro-card">
+                <div class="intel-macro-card-head">
+                  <span class="intel-macro-card-title">M2 money stock</span>
+                  <span class="intel-macro-card-note">Broad money supply</span>
+                </div>
+                <div class="intel-widget" data-intel-widget="macroChart"
+                     data-intel-symbol="FRED:M2SL" style="--intel-widget-h:190px"></div>
+              </article>
+              <article class="intel-macro-card">
+                <div class="intel-macro-card-head">
+                  <span class="intel-macro-card-title">Fed balance sheet</span>
+                  <span class="intel-macro-card-note">Total assets</span>
+                </div>
+                <div class="intel-widget" data-intel-widget="macroChart"
+                     data-intel-symbol="FRED:WALCL" style="--intel-widget-h:190px"></div>
+              </article>
+              <article class="intel-macro-card">
+                <div class="intel-macro-card-head">
+                  <span class="intel-macro-card-title">Financial conditions</span>
+                  <span class="intel-macro-card-note">Chicago Fed NFCI, 0 = average</span>
+                </div>
+                <div class="intel-widget" data-intel-widget="macroChart"
+                     data-intel-symbol="FRED:NFCI" style="--intel-widget-h:190px"></div>
+              </article>
+              <article class="intel-macro-card">
+                <div class="intel-macro-card-head">
+                  <span class="intel-macro-card-title">High yield spread</span>
+                  <span class="intel-macro-card-note">ICE BofA HY option-adjusted spread</span>
+                </div>
+                <div class="intel-widget" data-intel-widget="macroChart"
+                     data-intel-symbol="FRED:BAMLH0A0HYM2" style="--intel-widget-h:190px"></div>
+              </article>
+            </div>
+          </div>
+            <p class="intel-macro-footnote">
+              Series are shown as published: index levels are levels and rates are
+              rates, so a rising CPI index line is not the same statement as rising
+              year-over-year inflation. Breakevens carry the market's inflation rate.
+            </p>
+          </div>
+        </div>
+      </section>
+
     </div>
 
     <section class="newsroom-overview" id="newsroomOverview" aria-label="Reporter Room overview">

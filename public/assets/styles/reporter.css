@@ -841,3 +841,80 @@ body.crypto-bg {
 @media (prefers-reduced-motion: reduce) {
   .intel-asset-bar-fill { transition: none; }
 }
+
+/* ── Reporter intelligence — macro data tabs ──────────────*/
+.intel-macro {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.012)),
+    var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  padding: 13px;
+}
+.intel-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 13px;
+}
+.intel-tab {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 8px 16px;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.intel-tab:hover { background: rgba(255,255,255,0.08); color: var(--soft); }
+.intel-tab.active {
+  background: var(--intel-accent-bg);
+  border-color: var(--intel-accent);
+  color: var(--text);
+}
+.intel-tab:focus-visible { outline: 2px solid var(--intel-accent); outline-offset: 2px; }
+
+.intel-macro-grid {
+  display: grid;
+  gap: 11px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.intel-macro-card {
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  min-width: 0;
+  overflow: hidden;
+}
+.intel-macro-card-head {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  padding: 10px 12px 8px;
+}
+.intel-macro-card-title {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 800;
+}
+.intel-macro-card-note {
+  color: var(--muted);
+  font-size: 10px;
+  margin-left: auto;
+  text-align: right;
+}
+.intel-macro-footnote {
+  color: var(--dim);
+  font-size: 10.5px;
+  line-height: 1.5;
+  margin-top: 11px;
+}
+
+@media (max-width: 760px) {
+  .intel-macro-grid { grid-template-columns: 1fr; }
+  .intel-macro-card-note { display: none; }
+}

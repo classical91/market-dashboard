@@ -136,6 +136,27 @@
       narrow: { isZoomEnabled: false, hasSymbolTooltip: false }
     },
 
+    /* One definition, many instances: the symbol comes from the element's
+       data-intel-symbol, so the macro tabs declare a series rather than a
+       widget. */
+    macroChart: {
+      script: 'embed-widget-mini-symbol-overview.js',
+      source: 'https://fred.stlouisfed.org/',
+      sourceLabel: 'St. Louis Fed (FRED)',
+      config: {
+        symbol: 'FRED:FEDFUNDS',
+        dateRange: '60M',
+        chartOnly: false,
+        noTimeScale: false,
+        autosize: false,
+        largeChartUrl: '',
+        trendLineColor: 'rgba(77, 163, 255, 1)',
+        underLineColor: 'rgba(77, 163, 255, 0.14)',
+        underLineBottomColor: 'rgba(77, 163, 255, 0)'
+      },
+      narrow: { noTimeScale: true }
+    },
+
     sectorHeatmap: {
       script: 'embed-widget-stock-heatmap.js',
       source: 'https://www.tradingview.com/heatmap/stock/',
@@ -220,7 +241,7 @@
     return (global.innerWidth || doc.documentElement.clientWidth || 0) < NARROW_WIDTH;
   }
 
-  function buildConfig(def) {
+  function buildConfig(def, el) {
     var config = {};
     var key;
     for (key in THEME) {
@@ -234,6 +255,9 @@
         if (Object.prototype.hasOwnProperty.call(def.narrow, key)) config[key] = def.narrow[key];
       }
     }
+    // Instance options, so one definition can serve a grid of series.
+    if (el && el.dataset.intelSymbol) config.symbol = el.dataset.intelSymbol;
+    if (el && el.dataset.intelRange) config.dateRange = el.dataset.intelRange;
     return config;
   }
 
@@ -355,7 +379,7 @@
       script.async = true;
       script.src = TRADINGVIEW_BASE + def.script;
       // The embed loaders read their options from their own script body.
-      script.text = JSON.stringify(buildConfig(def));
+      script.text = JSON.stringify(buildConfig(def, el));
       script.addEventListener('error', function () { renderError(el, def); });
       container.appendChild(script);
 
@@ -442,6 +466,76 @@
     });
   }
 
+  /* ── Tab groups ────────────────────────────────────────── */
+  /* Only the visible panel's widgets are ever mounted, so a four-tab macro
+     section costs one panel, not four. */
+
+  function tabKey(group) {
+    return 'reporterIntelTab:' + (group.getAttribute('data-intel-tabs') || 'group');
+  }
+
+  function readTab(group) {
+    try {
+      return global.localStorage.getItem(tabKey(group));
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function writeTab(group, name) {
+    try {
+      global.localStorage.setItem(tabKey(group), name);
+    } catch (error) {
+      /* Storage unavailable — the tab still switches, it just is not kept. */
+    }
+  }
+
+  function selectTab(group, name) {
+    var buttons = group.querySelectorAll('[data-intel-tab]');
+    var panels = group.querySelectorAll('[data-intel-tab-panel]');
+    var shown = null;
+
+    Array.prototype.forEach.call(buttons, function (button) {
+      var active = button.getAttribute('data-intel-tab') === name;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-selected', active ? 'true' : 'false');
+      button.tabIndex = active ? 0 : -1;
+    });
+
+    Array.prototype.forEach.call(panels, function (panel) {
+      var active = panel.getAttribute('data-intel-tab-panel') === name;
+      panel.hidden = !active;
+      if (active) shown = panel;
+    });
+
+    if (shown) scan(shown);
+  }
+
+  function initTabs(root) {
+    var groups = (root || doc).querySelectorAll('[data-intel-tabs]');
+
+    Array.prototype.forEach.call(groups, function (group) {
+      var buttons = group.querySelectorAll('[data-intel-tab]');
+      if (!buttons.length) return;
+
+      var stored = readTab(group);
+      var names = Array.prototype.map.call(buttons, function (button) {
+        return button.getAttribute('data-intel-tab');
+      });
+      var initial = names.indexOf(stored) !== -1 ? stored : names[0];
+
+      group.addEventListener('click', function (event) {
+        var button = event.target.closest('[data-intel-tab]');
+        if (!button || !group.contains(button)) return;
+        var name = button.getAttribute('data-intel-tab');
+        writeTab(group, name);
+        selectTab(group, name);
+      });
+
+      selectTab(group, initial);
+    });
+  }
+
   function init(options) {
     var settings = options || {};
     var root = settings.root || doc;
@@ -457,6 +551,7 @@
     }
 
     initSections(root);
+    initTabs(root);
     scan(root);
   }
 
