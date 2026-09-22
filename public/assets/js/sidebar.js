@@ -79,6 +79,11 @@
     {
       label: "Reporter",
       children: [
+        // The Reporter Room itself was reachable only by typing the URL: the
+        // three entries below are single-desk pages that deliberately strip
+        // the News Intelligence tab, Master News, the desk statuses and the
+        // newsroom controls, so none of them can reach the newsroom.
+        { href: "/reporter.html", label: "Reporter Room" },
         { href: "/emerging-markets.html", label: "Emerging Markets" },
         { href: "/economics-top-10.html", label: "Economics Top 10" },
         { href: "/markets-top-10.html", label: "Markets Top 10" },

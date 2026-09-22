@@ -29,6 +29,22 @@ test("primary sidebar order and removed links stay exact", () => {
   }
 });
 
+test("the Reporter menu can actually reach the Reporter Room", () => {
+  // The three desk pages share reporter.html but strip the News Intelligence
+  // tab, Master News, the desk statuses and the newsroom controls. Without a
+  // link to /reporter.html the newsroom is unreachable from the navigation.
+  const start = sidebar.indexOf('label: "Reporter"');
+  const reporter = sidebar.slice(start, sidebar.indexOf('label: "Market Intel Links"'));
+  assert.match(reporter, /href: "\/reporter\.html", label: "Reporter Room"/);
+  const order = ["Reporter Room", "Emerging Markets", "Economics Top 10", "Markets Top 10"];
+  let cursor = -1;
+  for (const label of order) {
+    const next = reporter.indexOf(`label: "${label}"`, cursor + 1);
+    assert.ok(next > cursor, `${label} is missing or out of order under Reporter`);
+    cursor = next;
+  }
+});
+
 test("TradeHunter sits above AI Analysis and owns the scanner workflow", () => {
   const tradeHunterStart = sidebar.indexOf('label: "TradeHunter"');
   const aiAnalysisStart = sidebar.indexOf('label: "AI Analysis"');
