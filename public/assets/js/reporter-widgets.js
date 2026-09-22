@@ -646,6 +646,35 @@
     });
   }
 
+  /**
+   * Open whatever contains `id` so a deep link lands on something visible.
+   *
+   * The links that used to point into the Overview page now point here, and a
+   * target inside a collapsed section would otherwise scroll to nothing.
+   * Returns the element so the caller can scroll to it.
+   */
+  function reveal(id) {
+    var target = doc.getElementById(id);
+    if (!target) return null;
+
+    var section = target.closest ? target.closest('[data-intel-section]') : null;
+    if (section && section.classList.contains('collapsed')) {
+      var header = section.querySelector('.intel-section-header');
+      var body = section.querySelector('.intel-section-body');
+      if (header && body) {
+        applyCollapsed(section, header, body, false);
+        var sectionId = section.getAttribute('data-intel-section');
+        var ids = readCollapsed();
+        var index = ids.indexOf(sectionId);
+        if (index !== -1) ids.splice(index, 1);
+        writeCollapsed(ids);
+        rememberOpened(sectionId);
+        scan(body);
+      }
+    }
+    return target;
+  }
+
   function init(options) {
     var settings = options || {};
     var root = settings.root || doc;
@@ -671,6 +700,7 @@
     scan: scan,
     mount: mount,
     remount: remount,
+    reveal: reveal,
     /** Register extra panels without editing this file. */
     define: function (name, definition) { WIDGETS[name] = definition; },
     widgets: WIDGETS

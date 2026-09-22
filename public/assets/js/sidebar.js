@@ -26,22 +26,17 @@
       children: [
         { href: "/", label: "Top" },
         { href: "/#ticker", label: "Ticker" },
-        { href: "/#calendars-tools", label: "Calendars & Tools" },
         { href: "/#kpiGrid", label: "Key Indicators" },
         { href: "/#market-pulse", label: "Market Pulse" },
         { href: "/#market-heatmap", label: "Market Heatmap" },
         { href: "/#risk-meter", label: "Risk Meter" },
         { href: "/#watchlist", label: "Watchlist" },
         { href: "/#alerts", label: "Alerts" },
-        { href: "/#macro-calendar", label: "Macro Calendar" },
-        { href: "/#news-pulse", label: "News Pulse" },
         { href: "/#ovh-market-overview", label: "TV Market Overview" },
         { href: "/#ovh-technical-analysis", label: "Technical Analysis" },
         { href: "/#ovh-derivatives", label: "Derivatives & Positioning" },
         { href: "/#ovh-liquidity", label: "Liquidity & Volatility" },
         { href: "/#ovh-heatmap", label: "Crypto Heatmap" },
-        { href: "/#ovh-econ-calendar", label: "Economic Calendar" },
-        { href: "/#ovh-top-stories", label: "Top Stories" },
       ],
     },
     {
@@ -84,6 +79,18 @@
         // the News Intelligence tab, Master News, the desk statuses and the
         // newsroom controls, so none of them can reach the newsroom.
         { href: "/reporter.html", label: "Reporter Room" },
+        {
+          // Moved out of Overview: these are newsroom inputs, and the Overview
+          // page was carrying the same feeds the Reporter actually needs.
+          label: "News Intelligence",
+          children: [
+            { href: "/reporter.html#economic-calendar", label: "Economic Calendar" },
+            { href: "/reporter.html#top-stories", label: "Top Stories" },
+            { href: "/reporter.html#news-pulse", label: "News Pulse" },
+            { href: "/reporter.html#macro-calendar", label: "Macro Calendar" },
+            { href: "/reporter.html#calendars-tools", label: "Calendars & Tools" },
+          ],
+        },
         { href: "/emerging-markets.html", label: "Emerging Markets" },
         { href: "/economics-top-10.html", label: "Economics Top 10" },
         { href: "/markets-top-10.html", label: "Markets Top 10" },

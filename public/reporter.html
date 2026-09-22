@@ -40,7 +40,7 @@
     -->
     <div class="news-intel" id="newsIntelligence">
 
-      <section class="intel-section" aria-label="Live News" data-intel-section="live-news" data-intel-accent="purple">
+      <section class="intel-section" id="live-news" aria-label="Live News" data-intel-section="live-news" data-intel-accent="purple">
         <button class="intel-section-header" type="button" aria-expanded="true">
           <span>
             <span class="intel-section-title">📰 Live News</span>
@@ -53,7 +53,7 @@
           <div class="intel-grid intel-grid--2">
             <article class="intel-panel">
               <div class="intel-panel-head">
-                <span class="intel-panel-title">Economic Calendar</span>
+                <span class="intel-panel-title" id="economic-calendar">Economic Calendar</span>
                 <span class="intel-panel-note">US · EU · UK · JP · CN</span>
               </div>
               <div class="intel-widget" data-intel-widget="economicCalendar"
@@ -61,7 +61,7 @@
             </article>
             <article class="intel-panel">
               <div class="intel-panel-head">
-                <span class="intel-panel-title">Top Stories</span>
+                <span class="intel-panel-title" id="top-stories">Top Stories</span>
                 <span class="intel-panel-note">All markets</span>
               </div>
               <div class="intel-widget" data-intel-widget="topStories"
@@ -75,7 +75,7 @@
         <button class="intel-section-header" type="button" aria-expanded="true">
           <span>
             <span class="intel-section-title">🔎 News Discovery</span>
-            <span class="intel-section-sub">Headlines per asset, and the catalysts already on the schedule</span>
+            <span class="intel-section-sub">Headlines per asset, and the newsroom's own wire</span>
           </span>
           <span class="intel-section-note">Provider refreshed</span>
           <span class="intel-section-chevron" aria-hidden="true">▾</span>
@@ -104,7 +104,33 @@
 
             <article class="intel-panel">
               <div class="intel-panel-head">
-                <span class="intel-panel-title">Catalysts &amp; Earnings</span>
+                <span class="intel-panel-title" id="news-pulse">News Pulse</span>
+                <span class="intel-panel-note">The newsroom's own wire</span>
+              </div>
+              <div class="intel-feed" id="newsFeed">
+                <div class="intel-empty">Loading headlines&hellip;</div>
+              </div>
+            </article>
+
+          </div>
+        </div>
+      </section>
+
+      <section class="intel-section" id="calendars-tools" aria-label="Catalysts and schedules"
+               data-intel-section="catalysts-schedules" data-intel-accent="amber">
+        <button class="intel-section-header" type="button" aria-expanded="true">
+          <span>
+            <span class="intel-section-title">🗓️ Catalysts &amp; Schedules</span>
+            <span class="intel-section-sub">What is already on the calendar, and where to look the rest up</span>
+          </span>
+          <span class="intel-section-chevron" aria-hidden="true">▾</span>
+        </button>
+        <div class="intel-section-body">
+          <div class="intel-grid intel-grid--2">
+
+            <article class="intel-panel">
+              <div class="intel-panel-head">
+                <span class="intel-panel-title" id="macro-calendar">Macro Calendar</span>
                 <span class="intel-panel-note">Today's scheduled events</span>
               </div>
               <div class="intel-catalysts" id="catalystList">
@@ -113,6 +139,41 @@
               <div class="intel-catalyst-links">
                 <a href="https://www.tradingview.com/markets/stocks-usa/earnings/" target="_blank" rel="noopener">Earnings calendar ↗</a>
                 <a href="https://www.nasdaq.com/market-activity/earnings" target="_blank" rel="noopener">Nasdaq earnings ↗</a>
+              </div>
+            </article>
+
+            <article class="intel-panel">
+              <div class="intel-panel-head">
+                <span class="intel-panel-title">Calendars &amp; Tools</span>
+                <button type="button" class="intel-open-all" id="toolsOpenAll"
+                  aria-label="Open all calendar and tool links in new tabs">&#10697; Open All</button>
+              </div>
+              <div class="tool-grid">
+                <a class="tool-card" href="https://www.marketwatch.com/economy-politics/calendar" target="_blank" rel="noopener">
+                  <div class="tool-card-top"><span class="tool-badge" style="background:rgba(0,227,150,0.14);color:var(--green)">ECON CALENDAR</span><span class="tool-arrow">&#8599;</span></div>
+                  <div class="tool-name">U.S. Economic Calendar</div>
+                  <div class="tool-src">marketwatch.com</div>
+                </a>
+                <a class="tool-card" href="https://www.marketwatch.com/tools/options-expiration-calendar" target="_blank" rel="noopener">
+                  <div class="tool-card-top"><span class="tool-badge" style="background:rgba(255,77,109,0.14);color:var(--red)">OPTIONS EXP</span><span class="tool-arrow">&#8599;</span></div>
+                  <div class="tool-name">Options Expiration Calendar</div>
+                  <div class="tool-src">marketwatch.com</div>
+                </a>
+                <a class="tool-card" href="https://www.timeanddate.com/moon/phases/" target="_blank" rel="noopener">
+                  <div class="tool-card-top"><span class="tool-badge" style="background:rgba(155,123,255,0.16);color:var(--purple)">MOON PHASES</span><span class="tool-arrow">&#8599;</span></div>
+                  <div class="tool-name">Moon Phase Calendar</div>
+                  <div class="tool-src">timeanddate.com</div>
+                </a>
+                <a class="tool-card" href="https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm" target="_blank" rel="noopener">
+                  <div class="tool-card-top"><span class="tool-badge" style="background:rgba(77,163,255,0.16);color:var(--blue)">FOMC</span><span class="tool-arrow">&#8599;</span></div>
+                  <div class="tool-name">FOMC Meeting Calendar</div>
+                  <div class="tool-src">federalreserve.gov</div>
+                </a>
+                <a class="tool-card" href="https://www.cnn.com/markets/fear-and-greed" target="_blank" rel="noopener">
+                  <div class="tool-card-top"><span class="tool-badge" style="background:rgba(245,197,66,0.16);color:var(--yellow)">FEAR &amp; GREED</span><span class="tool-arrow">&#8599;</span></div>
+                  <div class="tool-name">CNN Fear &amp; Greed Index</div>
+                  <div class="tool-src">cnn.com/markets</div>
+                </a>
               </div>
             </article>
 
@@ -273,6 +334,7 @@
 <script src="/assets/js/admin-key.js"></script>
 <script src="/assets/js/trading-sessions.js"></script>
 <script src="/assets/js/reporter-widgets.js"></script>
+<script src="/assets/js/tools.js"></script>
 <script src="/assets/js/reporter-market.js"></script>
 <script>
   /* ── Reporter ───────────────────────────────────────────── */
@@ -1493,12 +1555,30 @@
         });
     });
 
+    /* Deep links that used to point at Overview sections now point here. A
+       target inside the workspace needs its tab selected and its section
+       opened before scrolling, or the link lands on a hidden element. */
+    function openHashTarget() {
+      var id = decodeURIComponent((window.location.hash || '').slice(1));
+      if (!id) return;
+      var target = document.getElementById(id);
+      if (!target) return;
+      var workspace = document.getElementById('newsIntelligence');
+      if (workspace && workspace.contains(target)) setActiveTab(NEWS_TAB);
+      if (window.ReporterWidgets && window.ReporterWidgets.reveal) {
+        window.ReporterWidgets.reveal(id);
+      }
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    window.addEventListener('hashchange', openHashTarget);
+
     configurePageShell();
     // Before setActiveTab: init() creates the IntersectionObserver, and a scan
     // that runs without one mounts every panel on the spot.
     if (window.ReporterWidgets) window.ReporterWidgets.init();
     if (window.ReporterMarket) window.ReporterMarket.init();
     setActiveTab(activeTab);
+    openHashTarget();
 
     setInterval(renderGenBadge, 1000);
     renderDeskStatus(null);

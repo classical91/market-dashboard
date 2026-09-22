@@ -192,13 +192,22 @@ The four desk tabs are the generated reports, unchanged. **News Intelligence**
 is the workspace they are produced from, and is the default tab:
 
 ```text
-Live News        economic calendar + breaking top stories
-News Discovery   per-asset headlines + today's scheduled catalysts
-Market Reaction  compact strip — how assets responded
-Reporter Output  Master News + newsroom status/controls
-Latest Desks     the four desks, each opening its report tab
-Global Context   optional background, collapsed by default
+Live News            economic calendar + breaking top stories
+News Discovery       per-asset headlines + the newsroom's own wire
+Catalysts & Schedules macro calendar + Calendars & Tools
+Market Reaction      compact strip — how assets responded
+Reporter Output      Master News + newsroom status/controls
+Latest Desks         the four desks, each opening its report tab
+Global Context       optional background, collapsed by default
 ```
+
+The economic calendar, top stories, the macro calendar, News Pulse and
+Calendars & Tools used to sit on the Overview page. They are newsroom inputs,
+so they live here now, and Overview no longer carries them. The sidebar
+entries and the indicators glossary cross-references were repointed rather
+than dropped: `/reporter.html#economic-calendar`, `#top-stories`,
+`#news-pulse`, `#macro-calendar` and `#calendars-tools` each select the News
+tab, open the section if it is collapsed, and scroll to the panel.
 
 - **`news` is a UI tab, never a report section.** The backend still has exactly
   four sections. `news` is deliberately absent from `sectionOrder`, so it never
@@ -212,8 +221,8 @@ Global Context   optional background, collapsed by default
   Market Intel — not here. Heatmaps, the forex matrix, the rates board and the
   FRED macro charts stay defined in `reporter-widgets.js` so any page can
   declare one with `data-intel-widget`, but the Reporter mounts none of them.
-- **Own data first.** The reaction strip and the catalyst list share one
-  `/api/overview` call — the payload the Main Hub already renders — so Reporter
+- **Own data first.** The reaction strip, the catalyst list and News Pulse
+  share one `/api/overview` call — the payload the Main Hub already renders — so Reporter
   introduces no market API call of its own. The poll matches the hub's 90s
   cadence and is skipped while the tab is hidden. The session label is clock
   arithmetic from `public/assets/js/trading-sessions.js`, not a request. Rows

@@ -2,8 +2,8 @@
  * News Intelligence — market reaction and scheduled catalysts.
  *
  * A headline means more with a number next to it, so the newsroom carries a
- * compact reaction strip: how the major assets moved today, and which events
- * were already on the schedule. It is deliberately not a charting surface —
+ * compact reaction strip: how the major assets moved today, which events were
+ * already on the schedule, and the wire itself. It is deliberately not a charting surface —
  * "what should I trade?" is the Terminal Suite's and the screeners' job.
  *
  * Both read the dashboard's own /api/overview payload, the same one the Main
@@ -40,8 +40,9 @@
   ];
 
   var MAX_CATALYSTS = 8;
+  var MAX_HEADLINES = 12;
 
-  var state = { rows: {}, marketStatus: null, quality: null, calendar: [], updatedAt: null };
+  var state = { rows: {}, marketStatus: null, quality: null, calendar: [], news: [], updatedAt: null };
 
   function esc(value) {
     return String(value == null ? '' : value)
@@ -193,6 +194,42 @@
     }).join('');
   }
 
+  /* News Pulse — the newsroom's own wire, from MARKET_NEWS_URL when it is
+     configured. It moved here from the Overview page, which was showing the
+     same feed the newsroom actually needs. Same payload as the reaction strip
+     and the catalyst list, so it costs no extra request. */
+  function timeAgo(iso) {
+    var then = new Date(iso).getTime();
+    if (!Number.isFinite(then)) return '';
+    var minutes = Math.floor((Date.now() - then) / 60000);
+    if (minutes < 1) return 'just now';
+    if (minutes < 60) return minutes + 'm ago';
+    var hours = Math.floor(minutes / 60);
+    if (hours < 24) return hours + 'h ago';
+    return Math.floor(hours / 24) + 'd ago';
+  }
+
+  function renderNewsPulse() {
+    var el = doc.getElementById('newsFeed');
+    if (!el) return;
+
+    var items = (state.news || []).filter(function (item) { return item && item.title; });
+    if (!items.length) {
+      el.innerHTML = '<div class="intel-empty">No headlines yet — set MARKET_NEWS_URL for a live wire.</div>';
+      return;
+    }
+
+    el.innerHTML = items.slice(0, MAX_HEADLINES).map(function (item) {
+      var when = item.publishedAt ? timeAgo(item.publishedAt) : '';
+      var meta = '<span class="intel-feed-meta">' + esc(item.source || 'Unknown source') +
+        (when ? '<span>' + esc(when) + '</span>' : '') + '</span>';
+      var body = '<span class="intel-feed-title">' + esc(item.title) + '</span>' + meta;
+      if (!item.url) return '<div class="intel-feed-item">' + body + '</div>';
+      return '<a class="intel-feed-item" href="' + esc(item.url) + '" target="_blank" rel="noopener">' +
+        body + '</a>';
+    }).join('');
+  }
+
   function renderUnavailable(message) {
     var reaction = doc.getElementById('marketReaction');
     if (reaction && !reaction.dataset.loaded) {
@@ -201,6 +238,10 @@
     var catalysts = doc.getElementById('catalystList');
     if (catalysts && !catalysts.dataset.loaded) {
       catalysts.innerHTML = '<div class="intel-empty">Calendar unavailable — ' + esc(message) + '</div>';
+    }
+    var feed = doc.getElementById('newsFeed');
+    if (feed && !feed.dataset.loaded) {
+      feed.innerHTML = '<div class="intel-empty">Headlines unavailable — ' + esc(message) + '</div>';
     }
     renderQuality();
   }
@@ -224,15 +265,19 @@
         state.marketStatus = payload.marketStatus || null;
         state.quality = payload.dataQuality || null;
         state.calendar = Array.isArray(payload.calendar) ? payload.calendar : [];
+        state.news = Array.isArray(payload.news) ? payload.news : [];
         state.updatedAt = payload.updatedAt ? new Date(payload.updatedAt) : new Date();
 
         var reaction = doc.getElementById('marketReaction');
         var catalysts = doc.getElementById('catalystList');
         if (reaction) reaction.dataset.loaded = 'true';
         if (catalysts) catalysts.dataset.loaded = 'true';
+        var feed = doc.getElementById('newsFeed');
+        if (feed) feed.dataset.loaded = 'true';
 
         renderReaction();
         renderCatalysts();
+        renderNewsPulse();
         renderQuality();
       })
       .catch(function (error) {
@@ -241,7 +286,8 @@
   }
 
   function init() {
-    if (!doc.getElementById('marketReaction') && !doc.getElementById('catalystList')) return;
+    if (!doc.getElementById('marketReaction') && !doc.getElementById('catalystList') &&
+        !doc.getElementById('newsFeed')) return;
     load();
     global.setInterval(function () {
       // Nothing to repaint for a tab nobody is looking at.
