@@ -320,6 +320,16 @@ const config = {
     requestTimeoutMs: parseNumber(process.env.OPEN_INTEREST_REQUEST_TIMEOUT_MS, 8000),
     venueCooldownMs: parseNumber(process.env.OPEN_INTEREST_VENUE_COOLDOWN_MS, 5 * 60 * 1000),
   },
+  // Cross-Market Open Interest page. CFTC Public Reporting (Socrata) is free
+  // and keyless; CFTC_APP_TOKEN only raises the anonymous rate limit and is
+  // sent server-side.
+  crossMarketOi: {
+    baseUrl: process.env.CFTC_API_BASE_URL || "https://publicreporting.cftc.gov",
+    appToken: process.env.CFTC_APP_TOKEN || "",
+    cacheTtlMs: parseNumber(process.env.CROSS_MARKET_OI_CACHE_MS, 60 * 60 * 1000),
+    staleAfterDays: parseNumber(process.env.CROSS_MARKET_OI_STALE_AFTER_DAYS, 11),
+    requestTimeoutMs: parseNumber(process.env.CROSS_MARKET_OI_REQUEST_TIMEOUT_MS, 15000),
+  },
   // On-Chain Intelligence card on Overview. DefiLlama's free, keyless public
   // endpoints only — no paid provider and no API key.
   onchainIntelligence: {

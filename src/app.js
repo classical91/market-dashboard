@@ -29,6 +29,7 @@ const { createSignalScreenerRouter } = require("./routes/signal-screener");
 const { createDirectionalBiasRouter } = require("./routes/directional-bias");
 const { createLocalExtremesRouter } = require("./routes/local-extremes");
 const { createOpenInterestRouter } = require("./routes/open-interest");
+const { createCrossMarketOiRouter } = require("./routes/cross-market-oi");
 const { createScreenerSettingsRouter } = require("./routes/screener-settings");
 const { createStrategyEngineRouter } = require("./routes/strategy-engine");
 const { createTradingLabRouter } = require("./routes/trading-lab");
@@ -62,6 +63,8 @@ const { PatternScannerService } = require("./services/pattern-scanner");
 const { SignalScreenerService } = require("./services/signal-screener");
 const { OpenInterestService } = require("./services/open-interest/service");
 const { createProviders: createOpenInterestProviders } = require("./services/open-interest/providers");
+const { CrossMarketOiService } = require("./services/cross-market-oi/service");
+const { CftcCotProvider } = require("./services/cross-market-oi/cftc-provider");
 const { ScreenerSettingsService } = require("./services/screener-settings");
 const { UsdtDominanceService } = require("./services/usdt-dominance");
 const { StrategyEngineService } = require("./services/strategy-engine");
@@ -285,6 +288,20 @@ function createApp() {
     staleAfterMs: config.openInterest.staleAfterMs,
     venueCooldownMs: config.openInterest.venueCooldownMs,
   });
+  // Cross-Market Open Interest: weekly CFTC futures data. The last good
+  // report is kept on disk, so a CFTC outage or a restart still shows the
+  // most recent week, marked as cached.
+  const crossMarketOiService = new CrossMarketOiService({
+    provider: new CftcCotProvider({
+      baseUrl: config.crossMarketOi.baseUrl,
+      appToken: config.crossMarketOi.appToken,
+      timeoutMs: config.crossMarketOi.requestTimeoutMs,
+    }),
+    cache,
+    store: new PersistentReporterCache(path.join(dataDir, "cross-market-oi.json")),
+    cacheTtlMs: config.crossMarketOi.cacheTtlMs,
+    staleAfterDays: config.crossMarketOi.staleAfterDays,
+  });
   const usdtDominanceService = new UsdtDominanceService({ marketDataService, dataDir });
   const strategyEngineService = new StrategyEngineService({ signalScreenerService });
   const watchlistService = new WatchlistService({ dataDir });
@@ -506,6 +523,7 @@ function createApp() {
   );
   app.use("/api/local-extremes", createLocalExtremesRouter({ signalScreenerService, screenerSettingsService }));
   app.use("/api/open-interest", createOpenInterestRouter({ openInterestService }));
+  app.use("/api/cross-market-oi", createCrossMarketOiRouter({ crossMarketOiService }));
   // Settings owns the universes above. Reads are open like the screeners
   // themselves; writes take the browser-management guard (owner session or
   // admin key), the same one the X Intelligence registry uses.

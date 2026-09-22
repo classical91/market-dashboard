@@ -378,6 +378,16 @@ The Overview card reads `GET /api/onchain/intelligence`, which wraps DefiLlama's
 - **Missing and stale** - missing values are `null` and render `—`, never 0%. Totals and breadth report how many assets they cover. A row whose latest OI point is older than `OPEN_INTEREST_STALE_AFTER_MS` (default 45 min), or that is being served from the last good copy after a failed refresh, is marked STALE. `OPEN_INTEREST_CACHE_MS` (default 2 min) and `OPEN_INTEREST_REQUEST_TIMEOUT_MS` (default 8 s) tune caching and timeouts.
 - **Not available** - liquidations (no free keyless feed); the detail panel links out to CoinGlass instead.
 
+### Cross-Market Open Interest
+
+`/cross-market-oi.html` (sidebar: Market Intel Links → Market Intel → Cross-Market Open Interest) compares futures across indexes, FX, metals, energy, rates and crypto on one elliptical plot. It is separate from the crypto OI screener at `/open-interest.html`; both pages stay. It reads `GET /api/cross-market-oi?lookback=1w|4w`, served from `src/services/cross-market-oi/`.
+
+- **Source** - CFTC Commitments of Traders, Legacy Futures Only, from the CFTC Public Reporting API (`publicreporting.cftc.gov`, dataset `6dca-aqww`). Free and public domain; one request covers every market. Weekly only: positions as of Tuesday, published Friday. There is no free, licensed daily OI feed for CME/ICE/COMEX/NYMEX, so Daily is shown disabled.
+- **Metrics** - every row carries `metricType`. `OI` plots the % change in total open interest over 1 or 4 weekly reports; raw contract counts are never plotted across markets. `COT_NET_SPEC` plots net non-commercial (long − short) as a % of open interest. Neither claims to reproduce LuxAlgo's formula.
+- **Markets** - `src/config/cross-market-oi.js`, keyed by CFTC contract market code. The default comparison is the reference six (BTC CME, DXY ICE, Gold COMEX, Natural Gas NYMEX, E-mini S&P 500, E-mini Russell 2000); viewers choose 3–8 (kept in their browser) or a whole asset class. Quarterly contracts inside three weeks of a Mar/Jun/Sep/Dec expiry are flagged ROLL.
+- **Missing and stale** - a market absent from the report is `null` and leaves a gap in the shape, never 0. A report older than `CROSS_MARKET_OI_STALE_AFTER_DAYS` (default 11) is STALE. The last good report is saved to `DATA_DIR/cross-market-oi.json`; if the CFTC is unreachable the page shows it as CACHED.
+- `CFTC_API_BASE_URL`, `CFTC_APP_TOKEN` (optional Socrata app token for a higher rate limit; server-side only), `CROSS_MARKET_OI_CACHE_MS` (default 1 h), `CROSS_MARKET_OI_REQUEST_TIMEOUT_MS` (default 15 s).
+
 ### YouTube Intelligence
 
 `/youtube-v2.html` runs on a hybrid of the YouTube Data API v3 and YouTube's public RSS feeds. Per channel the service tries the API first (uploads plus live/upcoming state), falls back to RSS (uploads only, no key, but it needs a known `UC...` channel ID), and finally serves the last known good feed rather than blanking the page. It never scrapes `youtube.com/@handle` HTML — doing that is what used to break the page on Railway, where YouTube answers datacenter IPs with a consent interstitial instead of the channel document.
