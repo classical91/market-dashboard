@@ -486,12 +486,12 @@ body.crypto-bg {
 /* App content sits above the fixed decor layer. */
 .app { position: relative; z-index: 1; }
 
-/* ── Reporter intelligence — shared section + panel shell ─*/
-/* Every dashboard module on the page is one .intel-section with a collapsing
-   header and a body of .intel-panel cards, so a new module never needs its
-   own one-off layout CSS. Accent colour is set per section and inherited by
-   everything inside it. */
-.reporter-intel {
+/* ── News Intelligence — shared section + panel shell ────*/
+/* Every module in the News Intelligence tab is one .intel-section with a
+   collapsing header and a body of .intel-panel cards, so a new module never
+   needs its own one-off layout CSS. Accent colour is set per section and
+   inherited by everything inside it. */
+.news-intel {
   display: grid;
   /* minmax(0, ...) rather than a bare 1fr: an auto track is floored at the
      min-content width of its contents, and the market strip's non-wrapping
@@ -604,7 +604,7 @@ body.crypto-bg {
   text-align: right;
 }
 
-/* ── Reporter intelligence — third-party widget frames ────*/
+/* ── News Intelligence — third-party widget frames ───────*/
 /* The frame owns the height. The embed and every state render on top of it,
    so swapping a placeholder for a widget never moves the page. */
 .intel-widget {
@@ -673,12 +673,12 @@ body.crypto-bg {
 .intel-widget-retry:focus-visible,
 .intel-widget-source:focus-visible { outline: 2px solid var(--intel-accent); outline-offset: 2px; }
 
-/* ── Reporter intelligence — responsive ───────────────────*/
+/* ── News Intelligence — responsive ──────────────────────*/
 @media (max-width: 1100px) {
   .intel-grid--2 { grid-template-columns: 1fr; }
 }
 @media (max-width: 620px) {
-  .reporter-intel { gap: 18px; }
+  .news-intel { gap: 18px; }
   .intel-widget { height: var(--intel-widget-h-sm, var(--intel-widget-h, 340px)); }
   .intel-section-header { gap: 10px; padding: 10px 12px; }
   .intel-section-note { display: none; }
@@ -686,288 +686,13 @@ body.crypto-bg {
   .intel-panel-note { display: none; }
 }
 
-/* ── Reporter intelligence — market status strip ──────────*/
-/* Compact pills, not widgets: the top of the page should read in a glance
-   and cost nothing but the /api/overview call the hub already makes. */
-.intel-status-strip {
-  align-items: center;
-  min-width: 0;
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.012)),
-    var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 18px;
-  justify-content: space-between;
-  padding: 11px 15px;
-}
-.intel-strip-rail,
-.intel-strip-meta {
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 14px;
-  min-width: 0;
-}
-.intel-strip-empty { color: var(--muted); font-size: 12px; }
-
-.intel-pill {
-  align-items: baseline;
-  border-radius: 9px;
-  display: inline-flex;
-  gap: 7px;
-  white-space: nowrap;
-}
-.intel-pill-label {
-  color: var(--muted);
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-}
-.intel-pill-value {
-  color: var(--text);
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
-  font-weight: 800;
-}
-.intel-pill-change {
-  font-size: 11.5px;
-  font-variant-numeric: tabular-nums;
-  font-weight: 700;
-}
-.intel-pill-proxy,
-.intel-asset-proxy {
-  background: rgba(255,255,255,0.06);
-  border-radius: 5px;
-  color: var(--dim);
-  font-size: 8.5px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  padding: 1px 4px;
-  text-transform: uppercase;
-}
-.intel-pill--muted .intel-pill-value { color: var(--dim); font-weight: 700; }
-.intel-pill--regime,
-.intel-pill--session {
-  border: 1px solid var(--border);
-  padding: 4px 10px;
-}
-.intel-pill--regime.up   { background: var(--green-bg); border-color: rgba(0,227,150,0.28); }
-.intel-pill--regime.up   .intel-pill-value { color: var(--green); }
-.intel-pill--regime.down { background: var(--red-bg); border-color: rgba(255,77,109,0.28); }
-.intel-pill--regime.down .intel-pill-value { color: var(--red); }
-.intel-pill--session.open .intel-pill-value { color: var(--green); }
-
-.intel-quality {
-  color: var(--dim);
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  margin: 7px 2px 0;
-}
-.intel-quality--live { color: var(--green); }
-.intel-quality--partial { color: var(--amber); }
-.intel-quality--fallback { color: var(--muted); }
-
-.up   { color: var(--green); }
-.down { color: var(--red); }
-.flat { color: var(--muted); }
-
-/* ── Reporter intelligence — cross-asset monitor ──────────*/
-.intel-asset-grid {
-  display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-}
-.intel-asset {
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.01)),
-    var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 13px;
-  display: grid;
-  gap: 2px;
-  padding: 12px 13px 11px;
-}
-.intel-asset.up   { border-color: rgba(0,227,150,0.24); }
-.intel-asset.down { border-color: rgba(255,77,109,0.24); }
-.intel-asset-symbol {
-  align-items: center;
-  color: var(--text);
-  display: flex;
-  font-size: 12px;
-  font-weight: 800;
-  gap: 6px;
-  letter-spacing: 0.08em;
-}
-.intel-asset-name {
-  color: var(--muted);
-  font-size: 10.5px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.intel-asset-value {
-  color: var(--text);
-  font-size: 18px;
-  font-variant-numeric: tabular-nums;
-  font-weight: 800;
-  margin-top: 5px;
-}
-.intel-asset-change {
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-  font-weight: 700;
-}
-.intel-asset-bar {
-  background: rgba(255,255,255,0.06);
-  border-radius: 99px;
-  height: 3px;
-  margin-top: 8px;
-  overflow: hidden;
-}
-.intel-asset-bar-fill {
-  background: var(--muted);
-  display: block;
-  height: 100%;
-  transition: width 0.3s ease;
-}
-.intel-asset.up   .intel-asset-bar-fill { background: var(--green); }
-.intel-asset.down .intel-asset-bar-fill { background: var(--red); }
-.intel-asset--empty .intel-asset-value { color: var(--dim); font-size: 13px; font-weight: 700; }
-.intel-asset-hint { color: var(--dim); font-size: 9.5px; line-height: 1.4; margin-top: 4px; }
-
-.intel-empty {
-  color: var(--muted);
-  font-size: 12px;
-  grid-column: 1 / -1;
-  padding: 18px 4px;
-}
-
-@media (max-width: 620px) {
-  .intel-status-strip { gap: 8px 12px; padding: 10px 12px; }
-  /* The strip is the one thing allowed to scroll sideways on a phone —
-     everything else on the page wraps. */
-  .intel-strip-rail {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
-  }
-  .intel-strip-rail::-webkit-scrollbar { display: none; }
-  .intel-asset-grid { grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); }
-  .intel-asset-value { font-size: 16px; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .intel-asset-bar-fill { transition: none; }
-}
-
-/* ── Reporter intelligence — macro data tabs ──────────────*/
-.intel-macro {
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.012)),
-    var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 15px;
-  padding: 13px;
-}
-.intel-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-  margin-bottom: 13px;
-}
-.intel-tab {
-  background: rgba(255,255,255,0.04);
-  border: 1px solid var(--border);
-  border-radius: 11px;
-  color: var(--muted);
-  cursor: pointer;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 700;
-  padding: 8px 16px;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
-}
-.intel-tab:hover { background: rgba(255,255,255,0.08); color: var(--soft); }
-.intel-tab.active {
-  background: var(--intel-accent-bg);
-  border-color: var(--intel-accent);
-  color: var(--text);
-}
-.intel-tab:focus-visible { outline: 2px solid var(--intel-accent); outline-offset: 2px; }
-
-.intel-macro-grid {
-  display: grid;
-  gap: 11px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-.intel-macro-card {
-  background: rgba(255,255,255,0.02);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  min-width: 0;
-  overflow: hidden;
-}
-.intel-macro-card-head {
-  align-items: baseline;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 10px;
-  padding: 10px 12px 8px;
-}
-.intel-macro-card-title {
-  color: var(--text);
-  font-size: 12px;
-  font-weight: 800;
-}
-.intel-macro-card-note {
-  color: var(--muted);
-  font-size: 10px;
-  margin-left: auto;
-  text-align: right;
-}
-.intel-macro-footnote {
-  color: var(--dim);
-  font-size: 10.5px;
-  line-height: 1.5;
-  margin-top: 11px;
-}
-
-@media (max-width: 760px) {
-  .intel-macro-grid { grid-template-columns: 1fr; }
-  .intel-macro-card-note { display: none; }
-}
-
-/* ── Reporter intelligence — AI Newsroom shell + operations ─*/
+/* ── News Intelligence — newsroom shell + operations ─────*/
 /* The newsroom keeps the dashboard's section language so it reads as part of
    the same page, but its header does not collapse: there is nothing below it
    to lazy-load, and hiding the desks is not a thing anyone wants. */
 .intel-section-header--static { cursor: default; }
 .intel-section-header--static:hover { background: var(--surface2); border-color: var(--border); }
 .intel-section--static .intel-section-note { margin-left: auto; }
-
-.intel-strip-footer {
-  align-items: baseline;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 14px;
-  justify-content: space-between;
-  margin: 7px 2px 0;
-}
-.intel-strip-footer .intel-quality { margin: 0; }
-.intel-jump {
-  color: var(--muted);
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-decoration: none;
-}
-.intel-jump:hover { color: var(--blue); }
-.intel-jump:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 
 .shareclaw-subtitle {
   color: var(--muted);
@@ -994,4 +719,185 @@ body.crypto-bg {
   .shareclaw-panel .shareclaw-note,
   .shareclaw-panel .shareclaw-message,
   .shareclaw-panel .reporter-broadcast-status { grid-column: 1 / -1; }
+}
+
+/* ── News Intelligence — market reaction strip ────────────*/
+/* Deliberately small: enough to put a number beside a headline, not another
+   charting surface. "What should I trade?" belongs on the screener pages. */
+.intel-reaction { min-width: 0; }
+.intel-react-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+}
+.intel-react {
+  align-items: baseline;
+  background: rgba(255,255,255,0.025);
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--dim);
+  border-radius: 10px;
+  display: grid;
+  gap: 1px;
+  padding: 9px 11px;
+}
+.intel-react.up { border-left-color: var(--green); }
+.intel-react.down { border-left-color: var(--red); }
+.intel-react-label {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  font-size: 10px;
+  font-weight: 800;
+  gap: 5px;
+  letter-spacing: 0.08em;
+}
+.intel-react-value {
+  color: var(--text);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+.intel-react-change {
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+.intel-react-proxy {
+  background: rgba(255,255,255,0.06);
+  border-radius: 5px;
+  color: var(--dim);
+  font-size: 8px;
+  letter-spacing: 0.05em;
+  padding: 1px 4px;
+}
+.intel-react--empty .intel-react-value { color: var(--dim); font-size: 13px; }
+.intel-react--empty .intel-react-change { font-size: 9.5px; text-transform: uppercase; }
+
+.intel-react-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-top: 11px;
+}
+.intel-react-meta-item { color: var(--muted); font-size: 11px; }
+.intel-react-meta-item strong { color: var(--soft); font-weight: 800; letter-spacing: 0.06em; }
+.intel-react-meta-item.up strong { color: var(--green); }
+.intel-react-meta-item.down strong { color: var(--red); }
+.intel-reaction-footer { margin-top: 9px; }
+
+.intel-quality {
+  color: var(--dim);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.intel-quality--live { color: var(--green); }
+.intel-quality--partial { color: var(--amber); }
+.intel-quality--fallback { color: var(--muted); }
+
+.up   { color: var(--green); }
+.down { color: var(--red); }
+.flat { color: var(--muted); }
+
+.intel-empty { color: var(--muted); font-size: 12px; padding: 16px 2px; }
+
+/* ── News Intelligence — symbol chips ─────────────────────*/
+.intel-chip-row {
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 9px 12px;
+}
+.intel-chip {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  padding: 4px 10px;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.intel-chip:hover { background: rgba(255,255,255,0.08); color: var(--soft); }
+.intel-chip.active {
+  background: var(--intel-accent-bg);
+  border-color: var(--intel-accent);
+  color: var(--text);
+}
+.intel-chip:focus-visible { outline: 2px solid var(--intel-accent); outline-offset: 2px; }
+
+/* ── News Intelligence — catalysts ────────────────────────*/
+.intel-catalysts {
+  display: grid;
+  flex: 1 1 auto;
+  gap: 1px;
+  padding: 6px 6px 0;
+}
+.intel-catalyst {
+  align-items: center;
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 52px minmax(0, 1fr) auto;
+  padding: 8px 8px;
+}
+.intel-catalyst:nth-child(odd) { background: rgba(255,255,255,0.018); }
+.intel-catalyst-time {
+  color: var(--soft);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+/* A fallback calendar has no confirmed clock time; the tilde says so rather
+   than presenting a scheduled slot as a release time. */
+.intel-catalyst-time.approx { color: var(--dim); font-weight: 700; }
+.intel-catalyst-title {
+  color: var(--text);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.intel-catalyst-impact {
+  border-radius: 6px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  padding: 2px 7px;
+  text-transform: uppercase;
+}
+.intel-catalyst-impact.high { background: var(--red-bg); color: var(--red); }
+.intel-catalyst-impact.medium { background: var(--amber-bg); color: var(--amber); }
+.intel-catalyst-impact.low { background: rgba(255,255,255,0.05); color: var(--muted); }
+
+.intel-catalyst-links {
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 10px;
+  padding: 10px 14px;
+}
+.intel-catalyst-links a {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+}
+.intel-catalyst-links a:hover { color: var(--blue); }
+.intel-catalyst-links a:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+/* ── News Intelligence — desk list in the workspace ───────*/
+.newsroom-main--desks { padding: 4px 18px 8px; }
+.newsroom-main--desks .desk-status-list { margin-top: 0; }
+
+@media (max-width: 620px) {
+  .intel-react-grid { grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); }
+  .intel-react-value { font-size: 14px; }
+  .intel-catalyst { grid-template-columns: 46px minmax(0, 1fr) auto; }
+  .intel-catalyst-title { white-space: normal; }
 }

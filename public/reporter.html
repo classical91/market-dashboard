@@ -16,38 +16,41 @@
     <div class="cmd-page-header">
       <div>
         <div class="cmd-page-title" id="reporterPageTitle">📰 Reporter Room</div>
-        <div class="cmd-page-subtitle" id="reporterPageSubtitle">Newsroom archive, monitoring and manual control</div>
+        <div class="cmd-page-subtitle" id="reporterPageSubtitle">News gathering, intelligence, AI reports and newsroom operations</div>
       </div>
     </div>
 
-    <!-- ── Reporter Intelligence ─────────────────────────────
-         Market context above the AI synthesis: what is happening now,
-         then where markets are moving, then what the desks made of it.
+    <!-- Tabs — News Intelligence is the newsroom's workspace; the other four
+         are the generated desk reports and are unchanged. "news" is a UI tab
+         only: it is never a report section, so it never reaches
+         REPORT_SECTIONS, generation, broadcast routing or the logs. -->
+    <div class="reporter-tabs" id="reporterTabs">
+      <button class="reporter-tab active" data-tab="news">📰 News Intelligence</button>
+      <button class="reporter-tab" data-tab="geopolitics">🌍 Geopolitics</button>
+      <button class="reporter-tab" data-tab="economics">🏦 Economics</button>
+      <button class="reporter-tab" data-tab="markets">📈 Stocks</button>
+      <button class="reporter-tab" data-tab="crypto">₿ Crypto</button>
+    </div>
+
+    <div class="reporter-link-row" id="reporterExternalLinks"></div>
+
+    <!-- ── News Intelligence workspace ───────────────────────
+         Raw news -> market reaction -> what the desks made of it.
          Removed entirely on the fixed desk pages (see configurePageShell).
     -->
-    <div class="reporter-intel" id="reporterIntel">
+    <div class="news-intel" id="newsIntelligence">
 
-      <div class="intel-status-strip" id="intelStatusStrip" aria-label="Market status" aria-live="polite">
-        <div class="intel-strip-empty">Reading market context&hellip;</div>
-      </div>
-      <div class="intel-strip-footer">
-        <span class="intel-quality" id="intelDataQuality" aria-live="polite"></span>
-        <a class="intel-jump" href="#newsroomSection">Skip to AI Newsroom ↓</a>
-      </div>
-
-
-      <section class="intel-section" aria-label="Live Intelligence" data-intel-section="live-intelligence" data-intel-accent="purple">
+      <section class="intel-section" aria-label="Live News" data-intel-section="live-news" data-intel-accent="purple">
         <button class="intel-section-header" type="button" aria-expanded="true">
           <span>
-            <span class="intel-section-title">📰 Live Intelligence</span>
-            <span class="intel-section-sub">Scheduled events and breaking market news</span>
+            <span class="intel-section-title">📰 Live News</span>
+            <span class="intel-section-sub">What is scheduled, and what just broke</span>
           </span>
           <span class="intel-section-note">Provider refreshed</span>
           <span class="intel-section-chevron" aria-hidden="true">▾</span>
         </button>
         <div class="intel-section-body">
           <div class="intel-grid intel-grid--2">
-
             <article class="intel-panel">
               <div class="intel-panel-head">
                 <span class="intel-panel-title">Economic Calendar</span>
@@ -56,7 +59,6 @@
               <div class="intel-widget" data-intel-widget="economicCalendar"
                    style="--intel-widget-h:420px;--intel-widget-h-sm:360px"></div>
             </article>
-
             <article class="intel-panel">
               <div class="intel-panel-head">
                 <span class="intel-panel-title">Top Stories</span>
@@ -65,16 +67,15 @@
               <div class="intel-widget" data-intel-widget="topStories"
                    style="--intel-widget-h:420px;--intel-widget-h-sm:360px"></div>
             </article>
-
           </div>
         </div>
       </section>
 
-      <section class="intel-section" aria-label="Global Macro" data-intel-section="global-macro" data-intel-accent="blue">
+      <section class="intel-section" aria-label="News Discovery" data-intel-section="news-discovery" data-intel-accent="blue">
         <button class="intel-section-header" type="button" aria-expanded="true">
           <span>
-            <span class="intel-section-title">🌍 Global Macro</span>
-            <span class="intel-section-sub">Which regions are leading and which are lagging</span>
+            <span class="intel-section-title">🔎 News Discovery</span>
+            <span class="intel-section-sub">Headlines per asset, and the catalysts already on the schedule</span>
           </span>
           <span class="intel-section-note">Provider refreshed</span>
           <span class="intel-section-chevron" aria-hidden="true">▾</span>
@@ -82,382 +83,182 @@
         <div class="intel-section-body">
           <div class="intel-grid intel-grid--2">
 
-            <article class="intel-panel">
+            <article class="intel-panel" data-intel-symbol-switch="market-news">
               <div class="intel-panel-head">
-                <span class="intel-panel-title">World Markets</span>
-                <span class="intel-panel-note">Americas · Europe · Asia-Pacific</span>
+                <span class="intel-panel-title">Market News</span>
+                <span class="intel-panel-note">Headlines for one asset at a time</span>
               </div>
-              <div class="intel-widget" data-intel-widget="worldMarkets"
-                   style="--intel-widget-h:430px;--intel-widget-h-sm:380px"></div>
+              <div class="intel-chip-row" role="group" aria-label="Asset to show headlines for">
+                <button class="intel-chip" type="button" data-intel-symbol-option="AMEX:SPY">SPY</button>
+                <button class="intel-chip" type="button" data-intel-symbol-option="NASDAQ:QQQ">QQQ</button>
+                <button class="intel-chip" type="button" data-intel-symbol-option="BINANCE:BTCUSDT">BTC</button>
+                <button class="intel-chip" type="button" data-intel-symbol-option="BINANCE:ETHUSDT">ETH</button>
+                <button class="intel-chip" type="button" data-intel-symbol-option="TVC:DXY">DXY</button>
+                <button class="intel-chip" type="button" data-intel-symbol-option="TVC:GOLD">Gold</button>
+                <button class="intel-chip" type="button" data-intel-symbol-option="TVC:USOIL">Oil</button>
+                <button class="intel-chip" type="button" data-intel-symbol-option="TVC:US10Y">US10Y</button>
+              </div>
+              <div class="intel-widget" data-intel-widget="symbolNews"
+                   data-intel-symbol="AMEX:SPY" style="--intel-widget-h:360px;--intel-widget-h-sm:330px"></div>
             </article>
 
             <article class="intel-panel">
               <div class="intel-panel-head">
-                <span class="intel-panel-title">Global Equity Map</span>
-                <span class="intel-panel-note">World equities by country</span>
+                <span class="intel-panel-title">Catalysts &amp; Earnings</span>
+                <span class="intel-panel-note">Today's scheduled events</span>
               </div>
-              <div class="intel-widget" data-intel-widget="globalEquityMap"
-                   style="--intel-widget-h:430px;--intel-widget-h-sm:380px"></div>
+              <div class="intel-catalysts" id="catalystList">
+                <div class="intel-empty">Loading scheduled catalysts&hellip;</div>
+              </div>
+              <div class="intel-catalyst-links">
+                <a href="https://www.tradingview.com/markets/stocks-usa/earnings/" target="_blank" rel="noopener">Earnings calendar ↗</a>
+                <a href="https://www.nasdaq.com/market-activity/earnings" target="_blank" rel="noopener">Nasdaq earnings ↗</a>
+              </div>
             </article>
 
           </div>
         </div>
       </section>
 
-      <section class="intel-section" aria-label="Cross-Asset Monitor" data-intel-section="cross-asset" data-intel-accent="teal">
+      <section class="intel-section" aria-label="Market Reaction" data-intel-section="market-reaction" data-intel-accent="teal">
         <button class="intel-section-header" type="button" aria-expanded="true">
           <span>
-            <span class="intel-section-title">📊 Cross-Asset Monitor</span>
-            <span class="intel-section-sub">Where the major asset classes are moving today</span>
+            <span class="intel-section-title">📊 Market Reaction</span>
+            <span class="intel-section-sub">How assets are responding, so a headline lands with a number on it</span>
           </span>
           <span class="intel-section-note">Live · 90s</span>
           <span class="intel-section-chevron" aria-hidden="true">▾</span>
         </button>
         <div class="intel-section-body">
-          <div class="intel-asset-grid" id="crossAssetGrid">
-            <div class="intel-empty">Loading cross-asset prices&hellip;</div>
+          <div class="intel-reaction" id="marketReaction" aria-live="polite">
+            <div class="intel-empty">Loading market reaction&hellip;</div>
+          </div>
+          <div class="intel-reaction-footer">
+            <span class="intel-quality" id="intelDataQuality" aria-live="polite"></span>
           </div>
         </div>
       </section>
 
-      <section class="intel-section" aria-label="Market Breadth" data-intel-section="market-breadth" data-intel-accent="teal">
-        <button class="intel-section-header" type="button" aria-expanded="true">
+      <section class="intel-section intel-section--static" aria-label="Reporter output" data-intel-accent="amber">
+        <div class="intel-section-header intel-section-header--static">
           <span>
-            <span class="intel-section-title">🧭 Market Breadth</span>
-            <span class="intel-section-sub">Is the move broad, or is a handful of names carrying it?</span>
+            <span class="intel-section-title">🔥 Reporter Output</span>
+            <span class="intel-section-sub">The most important stories across all four desks</span>
           </span>
-          <span class="intel-section-note">Provider refreshed</span>
-          <span class="intel-section-chevron" aria-hidden="true">▾</span>
-        </button>
+          <span class="intel-section-note">Read-only on load</span>
+        </div>
         <div class="intel-section-body">
-          <div class="intel-grid intel-grid--2">
-
-            <article class="intel-panel">
-              <div class="intel-panel-head">
-                <span class="intel-panel-title">US Equities by Sector</span>
-                <span class="intel-panel-note">S&amp;P 500</span>
+          <section class="newsroom-overview" id="newsroomOverview" aria-label="Master News and newsroom operations">
+            <div class="newsroom-main">
+            <div class="master-news">
+              <div class="master-news-head">
+                <div class="master-news-title"><span>🔥</span> Master News</div>
+                <div class="master-toggle" aria-label="Master News story count">
+                  <button class="active" type="button" data-master-limit="5">Top 5</button>
+                  <button type="button" data-master-limit="10">Top 10</button>
+                </div>
               </div>
-              <div class="intel-widget" data-intel-widget="sectorHeatmap"
-                   style="--intel-widget-h:440px;--intel-widget-h-sm:380px"></div>
-            </article>
+              <div class="master-news-list" id="masterNewsList"></div>
+            </div>
+            </div>
 
-            <article class="intel-panel">
-              <div class="intel-panel-head">
-                <span class="intel-panel-title">ETFs by Asset Class</span>
-                <span class="intel-panel-note">Equity · bonds · commodities · EM</span>
+          <aside class="shareclaw-panel" aria-label="Newsroom status and controls">
+            <div class="shareclaw-head">
+              <div>
+                <div class="shareclaw-title">Newsroom Status</div>
+                <div class="shareclaw-subtitle">ShareClaw operations</div>
               </div>
-              <div class="intel-widget" data-intel-widget="etfHeatmap"
-                   style="--intel-widget-h:440px;--intel-widget-h-sm:380px"></div>
-            </article>
-
-          </div>
+              <div class="shareclaw-state" id="shareclawState"><span class="shareclaw-dot"></span><span>Checking</span></div>
+            </div>
+            <div class="shareclaw-times">
+              <div class="shareclaw-time"><span>Last run</span><strong id="shareclawLastRun">—</strong></div>
+              <div class="shareclaw-time"><span>Next run</span><strong id="shareclawNextRun">—</strong></div>
+            </div>
+            <div class="shareclaw-metrics">
+              <div class="shareclaw-metric"><div class="shareclaw-metric-value" id="metricSources">—</div><div class="shareclaw-metric-label">Cited sources</div></div>
+              <div class="shareclaw-metric"><div class="shareclaw-metric-value" id="metricCandidates">0</div><div class="shareclaw-metric-label">Candidates</div></div>
+              <div class="shareclaw-metric"><div class="shareclaw-metric-value" id="metricDuplicates">0</div><div class="shareclaw-metric-label">Duplicates removed</div></div>
+              <div class="shareclaw-metric"><div class="shareclaw-metric-value" id="metricStories">0</div><div class="shareclaw-metric-label">Final stories</div></div>
+              <div class="shareclaw-metric"><div class="shareclaw-metric-value" id="metricDesks">0/4</div><div class="shareclaw-metric-label">Desks ready</div></div>
+              <div class="shareclaw-metric"><div class="shareclaw-metric-value" id="metricCycles">0</div><div class="shareclaw-metric-label">Runs tracked</div></div>
+            </div>
+            <div class="shareclaw-actions">
+              <button class="open-all-btn shareclaw-run" id="shareclawRunBtn" type="button">⚡ Run Now</button>
+              <button class="open-all-btn shareclaw-run" id="reporterBroadcastBtn" type="button" disabled>📣 Broadcast</button>
+            </div>
+            <div class="shareclaw-note">Run Now generates and saves all desks; it never broadcasts. Broadcast sends the saved desks to Telegram.</div>
+            <div class="shareclaw-message" id="shareclawMessage" aria-live="polite"></div>
+            <div class="reporter-broadcast-status" id="reporterBroadcastStatus" style="display:none"></div>
+          </aside>
+          </section>
         </div>
       </section>
 
-      <section class="intel-section" aria-label="FX and Rates" data-intel-section="fx-rates" data-intel-accent="blue">
-        <button class="intel-section-header" type="button" aria-expanded="true">
+      <section class="intel-section intel-section--static" aria-label="Latest reporter desks" data-intel-accent="amber">
+        <div class="intel-section-header intel-section-header--static">
           <span>
-            <span class="intel-section-title">💱 FX &amp; Rates</span>
-            <span class="intel-section-sub">Dollar direction, the curve, and where funding is going</span>
+            <span class="intel-section-title">🗞️ Latest Reporter Desks</span>
+            <span class="intel-section-sub">Open a desk to read its generated report</span>
           </span>
-          <span class="intel-section-note">Provider refreshed</span>
-          <span class="intel-section-chevron" aria-hidden="true">▾</span>
-        </button>
+        </div>
         <div class="intel-section-body">
-          <div class="intel-grid intel-grid--2">
-
-            <article class="intel-panel">
-              <div class="intel-panel-head">
-                <span class="intel-panel-title">Forex Heatmap</span>
-                <span class="intel-panel-note">USD · EUR · GBP · JPY · CHF · CAD · AUD · NZD</span>
-              </div>
-              <div class="intel-widget" data-intel-widget="forexHeatmap"
-                   style="--intel-widget-h:420px;--intel-widget-h-sm:400px"></div>
-            </article>
-
-            <article class="intel-panel">
-              <div class="intel-panel-head">
-                <span class="intel-panel-title">Rates Monitor</span>
-                <span class="intel-panel-note">US curve · 2s10s · global 10Y</span>
-              </div>
-              <div class="intel-widget" data-intel-widget="ratesMonitor"
-                   style="--intel-widget-h:420px;--intel-widget-h-sm:400px"></div>
-            </article>
-
-          </div>
-        </div>
-      </section>
-
-      <section class="intel-section" aria-label="Macro Data" data-intel-section="macro-data" data-intel-accent="amber">
-        <button class="intel-section-header" type="button" aria-expanded="true">
-          <span>
-            <span class="intel-section-title">📉 Macro Data</span>
-            <span class="intel-section-sub">The conditions every desk is writing against</span>
-          </span>
-          <span class="intel-section-note">FRED · monthly</span>
-          <span class="intel-section-chevron" aria-hidden="true">▾</span>
-        </button>
-        <div class="intel-section-body">
-          <div class="intel-macro" data-intel-tabs="macro-data">
-            <div class="intel-tabs" role="tablist" aria-label="Macro data category">
-            <button class="intel-tab" type="button" role="tab" data-intel-tab="inflation"
-                    aria-selected="true" aria-controls="macro-panel-inflation">Inflation</button>
-            <button class="intel-tab" type="button" role="tab" data-intel-tab="labor"
-                    aria-selected="false" aria-controls="macro-panel-labor">Labor</button>
-            <button class="intel-tab" type="button" role="tab" data-intel-tab="rates"
-                    aria-selected="false" aria-controls="macro-panel-rates">Rates</button>
-            <button class="intel-tab" type="button" role="tab" data-intel-tab="liquidity"
-                    aria-selected="false" aria-controls="macro-panel-liquidity">Liquidity</button>
-            </div>
-          <div class="intel-macro-panel" role="tabpanel" id="macro-panel-inflation"
-               data-intel-tab-panel="inflation" aria-label="Inflation" hidden>
-            <div class="intel-macro-grid">
-              <article class="intel-macro-card">
-                <div class="intel-macro-card-head">
-                  <span class="intel-macro-card-title">CPI index</span>
-                  <span class="intel-macro-card-note">Headline consumer price index</span>
-                </div>
-                <div class="intel-widget" data-intel-widget="macroChart"
-                     data-intel-symbol="FRED:CPIAUCSL" style="--intel-widget-h:190px"></div>
-              </article>
-              <article class="intel-macro-card">
-                <div class="intel-macro-card-head">
-                  <span class="intel-macro-card-title">Core CPI index</span>
-                  <span class="intel-macro-card-note">Ex food and energy</span>
-                </div>
-                <div class="intel-widget" data-intel-widget="macroChart"
-                     data-intel-symbol="FRED:CPILFESL" style="--intel-widget-h:190px"></div>
-              </article>
-              <article class="intel-macro-card">
-                <div class="intel-macro-card-head">
-                  <span class="intel-macro-card-title">10Y breakeven</span>
-                  <span class="intel-macro-card-note">Market-implied 10Y inflation</span>
-                </div>
-                <div class="intel-widget" data-intel-widget="macroChart"
-                     data-intel-symbol="FRED:T10YIE" style="--intel-widget-h:190px"></div>
-              </article>
-              <article class="intel-macro-card">
-                <div class="intel-macro-card-head">
-                  <span class="intel-macro-card-title">5Y5Y forward</span>
-                  <span class="intel-macro-card-note">Market-implied forward inflation</span>
-                </div>
-                <div class="intel-widget" data-intel-widget="macroChart"
-                     data-intel-symbol="FRED:T5YIFR" style="--intel-widget-h:190px"></div>
-              </article>
-            </div>
-          </div>
-          <div class="intel-macro-panel" role="tabpanel" id="macro-panel-labor"
-               data-intel-tab-panel="labor" aria-label="Labor" hidden>
-            <div class="intel-macro-grid">
-              <article class="intel-macro-card">
-                <div class="intel-macro-card-head">
-                  <span class="intel-macro-card-title">Unemployment rate</span>
-                  <span class="intel-macro-card-note">Headline U-3, percent</span>
-                </div>
-                <div class="intel-widget" data-intel-widget="macroChart"
-                     data-intel-symbol="FRED:UNRATE" style="--intel-widget-h:190px"></div>
-              </article>
-              <article class="intel-macro-card">
-                <div class="intel-macro-card-head">
-                  <span class="intel-macro-card-title">Initial claims</span>
-                  <span class="intel-macro-card-note">Weekly, seasonally adjusted</span>
-                </div>
-                <div class="intel-widget" data-intel-widget="macroChart"
-                     data-intel-symbol="FRED:ICSA" style="--intel-widget-h:190px"></div>
-              </article>
-              <article class="intel-macro-card">
-                <div class="intel-macro-card-head">
-                  <span class="intel-macro-card-title">Nonfarm payrolls</span>
-                  <span class="intel-macro-card-note">Total employment level</span>
-                </div>
-                <div class="intel-widget" data-intel-widget="macroChart"
-                     data-intel-symbol="FRED:PAYEMS" style="--intel-widget-h:190px"></div>
-              </article>
-              <article class="intel-macro-card">
-                <div class="intel-macro-card-head">
-                  <span class="intel-macro-card-title">Participation rate</span>
-                  <span class="intel-macro-card-note">Civilian labor force, percent</span>
-                </div>
-                <div class="intel-widget" data-intel-widget="macroChart"
-                     data-intel-symbol="FRED:CIVPART" style="--intel-widget-h:190px"></div>
-              </article>
-            </div>
-          </div>
-          <div class="intel-macro-panel" role="tabpanel" id="macro-panel-rates"
-               data-intel-tab-panel="rates" aria-label="Rates" hidden>
-            <div class="intel-macro-grid">
-              <article class="intel-macro-card">
-                <div class="intel-macro-card-head">
-                  <span class="intel-macro-card-title">Fed funds rate</span>
-                  <span class="intel-macro-card-note">Effective policy rate</span>
-                </div>
-                <div class="intel-widget" data-intel-widget="macroChart"
-                     data-intel-symbol="FRED:FEDFUNDS" style="--intel-widget-h:190px"></div>
-              </article>
-              <article class="intel-macro-card">
-                <div class="intel-macro-card-head">
-                  <span class="intel-macro-card-title">US 2Y</span>
-                  <span class="intel-macro-card-note">Policy expectations</span>
-                </div>
-                <div class="intel-widget" data-intel-widget="macroChart"
-                     data-intel-symbol="TVC:US02Y" style="--intel-widget-h:190px"></div>
-              </article>
-              <article class="intel-macro-card">
-                <div class="intel-macro-card-head">
-                  <span class="intel-macro-card-title">US 10Y</span>
-                  <span class="intel-macro-card-note">Long-end benchmark</span>
-                </div>
-                <div class="intel-widget" data-intel-widget="macroChart"
-                     data-intel-symbol="TVC:US10Y" style="--intel-widget-h:190px"></div>
-              </article>
-              <article class="intel-macro-card">
-                <div class="intel-macro-card-head">
-                  <span class="intel-macro-card-title">2s10s spread</span>
-                  <span class="intel-macro-card-note">Curve slope, percentage points</span>
-                </div>
-                <div class="intel-widget" data-intel-widget="macroChart"
-                     data-intel-symbol="FRED:T10Y2Y" style="--intel-widget-h:190px"></div>
-              </article>
-            </div>
-          </div>
-          <div class="intel-macro-panel" role="tabpanel" id="macro-panel-liquidity"
-               data-intel-tab-panel="liquidity" aria-label="Liquidity" hidden>
-            <div class="intel-macro-grid">
-              <article class="intel-macro-card">
-                <div class="intel-macro-card-head">
-                  <span class="intel-macro-card-title">M2 money stock</span>
-                  <span class="intel-macro-card-note">Broad money supply</span>
-                </div>
-                <div class="intel-widget" data-intel-widget="macroChart"
-                     data-intel-symbol="FRED:M2SL" style="--intel-widget-h:190px"></div>
-              </article>
-              <article class="intel-macro-card">
-                <div class="intel-macro-card-head">
-                  <span class="intel-macro-card-title">Fed balance sheet</span>
-                  <span class="intel-macro-card-note">Total assets</span>
-                </div>
-                <div class="intel-widget" data-intel-widget="macroChart"
-                     data-intel-symbol="FRED:WALCL" style="--intel-widget-h:190px"></div>
-              </article>
-              <article class="intel-macro-card">
-                <div class="intel-macro-card-head">
-                  <span class="intel-macro-card-title">Financial conditions</span>
-                  <span class="intel-macro-card-note">Chicago Fed NFCI, 0 = average</span>
-                </div>
-                <div class="intel-widget" data-intel-widget="macroChart"
-                     data-intel-symbol="FRED:NFCI" style="--intel-widget-h:190px"></div>
-              </article>
-              <article class="intel-macro-card">
-                <div class="intel-macro-card-head">
-                  <span class="intel-macro-card-title">High yield spread</span>
-                  <span class="intel-macro-card-note">ICE BofA HY option-adjusted spread</span>
-                </div>
-                <div class="intel-widget" data-intel-widget="macroChart"
-                     data-intel-symbol="FRED:BAMLH0A0HYM2" style="--intel-widget-h:190px"></div>
-              </article>
-            </div>
-          </div>
-            <p class="intel-macro-footnote">
-              Series are shown as published: index levels are levels and rates are
-              rates, so a rising CPI index line is not the same statement as rising
-              year-over-year inflation. Breakevens carry the market's inflation rate.
-            </p>
-          </div>
-        </div>
-      </section>
-
-    </div>
-
-    <section class="intel-section intel-section--static" id="newsroomSection" aria-label="AI Newsroom" data-intel-accent="amber">
-      <div class="intel-section-header intel-section-header--static">
-        <span>
-          <span class="intel-section-title">🤖 AI Newsroom</span>
-          <span class="intel-section-sub">What the four desks made of the day</span>
-        </span>
-        <span class="intel-section-note">Read-only on load</span>
-      </div>
-      <div class="intel-section-body">
-
-    <section class="newsroom-overview" id="newsroomOverview" aria-label="Reporter Room overview">
-      <div class="newsroom-main">
-        <div class="newsroom-section-head">
-          <div>
-            <div class="newsroom-kicker">News desks</div>
-            <div class="newsroom-heading">Latest saved briefings</div>
-          </div>
-          <div class="newsroom-read-note">Read-only on page load<br>No AI generation</div>
-        </div>
+          <div class="newsroom-main newsroom-main--desks">
         <div class="desk-status-list" id="deskStatusList" aria-live="polite"></div>
-
-        <div class="master-news">
-          <div class="master-news-head">
-            <div class="master-news-title"><span>🔥</span> Master News</div>
-            <div class="master-toggle" aria-label="Master News story count">
-              <button class="active" type="button" data-master-limit="5">Top 5</button>
-              <button type="button" data-master-limit="10">Top 10</button>
-            </div>
           </div>
-          <div class="master-news-list" id="masterNewsList"></div>
         </div>
-      </div>
+      </section>
 
-      <aside class="shareclaw-panel" aria-label="Newsroom status and controls">
-        <div class="shareclaw-head">
-          <div>
-            <div class="shareclaw-title">Newsroom Status</div>
-            <div class="shareclaw-subtitle">ShareClaw operations</div>
+      <section class="intel-section" aria-label="Global context" data-intel-section="global-context"
+               data-intel-accent="blue" data-intel-collapsed="true">
+        <button class="intel-section-header" type="button" aria-expanded="false">
+          <span>
+            <span class="intel-section-title">🌍 Global Context</span>
+            <span class="intel-section-sub">Optional background for interpreting a story — closed by default</span>
+          </span>
+          <span class="intel-section-note">Loads when opened</span>
+          <span class="intel-section-chevron" aria-hidden="true">▾</span>
+        </button>
+        <div class="intel-section-body">
+          <div class="intel-grid intel-grid--2">
+            <article class="intel-panel">
+              <div class="intel-panel-head">
+                <span class="intel-panel-title">World Markets</span>
+                <span class="intel-panel-note">US · Europe · Asia · FX · Commodities · Crypto</span>
+              </div>
+              <div class="intel-widget" data-intel-widget="worldMarkets"
+                   style="--intel-widget-h:400px;--intel-widget-h-sm:360px"></div>
+            </article>
+            <article class="intel-panel">
+              <div class="intel-panel-head">
+                <span class="intel-panel-title">Economic Map</span>
+                <span class="intel-panel-note">World equities by country</span>
+              </div>
+              <div class="intel-widget" data-intel-widget="globalEquityMap"
+                   style="--intel-widget-h:400px;--intel-widget-h-sm:360px"></div>
+            </article>
           </div>
-          <div class="shareclaw-state" id="shareclawState"><span class="shareclaw-dot"></span><span>Checking</span></div>
         </div>
-        <div class="shareclaw-times">
-          <div class="shareclaw-time"><span>Last run</span><strong id="shareclawLastRun">—</strong></div>
-          <div class="shareclaw-time"><span>Next run</span><strong id="shareclawNextRun">—</strong></div>
-        </div>
-        <div class="shareclaw-metrics">
-          <div class="shareclaw-metric"><div class="shareclaw-metric-value" id="metricSources">—</div><div class="shareclaw-metric-label">Cited sources</div></div>
-          <div class="shareclaw-metric"><div class="shareclaw-metric-value" id="metricCandidates">0</div><div class="shareclaw-metric-label">Candidates</div></div>
-          <div class="shareclaw-metric"><div class="shareclaw-metric-value" id="metricDuplicates">0</div><div class="shareclaw-metric-label">Duplicates removed</div></div>
-          <div class="shareclaw-metric"><div class="shareclaw-metric-value" id="metricStories">0</div><div class="shareclaw-metric-label">Final stories</div></div>
-          <div class="shareclaw-metric"><div class="shareclaw-metric-value" id="metricDesks">0/4</div><div class="shareclaw-metric-label">Desks ready</div></div>
-          <div class="shareclaw-metric"><div class="shareclaw-metric-value" id="metricCycles">0</div><div class="shareclaw-metric-label">Runs tracked</div></div>
-        </div>
-        <div class="shareclaw-actions">
-          <button class="open-all-btn shareclaw-run" id="shareclawRunBtn" type="button">⚡ Run Now</button>
-          <button class="open-all-btn shareclaw-run" id="reporterBroadcastBtn" type="button" disabled>📣 Broadcast</button>
-        </div>
-        <div class="shareclaw-note">Run Now generates and saves all desks; it never broadcasts. Broadcast sends the saved desks to Telegram.</div>
-        <div class="shareclaw-message" id="shareclawMessage" aria-live="polite"></div>
-        <div class="reporter-broadcast-status" id="reporterBroadcastStatus" style="display:none"></div>
-      </aside>
-    </section>
+      </section>
 
-      </div>
-    </section>
-
-    <!-- Date + generated-at badges -->
-    <div class="reporter-header-row" id="reporterHeaderRow" style="display:none">
-      <div class="reporter-date-badge" id="reporterDate"></div>
-      <div class="reporter-gen-badge" id="reporterGen"></div>
-      <div class="reporter-actions" style="margin-left:auto">
-        <button class="open-all-btn reporter-generate-cta" id="reporterRegenBtn" type="button">&#9889; Regenerate</button>
-      </div>
     </div>
 
-    <!-- Tabs -->
-    <div class="reporter-tabs" id="reporterTabs">
-      <button class="reporter-tab active" data-tab="geopolitics">🌍 Geopolitics</button>
-      <button class="reporter-tab" data-tab="economics">🏦 Economics</button>
-      <button class="reporter-tab" data-tab="markets">📈 Stocks</button>
-      <button class="reporter-tab" data-tab="crypto">₿ Crypto</button>
-    </div>
+    <!-- ── Generated desk report ─────────────────────────────
+         Shown for geopolitics / economics / markets / crypto. Unchanged.
+    -->
+    <div id="reporterReport" hidden>
+      <div class="reporter-header-row" id="reporterHeaderRow" style="display:none">
+        <div class="reporter-date-badge" id="reporterDate"></div>
+        <div class="reporter-gen-badge" id="reporterGen"></div>
+        <div class="reporter-actions" style="margin-left:auto">
+          <button class="open-all-btn reporter-generate-cta" id="reporterRegenBtn" type="button">&#9889; Regenerate</button>
+        </div>
+      </div>
 
-    <div class="reporter-link-row" id="reporterExternalLinks"></div>
-
-    <!-- Content area -->
-    <div id="reporterContent">
-      <div class="reporter-loading">
-        <span class="spinner"></span>
-        Loading daily briefing&hellip;
+      <div id="reporterContent">
+        <div class="reporter-loading">
+          <span class="spinner"></span>
+          Loading daily briefing&hellip;
+        </div>
       </div>
     </div>
 
@@ -470,6 +271,9 @@
 
 <script src="/assets/js/sidebar.js"></script>
 <script src="/assets/js/admin-key.js"></script>
+<script src="/assets/js/trading-sessions.js"></script>
+<script src="/assets/js/reporter-widgets.js"></script>
+<script src="/assets/js/reporter-market.js"></script>
 <script>
   /* ── Reporter ───────────────────────────────────────────── */
   (function () {
@@ -484,20 +288,31 @@
       markets: '/markets-top-10.html'
     };
     var fixedSection = pageSections[window.location.pathname] || '';
-    var activeTab = fixedSection || 'geopolitics';
+    // NEWS_TAB is a workspace, not a desk. It is deliberately absent from
+    // sectionOrder, so it never reaches generation, broadcast routing, the
+    // generation log or Master News — the backend still has exactly four
+    // sections and this tab only brings them together.
+    var NEWS_TAB = 'news';
+    var activeTab = fixedSection || NEWS_TAB;
     var sectionOrder = ['geopolitics', 'economics', 'markets', 'crypto'];
+
+    function isReportTab(tab) {
+      return sectionOrder.indexOf(tab) !== -1;
+    }
     var masterLimit = 5;
     var reportData = null;
     var generationLogEntries = [];
     var localLogKey = 'reporterGenerationLog:v1';
     var localLogSynced = false;
     var tabLabels = {
+      news: 'News Intelligence',
       geopolitics: 'Geopolitics Top 10',
       economics: 'Economics Top 10',
       markets: 'Stocks Top 10',
       crypto: 'Crypto Top 10'
     };
     var deskMeta = {
+      news: { icon: '📰', short: 'News Intelligence' },
       geopolitics: { icon: '🌍', short: 'Geopolitics' },
       economics: { icon: '🏦', short: 'Economics' },
       markets: { icon: '📈', short: 'Stocks' },
@@ -834,15 +649,16 @@
 
     function configurePageShell() {
       if (!fixedSection) return;
-      var newsroom = document.getElementById('newsroomSection');
-      if (newsroom) newsroom.style.display = 'none';
-      var overview = document.getElementById('newsroomOverview');
-      if (overview) overview.style.display = 'none';
-      // Drop the dashboard rather than hiding it: a hidden widget still
-      // counts as declared, and these pages should fetch no third-party
-      // panels at all.
-      var intel = document.getElementById('reporterIntel');
-      if (intel && intel.parentNode) intel.parentNode.removeChild(intel);
+      // These pages are one fixed desk report. Drop the workspace rather than
+      // hiding it: a hidden widget still counts as declared, and they should
+      // fetch no third-party panels at all. Master News, the desk list and
+      // the newsroom controls live inside it and go with it.
+      var workspace = document.getElementById('newsIntelligence');
+      if (workspace && workspace.parentNode) workspace.parentNode.removeChild(workspace);
+      var newsTabBtn = document.querySelector('.reporter-tab[data-tab="news"]');
+      if (newsTabBtn && newsTabBtn.parentNode) newsTabBtn.parentNode.removeChild(newsTabBtn);
+      var report = document.getElementById('reporterReport');
+      if (report) report.hidden = false;
       document.title = tabLabels[fixedSection] + ' · Market Command';
       var title = document.getElementById('reporterPageTitle');
       var subtitle = document.getElementById('reporterPageSubtitle');
@@ -1201,11 +1017,13 @@
       syncBroadcastAvailability();
 
       renderLog(data.generationLog);
-      if (!data[activeTab] && data.latestSection) {
+      // Only a desk tab can be empty and want redirecting; News Intelligence
+      // has no report of its own and is never "missing" one.
+      if (isReportTab(activeTab) && !data[activeTab] && data.latestSection) {
         setActiveTab(data.latestSection);
         return;
       }
-      renderTab(activeTab);
+      if (isReportTab(activeTab)) renderTab(activeTab);
     }
 
     /* Read-only on page load — never triggers a generation. */
@@ -1233,10 +1051,15 @@
     var generating = false;
     function generateReport(sectionOverride) {
       if (generating) return;
+      var section = sectionOverride || activeTab;
+      // Belt and braces: the Regenerate button lives inside the report view,
+      // so it cannot be reached from News Intelligence — but a generation is
+      // for a desk, and 'news' is not one. Checked before anything is put
+      // into the generating state, so there is nothing to unwind.
+      if (!isReportTab(section)) return;
       generating = true;
       var regenBtnEl = document.getElementById('reporterRegenBtn');
       if (regenBtnEl) { regenBtnEl.disabled = true; regenBtnEl.textContent = '⚡ Generating…'; }
-      var section = sectionOverride || activeTab;
       if (sectionOverride) setActiveTab(sectionOverride);
       var content = document.getElementById('reporterContent');
       content.innerHTML =
@@ -1360,10 +1183,28 @@
     function setActiveTab(tab) {
       activeTab = tab;
       document.querySelectorAll('.reporter-tab').forEach(function (t) {
-        t.classList.toggle('active', t.dataset.tab === tab);
+        var active = t.dataset.tab === tab;
+        t.classList.toggle('active', active);
+        t.setAttribute('aria-selected', active ? 'true' : 'false');
         var meta = deskMeta[t.dataset.tab];
         if (meta) t.textContent = meta.icon + ' ' + meta.short;
       });
+
+      // Swap the two views rather than rebuilding either. Third-party panels
+      // in the workspace stay mounted across tab switches; leaving a desk and
+      // coming back must not cost another round of embed loads.
+      var workspace = document.getElementById('newsIntelligence');
+      var report = document.getElementById('reporterReport');
+      var onNews = tab === NEWS_TAB;
+      if (workspace) workspace.hidden = !onNews;
+      if (report) report.hidden = onNews;
+
+      if (onNews) {
+        // Panels the reader has never reached are mounted the first time the
+        // workspace becomes visible.
+        if (window.ReporterWidgets && workspace) window.ReporterWidgets.scan(workspace);
+        return;
+      }
       if (reportData) renderTab(activeTab);
     }
 
@@ -1378,14 +1219,15 @@
       setActiveTab(btn.dataset.tab);
     });
 
-    var overview = document.getElementById('newsroomOverview');
-    if (overview) overview.addEventListener('click', function (e) {
+    var workspace = document.getElementById('newsIntelligence');
+    if (workspace) workspace.addEventListener('click', function (e) {
       var desk = e.target.closest('[data-desk-section], [data-master-section]');
       if (desk) {
         setActiveTab(desk.getAttribute('data-desk-section') || desk.getAttribute('data-master-section'));
         document.getElementById('reporterTabs').scrollIntoView({ behavior: 'smooth', block: 'start' });
         return;
       }
+      if (e.target.closest('[data-intel-symbol-option]') || e.target.closest('.intel-section-header')) return;
       var limitButton = e.target.closest('[data-master-limit]');
       if (limitButton) {
         masterLimit = Number(limitButton.getAttribute('data-master-limit')) || 5;
@@ -1454,6 +1296,10 @@
     });
 
     configurePageShell();
+    // Before setActiveTab: init() creates the IntersectionObserver, and a scan
+    // that runs without one mounts every panel on the spot.
+    if (window.ReporterWidgets) window.ReporterWidgets.init();
+    if (window.ReporterMarket) window.ReporterMarket.init();
     setActiveTab(activeTab);
 
     setInterval(renderGenBadge, 1000);
@@ -1464,13 +1310,6 @@
     loadNewsroomStatus();
     setInterval(loadNewsroomStatus, 30000);
   })();
-</script>
-<script src="/assets/js/trading-sessions.js"></script>
-<script src="/assets/js/reporter-widgets.js"></script>
-<script src="/assets/js/reporter-market.js"></script>
-<script>
-  if (window.ReporterWidgets) window.ReporterWidgets.init();
-  if (window.ReporterMarket) window.ReporterMarket.init();
 </script>
 </body>
 </html>

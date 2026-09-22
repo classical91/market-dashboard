@@ -36,6 +36,7 @@
   var LAZY_MARGIN = '400px 0px';
 
   var COLLAPSE_KEY = 'reporterIntelCollapsed:v1';
+  var OPENED_KEY = 'reporterIntelOpened:v1:';
   var NARROW_WIDTH = 760;
 
   /* Shared look for every TradingView panel — dark, transparent so the page
@@ -78,6 +79,21 @@
       narrow: { displayMode: 'compact' }
     },
 
+    /* Headlines for one asset at a time. The timeline embed takes a single
+       symbol, so the panel carries a chip row and remounts on a change
+       rather than holding eight live frames. */
+    symbolNews: {
+      script: 'embed-widget-timeline.js',
+      source: 'https://www.tradingview.com/news/',
+      sourceLabel: 'TradingView news',
+      config: {
+        feedMode: 'symbol',
+        symbol: 'AMEX:SPY',
+        displayMode: 'regular'
+      },
+      narrow: { displayMode: 'compact' }
+    },
+
     worldMarkets: {
       script: 'embed-widget-market-quotes.js',
       source: 'https://www.tradingview.com/markets/indices/quotes-major/',
@@ -87,30 +103,47 @@
         backgroundColor: 'rgba(0, 0, 0, 0)',
         symbolsGroups: [
           {
-            name: 'Americas',
+            name: 'US',
             symbols: [
               { name: 'FOREXCOM:SPXUSD', displayName: 'S&P 500' },
               { name: 'FOREXCOM:NSXUSD', displayName: 'Nasdaq 100' },
-              { name: 'FOREXCOM:DJI', displayName: 'Dow 30' },
-              { name: 'FOREXCOM:RUTUSD', displayName: 'Russell 2000' }
+              { name: 'FOREXCOM:DJI', displayName: 'Dow 30' }
             ]
           },
           {
             name: 'Europe',
             symbols: [
               { name: 'INDEX:DEU40', displayName: 'DAX' },
-              { name: 'FOREXCOM:UKXGBP', displayName: 'FTSE 100' },
-              { name: 'INDEX:CAC40', displayName: 'CAC 40' },
-              { name: 'INDEX:SMI', displayName: 'SMI' }
+              { name: 'FOREXCOM:UKXGBP', displayName: 'FTSE 100' }
             ]
           },
           {
-            name: 'Asia-Pacific',
+            name: 'Asia',
             symbols: [
               { name: 'INDEX:NKY', displayName: 'Nikkei 225' },
-              { name: 'INDEX:HSI', displayName: 'Hang Seng' },
-              { name: 'NSE:NIFTY', displayName: 'Nifty 50' },
-              { name: 'ASX:XJO', displayName: 'ASX 200' }
+              { name: 'INDEX:HSI', displayName: 'Hang Seng' }
+            ]
+          },
+          {
+            name: 'FX',
+            symbols: [
+              { name: 'TVC:DXY', displayName: 'Dollar index' },
+              { name: 'FX:EURUSD', displayName: 'EUR/USD' },
+              { name: 'FX:USDJPY', displayName: 'USD/JPY' }
+            ]
+          },
+          {
+            name: 'Commodities',
+            symbols: [
+              { name: 'TVC:GOLD', displayName: 'Gold' },
+              { name: 'TVC:USOIL', displayName: 'Crude oil' }
+            ]
+          },
+          {
+            name: 'Crypto',
+            symbols: [
+              { name: 'BINANCE:BTCUSDT', displayName: 'Bitcoin' },
+              { name: 'BINANCE:ETHUSDT', displayName: 'Ethereum' }
             ]
           }
         ]
@@ -156,6 +189,14 @@
       },
       narrow: { noTimeScale: true }
     },
+
+    /* ── Not mounted by the Reporter ──────────────────────────
+       These answer "what should I trade?" rather than "what happened and why
+       does it matter?", so the newsroom does not show them — that is the job
+       of the Terminal Suite, the screeners and the Market Intel pages. They
+       stay defined because the loader is generic: any page can declare one
+       with data-intel-widget, or register its own through
+       ReporterWidgets.define(). */
 
     sectorHeatmap: {
       script: 'embed-widget-stock-heatmap.js',
@@ -390,6 +431,50 @@
     }
   }
 
+  /** Rebuild a mounted panel, e.g. after its symbol changed. */
+  function remount(el) {
+    clear(el);
+    delete el.dataset.intelState;
+    mount(el);
+  }
+
+  /* ── Symbol switchers ──────────────────────────────────── */
+  /* A chip row that repoints one panel at a different asset. One live frame,
+     not one per asset: the embed takes a single symbol, and eight retained
+     iframes to read eight headlines is not a trade worth making. */
+
+  function initSymbolSwitchers(root) {
+    var panels = (root || doc).querySelectorAll('[data-intel-symbol-switch]');
+
+    Array.prototype.forEach.call(panels, function (panel) {
+      var target = panel.querySelector('.intel-widget[data-intel-widget]');
+      var options = panel.querySelectorAll('[data-intel-symbol-option]');
+      if (!target || !options.length) return;
+
+      function select(symbol, mountNow) {
+        Array.prototype.forEach.call(options, function (option) {
+          var active = option.getAttribute('data-intel-symbol-option') === symbol;
+          option.classList.toggle('active', active);
+          option.setAttribute('aria-pressed', active ? 'true' : 'false');
+        });
+        target.dataset.intelSymbol = symbol;
+        if (mountNow) remount(target);
+      }
+
+      select(target.dataset.intelSymbol || options[0].getAttribute('data-intel-symbol-option'), false);
+
+      panel.addEventListener('click', function (event) {
+        var option = event.target.closest('[data-intel-symbol-option]');
+        if (!option || !panel.contains(option)) return;
+        var symbol = option.getAttribute('data-intel-symbol-option');
+        if (symbol === target.dataset.intelSymbol && target.dataset.intelState) return;
+        // Only remount a panel that is already showing something; one that
+        // has not been reached yet is left for the observer.
+        select(symbol, Boolean(target.dataset.intelState));
+      });
+    });
+  }
+
   var observer = null;
 
   function observe(el) {
@@ -426,6 +511,24 @@
     }
   }
 
+  /* A section that defaults to closed should stay open once the reader has
+     opened it, which the collapsed list alone cannot express. */
+  function hasBeenOpened(id) {
+    try {
+      return global.localStorage.getItem(OPENED_KEY + id) === '1';
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function rememberOpened(id) {
+    try {
+      global.localStorage.setItem(OPENED_KEY + id, '1');
+    } catch (error) {
+      /* Storage unavailable — it just reverts to closed next visit. */
+    }
+  }
+
   function applyCollapsed(section, header, body, collapsed) {
     section.classList.toggle('collapsed', collapsed);
     header.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
@@ -445,9 +548,15 @@
       if (!body.id) body.id = 'intel-body-' + id;
       header.setAttribute('aria-controls', body.id);
 
-      // Sections start open: the point of the page is to read the market at a
-      // glance, so only sections the reader closed themselves stay closed.
-      applyCollapsed(section, header, body, stored.indexOf(id) !== -1);
+      // Sections start open unless they declare otherwise, so only sections
+      // the reader closed themselves stay closed. A section marked
+      // data-intel-collapsed is optional background: it starts closed, and
+      // therefore fetches nothing until it is opened.
+      var remembered = stored.indexOf(id);
+      var collapsed = remembered !== -1
+        ? true
+        : section.getAttribute('data-intel-collapsed') === 'true' && !hasBeenOpened(id);
+      applyCollapsed(section, header, body, collapsed);
 
       header.addEventListener('click', function () {
         var collapsed = !section.classList.contains('collapsed');
@@ -458,6 +567,7 @@
         if (collapsed && index === -1) ids.push(id);
         if (!collapsed && index !== -1) ids.splice(index, 1);
         writeCollapsed(ids);
+        if (!collapsed) rememberOpened(id);
 
         // Widgets in a section that was closed on load have never been
         // fetched; opening it is the first chance they get.
@@ -552,6 +662,7 @@
 
     initSections(root);
     initTabs(root);
+    initSymbolSwitchers(root);
     scan(root);
   }
 
@@ -559,6 +670,7 @@
     init: init,
     scan: scan,
     mount: mount,
+    remount: remount,
     /** Register extra panels without editing this file. */
     define: function (name, definition) { WIDGETS[name] = definition; },
     widgets: WIDGETS

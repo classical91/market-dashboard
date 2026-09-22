@@ -30,7 +30,7 @@ The app is intentionally lightweight: no bundler, no frontend framework, and no 
 - `/x-intelligence.html` - X Intelligence: curated X feeds per theme, with a per-post **Broadcast** button that sends the post (and its picture) to chosen Telegram channels. See [X Intelligence broadcasting](#x-intelligence-broadcasting).
 - `/settings.html` - Appearance, **Reporter -> Report Prompts** (a manageable library of named prompts per reporter desk) and Refresh Frequency, and **Screeners -> Token Universe**: a matrix that decides which tokens Directional Bias, Local Extremes and Pattern Scanner each scan. Saved on the server under `DATA_DIR/screener-settings.json`, so the scanners and the signal bot follow it rather than the browser. Binance USDT pairs can be added (verified against Binance first) beyond the shipped defaults. USDT.D is deliberately not in the matrix: it has no Binance candles to scan and already rides along with Directional Bias as market context.
 - `/indicators.html` - Trading and market glossary.
-- `/reporter.html` - Reporter Intelligence: market context above the AI newsroom. A status strip (BTC, SPY, DXY, VIX, US10Y, GOLD, risk regime, open session) and a cross-asset monitor read `/api/overview` — the same payload the Main Hub renders, so the page adds no market API call of its own — over Live Intelligence, Global Macro, Market Breadth, FX & Rates and a tabbed Macro Data section, then the four desks, Master News, newsroom operations and saved reports. See [Reporter Intelligence dashboard](#reporter-intelligence-dashboard).
+- `/reporter.html` - Reporter Room: the newsroom. **News Intelligence** is its first tab — live news, per-asset headlines, scheduled catalysts, a compact market-reaction strip, Master News, desk status and newsroom controls — alongside the four generated desk tabs (Geopolitics, Economics, Stocks, Crypto). See [News Intelligence tab](#news-intelligence-tab).
 - `/api/newsroom` - newsroom cycle records and health for the scheduled reporting run: one durable cycle per run, linking generated sections to broadcast receipts and Telegram message ids. See [docs/newsroom-cycles.md](docs/newsroom-cycles.md).
 - `/api/broadcast-ledger/preflight` - answers the environment, persistence and routing half of [docs/production-verification.md](docs/production-verification.md) from inside the running service. Sends nothing, echoes no secret. `node scripts/verify-broadcast-ledger.js --url <host> --key <key>` runs it plus the read-only endpoint checks and prints a verdict.
 - `/api/broadcast-ledger/broadcast` - sends a broadcast to Telegram **and** records the receipt in one call, from the real send result. Telegram never reports a bot's own messages back through `getUpdates`, so anything sent through this bot cannot be picked up by the channel watch and must go through here.
@@ -180,42 +180,66 @@ An unedited desk default sends no prompt with the request, which lets the server
 
 **Refresh Frequency** (Daily / Every 2 Days) is the shortest gap between two briefings for the same desk. It travels as `ttlHours` on the generate request, and the reporter turns it into a cooldown in whole calendar days: generating again inside the window returns the saved report with `generationSkipped` and `nextGenerationDate` rather than spending another OpenAI call. The gate counts calendar days rather than a rolling window, so a briefing generated at 11pm under **Daily** can be remade the next morning. A sub-day `ttlHours` floors at one day. The setting is stored per browser, so it governs generations started from that device; a scheduled cycle sends whatever `ttlHours` its caller uses.
 
-### Reporter Intelligence dashboard
+### News Intelligence tab
 
-`/reporter.html` puts market context above the AI synthesis, in the order a reader
-needs it: what is happening now, where markets are moving, what the macro backdrop
-is, then what the desks made of it.
+`/reporter.html` is the newsroom, not a market dashboard. Its tab row is:
 
 ```text
-status strip -> Live Intelligence -> Global Macro -> Cross-Asset Monitor
-             -> Market Breadth -> FX & Rates -> Macro Data
-             -> AI Newsroom -> desk tabs -> saved reports
+[ 📰 News Intelligence ] [ 🌍 Geopolitics ] [ 🏦 Economics ] [ 📈 Stocks ] [ ₿ Crypto ]
 ```
 
-- **Own data first.** The status strip and cross-asset monitor read `/api/overview`,
-  the payload the Main Hub already renders, so Reporter introduces no market API
-  call of its own and cannot disagree with the hub about a price. The poll matches
-  the hub's 90s cadence and is skipped while the tab is hidden. The session chip is
-  clock arithmetic from `public/assets/js/trading-sessions.js`, not a request. Rows
-  the configured macro feed does not carry — US 10Y yields in a default install —
+The four desk tabs are the generated reports, unchanged. **News Intelligence**
+is the workspace they are produced from, and is the default tab:
+
+```text
+Live News        economic calendar + breaking top stories
+News Discovery   per-asset headlines + today's scheduled catalysts
+Market Reaction  compact strip — how assets responded
+Reporter Output  Master News + newsroom status/controls
+Latest Desks     the four desks, each opening its report tab
+Global Context   optional background, collapsed by default
+```
+
+- **`news` is a UI tab, never a report section.** The backend still has exactly
+  four sections. `news` is deliberately absent from `sectionOrder`, so it never
+  reaches generation, broadcast routing, the generation log or Master News —
+  and a generation is refused for anything that is not a desk.
+- **Switching tabs swaps two views, it does not rebuild them.** Third-party
+  panels stay mounted once activated, so leaving a desk and coming back costs
+  no further embed loads.
+- **The newsroom does not duplicate the trading pages.** If a panel answers
+  "what should I trade?" it belongs on the Terminal Suite, the screeners or
+  Market Intel — not here. Heatmaps, the forex matrix, the rates board and the
+  FRED macro charts stay defined in `reporter-widgets.js` so any page can
+  declare one with `data-intel-widget`, but the Reporter mounts none of them.
+- **Own data first.** The reaction strip and the catalyst list share one
+  `/api/overview` call — the payload the Main Hub already renders — so Reporter
+  introduces no market API call of its own. The poll matches the hub's 90s
+  cadence and is skipped while the tab is hidden. The session label is clock
+  arithmetic from `public/assets/js/trading-sessions.js`, not a request. Rows
+  the configured macro feed does not carry (US 10Y yields in a default install)
   render as "Not configured" and name the env var that supplies them.
+- **Earnings are links, not a feed.** No embed provider offers an earnings
+  calendar widget, and the page will not take on a new data dependency for one.
+  The panel shows the scheduled catalysts already in the payload — marking
+  times it cannot confirm — and links out for the earnings list.
 - **Nothing third-party loads until it is needed.** Panels are declared, not
   embedded: `<div class="intel-widget" data-intel-widget="economicCalendar">`.
-  `public/assets/js/reporter-widgets.js` mounts one as it approaches the viewport,
-  shows a placeholder while it loads, and replaces a panel that never produces a
-  frame with "Market data unavailable", a Retry and a link to the source. A
-  collapsed section fetches nothing, and the Macro Data tabs mount only the visible
-  tab's four charts. On a 1440px load that is 6 of 24 declared panels mounted, 12
-  after scrolling the whole page.
-- **A provider outage is contained.** Every panel fails on its own; the AI Reporter,
-  generation, Broadcast and saved reports keep working with all of them down.
-- **Fixed desk pages are unaffected.** `/emerging-markets.html`,
-  `/economics-top-10.html` and `/markets-top-10.html` share this template and are
-  single-desk briefings, so they drop the dashboard entirely and request no
-  third-party panels.
-- **Master News is ready for classification it does not have yet.** Cards show rank,
-  headline, desk, that desk's last run and its cited source count. Impact, affected
-  assets and themes render from an optional
+  `reporter-widgets.js` mounts one as it approaches the viewport, shows a
+  placeholder while it loads, and replaces a panel that never produces a frame
+  with "Market data unavailable", a Retry and a link to the source. A collapsed
+  section fetches nothing, so Global Context costs nothing until opened. Market
+  News repoints one frame between assets rather than holding eight.
+- **A provider outage is contained.** Every panel fails on its own; the AI
+  Reporter, generation, Broadcast and saved reports keep working with all of
+  them down.
+- **Fixed desk pages open straight into their report.** `/emerging-markets.html`,
+  `/economics-top-10.html` and `/markets-top-10.html` share this template, so
+  they drop the workspace and the News tab entirely and request no third-party
+  panels.
+- **Master News is ready for classification it does not have yet.** Cards show
+  rank, headline, desk, that desk's last run and its cited source count.
+  Impact, affected assets and themes render from an optional
   `storyMetaBySection[section][deskRank]` block on the saved report. Nothing is
   inferred in the browser: a field the report does not carry does not render.
 
