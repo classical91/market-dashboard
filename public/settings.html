@@ -110,10 +110,33 @@
       border-radius: 12px;
       font: inherit;
     }
-    .prompt-editor select {
-      max-width: 280px;
+    .prompt-editor select,
+    .prompt-editor input[type="text"] {
+      max-width: 340px;
       padding: 10px 12px;
     }
+    .prompt-editor input[type="text"] {
+      width: 100%;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.04);
+      color: var(--text);
+      border-radius: 12px;
+      font: inherit;
+    }
+    .prompt-field { display: grid; gap: 6px; }
+    .prompt-field-label {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
+      text-transform: uppercase; color: var(--muted);
+    }
+    .prompt-field-row {
+      display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end;
+    }
+    .prompt-field-row .prompt-field { flex: 1 1 240px; }
+    .prompt-active-note {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12px; font-weight: 700; color: var(--green);
+    }
+    .prompt-active-note.inactive { color: var(--muted); font-weight: 600; }
     .prompt-editor textarea {
       min-height: 260px;
       resize: vertical;
@@ -122,6 +145,7 @@
       font-size: 13px;
     }
     .prompt-editor select:focus,
+    .prompt-editor input[type="text"]:focus,
     .prompt-editor textarea:focus {
       outline: none;
       border-color: rgba(77,163,255,0.42);
@@ -131,7 +155,14 @@
       display: flex;
       gap: 10px;
       flex-wrap: wrap;
+      align-items: center;
     }
+    .settings-action-btn[disabled] {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .settings-action-btn.danger { color: var(--coral); border-color: rgba(255,77,109,0.3); }
+    .settings-action-btn.danger:hover { background: var(--coral-bg); color: var(--coral); }
     .settings-action-btn {
       border: 1px solid var(--border);
       background: rgba(255,255,255,0.04);
@@ -380,7 +411,11 @@
         <div class="settings-row">
           <div>
             <div class="settings-row-label">Refresh Frequency</div>
-            <div class="settings-row-sub">How often the Daily News Reporter generates a new briefing</div>
+            <div class="settings-row-sub">
+              The shortest gap between two briefings for the same desk. Generating again inside the
+              window returns the saved report instead of spending another OpenAI call. Saved in this
+              browser, so it applies to generations started from this device.
+            </div>
           </div>
         </div>
         <div class="freq-options" id="freqOptions">
@@ -389,19 +424,45 @@
         </div>
         <div class="prompt-editor">
           <div>
-            <div class="settings-row-label">Report Prompt</div>
-            <div class="settings-row-sub">Choose a reporter tab and adjust the request sent when you generate that page. Use <code>{date}</code> where today&apos;s date should appear.</div>
+            <div class="settings-row-label">Report Prompts</div>
+            <div class="settings-row-sub">
+              Add, rename and delete the requests the reporter sends. Each prompt belongs to one desk,
+              and the desk generates with whichever of its prompts is in use. Use <code>{date}</code>
+              where today&apos;s date should appear. Every desk ships with a default prompt that can be
+              retitled, rewritten and reset, but not deleted.
+            </div>
           </div>
-          <select id="reportPromptSection" aria-label="Reporter prompt section">
-            <option value="crypto">Emerging Markets</option>
-            <option value="economics">Economics Top 10</option>
-            <option value="markets">Markets Top 10</option>
-          </select>
-          <textarea id="reportPromptText" spellcheck="true" aria-label="Reporter prompt"></textarea>
+
+          <div class="prompt-field">
+            <label class="prompt-field-label" for="promptPicker">Prompt</label>
+            <select id="promptPicker" aria-label="Report prompt"></select>
+          </div>
+
+          <div class="prompt-field-row">
+            <div class="prompt-field">
+              <label class="prompt-field-label" for="promptTitle">Title</label>
+              <input id="promptTitle" type="text" maxlength="80" autocomplete="off" placeholder="Emerging Markets" />
+            </div>
+            <div class="prompt-field">
+              <label class="prompt-field-label" for="promptDesk">Reporter desk</label>
+              <select id="promptDesk" aria-label="Reporter desk"></select>
+            </div>
+          </div>
+
+          <div class="prompt-field">
+            <label class="prompt-field-label" for="reportPromptText">Prompt text</label>
+            <textarea id="reportPromptText" spellcheck="true" aria-label="Reporter prompt"></textarea>
+          </div>
+
           <div class="prompt-actions">
             <button class="settings-action-btn primary" id="saveReportPrompt" type="button">Save Prompt</button>
+            <button class="settings-action-btn" id="usePromptBtn" type="button">Use for This Desk</button>
+            <button class="settings-action-btn" id="newPromptBtn" type="button">New Prompt</button>
+            <button class="settings-action-btn" id="duplicatePromptBtn" type="button">Duplicate</button>
             <button class="settings-action-btn" id="resetReportPrompt" type="button">Reset Default</button>
+            <button class="settings-action-btn danger" id="deletePromptBtn" type="button">Delete</button>
           </div>
+          <div class="screener-note" id="promptStatus"></div>
         </div>
       </div>
     </div>
@@ -577,30 +638,155 @@
     });
   })();
 
-  /* Reporter prompt */
+  /* ── Report prompts ─────────────────────────────────────
+     The library itself lives in AppSettings; this is only the editor over
+     it. Every action writes through AppSettings and re-renders from the
+     library that came back, so what is on screen is always what was saved
+     rather than what the form happened to hold. */
   (function () {
     var s = window.AppSettings;
-    var section = document.getElementById('reportPromptSection');
+    var picker = document.getElementById('promptPicker');
+    var titleInput = document.getElementById('promptTitle');
+    var deskSelect = document.getElementById('promptDesk');
     var text = document.getElementById('reportPromptText');
-    var save = document.getElementById('saveReportPrompt');
-    var reset = document.getElementById('resetReportPrompt');
+    var status = document.getElementById('promptStatus');
+    var saveBtn = document.getElementById('saveReportPrompt');
+    var useBtn = document.getElementById('usePromptBtn');
+    var newBtn = document.getElementById('newPromptBtn');
+    var duplicateBtn = document.getElementById('duplicatePromptBtn');
+    var resetBtn = document.getElementById('resetReportPrompt');
+    var deleteBtn = document.getElementById('deletePromptBtn');
+    if (!picker) return;
 
-    function loadPrompt() {
-      text.value = s.getReporterPrompt(section.value);
+    var library = s.getReporterPromptLibrary();
+    var selectedId = library.active.crypto;
+
+    function deskLabel(section) {
+      return s.REPORTER_DESK_LABELS[section] || section;
     }
 
-    section.addEventListener('change', loadPrompt);
-    save.addEventListener('click', function () {
-      s.setReporterPrompt(section.value, text.value);
+    function selected() {
+      return s.ReporterPrompts.find(library, selectedId);
+    }
+
+    function isActive(prompt) {
+      return Boolean(prompt) && library.active[prompt.section] === prompt.id;
+    }
+
+    function setStatus(message) {
+      status.textContent = message || '';
+    }
+
+    /* Grouped by desk so the list stays readable once custom prompts
+       outnumber the four defaults. The dot marks the one its desk is
+       currently generating with. */
+    function renderPicker() {
+      picker.innerHTML = '';
+      s.REPORTER_SECTIONS.forEach(function (section) {
+        var prompts = library.prompts.filter(function (prompt) {
+          return prompt.section === section;
+        });
+        if (!prompts.length) return;
+        var group = document.createElement('optgroup');
+        group.label = deskLabel(section);
+        prompts.forEach(function (prompt) {
+          var option = document.createElement('option');
+          option.value = prompt.id;
+          option.textContent = (isActive(prompt) ? '● ' : '○ ') + prompt.title;
+          group.appendChild(option);
+        });
+        picker.appendChild(group);
+      });
+      picker.value = selectedId;
+    }
+
+    function renderDeskSelect(prompt) {
+      deskSelect.innerHTML = '';
+      s.REPORTER_SECTIONS.forEach(function (section) {
+        var option = document.createElement('option');
+        option.value = section;
+        option.textContent = deskLabel(section);
+        deskSelect.appendChild(option);
+      });
+      deskSelect.value = prompt.section;
+      /* A default prompt is the desk's fallback, so it cannot be moved to
+         another desk — a custom prompt can. */
+      deskSelect.disabled = prompt.builtin;
+    }
+
+    function render() {
+      var prompt = selected();
+      if (!prompt) {
+        selectedId = library.active.crypto;
+        prompt = selected();
+      }
+      renderPicker();
+      renderDeskSelect(prompt);
+      titleInput.value = prompt.title;
+      text.value = prompt.text;
+      deleteBtn.disabled = prompt.builtin;
+      deleteBtn.title = prompt.builtin ? 'Default prompts reset instead of deleting' : '';
+      useBtn.disabled = isActive(prompt);
+      setStatus(isActive(prompt)
+        ? deskLabel(prompt.section) + ' generates with this prompt.'
+        : deskLabel(prompt.section) + ' currently generates with a different prompt.');
+    }
+
+    function adopt(next, id) {
+      library = next;
+      if (id) selectedId = id;
+      render();
       showToast();
-    });
-    reset.addEventListener('click', function () {
-      s.resetReporterPrompt(section.value);
-      loadPrompt();
-      showToast();
+    }
+
+    picker.addEventListener('change', function () {
+      selectedId = picker.value;
+      render();
     });
 
-    loadPrompt();
+    saveBtn.addEventListener('click', function () {
+      adopt(s.updateReporterPrompt(selectedId, {
+        title: titleInput.value,
+        section: deskSelect.value,
+        text: text.value,
+      }));
+    });
+
+    useBtn.addEventListener('click', function () {
+      adopt(s.useReporterPrompt(selectedId));
+    });
+
+    newBtn.addEventListener('click', function () {
+      var prompt = selected();
+      var result = s.addReporterPrompt({
+        title: 'New prompt',
+        section: prompt ? prompt.section : 'crypto',
+        text: s.ReporterPrompts.DEFAULT_TEXT[prompt ? prompt.section : 'crypto'],
+      });
+      adopt(result.library, result.id);
+      titleInput.focus();
+      titleInput.select();
+    });
+
+    duplicateBtn.addEventListener('click', function () {
+      var result = s.duplicateReporterPrompt(selectedId);
+      adopt(result.library, result.id);
+    });
+
+    resetBtn.addEventListener('click', function () {
+      adopt(s.resetReporterPromptById(selectedId));
+    });
+
+    deleteBtn.addEventListener('click', function () {
+      var prompt = selected();
+      if (!prompt || prompt.builtin) return;
+      if (!window.confirm('Delete the prompt "' + prompt.title + '"? This cannot be undone.')) return;
+      var section = prompt.section;
+      var next = s.removeReporterPrompt(selectedId);
+      adopt(next, next.active[section]);
+    });
+
+    render();
   })();
 
   /* ── Screener token universes ───────────────────────── */

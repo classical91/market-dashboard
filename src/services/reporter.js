@@ -51,13 +51,64 @@ function msUntilNextDay(date = new Date()) {
   return Math.max(nextDay.getTime() - date.getTime(), 60 * 1000);
 }
 
-function isGeneratedToday(entry) {
+function midnightFromDateKey(dateKey) {
+  const parts = String(dateKey || "").split("-").map((part) => parseInt(part, 10));
+  if (parts.length !== 3 || parts.some((part) => !Number.isFinite(part))) return null;
+  const date = new Date(parts[0], parts[1] - 1, parts[2]);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/**
+ * Whole calendar days between two YYYY-MM-DD keys, in the server's own
+ * timezone — which is the timezone formatDateKey() writes them in. Rounding
+ * absorbs the hour a DST change adds to or removes from a day.
+ */
+function calendarDaysBetween(fromKey, toKey) {
+  const from = midnightFromDateKey(fromKey);
+  const to = midnightFromDateKey(toKey);
+  if (!from || !to) return null;
+  return Math.round((to.getTime() - from.getTime()) / (24 * 60 * 60 * 1000));
+}
+
+function addCalendarDays(dateKey, days) {
+  const from = midnightFromDateKey(dateKey);
+  if (!from) return formatDateKey(new Date(Date.now() + msUntilNextDay()));
+  return formatDateKey(new Date(from.getFullYear(), from.getMonth(), from.getDate() + days));
+}
+
+/**
+ * The requested refresh frequency, expressed as whole calendar days between
+ * two generations of the same desk.
+ *
+ * The gate is deliberately a calendar-day one rather than a rolling window:
+ * "Daily" has to mean a briefing made at 11pm can be remade the next morning,
+ * which a rolling 24 hours would refuse. A sub-day TTL floors at one day, so
+ * shortening the TTL can never open up repeat spending on the same desk.
+ */
+function cooldownDays(ttlMs) {
+  const days = Math.round((ttlMs || DEFAULT_TTL_MS) / (24 * 60 * 60 * 1000));
+  return Math.max(days, 1);
+}
+
+/**
+ * Whether a stored generation still holds its desk's slot.
+ *
+ * `days` is the cooldown: 1 means "generated today", 2 means "generated today
+ * or yesterday", and so on. This is what makes the Every 2 Days setting mean
+ * something — the gate used to be hardcoded to the calendar day, so every
+ * refresh frequency collapsed to the same once-a-day behaviour and a 48-hour
+ * setting regenerated (and paid) daily anyway.
+ *
+ * An entry dated in the future (a clock that moved backwards) does not hold
+ * the slot, matching the old check, which only ever recognised today.
+ */
+function isWithinCooldown(entry, days) {
   if (!entry) return false;
-  if (entry.generatedDateKey) return entry.generatedDateKey === formatDateKey();
-  if (!entry.generatedAt) return false;
-  const generatedAt = new Date(entry.generatedAt);
-  if (Number.isNaN(generatedAt.getTime())) return false;
-  return formatDateKey(generatedAt) === formatDateKey();
+  const dayKey = logEntryDayKey(entry);
+  if (!dayKey) return false;
+  const elapsed = calendarDaysBetween(dayKey, formatDateKey());
+  if (elapsed === null || elapsed < 0) return false;
+  return elapsed < Math.max(days, 1);
 }
 
 function normalizeSection(section) {
@@ -305,9 +356,22 @@ class ReporterService {
     this._rateLimitedUntil = new Map();
   }
 
+  /**
+   * The in-flight/per-day key a generation loads under.
+   *
+   * Keyed by calendar day rather than by an epoch-aligned `now / ttlMs`
+   * bucket, so it lines up with the cooldown gate in generateReport(). Those
+   * buckets did not: a report made at 11pm and a regeneration at 1am the next
+   * day fall in the same bucket, so a request the gate had just allowed was
+   * served the previous entry instead — no new content, no new log entry, and
+   * nothing saying why. Sharing the day keeps the two answers identical, and
+   * still collapses the duplicate requests a cycle fan-out makes.
+   *
+   * `ttlMs` no longer appears in the key: how far apart two generations have
+   * to be is the gate's job, not the cache's.
+   */
   _cacheKey(ttlMs, section, promptKey = "default") {
-    const period = Math.floor(Date.now() / ttlMs);
-    return `reporter:v3:${section}:${promptKey}:${ttlMs}:${period}`;
+    return `reporter:v4:${section}:${promptKey}:${formatDateKey()}`;
   }
 
   _latestCacheKey(section) {
@@ -598,28 +662,35 @@ class ReporterService {
     const section = normalizeSection(requestedSection);
     const promptOverride = normalizeCustomPrompt(customPrompt);
     const key = this._cacheKey(resolvedTtl, section, promptCacheKey(promptOverride));
+    // How far apart two generations of this desk have to be. It comes from the
+    // caller's ttlHours, which is the dashboard's Refresh Frequency setting.
+    const cooldown = cooldownDays(resolvedTtl);
     const existingReport = this._buildReport(resolvedTtl);
     const existingGeneratedAt = existingReport.generatedAtBySection && existingReport.generatedAtBySection[section];
-    const loggedToday = this._readLog().find(
-      (entry) => entry && entry.section === section && isGeneratedToday(entry)
+    const loggedRecently = this._readLog().find(
+      (entry) => entry && entry.section === section && isWithinCooldown(entry, cooldown)
     );
-    if ((existingReport[section] && isGeneratedToday({ generatedAt: existingGeneratedAt })) || loggedToday) {
-      const fallback = loggedToday
-        ? { ...existingReport, [section]: existingReport[section] || loggedToday.content }
+    if ((existingReport[section] && isWithinCooldown({ generatedAt: existingGeneratedAt }, cooldown)) || loggedRecently) {
+      const fallback = loggedRecently
+        ? { ...existingReport, [section]: existingReport[section] || loggedRecently.content }
         : existingReport;
+      const heldSince = (loggedRecently && logEntryDayKey(loggedRecently))
+        || logEntryDayKey({ generatedAt: existingGeneratedAt })
+        || formatDateKey();
       return {
         ...fallback,
         generatedSection: section,
         generationSkipped: true,
-        generationSkippedReason: "already-generated-today",
+        generationSkippedReason: cooldown === 1 ? "already-generated-today" : "within-refresh-window",
+        refreshCooldownDays: cooldown,
         // The section already exists, so a cycle that lands here reuses it
         // rather than paying to remake it. These describe the entry being
         // reused — including the cycle that first produced it, when there was
         // one — so the reuse stays traceable.
-        reusedGeneratedAt: (loggedToday && loggedToday.generatedAt) || existingGeneratedAt || null,
-        reusedCycleId: (loggedToday && loggedToday.cycleId) || null,
-        reusedModel: (loggedToday && loggedToday.model) || null,
-        nextGenerationDate: formatDateKey(new Date(Date.now() + msUntilNextDay())),
+        reusedGeneratedAt: (loggedRecently && loggedRecently.generatedAt) || existingGeneratedAt || null,
+        reusedCycleId: (loggedRecently && loggedRecently.cycleId) || null,
+        reusedModel: (loggedRecently && loggedRecently.model) || null,
+        nextGenerationDate: addCalendarDays(heldSince, cooldown),
       };
     }
 
@@ -693,6 +764,8 @@ class ReporterService {
 module.exports = {
   ReporterService,
   REPORT_SECTIONS,
+  cooldownDays,
+  isWithinCooldown,
   SECTION_LABELS,
   extractSources,
   GENERATION_REFERENCE_MISSING,
