@@ -1,0 +1,309 @@
+/* ─────────────────────────────────────────────────────────
+   Open Interest Intelligence — page-specific chrome.
+
+   The table, toolbar, view tabs and freshness badges come from
+   signal-screener.css, shared with the other screener pages.
+───────────────────────────────────────────────────────── */
+
+.oi-explainer {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(137, 146, 166, 0.22);
+  border-left: 3px solid #f5c542;
+  border-radius: 8px;
+  background: #0a0a18;
+}
+.oi-explainer p { margin: 0; font-size: 12px; line-height: 1.55; color: #9aa4bb; }
+.oi-explainer strong { color: #e8edf5; }
+
+.oi-notice--warn { border-color: rgba(255, 176, 32, 0.4); color: #ffc45c; }
+.oi-notice--error { border-color: rgba(255, 93, 93, 0.45); color: #ff9b9b; }
+
+.oi-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #8892a6;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.oi-search { min-width: 150px; }
+
+/* ── KPI row ─────────────────────────────────────────────── */
+.oi-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.oi-kpi,
+.oi-card {
+  background: #0a0a14;
+  border: 1px solid rgba(74, 74, 170, 0.3);
+  border-radius: 12px;
+  padding: 12px 14px;
+  min-width: 0;
+}
+
+/* BTC sets the weather for everything else, so it gets the widest tile. */
+.oi-kpi--hero {
+  grid-column: span 2;
+  border-color: rgba(245, 197, 66, 0.45);
+  background: linear-gradient(135deg, rgba(245, 197, 66, 0.08), #0a0a14 60%);
+}
+.oi-kpi--hero .oi-kpi-value { font-size: 26px; }
+
+.oi-kpi-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #8892a6;
+}
+.oi-kpi-value { margin-top: 4px; font-size: 19px; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; }
+.oi-kpi-sub { margin-top: 4px; font-size: 11px; line-height: 1.45; color: #8892a6; }
+.oi-kpi-sub a { color: #4da3ff; }
+
+/* ── Sources strip ───────────────────────────────────────── */
+.oi-sources {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 14px;
+  font-size: 11px;
+}
+.oi-sources-label { font-weight: 800; color: #8892a6; text-transform: uppercase; letter-spacing: 0.06em; font-size: 10px; }
+.oi-sources-time { margin-left: auto; color: #8892a6; }
+.oi-source {
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(137, 146, 166, 0.25);
+  color: #c9d4e8;
+  white-space: nowrap;
+}
+.oi-source--ok { border-color: rgba(0, 211, 167, 0.4); }
+.oi-source--ok::before { content: "● "; color: #00d3a7; }
+.oi-source--idle { color: #8892a6; }
+.oi-source--down { border-color: rgba(255, 176, 32, 0.45); color: #ffc45c; }
+.oi-source--down::before { content: "▲ "; }
+
+/* ── Leaders ─────────────────────────────────────────────── */
+.oi-leaders {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.oi-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.oi-card-title { font-size: 13px; font-weight: 800; color: #fff; }
+.oi-card-tag { font-size: 10px; color: #8892a6; border: 1px solid rgba(137, 146, 166, 0.3); border-radius: 5px; padding: 1px 6px; }
+
+.oi-rank { margin: 0; padding: 0 0 0 18px; font-size: 12px; color: #8892a6; }
+.oi-rank--plain { list-style: none; padding-left: 0; }
+.oi-rank li { padding: 2px 0; }
+.oi-rank-empty { list-style: none; margin-left: -18px; font-style: italic; }
+.oi-rank--plain .oi-rank-empty { margin-left: 0; }
+
+.oi-rank-btn,
+.oi-asset-btn {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.oi-rank-btn { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; padding: 3px 4px; border-radius: 6px; }
+.oi-rank-btn:hover { background: rgba(255, 255, 255, 0.04); }
+.oi-rank-asset { font-weight: 800; color: #fff; min-width: 48px; }
+.oi-asset-btn { font-weight: 800; color: #fff; text-decoration: underline dotted rgba(137, 146, 166, 0.6); text-underline-offset: 3px; }
+.oi-asset-btn:hover { color: #7cc0ff; }
+.oi-rank-btn:focus-visible,
+.oi-asset-btn:focus-visible { outline: 2px solid #4da3ff; outline-offset: 2px; }
+
+/* ── Values & badges ─────────────────────────────────────── */
+.oi-pct { font-variant-numeric: tabular-nums; font-weight: 700; }
+.oi-pct--up { color: #00d3a7; }
+.oi-pct--down { color: #ff7b7b; }
+.oi-pct--none { color: #6f7789; font-weight: 400; }
+.oi-muted { color: #8892a6; }
+
+.oi-state {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+.oi-state--bull { background: rgba(0, 211, 167, 0.16); color: #3ce0bc; }
+.oi-state--bear { background: rgba(255, 93, 93, 0.16); color: #ff8b8b; }
+.oi-state--cover { background: rgba(245, 197, 66, 0.16); color: #ffd76a; }
+.oi-state--unwind { background: rgba(255, 140, 66, 0.16); color: #ffab70; }
+.oi-state--watch { background: rgba(77, 163, 255, 0.16); color: #7cc0ff; }
+.oi-state--quiet { background: rgba(137, 146, 166, 0.14); color: #9aa4bb; }
+.oi-state--none { background: rgba(137, 146, 166, 0.08); color: #6f7789; }
+
+.oi-spike {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  background: rgba(199, 146, 234, 0.2);
+  color: #d7a8f5;
+}
+
+.oi-bias { font-size: 10px; font-weight: 800; }
+.oi-bias--bullish { color: #3ce0bc; }
+.oi-bias--bearish { color: #ff8b8b; }
+.oi-bias--neutral { color: #9aa4bb; }
+.oi-extreme { font-size: 10px; font-weight: 800; color: #ffd76a; }
+
+.oi-conf-cell { text-align: left !important; white-space: normal !important; min-width: 170px; }
+.oi-conf { display: flex; flex-wrap: wrap; gap: 6px; }
+.oi-note { margin-top: 3px; font-size: 10px; line-height: 1.35; }
+.oi-note--warn { color: #ffc45c; }
+.oi-note--caution { color: #ffab70; }
+.oi-note--aligned { color: #3ce0bc; }
+.oi-note--info { color: #9aa4bb; }
+
+.oi-table th,
+.oi-table td { padding: 7px 8px; }
+.oi-row--pinned { background: rgba(245, 197, 66, 0.05); box-shadow: inset 3px 0 #f5c542; }
+.oi-error-cell { text-align: left !important; color: #ff9b9b; white-space: normal !important; }
+
+/* ── Heatmap ─────────────────────────────────────────────── */
+.oi-heatmap { display: grid; gap: 2px; }
+.oi-heat-row {
+  display: grid;
+  grid-template-columns: 70px repeat(4, minmax(0, 1fr));
+  gap: 2px;
+  align-items: stretch;
+  font-size: 11px;
+}
+.oi-heat-row > .oi-asset-btn { text-align: left; align-self: center; }
+.oi-heat-row--head span { text-align: center; font-size: 10px; font-weight: 800; color: #8892a6; padding: 2px 0; }
+.oi-heat-row--head span.is-selected { color: #fff; }
+.oi-heat-cell {
+  text-align: center;
+  padding: 6px 2px;
+  border-radius: 4px;
+  color: #fff;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.oi-heat-cell--none { color: #6f7789; background: rgba(137, 146, 166, 0.06) !important; font-weight: 400; }
+.oi-legend { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 10px; font-size: 10px; color: #8892a6; }
+.oi-legend-bar {
+  width: 160px;
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, rgba(255, 99, 99, 0.8), rgba(137, 146, 166, 0.2), rgba(0, 196, 160, 0.8));
+}
+
+/* ── Radar ───────────────────────────────────────────────── */
+.oi-radar svg { display: block; width: 100%; max-width: 440px; margin: 0 auto; }
+.oi-radar-grid { fill: none; stroke: rgba(137, 146, 166, 0.18); stroke-width: 1; }
+.oi-radar-zero { fill: none; stroke: rgba(232, 237, 245, 0.55); stroke-width: 1; stroke-dasharray: 3 3; }
+.oi-radar-axis { stroke: rgba(137, 146, 166, 0.18); }
+.oi-radar-label { fill: #c9d4e8; font-size: 11px; font-weight: 700; }
+.oi-radar-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 8px; font-size: 11px; color: #c9d4e8; }
+.oi-radar-legend span { display: inline-flex; align-items: center; gap: 5px; }
+
+/* ── Detail ──────────────────────────────────────────────── */
+.oi-detail { margin: 18px 0 16px; scroll-margin-top: 12px; }
+.oi-detail-head { flex-wrap: wrap; }
+.oi-detail-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.oi-interval-tabs { margin-bottom: 0; }
+.oi-detail-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+  gap: 14px;
+}
+.oi-chart { margin-bottom: 8px; }
+.oi-chart-title { font-size: 10px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: #8892a6; margin-bottom: 4px; }
+.oi-chart-svg { display: block; width: 100%; height: auto; touch-action: pan-y; }
+.oi-chart-grid { stroke: rgba(137, 146, 166, 0.14); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.oi-chart-tick { fill: #8892a6; font-size: 10px; }
+.oi-chart-line { fill: none; stroke-width: 2; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+.oi-chart-line--price { stroke: #e8edf5; }
+.oi-chart-line--oi { stroke: #f5c542; }
+.oi-chart-area { fill: rgba(245, 197, 66, 0.1); }
+.oi-chart-cross { stroke: rgba(232, 237, 245, 0.45); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.oi-chart-empty { padding: 24px; text-align: center; color: #8892a6; font-size: 12px; border: 1px dashed rgba(137, 146, 166, 0.25); border-radius: 8px; }
+.oi-chart-readout { font-size: 11px; color: #c9d4e8; min-height: 16px; font-variant-numeric: tabular-nums; }
+
+.oi-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; align-content: start; }
+.oi-stat { padding: 8px 10px; border-radius: 8px; background: rgba(255, 255, 255, 0.025); border: 1px solid rgba(137, 146, 166, 0.14); min-width: 0; }
+.oi-stat-value { margin-top: 3px; font-size: 14px; font-weight: 800; color: #fff; display: flex; flex-wrap: wrap; gap: 4px 8px; }
+.oi-mini { font-size: 11px; font-weight: 700; color: #8892a6; }
+.oi-detail-foot { margin-top: 8px; font-size: 11px; color: #ffc45c; }
+
+/* ── Cheat sheet ─────────────────────────────────────────── */
+.oi-cheats { margin-bottom: 16px; }
+.oi-cheat-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.oi-cheat p { margin: 5px 0 0; font-size: 11px; line-height: 1.45; color: #9aa4bb; }
+
+@media (max-width: 1100px) {
+  .oi-detail-body { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 720px) {
+  .oi-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .oi-kpi--hero { grid-column: 1 / -1; }
+  .oi-leaders,
+  .oi-cheat-grid { grid-template-columns: 1fr; }
+  .oi-sources-time { margin-left: 0; width: 100%; }
+  .oi-stats { grid-template-columns: 1fr; }
+
+  /* The table becomes one card per asset: twelve columns do not fit a phone,
+     and a sideways scroll hides the freshness column the row depends on. */
+  .oi-table,
+  .oi-table tbody,
+  .oi-table tr,
+  .oi-table td { display: block; width: 100%; }
+  .oi-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .oi-table tr { padding: 10px 12px; border-bottom: 1px solid rgba(42, 42, 74, 0.6); }
+  .oi-table td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 3px 0;
+    border: 0;
+    text-align: right;
+    white-space: normal;
+  }
+  .oi-table td[data-label]::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    color: #8892a6;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .oi-table tbody td:first-child { padding-bottom: 6px; margin-bottom: 4px; border-bottom: 1px solid rgba(42, 42, 74, 0.6); }
+  .oi-conf-cell { min-width: 0; flex-direction: column; align-items: flex-end !important; text-align: right !important; }
+  .oi-conf { justify-content: flex-end; }
+  .oi-heat-row { grid-template-columns: 54px repeat(4, minmax(0, 1fr)); font-size: 10px; }
+  /* The chart SVG scales down to a phone's width; its labels scale back up. */
+  .oi-chart-tick { font-size: 20px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oi-detail { scroll-margin-top: 0; }
+}

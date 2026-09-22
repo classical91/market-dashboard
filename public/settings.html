@@ -262,10 +262,10 @@
     }
 
     .screener-matrix { margin-top: 14px; overflow-x: auto; }
-    .screener-grid { min-width: 520px; }
+    .screener-grid { min-width: 600px; }
     .screener-row {
       display: grid;
-      grid-template-columns: minmax(104px, 1.5fr) repeat(4, minmax(74px, 1fr)) 30px;
+      grid-template-columns: minmax(104px, 1.5fr) repeat(var(--screener-cols, 4), minmax(74px, 1fr)) 30px;
       gap: 8px; align-items: center;
       padding: 7px 0; border-bottom: 1px solid var(--border);
       font-size: 13px;
@@ -317,7 +317,7 @@
     .screener-note { font-size: 12px; color: var(--muted); line-height: 1.5; }
     .screener-note.error { color: var(--amber); }
     @media (max-width: 640px) {
-      .screener-row { grid-template-columns: minmax(84px, 1.3fr) repeat(4, minmax(56px, 1fr)) 26px; gap: 6px; }
+      .screener-row { grid-template-columns: minmax(84px, 1.3fr) repeat(var(--screener-cols, 4), minmax(56px, 1fr)) 26px; gap: 6px; }
     }
 
     /* ── Saved toast ────────────────────────────────────── */
@@ -393,7 +393,7 @@
         <div class="screener-add">
           <input id="screenerAddInput" type="text" placeholder="RENDERUSDT" aria-label="Add a Binance USDT pair" autocomplete="off" spellcheck="false" />
           <button class="settings-action-btn" id="screenerAddBtn" type="button">Add Token</button>
-          <span class="screener-note" id="screenerAddNote">Verified against Binance before it is saved, then enabled on all three screeners.</span>
+          <span class="screener-note" id="screenerAddNote">Verified against Binance before it is saved, then enabled on every screener.</span>
         </div>
 
         <div class="screener-actions">
@@ -808,7 +808,7 @@
     var snapshot = null;
     var selection = {};
     var dirty = false;
-    var ADD_HINT = 'Verified against Binance before it is saved, then enabled on all three screeners.';
+    var ADD_HINT = 'Verified against Binance before it is saved, then enabled on every screener.';
 
     function keys() {
       return snapshot ? snapshot.screeners.map(function (s) { return s.key; }) : [];
@@ -863,7 +863,7 @@
         ['None', function () { selection[key].clear(); }],
         // Per-column reset is the shipped default catalog for that column
         // only, and stays local until Save — unlike "Reset All to Defaults",
-        // which is a server write across all three.
+        // which is a server write across every screener.
         ['Reset', function () { selection[key] = new Set(snapshot.defaults); }]
       ].forEach(function (entry) {
         var btn = document.createElement('button');
@@ -895,7 +895,7 @@
       token.textContent = 'Token';
       row.appendChild(token);
       // "All" has no column of its own on the server — it is a write across
-      // the other three, so it gets bulk buttons that fan out to each.
+      // the other screeners, so it gets bulk buttons that fan out to each.
       var allTools = document.createElement('div');
       allTools.className = 'screener-col-tools';
       [
@@ -1003,6 +1003,9 @@
     function render() {
       if (!snapshot) return;
       renderCounts();
+      // One column per screener plus "All", so a screener added server-side
+      // gets its column without touching this stylesheet.
+      gridEl.style.setProperty('--screener-cols', String(snapshot.screeners.length + 1));
       gridEl.innerHTML = '';
       renderHead();
       var query = searchEl.value.trim().toUpperCase();
@@ -1076,7 +1079,7 @@
     });
 
     resetBtn.addEventListener('click', function () {
-      if (!window.confirm('Scan every default token on all three screeners? Tokens you added stay in the list but are switched off.')) return;
+      if (!window.confirm('Scan every default token on every screener? Tokens you added stay in the list but are switched off.')) return;
       resetBtn.disabled = true;
       setStatus('Resetting…');
       write(API + '/reset', { method: 'POST' }).then(function (data) {
@@ -1101,7 +1104,7 @@
       }).then(function (data) {
         adopt(data);
         addInput.value = '';
-        setAddNote(symbol + ' added and enabled on all three screeners.');
+        setAddNote(symbol + ' added and enabled on every screener.');
         setStatus('Saved.');
         showToast();
       }).catch(function (err) {

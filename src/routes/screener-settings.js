@@ -44,7 +44,7 @@ function createScreenerSettingsRouter({ screenerSettingsService, requireAdmin })
   });
 
   // Adds a Binance USDT spot pair to the catalog. `screeners` is optional and
-  // defaults to all three; the service verifies the pair returns market data
+  // defaults to every screener; the service verifies the pair returns market data
   // before anything is persisted.
   router.post("/tokens", requireAdmin, async (req, res, next) => {
     try {

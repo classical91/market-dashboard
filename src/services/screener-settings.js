@@ -10,7 +10,7 @@
  * which meant the Settings page could not change what the scanners actually
  * monitor, and adding or dropping a token was a code change and a redeploy.
  * That static list is now only the default catalog: on first boot it seeds all
- * three universes, and from then on this file is what the routes read.
+ * screener universes, and from then on this file is what the routes read.
  *
  * Server-side on purpose. The scanning happens here, not in the browser, so a
  * localStorage-only setting would leave the UI claiming one universe while
@@ -51,7 +51,7 @@ const { createServiceError } = require("../utils/errors");
 
 const SETTINGS_VERSION = 1;
 
-// The three screeners this store fronts. Order is the display order of the
+// The screeners this store fronts. Order is the display order of the
 // matrix columns on the Settings page.
 const SCREENERS = [
   {
@@ -68,6 +68,11 @@ const SCREENERS = [
     key: "patternScanner",
     label: "Pattern Scanner",
     description: "Flags, wedges and RSI divergence across 1h / 4h / 1D",
+  },
+  {
+    key: "openInterest",
+    label: "Open Interest",
+    description: "Futures positioning — OI change against price across 15m / 1h / 4h / 24h",
   },
 ];
 
@@ -143,7 +148,7 @@ function assertScreenerKey(value) {
 /**
  * The default Binance ticker probe: does this pair actually return market
  * data? Adding a pair Binance has never heard of would otherwise put a
- * permanently erroring row on three pages. Injectable so tests — and any
+ * permanently erroring row on every screener page. Injectable so tests — and any
  * future data source — can supply their own.
  */
 async function verifySymbolOnBinance(symbol) {
@@ -381,9 +386,19 @@ class ScreenerSettingsService {
 
       const state = this._read();
       if (this._loadState === "corrupt") return false;
+      // A screener added by a later release (Open Interest joined the
+      // original three) is missing from an older file. _read() has already
+      // filled it from the defaults; writing that once stops every later read
+      // from reporting the file as partial.
+      const migrated = this._loadState === "partial";
       const seeded = new Set(state.seededDefaults);
       const pending = this._defaults.filter((symbol) => !seeded.has(symbol));
-      if (!pending.length) return false;
+      if (!pending.length) {
+        if (!migrated) return false;
+        if (!this._write(state)) throw createServiceError("Could not add the new screener universes", 500);
+        this._logger.log?.("[ScreenerSettings] Added missing screener universe(s) from the defaults");
+        return true;
+      }
 
       for (const key of SCREENER_KEYS) {
         state.universes[key] = dedupeSymbols([...(state.universes[key] || []), ...pending]);

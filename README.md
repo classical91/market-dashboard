@@ -365,6 +365,19 @@ The Overview card reads `GET /api/onchain/intelligence`, which wraps DefiLlama's
 - **Pulse** - deterministic, rules in `scoring.js` and echoed in the payload: stablecoin supply 7D (±0.5% / ±1.5%), DeFi TVL 7D (±3% / ±8%) and DEX volume 7D-over-prior-7D (±10% / ±25%) each score 0 / ±1 / ±2; the sum maps to Strong Expansion (≥4), Expansion (≥2), Neutral, Contraction (≤−2), Strong Contraction (≤−4). Needs at least two components. Context only; it never says LONG or SHORT.
 - **Status** - `LIVE` (latest refresh succeeded), `CACHED` (refresh failed, serving a copy younger than `ONCHAIN_INTEL_STALE_AFTER_MS`), `STALE` (older), `UNAVAILABLE` (never fetched). The last good dataset is kept per section in `DATA_DIR/onchain-intelligence.json`, so it survives restarts. Missing values render `—`, never zero.
 
+### Open Interest Intelligence
+
+`/open-interest.html` (sidebar: TradeHunter → Screeners → Open Interest) reads `GET /api/open-interest` and `GET /api/open-interest/:symbol?interval=15m|1h|4h|1d`. The server calls public, keyless futures endpoints only — never TradingView or LuxAlgo — and the browser never talks to an exchange. Code lives in `src/services/open-interest/`.
+
+- **Venues** - per asset, the first venue in `OPEN_INTEREST_PROVIDERS` (default `binance,bybit,okx,bitget`) that lists the symbol serves the whole row; venues are never summed for one asset. A geo-blocked, rate-limited or failing venue is benched for `OPEN_INTEREST_VENUE_COOLDOWN_MS` (default 5 min) and the next one answers. Bitget publishes current OI only, so its rows show changes as unavailable.
+- **Changes** - OI change is computed in coins (15m resolution, 15m / 1h / 4h / 24h), so a price move alone never reads as leverage entering. Price change comes from the shared spot candle cache (`SignalScreenerService.getCandles`).
+- **Price × OI** - Long buildup (P↑ OI↑), Short buildup (P↓ OI↑), Short covering (P↑ OI↓), Long unwind (P↓ OI↓), plus Leverage building/leaving when price is flat and Quiet below each horizon's noise floor (`classify.js`). Positioning interpretations, not signals.
+- **Spikes** - the latest 1h OI change against the asset's own recent 1h changes (z ≥ 2.5 and ≥ 1%).
+- **Confluence** - Directional Bias and Local Extremes come from the existing screener projections (`scanDirectionalBias` / `scanLocalExtremes`), not recomputed.
+- **Universe** - the Open Interest column in Settings → Screeners (`openInterest` in `DATA_DIR/screener-settings.json`, seeded from the defaults on first boot). BTC is pinned first.
+- **Missing and stale** - missing values are `null` and render `—`, never 0%. Totals and breadth report how many assets they cover. A row whose latest OI point is older than `OPEN_INTEREST_STALE_AFTER_MS` (default 45 min), or that is being served from the last good copy after a failed refresh, is marked STALE. `OPEN_INTEREST_CACHE_MS` (default 2 min) and `OPEN_INTEREST_REQUEST_TIMEOUT_MS` (default 8 s) tune caching and timeouts.
+- **Not available** - liquidations (no free keyless feed); the detail panel links out to CoinGlass instead.
+
 ### YouTube Intelligence
 
 `/youtube-v2.html` runs on a hybrid of the YouTube Data API v3 and YouTube's public RSS feeds. Per channel the service tries the API first (uploads plus live/upcoming state), falls back to RSS (uploads only, no key, but it needs a known `UC...` channel ID), and finally serves the last known good feed rather than blanking the page. It never scrapes `youtube.com/@handle` HTML — doing that is what used to break the page on Railway, where YouTube answers datacenter IPs with a consent interstitial instead of the channel document.

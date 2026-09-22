@@ -193,7 +193,7 @@ test("the snapshot marks which catalog rows are defaults and counts each univers
     snapshot.catalog.map((token) => [token.symbol, token.label, token.isDefault]),
     [["BTCUSDT", "BTC", true], ["ETHUSDT", "ETH", true], ["RENDERUSDT", "RENDER", false]],
   );
-  assert.deepEqual(snapshot.counts, { directionalBias: 2, localExtremes: 2, patternScanner: 3 });
+  assert.deepEqual(snapshot.counts, { directionalBias: 2, localExtremes: 2, patternScanner: 3, openInterest: 2 });
 });
 
 test("the API reads openly and gates every write", async () => {
@@ -352,4 +352,27 @@ test("omitting symbols leaves every existing caller on the default universe", as
 
   await service.scanAll("4h", 4);
   assert.deepEqual(scanned, ["BTCUSDT", "ETHUSDT"]);
+});
+
+test("an older settings file gains the Open Interest universe once, from the defaults", () => {
+  const dataDir = tempDir();
+  const file = path.join(dataDir, "screener-settings.json");
+  // The shape every deployment wrote before Open Interest existed, with a
+  // deliberately customised universe that must survive the migration.
+  fs.writeFileSync(file, JSON.stringify({
+    version: 1,
+    seededDefaults: ["BTCUSDT", "ETHUSDT"],
+    added: [],
+    universes: { directionalBias: ["BTCUSDT"], localExtremes: ["ETHUSDT"], patternScanner: [] },
+  }));
+  const service = makeService({ dataDir, defaults: ["BTCUSDT", "ETHUSDT"] });
+
+  assert.equal(service.ensureSeeded(), true);
+  const written = JSON.parse(fs.readFileSync(file, "utf8"));
+  assert.deepEqual(written.universes.openInterest, ["BTCUSDT", "ETHUSDT"]);
+  assert.deepEqual(written.universes.directionalBias, ["BTCUSDT"]);
+  assert.deepEqual(written.universes.patternScanner, []);
+  assert.equal(service.snapshot().status.state, "loaded");
+  // Idempotent: a second boot has nothing left to migrate.
+  assert.equal(service.ensureSeeded(), false);
 });

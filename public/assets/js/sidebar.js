@@ -67,6 +67,7 @@
             { href: "/directional-bias.html", label: "Directional Bias" },
             { href: "/local-extremes.html", label: "Local Extremes" },
             { href: "/pattern-scanner.html", label: "Pattern Scanner" },
+            { href: "/open-interest.html", label: "Open Interest" },
             { href: "/pattern-scanner-trades.html", label: "My Trades" },
           ],
         },
@@ -137,7 +138,7 @@
             { href: "/crypto.html#market-trends", label: "Market Trends" },
             { href: "/crypto.html#rankings", label: "Rankings" },
             { href: "/crypto.html#liquidations", label: "Liquidations" },
-            { href: "/crypto.html#open-interest", label: "Open-Interest Overview" },
+            { href: "/crypto.html#open-interest", label: "Open-Interest Links" },
             { href: "/crypto.html#heatmaps", label: "Heatmaps & Momentum" },
             {
               label: "On-Chain Analytics",
