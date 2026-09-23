@@ -40,9 +40,8 @@
 
     <div class="xoi-classes" role="group" aria-label="Asset class" id="xoi-classes"></div>
 
-    <div class="aia-notice xoi-notice" id="xoi-notice" style="display:none" role="status"></div>
-
     <section class="xoi-stage" aria-label="Cross-market open interest comparison">
+      <div class="aia-notice xoi-notice" id="xoi-notice" style="display:none" role="status"></div>
       <div class="xoi-table" id="xoi-table" role="list" aria-label="Instruments in this comparison"></div>
       <div class="xoi-plot-wrap">
         <div class="xoi-plot" id="xoi-plot"></div>
@@ -68,7 +67,7 @@
           <li><strong>Source.</strong> The CFTC&rsquo;s weekly Commitments of Traders report (Legacy, futures only) from publicreporting.cftc.gov. It&rsquo;s free and public domain. Positions are as of Tuesday and published Friday at 3:30pm ET. The server fetches it once an hour at most and keeps the last good report if the CFTC is unreachable.</li>
           <li><strong>Open interest</strong> plots the % change in total open interest over the lookback (1 or 4 weekly reports). Contract counts are never plotted directly: a Bitcoin contract and a Natural Gas contract share no unit.</li>
           <li><strong>COT positioning</strong> plots net non-commercial (large speculator) longs minus shorts as a % of open interest. That&rsquo;s the direction of the speculative crowd, a different quantity from OI. Every row is labelled with the metric it shows.</li>
-          <li><strong>The ellipse.</strong> Rings are value bands from the inner ring (&minus;scale) through the dashed ring (0) to the outer ring (+scale). The geometry follows the reference Pine script&rsquo;s <code>sqrt(1 &minus; x&sup2;)</code> half-ellipse, mirrored.</li>
+          <li><strong>The ellipse.</strong> Values run from the centre (&minus;scale) through the dashed ring (0) to the outer ring (+scale). As on the reference indicator, what the shape adds beyond the zero ring is shaded orange (above 0) and what it cuts out of the zero ring is grey (below 0). The geometry follows the reference Pine script&rsquo;s <code>sqrt(1 &minus; x&sup2;)</code> half-ellipse, mirrored.</li>
           <li><strong>ROLL</strong> marks quarterly contracts within three weeks of a March/June/September/December expiry. Large OI swings there are usually contracts rolling, not new positioning.</li>
         </ol>
         <ul class="aia-how-notes">

@@ -109,7 +109,7 @@
   height: 20px;
   border-radius: 50%;
   background: var(--slot, #555);
-  color: #05070c;
+  color: #fff;
   font-size: 11px;
   font-weight: 900;
 }
@@ -151,15 +151,22 @@
 
 .xoi-guide { stroke: rgba(34, 211, 238, 0.22); stroke-width: 1; stroke-dasharray: 1 4; }
 
-.xoi-poly { fill: rgba(255, 62, 200, 0.14); stroke: var(--xoi-magenta); stroke-width: 2; stroke-linejoin: round; }
-.xoi-poly--open { fill: none; stroke-dasharray: 6 4; }
+/* The reference's two-tone reading: orange where the shape rises above the
+   zero ring, grey where it sinks inside it. */
+.xoi-fill-up { fill: rgba(226, 138, 36, 0.82); }
+.xoi-fill-down { fill: rgba(170, 172, 180, 0.62); }
+.xoi-poly { fill: none; stroke: rgba(232, 237, 245, 0.55); stroke-width: 1.25; stroke-linejoin: round; }
+.xoi-key { fill: #8a93a6; font-size: 10px; font-weight: 700; }
+.xoi-key-up { fill: rgb(226, 138, 36); }
+.xoi-key-down { fill: rgb(170, 172, 180); }
+.xoi-poly--open { fill: none; stroke: var(--xoi-magenta); stroke-width: 1.5; stroke-dasharray: 6 4; }
 
 .xoi-node { cursor: pointer; outline: none; }
 .xoi-point { fill: var(--xoi-magenta); stroke: var(--xoi-surface); stroke-width: 2; }
 .xoi-halo { fill: rgba(255, 62, 200, 0.18); stroke: rgba(255, 62, 200, 0.7); stroke-width: 1; }
-.xoi-point-label { fill: #f5b8e6; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; paint-order: stroke; stroke: var(--xoi-surface); stroke-width: 3px; }
+.xoi-point-label { fill: #f5d0ec; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .xoi-badge-dot { stroke: var(--xoi-surface); stroke-width: 2; }
-.xoi-badge-num { fill: #05070c; font-size: 12px; font-weight: 900; pointer-events: none; }
+.xoi-badge-num { fill: #fff; font-size: 12px; font-weight: 900; pointer-events: none; }
 .xoi-axis-label { fill: #c9d4e8; font-size: 11px; font-weight: 800; letter-spacing: 0.04em; }
 .xoi-hit { fill: transparent; }
 .xoi-node.is-missing .xoi-axis-label { fill: #6f7789; }
@@ -248,3 +255,22 @@
 
 /* Why Daily is greyed out, visible on touch screens where a title never is. */
 .xoi-tf-note { font-size: 10px; font-weight: 700; color: #8a93a6; letter-spacing: 0.03em; }
+
+/* A control change is in flight: the old shape stays, dimmed, until the
+   new one replaces it. */
+.xoi-plot.is-loading .xoi-svg { opacity: 0.35; transition: opacity 120ms ease; }
+.xoi-plot.is-loading::after {
+  content: "Loading…";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #5fb9c9;
+  font-size: 12px;
+  font-weight: 700;
+  pointer-events: none;
+}
+.xoi-stage .xoi-notice { margin: 0 0 10px; }
+@media (prefers-reduced-motion: reduce) {
+  .xoi-plot.is-loading .xoi-svg { transition: none; }
+}
