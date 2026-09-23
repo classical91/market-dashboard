@@ -160,7 +160,10 @@
 
   // ── geometry ─────────────────────────────────────────────
 
-  var INNER = 0.2; // fraction of the outer radius where −scale sits
+  // −scale sits at the very centre, 0 on the middle ring and +scale on the
+  // outer ring, as on the reference indicator.
+  var INNER = 0;
+  var maskSeq = 0;
 
   function frac(v, scale) {
     var clamped = Math.max(-scale, Math.min(scale, v));
@@ -190,7 +193,7 @@
     // Wide oval on a desktop, close to a circle on a phone, so the plot fills
     // the screen either way.
     return mobile
-      ? { w: 400, h: 430, cx: 200, cy: 212, rx: 148, ry: 156 }
+      ? { w: 400, h: 456, cx: 200, cy: 212, rx: 148, ry: 156 }
       : { w: 920, h: 520, cx: 460, cy: 262, rx: 330, ry: 196 };
   }
 
@@ -284,14 +287,16 @@
     var levels = [-1, -0.5, 0, 0.5, 1];
     levels.forEach(function (l) {
       var f = frac(l * scale, scale);
-      svg.appendChild(svgEl("path", {
+      if (f > 0) svg.appendChild(svgEl("path", {
         d: ellipsePath(g.cx, g.cy, g.rx * f, g.ry * f),
         class: "xoi-ring" + (l === 0 ? " xoi-ring--zero" : "") + (l === 1 ? " xoi-ring--outer" : ""),
       }));
       // Band labels run along the empty bisector between the last and the
       // first instrument, like a ruler, so they never sit under a value.
       var ra = angle(-0.5, Math.max(n, 1));
-      svg.appendChild(svgEl("text", {
+      // −scale is the centre point itself; it is named in the scale caption
+      // instead, where it can't sit on top of a value near the minimum.
+      if (f > 0) svg.appendChild(svgEl("text", {
         x: g.cx + Math.cos(ra) * g.rx * f, y: g.cy + Math.sin(ra) * g.ry * f - 3,
         "text-anchor": "middle", class: "xoi-ring-label",
       }, fmtScale(l * scale)));
@@ -312,7 +317,30 @@
     });
     var complete = pts.every(Boolean);
     if (n >= 3 && complete) {
-      svg.appendChild(svgEl("polygon", { points: pts.map(function (p) { return p[0].toFixed(1) + "," + p[1].toFixed(1); }).join(" "), class: "xoi-poly" }));
+      var polyPoints = pts.map(function (p) { return p[0].toFixed(1) + "," + p[1].toFixed(1); }).join(" ");
+      var zf = frac(0, scale);
+      var zeroPath = ellipsePath(g.cx, g.cy, g.rx * zf, g.ry * zf);
+      // Two-tone fill, as on the reference: what the shape adds beyond the
+      // zero ring is orange (above 0), what it takes out of the zero disc is
+      // grey (below 0). Where the shape and the zero disc overlap is left
+      // empty, so only the departures from zero carry colour.
+      var id = "xoi-m" + (maskSeq += 1);
+      var defs = svgEl("defs", {});
+      var outside = svgEl("mask", { id: id + "-out", maskUnits: "userSpaceOnUse", x: 0, y: 0, width: g.w, height: g.h });
+      outside.appendChild(svgEl("rect", { x: 0, y: 0, width: g.w, height: g.h, fill: "#fff" }));
+      outside.appendChild(svgEl("path", { d: zeroPath, fill: "#000" }));
+      var inside = svgEl("mask", { id: id + "-in", maskUnits: "userSpaceOnUse", x: 0, y: 0, width: g.w, height: g.h });
+      inside.appendChild(svgEl("rect", { x: 0, y: 0, width: g.w, height: g.h, fill: "#fff" }));
+      inside.appendChild(svgEl("polygon", { points: polyPoints, fill: "#000" }));
+      defs.appendChild(outside);
+      defs.appendChild(inside);
+      var fills = svgEl("g", { class: "xoi-fills", "aria-hidden": "true" });
+      fills.appendChild(defs);
+      fills.appendChild(svgEl("path", { d: zeroPath, class: "xoi-fill-down", mask: "url(#" + id + "-in)" }));
+      fills.appendChild(svgEl("polygon", { points: polyPoints, class: "xoi-fill-up", mask: "url(#" + id + "-out)" }));
+      // Under the rings and guides, so the scale stays readable through it.
+      svg.insertBefore(fills, svg.firstChild);
+      svg.appendChild(svgEl("polygon", { points: polyPoints, class: "xoi-poly" }));
     } else {
       var d = "";
       var pen = false;
@@ -370,6 +398,15 @@
     var d0 = state.data;
     svg.appendChild(svgEl("text", { x: 14, y: 22, class: "xoi-corner" }, "TF: " + (d0 ? d0.timeframe : "W") + " · Δ " + (d0 ? d0.lookback : "")));
     svg.appendChild(svgEl("text", { x: 14, y: 40, class: "xoi-corner xoi-corner--dim" }, "As of " + fmtDate(d0 && d0.source.reportDate)));
+    // Colour key, in words as well as colour.
+    var upWord = state.metric === "OI" ? "OI up" : "net long";
+    var downWord = state.metric === "OI" ? "OI down" : "net short";
+    var key = svgEl("text", { x: 14, y: g.h - 10, class: "xoi-key" });
+    key.appendChild(svgEl("tspan", { class: "xoi-key-up" }, "■ "));
+    key.appendChild(svgEl("tspan", {}, "above 0 (" + upWord + ")   "));
+    key.appendChild(svgEl("tspan", { class: "xoi-key-down" }, "■ "));
+    key.appendChild(svgEl("tspan", {}, "below 0 (" + downWord + ") · centre = −" + scale));
+    svg.appendChild(key);
     svg.appendChild(svgEl("text", { x: g.w - 14, y: 22, "text-anchor": "end", class: "xoi-corner" }, info.label));
     svg.appendChild(svgEl("text", { x: g.w - 14, y: 40, "text-anchor": "end", class: "xoi-corner xoi-corner--dim" }, "Scale ±" + scale + " " + info.plottedUnit));
 
