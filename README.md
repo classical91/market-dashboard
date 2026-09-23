@@ -367,7 +367,7 @@ The Overview card reads `GET /api/onchain/intelligence`, which wraps DefiLlama's
 
 ### Open Interest Intelligence
 
-`/open-interest.html` (sidebar: TradeHunter → Screeners → Open Interest) reads `GET /api/open-interest` and `GET /api/open-interest/:symbol?interval=15m|1h|4h|1d`. The server calls public, keyless futures endpoints only — never TradingView or LuxAlgo — and the browser never talks to an exchange. Code lives in `src/services/open-interest/`.
+`/open-interest.html` (sidebar: TradeHunter → Screeners → Crypto Open Interest) reads `GET /api/open-interest` and `GET /api/open-interest/:symbol?interval=15m|1h|4h|1d`. The server calls public, keyless futures endpoints only — never TradingView or LuxAlgo — and the browser never talks to an exchange. Code lives in `src/services/open-interest/`.
 
 - **Venues** - per asset, the first venue in `OPEN_INTEREST_PROVIDERS` (default `binance,bybit,okx,bitget`) that lists the symbol serves the whole row; venues are never summed for one asset. A geo-blocked, rate-limited or failing venue is benched for `OPEN_INTEREST_VENUE_COOLDOWN_MS` (default 5 min) and the next one answers. Bitget publishes current OI only, so its rows show changes as unavailable.
 - **Changes** - OI change is computed in coins (15m resolution, 15m / 1h / 4h / 24h), so a price move alone never reads as leverage entering. Price change comes from the shared spot candle cache (`SignalScreenerService.getCandles`).
@@ -380,7 +380,7 @@ The Overview card reads `GET /api/onchain/intelligence`, which wraps DefiLlama's
 
 ### Cross-Market Open Interest
 
-`/cross-market-oi.html` (sidebar: Market Intel Links → Market Intel → Cross-Market Open Interest) compares futures across indexes, FX, metals, energy, rates and crypto on one elliptical plot. It is separate from the crypto OI screener at `/open-interest.html`; both pages stay. It reads `GET /api/cross-market-oi?lookback=1w|4w`, served from `src/services/cross-market-oi/`.
+`/cross-market-oi.html` (sidebar: TradeHunter → Screeners → Cross-Market Open Interest, next to the crypto page) compares futures across indexes, FX, metals, energy, rates and crypto on one elliptical plot. It is separate from the crypto OI screener at `/open-interest.html`; both pages stay. It reads `GET /api/cross-market-oi?lookback=1w|4w`, served from `src/services/cross-market-oi/`.
 
 - **Source** - CFTC Commitments of Traders, Legacy Futures Only, from the CFTC Public Reporting API (`publicreporting.cftc.gov`, dataset `6dca-aqww`). Free and public domain; one request covers every market. Weekly only: positions as of Tuesday, published Friday. There is no free, licensed daily OI feed for CME/ICE/COMEX/NYMEX, so Daily is shown disabled.
 - **Metrics** - every row carries `metricType`. `OI` plots the % change in total open interest over 1 or 4 weekly reports; raw contract counts are never plotted across markets. `COT_NET_SPEC` plots net non-commercial (long − short) as a % of open interest. Neither claims to reproduce LuxAlgo's formula.

@@ -214,3 +214,25 @@ test("the persisted last good dataset survives a restart", async () => {
   assert.equal(restarted.status, "CACHED");
   assert.equal(restarted.metrics.stablecoins.current, live.metrics.stablecoins.current);
 });
+
+test("a saved copy from the same millisecond is CACHED, not LIVE", async () => {
+  // Pins the clock so the restart's refresh and the saved copy share a
+  // timestamp — the case that used to read a failed refresh as LIVE.
+  const saved = new Map();
+  const store = { get: (k) => saved.get(k) ?? null, set: (k, v) => saved.set(k, JSON.parse(JSON.stringify(v))) };
+  const now = () => Date.UTC(2026, 8, 23, 0, 0, 0);
+  const make = (routes) =>
+    new OnchainIntelligenceService({
+      provider: new DefiLlamaOnchainProvider({ fetchImpl: fakeFetch(routes) }),
+      cache: new MemoryCache(),
+      store,
+      cacheTtlMs: 0,
+      failureCacheTtlMs: 0,
+      now,
+    });
+
+  assert.equal((await make(healthyRoutes()).getIntelligence()).status, "LIVE");
+  const restarted = await make({}).getIntelligence();
+  assert.equal(restarted.status, "CACHED");
+  assert.ok(Object.values(restarted.sections).every((status) => status !== "LIVE"));
+});

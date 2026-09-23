@@ -52,7 +52,7 @@ test("TradeHunter sits above AI Analysis and owns the scanner workflow", () => {
 
   assert.ok(tradeHunterStart > -1, "TradeHunter is missing");
   assert.ok(aiAnalysisStart > tradeHunterStart, "TradeHunter must sit above AI Analysis");
-  const labels = ["Screeners", "Directional Bias", "Local Extremes", "Pattern Scanner", "Open Interest", "My Trades", "Track Record", "Decision Engine"];
+  const labels = ["Screeners", "Directional Bias", "Local Extremes", "Pattern Scanner", "Crypto Open Interest", "Cross-Market Open Interest", "My Trades", "Track Record", "Decision Engine"];
   let cursor = -1;
   for (const label of labels) {
     const next = tradeHunter.indexOf(`label: "${label}"`, cursor + 1);
@@ -74,7 +74,8 @@ test("the Screeners group holds one entry per screener and no combined page", ()
   assert.match(menu, /href: "\/directional-bias\.html"/);
   assert.match(menu, /href: "\/local-extremes\.html"/);
   assert.match(menu, /href: "\/pattern-scanner\.html"/);
-  assert.match(menu, /href: "\/open-interest\.html", label: "Open Interest"/);
+  assert.match(menu, /href: "\/open-interest\.html", label: "Crypto Open Interest"/);
+  assert.match(menu, /href: "\/cross-market-oi\.html", label: "Cross-Market Open Interest"/);
   assert.match(menu, /href: "\/pattern-scanner-trades\.html"/);
   assert.doesNotMatch(sidebar, /label: "Signal Screener"/);
   // Future screeners join this group; none of them may ship as a dead link yet.
@@ -168,10 +169,11 @@ test("Overview opens its page directly and nests Widgets and Heatmaps", () => {
   assert.match(sidebar, /nav-split-toggle/);
 });
 
-test("Cross-Market Open Interest sits with the macro pages, apart from the crypto OI screener", () => {
-  const start = sidebar.indexOf('label: "Market Intel Links"');
-  const marketIntel = sidebar.slice(start, sidebar.indexOf('label: "Crypto"', start));
-  assert.match(marketIntel, /href: "\/cross-market-oi\.html", label: "Cross-Market Open Interest"/);
-  // Both OI pages stay reachable.
-  assert.match(sidebar, /href: "\/open-interest\.html", label: "Open Interest"/);
+test("both Open Interest pages sit side by side under Screeners", () => {
+  const start = sidebar.indexOf('label: "Screeners"');
+  const menu = sidebar.slice(start, sidebar.indexOf('label: "Track Record"', start));
+  const crypto = menu.indexOf('href: "/open-interest.html", label: "Crypto Open Interest"');
+  const cross = menu.indexOf('href: "/cross-market-oi.html", label: "Cross-Market Open Interest"');
+  assert.ok(crypto > -1, "crypto OI is under Screeners");
+  assert.equal(cross > crypto, true, "cross-market OI sits right after crypto OI");
 });

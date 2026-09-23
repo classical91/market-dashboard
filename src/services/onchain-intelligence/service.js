@@ -64,12 +64,17 @@ class OnchainIntelligenceService {
     const fetchedAt = new Date(this.now()).toISOString();
     const fresh = snapshot?.data || {};
     const sections = {};
+    // Which sections this refresh actually fetched. LIVE is decided from
+    // this, never by comparing timestamps: a saved copy written in the same
+    // millisecond as this refresh would otherwise read as live.
+    const refreshed = new Set();
     let updated = false;
 
     for (const name of ["tvl", "stablecoins", "dex"]) {
       if (fresh[name]) {
         sections[name] = { value: fresh[name], fetchedAt };
         this.lastGood[name] = sections[name];
+        refreshed.add(name);
         updated = true;
       } else if (this.lastGood[name]) {
         sections[name] = this.lastGood[name];
@@ -82,6 +87,7 @@ class OnchainIntelligenceService {
       const value = mergeChainRows(fresh.chains, this.lastGood.chains?.value);
       sections.chains = { value, fetchedAt };
       this.lastGood.chains = sections.chains;
+      refreshed.add("chains");
       updated = true;
     } else if (this.lastGood.chains) {
       sections.chains = this.lastGood.chains;
@@ -91,14 +97,14 @@ class OnchainIntelligenceService {
 
     const errors = providerError ? [providerError.message] : snapshot?.errors || [];
     this.lastRefreshFailed = Boolean(providerError) || errors.length > 0;
-    return this.buildPayload({ sections, errors, fetchedAt });
+    return this.buildPayload({ sections, errors, fetchedAt, refreshed });
   }
 
-  buildPayload({ sections, errors, fetchedAt }) {
+  buildPayload({ sections, errors, fetchedAt, refreshed = new Set() }) {
     const nowMs = this.now();
-    const statusOf = (section) => {
+    const statusOf = (section, name) => {
       if (!section) return "UNAVAILABLE";
-      if (section.fetchedAt === fetchedAt) return "LIVE";
+      if (refreshed.has(name)) return "LIVE";
       return nowMs - Date.parse(section.fetchedAt) > this.staleAfterMs ? "STALE" : "CACHED";
     };
 
@@ -107,7 +113,7 @@ class OnchainIntelligenceService {
     const dex = sections.dex?.value ?? null;
     const chains = sections.chains?.value ?? [];
 
-    const sectionStatus = Object.fromEntries(SECTIONS.map((name) => [name, statusOf(sections[name])]));
+    const sectionStatus = Object.fromEntries(SECTIONS.map((name) => [name, statusOf(sections[name], name)]));
     const pulse = computePulse({ stablecoins, tvl, dex });
     const liquidity = liquidityRegime(stablecoins);
     const bands = RULES.components;
