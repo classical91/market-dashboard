@@ -60,6 +60,7 @@ const { shadowBananagunV1 } = require("./shadow-bananagun-v1");
 const { donchianBreakoutV1 } = require("./donchian-breakout-v1");
 const { vwapReversionV1 } = require("./vwap-reversion-v1");
 const { bbMeanReversionV4 } = require("./bb-mean-reversion-v4");
+const { emaVwapRsiV1 } = require("./ema-vwap-rsi-v1");
 const {
   LIFECYCLE_STATUSES,
   SCANNER_STATUSES,
@@ -79,6 +80,7 @@ const STRATEGIES = [
   donchianBreakoutV1,
   vwapReversionV1,
   bbMeanReversionV4,
+  emaVwapRsiV1,
 ].map(assertValidLifecycle);
 
 const BY_ID = new Map(STRATEGIES.map((strategy) => [strategy.id, strategy]));

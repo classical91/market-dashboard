@@ -1,0 +1,32 @@
+//@version=5
+strategy("Market Dashboard - EMA/VWAP/RSI v1", overlay=true, initial_capital=10000, commission_type=strategy.commission.percent, commission_value=0.06, slippage=2)
+trendEmaLen = input.int(100, "Trend EMA", minval=2)
+entryEmaLen = input.int(21, "Entry EMA", minval=2)
+rsiLen = input.int(14, "RSI length", minval=2)
+atrLen = input.int(14, "ATR length", minval=2)
+atrMultSL = input.float(1.2, "ATR stop multiplier", minval=0.2)
+rr = input.float(2.0, "Reward/risk", minval=0.5)
+useVwap = input.bool(true, "Require VWAP side")
+allowLong = input.bool(true, "Allow longs")
+allowShort = input.bool(true, "Allow shorts")
+trend = ta.ema(close, trendEmaLen)
+entryEma = ta.ema(close, entryEmaLen)
+r = ta.rsi(close, rsiLen)
+a = ta.atr(atrLen)
+vw = ta.vwap(hlc3, timeframe.change(timeframe.isdaily or timeframe.isweekly or timeframe.ismonthly ? "M" : "D"))
+crossedUp = close[1] <= entryEma[1] and close > entryEma
+crossedDown = close[1] >= entryEma[1] and close < entryEma
+longSignal = allowLong and close > trend and crossedUp and r > 50 and (not useVwap or close > vw)
+shortSignal = allowShort and close < trend and crossedDown and r < 50 and (not useVwap or close < vw)
+var float risk = na
+if strategy.position_size == 0 and longSignal
+    risk := a * atrMultSL
+    strategy.entry("Long", strategy.long)
+if strategy.position_size == 0 and shortSignal
+    risk := a * atrMultSL
+    strategy.entry("Short", strategy.short)
+strategy.exit("Long exit", "Long", stop=strategy.position_avg_price-risk, limit=strategy.position_avg_price+risk*rr)
+strategy.exit("Short exit", "Short", stop=strategy.position_avg_price+risk, limit=strategy.position_avg_price-risk*rr)
+plot(trend, "Trend EMA", color=color.orange)
+plot(entryEma, "Entry EMA", color=color.new(color.aqua, 20))
+plot(useVwap ? vw : na, "VWAP", color=color.new(color.purple, 30))
