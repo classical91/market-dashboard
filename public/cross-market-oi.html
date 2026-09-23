@@ -27,13 +27,14 @@
         <button type="button" data-metric="COT_NET_SPEC" aria-pressed="false">COT positioning</button>
       </div>
       <div class="xoi-seg" role="group" aria-label="Timeframe" id="xoi-timeframe">
-        <button type="button" data-tf="D" disabled aria-disabled="true" title="No free, licensed daily open-interest feed for CME / ICE / COMEX / NYMEX. CFTC data is weekly.">Daily</button>
+        <button type="button" data-tf="D" disabled aria-disabled="true" aria-pressed="false">Daily</button>
         <button type="button" data-tf="W" aria-pressed="true" class="is-active">Weekly</button>
       </div>
       <div class="xoi-seg" role="group" aria-label="Lookback" id="xoi-lookback">
         <button type="button" data-lookback="1w" aria-pressed="true" class="is-active">&Delta; 1W</button>
         <button type="button" data-lookback="4w" aria-pressed="false">&Delta; 4W</button>
       </div>
+      <span class="xoi-tf-note" id="xoi-tf-note" hidden></span>
       <button type="button" class="xoi-refresh" id="xoi-refresh">Refresh</button>
     </div>
 
@@ -71,7 +72,7 @@
           <li><strong>ROLL</strong> marks quarterly contracts within three weeks of a March/June/September/December expiry. Large OI swings there are usually contracts rolling, not new positioning.</li>
         </ol>
         <ul class="aia-how-notes">
-          <li><strong>Daily is unavailable.</strong> No free, licensed daily open-interest feed exists for these exchanges.</li>
+          <li><strong>Daily</strong> reads exchange open interest per trading session from Databento (paid; enabled by <code>DATABENTO_API_KEY</code>), summed across every expiry. &Delta; 1D compares with the previous session, &Delta; 5D with five sessions back. Exchanges publish OI once per session, so there is no 4h or 8h figure. COT positioning stays weekly.</li>
           <li><strong>Not LuxAlgo&rsquo;s formula.</strong> The reference indicator&rsquo;s calculation isn&rsquo;t public, so this page doesn&rsquo;t claim to reproduce its numbers.</li>
           <li><strong>Missing is missing.</strong> A market absent from the report shows &mdash; and leaves a gap in the shape. It is never plotted as 0.</li>
         </ul>

@@ -23,6 +23,8 @@
   var el = {
     metric: document.getElementById("xoi-metric"),
     lookback: document.getElementById("xoi-lookback"),
+    timeframe: document.getElementById("xoi-timeframe"),
+    tfNote: document.getElementById("xoi-tf-note"),
     refresh: document.getElementById("xoi-refresh"),
     classes: document.getElementById("xoi-classes"),
     notice: document.getElementById("xoi-notice"),
@@ -41,6 +43,7 @@
   var state = {
     data: null,
     metric: "OI",
+    timeframe: "W",
     lookback: "1w",
     assetClass: "all",
     selection: null,
@@ -143,8 +146,10 @@
       var v = it.row && it.row.normalizedValue;
       if (isNum(v)) max = Math.max(max, Math.abs(v));
     });
-    var steps = [10, 25, 50, 100, 200, 500];
-    var scale = info.defaultScale || 25;
+    var steps = [5, 10, 25, 50, 100, 200, 500];
+    // Daily moves are a session's worth: ±1% is a large one. On the weekly
+    // ±25 scale every point would sit on the zero ring, so Daily opens at ±5.
+    var scale = state.timeframe === "D" && state.metric === "OI" ? 5 : info.defaultScale || 25;
     if (max > scale) {
       for (var i = 0; i < steps.length; i += 1) { if (steps[i] >= max) { scale = steps[i]; break; } }
       if (max > scale) scale = Math.ceil(max / 100) * 100;
@@ -449,6 +454,45 @@
     }).join("");
   }
 
+  function timeframeInfo(key) {
+    var list = (state.data && state.data.timeframes) || [];
+    for (var i = 0; i < list.length; i += 1) if (list[i].key === key) return list[i];
+    return null;
+  }
+
+  /**
+   * Timeframe, lookback and metric controls follow the server: Daily is
+   * enabled only when a daily source is configured, lookbacks are the
+   * timeframe's own (sessions for Daily, reports for Weekly), and a metric
+   * the timeframe cannot serve is disabled rather than shown empty.
+   */
+  function renderTimeframes() {
+    var daily = timeframeInfo("D");
+    var dBtn = el.timeframe.querySelector('[data-tf="D"]');
+    var dailyOk = Boolean(daily && daily.available);
+    dBtn.disabled = !dailyOk;
+    dBtn.setAttribute("aria-disabled", String(!dailyOk));
+    dBtn.title = dailyOk ? "Exchange open interest per trading session" : (daily && daily.reason) || "Daily is unavailable";
+    el.tfNote.hidden = dailyOk;
+    el.tfNote.textContent = dailyOk ? "" : "Daily needs a data key";
+    el.tfNote.title = dBtn.title;
+    setPressed(el.timeframe, "data-tf", state.timeframe);
+
+    var current = timeframeInfo(state.timeframe);
+    var lookbacks = (state.data && state.data.lookbacks) || [];
+    el.lookback.innerHTML = lookbacks.map(function (l) {
+      var on = l.key === state.lookback;
+      return '<button type="button" data-lookback="' + esc(l.key) + '" aria-pressed="' + on + '"' + (on ? ' class="is-active"' : "") + ">Δ " + esc(l.label) + "</button>";
+    }).join("");
+
+    var allowed = current && current.metrics ? current.metrics : ["OI", "COT_NET_SPEC"];
+    Array.prototype.forEach.call(el.metric.querySelectorAll("[data-metric]"), function (b) {
+      var ok = allowed.indexOf(b.getAttribute("data-metric")) !== -1;
+      b.disabled = !ok;
+      b.title = ok ? "" : "COT positioning is published weekly only";
+    });
+  }
+
   function render() {
     if (!state.data) return;
     var items = plotted();
@@ -459,8 +503,8 @@
     renderDetail(items);
     renderSource();
     renderEdit();
+    renderTimeframes();
     setPressed(el.metric, "data-metric", state.metric);
-    setPressed(el.lookback, "data-lookback", state.lookback);
   }
 
   function setPressed(group, attr, value) {
@@ -504,16 +548,18 @@
     el.refresh.disabled = true;
     if (!state.data) {
       el.table.innerHTML = UI.skeletonCard(4);
-      el.plot.innerHTML = '<div class="xoi-plot-loading">Loading CFTC report…</div>';
+      el.plot.innerHTML = '<div class="xoi-plot-loading">Loading open interest…</div>';
     }
-    return fetch("/api/cross-market-oi?lookback=" + encodeURIComponent(state.lookback) + (force ? "&force=1" : ""))
+    return fetch("/api/cross-market-oi?timeframe=" + encodeURIComponent(state.timeframe) +
+      "&lookback=" + encodeURIComponent(state.lookback) + (force ? "&force=1" : ""))
       .then(function (res) { return res.json().then(function (body) { if (!res.ok) throw new Error(body.error || "HTTP " + res.status); return body; }); })
       .then(function (body) {
         state.data = body;
         state.selection = sanitizeSelection(state.selection || loadSelection() || body.defaultSelection);
         var s = body.source;
-        if (s.status === "UNAVAILABLE") showNotice("The CFTC report is unavailable and no earlier copy is saved: " + (s.error || "unknown error"), "error");
-        else if (s.status === "CACHED" || s.status === "STALE") showNotice("Showing the last saved CFTC report because the latest request failed (" + s.error + ").", "warn");
+        var what = body.timeframe === "D" ? "daily open interest" : "CFTC report";
+        if (s.status === "UNAVAILABLE") showNotice("The " + what + " is unavailable and no earlier copy is saved: " + (s.error || "unknown error"), "error");
+        else if (s.status === "CACHED" || s.status === "STALE") showNotice("Showing the last saved " + what + " because the latest request failed (" + s.error + ").", "warn");
         else if (body.freshness.state === "STALE") showNotice(body.freshness.reason, "warn");
         else if (body.coverage.withData < body.coverage.markets) showNotice(body.coverage.withData + " of " + body.coverage.markets + " markets are in the latest report; the rest show —.", "warn");
         else showNotice("");
@@ -587,6 +633,17 @@
     if (!b) return;
     state.metric = b.getAttribute("data-metric");
     render();
+  });
+
+  el.timeframe.addEventListener("click", function (e) {
+    var b = e.target.closest("[data-tf]");
+    if (!b || b.disabled || b.getAttribute("data-tf") === state.timeframe) return;
+    state.timeframe = b.getAttribute("data-tf");
+    state.lookback = state.timeframe === "D" ? "1d" : "1w";
+    // Positioning is weekly-only; Daily always opens on open interest.
+    if (state.timeframe === "D") state.metric = "OI";
+    setPressed(el.timeframe, "data-tf", state.timeframe);
+    load(false);
   });
 
   el.lookback.addEventListener("click", function (e) {

@@ -65,6 +65,7 @@ const { OpenInterestService } = require("./services/open-interest/service");
 const { createProviders: createOpenInterestProviders } = require("./services/open-interest/providers");
 const { CrossMarketOiService } = require("./services/cross-market-oi/service");
 const { CftcCotProvider } = require("./services/cross-market-oi/cftc-provider");
+const { DatabentoDailyOiProvider } = require("./services/cross-market-oi/databento-provider");
 const { ScreenerSettingsService } = require("./services/screener-settings");
 const { UsdtDominanceService } = require("./services/usdt-dominance");
 const { StrategyEngineService } = require("./services/strategy-engine");
@@ -301,6 +302,11 @@ function createApp() {
     store: new PersistentReporterCache(path.join(dataDir, "cross-market-oi.json")),
     cacheTtlMs: config.crossMarketOi.cacheTtlMs,
     staleAfterDays: config.crossMarketOi.staleAfterDays,
+    dailyProvider: new DatabentoDailyOiProvider({
+      apiKey: config.crossMarketOi.databentoApiKey,
+      baseUrl: config.crossMarketOi.databentoBaseUrl,
+    }),
+    dailyStaleAfterDays: config.crossMarketOi.dailyStaleAfterDays,
   });
   const usdtDominanceService = new UsdtDominanceService({ marketDataService, dataDir });
   const strategyEngineService = new StrategyEngineService({ signalScreenerService });
