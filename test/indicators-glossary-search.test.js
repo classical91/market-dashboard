@@ -35,3 +35,19 @@ test("glossary search matches whole-word prefixes, not fragments inside words", 
   assert.deepStrictEqual(search("zzzz"), []);
   assert.strictEqual(search("").length, ALL_GLOSSARY.length);
 });
+
+test("glossary toolbar cannot push the page wider than a phone screen", () => {
+  const page = require("node:fs").readFileSync(require("node:path").join(__dirname, "..", "public/indicators.html"), "utf8");
+  // The A–Z <select> sizes to its longest option unless it is allowed to shrink.
+  assert.match(page, /\.glossary-jump \{[^}]*min-width: 0;[^}]*max-width: 100%;/);
+  assert.match(page, /minmax\(min\(300px, 100%\), 1fr\)/);
+});
+
+test("category list sits in a side panel, so results follow the search bar directly", () => {
+  const page = require("node:fs").readFileSync(require("node:path").join(__dirname, "..", "public/indicators.html"), "utf8");
+  const main = page.slice(page.indexOf('class="glossary-main"'), page.indexOf('class="glossary-side"'));
+  assert.ok(main.includes('id="glossarySearch"') && main.includes('id="glossaryContent"'));
+  assert.ok(!main.includes('id="glossaryPills"'), "category list must not sit between search and results");
+  assert.match(page, /<aside class="glossary-side" id="glossarySide"[\s\S]*id="glossaryPills"/);
+  assert.match(page, /id="glossarySideToggle"/);
+});
