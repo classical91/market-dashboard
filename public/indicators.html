@@ -49,11 +49,16 @@
       padding: 18px 20px;
     }
     .glossary-term {
+      display: block;
       font-size: 15px;
       font-weight: 700;
       color: var(--text);
       margin-bottom: 8px;
+      text-decoration: none;
     }
+    .glossary-term::after { content: " \2192"; color: var(--muted); font-weight: 600; }
+    .glossary-term:hover,
+    .glossary-term:focus-visible { color: var(--blue); outline: none; text-decoration: underline; text-underline-offset: 3px; }
     .glossary-def {
       font-size: 13px;
       color: var(--soft);

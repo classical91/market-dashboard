@@ -51,3 +51,35 @@ test("category list sits in a side panel, so results follow the search bar direc
   assert.match(page, /<aside class="glossary-side" id="glossarySide"[\s\S]*id="glossaryPills"/);
   assert.match(page, /id="glossarySideToggle"/);
 });
+
+test("every glossary concept has its own page with a unique, known id", () => {
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const glossary = require("../public/assets/js/indicators.js");
+  const ids = glossary.ALL_GLOSSARY.map((e) => e.id);
+  assert.deepStrictEqual(ids.filter((id, i) => ids.indexOf(id) !== i), [], "concept ids must be unique");
+  for (const entry of glossary.ALL_GLOSSARY) {
+    assert.ok(glossary.CATEGORY_ORDER.includes(entry.category), `${entry.id} has an unlisted category`);
+  }
+  assert.strictEqual(glossary.orderedEntries().length, glossary.ALL_GLOSSARY.length);
+  assert.strictEqual(glossary.conceptHref({ id: "parabolic-sar" }), "/concept.html?id=parabolic-sar");
+
+  const page = fs.readFileSync(path.join(__dirname, "..", "public/concept.html"), "utf8");
+  assert.ok(page.indexOf("/assets/js/indicators.js") < page.indexOf("/assets/js/concept.js"), "concept.js needs the glossary data first");
+  assert.match(fs.readFileSync(path.join(__dirname, "..", "public/assets/js/indicators.js"), "utf8"), /class="glossary-term" href="/);
+});
+
+test("glossary covers the Definitions Indicators list", () => {
+  const { ALL_GLOSSARY } = require("../public/assets/js/indicators.js");
+  const ids = new Set(ALL_GLOSSARY.map((e) => e.id));
+  for (const id of [
+    "fair-value-gap", "order-blocks", "liquidity", "liquidations", "rsi", "macd", "impulse-macd", "bollinger",
+    "sma", "ema", "atr", "stochastic-oscillator", "parabolic-sar", "fibonacci-retracement", "ichimoku-cloud",
+    "cumulative-volume-delta", "aggregated-cvd", "open-interest", "aggregated-open-interest", "crvol", "volume-delta",
+    "aggregated-liquidations", "previous-day-high", "previous-day-low", "previous-week-high", "previous-month-high",
+    "social-media-sentiment", "on-chain-metrics", "position-sizing", "diversification", "risk-reward-ratio",
+    "project-fundamentals", "regulatory-news",
+  ]) {
+    assert.ok(ids.has(id), `missing concept ${id}`);
+  }
+});

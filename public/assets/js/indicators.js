@@ -1013,7 +1013,7 @@
       pages: [{ label: "Decision Engine", href: "/decision.html" }],
     },
     {
-      id: "market-regime", term: "Market Regime (Risk-On / Risk-Off / Defensive / Volatile / Trend Mode / Choppy)", category: "Decision Engine & Trading Framework",
+      id: "market-regime-score", term: "Market Regime (Risk-On / Risk-Off / Defensive / Volatile / Trend Mode / Choppy)", category: "Decision Engine & Trading Framework",
       def: "A single read on “what environment are we in,” built by voting BTC, crypto breadth, SPY, QQQ, DXY, VIX, gold, oil and US10Y (when available) each –10..+1 on risk appetite, weighting them, and turning the result into a 0–100 score and a label.",
       read: "Score ≥62 is Risk-On, ≤38 is Risk-Off; in between it falls back to Defensive (gold bid + soft equities), Volatile (VIX/crypto swings large), Trend Mode (inputs agree and lean hard one way), or Choppy (inputs disagree or are flat). Use it to set directional bias, not as an entry trigger.",
       pages: [{ label: "Decision Engine → Market Regime", href: "/decision.html#de-regime-card" }],
@@ -1414,6 +1414,100 @@
     },
   ];
 
+  // Concepts from the "Definitions Indicators" list that the glossary did not
+  // cover yet (the rest of that list already had entries).
+  var DEFINITIONS_LIST_GLOSSARY = [
+    {
+      id: "impulse-macd", term: "Impulse MACD", category: "Technical Indicators",
+      def: "A MACD variant (popularised by LazyBear on TradingView) that only prints momentum when a fast zero-lag average breaks outside a smoothed high/low channel. While price chops inside that channel the histogram stays flat at zero.",
+      read: "The flat stretches are the point: they filter out the sideways noise that makes a normal MACD whipsaw. Bars growing away from zero show a fresh momentum impulse; bars shrinking back toward zero show it fading. Treat a return to flat as \u201cno trend\u201d, not as a reversal signal.",
+    },
+    {
+      id: "parabolic-sar", term: "Parabolic SAR", category: "Technical Indicators",
+      def: "\u201cStop And Reverse\u201d \u2014 a trend-following indicator plotted as dots below price in an uptrend and above price in a downtrend. The dots accelerate toward price as the trend extends (the acceleration factor typically starts at 0.02 and steps up to 0.20).",
+      read: "A flip of the dots to the other side of price marks a potential trend reversal, and the dot level itself works as a trailing stop. It shines in clean trends and flips constantly in ranges, so pair it with a trend filter such as ADX or a higher-timeframe moving average.",
+    },
+    {
+      id: "aggregated-cvd", term: "Aggregated CVD", category: "Market Profile & Volume",
+      def: "Cumulative Volume Delta summed across several exchanges (and often split into spot and perpetuals) so it shows net aggressive buying or selling for the whole market instead of a single venue.",
+      read: "One exchange's CVD can be skewed by a single large player; the aggregate shows whether the move is broad. Price rising with aggregated spot CVD rising is healthier than a rally driven only by perp CVD, which is more likely to be leveraged and unwind.",
+      pages: [{ label: "Indicators Glossary \u2192 Cumulative Volume Delta (CVD)", href: "/indicators.html#term-cumulative-volume-delta" }],
+    },
+    {
+      id: "crvol", term: "CRVOL (Crypto Realized Volatility)", category: "Volatility & Sentiment",
+      def: "A measure of how much a crypto asset's price has actually moved over a lookback window, usually the annualised standard deviation of its returns. It tracks price variation after the fact, unlike implied volatility, which is priced into options.",
+      read: "Low and falling realized volatility often precedes a large expansion move, so compression is a warning to size down rather than a sign of safety. Compare it with implied volatility: implied well above realized means options are pricing in a move the market has not made yet.",
+    },
+    {
+      id: "aggregated-liquidations", term: "Aggregated Liquidations", category: "Futures & Derivatives",
+      def: "The total value of positions forcibly closed across exchanges over a set window, usually split into long liquidations and short liquidations.",
+      read: "Large long-liquidation spikes into support often mark capitulation and a local low; large short-liquidation spikes into resistance often mark a squeeze top. After a big flush, leverage is reset, so the next move is usually driven by spot flows rather than forced orders.",
+      pages: [{ label: "Indicators Glossary \u2192 Liquidations", href: "/indicators.html#term-liquidations" }],
+    },
+    {
+      id: "previous-day-high", term: "PDH (Previous Day High)", category: "Price Action & Liquidity",
+      def: "The highest price traded during the previous trading day (the prior daily candle).",
+      read: "Buy stops and breakout orders cluster just above it, so it is a common sweep target. Acceptance above the PDH (closes and holding) favours continuation; a quick wick above and back inside is a classic liquidity grab.",
+      pages: [{ label: "Indicators Glossary \u2192 PDH, PWH, and PMH", href: "/indicators.html#term-pdh-pwh-pmh" }],
+    },
+    {
+      id: "previous-day-low", term: "PDL (Previous Day Low)", category: "Price Action & Liquidity",
+      def: "The lowest price traded during the previous trading day (the prior daily candle).",
+      read: "Sell stops from longs sit just below it, making it a frequent sweep target. Holding above the PDL keeps the prior range intact; losing it on a close opens the way toward the next lower level.",
+    },
+    {
+      id: "previous-week-high", term: "PWH (Previous Week High)", category: "Price Action & Liquidity",
+      def: "The highest price traded during the previous week (the prior weekly candle).",
+      read: "A higher-timeframe level than the PDH, so reactions tend to be larger. Swing traders watch it as a breakout trigger or a place to take profit on longs.",
+      pages: [{ label: "Indicators Glossary \u2192 PDH, PWH, and PMH", href: "/indicators.html#term-pdh-pwh-pmh" }],
+    },
+    {
+      id: "previous-month-high", term: "PMH (Previous Month High)", category: "Price Action & Liquidity",
+      def: "The highest price traded during the previous month (the prior monthly candle).",
+      read: "One of the strongest reference levels on the chart. A monthly close above the PMH is a significant bullish structure shift; repeated failures below it mark the top of the current range.",
+      pages: [{ label: "Indicators Glossary \u2192 PDH, PWH, and PMH", href: "/indicators.html#term-pdh-pwh-pmh" }],
+    },
+    {
+      id: "social-media-sentiment", term: "Social Media Sentiment Analysis", category: "Volatility & Sentiment",
+      def: "Gauging market mood from social platforms (X/Twitter, Reddit, Telegram, YouTube) by tracking mention volume, positive/negative tone, and which narratives or tickers are trending.",
+      read: "A sudden surge in mentions often arrives near the end of a move, when the crowd is already positioned. Use extreme euphoria or despair as a crowding warning, and wait for price and volume to confirm before acting on it.",
+      pages: [{ label: "Indicators Glossary \u2192 Twitter + Crypto Sentiment", href: "/indicators.html#term-twitter-crypto-sentiment" }],
+    },
+    {
+      id: "on-chain-metrics", term: "On-Chain Metrics", category: "On-Chain & Network",
+      def: "Data read directly from a blockchain to judge its activity and health: active addresses, transaction counts and fees, exchange inflows/outflows, holder behaviour, and valuation ratios such as MVRV, SOPR and NUPL.",
+      read: "Coins flowing onto exchanges usually signal selling intent; coins leaving for self-custody signal accumulation. On-chain data moves slowly, so it is best for cycle and trend context rather than intraday timing.",
+      pages: [{ label: "On-Chain Dashboard", href: "/onchain.html" }],
+    },
+    {
+      id: "position-sizing", term: "Position Sizing", category: "Trading Risk & Strategy",
+      def: "Choosing how large a trade to take so that hitting the stop loses only a fixed share of the account. Position size = amount you are willing to risk \u00f7 distance from entry to stop.",
+      read: "Example: a $10,000 account risking 1% ($100) with a stop 2% below entry allows a $5,000 position. A wider stop means a smaller position for the same risk. Leverage changes how much margin the trade uses, not how much you lose at the stop.",
+      pages: [{ label: "Indicators Glossary \u2192 Risk Management", href: "/indicators.html#term-risk-management" }],
+    },
+    {
+      id: "diversification", term: "Diversification", category: "Trading Risk & Strategy",
+      def: "Spreading capital across assets, sectors or strategies that do not all move together, so one loss does not dominate the portfolio.",
+      read: "In crypto most coins are highly correlated with BTC and become even more correlated in sell-offs, so holding ten altcoins is not real diversification. Genuine diversification means mixing assets and strategies with different drivers, including stablecoins or cash.",
+    },
+    {
+      id: "risk-reward-ratio", term: "Risk/Reward Ratio (R:R)", category: "Trading Risk & Strategy",
+      def: "The potential gain of a trade compared with its potential loss: (target \u2212 entry) \u00f7 (entry \u2212 stop) for a long. A 1:3 trade risks $1 to make $3.",
+      read: "R:R sets the win rate you need to break even: 1 \u00f7 (1 + R). At 1:1 you must win more than 50% of trades; at 1:3 only 25%. Only count targets price can realistically reach \u2014 a high R:R to an unrealistic target is not an edge.",
+    },
+    {
+      id: "project-fundamentals", term: "Project Fundamentals", category: "Fundamental & Research",
+      def: "Assessing a crypto project's underlying quality: the technology and what problem it solves, the team and backers, tokenomics (supply, emissions, unlocks), real usage and revenue, and its competition.",
+      read: "Strong fundamentals matter over months and years, not days. Check upcoming token unlocks and emissions first \u2014 heavy supply hitting the market can overwhelm a good project's price for a long time.",
+      pages: [{ label: "Crypto Hub \u2192 Alt Research", href: "/crypto.html#alt-research" }],
+    },
+    {
+      id: "regulatory-news", term: "Regulatory News & Developments", category: "Fundamental & Research",
+      def: "Legal and policy changes that affect crypto markets: enforcement actions, ETF approvals, exchange licensing, stablecoin and tax rules, and frameworks such as the EU's MiCA.",
+      read: "Regulatory headlines can move the whole market within minutes. Distinguish rumour from official filings or statements, and watch which assets are directly named \u2014 those react hardest.",
+    },
+  ];
+
   var ALL_GLOSSARY = GLOSSARY.concat(USER_GLOSSARY)
     .concat(DECISION_ENGINE_GLOSSARY)
     .concat(MARKET_FUNDAMENTALS_GLOSSARY)
@@ -1424,7 +1518,8 @@
     .concat(ICT_GLOSSARY)
     .concat(VOLUME_FLOW_GLOSSARY)
     .concat(CHART_PATTERNS_GLOSSARY)
-    .concat(CONFLUENCE_GLOSSARY);
+    .concat(CONFLUENCE_GLOSSARY)
+    .concat(DEFINITIONS_LIST_GLOSSARY);
 
   var CATEGORY_ORDER = [
     "Market Fundamentals",
@@ -1467,6 +1562,23 @@
     return "cat-" + category.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
   }
 
+  function conceptHref(entry) {
+    return "/concept.html?id=" + encodeURIComponent(entry.id);
+  }
+
+  // The order concepts appear on the glossary page: categories in
+  // CATEGORY_ORDER, terms A–Z within each. Concept pages page through it.
+  function orderedEntries() {
+    var byCategory = {};
+    ALL_GLOSSARY.forEach(function (entry) {
+      (byCategory[entry.category] = byCategory[entry.category] || []).push(entry);
+    });
+    return CATEGORY_ORDER.reduce(function (out, category) {
+      var entries = (byCategory[category] || []).slice().sort(function (a, b) { return a.term.localeCompare(b.term); });
+      return out.concat(entries);
+    }, []);
+  }
+
   // entry.illustration is authored, trusted HTML (defined in this file, not
   // user input) — rendered as-is so glossary entries can carry a small
   // diagram or reference table alongside the def/read text.
@@ -1478,7 +1590,7 @@
       .join("");
     return (
       '<article class="glossary-card" id="term-' + escapeHtml(entry.id) + '" data-search="' + escapeHtml(searchIndex(entry)) + '" data-category="' + escapeHtml(entry.category) + '">' +
-      '<div class="glossary-term">' + escapeHtml(entry.term) + "</div>" +
+      '<a class="glossary-term" href="' + escapeHtml(conceptHref(entry)) + '">' + escapeHtml(entry.term) + "</a>" +
       '<div class="glossary-def">' + escapeHtml(entry.def) + "</div>" +
       '<div class="glossary-read"><strong>How to read it:</strong> ' + escapeHtml(entry.read) + "</div>" +
       (entry.illustration ? '<div class="glossary-illustration">' + entry.illustration + "</div>" : "") +
@@ -1598,18 +1710,7 @@
       var id = jump.value;
       jump.value = "";
       if (!id) return;
-      var search = document.getElementById("glossarySearch");
-      if (search && search.value) {
-        search.value = "";
-        applyFilter("");
-      }
-      var card = document.getElementById("term-" + id);
-      if (!card) return;
-      card.scrollIntoView({ behavior: "smooth", block: "center" });
-      card.classList.add("glossary-card--highlight");
-      setTimeout(function () {
-        card.classList.remove("glossary-card--highlight");
-      }, 1600);
+      window.location.assign("/concept.html?id=" + encodeURIComponent(id));
     });
   }
 
@@ -1660,9 +1761,19 @@
     }
   }
 
-  if (typeof module !== "undefined" && module.exports) {
-    module.exports = { ALL_GLOSSARY: ALL_GLOSSARY, searchIndex: searchIndex, queryTokens: queryTokens, matchesQuery: matchesQuery };
-  }
+  var api = {
+    ALL_GLOSSARY: ALL_GLOSSARY,
+    CATEGORY_ORDER: CATEGORY_ORDER,
+    orderedEntries: orderedEntries,
+    conceptHref: conceptHref,
+    escapeHtml: escapeHtml,
+    slug: slug,
+    searchIndex: searchIndex,
+    queryTokens: queryTokens,
+    matchesQuery: matchesQuery,
+  };
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+  if (typeof window !== "undefined") window.MarketGlossary = api;
   if (typeof document === "undefined") return;
 
   if (document.readyState === "loading") {

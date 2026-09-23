@@ -223,7 +223,10 @@
 
   function currentPath() {
     var path = window.location.pathname || "/";
-    return path === "/index.html" ? "/" : path;
+    if (path === "/index.html") return "/";
+    // Single-concept pages belong to the Indicators Glossary.
+    if (path === "/concept.html") return "/indicators.html";
+    return path;
   }
 
   function isActive(href) {
