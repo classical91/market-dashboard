@@ -37,7 +37,7 @@
     }
     .glossary-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
       gap: 14px;
     }
     .glossary-card {
@@ -98,9 +98,14 @@
       flex-wrap: wrap;
       margin-bottom: 16px;
     }
-    .glossary-toolbar .glossary-search { margin-bottom: 0; flex: 1 1 320px; }
+    .glossary-toolbar .glossary-search { margin-bottom: 0; flex: 1 1 320px; min-width: 0; }
     .glossary-jump {
       flex: 0 1 260px;
+      /* A <select> sizes itself to its longest option (~600px here); without
+         these it pushes the page wider than a phone screen. */
+      min-width: 0;
+      max-width: 100%;
+      text-overflow: ellipsis;
       padding: 12px 16px;
       background: var(--panel);
       border: 1px solid var(--border);
@@ -110,6 +115,131 @@
       font-family: inherit;
     }
     .glossary-jump:focus { outline: none; border-color: var(--border-hover); }
+    @media (max-width: 1024px) {
+      /* Clear the sticky mobile top bar when jumping to a category. */
+      .glossary-category { scroll-margin-top: 72px; }
+    }
+    @media (max-width: 640px) {
+      .glossary-toolbar .glossary-search { flex: 1 1 100%; }
+      .glossary-jump { flex: 1 1 0; }
+      .glossary-card { padding: 16px; }
+    }
+    /* Categories live in a side panel so search results sit right under the
+       search bar. Sticky column on wide screens, slide-in drawer below that. */
+    .glossary-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 240px;
+      gap: 22px;
+      align-items: start;
+    }
+    .glossary-main { min-width: 0; }
+    .glossary-main .glossary-category:first-child { margin-top: 4px; }
+    .glossary-side {
+      position: sticky;
+      top: 16px;
+      max-height: calc(100vh - 32px);
+      display: flex;
+      flex-direction: column;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+    }
+    .glossary-side-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+    }
+    .glossary-side-close {
+      display: none;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 4px 10px;
+      font-size: 16px;
+      line-height: 1;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .glossary-side-list {
+      overflow-y: auto;
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+    .glossary-side-link {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 7px 10px;
+      border-radius: 10px;
+      font-size: 13px;
+      color: var(--soft);
+      text-decoration: none;
+    }
+    .glossary-side-link:hover,
+    .glossary-side-link:focus-visible { background: var(--surface2); color: var(--text); outline: none; }
+    .glossary-side-link.is-active { background: var(--accent-bg, var(--surface2)); color: var(--text); }
+    .glossary-side-link.is-empty { display: none; }
+    .glossary-side-count {
+      flex: 0 0 auto;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+    .glossary-side-toggle {
+      display: none;
+      padding: 12px 16px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .glossary-side-toggle:focus-visible,
+    .glossary-side-close:focus-visible { outline: none; box-shadow: var(--ui-focus); }
+    .glossary-side-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      z-index: 300;
+    }
+    @media (max-width: 1180px) {
+      .glossary-layout { grid-template-columns: minmax(0, 1fr); }
+      .glossary-side-toggle { display: block; flex: 0 0 auto; }
+      .glossary-side-close { display: block; }
+      .glossary-side {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: min(300px, 86vw);
+        max-height: none;
+        border-radius: 0;
+        border-width: 0 0 0 1px;
+        z-index: 301;
+        transform: translateX(105%);
+        transition: transform 0.24s cubic-bezier(0.4, 0, 0.2, 1);
+        visibility: hidden;
+      }
+      .glossary-side.open { transform: translateX(0); visibility: visible; }
+      .glossary-side-backdrop.open { display: block; }
+    }
     .glossary-card--highlight {
       border-color: var(--blue, #4da3ff);
       box-shadow: 0 0 0 2px rgba(77, 163, 255, 0.35);
@@ -175,17 +305,29 @@
       </div>
     </div>
 
-    <div class="glossary-toolbar">
-      <input class="glossary-search" id="glossarySearch" type="search" placeholder="Search indicators — e.g. MACD, funding rate, MVRV..." />
-      <select class="glossary-jump" id="glossaryJump">
-        <option value="">Jump to a concept (A–Z)&hellip;</option>
-      </select>
+    <div class="glossary-layout">
+      <div class="glossary-main">
+        <div class="glossary-toolbar">
+          <input class="glossary-search" id="glossarySearch" type="search" placeholder="Search indicators — e.g. MACD, funding rate, MVRV..." />
+          <select class="glossary-jump" id="glossaryJump">
+            <option value="">Jump to a concept (A–Z)&hellip;</option>
+          </select>
+          <button class="glossary-side-toggle" id="glossarySideToggle" type="button" aria-controls="glossarySide" aria-expanded="false">Categories</button>
+        </div>
+
+        <div id="glossaryContent"></div>
+        <div class="glossary-empty" id="glossaryEmpty" hidden>No indicators match your search.</div>
+      </div>
+
+      <aside class="glossary-side" id="glossarySide" aria-label="Glossary categories">
+        <div class="glossary-side-head">
+          <span>Categories</span>
+          <button class="glossary-side-close" id="glossarySideClose" type="button" aria-label="Close categories">&times;</button>
+        </div>
+        <nav class="glossary-side-list" id="glossaryPills"></nav>
+      </aside>
     </div>
-
-    <nav class="nav-pills" id="glossaryPills"></nav>
-
-    <div id="glossaryContent"></div>
-    <div class="glossary-empty" id="glossaryEmpty" hidden>No indicators match your search.</div>
+    <div class="glossary-side-backdrop" id="glossarySideBackdrop"></div>
 
     <footer>Indicators Glossary &mdash; <a href="/">Market Command</a></footer>
 

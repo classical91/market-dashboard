@@ -1503,7 +1503,11 @@
 
     pills.innerHTML = CATEGORY_ORDER.filter(function (c) { return byCategory[c]; })
       .map(function (c) {
-        return '<a href="#' + slug(c) + '" class="nav-pill nav-pill--accent">' + escapeHtml(c) + "</a>";
+        return (
+          '<a href="#' + slug(c) + '" class="glossary-side-link" data-category="' + escapeHtml(c) + '">' +
+          "<span>" + escapeHtml(c) + "</span>" +
+          '<span class="glossary-side-count">' + byCategory[c].length + "</span></a>"
+        );
       })
       .join("");
 
@@ -1558,7 +1562,15 @@
     cards.forEach(function (card) {
       var match = !tokens.length || matchesQuery(card.dataset.search, tokens);
       card.style.display = match ? "" : "none";
-      if (match) anyVisible[card.dataset.category] = true;
+      if (match) anyVisible[card.dataset.category] = (anyVisible[card.dataset.category] || 0) + 1;
+    });
+    // Keep the category panel in step with the results: match counts, and
+    // categories with nothing to show drop out of the list.
+    document.querySelectorAll(".glossary-side-link").forEach(function (link) {
+      var count = anyVisible[link.dataset.category] || 0;
+      link.classList.toggle("is-empty", count === 0);
+      var countEl = link.querySelector(".glossary-side-count");
+      if (countEl) countEl.textContent = count;
     });
     document.querySelectorAll(".glossary-category").forEach(function (section) {
       var label = section.querySelector(".glossary-category-label");
@@ -1601,9 +1613,45 @@
     });
   }
 
+  function setupSidePanel() {
+    var side = document.getElementById("glossarySide");
+    var toggle = document.getElementById("glossarySideToggle");
+    var close = document.getElementById("glossarySideClose");
+    var backdrop = document.getElementById("glossarySideBackdrop");
+    if (!side || !toggle) return;
+
+    function setOpen(open) {
+      side.classList.toggle("open", open);
+      if (backdrop) backdrop.classList.toggle("open", open);
+      toggle.setAttribute("aria-expanded", open ? "true" : "false");
+      if (open) {
+        var first = side.querySelector(".glossary-side-link:not(.is-empty)") || close;
+        if (first) first.focus();
+      }
+    }
+
+    toggle.addEventListener("click", function () { setOpen(!side.classList.contains("open")); });
+    if (close) close.addEventListener("click", function () { setOpen(false); toggle.focus(); });
+    if (backdrop) backdrop.addEventListener("click", function () { setOpen(false); });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && side.classList.contains("open")) {
+        setOpen(false);
+        toggle.focus();
+      }
+    });
+    side.addEventListener("click", function (e) {
+      var link = e.target.closest(".glossary-side-link");
+      if (!link) return;
+      side.querySelectorAll(".glossary-side-link.is-active").forEach(function (el) { el.classList.remove("is-active"); });
+      link.classList.add("is-active");
+      if (side.classList.contains("open")) setOpen(false);
+    });
+  }
+
   function init() {
     render();
     populateJumpMenu();
+    setupSidePanel();
     var search = document.getElementById("glossarySearch");
     if (search) {
       search.addEventListener("input", function () {
