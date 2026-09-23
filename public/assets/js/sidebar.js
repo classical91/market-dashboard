@@ -71,9 +71,9 @@
             // (live, per coin) and CFTC futures across asset classes (weekly).
             { href: "/open-interest.html", label: "Crypto Open Interest" },
             { href: "/cross-market-oi.html", label: "Cross-Market Open Interest" },
-            { href: "/pattern-scanner-trades.html", label: "My Trades" },
           ],
         },
+        { href: "/pattern-scanner-trades.html", label: "My Trades" },
         { href: "/pattern-scanner-stats.html", label: "Track Record" },
         {
           href: "https://trading-strategy-production-1b41.up.railway.app/",
