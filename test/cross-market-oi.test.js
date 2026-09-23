@@ -245,7 +245,7 @@ test("the payload says Daily is unavailable and why", async () => {
   const snap = await makeService().snapshot();
   const daily = snap.timeframes.find((t) => t.key === "D");
   assert.equal(daily.available, false);
-  assert.match(daily.reason, /No free, licensed daily/);
+  assert.match(daily.reason, /DATABENTO_API_KEY/);
   assert.deepEqual(snap.metrics.map((m) => m.type), ["OI", "COT_NET_SPEC"]);
 });
 
@@ -283,5 +283,170 @@ test("the catalog is consistent with the selection limits and asset-class filter
   assert.ok(DEFAULT_SELECTION.length >= MIN_SELECTION && DEFAULT_SELECTION.length <= MAX_SELECTION);
   for (const key of classKeys) {
     assert.ok(INSTRUMENTS.filter((i) => i.assetClass === key).length <= MAX_SELECTION);
+  }
+});
+
+// ── daily (Databento) ──────────────────────────────────────
+
+const { DatabentoDailyOiProvider, aggregateOpenInterest } = require("../src/services/cross-market-oi/databento-provider");
+
+function stat(instrumentId, tsRef, quantity, extra = {}) {
+  return JSON.stringify({ hd: { ts_event: `${tsRef}T22:00:00.000000000Z`, instrument_id: instrumentId }, ts_ref: `${tsRef}T00:00:00.000000000Z`, stat_type: 9, quantity, update_action: 1, ...extra });
+}
+
+test("daily open interest is summed across every expiry, keeping each expiry's last correction", () => {
+  const text = [
+    stat(1, "2026-09-21", 100),
+    stat(2, "2026-09-21", 50),
+    stat(1, "2026-09-22", 90),
+    stat(1, "2026-09-22", 95), // correction for the same expiry and day
+    stat(2, "2026-09-22", 60),
+    stat(3, "2026-09-22", 2147483647), // undefined sentinel, never a real OI
+    stat(4, "2026-09-22", 999, { update_action: 2 }), // delete
+    stat(5, "2026-09-22", 999, { stat_type: 3 }), // settlement price, not OI
+    "not json",
+  ].join("\n");
+  assert.deepEqual(aggregateOpenInterest(text), [
+    { date: "2026-09-22", openInterest: 155 },
+    { date: "2026-09-21", openInterest: 150 },
+  ]);
+});
+
+test("the Databento provider asks per product with basic auth and never echoes the key", async () => {
+  const seen = [];
+  const provider = new DatabentoDailyOiProvider({
+    apiKey: "db-secret",
+    fetchImpl: async (url, init) => {
+      seen.push({ url: new URL(url), init });
+      if (url.includes("DX.FUT")) return { ok: false, status: 422, text: async () => JSON.stringify({ detail: "symbol not found" }) };
+      return { ok: true, status: 200, text: async () => [stat(1, "2026-09-22", 10), stat(1, "2026-09-21", 8)].join("\n") };
+    },
+  });
+  const { byId, errors } = await provider.fetchDaily([
+    { id: "gold-comex", daily: { dataset: "GLBX.MDP3", parent: "GC.FUT" } },
+    { id: "dxy-ice", daily: { dataset: "IFUS.IMPACT", parent: "DX.FUT" } },
+  ], { startDate: "2026-09-09" });
+  const gold = seen.find((s) => s.url.searchParams.get("symbols") === "GC.FUT");
+  assert.equal(gold.url.searchParams.get("schema"), "statistics");
+  assert.equal(gold.url.searchParams.get("stype_in"), "parent");
+  assert.equal(gold.url.searchParams.get("dataset"), "GLBX.MDP3");
+  assert.equal(gold.init.headers.Authorization, `Basic ${Buffer.from("db-secret:").toString("base64")}`);
+  assert.equal(byId.get("gold-comex")[0].openInterest, 10);
+  assert.match(errors["dxy-ice"], /HTTP 422 — symbol not found/);
+  assert.doesNotMatch(JSON.stringify(errors), /db-secret/);
+
+  await assert.rejects(new DatabentoDailyOiProvider({}).fetchDaily([], { startDate: "2026-09-01" }), /DATABENTO_API_KEY is not set/);
+});
+
+const DAILY_INSTR = INSTR.map((i) => ({ ...i, daily: { dataset: "GLBX.MDP3", parent: `${i.symbol}.FUT` } }));
+
+function dailyProvider(impl, configured = true) {
+  const calls = [];
+  return { label: "Databento test", configured, calls, async fetchDaily(instruments, opts) { calls.push(opts); return impl(instruments, opts); } };
+}
+
+function sessions(values, end = "2026-09-22") {
+  // Trading days only, newest first: skips weekends.
+  const out = [];
+  let t = Date.parse(`${end}T00:00:00Z`);
+  for (const v of values) {
+    while ([0, 6].includes(new Date(t).getUTCDay())) t -= DAY;
+    out.push({ date: new Date(t).toISOString().slice(0, 10), openInterest: v });
+    t -= DAY;
+  }
+  return out;
+}
+
+function makeDailyService(daily, opts = {}) {
+  return new CrossMarketOiService({
+    provider: fakeProvider(() => history()),
+    dailyProvider: daily,
+    cache: new MemoryCache(),
+    store: opts.store === undefined ? memoryStore() : opts.store,
+    instruments: DAILY_INSTR,
+    now: opts.now || (() => NOW),
+    logger: quiet,
+  });
+}
+
+test("Daily compares trading sessions: 1D is the previous session, 5D five sessions back", async () => {
+  const daily = dailyProvider(() => ({
+    byId: new Map([["btc-cme", sessions([110, 100, 99, 98, 97, 88])]]),
+    errors: { "gold-comex": "No open-interest records for GC.FUT" },
+  }));
+  const service = makeDailyService(daily);
+  const one = await service.snapshot({ timeframe: "D", lookback: "1d" });
+  const btc = pick(one, "btc-cme", "OI");
+  assert.equal(one.timeframe, "D");
+  assert.equal(btc.timeframe, "D");
+  assert.equal(btc.lookback, "1D");
+  assert.equal(btc.observationDate, "2026-09-22");
+  assert.equal(btc.previousDate, "2026-09-21");
+  assert.equal(btc.changePct, 10);
+  assert.equal(btc.freshness.state, "FRESH");
+  assert.equal(one.source.status, "LIVE");
+
+  const five = pick(await service.snapshot({ timeframe: "D", lookback: "5d" }), "btc-cme", "OI");
+  assert.equal(five.previousDate, "2026-09-15", "five sessions back, across the weekend");
+  assert.equal(five.changePct, 25);
+  assert.equal(daily.calls.length, 1, "both daily lookbacks share one fetch");
+
+  // Per-product failure is that market's error, not the page's.
+  assert.match(pick(one, "gold-comex", "OI").error, /No open-interest records for GC.FUT/);
+  assert.equal(pick(one, "gold-comex", "OI").normalizedValue, null);
+  assert.equal(one.coverage.withData, 1);
+});
+
+test("COT positioning is never faked on Daily; it is a weekly quantity", async () => {
+  const daily = dailyProvider(() => ({ byId: new Map([["btc-cme", sessions([110, 100])]]), errors: {} }));
+  const snap = await makeDailyService(daily).snapshot({ timeframe: "D" });
+  const cot = pick(snap, "btc-cme", "COT_NET_SPEC");
+  assert.equal(cot.normalizedValue, null);
+  assert.match(cot.error, /weekly only/);
+  assert.deepEqual(snap.timeframes.find((t) => t.key === "D").metrics, ["OI"]);
+});
+
+test("without a key Daily is unavailable, says why, and Weekly is untouched", async () => {
+  const daily = dailyProvider(() => { throw new Error("should not be called"); }, false);
+  const service = makeDailyService(daily);
+  const snap = await service.snapshot({ timeframe: "D" });
+  assert.equal(snap.source.status, "UNAVAILABLE");
+  assert.match(snap.source.error, /DATABENTO_API_KEY/);
+  assert.ok(snap.rows.every((r) => r.normalizedValue === null && r.error));
+  assert.equal(daily.calls.length, 0, "nothing is requested without a key");
+  const weekly = await service.snapshot({ timeframe: "W" });
+  assert.equal(weekly.source.status, "LIVE");
+  assert.equal(weekly.timeframes.find((t) => t.key === "D").available, false);
+});
+
+test("a Databento outage serves the last good daily copy as CACHED", async () => {
+  const store = memoryStore();
+  await makeDailyService(dailyProvider(() => ({ byId: new Map([["btc-cme", sessions([110, 100])]]), errors: {} })), { store }).snapshot({ timeframe: "D" });
+  const down = dailyProvider(() => { throw new Error("Databento HTTP 503"); });
+  const snap = await makeDailyService(down, { store }).snapshot({ timeframe: "D" });
+  assert.equal(snap.source.status, "CACHED");
+  assert.equal(pick(snap, "btc-cme", "OI").changePct, 10);
+  // The weekly report's saved copy is a separate record.
+  assert.ok(store.map.has("cross-market-oi:last-good") || store.map.size >= 1);
+});
+
+test("a daily series that stopped advancing is STALE", async () => {
+  const daily = dailyProvider(() => ({ byId: new Map([["btc-cme", sessions([110, 100], "2026-09-15")]]), errors: {} }));
+  const snap = await makeDailyService(daily).snapshot({ timeframe: "D" });
+  assert.equal(pick(snap, "btc-cme", "OI").freshness.state, "STALE");
+});
+
+test("the route passes timeframe=D through and defaults anything else to Weekly", async () => {
+  const daily = dailyProvider(() => ({ byId: new Map([["btc-cme", sessions([110, 100])]]), errors: {} }));
+  const app = express();
+  app.use("/api/cross-market-oi", createCrossMarketOiRouter({ crossMarketOiService: makeDailyService(daily) }));
+  const server = http.createServer(app);
+  await new Promise((resolve) => server.listen(0, resolve));
+  try {
+    const base = `http://127.0.0.1:${server.address().port}/api/cross-market-oi`;
+    assert.equal((await (await fetch(`${base}?timeframe=D&lookback=5d`)).json()).lookback, "5D");
+    assert.equal((await (await fetch(`${base}?timeframe=4h`)).json()).timeframe, "W");
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
   }
 });

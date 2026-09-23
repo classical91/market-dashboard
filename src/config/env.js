@@ -329,6 +329,11 @@ const config = {
     cacheTtlMs: parseNumber(process.env.CROSS_MARKET_OI_CACHE_MS, 60 * 60 * 1000),
     staleAfterDays: parseNumber(process.env.CROSS_MARKET_OI_STALE_AFTER_DAYS, 11),
     requestTimeoutMs: parseNumber(process.env.CROSS_MARKET_OI_REQUEST_TIMEOUT_MS, 15000),
+    // Daily timeframe. Databento is paid and keyed; without a key the page
+    // offers Daily as unavailable and Weekly is unaffected.
+    databentoApiKey: process.env.DATABENTO_API_KEY || "",
+    databentoBaseUrl: process.env.DATABENTO_API_BASE_URL || "https://hist.databento.com",
+    dailyStaleAfterDays: parseNumber(process.env.CROSS_MARKET_OI_DAILY_STALE_AFTER_DAYS, 4),
   },
   // On-Chain Intelligence card on Overview. DefiLlama's free, keyless public
   // endpoints only — no paid provider and no API key.
