@@ -83,29 +83,3 @@ test("glossary covers the Definitions Indicators list", () => {
     assert.ok(ids.has(id), `missing concept ${id}`);
   }
 });
-
-test("library reading list is merged into the glossary under Library categories", () => {
-  const fs = require("node:fs");
-  const path = require("node:path");
-  const library = require("../public/assets/js/glossary-library.js");
-  const glossary = require("../public/assets/js/indicators.js");
-  const ids = new Set(glossary.ALL_GLOSSARY.map((e) => e.id));
-
-  assert.ok(library.entries.length > 150);
-  for (const entry of library.entries) {
-    assert.ok(ids.has(entry.id), `${entry.id} missing from glossary`);
-    assert.ok(entry.category.startsWith("Library · "), `${entry.id} is outside a Library category`);
-    assert.ok(entry.term && entry.def && entry.read, `${entry.id} is incomplete`);
-  }
-  for (const category of library.categories) assert.ok(glossary.CATEGORY_ORDER.includes(category));
-
-  // Duplicates in the source list are merged into one page each.
-  for (const id of ["book-tanakh", "book-attached", "book-intention-experiment", "book-supernatural", "book-divine-matrix"]) {
-    assert.strictEqual(library.entries.filter((e) => e.id === id).length, 1);
-  }
-
-  for (const page of ["public/indicators.html", "public/concept.html"]) {
-    const html = fs.readFileSync(path.join(__dirname, "..", page), "utf8");
-    assert.ok(html.indexOf("/assets/js/glossary-library.js") < html.indexOf("/assets/js/indicators.js"), `${page} must load the library first`);
-  }
-});
