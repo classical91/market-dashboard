@@ -74,6 +74,11 @@
     return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
   }
 
+  function fmtShortDate(iso) {
+    if (!iso) return "—";
+    return new Date(iso + "T00:00:00Z").toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
+  }
+
   function metricInfo() {
     var list = (state.data && state.data.metrics) || [];
     for (var i = 0; i < list.length; i += 1) if (list[i].type === state.metric) return list[i];
@@ -397,7 +402,13 @@
     // Corner labels, as on the reference: timeframe and metric.
     var d0 = state.data;
     svg.appendChild(svgEl("text", { x: 14, y: 22, class: "xoi-corner" }, "TF: " + (d0 ? d0.timeframe : "W") + " · Δ " + (d0 ? d0.lookback : "")));
-    svg.appendChild(svgEl("text", { x: 14, y: 40, class: "xoi-corner xoi-corner--dim" }, "As of " + fmtDate(d0 && d0.source.reportDate)));
+    // What the change is measured against, on screen: on a phone the table's
+    // per-row "vs" line is hidden, and 1W and 4W differ only by this date.
+    var vsDates = {};
+    items.forEach(function (it) { if (it.row && it.row.previousDate) vsDates[it.row.previousDate] = (vsDates[it.row.previousDate] || 0) + 1; });
+    var vs = Object.keys(vsDates).sort(function (a, b) { return vsDates[b] - vsDates[a]; })[0];
+    svg.appendChild(svgEl("text", { x: 14, y: 40, class: "xoi-corner xoi-corner--dim" },
+      "As of " + fmtShortDate(d0 && d0.source.reportDate) + (vs ? " · vs " + fmtShortDate(vs) : "")));
     // Colour key, in words as well as colour.
     var upWord = state.metric === "OI" ? "OI up" : "net long";
     var downWord = state.metric === "OI" ? "OI down" : "net short";
@@ -580,9 +591,20 @@
     el.notice.textContent = text || "";
   }
 
+  var loadSeq = 0;
+
+  /**
+   * One request per control change. Only the newest request may paint: on a
+   * slow connection a 4W response arriving after the 1W one would otherwise
+   * show four-week numbers under a highlighted 1W. While a request is in
+   * flight the plot is dimmed, so a switch is visibly happening.
+   */
   function load(force) {
+    var seq = ++loadSeq;
     state.loading = true;
     el.refresh.disabled = true;
+    el.plot.classList.add("is-loading");
+    el.plot.setAttribute("aria-busy", "true");
     if (!state.data) {
       el.table.innerHTML = UI.skeletonCard(4);
       el.plot.innerHTML = '<div class="xoi-plot-loading">Loading open interest…</div>';
@@ -591,6 +613,7 @@
       "&lookback=" + encodeURIComponent(state.lookback) + (force ? "&force=1" : ""))
       .then(function (res) { return res.json().then(function (body) { if (!res.ok) throw new Error(body.error || "HTTP " + res.status); return body; }); })
       .then(function (body) {
+        if (seq !== loadSeq) return;
         state.data = body;
         state.selection = sanitizeSelection(state.selection || loadSelection() || body.defaultSelection);
         var s = body.source;
@@ -603,13 +626,26 @@
         render();
       })
       .catch(function (err) {
+        if (seq !== loadSeq) return;
         showNotice("Could not load cross-market open interest: " + err.message, "error");
         if (!state.data) {
           el.table.innerHTML = UI.errorState("Could not load the CFTC report", err.message);
           el.plot.innerHTML = "";
+          return;
         }
+        // The screen still shows the previous data, so the controls go back
+        // to describing it rather than the request that failed.
+        state.timeframe = state.data.timeframe;
+        state.lookback = String(state.data.lookback || "").toLowerCase();
+        render();
       })
-      .finally(function () { state.loading = false; el.refresh.disabled = false; });
+      .finally(function () {
+        if (seq !== loadSeq) return;
+        state.loading = false;
+        el.refresh.disabled = false;
+        el.plot.classList.remove("is-loading");
+        el.plot.removeAttribute("aria-busy");
+      });
   }
 
   // ── events ───────────────────────────────────────────────

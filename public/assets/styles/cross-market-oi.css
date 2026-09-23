@@ -255,3 +255,22 @@
 
 /* Why Daily is greyed out, visible on touch screens where a title never is. */
 .xoi-tf-note { font-size: 10px; font-weight: 700; color: #8a93a6; letter-spacing: 0.03em; }
+
+/* A control change is in flight: the old shape stays, dimmed, until the
+   new one replaces it. */
+.xoi-plot.is-loading .xoi-svg { opacity: 0.35; transition: opacity 120ms ease; }
+.xoi-plot.is-loading::after {
+  content: "Loading…";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #5fb9c9;
+  font-size: 12px;
+  font-weight: 700;
+  pointer-events: none;
+}
+.xoi-stage .xoi-notice { margin: 0 0 10px; }
+@media (prefers-reduced-motion: reduce) {
+  .xoi-plot.is-loading .xoi-svg { transition: none; }
+}
