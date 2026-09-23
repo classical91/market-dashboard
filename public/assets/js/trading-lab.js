@@ -1768,7 +1768,7 @@
       }
       return '<label class="tl-inline-label" for="' + id + '">' + escapeHtml(field.label) + " " + input + "</label>";
     }).join("");
-    if (strategy.id === "bb_mean_reversion_v4") btMode.value = "native";
+    if (strategy.id === "bb_mean_reversion_v4" || strategy.id === "ema_vwap_rsi_v1") btMode.value = "native";
   }
 
   function selectedOptions() {

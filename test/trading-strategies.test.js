@@ -42,6 +42,7 @@ test("the registry loads every Trading Lab strategy", () => {
   assert.deepEqual(ids.sort(), [
     "bb_mean_reversion_v4",
     "donchian_breakout_v1",
+    "ema_vwap_rsi_v1",
     "mindset_v1",
     "shadow_bananagun_v1",
     "smc_v1",
