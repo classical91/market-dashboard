@@ -1477,7 +1477,7 @@
       })
       .join("");
     return (
-      '<article class="glossary-card" id="term-' + escapeHtml(entry.id) + '" data-search="' + escapeHtml((entry.term + " " + entry.category + " " + entry.def + " " + entry.read).toLowerCase()) + '" data-category="' + escapeHtml(entry.category) + '">' +
+      '<article class="glossary-card" id="term-' + escapeHtml(entry.id) + '" data-search="' + escapeHtml(searchIndex(entry)) + '" data-category="' + escapeHtml(entry.category) + '">' +
       '<div class="glossary-term">' + escapeHtml(entry.term) + "</div>" +
       '<div class="glossary-def">' + escapeHtml(entry.def) + "</div>" +
       '<div class="glossary-read"><strong>How to read it:</strong> ' + escapeHtml(entry.read) + "</div>" +
@@ -1518,12 +1518,45 @@
       .join("");
   }
 
+  // Search matches word-by-word rather than as one exact phrase, so
+  // "head and shoulders" finds "Head & Shoulders (H&S)" and "rsi divergence"
+  // finds entries mentioning both words. Every query word must start a word
+  // in the entry, which also keeps "ema" from matching inside "premium".
+  var STOP_WORDS = { and: true, or: true, the: true, of: true, a: true, an: true, vs: true };
+
+  function normalizeSearchText(text) {
+    return String(text ?? "")
+      .toLowerCase()
+      .replace(/([a-z0-9])&([a-z0-9])/g, "$1$2") // S&P -> sp, H&S -> hs
+      .replace(/&/g, " and ")
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+  }
+
+  function searchIndex(entry) {
+    var pages = (entry.pages || []).map(function (p) { return p.label; }).join(" ");
+    return " " + normalizeSearchText([entry.term, entry.category, entry.def, entry.read, pages].join(" ")) + " ";
+  }
+
+  function queryTokens(query) {
+    var words = normalizeSearchText(query).split(" ").filter(Boolean);
+    var meaningful = words.filter(function (w) { return !STOP_WORDS[w]; });
+    return (meaningful.length ? meaningful : words).map(function (w) {
+      // Drop a plural "s" so "averages" still matches "average".
+      return w.length > 3 && /[^s]s$/.test(w) ? w.slice(0, -1) : w;
+    });
+  }
+
+  function matchesQuery(index, tokens) {
+    return tokens.every(function (t) { return index.indexOf(" " + t) !== -1; });
+  }
+
   function applyFilter(query) {
-    var q = query.trim().toLowerCase();
+    var tokens = queryTokens(query);
     var cards = document.querySelectorAll(".glossary-card");
     var anyVisible = {};
     cards.forEach(function (card) {
-      var match = !q || card.dataset.search.indexOf(q) !== -1 || card.dataset.category.toLowerCase().indexOf(q) !== -1;
+      var match = !tokens.length || matchesQuery(card.dataset.search, tokens);
       card.style.display = match ? "" : "none";
       if (match) anyVisible[card.dataset.category] = true;
     });
@@ -1578,6 +1611,11 @@
       });
     }
   }
+
+  if (typeof module !== "undefined" && module.exports) {
+    module.exports = { ALL_GLOSSARY: ALL_GLOSSARY, searchIndex: searchIndex, queryTokens: queryTokens, matchesQuery: matchesQuery };
+  }
+  if (typeof document === "undefined") return;
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", init);
