@@ -49,11 +49,16 @@
       padding: 18px 20px;
     }
     .glossary-term {
+      display: block;
       font-size: 15px;
       font-weight: 700;
       color: var(--text);
       margin-bottom: 8px;
+      text-decoration: none;
     }
+    .glossary-term::after { content: " \2192"; color: var(--muted); font-weight: 600; }
+    .glossary-term:hover,
+    .glossary-term:focus-visible { color: var(--blue); outline: none; text-decoration: underline; text-underline-offset: 3px; }
     .glossary-def {
       font-size: 13px;
       color: var(--soft);
@@ -191,6 +196,17 @@
     .glossary-side-link:focus-visible { background: var(--surface2); color: var(--text); outline: none; }
     .glossary-side-link.is-active { background: var(--accent-bg, var(--surface2)); color: var(--text); }
     .glossary-side-link.is-empty { display: none; }
+    .glossary-side-group {
+      margin: 10px 4px 4px;
+      padding: 10px 6px 4px;
+      border-top: 1px solid var(--border);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .glossary-side-group[hidden] { display: none; }
     .glossary-side-count {
       flex: 0 0 auto;
       font-size: 11px;
@@ -335,6 +351,7 @@
 </div>
 
 <script src="/assets/js/sidebar.js"></script>
+<script src="/assets/js/glossary-library.js"></script>
 <script src="/assets/js/indicators.js"></script>
 </body>
 </html>
