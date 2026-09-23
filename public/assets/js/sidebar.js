@@ -71,6 +71,9 @@
             // (live, per coin) and CFTC futures across asset classes (weekly).
             { href: "/open-interest.html", label: "Crypto Open Interest" },
             { href: "/cross-market-oi.html", label: "Cross-Market Open Interest" },
+            // Momentum across markets and timeframes at once: RSI 14 on
+            // 1W / 1D / 4H / 1H for crypto, indices, commodities and dominance.
+            { href: "/rsi-matrix.html", label: "RSI Matrix" },
           ],
         },
         { href: "/pattern-scanner-trades.html", label: "My Trades" },

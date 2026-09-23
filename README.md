@@ -24,6 +24,7 @@ The app is intentionally lightweight: no bundler, no frontend framework, and no 
 - `/ai-analysis.html` - TradingView chart snapshots with AI reads for crypto plus BTC-correlated macro tickers.
 - `/directional-bias.html` - Directional Bias screener: which way trend and momentum are leaning across the token universe configured in Settings (all 25 defaults out of the box), scored by how many of six checks (RSI, MACD, VWAP, volume, EMA20/50, price vs EMA200) agree. BTC and USDT.D ride along as market context. Reads `BULLISH / BEARISH / NEUTRAL`; `LONG / SHORT` stay on the wire and on pages that publish an actual setup.
 - `/local-extremes.html` - Local Extremes screener: whether price is stretched toward a possible local top or bottom, with bottom and top scored independently from Bollinger excursion, RSI extreme, divergence, liquidity sweep, volume climax and reversal confirmation. Direction and location are separate questions — a bullish bias and a confirmed local top are both legitimate at once. `/signal-screener.html` redirected here and to Directional Bias when the combined page was split.
+- `/rsi-matrix.html` - Multi-Timeframe RSI Matrix: RSI 14 on 1W / 1D / 4H / 1H for crypto, indices, commodities, FX, dominance and stablecoins, with an AVG row that flags MTF overbought (≥70) / oversold (≤30). See [RSI Matrix](#rsi-matrix).
 - `/decision.html` - Decision Engine: multi-asset regime score (BTC, breadth, SPY, QQQ, DXY, VIX, gold, oil, optional US10Y), asset-class rotation board, setup-quality ranking layered over the signal screener, execution levels (trigger / invalidation / target / R:R with explicit "do not trade" reasons), and a trading journal that grades whether the engine's calls were right.
 - `/trading-lab.html` - Trading Lab: paper execution with real TP1/TP2 scale-outs, ATR risk sizing, kill switches, a historical edge gate that scores every Decision Engine plan against how setups like it have actually performed, and bar-replay backtesting over the same engine. See [docs/trading-lab.md](docs/trading-lab.md).
 - `/youtube-v2.html` - YouTube Intelligence: live streams, scheduled streams, and latest uploads from tracked channels.
@@ -389,6 +390,15 @@ The Overview card reads `GET /api/onchain/intelligence`, which wraps DefiLlama's
 - **Missing and stale** - a market absent from the report is `null` and leaves a gap in the shape, never 0. A report older than `CROSS_MARKET_OI_STALE_AFTER_DAYS` (default 11) is STALE. The last good report is saved to `DATA_DIR/cross-market-oi.json`; if the CFTC is unreachable the page shows it as CACHED.
 - `CFTC_API_BASE_URL`, `CFTC_APP_TOKEN` (optional Socrata app token for a higher rate limit; server-side only), `CROSS_MARKET_OI_CACHE_MS` (default 1 h), `CROSS_MARKET_OI_REQUEST_TIMEOUT_MS` (default 15 s).
 
+### RSI Matrix
+
+`/rsi-matrix.html` (sidebar: TradeHunter → Screeners → RSI Matrix) shows RSI 14 on close for many markets across 1W / 1D / 4H / 1H at once, as a heatmap with columns = instruments and rows = timeframes plus AVG. It reads `GET /api/rsi-matrix` (`?force=1` is the Refresh button), served from `src/services/rsi-matrix/`.
+
+- **Calculation** - the Signal Screener's own `rsi()` on closed bars only (`dropUnclosedCandle`). Cells use momentum bands (≥75 strong bullish … ≤25 strong bearish). AVG is the mean of every *enabled* timeframe and is reported only when all of them have a value; otherwise it shows `— (3/4)`. AVG ≥ 70 is flagged MTF overbought and ≤ 30 MTF oversold. These are RSI conditions, never BUY/SELL.
+- **Instruments** - a registry separate from the Binance-only token universe: each row is a display label, a group (Cross-Market, Crypto / Dominance / Stablecoins), a provider and the provider's own symbol. Edited in **Settings → Screeners → RSI Matrix** (add, delete user rows, reorder, enable, relabel, change source, timeframes, reset) and saved to `DATA_DIR/rsi-matrix-settings.json`. A new or changed source is checked against its provider before it is saved; TradingView notation (`MEXC:MXUSDT`) and synthetic indices sent to an exchange are refused.
+- **Providers** - Binance spot (through `SignalScreenerService.getCandles()`), Binance USDT-M perpetuals, MEXC, KuCoin, Coinbase, Kraken, Poloniex (public keyless candles); Yahoo Finance chart history for indices, yields, futures and DXY (Finnhub's free tier only serves quotes, not candles; 4H is rolled up from 1H on UTC boundaries); CoinGecko `market_chart` for stablecoin market caps (`CRYPTOCAP:*`); and a sampled **dominance** provider for USDT.D / USDC.D / BTC.D / TOTAL3. No free API serves dominance history, so the server records CoinGecko `/global` every 15 minutes into `DATA_DIR/rsi-matrix-dominance-history.json` (USDT.D also reads the existing `usdt-dominance-history.json`) and cuts bars from those observations; a timeframe reads "building history" until it has 15 consecutive bars.
+- **Failure and caching** - every instrument × timeframe fails on its own; a missing value is `null` with a reason, never 0 and never a substitute market. Series are cached by provider + symbol + timeframe until just after the next bar close, failures for 3 minutes, and concurrent requests share one upstream call. A forced refresh is honoured at most once a minute across all viewers. No new environment variables.
+
 ### YouTube Intelligence
 
 `/youtube-v2.html` runs on a hybrid of the YouTube Data API v3 and YouTube's public RSS feeds. Per channel the service tries the API first (uploads plus live/upcoming state), falls back to RSS (uploads only, no key, but it needs a known `UC...` channel ID), and finally serves the last known good feed rather than blanking the page. It never scrapes `youtube.com/@handle` HTML — doing that is what used to break the page on Railway, where YouTube answers datacenter IPs with a consent interstitial instead of the channel document.
@@ -465,9 +475,12 @@ market-dashboard/
       directional-bias.js one screener projection: direction
       local-extremes.js   the other: location/exhaustion
       screener-settings.js  read the token matrix; admin-gated writes
+      rsi-matrix.js       RSI Matrix + its settings; admin-gated writes
     services/             provider clients and aggregation
       signal-screener.js  the confluence engine behind both screener pages
       screener-settings.js  which tokens each screener scans (DATA_DIR-backed)
+      rsi-matrix-settings.js  RSI Matrix instruments/timeframes (DATA_DIR-backed)
+      rsi-matrix/         multi-provider candles + RSI Matrix engine
       local-extreme-engine.js  independent local top/bottom scoring
       screener-projections.js  reshapes one cached scan for either page
       trade-context.js    combines bias + extremes + patterns per tracked pair

@@ -1,0 +1,159 @@
+/* ─────────────────────────────────────────────────────────
+   RSI Matrix — dense heatmap of RSI 14 per instrument × timeframe.
+
+   Columns are instruments, rows are timeframes plus AVG, like the reference
+   indicator. On narrow screens the table scrolls horizontally behind a
+   sticky timeframe axis rather than shrinking cells until they're unreadable.
+   Toolbar, select and button styles come from signal-screener.css /
+   ai-analysis.css.
+───────────────────────────────────────────────────────── */
+
+.rm-explainer {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(137, 146, 166, 0.22);
+  border-left: 3px solid var(--blue, #4da3ff);
+  border-radius: 8px;
+  background: #0a0a18;
+}
+.rm-explainer p { margin: 0; font-size: 12px; line-height: 1.55; color: #9aa4bb; }
+.rm-explainer p + p { margin-top: 7px; }
+.rm-explainer strong { color: #e8edf5; }
+
+.rm-sort-label { font-size: 11px; color: var(--muted, #8492aa); text-transform: uppercase; letter-spacing: 0.06em; }
+.rm-settings-link { font-size: 12px; color: var(--blue, #4da3ff); text-decoration: none; }
+.rm-settings-link:hover { text-decoration: underline; }
+
+/* ── Legend ─────────────────────────────────────────────── */
+.rm-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0 0 14px; font-size: 11px; color: #9aa4bb; }
+.rm-legend-item { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.rm-swatch { width: 14px; height: 10px; border-radius: 2px; display: inline-block; }
+
+/* ── Heat colours (restrained, not the TradingView palette) ─ */
+.rm-cell--strong-bullish { background: rgba(0, 190, 128, 0.62); color: #f2fff9; }
+.rm-cell--bullish        { background: rgba(0, 190, 128, 0.40); color: #e9fbf3; }
+.rm-cell--weak-bullish   { background: rgba(0, 190, 128, 0.18); color: #cdeee0; }
+.rm-cell--neutral        { background: rgba(137, 146, 166, 0.14); color: #c9d2e3; }
+.rm-cell--weak-bearish   { background: rgba(230, 72, 100, 0.18); color: #f2d3da; }
+.rm-cell--bearish        { background: rgba(230, 72, 100, 0.40); color: #fde9ed; }
+.rm-cell--strong-bearish { background: rgba(230, 72, 100, 0.62); color: #fff3f5; }
+.rm-cell--na             { background: repeating-linear-gradient(135deg, rgba(255,255,255,0.025) 0 6px, transparent 6px 12px); color: #566070; }
+
+/* AVG extremes: a stretched market on every timeframe, not momentum. */
+.rm-avg--mtf-overbought { background: rgba(245, 197, 66, 0.26); box-shadow: inset 0 0 0 2px rgba(245, 197, 66, 0.85); color: #fff4d4; }
+.rm-avg--mtf-oversold   { background: rgba(77, 163, 255, 0.24); box-shadow: inset 0 0 0 2px rgba(77, 163, 255, 0.85); color: #e3f0ff; }
+
+/* ── Groups ─────────────────────────────────────────────── */
+.rm-groups { display: flex; flex-direction: column; gap: 16px; margin-bottom: 20px; }
+.rm-loading, .rm-empty { padding: 18px 14px; font-size: 13px; color: var(--muted, #8492aa); }
+.rm-error { color: var(--amber, #f5c542); }
+.rm-empty a { color: var(--blue, #4da3ff); }
+
+.rm-group {
+  border: 1px solid rgba(74, 74, 170, 0.3);
+  border-radius: 12px;
+  background: #0a0a14;
+  overflow: hidden;
+}
+.rm-group-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  background: #12122a;
+  list-style: none;
+}
+.rm-group-head::-webkit-details-marker { display: none; }
+.rm-group-head::before { content: "\25B8"; color: var(--muted, #8492aa); font-size: 11px; transition: transform 0.15s; }
+.rm-group[open] > .rm-group-head::before { transform: rotate(90deg); }
+.rm-group-head:focus-visible { outline: 2px solid var(--blue, #4da3ff); outline-offset: -2px; }
+.rm-group-title { font-size: 13px; font-weight: 700; color: var(--text, #edf3ff); }
+.rm-group-count { font-size: 11px; color: var(--muted, #8492aa); }
+
+/* ── Summary tiles (descriptive statistics only) ───────── */
+.rm-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding: 12px 14px 0; }
+.rm-stat {
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  min-width: 0;
+}
+.rm-stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted, #8492aa); }
+.rm-stat-value { margin-top: 3px; font-size: 13px; color: #c9d4e8; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rm-stat-value strong { color: var(--text, #edf3ff); }
+.rm-stat-tf { font-size: 10px; color: var(--muted, #8492aa); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 0 4px; }
+.rm-stat-empty { color: #566070; }
+
+.rm-extremes { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 8px 14px 0; font-size: 11px; font-weight: 600; }
+.rm-ext--ob { color: #f5c542; }
+.rm-ext--os { color: #7dbbff; }
+
+/* ── Matrix ─────────────────────────────────────────────── */
+.rm-table-wrap { overflow-x: auto; margin: 12px 0 0; -webkit-overflow-scrolling: touch; }
+.rm-table { border-collapse: separate; border-spacing: 2px; width: 100%; font-variant-numeric: tabular-nums; }
+.rm-table th, .rm-table td { font-size: 12px; white-space: nowrap; }
+
+.rm-axis {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 56px;
+  padding: 6px 6px;
+  text-align: left;
+  font-size: 10px !important;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #8892a6;
+  background: #0a0a14;
+}
+.rm-avg-row .rm-axis { color: var(--text, #edf3ff); }
+
+.rm-col-head { padding: 4px 2px 6px; min-width: 52px; text-align: center; vertical-align: bottom; cursor: help; }
+.rm-col-label { display: block; font-size: 10.5px; font-weight: 700; color: var(--text, #edf3ff); }
+.rm-col-source { display: block; font-size: 9px; color: #566070; text-transform: uppercase; letter-spacing: 0.05em; }
+.rm-col-head--down .rm-col-label { color: #8492aa; }
+
+.rm-cell {
+  padding: 7px 3px;
+  min-width: 52px;
+  text-align: center;
+  border-radius: 3px;
+  font-weight: 600;
+  cursor: default;
+}
+.rm-cell:focus-visible { outline: 2px solid var(--blue, #4da3ff); outline-offset: 1px; }
+.rm-avg-row .rm-cell { font-weight: 800; border-top: 2px solid rgba(255, 255, 255, 0.12); }
+.rm-avg-flag {
+  margin-left: 4px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.3);
+}
+.rm-avg-partial { display: block; font-size: 9px; font-weight: 600; color: #8492aa; }
+
+.rm-cell-detail {
+  padding: 8px 14px 12px;
+  min-height: 1.4em;
+  font-size: 11px;
+  color: #9aa4bb;
+  white-space: pre-line;
+}
+
+@media (max-width: 900px) {
+  .rm-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 560px) {
+  .rm-stats { padding: 10px 10px 0; gap: 6px; }
+  .rm-group-head { padding: 10px; }
+  /* Cells keep a readable width; the table scrolls under the sticky axis. */
+  .rm-cell, .rm-col-head { min-width: 56px; }
+  .rm-axis { min-width: 54px; padding: 6px; }
+  .rm-legend { font-size: 10px; }
+}

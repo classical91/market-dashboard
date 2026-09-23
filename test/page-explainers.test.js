@@ -19,6 +19,7 @@ const pages = [
   ["public/pattern-scanner-stats.html", 'id="ts-recent"'],
   ["public/directional-bias.html", 'id="db-tbody"'],
   ["public/local-extremes.html", 'id="lx-tbody"'],
+  ["public/rsi-matrix.html", 'id="rm-groups"'],
 ];
 
 test("AI Analysis and TradeHunter pages explain themselves at the bottom", () => {

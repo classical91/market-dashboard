@@ -31,6 +31,7 @@ const { createLocalExtremesRouter } = require("./routes/local-extremes");
 const { createOpenInterestRouter } = require("./routes/open-interest");
 const { createCrossMarketOiRouter } = require("./routes/cross-market-oi");
 const { createScreenerSettingsRouter } = require("./routes/screener-settings");
+const { createRsiMatrixRouter } = require("./routes/rsi-matrix");
 const { createStrategyEngineRouter } = require("./routes/strategy-engine");
 const { createTradingLabRouter } = require("./routes/trading-lab");
 const { createWatchlistRouter } = require("./routes/watchlist");
@@ -67,6 +68,9 @@ const { CrossMarketOiService } = require("./services/cross-market-oi/service");
 const { CftcCotProvider } = require("./services/cross-market-oi/cftc-provider");
 const { DatabentoDailyOiProvider } = require("./services/cross-market-oi/databento-provider");
 const { ScreenerSettingsService } = require("./services/screener-settings");
+const { RsiMatrixSettingsService } = require("./services/rsi-matrix-settings");
+const { RsiMatrixService } = require("./services/rsi-matrix/service");
+const { createProviders: createRsiMatrixProviders, createVerifier: createRsiMatrixVerifier } = require("./services/rsi-matrix/providers");
 const { UsdtDominanceService } = require("./services/usdt-dominance");
 const { StrategyEngineService } = require("./services/strategy-engine");
 const { SignalBotService } = require("./services/signal-bot");
@@ -309,6 +313,21 @@ function createApp() {
     dailyStaleAfterDays: config.crossMarketOi.dailyStaleAfterDays,
   });
   const usdtDominanceService = new UsdtDominanceService({ marketDataService, dataDir });
+  // Multi-Timeframe RSI Matrix. Its instrument registry is its own store, not
+  // the Binance-only token universe above: the matrix mixes indices, futures,
+  // dominance series and stablecoins across venues. Binance spot candles
+  // still come through the screener engine's getCandles() and its cache.
+  const rsiMatrixProviders = createRsiMatrixProviders({ signalScreenerService, marketDataService, dataDir });
+  const rsiMatrixSettingsService = new RsiMatrixSettingsService({
+    dataDir,
+    verifyInstrument: createRsiMatrixVerifier(rsiMatrixProviders),
+  });
+  rsiMatrixSettingsService.ensureSeeded();
+  const rsiMatrixService = new RsiMatrixService({
+    settingsService: rsiMatrixSettingsService,
+    providers: rsiMatrixProviders,
+    cache,
+  });
   const strategyEngineService = new StrategyEngineService({ signalScreenerService });
   const watchlistService = new WatchlistService({ dataDir });
   // Pure aggregation over the engines above — it owns no indicator maths and
@@ -537,6 +556,10 @@ function createApp() {
     "/api/screener-settings",
     createScreenerSettingsRouter({ screenerSettingsService, requireAdmin: requireXAdmin }),
   );
+  app.use(
+    "/api/rsi-matrix",
+    createRsiMatrixRouter({ rsiMatrixService, rsiMatrixSettingsService, requireAdmin: requireXAdmin }),
+  );
   app.use("/api/strategy-engine", createStrategyEngineRouter({ strategyEngineService }));
   app.use(
     "/api/decision",
@@ -637,6 +660,7 @@ function createApp() {
   app.locals.broadcastIngest = broadcastIngestService;
   app.locals.liveScanner = liveScannerService;
   app.locals.liveResearch = liveResearchService;
+  app.locals.rsiMatrix = rsiMatrixService;
 
   return app;
 }

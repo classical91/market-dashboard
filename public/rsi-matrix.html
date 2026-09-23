@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RSI Matrix · Market Command</title>
+  <script src="/assets/js/settings.js"></script>
+  <link rel="stylesheet" href="/assets/styles/command.css" />
+  <link rel="stylesheet" href="/assets/styles/ai-analysis.css" />
+  <link rel="stylesheet" href="/assets/styles/signal-screener.css" />
+  <link rel="stylesheet" href="/assets/styles/rsi-matrix.css" />
+</head>
+<body>
+<div class="app">
+  <aside class="cmd-sidebar"></aside>
+  <main class="cmd-main">
+
+    <div class="cmd-page-header">
+      <div>
+        <div class="cmd-page-title">&#128202; RSI Matrix</div>
+        <div class="cmd-page-subtitle">How strong or weak each market is right now, on four timeframes at once &mdash; RSI 14 on close, closed bars only</div>
+      </div>
+    </div>
+
+    <div class="rm-explainer">
+      <p><strong>Each cell is RSI 14 for one market on one timeframe. The AVG row is the mean of every enabled timeframe.</strong></p>
+      <p>Cell colours describe momentum: green from 55 up, red below 45, grey in between. The AVG row reads differently &mdash; an average at or above <strong>70</strong> is flagged <em>MTF overbought</em> and at or below <strong>30</strong> <em>MTF oversold</em>: stretched on every timeframe at once. These are RSI conditions, not BUY or SELL calls.</p>
+    </div>
+
+    <div class="aia-notice" id="rm-notice" style="display:none"></div>
+
+    <div class="ss-toolbar">
+      <label class="rm-sort-label" for="rm-sort">Sort</label>
+      <select class="aia-select" id="rm-sort" aria-label="Sort instruments">
+        <option value="default" selected>Default order</option>
+        <option value="avg:desc">Highest AVG RSI</option>
+        <option value="avg:asc">Lowest AVG RSI</option>
+      </select>
+      <button class="aia-run-btn" type="button" id="rm-refresh-btn">Refresh</button>
+      <a class="rm-settings-link" href="/settings.html#rsi-matrix-settings">Edit instruments</a>
+      <span class="ss-updated" id="rm-updated"></span>
+    </div>
+
+    <div class="rm-legend" id="rm-legend" aria-label="Colour legend"></div>
+
+    <div id="rm-groups" class="rm-groups" aria-live="polite">
+      <div class="rm-loading">Loading RSI readings…</div>
+    </div>
+
+    <details class="aia-how aia-how--footer" open>
+      <summary>&#8505;&#65039; How this page works</summary>
+      <div class="aia-how-body">
+        <ol class="aia-how-steps">
+          <li><strong>One RSI per cell.</strong> Every instrument &times; timeframe is fetched and computed on its own, so a failed GOLD 1H read leaves every other cell intact. RSI 14 uses the same Wilder formula as the other screeners, on closed bars only &mdash; a bar still forming never moves a value.</li>
+          <li><strong>AVG needs every timeframe.</strong> When one timeframe is unavailable the AVG shows &mdash; with how many readings exist (e.g. 3/4) instead of silently averaging fewer.</li>
+          <li><strong>Hover or tap a cell</strong> for the market, timeframe, exact value and state, or the reason a value is missing.</li>
+          <li><strong>Sorting is temporary.</strong> It reorders this view only; the configured order lives in <a href="/settings.html#rsi-matrix-settings">Settings &rarr; Screeners &rarr; RSI Matrix</a>, where instruments, sources and timeframes are edited.</li>
+        </ol>
+        <ul class="aia-how-notes">
+          <li><strong>Sources.</strong> Crypto pairs come from their exchange&rsquo;s public candles (Binance, MEXC, KuCoin, Coinbase, Kraken, Poloniex). Indices, yields, futures and DXY come from Yahoo Finance chart history; 4H there is built from 1H bars on UTC boundaries. Stablecoin market caps come from CoinGecko.</li>
+          <li><strong>Dominance and TOTAL series are sampled.</strong> USDT.D, USDC.D, BTC.D and TOTAL3 have no free historical feed, so the server records CoinGecko&rsquo;s global figures every 15 minutes and builds bars from those observations. A timeframe shows &ldquo;building history&rdquo; until it has 15 consecutive bars &mdash; nothing older is invented.</li>
+          <li><strong>Unavailable means unavailable.</strong> A missing value is shown as &mdash;, never as 0 and never replaced by another market.</li>
+          <li><strong>AI use: No.</strong> Every value is a fixed RSI calculation; this page does not call an AI model.</li>
+        </ul>
+      </div>
+    </details>
+
+    <footer>RSI Matrix &mdash; <a href="/directional-bias.html">Directional Bias</a> &mdash; <a href="/local-extremes.html">Local Extremes</a> &mdash; <a href="/settings.html#rsi-matrix-settings">Settings</a> &mdash; <a href="/">Overview</a></footer>
+
+  </main>
+</div>
+<script src="/assets/js/sidebar.js"></script>
+<script src="/assets/js/rsi-matrix.js"></script>
+</body>
+</html>

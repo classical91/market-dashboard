@@ -28,4 +28,7 @@ app.listen(config.port, () => {
   // here rather than in createApp(). start() logs and returns when the watch
   // is disabled or Telegram is unconfigured.
   if (app.locals.broadcastIngest) app.locals.broadcastIngest.start();
+  // The RSI Matrix samples CoinGecko /global to build the dominance and TOTAL
+  // history no free API serves. A timer, so it starts here too.
+  if (app.locals.rsiMatrix) app.locals.rsiMatrix.startSampler();
 });
