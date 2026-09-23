@@ -236,6 +236,33 @@
       .ledger-destination-row { grid-template-columns: 1fr; }
     }
 
+    /* ── RSI Matrix instruments ─────────────────────────── */
+    .rsi-tf-row { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 14px; font-size: 13px; color: var(--soft); }
+    .rsi-tf-row label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+    .rsi-tf-row input { accent-color: var(--blue); width: 15px; height: 15px; }
+    .rsi-group { margin-top: 18px; }
+    .rsi-group-title { font-size: 12px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+    .rsi-list { overflow-x: auto; }
+    .rsi-row {
+      display: grid;
+      grid-template-columns: 52px 26px minmax(96px, 1fr) minmax(130px, 1.1fr) minmax(150px, 1.3fr) minmax(110px, 1fr) 30px;
+      gap: 6px; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--border);
+      min-width: 660px; font-size: 12px;
+    }
+    .rsi-row.head { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; border-bottom-color: rgba(255,255,255,0.12); }
+    .rsi-row.off input[type=text], .rsi-row.off select { opacity: 0.5; }
+    .rsi-row input[type=text], .rsi-row select, .rsi-add input, .rsi-add select {
+      min-width: 0; width: 100%; box-sizing: border-box; border: 1px solid var(--border); border-radius: 8px;
+      padding: 6px 8px; background: rgba(255,255,255,.04); color: var(--text); font: inherit; font-size: 12px;
+    }
+    .rsi-row input:focus, .rsi-row select:focus, .rsi-add input:focus, .rsi-add select:focus { outline: none; border-color: rgba(77,163,255,0.42); }
+    .rsi-row input[type=checkbox] { accent-color: var(--blue); width: 15px; height: 15px; justify-self: center; }
+    .rsi-move { display: flex; gap: 2px; }
+    .rsi-note { grid-column: 3 / -1; font-size: 10px; color: var(--muted); margin-top: -2px; }
+    .rsi-badge { font-size: 9px; color: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; margin-left: 4px; }
+    .rsi-add { display: grid; grid-template-columns: minmax(90px, 1fr) minmax(130px, 1.2fr) minmax(120px, 1fr) minmax(130px, 1fr) auto; gap: 8px; margin-top: 18px; align-items: center; }
+    @media (max-width: 720px) { .rsi-add { grid-template-columns: 1fr 1fr; } }
+
     /* ── Screener token matrix ──────────────────────────── */
     .screener-counts { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
     .screener-count {
@@ -400,6 +427,38 @@
           <button class="settings-action-btn primary" id="screenerSave" type="button">Save Universes</button>
           <button class="settings-action-btn" id="screenerResetAll" type="button">Reset All to Defaults</button>
           <span class="screener-note" id="screenerStatus">Loading…</span>
+        </div>
+      </div>
+      <div class="settings-card" id="rsi-matrix-settings" style="margin-top: 14px;">
+        <div class="settings-row">
+          <div>
+            <div class="settings-row-label">RSI Matrix</div>
+            <div class="settings-row-sub">
+              Instruments and timeframes on the <a href="/rsi-matrix.html">RSI Matrix</a>. Separate from the token
+              universe above on purpose: this list mixes indices, futures, dominance series and stablecoins from
+              several sources, while that one stays Binance USDT spot pairs. Each row is a display label, a
+              source and the symbol <em>that source</em> uses. Saved on the server.
+            </div>
+          </div>
+        </div>
+
+        <div class="rsi-tf-row" id="rsiTimeframes" role="group" aria-label="RSI Matrix timeframes"></div>
+
+        <div id="rsiGroups"></div>
+
+        <div class="rsi-add" id="rsiAdd">
+          <input id="rsiAddLabel" type="text" placeholder="Display name (GOLD)" aria-label="Display name" autocomplete="off" />
+          <select id="rsiAddProvider" aria-label="Source / provider"></select>
+          <input id="rsiAddSymbol" type="text" placeholder="Provider symbol" aria-label="Provider symbol" autocomplete="off" spellcheck="false" />
+          <select id="rsiAddGroup" aria-label="Group"></select>
+          <button class="settings-action-btn" id="rsiAddBtn" type="button">Add Instrument</button>
+        </div>
+        <div class="screener-note" id="rsiAddNote" style="margin-top: 8px;">The symbol is checked against the chosen source before it is saved.</div>
+
+        <div class="screener-actions">
+          <button class="settings-action-btn primary" id="rsiSave" type="button">Save RSI Matrix</button>
+          <button class="settings-action-btn" id="rsiReset" type="button">Reset to Defaults</button>
+          <span class="screener-note" id="rsiStatus">Loading…</span>
         </div>
       </div>
     </div>
@@ -1127,6 +1186,326 @@
     addBtn.addEventListener('click', addToken);
     addInput.addEventListener('keydown', function (e) {
       if (e.key === 'Enter') { e.preventDefault(); addToken(); }
+    });
+
+    load();
+  })();
+
+  /* ── RSI Matrix instruments ─────────────────────────── */
+  (function () {
+    var API = '/api/rsi-matrix/settings';
+    var tfEl = document.getElementById('rsiTimeframes');
+    var groupsEl = document.getElementById('rsiGroups');
+    var addLabel = document.getElementById('rsiAddLabel');
+    var addProvider = document.getElementById('rsiAddProvider');
+    var addSymbol = document.getElementById('rsiAddSymbol');
+    var addGroup = document.getElementById('rsiAddGroup');
+    var addBtn = document.getElementById('rsiAddBtn');
+    var addNote = document.getElementById('rsiAddNote');
+    var saveBtn = document.getElementById('rsiSave');
+    var resetBtn = document.getElementById('rsiReset');
+    var statusEl = document.getElementById('rsiStatus');
+    var ADD_HINT = 'The symbol is checked against the chosen source before it is saved.';
+
+    // Server truth and the working copy the controls edit, kept apart so a
+    // failed save falls back cleanly and "unsaved" is answerable.
+    var snapshot = null;
+    var rows = [];
+    var timeframes = {};
+    var dirty = false;
+
+    function setStatus(message, isError) {
+      statusEl.textContent = message;
+      statusEl.className = 'screener-note' + (isError ? ' error' : '');
+    }
+    function setAddNote(message, isError) {
+      addNote.textContent = message || ADD_HINT;
+      addNote.className = 'screener-note' + (isError ? ' error' : '');
+    }
+    function markDirty() { dirty = true; setStatus('Unsaved changes.'); }
+
+    function providerHint(id) {
+      var p = (snapshot.providers || []).filter(function (x) { return x.id === id; })[0];
+      return p ? p.hint : '';
+    }
+
+    function adopt(data) {
+      snapshot = data;
+      rows = data.instruments.map(function (r) { return Object.assign({}, r); });
+      timeframes = {};
+      data.timeframes.forEach(function (t) { timeframes[t.key] = t.enabled; });
+      dirty = false;
+      fillAddForm();
+      render();
+    }
+
+    function option(value, label, selected) {
+      var o = document.createElement('option');
+      o.value = value;
+      o.textContent = label;
+      if (selected) o.selected = true;
+      return o;
+    }
+
+    function fillAddForm() {
+      var provider = addProvider.value;
+      var group = addGroup.value;
+      addProvider.innerHTML = '';
+      snapshot.providers.forEach(function (p) { addProvider.appendChild(option(p.id, p.label, p.id === provider)); });
+      addGroup.innerHTML = '';
+      snapshot.groups.forEach(function (g) { addGroup.appendChild(option(g.id, g.label, g.id === group)); });
+      addSymbol.placeholder = 'Symbol, e.g. ' + providerHint(addProvider.value);
+    }
+
+    function renderTimeframes() {
+      tfEl.innerHTML = '';
+      snapshot.timeframes.forEach(function (t) {
+        var label = document.createElement('label');
+        var input = document.createElement('input');
+        input.type = 'checkbox';
+        input.checked = timeframes[t.key] !== false;
+        input.addEventListener('change', function () { timeframes[t.key] = input.checked; markDirty(); });
+        label.appendChild(input);
+        label.appendChild(document.createTextNode('RSI ' + t.label));
+        tfEl.appendChild(label);
+      });
+    }
+
+    // Moves a row past its nearest neighbour in the same group. The stored
+    // order is one list; each group shows its members in that order.
+    function move(row, dir) {
+      var i = rows.indexOf(row);
+      for (var j = i + dir; j >= 0 && j < rows.length; j += dir) {
+        if (rows[j].group === row.group) {
+          rows[i] = rows[j];
+          rows[j] = row;
+          markDirty();
+          render();
+          return;
+        }
+      }
+    }
+
+    function miniButton(text, title, onClick) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'screener-mini';
+      b.textContent = text;
+      b.title = title;
+      b.setAttribute('aria-label', title);
+      b.addEventListener('click', onClick);
+      return b;
+    }
+
+    function instrumentRow(row) {
+      var el = document.createElement('div');
+      el.className = 'rsi-row' + (row.enabled ? '' : ' off');
+
+      var moveEl = document.createElement('div');
+      moveEl.className = 'rsi-move';
+      moveEl.appendChild(miniButton('↑', 'Move ' + row.label + ' left / up', function () { move(row, -1); }));
+      moveEl.appendChild(miniButton('↓', 'Move ' + row.label + ' right / down', function () { move(row, 1); }));
+      el.appendChild(moveEl);
+
+      var enabled = document.createElement('input');
+      enabled.type = 'checkbox';
+      enabled.checked = row.enabled;
+      enabled.setAttribute('aria-label', 'Show ' + row.label);
+      enabled.addEventListener('change', function () { row.enabled = enabled.checked; markDirty(); el.className = 'rsi-row' + (row.enabled ? '' : ' off'); });
+      el.appendChild(enabled);
+
+      var label = document.createElement('input');
+      label.type = 'text';
+      label.value = row.label;
+      label.maxLength = 24;
+      label.setAttribute('aria-label', 'Display label');
+      label.addEventListener('input', function () { row.label = label.value; markDirty(); });
+      el.appendChild(label);
+
+      var group = document.createElement('select');
+      group.setAttribute('aria-label', 'Group for ' + row.label);
+      snapshot.groups.forEach(function (g) { group.appendChild(option(g.id, g.label, g.id === row.group)); });
+      group.addEventListener('change', function () { row.group = group.value; markDirty(); render(); });
+      el.appendChild(group);
+
+      var provider = document.createElement('select');
+      provider.setAttribute('aria-label', 'Source for ' + row.label);
+      snapshot.providers.forEach(function (p) { provider.appendChild(option(p.id, p.label, p.id === row.provider)); });
+      el.appendChild(provider);
+
+      var symbol = document.createElement('input');
+      symbol.type = 'text';
+      symbol.value = row.providerSymbol;
+      symbol.spellcheck = false;
+      symbol.setAttribute('aria-label', 'Provider symbol for ' + row.label);
+      symbol.placeholder = providerHint(row.provider);
+      symbol.addEventListener('input', function () { row.providerSymbol = symbol.value; markDirty(); });
+      provider.addEventListener('change', function () {
+        row.provider = provider.value;
+        symbol.placeholder = providerHint(row.provider);
+        markDirty();
+      });
+      el.appendChild(symbol);
+
+      var trailing = document.createElement('div');
+      // Shipped defaults are disabled rather than deleted, so Reset always
+      // restores the same list.
+      if (!row.isDefault) {
+        var remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'screener-remove';
+        remove.textContent = '×';
+        remove.title = 'Delete ' + row.label;
+        remove.setAttribute('aria-label', 'Delete ' + row.label);
+        remove.addEventListener('click', function () { removeInstrument(row); });
+        trailing.appendChild(remove);
+      }
+      el.appendChild(trailing);
+
+      if (row.note) {
+        var note = document.createElement('div');
+        note.className = 'rsi-note';
+        note.textContent = row.note;
+        el.appendChild(note);
+      }
+      return el;
+    }
+
+    function render() {
+      if (!snapshot) return;
+      renderTimeframes();
+      groupsEl.innerHTML = '';
+      snapshot.groups.forEach(function (g) {
+        var members = rows.filter(function (r) { return r.group === g.id; });
+        var wrap = document.createElement('div');
+        wrap.className = 'rsi-group';
+        var title = document.createElement('div');
+        title.className = 'rsi-group-title';
+        var on = members.filter(function (r) { return r.enabled; }).length;
+        title.textContent = g.label + ' — ' + on + ' of ' + members.length + ' shown';
+        wrap.appendChild(title);
+        var list = document.createElement('div');
+        list.className = 'rsi-list';
+        var head = document.createElement('div');
+        head.className = 'rsi-row head';
+        ['Order', 'On', 'Label', 'Group', 'Source', 'Symbol', ''].forEach(function (h) {
+          var c = document.createElement('div');
+          c.textContent = h;
+          head.appendChild(c);
+        });
+        list.appendChild(head);
+        if (!members.length) {
+          var empty = document.createElement('div');
+          empty.className = 'screener-empty';
+          empty.textContent = 'No instruments in this group.';
+          list.appendChild(empty);
+        }
+        members.forEach(function (r) { list.appendChild(instrumentRow(r)); });
+        wrap.appendChild(list);
+        groupsEl.appendChild(wrap);
+      });
+    }
+
+    function failure(res) {
+      return res.json().catch(function () { return {}; }).then(function (body) {
+        throw new Error(body.error || ('Request failed (HTTP ' + res.status + ')'));
+      });
+    }
+    function write(url, options) {
+      return AdminKey.fetchOrSession(url, options).then(function (res) {
+        if (!res.ok) return failure(res);
+        return res.json();
+      });
+    }
+
+    function load() {
+      setStatus('Loading…');
+      return fetch(API, { credentials: 'same-origin' })
+        .then(function (res) { return res.ok ? res.json() : failure(res); })
+        .then(function (data) {
+          adopt(data);
+          setStatus(data.status && data.status.state === 'corrupt'
+            ? '⚠ The saved RSI Matrix settings could not be read; showing the defaults. Saving will replace them.'
+            : 'Saved.', data.status && data.status.state === 'corrupt');
+        })
+        .catch(function (err) { setStatus('⚠ ' + err.message, true); });
+    }
+
+    saveBtn.addEventListener('click', function () {
+      if (!snapshot) return;
+      saveBtn.disabled = true;
+      setStatus('Saving… (changed sources are verified first)');
+      write(API, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          instruments: rows.map(function (r) {
+            return { id: r.id, label: r.label, group: r.group, provider: r.provider, providerSymbol: r.providerSymbol, enabled: r.enabled };
+          }),
+          timeframes: timeframes
+        })
+      }).then(function (data) {
+        adopt(data);
+        setStatus('Saved. The RSI Matrix uses this on its next refresh.');
+        showToast();
+      }).catch(function (err) {
+        setStatus('⚠ ' + err.message, true);
+      }).finally(function () { saveBtn.disabled = false; });
+    });
+
+    resetBtn.addEventListener('click', function () {
+      if (!window.confirm('Restore the shipped RSI Matrix instruments, sources, order and timeframes? Instruments you added stay in the list but are switched off.')) return;
+      resetBtn.disabled = true;
+      setStatus('Resetting…');
+      write(API + '/reset', { method: 'POST' }).then(function (data) {
+        adopt(data);
+        setStatus('Reset to defaults.');
+        showToast();
+      }).catch(function (err) {
+        setStatus('⚠ ' + err.message, true);
+      }).finally(function () { resetBtn.disabled = false; });
+    });
+
+    function addInstrument() {
+      var body = {
+        label: addLabel.value.trim(),
+        provider: addProvider.value,
+        providerSymbol: addSymbol.value.trim(),
+        group: addGroup.value
+      };
+      if (!body.label || !body.providerSymbol) { setAddNote('Enter a display name and the provider symbol.', true); return; }
+      if (dirty && !window.confirm('Adding an instrument reloads the list and discards your unsaved changes. Continue?')) return;
+      addBtn.disabled = true;
+      setAddNote('Checking ' + body.providerSymbol + '…');
+      write(API + '/instruments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      }).then(function (data) {
+        adopt(data);
+        addLabel.value = '';
+        addSymbol.value = '';
+        setAddNote(body.label + ' added.');
+        setStatus('Saved.');
+        showToast();
+      }).catch(function (err) {
+        setAddNote('⚠ ' + err.message, true);
+      }).finally(function () { addBtn.disabled = false; });
+    }
+
+    function removeInstrument(row) {
+      if (!window.confirm('Delete ' + row.label + ' from the RSI Matrix?')) return;
+      if (dirty && !window.confirm('Deleting reloads the list and discards your unsaved changes. Continue?')) return;
+      setStatus('Deleting ' + row.label + '…');
+      write(API + '/instruments/' + encodeURIComponent(row.id), { method: 'DELETE' })
+        .then(function (data) { adopt(data); setStatus(row.label + ' deleted.'); showToast(); })
+        .catch(function (err) { setStatus('⚠ ' + err.message, true); });
+    }
+
+    addProvider.addEventListener('change', function () { addSymbol.placeholder = 'Symbol, e.g. ' + providerHint(addProvider.value); });
+    addBtn.addEventListener('click', addInstrument);
+    [addLabel, addSymbol].forEach(function (input) {
+      input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); addInstrument(); } });
     });
 
     load();
