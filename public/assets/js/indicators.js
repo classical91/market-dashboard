@@ -1508,12 +1508,6 @@
     },
   ];
 
-  // The reading list lives in glossary-library.js (loaded first on the page).
-  var LIBRARY =
-    typeof module !== "undefined" && module.exports
-      ? require("./glossary-library.js")
-      : (typeof window !== "undefined" && window.GlossaryLibrary) || { entries: [], categories: [] };
-
   var ALL_GLOSSARY = GLOSSARY.concat(USER_GLOSSARY)
     .concat(DECISION_ENGINE_GLOSSARY)
     .concat(MARKET_FUNDAMENTALS_GLOSSARY)
@@ -1525,8 +1519,7 @@
     .concat(VOLUME_FLOW_GLOSSARY)
     .concat(CHART_PATTERNS_GLOSSARY)
     .concat(CONFLUENCE_GLOSSARY)
-    .concat(DEFINITIONS_LIST_GLOSSARY)
-    .concat(LIBRARY.entries);
+    .concat(DEFINITIONS_LIST_GLOSSARY);
 
   var CATEGORY_ORDER = [
     "Market Fundamentals",
@@ -1557,7 +1550,7 @@
     "Macro Economics",
     "Commodities",
     "Trading Tools & Workflows",
-  ].concat(LIBRARY.categories);
+  ];
 
   function escapeHtml(value) {
     return String(value ?? "").replace(/[&<>"']/g, function (c) {
@@ -1620,18 +1613,11 @@
       byCategory[category].sort(function (a, b) { return a.term.localeCompare(b.term); });
     });
 
-    var libraryPrefix = "Library \u00b7 ";
-    var seenLibrary = false;
     pills.innerHTML = CATEGORY_ORDER.filter(function (c) { return byCategory[c]; })
       .map(function (c) {
-        var isLibrary = c.indexOf(libraryPrefix) === 0;
-        // Reading-list categories get their own heading in the panel.
-        var heading = isLibrary && !seenLibrary ? '<div class="glossary-side-group" id="glossarySideLibrary">Library</div>' : "";
-        if (isLibrary) seenLibrary = true;
         return (
-          heading +
           '<a href="#' + slug(c) + '" class="glossary-side-link" data-category="' + escapeHtml(c) + '">' +
-          "<span>" + escapeHtml(isLibrary ? c.slice(libraryPrefix.length) : c) + "</span>" +
+          "<span>" + escapeHtml(c) + "</span>" +
           '<span class="glossary-side-count">' + byCategory[c].length + "</span></a>"
         );
       })
@@ -1698,10 +1684,6 @@
       var countEl = link.querySelector(".glossary-side-count");
       if (countEl) countEl.textContent = count;
     });
-    var libraryHeading = document.getElementById("glossarySideLibrary");
-    if (libraryHeading) {
-      libraryHeading.hidden = !document.querySelector('.glossary-side-link[data-category^="Library"]:not(.is-empty)');
-    }
     document.querySelectorAll(".glossary-category").forEach(function (section) {
       var label = section.querySelector(".glossary-category-label");
       var category = label ? label.textContent : "";
