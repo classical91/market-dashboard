@@ -67,7 +67,7 @@
           <li><strong>Source.</strong> The CFTC&rsquo;s weekly Commitments of Traders report (Legacy, futures only) from publicreporting.cftc.gov. It&rsquo;s free and public domain. Positions are as of Tuesday and published Friday at 3:30pm ET. The server fetches it once an hour at most and keeps the last good report if the CFTC is unreachable.</li>
           <li><strong>OI change</strong> plots the % change in open interest between two report dates (1 or 4 weekly reports apart): (current &minus; previous) &divide; previous &times; 100. The open interest is the CFTC&rsquo;s total for <em>every listed expiry combined</em> &mdash; not the front month and not a continuous chart like ES1!, so it won&rsquo;t match a charting site&rsquo;s front-contract OI. Both dates are on every row. Contract counts are never plotted directly: a Bitcoin contract and a Natural Gas contract share no unit.</li>
           <li><strong>COT positioning</strong> plots net non-commercial (large speculator) longs minus shorts as a % of open interest. That&rsquo;s the direction of the speculative crowd, a different quantity from OI. Every row is labelled with the metric it shows.</li>
-          <li><strong>The ellipse.</strong> Values run from the centre (&minus;scale) through the dashed ring (0) to the outer ring (+scale). As on the reference indicator, what the shape adds beyond the zero ring is shaded orange (above 0) and what it cuts out of the zero ring is grey (below 0). The geometry follows the reference Pine script&rsquo;s <code>sqrt(1 &minus; x&sup2;)</code> half-ellipse, mirrored.</li>
+          <li><strong>The ellipse.</strong> Values run from the centre (&minus;scale) through the dashed zero band (0) to the outer ring (+scale). Between each pair of neighbouring markets, the area between the zero band and the line joining their values is filled: orange where OI increased, grey where it decreased. When one is up and the next is down, the fill splits exactly where the joining line crosses zero, so no single fill spans both. The inner bands have straight sides through the axes so that &ldquo;above zero&rdquo; between two axes means the same thing as on them. Colour shows only whether open interest rose or fell &mdash; not price direction, so not bullish or bearish. The outer frame follows the reference Pine script&rsquo;s <code>sqrt(1 &minus; x&sup2;)</code> half-ellipse, mirrored.</li>
           <li><strong>ROLL</strong> marks a quarterly contract whose comparison touches the three weeks before through one week after a March/June/September/December expiry. The all-expiry total swells while traders hold both the old and the new contract and drops when the old one expires, so large swings there are mostly the roll, not new positioning.</li>
         </ol>
         <ul class="aia-how-notes">
@@ -84,6 +84,7 @@
 </div>
 <script src="/assets/js/sidebar.js"></script>
 <script src="/assets/js/ui.js"></script>
+<script src="/assets/js/oi-wedges.js"></script>
 <script src="/assets/js/cross-market-oi.js"></script>
 </body>
 </html>

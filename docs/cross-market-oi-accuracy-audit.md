@@ -125,7 +125,44 @@ OI and date, the served % and an independent recomputation, roll/stale/fallback 
 - **Unpatterned markets** (NQ, ETH, 6E, 6J, SI, HG, CL, ZN, ZT, ZB): identity shows
   "Not checked"; add a `cftcName` pattern once each report name is confirmed.
 
-## 7. Tests
+## 7. Radar fill: zero-split wedges
+
+**Reference not available.** The OI indicator's Pine Script is not in this repository (the
+`public/pine/` scripts are trading strategies) or its history; earlier notes record only its
+`sqrt(1 − x²)` outline. So the fill is built to the stated specification and still needs checking
+against the script: if the Pine code uses conditions beyond the sign of the OI change, or a
+different baseline, `public/assets/js/oi-wedges.js` is the one place to change.
+
+**What was wrong before.** The previous two-tone fill masked one polygon against a *curved* zero
+ring. Straight lines between axes bow inward, so the line joining two small increases (e.g. +2%
+and +2% on neighbouring axes) dips inside that ring and was painted grey — a "decrease" between
+two increases. Any missing market also switched the whole fill off.
+
+**Now.** For each neighbour pair (including last → first):
+
+1. Classify by sign only: `> 0` OI increasing, `< 0` OI decreasing, `0` on the baseline. No price
+   input, so the legend says "OI increasing / OI decreasing", never bullish/bearish.
+2. Same sign → one wedge between the zero baseline and the joining line
+   (`Z_i, P_i, P_j, Z_j`).
+3. Opposite signs → split at `t = d_i / (d_i − d_j)` (d = radial offset from zero). That point
+   lies on both the joining line and the zero baseline, so the increase wedge ends and the
+   decrease wedge begins exactly on zero (`Z_i, P_i, X` and `X, P_j, Z_j`).
+4. A missing value leaves both neighbouring segments unfilled.
+
+The zero and ±half bands are drawn with straight sides through the axes; only then does "above
+zero" between two axes agree with the straight joining lines. The outer ±scale frame keeps the
+reference ellipse. The wedges are drawing only: values, scale, ranking, selection and dates are
+untouched (`test/cross-market-oi-wedges.test.js` checks the input is not mutated).
+
+Synthetic datasets tested: all positive, all negative, alternating, one positive + five negative,
+five positive + one negative, exactly zero, crossing zero (+15.22 / −1.47), values on ±25, values
+beyond the default scale (auto-widened), and a missing market.
+
+**Not done: price + OI interpretation.** A reading such as price ↑ + OI ↑ (new longs) vs price ↓ +
+OI ↑ (new shorts) needs a price change over the same two dates for each market. The page has no
+price series today; that would be a separate, labelled signal alongside the OI radar.
+
+## 8. Tests
 
 `test/cross-market-oi-accuracy.test.js` covers positive / negative / zero change, missing current,
 missing previous, zero previous OI, stale observation, a market behind the others, contract
