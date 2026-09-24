@@ -42,8 +42,20 @@ function recordDate(record) {
 }
 
 /**
- * Newline-delimited JSON statistics records → [{ date, openInterest }],
- * newest first, summed across every expiry (instrument_id) of the product.
+ * A calendar spread (e.g. "ESZ6-ESH7") or a user-defined strategy ("UD:…").
+ * A parent symbol covers these as well as the outright expiries, and any open
+ * interest a spread reported would count the same positions twice. Records
+ * without a mapped symbol are kept: nothing says they are spreads.
+ */
+function isSpreadSymbol(symbol) {
+  return typeof symbol === "string" && (symbol.includes("-") || /^UD:/i.test(symbol));
+}
+
+/**
+ * Newline-delimited JSON statistics records → [{ date, openInterest,
+ * contracts }], newest first, summed across every outright expiry
+ * (instrument_id) of the product. `contracts` is how many expiries the day's
+ * total is made of, so a thin or partial day can be seen for what it is.
  */
 function aggregateOpenInterest(text) {
   // (instrument_id, date) → latest open interest for that expiry on that day.
@@ -58,21 +70,31 @@ function aggregateOpenInterest(text) {
       continue;
     }
     if (Number(record.stat_type) !== OPEN_INTEREST_STAT) continue;
-    if (Number(record.update_action) === UPDATE_DELETE) continue;
-    const quantity = num(record.quantity);
-    if (quantity == null || quantity < 0 || quantity >= UNDEF_QUANTITY) continue;
+    if (isSpreadSymbol(record.symbol)) continue;
     const date = recordDate(record);
     const instrument = record.hd ? record.hd.instrument_id : record.instrument_id;
     if (!date || instrument == null) continue;
+    const key = `${instrument}|${date}`;
+    // A delete withdraws that expiry's figure for the day; it is not skipped,
+    // or the withdrawn number would still be summed.
+    if (Number(record.update_action) === UPDATE_DELETE) {
+      perExpiry.delete(key);
+      continue;
+    }
+    const quantity = num(record.quantity);
+    if (quantity == null || quantity < 0 || quantity >= UNDEF_QUANTITY) continue;
     // Later records for the same expiry and day are corrections; keep the last.
-    perExpiry.set(`${instrument}|${date}`, { date, quantity });
+    perExpiry.set(key, { date, quantity });
   }
   const byDate = new Map();
   for (const { date, quantity } of perExpiry.values()) {
-    byDate.set(date, (byDate.get(date) || 0) + quantity);
+    const day = byDate.get(date) || { openInterest: 0, contracts: 0 };
+    day.openInterest += quantity;
+    day.contracts += 1;
+    byDate.set(date, day);
   }
   return [...byDate.entries()]
-    .map(([date, openInterest]) => ({ date, openInterest }))
+    .map(([date, day]) => ({ date, openInterest: day.openInterest, contracts: day.contracts }))
     .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
 }
 
@@ -104,6 +126,8 @@ class DatabentoDailyOiProvider {
       start: startDate,
       encoding: "json",
       pretty_ts: "true",
+      // Adds each record's raw symbol, so spreads can be told from outrights.
+      map_symbols: "true",
     });
     const url = `${this._base}/v0/timeseries.get_range?${params.toString()}`;
     const auth = Buffer.from(`${this._apiKey}:`).toString("base64");
@@ -161,4 +185,4 @@ class DatabentoDailyOiProvider {
   }
 }
 
-module.exports = { DatabentoDailyOiProvider, aggregateOpenInterest, recordDate, OPEN_INTEREST_STAT };
+module.exports = { DatabentoDailyOiProvider, aggregateOpenInterest, recordDate, isSpreadSymbol, OPEN_INTEREST_STAT };

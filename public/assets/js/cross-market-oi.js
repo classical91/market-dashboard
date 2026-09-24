@@ -56,7 +56,8 @@
   function fmtSigned(v, digits) {
     if (!isNum(v)) return "—";
     var d = digits == null ? 2 : digits;
-    return (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(d);
+    var abs = d === 0 ? Math.round(Math.abs(v)).toLocaleString() : Math.abs(v).toFixed(d);
+    return (v > 0 ? "+" : v < 0 ? "−" : "") + abs;
   }
 
   function fmtInt(v) {
@@ -168,7 +169,6 @@
   // −scale sits at the very centre, 0 on the middle ring and +scale on the
   // outer ring, as on the reference indicator.
   var INNER = 0;
-  var maskSeq = 0;
 
   function frac(v, scale) {
     var clamped = Math.max(-scale, Math.min(scale, v));
@@ -211,6 +211,23 @@
     return [g.cx + Math.cos(a) * g.rx * f, g.cy + Math.sin(a) * g.ry * f];
   }
 
+  function pointsAttr(pts) {
+    return pts.map(function (p) { return p[0].toFixed(1) + "," + p[1].toFixed(1); }).join(" ");
+  }
+
+  /**
+   * A value band drawn through the axes with straight sides. The lines that
+   * join observations are straight, so only a straight-sided band tells
+   * truthfully whether a point between two axes is above or below it — a
+   * curved zero ring would put part of a line between two increases on the
+   * "decrease" side.
+   */
+  function bandPoints(g, n, f) {
+    var pts = [];
+    for (var i = 0; i < n; i += 1) pts.push(project(g, i, n, f));
+    return pts;
+  }
+
   // ── rendering ────────────────────────────────────────────
 
   function renderClasses() {
@@ -227,15 +244,19 @@
   }
 
   function valueText(row) {
-    if (!row || row.error) return "—";
-    return fmtSigned(row.normalizedValue, 2);
+    if (!row || row.error || !isNum(row.normalizedValue)) return "—";
+    return fmtSigned(row.normalizedValue, 2) + "%";
   }
 
   function subText(row) {
     if (!row) return "";
     if (row.error) return row.error;
     if (row.metricType === "OI") {
-      return fmtInt(row.currentValue) + " contracts · Δ " + fmtSigned(row.change, 0) + " vs " + fmtDate(row.previousDate);
+      // Open interest is every listed expiry combined, on the report date
+      // shown; the change is to the comparison date, or why there isn't one.
+      var head = "All expiries · " + fmtInt(row.currentValue) + " contracts on " + fmtShortDate(row.observationDate);
+      if (row.valueStatus && row.valueStatus !== "OK") return head + " · " + (row.statusReason || "No comparable earlier report");
+      return head + " · Δ " + fmtSigned(row.change, 0) + " vs " + fmtShortDate(row.comparisonDate || row.previousDate);
     }
     return "Net " + fmtSigned(row.netContracts, 0) + " contracts · Δ " + fmtSigned(row.change, 2) + " pp vs " + fmtDate(row.previousDate);
   }
@@ -254,7 +275,7 @@
       var badges = "";
       // The roll distorts total OI, not the long/short split, so the flag
       // belongs to the OI view only.
-      if (row && row.rollWindow && state.metric === "OI") badges += '<span class="xoi-badge xoi-badge--roll" title="Quarterly contract near expiry: OI swings are usually the roll">ROLL</span>';
+      if (row && row.rollWindow && state.metric === "OI") badges += '<span class="xoi-badge xoi-badge--roll" title="' + esc(rollText(row)) + '">ROLL</span>';
       if (row && row.freshness && row.freshness.state === "STALE") badges += '<span class="xoi-badge xoi-badge--stale" title="' + esc(row.freshness.reason || "") + '">STALE</span>';
       return '<div role="listitem"><button type="button" class="xoi-row' + (selected ? " is-selected" : "") + (row && row.error ? " is-missing" : "") +
         '" data-id="' + esc(it.id) + '" aria-pressed="' + selected + '" style="--slot:' + it.color + '">' +
@@ -267,6 +288,11 @@
         '<span class="xoi-sr">Instrument ' + it.slot + "</span>" +
         "</button></div>";
     }).join("");
+  }
+
+  function rollText(row) {
+    return "This change spans the " + (row.rollExpiry ? fmtDate(row.rollExpiry) + " " : "") +
+      "quarterly expiry. Open interest across all expiries swells while both contracts are open and drops when the old one expires, so a large change here is mostly the roll, not new positioning.";
   }
 
   function svgEl(name, attrs, text) {
@@ -288,23 +314,31 @@
       "aria-label": info.label + " comparison of " + n + " futures markets on a ±" + scale + " scale",
     });
 
-    // Value bands: −scale (inner) … 0 (dashed) … +scale (outer).
+    // Value bands: −scale (centre) … 0 (dashed) … +scale (outer). The outer
+    // ring is the reference's elliptical frame; the bands inside it are
+    // straight-sided through the axes (see bandPoints).
     var levels = [-1, -0.5, 0, 0.5, 1];
+    var polygonal = n >= 3;
     levels.forEach(function (l) {
       var f = frac(l * scale, scale);
-      if (f > 0) svg.appendChild(svgEl("path", {
-        d: ellipsePath(g.cx, g.cy, g.rx * f, g.ry * f),
-        class: "xoi-ring" + (l === 0 ? " xoi-ring--zero" : "") + (l === 1 ? " xoi-ring--outer" : ""),
-      }));
-      // Band labels run along the empty bisector between the last and the
-      // first instrument, like a ruler, so they never sit under a value.
-      var ra = angle(-0.5, Math.max(n, 1));
       // −scale is the centre point itself; it is named in the scale caption
       // instead, where it can't sit on top of a value near the minimum.
-      if (f > 0) svg.appendChild(svgEl("text", {
-        x: g.cx + Math.cos(ra) * g.rx * f, y: g.cy + Math.sin(ra) * g.ry * f - 3,
-        "text-anchor": "middle", class: "xoi-ring-label",
-      }, fmtScale(l * scale)));
+      if (!(f > 0)) return;
+      var cls = "xoi-ring" + (l === 0 ? " xoi-ring--zero" : "") + (l === 1 ? " xoi-ring--outer" : "");
+      var labelAt;
+      if (l === 1 || !polygonal) {
+        svg.appendChild(svgEl("path", { d: ellipsePath(g.cx, g.cy, g.rx * f, g.ry * f), class: cls }));
+        var ra = angle(-0.5, Math.max(n, 1));
+        labelAt = [g.cx + Math.cos(ra) * g.rx * f, g.cy + Math.sin(ra) * g.ry * f];
+      } else {
+        var band = bandPoints(g, n, f);
+        svg.appendChild(svgEl("polygon", { points: pointsAttr(band), class: cls }));
+        // Midpoint of the side between the last and the first instrument.
+        labelAt = [(band[n - 1][0] + band[0][0]) / 2, (band[n - 1][1] + band[0][1]) / 2];
+      }
+      // Band labels run along the empty bisector between the last and the
+      // first instrument, like a ruler, so they never sit under a value.
+      svg.appendChild(svgEl("text", { x: labelAt[0], y: labelAt[1] - 3, "text-anchor": "middle", class: "xoi-ring-label" }, fmtScale(l * scale)));
     });
 
     // Dotted radial guides and numbered instrument positions.
@@ -313,39 +347,34 @@
       svg.appendChild(svgEl("line", { x1: g.cx, y1: g.cy, x2: outer[0], y2: outer[1], class: "xoi-guide" }));
     });
 
-    // The comparison polygon. It is filled only when every market has a
-    // value; a missing market breaks the outline rather than being drawn
-    // at zero.
-    var pts = items.map(function (it, i) {
+    // The observations and the line joining them. A missing market breaks
+    // the outline rather than being drawn at zero.
+    var zf = frac(0, scale);
+    var vals = items.map(function (it) {
       var v = it.row && !it.row.error ? it.row.normalizedValue : null;
-      return isNum(v) ? project(g, i, n, frac(v, scale)) : null;
+      return isNum(v) ? v : null;
     });
+    var pts = vals.map(function (v, i) { return v == null ? null : project(g, i, n, frac(v, scale)); });
     var complete = pts.every(Boolean);
-    if (n >= 3 && complete) {
-      var polyPoints = pts.map(function (p) { return p[0].toFixed(1) + "," + p[1].toFixed(1); }).join(" ");
-      var zf = frac(0, scale);
-      var zeroPath = ellipsePath(g.cx, g.cy, g.rx * zf, g.ry * zf);
-      // Two-tone fill, as on the reference: what the shape adds beyond the
-      // zero ring is orange (above 0), what it takes out of the zero disc is
-      // grey (below 0). Where the shape and the zero disc overlap is left
-      // empty, so only the departures from zero carry colour.
-      var id = "xoi-m" + (maskSeq += 1);
-      var defs = svgEl("defs", {});
-      var outside = svgEl("mask", { id: id + "-out", maskUnits: "userSpaceOnUse", x: 0, y: 0, width: g.w, height: g.h });
-      outside.appendChild(svgEl("rect", { x: 0, y: 0, width: g.w, height: g.h, fill: "#fff" }));
-      outside.appendChild(svgEl("path", { d: zeroPath, fill: "#000" }));
-      var inside = svgEl("mask", { id: id + "-in", maskUnits: "userSpaceOnUse", x: 0, y: 0, width: g.w, height: g.h });
-      inside.appendChild(svgEl("rect", { x: 0, y: 0, width: g.w, height: g.h, fill: "#fff" }));
-      inside.appendChild(svgEl("polygon", { points: polyPoints, fill: "#000" }));
-      defs.appendChild(outside);
-      defs.appendChild(inside);
+
+    // Zero-split wedges: between each pair of neighbours, the area between
+    // the zero band and the joining line — orange where OI increased, grey
+    // where it decreased — split exactly where the line crosses zero. Pairs
+    // next to a missing market are left unfilled.
+    if (n >= 3) {
+      var wedges = window.OiWedges.buildWedges(vals.map(function (v, i) {
+        return { value: v, point: pts[i], zero: project(g, i, n, zf), offset: v == null ? null : frac(v, scale) - zf };
+      }));
       var fills = svgEl("g", { class: "xoi-fills", "aria-hidden": "true" });
-      fills.appendChild(defs);
-      fills.appendChild(svgEl("path", { d: zeroPath, class: "xoi-fill-down", mask: "url(#" + id + "-in)" }));
-      fills.appendChild(svgEl("polygon", { points: polyPoints, class: "xoi-fill-up", mask: "url(#" + id + "-out)" }));
+      wedges.forEach(function (w) {
+        fills.appendChild(svgEl("polygon", { points: pointsAttr(w.points), class: w.direction === "up" ? "xoi-fill-up" : "xoi-fill-down" }));
+      });
       // Under the rings and guides, so the scale stays readable through it.
       svg.insertBefore(fills, svg.firstChild);
-      svg.appendChild(svgEl("polygon", { points: polyPoints, class: "xoi-poly" }));
+    }
+
+    if (n >= 3 && complete) {
+      svg.appendChild(svgEl("polygon", { points: pointsAttr(pts), class: "xoi-poly" }));
     } else {
       var d = "";
       var pen = false;
@@ -409,14 +438,16 @@
     var vs = Object.keys(vsDates).sort(function (a, b) { return vsDates[b] - vsDates[a]; })[0];
     svg.appendChild(svgEl("text", { x: 14, y: 40, class: "xoi-corner xoi-corner--dim" },
       "As of " + fmtShortDate(d0 && d0.source.reportDate) + (vs ? " · vs " + fmtShortDate(vs) : "")));
-    // Colour key, in words as well as colour.
-    var upWord = state.metric === "OI" ? "OI up" : "net long";
-    var downWord = state.metric === "OI" ? "OI down" : "net short";
+    // Colour key, in words as well as colour. OI change alone says whether
+    // participation rose or fell, not which way the market is leaning, so
+    // the OI key says "increasing/decreasing", never bullish/bearish.
+    var upWord = state.metric === "OI" ? "OI increasing" : "above 0 (net long)";
+    var downWord = state.metric === "OI" ? "OI decreasing" : "below 0 (net short)";
     var key = svgEl("text", { x: 14, y: g.h - 10, class: "xoi-key" });
     key.appendChild(svgEl("tspan", { class: "xoi-key-up" }, "■ "));
-    key.appendChild(svgEl("tspan", {}, "above 0 (" + upWord + ")   "));
+    key.appendChild(svgEl("tspan", {}, upWord + "   "));
     key.appendChild(svgEl("tspan", { class: "xoi-key-down" }, "■ "));
-    key.appendChild(svgEl("tspan", {}, "below 0 (" + downWord + ") · centre = −" + scale));
+    key.appendChild(svgEl("tspan", {}, downWord + " · centre = −" + scale));
     svg.appendChild(key);
     svg.appendChild(svgEl("text", { x: g.w - 14, y: 22, "text-anchor": "end", class: "xoi-corner" }, info.label));
     svg.appendChild(svgEl("text", { x: g.w - 14, y: 40, "text-anchor": "end", class: "xoi-corner xoi-corner--dim" }, "Scale ±" + scale + " " + info.plottedUnit));
@@ -448,9 +479,10 @@
     }
     var facts = [];
     if (row.metricType === "OI") {
-      facts.push(["Open interest", fmtInt(row.currentValue) + " contracts"]);
-      facts.push(["Previous (" + fmtDate(row.previousDate) + ")", fmtInt(row.previousValue)]);
-      facts.push(["Change", fmtSigned(row.change, 0) + " (" + fmtSigned(row.changePct, 2) + "%)"]);
+      facts.push(["Open interest, all expiries (" + fmtDate(row.observationDate) + ")", fmtInt(row.currentValue) + " contracts"]);
+      facts.push(["Compared with (" + fmtDate(row.comparisonDate || row.previousDate) + ")", isNum(row.previousValue) ? fmtInt(row.previousValue) + " contracts" : "—"]);
+      facts.push(["Change", isNum(row.changePct) ? fmtSigned(row.change, 0) + " (" + fmtSigned(row.changePct, 2) + "%)" : (row.statusReason || "—")]);
+      if (isNum(row.contractsCounted)) facts.push(["Expiries summed", String(row.contractsCounted) + (isNum(row.previousContractsCounted) ? " (was " + row.previousContractsCounted + ")" : "")]);
     } else {
       facts.push(["Net speculator position", fmtSigned(row.currentValue, 2) + "% of OI"]);
       facts.push(["Net contracts", fmtSigned(row.netContracts, 0)]);
@@ -458,13 +490,16 @@
       facts.push(["Change", fmtSigned(row.change, 2) + " pp"]);
     }
     facts.push(["Report date", fmtDate(row.observationDate)]);
-    facts.push(["CFTC contract", row.contract + (row.reportName ? " · " + row.reportName : "")]);
+    facts.push([row.timeframe === "D" ? "Daily source" : "CFTC contract", row.timeframe === "D" ? row.source : row.contract + (row.reportName ? " · " + row.reportName : "")]);
+    if (row.timeframe !== "D") facts.push(["Market identity", row.identityVerified === true ? "Report name matches" : "Not checked for this market"]);
+    if (row.retrievedAt) facts.push(["Retrieved", new Date(row.retrievedAt).toLocaleString() + (row.isFallback ? " (saved copy)" : "")]);
+    if (row.isStale && row.freshness && row.freshness.reason) facts.push(["Stale", row.freshness.reason]);
     facts.push(["Metric", row.metricType + " — " + metricInfo().plotted]);
     el.detail.innerHTML =
       '<div class="xoi-detail-head" style="--slot:' + it.color + '"><span class="xoi-slot">' + it.slot + "</span>" +
         esc(inst.marketName + " · " + inst.exchange) + ' <span class="xoi-muted">' + esc(inst.assetClass) + "</span></div>" +
       '<dl class="xoi-facts">' + facts.map(function (f) { return "<dt>" + esc(f[0]) + "</dt><dd>" + esc(f[1]) + "</dd>"; }).join("") + "</dl>" +
-      (row.rollWindow && row.metricType === "OI" ? '<p class="xoi-roll-note">Quarterly roll window. A large OI change here is usually contracts moving to the next expiry, not new positioning.</p>' : "");
+      (row.rollWindow && row.metricType === "OI" ? '<p class="xoi-roll-note">' + esc(rollText(row)) + "</p>" : "");
   }
 
   var STATUS_TEXT = {
@@ -621,7 +656,8 @@
         if (s.status === "UNAVAILABLE") showNotice("The " + what + " is unavailable and no earlier copy is saved: " + (s.error || "unknown error"), "error");
         else if (s.status === "CACHED" || s.status === "STALE") showNotice("Showing the last saved " + what + " because the latest request failed (" + s.error + ").", "warn");
         else if (body.freshness.state === "STALE") showNotice(body.freshness.reason, "warn");
-        else if (body.coverage.withData < body.coverage.markets) showNotice(body.coverage.withData + " of " + body.coverage.markets + " markets are in the latest report; the rest show —.", "warn");
+        else if (isNum(body.coverage.reported) && body.coverage.reported < body.coverage.markets) showNotice(body.coverage.reported + " of " + body.coverage.markets + " markets are in the latest report; the rest show —.", "warn");
+        else if (body.coverage.withData < body.coverage.markets) showNotice((body.coverage.markets - body.coverage.withData) + " of " + body.coverage.markets + " markets have no comparable earlier observation for this lookback; they show —.", "warn");
         else showNotice("");
         render();
       })

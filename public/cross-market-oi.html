@@ -23,7 +23,7 @@
 
     <div class="xoi-controls" role="group" aria-label="Comparison controls">
       <div class="xoi-seg" role="group" aria-label="Metric" id="xoi-metric">
-        <button type="button" data-metric="OI" aria-pressed="true" class="is-active">Open interest</button>
+        <button type="button" data-metric="OI" aria-pressed="true" class="is-active">OI change</button>
         <button type="button" data-metric="COT_NET_SPEC" aria-pressed="false">COT positioning</button>
       </div>
       <div class="xoi-seg" role="group" aria-label="Timeframe" id="xoi-timeframe">
@@ -65,15 +65,15 @@
       <div class="aia-how-body">
         <ol class="aia-how-steps">
           <li><strong>Source.</strong> The CFTC&rsquo;s weekly Commitments of Traders report (Legacy, futures only) from publicreporting.cftc.gov. It&rsquo;s free and public domain. Positions are as of Tuesday and published Friday at 3:30pm ET. The server fetches it once an hour at most and keeps the last good report if the CFTC is unreachable.</li>
-          <li><strong>Open interest</strong> plots the % change in total open interest over the lookback (1 or 4 weekly reports). Contract counts are never plotted directly: a Bitcoin contract and a Natural Gas contract share no unit.</li>
+          <li><strong>OI change</strong> plots the % change in open interest between two report dates (1 or 4 weekly reports apart): (current &minus; previous) &divide; previous &times; 100. The open interest is the CFTC&rsquo;s total for <em>every listed expiry combined</em> &mdash; not the front month and not a continuous chart like ES1!, so it won&rsquo;t match a charting site&rsquo;s front-contract OI. Both dates are on every row. Contract counts are never plotted directly: a Bitcoin contract and a Natural Gas contract share no unit.</li>
           <li><strong>COT positioning</strong> plots net non-commercial (large speculator) longs minus shorts as a % of open interest. That&rsquo;s the direction of the speculative crowd, a different quantity from OI. Every row is labelled with the metric it shows.</li>
-          <li><strong>The ellipse.</strong> Values run from the centre (&minus;scale) through the dashed ring (0) to the outer ring (+scale). As on the reference indicator, what the shape adds beyond the zero ring is shaded orange (above 0) and what it cuts out of the zero ring is grey (below 0). The geometry follows the reference Pine script&rsquo;s <code>sqrt(1 &minus; x&sup2;)</code> half-ellipse, mirrored.</li>
-          <li><strong>ROLL</strong> marks quarterly contracts within three weeks of a March/June/September/December expiry. Large OI swings there are usually contracts rolling, not new positioning.</li>
+          <li><strong>The ellipse.</strong> Values run from the centre (&minus;scale) through the dashed zero band (0) to the outer ring (+scale). Between each pair of neighbouring markets, the area between the zero band and the line joining their values is filled: orange where OI increased, grey where it decreased. When one is up and the next is down, the fill splits exactly where the joining line crosses zero, so no single fill spans both. The inner bands have straight sides through the axes so that &ldquo;above zero&rdquo; between two axes means the same thing as on them. Colour shows only whether open interest rose or fell &mdash; not price direction, so not bullish or bearish. The outer frame follows the reference Pine script&rsquo;s <code>sqrt(1 &minus; x&sup2;)</code> half-ellipse, mirrored.</li>
+          <li><strong>ROLL</strong> marks a quarterly contract whose comparison touches the three weeks before through one week after a March/June/September/December expiry. The all-expiry total swells while traders hold both the old and the new contract and drops when the old one expires, so large swings there are mostly the roll, not new positioning.</li>
         </ol>
         <ul class="aia-how-notes">
           <li><strong>Daily</strong> reads exchange open interest per trading session from Databento (paid; enabled by <code>DATABENTO_API_KEY</code>), summed across every expiry. &Delta; 1D compares with the previous session, &Delta; 5D with five sessions back. Exchanges publish OI once per session, so there is no 4h or 8h figure. COT positioning stays weekly.</li>
           <li><strong>Not LuxAlgo&rsquo;s formula.</strong> The reference indicator&rsquo;s calculation isn&rsquo;t public, so this page doesn&rsquo;t claim to reproduce its numbers.</li>
-          <li><strong>Missing is missing.</strong> A market absent from the report shows &mdash; and leaves a gap in the shape. It is never plotted as 0.</li>
+          <li><strong>Missing is missing.</strong> A market absent from the report, without a comparable earlier report, or whose earlier OI was 0 shows &mdash; with the reason, and leaves a gap in the shape. It is never plotted as 0. A market whose latest report is older than the others&rsquo; is marked STALE. A contract code whose CFTC name isn&rsquo;t the market we label it as is refused.</li>
         </ul>
       </div>
     </details>
@@ -84,6 +84,7 @@
 </div>
 <script src="/assets/js/sidebar.js"></script>
 <script src="/assets/js/ui.js"></script>
+<script src="/assets/js/oi-wedges.js"></script>
 <script src="/assets/js/cross-market-oi.js"></script>
 </body>
 </html>
