@@ -56,7 +56,8 @@
   function fmtSigned(v, digits) {
     if (!isNum(v)) return "—";
     var d = digits == null ? 2 : digits;
-    return (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(d);
+    var abs = d === 0 ? Math.round(Math.abs(v)).toLocaleString() : Math.abs(v).toFixed(d);
+    return (v > 0 ? "+" : v < 0 ? "−" : "") + abs;
   }
 
   function fmtInt(v) {
@@ -227,15 +228,19 @@
   }
 
   function valueText(row) {
-    if (!row || row.error) return "—";
-    return fmtSigned(row.normalizedValue, 2);
+    if (!row || row.error || !isNum(row.normalizedValue)) return "—";
+    return fmtSigned(row.normalizedValue, 2) + "%";
   }
 
   function subText(row) {
     if (!row) return "";
     if (row.error) return row.error;
     if (row.metricType === "OI") {
-      return fmtInt(row.currentValue) + " contracts · Δ " + fmtSigned(row.change, 0) + " vs " + fmtDate(row.previousDate);
+      // Open interest is every listed expiry combined, on the report date
+      // shown; the change is to the comparison date, or why there isn't one.
+      var head = "All expiries · " + fmtInt(row.currentValue) + " contracts on " + fmtShortDate(row.observationDate);
+      if (row.valueStatus && row.valueStatus !== "OK") return head + " · " + (row.statusReason || "No comparable earlier report");
+      return head + " · Δ " + fmtSigned(row.change, 0) + " vs " + fmtShortDate(row.comparisonDate || row.previousDate);
     }
     return "Net " + fmtSigned(row.netContracts, 0) + " contracts · Δ " + fmtSigned(row.change, 2) + " pp vs " + fmtDate(row.previousDate);
   }
@@ -254,7 +259,7 @@
       var badges = "";
       // The roll distorts total OI, not the long/short split, so the flag
       // belongs to the OI view only.
-      if (row && row.rollWindow && state.metric === "OI") badges += '<span class="xoi-badge xoi-badge--roll" title="Quarterly contract near expiry: OI swings are usually the roll">ROLL</span>';
+      if (row && row.rollWindow && state.metric === "OI") badges += '<span class="xoi-badge xoi-badge--roll" title="' + esc(rollText(row)) + '">ROLL</span>';
       if (row && row.freshness && row.freshness.state === "STALE") badges += '<span class="xoi-badge xoi-badge--stale" title="' + esc(row.freshness.reason || "") + '">STALE</span>';
       return '<div role="listitem"><button type="button" class="xoi-row' + (selected ? " is-selected" : "") + (row && row.error ? " is-missing" : "") +
         '" data-id="' + esc(it.id) + '" aria-pressed="' + selected + '" style="--slot:' + it.color + '">' +
@@ -267,6 +272,11 @@
         '<span class="xoi-sr">Instrument ' + it.slot + "</span>" +
         "</button></div>";
     }).join("");
+  }
+
+  function rollText(row) {
+    return "This change spans the " + (row.rollExpiry ? fmtDate(row.rollExpiry) + " " : "") +
+      "quarterly expiry. Open interest across all expiries swells while both contracts are open and drops when the old one expires, so a large change here is mostly the roll, not new positioning.";
   }
 
   function svgEl(name, attrs, text) {
@@ -448,9 +458,10 @@
     }
     var facts = [];
     if (row.metricType === "OI") {
-      facts.push(["Open interest", fmtInt(row.currentValue) + " contracts"]);
-      facts.push(["Previous (" + fmtDate(row.previousDate) + ")", fmtInt(row.previousValue)]);
-      facts.push(["Change", fmtSigned(row.change, 0) + " (" + fmtSigned(row.changePct, 2) + "%)"]);
+      facts.push(["Open interest, all expiries (" + fmtDate(row.observationDate) + ")", fmtInt(row.currentValue) + " contracts"]);
+      facts.push(["Compared with (" + fmtDate(row.comparisonDate || row.previousDate) + ")", isNum(row.previousValue) ? fmtInt(row.previousValue) + " contracts" : "—"]);
+      facts.push(["Change", isNum(row.changePct) ? fmtSigned(row.change, 0) + " (" + fmtSigned(row.changePct, 2) + "%)" : (row.statusReason || "—")]);
+      if (isNum(row.contractsCounted)) facts.push(["Expiries summed", String(row.contractsCounted) + (isNum(row.previousContractsCounted) ? " (was " + row.previousContractsCounted + ")" : "")]);
     } else {
       facts.push(["Net speculator position", fmtSigned(row.currentValue, 2) + "% of OI"]);
       facts.push(["Net contracts", fmtSigned(row.netContracts, 0)]);
@@ -458,13 +469,16 @@
       facts.push(["Change", fmtSigned(row.change, 2) + " pp"]);
     }
     facts.push(["Report date", fmtDate(row.observationDate)]);
-    facts.push(["CFTC contract", row.contract + (row.reportName ? " · " + row.reportName : "")]);
+    facts.push([row.timeframe === "D" ? "Daily source" : "CFTC contract", row.timeframe === "D" ? row.source : row.contract + (row.reportName ? " · " + row.reportName : "")]);
+    if (row.timeframe !== "D") facts.push(["Market identity", row.identityVerified === true ? "Report name matches" : "Not checked for this market"]);
+    if (row.retrievedAt) facts.push(["Retrieved", new Date(row.retrievedAt).toLocaleString() + (row.isFallback ? " (saved copy)" : "")]);
+    if (row.isStale && row.freshness && row.freshness.reason) facts.push(["Stale", row.freshness.reason]);
     facts.push(["Metric", row.metricType + " — " + metricInfo().plotted]);
     el.detail.innerHTML =
       '<div class="xoi-detail-head" style="--slot:' + it.color + '"><span class="xoi-slot">' + it.slot + "</span>" +
         esc(inst.marketName + " · " + inst.exchange) + ' <span class="xoi-muted">' + esc(inst.assetClass) + "</span></div>" +
       '<dl class="xoi-facts">' + facts.map(function (f) { return "<dt>" + esc(f[0]) + "</dt><dd>" + esc(f[1]) + "</dd>"; }).join("") + "</dl>" +
-      (row.rollWindow && row.metricType === "OI" ? '<p class="xoi-roll-note">Quarterly roll window. A large OI change here is usually contracts moving to the next expiry, not new positioning.</p>' : "");
+      (row.rollWindow && row.metricType === "OI" ? '<p class="xoi-roll-note">' + esc(rollText(row)) + "</p>" : "");
   }
 
   var STATUS_TEXT = {
@@ -621,7 +635,8 @@
         if (s.status === "UNAVAILABLE") showNotice("The " + what + " is unavailable and no earlier copy is saved: " + (s.error || "unknown error"), "error");
         else if (s.status === "CACHED" || s.status === "STALE") showNotice("Showing the last saved " + what + " because the latest request failed (" + s.error + ").", "warn");
         else if (body.freshness.state === "STALE") showNotice(body.freshness.reason, "warn");
-        else if (body.coverage.withData < body.coverage.markets) showNotice(body.coverage.withData + " of " + body.coverage.markets + " markets are in the latest report; the rest show —.", "warn");
+        else if (isNum(body.coverage.reported) && body.coverage.reported < body.coverage.markets) showNotice(body.coverage.reported + " of " + body.coverage.markets + " markets are in the latest report; the rest show —.", "warn");
+        else if (body.coverage.withData < body.coverage.markets) showNotice((body.coverage.markets - body.coverage.withData) + " of " + body.coverage.markets + " markets have no comparable earlier observation for this lookback; they show —.", "warn");
         else showNotice("");
         render();
       })

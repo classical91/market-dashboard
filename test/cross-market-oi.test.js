@@ -181,7 +181,7 @@ test("a market missing from the report is an error row of nulls, never zeros", a
       assert.equal(gold[key], null, `${metric}.${key}`);
     }
   }
-  assert.deepEqual(snap.coverage, { markets: 3, withData: 2 });
+  assert.deepEqual(snap.coverage, { markets: 3, withData: 2, reported: 2 });
 });
 
 test("quarterly contracts near a Mar/Jun/Sep/Dec expiry are flagged as rolling", async () => {
@@ -307,8 +307,8 @@ test("daily open interest is summed across every expiry, keeping each expiry's l
     "not json",
   ].join("\n");
   assert.deepEqual(aggregateOpenInterest(text), [
-    { date: "2026-09-22", openInterest: 155 },
-    { date: "2026-09-21", openInterest: 150 },
+    { date: "2026-09-22", openInterest: 155, contracts: 2 },
+    { date: "2026-09-21", openInterest: 150, contracts: 2 },
   ]);
 });
 
