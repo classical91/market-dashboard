@@ -18,7 +18,14 @@ const DAY_MS = 24 * HOUR_MS;
 // indicator.
 const TIMEFRAMES = ["1W", "1D", "4h", "1h"];
 
+const MINUTE_MS = 60 * 1000;
+
+// The intraday keys serve the Market Matrix charts only; the RSI Matrix's own
+// timeframe list is TIMEFRAMES above, which they are deliberately not in.
 const TIMEFRAME_MS = {
+  "5m": 5 * MINUTE_MS,
+  "15m": 15 * MINUTE_MS,
+  "30m": 30 * MINUTE_MS,
   "1h": HOUR_MS,
   "4h": 4 * HOUR_MS,
   "1D": DAY_MS,
