@@ -1,0 +1,153 @@
+/* ─────────────────────────────────────────────────────────
+   TradeHunter → Market Matrix — four charts in a 2×2 split.
+
+   The charts are the page: compact headers, thin borders, minimal padding.
+   Desktop and tablet get the 2×2 grid sized to the viewport; phones stack the
+   panels one per row at a readable height instead of shrinking four charts
+   into one screen. Colours come from the theme variables in command.css.
+───────────────────────────────────────────────────────── */
+
+.mm-main { padding-top: 14px; padding-bottom: 14px; }
+
+.mm-header { margin-bottom: 10px; padding-bottom: 10px; }
+
+.mm-toolbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+
+.mm-tool {
+  font: inherit; font-size: 12px; font-weight: 600;
+  color: var(--soft); background: var(--surface2);
+  border: 1px solid var(--border); border-radius: 6px;
+  padding: 6px 10px; cursor: pointer;
+}
+.mm-tool:hover { border-color: var(--border-hover); color: var(--text); }
+.mm-tool:focus-visible,
+.mm-icon-btn:focus-visible,
+.mm-select:focus-visible,
+.mm-tv-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.mm-sync[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); background: var(--accent-bg); }
+
+/* ── Relationship strip (values only, no conclusions) ───── */
+.mm-strip {
+  display: flex; flex-wrap: wrap; gap: 4px 18px;
+  margin: 0 0 8px; min-height: 18px;
+  font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted);
+}
+.mm-strip-item { display: inline-flex; gap: 6px; align-items: baseline; white-space: nowrap; }
+.mm-strip-item strong { color: var(--soft); font-weight: 700; }
+
+.mm-up { color: var(--green); }
+.mm-down { color: var(--red); }
+.mm-flat { color: var(--muted); }
+
+/* ── Grid ───────────────────────────────────────────────── */
+.mm-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  height: calc(100vh - 150px);
+  min-height: 520px;
+}
+.mm-loading { grid-column: 1 / -1; grid-row: 1 / -1; display: grid; place-items: center; color: var(--muted); font-size: 13px; }
+
+.mm-panel {
+  position: relative;
+  display: flex; flex-direction: column;
+  min-width: 0; min-height: 0;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+/* One panel expanded: the others are hidden, not destroyed, so each chart
+   keeps its zoom, scroll and data. */
+.mm-grid--focus { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+.mm-grid--focus .mm-panel { display: none; }
+.mm-grid--focus .mm-panel--expanded { display: flex; }
+
+/* ── Panel header ───────────────────────────────────────── */
+.mm-panel-head {
+  display: flex; align-items: center; gap: 8px;
+  min-height: 32px; padding: 3px 6px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 12px;
+}
+.mm-select {
+  font: inherit; font-size: 12px; font-weight: 700;
+  color: var(--text); background: transparent;
+  border: 1px solid transparent; border-radius: 4px;
+  padding: 3px 2px; cursor: pointer; max-width: 150px;
+}
+.mm-select:hover { border-color: var(--border-hover); }
+.mm-select option, .mm-select optgroup { background: var(--surface2); color: var(--text); }
+.mm-select--tf { font-weight: 600; color: var(--soft); }
+
+.mm-quote { display: inline-flex; gap: 6px; align-items: baseline; min-width: 0; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; }
+.mm-value { color: var(--text); font-weight: 700; }
+.mm-change { font-weight: 600; }
+
+.mm-head-spacer { flex: 1 1 auto; }
+
+.mm-source {
+  display: inline-flex; align-items: center; gap: 5px;
+  color: var(--dim); font-size: 11px; white-space: nowrap; cursor: help;
+}
+.mm-source::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--dim); }
+.mm-source--live::before { background: var(--green); }
+.mm-source--sampled::before { background: var(--amber); }
+.mm-source--error::before { background: var(--red); }
+
+.mm-icon-btn, .mm-tv-link {
+  display: inline-grid; place-items: center;
+  width: 24px; height: 24px; padding: 0;
+  font: inherit; font-size: 14px; line-height: 1;
+  color: var(--muted); background: transparent;
+  border: 1px solid transparent; border-radius: 4px;
+  cursor: pointer; text-decoration: none;
+}
+.mm-icon-btn:hover, .mm-tv-link:hover { color: var(--text); border-color: var(--border-hover); }
+.mm-icon-btn.is-busy { animation: mm-spin 0.9s linear infinite; }
+@keyframes mm-spin { to { transform: rotate(360deg); } }
+
+/* ── Chart body ─────────────────────────────────────────── */
+.mm-body { position: relative; flex: 1 1 auto; min-height: 0; }
+.mm-chart { position: absolute; inset: 0; }
+
+.mm-legend {
+  position: absolute; top: 4px; left: 8px; z-index: 2;
+  font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums;
+  pointer-events: none; white-space: nowrap;
+}
+.mm-legend b { color: var(--soft); font-weight: 600; margin-left: 2px; }
+
+.mm-overlay {
+  position: absolute; inset: 0; z-index: 3;
+  display: grid; place-content: center; gap: 6px;
+  padding: 16px; text-align: center;
+  background: var(--bg);
+  color: var(--muted); font-size: 12px;
+}
+.mm-overlay[hidden] { display: none; }
+.mm-overlay-title { font-size: 14px; font-weight: 700; color: var(--soft); }
+.mm-overlay--error .mm-overlay-title { color: var(--red); }
+.mm-overlay-reason { max-width: 420px; line-height: 1.5; }
+
+/* ── Responsive ─────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .mm-grid { height: calc(100vh - 190px); }
+  .mm-source-label { display: none; }
+}
+
+@media (max-width: 700px) {
+  .mm-grid,
+  .mm-grid--focus {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    grid-auto-rows: minmax(340px, 62vh);
+    height: auto; min-height: 0;
+  }
+  .mm-grid--focus { grid-auto-rows: calc(100vh - 120px); }
+  .mm-panel-head { flex-wrap: wrap; row-gap: 2px; }
+}

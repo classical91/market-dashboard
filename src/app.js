@@ -32,6 +32,7 @@ const { createOpenInterestRouter } = require("./routes/open-interest");
 const { createCrossMarketOiRouter } = require("./routes/cross-market-oi");
 const { createScreenerSettingsRouter } = require("./routes/screener-settings");
 const { createRsiMatrixRouter } = require("./routes/rsi-matrix");
+const { createMarketMatrixRouter } = require("./routes/market-matrix");
 const { createStrategyEngineRouter } = require("./routes/strategy-engine");
 const { createTradingLabRouter } = require("./routes/trading-lab");
 const { createWatchlistRouter } = require("./routes/watchlist");
@@ -70,6 +71,7 @@ const { DatabentoDailyOiProvider } = require("./services/cross-market-oi/databen
 const { ScreenerSettingsService } = require("./services/screener-settings");
 const { RsiMatrixSettingsService } = require("./services/rsi-matrix-settings");
 const { RsiMatrixService } = require("./services/rsi-matrix/service");
+const { MarketMatrixService } = require("./services/market-matrix");
 const { createProviders: createRsiMatrixProviders, createVerifier: createRsiMatrixVerifier } = require("./services/rsi-matrix/providers");
 const { UsdtDominanceService } = require("./services/usdt-dominance");
 const { StrategyEngineService } = require("./services/strategy-engine");
@@ -329,6 +331,13 @@ function createApp() {
     cache,
   });
   const strategyEngineService = new StrategyEngineService({ signalScreenerService });
+  // The Market Matrix charts reuse the RSI Matrix's dominance sampler (one
+  // sampler, one history file) and the screener's Binance klines.
+  const marketMatrixService = new MarketMatrixService({
+    signalScreenerService,
+    dominanceProvider: rsiMatrixProviders.dominance,
+    cache,
+  });
   const watchlistService = new WatchlistService({ dataDir });
   // Pure aggregation over the engines above — it owns no indicator maths and
   // asks both scanners per tracked symbol rather than for the full universe.
@@ -507,6 +516,11 @@ function createApp() {
     const query = req.originalUrl.slice(req.path.length);
     res.redirect(301, `/directional-bias.html${query}`);
   });
+  // TradeHunter → Market Matrix lives at a TradeHunter path; the .html file
+  // stays reachable too, like every other page.
+  app.get(["/tradehunter/market-matrix", "/market-matrix"], (req, res) => {
+    res.sendFile(path.join(__dirname, "..", "public", "market-matrix.html"));
+  });
   app.use(express.static(path.join(__dirname, "..", "public"), {
     setHeaders(res, filePath) {
       if (filePath.endsWith("reporter.html")) {
@@ -560,6 +574,7 @@ function createApp() {
     "/api/rsi-matrix",
     createRsiMatrixRouter({ rsiMatrixService, rsiMatrixSettingsService, requireAdmin: requireXAdmin }),
   );
+  app.use("/api/market-matrix", createMarketMatrixRouter({ marketMatrixService }));
   app.use("/api/strategy-engine", createStrategyEngineRouter({ strategyEngineService }));
   app.use(
     "/api/decision",

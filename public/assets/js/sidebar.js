@@ -76,6 +76,9 @@
             { href: "/rsi-matrix.html", label: "RSI Matrix" },
           ],
         },
+        // Not a screener: four live charts side by side (TOTAL / DXY / BTC /
+        // USDT.D by default) for cross-market confirmation.
+        { href: "/tradehunter/market-matrix", label: "Market Matrix" },
         { href: "/pattern-scanner-trades.html", label: "My Trades" },
         { href: "/pattern-scanner-stats.html", label: "Track Record" },
         {

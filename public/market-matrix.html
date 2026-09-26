@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Market Matrix · Market Command</title>
+  <script src="/assets/js/settings.js"></script>
+  <link rel="stylesheet" href="/assets/styles/command.css" />
+  <link rel="stylesheet" href="/assets/styles/ai-analysis.css" />
+  <link rel="stylesheet" href="/assets/styles/market-matrix.css" />
+</head>
+<body>
+<div class="app">
+  <aside class="cmd-sidebar"></aside>
+  <main class="cmd-main mm-main">
+
+    <div class="cmd-page-header mm-header">
+      <div>
+        <div class="cmd-page-title">&#128200; Market Matrix</div>
+        <div class="cmd-page-subtitle">Four live charts side by side for cross-market confirmation &mdash; TOTAL, DXY, BTC and USDT.D by default</div>
+      </div>
+      <div class="mm-toolbar" role="toolbar" aria-label="Market Matrix controls">
+        <button class="mm-tool mm-sync" type="button" id="mm-sync" aria-pressed="false" title="When on, changing one chart's timeframe changes all four">
+          Sync timeframes: <span id="mm-sync-state">OFF</span>
+        </button>
+        <button class="mm-tool" type="button" id="mm-refresh-all" title="Re-read all four charts">&#8635; Refresh all</button>
+        <button class="mm-tool" type="button" id="mm-reset" title="Restore TOTAL / DXY / BTC / USDT.D on 1H">Reset layout</button>
+      </div>
+    </div>
+
+    <!-- Relationship strip: each panel's last value and change, nothing inferred. -->
+    <div class="mm-strip" id="mm-strip" aria-label="Panel changes" aria-live="polite"></div>
+
+    <div class="aia-notice aia-notice--error" id="mm-notice" style="display:none"></div>
+
+    <div class="mm-grid" id="mm-grid" aria-label="Market charts">
+      <div class="mm-loading">Loading charts…</div>
+    </div>
+
+    <details class="aia-how aia-how--footer">
+      <summary>&#8505;&#65039; How this page works</summary>
+      <div class="aia-how-body">
+        <ol class="aia-how-steps">
+          <li><strong>Four independent charts.</strong> Each panel has its own symbol, timeframe, refresh and fullscreen. Click the symbol to swap a panel (e.g. USDT.D &rarr; ETH); your symbols, timeframes and the sync setting are remembered in this browser. <em>Reset layout</em> restores TOTAL / DXY / BTC / USDT.D on 1H.</li>
+          <li><strong>Sync timeframes.</strong> When on, changing any panel&rsquo;s timeframe moves all four to it. When off, every panel keeps its own.</li>
+          <li><strong>Header numbers.</strong> The value is the latest bar&rsquo;s close; the percentage is its change against the previous bar&rsquo;s close, the same convention as a TradingView legend. Hover it for the 24-hour change.</li>
+          <li><strong>Fullscreen.</strong> &#x26F6; expands one chart; &#x2715; or Esc returns to the matrix with its zoom and scroll intact.</li>
+        </ol>
+        <ul class="aia-how-notes">
+          <li><strong>Sources.</strong> The dot in each header names the feed; hover it for the exact provider symbol. Crypto pairs are Binance spot klines &mdash; the same BTCUSDT series Directional Bias and Local Extremes read. DXY is the ICE US Dollar Index (Yahoo Finance DX-Y.NYB), not a proxy; SPX, NDX, US10Y, gold and oil also come from Yahoo Finance, with 4H built from 1H bars on UTC boundaries.</li>
+          <li><strong>TOTAL and dominance are sampled.</strong> No free feed serves the history of TOTAL, TOTAL2/3 or the .D series, so the server records CoinGecko&rsquo;s global figures every 15 minutes and draws a line from those samples. The chart starts at the first sample, unsampled periods stay as gaps, and 5m is not offered. The &#8599; link opens the same concept on TradingView for full history.</li>
+          <li><strong>Unavailable means unavailable.</strong> If a feed fails, or a sampled series stops updating, the panel says <em>Data unavailable</em> with the reason and draws nothing &mdash; no stale or substitute values.</li>
+          <li><strong>AI use: No.</strong> Every value is a market price or sampled figure; this page does not call an AI model and draws no bullish or bearish conclusions.</li>
+        </ul>
+      </div>
+    </details>
+
+    <footer>Market Matrix &mdash; <a href="/rsi-matrix.html">RSI Matrix</a> &mdash; <a href="/directional-bias.html">Directional Bias</a> &mdash; <a href="/">Overview</a> &mdash; Charts by <a href="https://www.tradingview.com/" target="_blank" rel="noopener">TradingView Lightweight Charts&trade;</a></footer>
+
+  </main>
+</div>
+<script src="/assets/js/sidebar.js"></script>
+<script src="/assets/vendor/lightweight-charts/lightweight-charts-4.2.3.standalone.production.js"></script>
+<script src="/assets/js/market-matrix.js"></script>
+</body>
+</html>
