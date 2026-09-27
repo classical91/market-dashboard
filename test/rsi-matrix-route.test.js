@@ -76,7 +76,10 @@ test("GET /api/rsi-matrix renders every group even when one source is down", asy
     const body = JSON.parse(text);
     assert.equal(body.rsiLength, 14);
     assert.deepEqual(body.timeframes, ["1W", "1D", "4h", "1h"]);
-    assert.deepEqual(body.groups.map((g) => g.id), ["cross-market", "crypto-stables"]);
+    assert.deepEqual(body.groups.map((g) => g.id), ["cross-market", "crypto-stables", "exchange-tokens"]);
+    const members = (id) => body.groups.find((g) => g.id === id).rows;
+    assert.deepEqual(members("exchange-tokens"), ["mx", "cro", "kcs", "bnb-perp"]);
+    assert.ok(!members("crypto-stables").includes("mx"));
     const gold = body.instruments.find((r) => r.id === "gold");
     const btc = body.instruments.find((r) => r.id === "btc-usd");
     assert.match(gold.error, /Data unavailable/);

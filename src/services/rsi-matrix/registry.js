@@ -9,13 +9,16 @@
 // closest public market is used and the Source line on the page says so —
 // it is never silently swapped.
 //
-// The same market may appear in both groups (BTCUSD does, as in both
+// The same market may appear in more than one group (BTCUSD does, as in both
 // reference screenshots). That costs nothing upstream: candles are cached by
 // provider + symbol + timeframe, not by row.
 
+// "crypto-stables" keeps its id from when it also held the exchange tokens,
+// so rows operators already added to it stay valid.
 const GROUPS = [
   { id: "cross-market", label: "Cross-Market" },
-  { id: "crypto-stables", label: "Crypto / Dominance / Stablecoins" },
+  { id: "crypto-stables", label: "Stablecoins & Dominance" },
+  { id: "exchange-tokens", label: "Native Exchange Tokens" },
 ];
 
 const GROUP_IDS = GROUPS.map((g) => g.id);
@@ -37,18 +40,13 @@ const DEFAULT_INSTRUMENTS = [
   entry("eur1", "EUR1!", "cross-market", "yahoo", "6E=F", "CME euro FX front-month future"),
   entry("dxy", "DXY", "cross-market", "yahoo", "DX-Y.NYB", "ICE US Dollar Index"),
 
-  // Crypto / Dominance / Stablecoins
+  // Stablecoins & Dominance
   entry("usdt-d", "USDT.D", "crypto-stables", "dominance", "USDT.D"),
   entry("btc-usd-crypto", "BTCUSD", "crypto-stables", "binance", "BTCUSDT", "Binance BTCUSDT spot"),
   entry("btc-d", "BTC.D", "crypto-stables", "dominance", "BTC.D"),
   entry("total3", "TOTAL3", "crypto-stables", "dominance", "TOTAL3"),
   entry("usdc-d", "USDC.D", "crypto-stables", "dominance", "USDC.D"),
-  // MXUSDT and MEXC:MXUSDT in the references are one market: one column.
-  entry("mx", "MXUSDT", "crypto-stables", "mexc", "MXUSDT"),
   entry("ustc", "USTCUSDT", "crypto-stables", "binance", "USTCUSDT"),
-  entry("cro", "CROUSDT", "crypto-stables", "mexc", "CROUSDT", "CRO is not listed on Binance"),
-  entry("kcs", "KCSUSDT", "crypto-stables", "kucoin", "KCS-USDT"),
-  entry("bnb-perp", "BNBUSDT.P", "crypto-stables", "binance-futures", "BNBUSDT"),
   entry("usdt-mcap", "USDT MCAP", "crypto-stables", "coingecko-mcap", "tether", "CRYPTOCAP:USDT equivalent"),
   entry("usdc-mcap", "USDC MCAP", "crypto-stables", "coingecko-mcap", "usd-coin", "CRYPTOCAP:USDC equivalent"),
   entry("dai", "DAIUSD", "crypto-stables", "kraken", "DAIUSD", "Kraken DAIUSD — Capital.com has no public candle API"),
@@ -58,6 +56,18 @@ const DEFAULT_INSTRUMENTS = [
   entry("usdp", "USDPUSDT", "crypto-stables", "binance", "USDPUSDT"),
   entry("pyusd", "PYUSDEUR", "crypto-stables", "kraken", "PYUSDEUR"),
   entry("frax", "FRAXUSDT", "crypto-stables", "poloniex", "FRAX_USDT"),
+
+  // Native Exchange Tokens — each venue's own token, read from that venue
+  // where it has a public candle API (Crypto.com has none, so CRO is MEXC).
+  // MXUSDT and MEXC:MXUSDT in the references are one market: one column.
+  entry("mx", "MXUSDT", "exchange-tokens", "mexc", "MXUSDT"),
+  entry("cro", "CROUSDT", "exchange-tokens", "mexc", "CROUSDT", "CRO is not listed on Binance"),
+  entry("kcs", "KCSUSDT", "exchange-tokens", "kucoin", "KCS-USDT"),
+  entry("bnb-perp", "BNBUSDT.P", "exchange-tokens", "binance-futures", "BNBUSDT"),
 ];
 
-module.exports = { GROUPS, GROUP_IDS, DEFAULT_INSTRUMENTS };
+// Defaults that moved out of "crypto-stables" when the exchange tokens got
+// their own table. Saved settings from before the split are migrated once.
+const MOVED_TO_EXCHANGE_TOKENS = ["mx", "cro", "kcs", "bnb-perp"];
+
+module.exports = { GROUPS, GROUP_IDS, DEFAULT_INSTRUMENTS, MOVED_TO_EXCHANGE_TOKENS };
