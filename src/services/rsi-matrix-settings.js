@@ -16,7 +16,7 @@
  *
  * File shape (rsi-matrix-settings.json):
  *   {
- *     "version": 1,
+ *     "version": 2,
  *     "seededDefaults": ["spx", ...],          // defaults already offered once
  *     "timeframes": { "1W": true, "1D": true, "4h": true, "1h": true },
  *     "instruments": [
@@ -37,11 +37,13 @@ const crypto = require("crypto");
 
 const { withExclusiveLock, writeJsonAtomic } = require("./json-file-lock");
 const { createServiceError } = require("../utils/errors");
-const { GROUPS, GROUP_IDS, DEFAULT_INSTRUMENTS } = require("./rsi-matrix/registry");
+const { GROUPS, GROUP_IDS, DEFAULT_INSTRUMENTS, MOVED_TO_EXCHANGE_TOKENS } = require("./rsi-matrix/registry");
 const { TIMEFRAMES, TIMEFRAME_LABELS } = require("./rsi-matrix/candles");
 const { assertProviderId, normalizeProviderSymbol, describeProviders } = require("./rsi-matrix/providers");
 
-const SETTINGS_VERSION = 1;
+// v2: the native exchange tokens moved out of "crypto-stables" into their
+// own "exchange-tokens" group (see _read's migration).
+const SETTINGS_VERSION = 2;
 const RSI_LENGTH = 14;
 
 // Every instrument costs up to four upstream series per cold refresh; this
@@ -174,10 +176,23 @@ class RsiMatrixSettingsService {
         }
       }
       const seededDefaults = Array.isArray(parsed.seededDefaults) ? parsed.seededDefaults.map(String) : [];
+      // A v1 file predates the exchange-token table: move those defaults
+      // across, but only where they still sit in the group they shipped in —
+      // an operator's own regrouping wins. Written back as v2 by
+      // ensureSeeded(), so this runs once and a later move back sticks.
+      let migrated = false;
+      if ((Number(parsed.version) || 1) < 2) {
+        for (const row of instruments) {
+          if (MOVED_TO_EXCHANGE_TOKENS.includes(row.id) && row.group === "crypto-stables") {
+            row.group = "exchange-tokens";
+            migrated = true;
+          }
+        }
+      }
       this._loadState = dropped ? "partial" : "loaded";
       this._loadError = dropped ? `${dropped} unreadable instrument row(s) skipped` : null;
       if (dropped) this._logger.warn?.(`[RsiMatrixSettings] ${this._loadError} in ${this._file}`);
-      return { seededDefaults, timeframes, instruments };
+      return { seededDefaults, timeframes, instruments, migrated };
     } catch (err) {
       this._loadState = "corrupt";
       this._loadError = err.message;
@@ -239,7 +254,7 @@ class RsiMatrixSettingsService {
       const seeded = new Set(state.seededDefaults);
       const present = new Set(state.instruments.map((row) => row.id));
       const pending = this._defaults.filter((row) => !seeded.has(row.id) && !present.has(row.id));
-      if (!pending.length) return false;
+      if (!pending.length) return state.migrated ? this._write(state) : false;
       for (const { note, ...row } of pending) state.instruments.push({ ...row });
       state.seededDefaults.push(...pending.map((row) => row.id));
       return this._write(state);

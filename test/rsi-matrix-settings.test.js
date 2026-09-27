@@ -36,14 +36,16 @@ function editable(snapshot) {
   }));
 }
 
-test("both reference groups are seeded, with one column per logical market", () => {
+test("the reference instruments are seeded into three tables, one column per logical market", () => {
   const snap = create(tmpDir()).snapshot();
-  assert.deepEqual(snap.groups.map((g) => g.id), ["cross-market", "crypto-stables"]);
+  assert.deepEqual(snap.groups.map((g) => g.id), ["cross-market", "crypto-stables", "exchange-tokens"]);
   const labels = (group) => snap.instruments.filter((r) => r.group === group).map((r) => r.label);
   assert.deepEqual(labels("cross-market"), ["SPX", "BTCUSD", "ETHUSD", "XRPUSDT", "US10Y", "GOLD", "SILVER", "USOIL", "EUR1!", "DXY"]);
-  for (const label of ["USDT.D", "BTCUSD", "BTC.D", "TOTAL3", "USDC.D", "MXUSDT", "USTCUSDT", "CROUSDT", "KCSUSDT", "BNBUSDT.P", "DAIUSD", "TUSD", "USDDUSDC", "USDPUSDT", "PYUSDEUR", "FRAXUSDT"]) {
-    assert.ok(labels("crypto-stables").includes(label), `${label} is seeded`);
+  for (const label of ["USDT.D", "BTCUSD", "BTC.D", "TOTAL3", "USDC.D", "USTCUSDT", "DAIUSD", "TUSD", "USDDUSDC", "USDPUSDT", "PYUSDEUR", "FRAXUSDT"]) {
+    assert.ok(labels("crypto-stables").includes(label), `${label} is seeded with the stablecoins`);
   }
+  // Each exchange's own token gets its own table.
+  assert.deepEqual(labels("exchange-tokens"), ["MXUSDT", "CROUSDT", "KCSUSDT", "BNBUSDT.P"]);
   // MXUSDT and MEXC:MXUSDT were the same market: one column.
   assert.equal(snap.instruments.filter((r) => r.provider === "mexc" && r.providerSymbol === "MXUSDT").length, 1);
   assert.equal(snap.rsiLength, 14);
@@ -99,7 +101,7 @@ test("added instruments are verified, persisted and deletable; defaults are not 
 test("duplicate instruments are refused", async () => {
   const service = create(tmpDir(), async () => {});
   await assert.rejects(
-    service.addInstrument({ label: "MX again", group: "crypto-stables", provider: "mexc", providerSymbol: "MXUSDT" }),
+    service.addInstrument({ label: "MX again", group: "exchange-tokens", provider: "mexc", providerSymbol: "MXUSDT" }),
     (err) => err.statusCode === 409,
   );
   // The same market in the other group is a legitimate second column.
@@ -217,6 +219,37 @@ test("one unreadable row is skipped without breaking the rest", () => {
   const snap = new RsiMatrixSettingsService({ dataDir: dir, logger: quiet }).snapshot();
   assert.deepEqual(snap.instruments.map((r) => r.id), ["gold"]);
   assert.equal(snap.status.state, "partial");
+});
+
+test("settings saved before the split move the exchange tokens to their own table once", async () => {
+  const dir = tmpDir();
+  const file = path.join(dir, "rsi-matrix-settings.json");
+  const v1 = DEFAULT_INSTRUMENTS.map(({ note, ...row }) => ({
+    ...row,
+    group: row.group === "exchange-tokens" ? "crypto-stables" : row.group,
+  }));
+  // The operator had already moved CRO to Cross-Market and disabled KCS:
+  // their choices survive the migration.
+  v1.find((r) => r.id === "cro").group = "cross-market";
+  v1.find((r) => r.id === "kcs").enabled = false;
+  v1.push({ id: "render-abc123", label: "RENDER", group: "crypto-stables", provider: "binance", providerSymbol: "RENDERUSDT", enabled: true });
+  fs.writeFileSync(file, JSON.stringify({ version: 1, seededDefaults: DEFAULT_INSTRUMENTS.map((r) => r.id), instruments: v1 }));
+
+  const service = create(dir);
+  const group = (id) => service.snapshot().instruments.find((r) => r.id === id).group;
+  assert.equal(group("mx"), "exchange-tokens");
+  assert.equal(group("bnb-perp"), "exchange-tokens");
+  assert.equal(group("kcs"), "exchange-tokens");
+  assert.equal(service.snapshot().instruments.find((r) => r.id === "kcs").enabled, false);
+  assert.equal(group("cro"), "cross-market", "an operator's own regrouping wins");
+  assert.equal(group("render-abc123"), "crypto-stables", "user rows are untouched");
+  assert.equal(JSON.parse(fs.readFileSync(file, "utf8")).version, 2, "written back so it runs once");
+
+  // Moving MX back afterwards sticks across restarts.
+  const rows = editable(service.snapshot());
+  rows.find((r) => r.id === "mx").group = "crypto-stables";
+  await service.save({ instruments: rows });
+  assert.equal(create(dir).snapshot().instruments.find((r) => r.id === "mx").group, "crypto-stables");
 });
 
 test("the Binance-only token universe still refuses dominance and TradingView symbols", async () => {
