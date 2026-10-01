@@ -345,6 +345,8 @@ function createApp() {
     watchlistService,
     signalScreenerService,
     patternScannerService,
+    openInterestService,
+    rsiMatrixService,
   });
   const botCommandsService = new BotCommandsService({ dataDir });
   const patternTrackerService = new PatternTrackerService({ dataDir, fetchPrice: fetchBinancePrice });

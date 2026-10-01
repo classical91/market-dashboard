@@ -207,3 +207,41 @@
   .tc-data { font-size: 9px; }
   .tc-context { flex-direction: column; gap: 6px; }
 }
+
+/* Open interest: tones mirror the Crypto Open Interest page's states. */
+.tc-oi { font-size: 12px; font-weight: 800; }
+.tc-oi--bull { color: #00e676; }
+.tc-oi--bear { color: #ff1744; }
+.tc-oi--cover { color: #73d7ff; }
+.tc-oi--unwind { color: #ffb55f; }
+.tc-oi--watch { color: #ffd166; }
+.tc-oi--quiet,
+.tc-oi--none { color: #8892a6; }
+
+.tc-oi-strip { gap: 5px; }
+.tc-oi-chip {
+  padding: 2px 6px;
+  border: 1px solid rgba(137, 146, 166, 0.25);
+  border-radius: 5px;
+  font-size: 9px;
+  font-weight: 700;
+}
+.tc-oi-chip--active { border-color: currentColor; }
+.tc-oi-spike { color: #ffd166; }
+
+/* Multi-timeframe RSI: one cell per enabled timeframe. */
+.tc-rsi { display: grid; grid-template-columns: repeat(auto-fit, minmax(56px, 1fr)); gap: 6px; }
+.tc-rsi-cell {
+  padding: 5px 6px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  text-align: center;
+}
+.tc-rsi-value { font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums; color: #c9d4e8; }
+.tc-rsi--strong-bullish .tc-rsi-value,
+.tc-rsi--bullish .tc-rsi-value { color: #00e676; }
+.tc-rsi--weak-bullish .tc-rsi-value { color: #79f2c0; }
+.tc-rsi--weak-bearish .tc-rsi-value { color: #ff8b7b; }
+.tc-rsi--strong-bearish .tc-rsi-value,
+.tc-rsi--bearish .tc-rsi-value { color: #ff1744; }
+.tc-rsi--none .tc-rsi-value { color: #6f7a91; }

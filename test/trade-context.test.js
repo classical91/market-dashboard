@@ -438,3 +438,103 @@ test("buildCard reads its clock from the caller, so one request dates every card
 
   assert.equal(card.freshness.summary, "1h candle closed 10m ago · context calculated 1m ago");
 });
+
+function oiRow({ error = null } = {}) {
+  if (error) return { symbol: "APTUSDT", error, states: {}, oiChange: {}, priceChange: {} };
+  const states = {
+    "15m": { state: "FLAT", label: "Quiet", tone: "quiet", meaning: "No meaningful change" },
+    "1h": { state: "LONG_BUILDUP", label: "Long buildup", tone: "bull", meaning: "Price up, OI up" },
+    "4h": { state: "SHORT_COVERING", label: "Short covering", tone: "cover", meaning: "Price up, OI down" },
+    "24h": { state: "LONG_UNWIND", label: "Long unwind", tone: "unwind", meaning: "Price down, OI down" },
+  };
+  return {
+    symbol: "APTUSDT",
+    source: { label: "Binance USDT-M" },
+    states,
+    oiChange: { "15m": 0.1, "1h": 1.2, "4h": -2.5, "24h": -4 },
+    priceChange: { "15m": 0, "1h": 0.8, "4h": 1.5, "24h": -3 },
+    oiUsd: 120e6,
+    oiUsdBasis: "venue",
+    spike: { isSpike: true, direction: "DOWN", changePct: -2.5, zScore: -3.1 },
+    freshness: { state: "FRESH" },
+    error: null,
+  };
+}
+
+function rsiRow() {
+  return {
+    timeframes: ["1W", "1D", "4h", "1h"],
+    timeframeLabels: { "1W": "1W", "1D": "1D", "4h": "4H", "1h": "1H" },
+    values: { "1W": 55.2, "1D": 61, "4h": 72.4, "1h": null },
+    states: { "1W": "weak-bullish", "1D": "weak-bullish", "4h": "bullish", "1h": null },
+    errors: { "1W": null, "1D": null, "4h": null, "1h": "Only 3 closed 1H bars" },
+    average: null,
+    averageState: null,
+    averageAvailable: 3,
+    averageRequired: 4,
+    error: null,
+  };
+}
+
+test("open interest and multi-timeframe RSI land on the card when wired in", async () => {
+  const engines = stubEngines();
+  const calls = { oi: [], rsi: [] };
+  const service = new TradeContextService({
+    watchlistService: { list: () => [{ symbol: "APTUSDT", interval: "4h" }] },
+    signalScreenerService: engines.signalScreenerService,
+    patternScannerService: engines.patternScannerService,
+    openInterestService: { async row(symbol, opts) { calls.oi.push({ symbol, opts }); return oiRow(); } },
+    rsiMatrixService: { async tokenRow(symbol) { calls.rsi.push(symbol); return rsiRow(); } },
+  });
+  const { cards } = await service.list();
+  const card = cards[0];
+
+  assert.deepEqual(calls.oi.map((c) => c.symbol), ["APTUSDT"]);
+  assert.deepEqual(calls.rsi, ["APTUSDT"]);
+
+  // The OI horizon follows the card's timeframe.
+  assert.equal(card.openInterest.horizon, "4h");
+  assert.equal(card.openInterest.state.state, "SHORT_COVERING");
+  assert.equal(card.openInterest.oiChangePct, -2.5);
+  assert.equal(card.openInterest.horizons.length, 4);
+  assert.equal(card.openInterest.spike.direction, "DOWN");
+
+  assert.deepEqual(card.rsi.cells.map((c) => c.value), [55.2, 61, 72.4, null]);
+  assert.equal(card.rsi.cells[3].error, "Only 3 closed 1H bars");
+  assert.equal(card.rsi.average, null, "an incomplete AVG is reported as missing, not averaged over fewer timeframes");
+
+  // Neither engine is folded into the agreement state.
+  const withoutExtras = buildCard({ item: { symbol: "APTUSDT", interval: "4h" }, screenerRow: screenerRow(), patternRow: patternRow() });
+  assert.deepEqual(card.context, withoutExtras.context);
+});
+
+test("daily cards read the 24h OI horizon", () => {
+  const card = buildCard({ item: { symbol: "APTUSDT", interval: "1D" }, screenerRow: screenerRow(), patternRow: patternRow(), oiRow: oiRow() });
+  assert.equal(card.openInterest.horizon, "24h");
+  assert.equal(card.openInterest.state.label, "Long unwind");
+});
+
+test("a failed OI or RSI engine degrades only its own section", async () => {
+  const engines = stubEngines();
+  const service = new TradeContextService({
+    watchlistService: { list: () => [{ symbol: "APTUSDT", interval: "4h" }] },
+    signalScreenerService: engines.signalScreenerService,
+    patternScannerService: engines.patternScannerService,
+    openInterestService: { async row() { return oiRow({ error: "No venue returned open interest" }); } },
+    rsiMatrixService: { async tokenRow() { throw new Error("binance down"); } },
+  });
+  const { cards } = await service.list();
+  const card = cards[0];
+  assert.equal(card.openInterest.error, "No venue returned open interest");
+  assert.equal(card.rsi.error, "binance down");
+  assert.equal(card.directionalBias.bias, "BULLISH");
+  assert.ok(card.errors.includes("binance down"));
+});
+
+test("without the optional engines the card keeps its original sections", async () => {
+  const { service } = serviceWith([{ symbol: "APTUSDT", interval: "4h" }]);
+  const { cards } = await service.list();
+  assert.equal(cards[0].openInterest, null);
+  assert.equal(cards[0].rsi, null);
+  assert.deepEqual(cards[0].errors, []);
+});

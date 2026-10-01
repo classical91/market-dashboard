@@ -253,13 +253,76 @@ function buildFreshness({ item, screenerRow, patternRow, now }) {
   }, now);
 }
 
-function buildCard({ item, screenerRow, patternRow, now = Date.now() }) {
+// The OI horizon that matches a card's timeframe. Daily and weekly cards read
+// the longest horizon the OI engine computes (24h) rather than none.
+const OI_HORIZON_FOR_INTERVAL = { "15m": "15m", "1h": "1h", "4h": "4h", "1D": "24h", "1W": "24h" };
+
+/**
+ * Perp positioning from the Open Interest engine, passed through in its own
+ * terms. Kept out of classifyContext on purpose: OI says whether positions
+ * are opening or closing, not which way the market leans, and folding it in
+ * would change what ALIGNED / CONFLICT mean on every existing card.
+ */
+function buildOpenInterest(row, interval) {
+  if (row === undefined) return null;
+  if (!row || row.error) {
+    return { error: (row && row.error) || "Open interest unavailable" };
+  }
+  const horizon = OI_HORIZON_FOR_INTERVAL[interval] || "4h";
+  const states = row.states || {};
+  return {
+    horizon,
+    state: states[horizon] || null,
+    oiChangePct: row.oiChange ? row.oiChange[horizon] ?? null : null,
+    priceChangePct: row.priceChange ? row.priceChange[horizon] ?? null : null,
+    horizons: Object.keys(states).map((key) => ({ key, state: states[key].state, label: states[key].label, tone: states[key].tone })),
+    oiUsd: Number.isFinite(row.oiUsd) ? row.oiUsd : null,
+    oiUsdBasis: row.oiUsdBasis || null,
+    spike: row.spike && row.spike.isSpike ? { direction: row.spike.direction, changePct: row.spike.changePct, zScore: row.spike.zScore } : null,
+    source: row.source ? row.source.label : null,
+    freshness: row.freshness || null,
+  };
+}
+
+/** RSI 14 on every timeframe the RSI Matrix has enabled, for this pair. */
+function buildRsi(row) {
+  if (row === undefined) return null;
+  if (!row || row.error) {
+    return { error: (row && row.error) || "RSI unavailable" };
+  }
+  const timeframes = row.timeframes || Object.keys(row.values || {});
+  return {
+    cells: timeframes.map((tf) => ({
+      timeframe: tf,
+      label: (row.timeframeLabels && row.timeframeLabels[tf]) || tf,
+      value: row.values ? row.values[tf] ?? null : null,
+      state: row.states ? row.states[tf] || null : null,
+      error: row.errors ? row.errors[tf] || null : null,
+    })),
+    average: row.average ?? null,
+    averageState: row.averageState || null,
+    averageAvailable: row.averageAvailable ?? null,
+    averageRequired: row.averageRequired ?? null,
+  };
+}
+
+function buildCard({ item, screenerRow, patternRow, oiRow, rsiRow, now = Date.now() }) {
   const directionalBias = buildDirectionalBias(screenerRow);
   const extremes = buildExtremes(screenerRow);
   const patterns = buildPatterns(patternRow);
+  // Undefined when the engine isn't wired in at all, so the page omits the
+  // section rather than reporting an outage that never happened.
+  const openInterest = buildOpenInterest(oiRow, item.interval);
+  const rsi = buildRsi(rsiRow);
   // One upstream failure surfaces through both the bias and the extremes
   // sections, so the card would otherwise print the same message twice.
-  const errors = Array.from(new Set([directionalBias.error, extremes.error, patterns.error].filter(Boolean)));
+  const errors = Array.from(new Set([
+    directionalBias.error,
+    extremes.error,
+    patterns.error,
+    openInterest && openInterest.error,
+    rsi && rsi.error,
+  ].filter(Boolean)));
   return {
     symbol: item.symbol,
     label: item.label || (patternRow && patternRow.label) || item.symbol,
@@ -269,6 +332,8 @@ function buildCard({ item, screenerRow, patternRow, now = Date.now() }) {
     directionalBias,
     extremes,
     patterns,
+    openInterest,
+    rsi,
     evidence: buildEvidence({ directionalBias, extremes, patterns }),
     context: classifyContext({ directionalBias, extremes, patterns }),
     freshness: buildFreshness({ item, screenerRow, patternRow, now }),
@@ -280,10 +345,13 @@ function buildCard({ item, screenerRow, patternRow, now = Date.now() }) {
 }
 
 class TradeContextService {
-  constructor({ watchlistService, signalScreenerService, patternScannerService } = {}) {
+  constructor({ watchlistService, signalScreenerService, patternScannerService, openInterestService = null, rsiMatrixService = null } = {}) {
     this._watchlist = watchlistService;
     this._screener = signalScreenerService;
     this._patterns = patternScannerService;
+    // Optional: a card without them keeps its original three sections.
+    this._openInterest = openInterestService;
+    this._rsi = rsiMatrixService;
   }
 
   /**
@@ -300,15 +368,19 @@ class TradeContextService {
     // same moment never report ages a second apart.
     const now = Date.now();
     const cards = await Promise.all(items.map(async (item) => {
-      const [screener, pattern] = await Promise.allSettled([
+      const [screener, pattern, oi, rsi] = await Promise.allSettled([
         this._screener.scanToken(item.symbol, item.interval, undefined, { force }),
         this._patterns.scanToken(item.symbol, item.interval, { force }),
+        this._openInterest ? this._openInterest.row(item.symbol, { force }) : undefined,
+        this._rsi ? this._rsi.tokenRow(item.symbol) : undefined,
       ]);
       return buildCard({
         item,
         now,
         screenerRow: screener.status === "fulfilled" ? screener.value : { error: screener.reason?.message || "Directional engine failed" },
         patternRow: pattern.status === "fulfilled" ? pattern.value : { error: pattern.reason?.message || "Pattern engine failed" },
+        oiRow: !this._openInterest ? undefined : oi.status === "fulfilled" ? oi.value : { error: oi.reason?.message || "Open interest engine failed" },
+        rsiRow: !this._rsi ? undefined : rsi.status === "fulfilled" ? rsi.value : { error: rsi.reason?.message || "RSI engine failed" },
       });
     }));
 
