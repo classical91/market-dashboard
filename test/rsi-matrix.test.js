@@ -568,3 +568,31 @@ test("dominance history records only live readings and builds bars from them", a
   assert.equal(usdt.length, 21);
   assert.equal(usdt[0].close, 4.9);
 });
+
+test("tokenRow reads RSI for a Binance pair that is not a registry row", async () => {
+  const { RsiMatrixService } = require("../src/services/rsi-matrix/service");
+  const asked = [];
+  const day = 24 * 60 * 60 * 1000;
+  const now = Date.UTC(2026, 0, 15, 12);
+  const candles = Array.from({ length: 40 }, (_, i) => {
+    const openTime = now - (41 - i) * 7 * day;
+    return { openTime, closeTime: openTime + 7 * day - 1, close: 100 + i };
+  });
+  const store = new Map();
+  const cache = {
+    get: (k) => store.get(k),
+    set: (k, v) => store.set(k, v),
+    getOrLoad: async (k, _ttl, load) => (store.has(k) ? store.get(k) : load()),
+  };
+  const service = new RsiMatrixService({
+    settingsService: { snapshot: () => ({ timeframes: [{ key: "1W", enabled: true }, { key: "1D", enabled: false }], instruments: [], groups: [] }) },
+    providers: { binance: { async fetchCandles(symbol, tf) { asked.push(`${symbol}:${tf}`); return candles; } } },
+    cache,
+    now: () => now,
+  });
+  const row = await service.tokenRow("APTUSDT");
+  assert.deepEqual(asked, ["APTUSDT:1W"]);
+  assert.deepEqual(row.timeframes, ["1W"]);
+  assert.equal(row.source, "binance");
+  assert.ok(row.values["1W"] > 70, "a steadily rising close reads as strong RSI");
+});

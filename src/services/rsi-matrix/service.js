@@ -284,6 +284,23 @@ class RsiMatrixService {
     };
   }
 
+  /**
+   * RSI on every enabled timeframe for one Binance spot pair, whether or not
+   * it is a row in the matrix registry. My Trades reads this per tracked
+   * pair; candles share the matrix's cache, so a pair that is also a matrix
+   * row costs nothing extra. Never forced: series already expire on bar close.
+   */
+  async tokenRow(symbol) {
+    const snapshot = this._settings.snapshot();
+    const timeframes = TIMEFRAMES.filter((tf) => snapshot.timeframes.some((t) => t.key === tf && t.enabled));
+    const row = await this._row(
+      { id: `token:${symbol}`, label: symbol, group: null, provider: "binance", providerSymbol: symbol },
+      timeframes,
+      { forced: false },
+    );
+    return { ...row, timeframes, timeframeLabels: timeframes.reduce((acc, tf) => ({ ...acc, [tf]: TIMEFRAME_LABELS[tf] }), {}) };
+  }
+
   async getMatrix({ force = false } = {}) {
     const snapshot = this._settings.snapshot();
     const timeframes = TIMEFRAMES.filter((tf) => snapshot.timeframes.some((t) => t.key === tf && t.enabled));

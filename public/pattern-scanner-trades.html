@@ -44,7 +44,8 @@
         <ul class="aia-how-notes">
           <li><strong>Candle age is not the same as staleness.</strong> On a 4h card the newest closed candle is normally anything up to four hours old &mdash; that is the timeframe, not a fault. STALE appears only once the age runs past a whole bar plus half a bar of slack, which means the feed is behind rather than simply mid-bar.</li>
           <li><strong>No combined score.</strong> Averaging direction, exhaustion and structure into one number would hide exactly the disagreement worth seeing &mdash; a BULLISH bias beside a confirmed top is information, not an error.</li>
-          <li><strong>AI use: No.</strong> Every number here comes from the same fixed indicator rules Directional Bias, Local Extremes and Pattern Scanner already run; this page only assembles them.</li>
+          <li><strong>Open interest and multi-timeframe RSI sit beside the three engines, not inside the context strip.</strong> OI says whether perp positions are opening or closing on the horizon matching the card (daily and weekly cards use 24H); RSI shows RSI 14 on each timeframe enabled on the <a href="/rsi-matrix.html">RSI Matrix</a>. Neither changes ALIGNED, MIXED or CONFLICT.</li>
+          <li><strong>AI use: No.</strong> Every number here comes from the same fixed rules Directional Bias, Local Extremes, Pattern Scanner, Crypto Open Interest and the RSI Matrix already run; this page only assembles them.</li>
         </ul>
       </div>
     </details>
@@ -152,6 +153,62 @@
       return rows;
     }
 
+    function fmtPct(value) {
+      if (value == null) return '—';
+      return (value > 0 ? '+' : '') + value.toFixed(2) + '%';
+    }
+
+    function fmtUsd(value) {
+      if (value == null) return '—';
+      if (value >= 1e9) return '$' + (value / 1e9).toFixed(2) + 'B';
+      if (value >= 1e6) return '$' + (value / 1e6).toFixed(1) + 'M';
+      return '$' + Math.round(value).toLocaleString();
+    }
+
+    // Perp positioning on the horizon matching the card, plus the other
+    // horizons as a strip so a 4h build-up inside a 24h unwind is visible.
+    function oiSection(oi) {
+      if (oi.error) return '<div class="tc-muted">' + escapeHtml(oi.error) + '</div>';
+      var state = oi.state || { label: 'Unavailable', tone: 'none' };
+      var stale = oi.freshness && oi.freshness.state !== 'FRESH';
+      return (
+        '<div class="tc-row">' +
+          '<span class="tc-oi tc-oi--' + escapeHtml(state.tone || 'none') + '">' + escapeHtml(state.label) + '</span>' +
+          '<span class="tc-meta">' + escapeHtml(String(oi.horizon || '').toUpperCase()) + ' · OI ' + fmtPct(oi.oiChangePct) + ' · Price ' + fmtPct(oi.priceChangePct) + '</span>' +
+        '</div>' +
+        (state.meaning ? '<div class="tc-row"><span class="tc-meta" style="margin-left:0">' + escapeHtml(state.meaning) + '</span></div>' : '') +
+        '<div class="tc-row tc-oi-strip">' +
+          (oi.horizons || []).map(function (h) {
+            return '<span class="tc-oi-chip tc-oi--' + escapeHtml(h.tone || 'none') + (h.key === oi.horizon ? ' tc-oi-chip--active' : '') +
+              '" title="' + escapeHtml(h.label) + '">' + escapeHtml(String(h.key).toUpperCase()) + ' ' + escapeHtml(h.label) + '</span>';
+          }).join('') +
+        '</div>' +
+        '<div class="tc-row"><span class="tc-meta" style="margin-left:0">' +
+          'OI ' + fmtUsd(oi.oiUsd) + (oi.oiUsdBasis === 'estimated' ? ' (est.)' : '') +
+          (oi.source ? ' · ' + escapeHtml(oi.source) : '') +
+          (oi.spike ? ' · <strong class="tc-oi-spike">OI spike ' + escapeHtml(oi.spike.direction || '') + ' ' + fmtPct(oi.spike.changePct) + '</strong>' : '') +
+          (stale ? ' · <span class="tc-data-reason">' + escapeHtml(oi.freshness.state) + (oi.freshness.reason ? ': ' + escapeHtml(oi.freshness.reason) : '') + '</span>' : '') +
+        '</span></div>'
+      );
+    }
+
+    // RSI 14 on every timeframe the RSI Matrix has enabled. A missing cell
+    // shows its reason on hover rather than a zero.
+    function rsiSection(r) {
+      if (r.error) return '<div class="tc-muted">' + escapeHtml(r.error) + '</div>';
+      var cells = (r.cells || []).map(function (c) {
+        return '<div class="tc-rsi-cell tc-rsi--' + escapeHtml(c.state || 'none') + '"' + (c.error ? ' title="' + escapeHtml(c.error) + '"' : '') + '>' +
+          '<div class="tc-extreme-label">' + escapeHtml(c.label) + '</div>' +
+          '<div class="tc-rsi-value">' + (c.value == null ? '—' : c.value.toFixed(1)) + '</div>' +
+        '</div>';
+      }).join('');
+      var avg = r.average != null
+        ? 'AVG ' + r.average.toFixed(1) + (r.averageState === 'mtf-overbought' ? ' · MTF overbought' : r.averageState === 'mtf-oversold' ? ' · MTF oversold' : '')
+        : 'AVG — (' + (r.averageAvailable || 0) + '/' + (r.averageRequired || 0) + ' timeframes)';
+      return '<div class="tc-rsi">' + cells + '</div>' +
+        '<div class="tc-row" style="margin-top:6px"><span class="tc-meta" style="margin-left:0">' + escapeHtml(avg) + '</span></div>';
+    }
+
     // Age of the data behind the card, not the age of the page load. Without
     // it a cached BULLISH 67 and a live one are indistinguishable, so a stale
     // engine reads as current market context.
@@ -196,6 +253,12 @@
           '<div class="tc-section"><div class="tc-section-label">Directional bias</div>' + biasSection(card.directionalBias) + '</div>' +
           '<div class="tc-section"><div class="tc-section-label">Local extremes</div>' + extremesSection(card.extremes) + '</div>' +
           '<div class="tc-section"><div class="tc-section-label">Pattern scanner</div>' + patternsSection(card.patterns) + '</div>' +
+          (card.openInterest
+            ? '<div class="tc-section"><div class="tc-section-label">Open interest (perps)</div>' + oiSection(card.openInterest) + '</div>'
+            : '') +
+          (card.rsi
+            ? '<div class="tc-section"><div class="tc-section-label">RSI 14 · multi-timeframe</div>' + rsiSection(card.rsi) + '</div>'
+            : '') +
           (card.evidence && card.evidence.length
             ? '<div class="tc-section"><div class="tc-section-label">Evidence</div><ul class="tc-evidence">' +
               card.evidence.map(function (line) { return '<li>' + escapeHtml(line) + '</li>'; }).join('') + '</ul></div>'
