@@ -141,9 +141,10 @@
   // ── scale ────────────────────────────────────────────────
 
   /**
-   * Symmetric scale: the metric's default (±25 for OI change, ±50 for
-   * positioning), widened to the next nice step only when a plotted value
-   * would otherwise sit past the outer ring.
+   * Symmetric scale, fitted to the plotted values: the smallest nice step
+   * that holds the largest move. A fixed ±25 left a −3% or +5% week hugging
+   * the zero ring; fitted, a decrease visibly pulls its point toward the
+   * centre and an increase pushes it toward the outer ring.
    */
   function scaleFor(items) {
     var info = metricInfo();
@@ -152,14 +153,10 @@
       var v = it.row && it.row.normalizedValue;
       if (isNum(v)) max = Math.max(max, Math.abs(v));
     });
-    var steps = [5, 10, 25, 50, 100, 200, 500];
-    // Daily moves are a session's worth: ±1% is a large one. On the weekly
-    // ±25 scale every point would sit on the zero ring, so Daily opens at ±5.
-    var scale = state.timeframe === "D" && state.metric === "OI" ? 5 : info.defaultScale || 25;
-    if (max > scale) {
-      for (var i = 0; i < steps.length; i += 1) { if (steps[i] >= max) { scale = steps[i]; break; } }
-      if (max > scale) scale = Math.ceil(max / 100) * 100;
-    }
+    if (!(max > 0)) return info.defaultScale || 25;
+    var steps = [1, 2, 5, 10, 25, 50, 100, 200, 500];
+    var scale = Math.ceil(max / 100) * 100;
+    for (var i = 0; i < steps.length; i += 1) { if (steps[i] >= max) { scale = steps[i]; break; } }
     if (state.metric === "COT_NET_SPEC") scale = Math.min(scale, 100);
     return scale;
   }
