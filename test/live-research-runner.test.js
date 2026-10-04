@@ -147,6 +147,40 @@ test("a newly closed candle is evaluated once and persists structured intent", a
   assert.ok(status.activity.some((entry) => entry.type === "position-opened"));
 });
 
+test("startup catch-up yields to I/O and bounds shared-cache writes", async () => {
+  const cache = new MemoryStateCache();
+  let writes = 0;
+  const save = cache.set.bind(cache);
+  cache.set = (...args) => { writes += 1; return save(...args); };
+  const start = Date.now() - 300 * 60_000;
+  const allRows = Array.from({ length: 200 }, (_, index) => candle(index, {
+    openTime: start + index * 60_000,
+    closeTime: start + (index + 1) * 60_000 - 1,
+  }));
+  let rows = allRows.slice(0, 100);
+  let evaluations = 0;
+  const subject = runner({
+    cache,
+    source: { async getCandles() { return rows; } },
+    evaluate: () => { evaluations += 1; return signal("FLAT"); },
+  });
+  await startExperiment(subject);
+  writes = 0;
+  rows = allRows;
+  let finished = false;
+  const replay = subject.runOnce().then((result) => { finished = true; return result; });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(finished, false, "I/O must get a turn before the backlog finishes");
+  const result = await replay;
+  assert.equal(result.status, "processed");
+  assert.equal(result.state.counters.candlesProcessed, 100);
+  assert.equal(evaluations, 1, "only the newest close may evaluate entries");
+  assert.ok(writes <= 2, `replayed 100 candles with ${writes} shared-cache rewrites`);
+  assert.equal(subject.status().lastProcessedCandle.closeTime, allRows.at(-1).closeTime);
+  await subject.runOnce();
+  assert.equal(evaluations, 1, "persisted progress prevents replaying entries");
+});
+
 test("restart state prevents duplicate evaluation and duplicate execution", async () => {
   const lab = tempLab();
   const cache = new MemoryStateCache();

@@ -402,6 +402,9 @@ class CandleLiveResearchRunner {
         await this._processCandle(closed, index, candle, state, {
           allowEntry: pendingIndex === pending.length - 1,
         });
+        // Resolved promises alone keep draining microtasks. Give HTTP requests
+        // and timers a turn while all 80 runners replay their startup backlog.
+        await new Promise((resolve) => setImmediate(resolve));
       }
       state.healthStatus = "RUNNING";
       state.lastError = null;
@@ -557,7 +560,9 @@ class CandleLiveResearchRunner {
         activity("catch-up", `Missed ${this.timeframe} candle replayed for position management; entry skipped`, candleAt),
         ...events.map((event) => activity("position-event", `${event.type} on ${this.symbol}`, candleAt, event)),
       ]);
-      this._write(state);
+      // runOnce persists the completed replay (and persists on error). Writing
+      // here rewrote the shared 80-runner cache for every missed minute. The
+      // position ledger still persists each stop/target event independently.
       return;
     }
 
