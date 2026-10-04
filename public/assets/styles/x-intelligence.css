@@ -318,6 +318,7 @@ body[data-x-accent] .x-account-card--all.active { border-color: var(--x-accent);
 
 .x-post-open,
 .x-post-copy,
+.x-post-farmclaw,
 .x-post-broadcast {
   min-height: 30px;
   border-radius: 9px;
@@ -357,9 +358,31 @@ body[data-x-accent] .x-account-card--all.active { border-color: var(--x-accent);
 
 .x-post-copy:focus-visible,
 .x-post-open:focus-visible,
+.x-post-farmclaw:focus-visible,
 .x-post-broadcast:focus-visible {
   outline: 2px solid var(--blue);
   outline-offset: 2px;
+}
+
+/* Secondary send: amber so it reads apart from both Copy link and the green
+   Broadcast primary. */
+.x-post-farmclaw {
+  cursor: pointer;
+  padding: 8px 11px;
+  border-color: rgba(240, 180, 41, 0.42);
+  background: rgba(240, 180, 41, 0.10);
+  color: var(--text);
+}
+
+.x-post-farmclaw:hover:not(:disabled) {
+  border-color: rgba(240, 180, 41, 0.8);
+  background: rgba(240, 180, 41, 0.18);
+}
+
+.x-post-farmclaw:disabled {
+  cursor: wait;
+  color: var(--muted);
+  opacity: 0.82;
 }
 
 /* The primary action on a card: reads as a send, not as another link

@@ -1,4 +1,4 @@
-const { resolveBroadcastChannels } = require("../services/x-broadcast-channels");
+const { resolveBroadcastChannels, fromChatIdEntry } = require("../services/x-broadcast-channels");
 
 const DEFAULT_TRACKED_TOKENS = [
   {
@@ -243,6 +243,12 @@ const config = {
       channelsJson: process.env.X_BROADCAST_CHANNELS || "",
       chatIds: parseList(process.env.TELEGRAM_CHAT_IDS),
     }),
+  },
+  // The FarmClaw button on X Intelligence cards: sends just the post link to
+  // one Telegram chat/topic FarmClaw reads, through TELEGRAM_BOT_TOKEN.
+  // "chatId" or "chatId:threadId"; blank leaves the button reporting why.
+  farmclaw: {
+    target: fromChatIdEntry(process.env.FARMCLAW_TELEGRAM_CHAT || ""),
   },
   newsTelegram: {
     botToken: process.env.NEWS_TELEGRAM_BOT_TOKEN || "",

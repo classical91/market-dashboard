@@ -142,6 +142,7 @@ module.exports = {
   MAX_CHANNELS,
   channelId,
   defaultLabel,
+  fromChatIdEntry,
   parseChannelsJson,
   resolveBroadcastChannels,
   selectTargets,

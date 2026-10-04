@@ -649,6 +649,7 @@ function createApp() {
       // on.
       telegramService,
       broadcastChannels: config.xBroadcast.channels,
+      farmclawTarget: config.farmclaw.target,
     }),
   );
 
