@@ -12,6 +12,14 @@ const TOP_TOKENS = [
   "TONUSDT", "APTUSDT", "UNIUSDT", "TRXUSDT", "SHIBUSDT",
 ];
 
+// The wider top-30 catalog offered by the My Trades search bar, for trades
+// that didn't come from a screener. Kept separate from TOP_TOKENS so adding
+// a pair here doesn't widen what every scanner fetches on each run.
+const TRACKABLE_TOKENS = [
+  ...TOP_TOKENS,
+  "BCHUSDT", "XLMUSDT", "HBARUSDT", "AAVEUSDT", "ETCUSDT",
+];
+
 // Dominance / aggregate market-cap charts. These are synthetic TradingView
 // indices (CRYPTOCAP:*) with no Binance OHLCV data, so they can't go through
 // the Binance-based scanners — they're for the TradingView-driven
@@ -76,6 +84,7 @@ function resolvePresetCategory(category, symbol) {
 
 module.exports = {
   TOP_TOKENS,
+  TRACKABLE_TOKENS,
   DOMINANCE_PRESETS,
   PRESET_CATEGORIES,
   PRESET_CATEGORY_KEYS,

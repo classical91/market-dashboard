@@ -29,13 +29,28 @@
       <span class="ps-updated" id="tc-updated"></span>
     </div>
 
+    <form class="ps-toolbar tc-add" id="tc-add-form" autocomplete="off">
+      <input class="aia-select tc-add-search" type="search" id="tc-add-symbol" list="tc-add-tokens"
+        placeholder="Search top 30 tokens or type any pair…" aria-label="Token to track" required />
+      <datalist id="tc-add-tokens"></datalist>
+      <select class="aia-select" id="tc-add-interval" aria-label="Timeframe">
+        <option value="15m">15m</option>
+        <option value="1h">1h</option>
+        <option value="4h" selected>4h</option>
+        <option value="1D">1D</option>
+        <option value="1W">1W</option>
+      </select>
+      <button class="aia-run-btn" type="submit" id="tc-add-btn">&#9733; Track</button>
+      <span class="ps-updated" id="tc-add-status" role="status"></span>
+    </form>
+
     <div class="tc-grid" id="tc-grid"></div>
 
     <details class="aia-how aia-how--footer" open>
       <summary>&#8505;&#65039; How this page works</summary>
       <div class="aia-how-body">
         <ol class="aia-how-steps">
-          <li><strong>Star a setup in Pattern Scanner.</strong> This page collects those saved symbol/timeframe pairs and reports the full state of each one.</li>
+          <li><strong>Star a setup in Pattern Scanner, or add it here.</strong> This page collects those saved symbol/timeframe pairs and reports the full state of each one. For trades that didn't come from a screener, search the top 30 tokens (or type any Binance USDT pair) above the cards and press Track.</li>
           <li><strong>Read the three engines separately.</strong> Directional bias is the environment, local extremes are where price sits inside it, and the pattern is the structure forming &mdash; they measure different things and are never merged.</li>
           <li><strong>Use the context strip for agreement, not instruction.</strong> ALIGNED, MIXED, CONFLICT, QUIET and PARTIAL describe whether the engines currently point the same way &mdash; PARTIAL means an engine is down and there is too little left to compare. Deciding what to do with any of it is yours.</li>
           <li><strong>Check the DATA line before you trust the card.</strong> It reports how long ago the newest closed candle closed and how long ago each engine last recalculated. A card flagged STALE is showing evidence the feed or the cache has stopped advancing &mdash; the numbers are real, but they are not now.</li>
@@ -327,6 +342,62 @@
           refreshBtn.textContent = 'Refresh';
         });
     }
+
+    // Manual add: for trades that didn't start on a screener. Suggestions
+    // come from the top-30 catalog, but any Binance spot USDT pair is
+    // accepted — "sol", "SOL/USDT" and "BINANCE:SOLUSDT" all mean SOLUSDT.
+    var addForm = document.getElementById('tc-add-form');
+    var addSymbol = document.getElementById('tc-add-symbol');
+    var addInterval = document.getElementById('tc-add-interval');
+    var addBtn = document.getElementById('tc-add-btn');
+    var addStatus = document.getElementById('tc-add-status');
+    var tokenList = document.getElementById('tc-add-tokens');
+
+    function normalizeSymbol(raw) {
+      var s = String(raw || '').trim().toUpperCase().replace(/^[A-Z]+:/, '').replace(/[\s\/\-_]/g, '').replace(/\.P$/, '');
+      if (s && !/USDT$/.test(s)) s += 'USDT';
+      return /^[A-Z0-9]{2,20}USDT$/.test(s) ? s : '';
+    }
+
+    fetch('/api/watchlist/tokens')
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        tokenList.innerHTML = (data.tokens || []).map(function (symbol) {
+          return '<option value="' + escapeHtml(symbol) + '">' + escapeHtml(symbol.replace(/USDT$/, '')) + '</option>';
+        }).join('');
+      })
+      .catch(function () { /* no suggestions; typing a pair still works */ });
+
+    addForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var symbol = normalizeSymbol(addSymbol.value);
+      var interval = addInterval.value;
+      if (!symbol) {
+        addStatus.textContent = 'Enter a token like SOL or a pair like SOLUSDT.';
+        return;
+      }
+      addBtn.disabled = true;
+      addStatus.textContent = 'Adding ' + symbol + ' ' + interval + '…';
+      AdminKey.fetch('/api/watchlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbol: symbol, interval: interval, label: symbol.replace(/USDT$/, '') })
+      })
+        .then(function (res) {
+          if (!res.ok) {
+            return res.json().catch(function () { return {}; }).then(function (body) {
+              throw new Error(body.error || ('HTTP ' + res.status));
+            });
+          }
+          addSymbol.value = '';
+          addStatus.textContent = 'Tracking ' + symbol + ' ' + interval + '.';
+          load();
+        })
+        .catch(function (err) {
+          addStatus.textContent = 'Could not add ' + symbol + ': ' + err.message;
+        })
+        .finally(function () { addBtn.disabled = false; });
+    });
 
     refreshBtn.addEventListener('click', load);
     load();
