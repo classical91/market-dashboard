@@ -27,9 +27,6 @@
 
     <div class="ps-toolbar">
       <button class="aia-run-btn" type="button" id="ps-refresh-btn">Rescan</button>
-      <button class="aia-run-btn" type="button" id="ps-toggle-all-btn">Expand All</button>
-      <a class="aia-run-btn ps-trades-link" href="/pattern-scanner-trades.html">&#9733; My Trades</a>
-      <a class="aia-run-btn ps-trades-link" href="/pattern-scanner-stats.html">&#128202; Track Record</a>
       <span class="ps-updated" id="ps-updated"></span>
     </div>
 
@@ -96,10 +93,7 @@
     var notice = document.getElementById('ps-notice');
     var updatedEl = document.getElementById('ps-updated');
     var refreshBtn = document.getElementById('ps-refresh-btn');
-    var toggleAllBtn = document.getElementById('ps-toggle-all-btn');
-    // Cards start collapsed (header + bias only) so a full scan reads as a
-    // scannable list; expanding one (or all) reveals the chart + metrics.
-    var allExpanded = false;
+    // Cards are always expanded (chart + metrics visible) — no collapse toggle.
     var trackedKeys = {}; // "symbol:interval" -> true, refreshed from /api/watchlist
     var lastResults = [];
 
@@ -146,7 +140,7 @@
       grid.innerHTML = scannedNote +
         hits.map(function (entry, i) {
           return renderCard(entry, i, {
-            collapsed: !allExpanded,
+            expandedOnly: true,
             tracked: !!trackedKeys[trackKey(entry.symbol, entry.interval)],
             pinned: isPinned(entry)
           });
@@ -203,18 +197,7 @@
     grid.addEventListener('click', function (e) {
       if (e.target.closest('[data-role="ticker-link"], .ps-ticker-link')) return;
       var trackBtn = e.target.closest('[data-role="track-btn"]');
-      if (trackBtn) { toggleTrack(trackBtn); return; }
-      var head = e.target.closest('[data-role="head"]');
-      if (!head) return;
-      head.closest('.ps-card').classList.toggle('collapsed');
-    });
-
-    toggleAllBtn.addEventListener('click', function () {
-      allExpanded = !allExpanded;
-      toggleAllBtn.textContent = allExpanded ? 'Collapse All' : 'Expand All';
-      grid.querySelectorAll('.ps-card').forEach(function (card) {
-        card.classList.toggle('collapsed', !allExpanded);
-      });
+      if (trackBtn) toggleTrack(trackBtn);
     });
 
     refreshBtn.addEventListener('click', function () { load(true); });

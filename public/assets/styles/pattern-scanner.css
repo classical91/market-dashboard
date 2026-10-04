@@ -113,6 +113,7 @@
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
+.ps-card--static .ps-card-head { cursor: default; }
 .ps-card.collapsed .ps-card-head { margin-bottom: 0; }
 .ps-card:not(.collapsed) .ps-card-head { margin-bottom: 10px; }
 
