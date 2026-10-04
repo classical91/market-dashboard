@@ -48,6 +48,9 @@
       onBroadcast: function (post, button) {
         window.XBroadcast.bindBroadcastButton(button, post);
       },
+      onFarmclaw: function (post, button) {
+        window.XBroadcast.bindFarmclawButton(button, post);
+      },
     }
     : null;
 

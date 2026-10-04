@@ -477,6 +477,7 @@
      broadcasting simply does not pass it. */
   function renderPostCards(root, posts, emptyText, options) {
     var onBroadcast = options && typeof options.onBroadcast === "function" ? options.onBroadcast : null;
+    var onFarmclaw = options && typeof options.onFarmclaw === "function" ? options.onFarmclaw : null;
     root.innerHTML = "";
     root.classList.toggle("is-empty", !posts.length);
     var grid = document.createElement("div");
@@ -542,6 +543,17 @@
 
       actions.appendChild(openLink);
       actions.appendChild(copyButton);
+
+      // Link-only hand-off to the FarmClaw agent; wired by x-broadcast.js.
+      if (onFarmclaw && post.url) {
+        var farmclawButton = document.createElement("button");
+        farmclawButton.type = "button";
+        farmclawButton.className = "x-post-farmclaw";
+        farmclawButton.textContent = "FarmClaw";
+        farmclawButton.title = "Send this post's link to FarmClaw";
+        onFarmclaw(post, farmclawButton);
+        actions.appendChild(farmclawButton);
+      }
 
       // Last, so the primary action sits at the end of a row that is
       // right-aligned — and after Copy link, which is what it replaces for

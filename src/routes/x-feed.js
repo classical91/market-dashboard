@@ -115,6 +115,7 @@ function createXFeedRouter({
   requireAdmin,
   telegramService = null,
   broadcastChannels = [],
+  farmclawTarget = null,
 }) {
   const router = express.Router();
 
@@ -420,6 +421,34 @@ function createXFeedRouter({
             };
           }),
         });
+      }),
+    );
+  }
+
+  /* Send one post's link to FarmClaw. One fixed destination and the link
+     alone, so there is no picker: the card button is the whole interface.
+     Goes through the same postXPost path as Broadcast, which already
+     refuses an empty target list rather than widening to every chat. */
+  if (requireAdmin) {
+    router.post(
+      "/farmclaw",
+      requireAdmin,
+      asyncRoute(async (req, res) => {
+        const url = typeof req.body?.url === "string" ? req.body.url.trim() : "";
+        if (!/^https?:\/\//i.test(url)) {
+          throw createServiceError("url must be an http(s) link to the post", 400);
+        }
+        if (!farmclawTarget) {
+          throw createServiceError("FarmClaw is not configured (set FARMCLAW_TELEGRAM_CHAT)", 400);
+        }
+        if (!telegramService || !telegramService._botToken) {
+          throw createServiceError("Telegram is not configured (set TELEGRAM_BOT_TOKEN)", 400);
+        }
+        const target = farmclawTarget.threadId
+          ? { chatId: farmclawTarget.chatId, threadId: farmclawTarget.threadId }
+          : { chatId: farmclawTarget.chatId };
+        const result = await telegramService.postXPost({ url }, { targets: [target] });
+        res.json({ ok: true, sent: result.posted });
       }),
     );
   }

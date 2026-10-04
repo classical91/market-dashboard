@@ -74,26 +74,26 @@
     } catch (err) {}
   }
 
-  function readSent(storage) {
+  function readSent(storage, key) {
     try {
-      var parsed = JSON.parse((storage || localStorage).getItem(SENT_KEY) || "null");
+      var parsed = JSON.parse((storage || localStorage).getItem(key || SENT_KEY) || "null");
       return Array.isArray(parsed) ? parsed.filter(function (url) { return typeof url === "string"; }) : [];
     } catch (err) {
       return [];
     }
   }
 
-  function rememberSent(url, storage) {
+  function rememberSent(url, storage, key) {
     if (!url) return;
     try {
-      var sent = readSent(storage).filter(function (entry) { return entry !== url; });
+      var sent = readSent(storage, key).filter(function (entry) { return entry !== url; });
       sent.unshift(url);
-      (storage || localStorage).setItem(SENT_KEY, JSON.stringify(sent.slice(0, MAX_REMEMBERED_SENDS)));
+      (storage || localStorage).setItem(key || SENT_KEY, JSON.stringify(sent.slice(0, MAX_REMEMBERED_SENDS)));
     } catch (err) {}
   }
 
-  function wasSent(url, storage) {
-    return Boolean(url) && readSent(storage).indexOf(url) !== -1;
+  function wasSent(url, storage, key) {
+    return Boolean(url) && readSent(storage, key).indexOf(url) !== -1;
   }
 
   /* What to tell the reader about a completed send. A partial delivery is
@@ -360,8 +360,50 @@
     });
   }
 
+  var FARMCLAW_SENT_KEY = "xIntelligence:farmclawSent:v1";
+  var FARMCLAW_LABELS = {
+    idle: "FarmClaw",
+    busy: "Sending…",
+    sent: "FarmClaw ✓",
+    failure: "FarmClaw failed",
+  };
+
+  /* One tap, one fixed destination, the link alone — so no picker. The
+     server's error is put in the title, because the button label has room
+     for "failed" and not for why. */
+  function bindFarmclawButton(button, post) {
+    var url = post && post.url;
+    var resting = wasSent(url, null, FARMCLAW_SENT_KEY) ? FARMCLAW_LABELS.sent : FARMCLAW_LABELS.idle;
+    button.textContent = resting;
+    button.addEventListener("click", function () {
+      if (button.disabled || !url) return;
+      button.disabled = true;
+      button.textContent = FARMCLAW_LABELS.busy;
+      request("/api/x/farmclaw", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: url }),
+      }).then(
+        function () {
+          rememberSent(url, null, FARMCLAW_SENT_KEY);
+          button.disabled = false;
+          button.textContent = FARMCLAW_LABELS.sent;
+          button.title = "Sent to FarmClaw — tap to send again";
+        },
+        function (err) {
+          button.disabled = false;
+          button.textContent = FARMCLAW_LABELS.failure;
+          button.title = (err && err.message) || "Could not send to FarmClaw";
+        },
+      );
+    });
+  }
+
   return {
     SELECTION_KEY: SELECTION_KEY,
+    FARMCLAW_SENT_KEY: FARMCLAW_SENT_KEY,
+    FARMCLAW_LABELS: FARMCLAW_LABELS,
+    bindFarmclawButton: bindFarmclawButton,
     SENT_KEY: SENT_KEY,
     channelIds: channelIds,
     resolveSelection: resolveSelection,

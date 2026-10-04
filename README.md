@@ -459,6 +459,15 @@ Two behaviours are worth knowing before relying on it:
 
 Sends are not written to the Broadcast Ledger: it is built around news categories, per-category duplicate windows and receipts, and an X post carries none of those. The card remembers which posts this browser has already broadcast and marks them, but that is a convenience, not a guard — a deliberate resend into a second channel is a real thing to want, so the server does not refuse repeats.
 
+
+### Sending a post to FarmClaw
+
+Each post card also carries a **FarmClaw** button. One tap sends that post's `x.com/.../status/...` link — nothing else — to the single Telegram chat or topic FarmClaw reads.
+
+- `FARMCLAW_TELEGRAM_CHAT` - `chatId` or `chatId:threadId`. Sent through `TELEGRAM_BOT_TOKEN`. Blank keeps the button visible but it reports that FarmClaw is not configured.
+
+`POST /api/x/farmclaw` (`{ "url": "https://x.com/..." }`) is admin-gated like the Broadcast endpoints. Note that Telegram does not deliver one bot's group messages to another bot, so if FarmClaw is itself a Telegram bot, point this at a chat where it can see the dashboard bot's posts (for example a DM chat it reads, or a channel it administers).
+
 ### Railway Deployment
 
 Railway reads `railway.toml` (start command, `/api/health` healthcheck) and takes every value above from the service's **Variables** tab — there is no `.env` file in the deployed image. For YouTube Intelligence, set `YOUTUBE_API_KEY` there; optionally add `YOUTUBE_CHANNEL_IDS` so the RSS fallback keeps working if the key is ever removed or exhausted. Railway restarts the service on a variable change, which also clears the in-memory caches. `DATA_DIR` should point at the mounted volume (usually `/app/data`) so resolved channel IDs survive restarts.
