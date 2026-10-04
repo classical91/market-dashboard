@@ -50,3 +50,27 @@ test("persists across service instances against the same data dir", () => {
   assert.equal(second.list().length, 1);
   assert.equal(second.list()[0].symbol, "XRPUSDT");
 });
+
+test("the My Trades search catalog is a top-30 superset of the scanner universe", () => {
+  const { TOP_TOKENS, TRACKABLE_TOKENS } = require("../src/config/market-symbols");
+  assert.equal(TRACKABLE_TOKENS.length, 30);
+  assert.equal(new Set(TRACKABLE_TOKENS).size, 30);
+  for (const symbol of TOP_TOKENS) assert.ok(TRACKABLE_TOKENS.includes(symbol), symbol);
+});
+
+test("GET /api/watchlist/tokens serves the catalog without the admin gate", async () => {
+  const express = require("express");
+  const { createWatchlistRouter } = require("../src/routes/watchlist");
+  const { TRACKABLE_TOKENS } = require("../src/config/market-symbols");
+  const app = express();
+  const denied = (req, res) => res.status(401).end();
+  app.use("/api/watchlist", createWatchlistRouter({ watchlistService: makeService(), requireAdmin: denied }));
+  const server = app.listen(0);
+  try {
+    const res = await fetch(`http://127.0.0.1:${server.address().port}/api/watchlist/tokens`);
+    assert.equal(res.status, 200);
+    assert.deepEqual((await res.json()).tokens, TRACKABLE_TOKENS);
+  } finally {
+    server.close();
+  }
+});

@@ -1,4 +1,5 @@
 const { Router } = require("express");
+const { TRACKABLE_TOKENS } = require("../config/market-symbols");
 
 function createWatchlistRouter({ watchlistService, requireAdmin }) {
   const router = Router();
@@ -6,6 +7,11 @@ function createWatchlistRouter({ watchlistService, requireAdmin }) {
   // Read-only: no admin gate needed, mirrors the other public scanner reads.
   router.get("/", (req, res) => {
     res.json({ items: watchlistService.list() });
+  });
+
+  // The top-30 catalog the My Trades search bar suggests from.
+  router.get("/tokens", (req, res) => {
+    res.json({ tokens: TRACKABLE_TOKENS });
   });
 
   // Mutating — gated like every other state-changing route in this app,

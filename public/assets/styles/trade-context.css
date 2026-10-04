@@ -245,3 +245,7 @@
 .tc-rsi--strong-bearish .tc-rsi-value,
 .tc-rsi--bearish .tc-rsi-value { color: #ff1744; }
 .tc-rsi--none .tc-rsi-value { color: #6f7a91; }
+
+/* Manual add bar — search the top-30 catalog or type any pair. */
+.tc-add { flex-wrap: wrap; }
+.tc-add-search { flex: 1 1 240px; min-width: 0; max-width: 360px; }
