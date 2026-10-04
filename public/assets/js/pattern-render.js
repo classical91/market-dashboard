@@ -65,7 +65,8 @@
     );
   }
 
-  // `opts.collapsed` sets the initial collapsed state; `opts.tracked` shows
+  // `opts.collapsed` sets the initial collapsed state; `opts.expandedOnly`
+  // renders a permanently open card with no chevron; `opts.tracked` shows
   // the star as filled; `opts.pinned` marks a card the caller sorted to the
   // top (BTC on the scanner). `index` keys the canvas back to its entry for
   // drawChart — pass -1 for entries with no chart (errors).
@@ -89,7 +90,7 @@
       "</button>"
     );
     return (
-      '<div class="ps-card' + (opts.collapsed ? " collapsed" : "") + '">' +
+      '<div class="ps-card' + (opts.collapsed ? " collapsed" : "") + (opts.expandedOnly ? " ps-card--static" : "") + '">' +
         '<div class="ps-card-head" data-role="head">' +
           '<div class="ps-card-symbol">' + tickerLink(entry) + '<span class="ps-tf">' + escapeHtml(entry.interval) + "</span>" +
             (opts.pinned ? '<span class="ps-pin" title="Pinned to the top of the scan">&#128204; PINNED</span>' : "") +
@@ -97,7 +98,7 @@
           '<div class="ps-card-actions">' +
             trackBtn +
             '<span class="' + biasClass(bias) + '">' + escapeHtml(bias) + "</span>" +
-            '<span class="ps-chevron" aria-hidden="true">&#9660;</span>' +
+            (opts.expandedOnly ? "" : '<span class="ps-chevron" aria-hidden="true">&#9660;</span>') +
           "</div>" +
         "</div>" +
         '<div class="ps-card-content" data-role="content">' +
