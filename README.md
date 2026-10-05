@@ -37,6 +37,7 @@ The app is intentionally lightweight: no bundler, no frontend framework, and no 
 - `/api/broadcast-ledger/preflight` - answers the environment, persistence and routing half of [docs/production-verification.md](docs/production-verification.md) from inside the running service. Sends nothing, echoes no secret. `node scripts/verify-broadcast-ledger.js --url <host> --key <key>` runs it plus the read-only endpoint checks and prints a verdict.
 - `/api/broadcast-ledger/broadcast` - sends a broadcast to Telegram **and** records the receipt in one call, from the real send result. Telegram never reports a bot's own messages back through `getUpdates`, so anything sent through this bot cannot be picked up by the channel watch and must go through here.
 - `/api/broadcast-ledger/manual` - operational Broadcast Ledger with date/category/status filters, search, daily summaries, destination labels, attempt history, edit/delete, copy, and failed retry. **Ledger Settings** controls exact categories, per-category limits and duplicate windows, blocked-attempt recording, retention, sources, and destination names. See [docs/broadcast-ledger.md](docs/broadcast-ledger.md).
+- `/api/reporter-news` - canonical Reporter news log: ShareBot/FarmClaw log each verified item through `POST /intake` (deduplicated on canonical URL), then approval, FarmBot queueing and publication receipts are patched onto the same record. Shown as **Daily News Log** in the Reporter Room, grouped by America/Vancouver day. See [docs/reporter-news-log.md](docs/reporter-news-log.md).
 
 ## Setup
 
@@ -92,6 +93,7 @@ When `MARKET_DASHBOARD_LOGIN_PASSWORD` is set, site auth runs ahead of every rou
 - `GET /api/health` — the minimal deploy probe.
 - `GET /api/decision` — read-only market decision data, polled by the TraderClaw agent, which authenticates no session cookie. This is the exact path only: `/api/decision/journal` and every mutating journal route still require the owner session (and, for writes, `ADMIN_API_KEY`).
 - `/api/broadcast-ledger*` — machine callers that present `BROADCAST_LEDGER_API_KEY` or `ADMIN_API_KEY`; the ledger routes still enforce that key themselves. See [docs/broadcast-ledger.md](docs/broadcast-ledger.md).
+- `/api/reporter-news*` — same machine-caller bypass and key as the broadcast ledger; writes still require the key. See [docs/reporter-news-log.md](docs/reporter-news-log.md).
 - `GET /api/market-session` — which trading session is open right now, read by Main Hub's Daily Dashboard from its server with no cookie to present. Clock arithmetic over published session hours: no account data, no market data, no credential, and the overview chip already computes the same answer in every visitor's browser. The exact path only, read methods only.
 
 Everything else — including all Trading Lab paper-trade and mutation endpoints, settings, and the rest of `/api/decision/*` — needs a session. The Alpha Team role additionally reaches only the shared `?view=alpha` pages (Directional Bias, Local Extremes, Pattern Scanner) and their read-only data APIs; every write on those APIs, including starring a pair into My Trades, still answers `403` for that role.
@@ -522,6 +524,7 @@ market-dashboard/
         trade-intent.js   raw strategy intent, with risk fields refused
         intent-handler.js one boundary: gated entries, ungated exits
     services/broadcast-ledger.js  broadcast receipts: dedupe, idempotency, reconciliation
+    services/reporter-news-log.js  reporter news log: canonical-URL dedupe, workflow states, daily view
     services/broadcast-ingest.js  watches Telegram channels and auto-records what it sees
     middleware/ledger-auth.js     ledger API key guard (separate secret from ADMIN_API_KEY)
     middleware/rate-limit.js      in-process per-IP fixed-window limiter
@@ -529,6 +532,7 @@ market-dashboard/
   docs/
     trading-lab.md        migration map and remaining work
     broadcast-ledger.md   receipt ledger: data model, endpoints, integrations
+    reporter-news-log.md  reporter news log: intake contract, workflow, FarmBot linkage
   scripts/
     lint.js
     build-check.js
