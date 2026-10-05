@@ -199,6 +199,44 @@
   text-align: center;
 }
 
+/* Analysis Trader (GPT) hand-off: a footer action row, kept below the
+   context strip so it reads as "do something with this card", not data. */
+.tc-gpt {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid rgba(42, 42, 74, 0.7);
+}
+
+.tc-gpt-send,
+.tc-gpt-copy,
+.tc-gpt-link {
+  min-height: 28px;
+  border: 1px solid rgba(16, 163, 127, 0.4);
+  border-radius: 6px;
+  padding: 4px 10px;
+  background: rgba(16, 163, 127, 0.1);
+  color: #5fd4b0;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+}
+.tc-gpt-copy,
+.tc-gpt-link { border-color: rgba(137, 146, 166, 0.35); background: transparent; color: #a8b6cf; }
+.tc-gpt-link { margin-left: auto; }
+.tc-gpt-send:hover { background: rgba(16, 163, 127, 0.2); }
+.tc-gpt-copy:hover,
+.tc-gpt-link:hover { background: rgba(137, 146, 166, 0.12); }
+.tc-gpt-send:focus-visible,
+.tc-gpt-copy:focus-visible,
+.tc-gpt-link:focus-visible { outline: 2px solid #5fd4b0; outline-offset: 2px; }
+
 @media (max-width: 720px) {
   .tc-grid { grid-template-columns: 1fr; gap: 12px; }
   /* The price and the freshness badge share the wrapped row rather than each
