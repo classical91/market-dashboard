@@ -69,3 +69,46 @@ test("freshness is styled as a qualifier, not as a fourth engine section", () =>
   assert.match(css, /\.tc-head\s*\{[^}]*flex-wrap:\s*wrap/s);
   assert.match(css, /\.tc-head > \*\s*\{\s*white-space:\s*nowrap/);
 });
+
+test("each card offers the Analysis Trader (GPT) hand-off", () => {
+  assert.match(page, /<script src="\/assets\/js\/trade-gpt\.js"><\/script>/);
+  assert.match(page, /gptActions\(card, index\)/);
+  assert.match(page, /data-role="gpt-send"/);
+  assert.match(page, /data-role="gpt-copy"/);
+  assert.match(css, /\.tc-gpt\s*\{/);
+});
+
+test("the GPT brief carries the card's data and prefills the custom GPT", () => {
+  const TradeGpt = require("../public/assets/js/trade-gpt.js");
+  assert.strictEqual(TradeGpt.GPT_URL, "https://chatgpt.com/g/g-6a3806b123748191b5bfa7c394c5dd66-analysis-trader");
+  const brief = TradeGpt.buildBrief({
+    symbol: "SOLUSDT",
+    interval: "4h",
+    price: 142.5,
+    freshness: { state: "FRESH", summary: "candle closed 12m ago" },
+    directionalBias: { bias: "BULLISH", score: 67, trendRegime: "TREND_UP", rsi: 58.2, adx: 24 },
+    extremes: { bottomScore: 15, topScore: 40, state: "NONE" },
+    patterns: { pattern: "Bull flag", patternBias: "bullish", status: "forming", patternScore: 72 },
+    openInterest: { horizon: "4h", state: { label: "Longs opening" }, oiChangePct: 3.1, priceChangePct: 1.2 },
+    rsi: { cells: [{ label: "1h", value: 61.2 }], average: 61.2 },
+    evidence: ["Higher lows on 4h"],
+    context: { state: "ALIGNED", summary: "Bias and pattern agree" },
+  });
+  for (const fragment of ["SOLUSDT", "4h", "BULLISH (score 67/100)", "Bull flag", "Longs opening", "1h 61.2", "Higher lows on 4h", "ALIGNED"]) {
+    assert.ok(brief.includes(fragment), `brief should include ${fragment}`);
+  }
+  const url = TradeGpt.gptUrl(brief);
+  assert.ok(url.startsWith(TradeGpt.GPT_URL + "?q="));
+  assert.strictEqual(decodeURIComponent(url.slice(url.indexOf("?q=") + 3)), brief);
+  // Too long for a URL: open the GPT plain and rely on the clipboard.
+  assert.strictEqual(TradeGpt.gptUrl("x".repeat(TradeGpt.MAX_PREFILL_CHARS + 1)), TradeGpt.GPT_URL);
+});
+
+test("a card with failed engines still produces a brief rather than throwing", () => {
+  const TradeGpt = require("../public/assets/js/trade-gpt.js");
+  const brief = TradeGpt.buildBrief({
+    symbol: "BTCUSDT", interval: "1D",
+    directionalBias: { error: "bias engine down" }, extremes: { error: "x" }, patterns: { error: "y" },
+  });
+  assert.match(brief, /unavailable: bias engine down/);
+});
