@@ -74,7 +74,10 @@ test("each card offers the Analysis Trader (GPT) hand-off", () => {
   assert.match(page, /<script src="\/assets\/js\/trade-gpt\.js"><\/script>/);
   assert.match(page, /gptActions\(card, index\)/);
   assert.match(page, /data-role="gpt-send"/);
-  assert.match(page, /data-role="gpt-copy"/);
+  assert.doesNotMatch(page, /data-role="gpt-copy"/);
+  // Each card links its own token's CoinGlass Super Chart.
+  assert.match(page, /'https:\/\/www\.coinglass\.com\/tv\/Binance_' \+ encodeURIComponent\(symbol\)/);
+  assert.match(page, /superChartLink\(card\.symbol\)/);
   assert.match(css, /\.tc-gpt\s*\{/);
 });
 
