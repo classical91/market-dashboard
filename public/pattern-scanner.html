@@ -27,8 +27,11 @@
 
     <div class="ps-toolbar">
       <button class="aia-run-btn" type="button" id="ps-refresh-btn">Rescan</button>
+      <button class="aia-run-btn" type="button" id="ps-toggle-all-btn">Collapse All</button>
       <span class="ps-updated" id="ps-updated"></span>
     </div>
+
+    <div class="ps-summary-strip" id="ps-summary" style="display:none"></div>
 
     <div class="ps-grid" id="ps-grid"></div>
 
@@ -93,7 +96,11 @@
     var notice = document.getElementById('ps-notice');
     var updatedEl = document.getElementById('ps-updated');
     var refreshBtn = document.getElementById('ps-refresh-btn');
-    // Cards are always expanded (chart + metrics visible) — no collapse toggle.
+    var toggleAllBtn = document.getElementById('ps-toggle-all-btn');
+    var summary = document.getElementById('ps-summary');
+    // Cards start expanded (chart + metrics visible); Collapse All shrinks the
+    // scan to header + bias rows, and the choice survives a rescan.
+    var allExpanded = true;
     var trackedKeys = {}; // "symbol:interval" -> true, refreshed from /api/watchlist
     var lastResults = [];
 
@@ -136,11 +143,12 @@
         var scoreB = (b.pattern && b.pattern.score) || 0;
         return scoreB - scoreA;
       });
+      renderSummary(hits);
       var scannedNote = '<div class="ps-empty">Scanned ' + results.length + ' token/timeframe combos &mdash; ' + hits.length + ' with a pattern or divergence.</div>';
       grid.innerHTML = scannedNote +
         hits.map(function (entry, i) {
           return renderCard(entry, i, {
-            expandedOnly: true,
+            collapsed: !allExpanded,
             tracked: !!trackedKeys[trackKey(entry.symbol, entry.interval)],
             pinned: isPinned(entry)
           });
@@ -150,6 +158,26 @@
         var entry = hits[Number(canvas.getAttribute('data-chart-index'))];
         if (entry && entry.chart) drawChart(canvas, entry.chart);
       });
+    }
+
+    // Same read as the Directional Bias strip: how many hits lean each way and
+    // which side has the majority.
+    function biasOf(entry) {
+      return (entry.pattern && entry.pattern.bias) || (entry.divergence && entry.divergence.bias) || '';
+    }
+
+    function renderSummary(hits) {
+      var bullish = hits.filter(function (e) { return biasOf(e) === 'bullish'; }).length;
+      var bearish = hits.filter(function (e) { return biasOf(e) === 'bearish'; }).length;
+      var other = hits.length - bullish - bearish;
+      var lean = bullish > bearish ? 'RISK ON' : bearish > bullish ? 'RISK OFF' : 'BALANCED';
+      var leanClass = bullish > bearish ? 'ps-summary-lean--on' : bearish > bullish ? 'ps-summary-lean--off' : 'ps-summary-lean--neutral';
+      summary.style.display = hits.length ? '' : 'none';
+      summary.innerHTML =
+        '<span class="ps-summary-bull">&#9650; ' + bullish + ' bullish</span>' +
+        '<span class="ps-summary-bear">&#9660; ' + bearish + ' bearish</span>' +
+        (other ? '<span>' + other + ' neutral</span>' : '') +
+        '<span class="' + leanClass + '">' + lean + '</span>';
     }
 
     function toggleTrack(btn) {
@@ -197,7 +225,18 @@
     grid.addEventListener('click', function (e) {
       if (e.target.closest('[data-role="ticker-link"], .ps-ticker-link')) return;
       var trackBtn = e.target.closest('[data-role="track-btn"]');
-      if (trackBtn) toggleTrack(trackBtn);
+      if (trackBtn) { toggleTrack(trackBtn); return; }
+      var head = e.target.closest('[data-role="head"]');
+      if (!head) return;
+      head.closest('.ps-card').classList.toggle('collapsed');
+    });
+
+    toggleAllBtn.addEventListener('click', function () {
+      allExpanded = !allExpanded;
+      toggleAllBtn.textContent = allExpanded ? 'Collapse All' : 'Expand All';
+      grid.querySelectorAll('.ps-card').forEach(function (card) {
+        card.classList.toggle('collapsed', !allExpanded);
+      });
     });
 
     refreshBtn.addEventListener('click', function () { load(true); });

@@ -113,7 +113,6 @@
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
-.ps-card--static .ps-card-head { cursor: default; }
 .ps-card.collapsed .ps-card-head { margin-bottom: 0; }
 .ps-card:not(.collapsed) .ps-card-head { margin-bottom: 10px; }
 
@@ -288,3 +287,25 @@
   padding-top: 0;
   border-top: 0;
 }
+
+/* Bullish vs bearish count over the scan's hits — mirrors the Directional
+   Bias summary strip. */
+.ps-summary-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #c9d4e8;
+  background: #1a1a3e;
+  border: 1px solid rgba(74, 74, 170, 0.3);
+  border-radius: var(--radius);
+  padding: 10px 16px;
+  margin-bottom: 16px;
+}
+.ps-summary-bull { color: #45d6b5; }
+.ps-summary-bear { color: #ff8b7b; }
+.ps-summary-lean--on { color: #00e676; }
+.ps-summary-lean--off { color: #ff1744; }
+.ps-summary-lean--neutral { color: #9e9e9e; }
