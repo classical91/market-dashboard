@@ -135,8 +135,12 @@ function isAlphaReadApi(req) {
 // exactly the silent failure the ledger exists to prevent. The routes still
 // enforce their own key; this only stops site auth from short-circuiting
 // them first.
+// The reporter news log's intake is called by the same machine callers with
+// the same key, so it shares the bypass.
+const LEDGER_API_PREFIXES = ["/api/broadcast-ledger", "/api/reporter-news"];
+
 function isLedgerApiPath(req) {
-  return req.path === "/api/broadcast-ledger" || req.path.startsWith("/api/broadcast-ledger/");
+  return LEDGER_API_PREFIXES.some((prefix) => req.path === prefix || req.path.startsWith(`${prefix}/`));
 }
 
 // The manual receipt form is opened in a phone browser, which can't set a

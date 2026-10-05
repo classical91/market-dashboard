@@ -59,3 +59,9 @@ When operating as OpenClaw agent `newsreporter`, focus on the reporter workflow:
 - After posting, patch the receipt with one result per destination.
 - On startup or gateway reconnect, call `POST /reconcile` with `{ "windowMs": 172800000 }`. Reconciled items are complete; only outstanding items remain actionable.
 - Never infer failure from a missing gateway acknowledgment. Ask the ledger; a posted receipt outranks an absent acknowledgment.
+
+### Reporter news log contract
+
+- After verifying a news item, log it with `POST /api/reporter-news/intake` (same host and `x-broadcast-key`). Keep the returned `id`; a repeat intake of the same canonical URL returns the same record with `deduplicated: true`.
+- Logging is not approval. Record approval, FarmBot queueing (`farmbot.queueId`), and publication (`farmbot.publication` receipt) with `PATCH /api/reporter-news/:id`. Never mark `posted` from a helper response alone.
+- Network/TLS failures go to `failed` with the exact `error`; never record them as `queued`. See `docs/reporter-news-log.md`.

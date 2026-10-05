@@ -269,6 +269,53 @@
         </div>
       </section>
 
+      <!-- Daily News Log: the canonical record of every verified candidate
+           ShareBot/FarmClaw logged, grouped by America/Vancouver day. Logged
+           is not approved, queued or posted — the status column says which. -->
+      <section class="intel-section intel-section--static" id="news-log" aria-label="Daily news log" data-intel-accent="blue">
+        <div class="intel-section-header intel-section-header--static">
+          <span>
+            <span class="intel-section-title">📒 Daily News Log</span>
+            <span class="intel-section-sub">Every verified candidate and where it is in the workflow</span>
+          </span>
+          <span class="intel-section-note" id="newsLogTz">America/Vancouver</span>
+        </div>
+        <div class="intel-section-body">
+          <div class="news-log" id="newsLog">
+            <form class="news-log-filters" id="newsLogFilters" aria-label="News log filters">
+              <label>Day <input type="date" name="date" id="newsLogDate" /></label>
+              <label>Market
+                <select name="market">
+                  <option value="">All</option>
+                  <option value="stocks">Stocks</option>
+                  <option value="crypto">Crypto</option>
+                  <option value="economics">Economics</option>
+                  <option value="geopolitics">Geopolitics</option>
+                  <option value="general">General</option>
+                </select>
+              </label>
+              <label>Source <select name="source" id="newsLogSource"><option value="">All</option></select></label>
+              <label>Symbol <select name="symbol" id="newsLogSymbol"><option value="">All</option></select></label>
+              <label>State
+                <select name="status">
+                  <option value="">All</option>
+                  <option value="discovered">Discovered</option>
+                  <option value="verified">Verified</option>
+                  <option value="approved">Approved</option>
+                  <option value="queued">Queued</option>
+                  <option value="posted">Posted</option>
+                  <option value="rejected">Rejected</option>
+                  <option value="failed">Failed</option>
+                </select>
+              </label>
+              <button type="button" class="news-log-refresh" id="newsLogRefresh">Refresh</button>
+            </form>
+            <div class="news-log-counts" id="newsLogCounts" aria-live="polite"></div>
+            <div class="news-log-list" id="newsLogList" aria-live="polite"></div>
+          </div>
+        </div>
+      </section>
+
       <section class="intel-section" aria-label="Global context" data-intel-section="global-context"
                data-intel-accent="blue" data-intel-collapsed="true">
         <button class="intel-section-header" type="button" aria-expanded="false">
@@ -336,6 +383,7 @@
 <script src="/assets/js/reporter-widgets.js"></script>
 <script src="/assets/js/tools.js"></script>
 <script src="/assets/js/reporter-market.js"></script>
+<script src="/assets/js/reporter-news-log.js"></script>
 <script>
   /* ── Reporter ───────────────────────────────────────────── */
   (function () {

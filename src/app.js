@@ -46,6 +46,7 @@ const { createOverviewRouter } = require("./routes/overview");
 const { createMarketSessionRouter } = require("./routes/market-session");
 const { createBroadcastLedgerRouter } = require("./routes/broadcast-ledger");
 const { createReporterRouter } = require("./routes/reporter");
+const { createReporterNewsLogRouter } = require("./routes/reporter-news-log");
 const { createNewsroomRouter } = require("./routes/newsroom");
 const { createTelegramRouter } = require("./routes/telegram");
 const { createYoutubeRouter } = require("./routes/youtube");
@@ -100,6 +101,7 @@ const { BroadcastIngestService } = require("./services/broadcast-ingest");
 const { BroadcastLedgerStore } = require("./services/broadcast-ledger");
 const { BroadcastLedgerNotificationService } = require("./services/broadcast-ledger-notifications");
 const { ReporterService } = require("./services/reporter");
+const { ReporterNewsLogStore } = require("./services/reporter-news-log");
 const { NewsroomCycleStore } = require("./services/newsroom-cycles");
 const { NewsroomService } = require("./services/newsroom");
 const { createAgentRoutePreflight } = require("./services/newsroom-agent-preflight");
@@ -155,6 +157,10 @@ function createApp() {
   // here rather than behind the OpenClaw gateway precisely so it stays
   // readable when that gateway is down.
   const broadcastLedgerStore = new BroadcastLedgerStore({ dataDir });
+  // Canonical log of every verified news candidate and what became of it
+  // (approved, FarmBot-queued, posted). Separate from the broadcast ledger:
+  // logging an item here never implies it was sent.
+  const reporterNewsLogStore = new ReporterNewsLogStore({ dataDir });
   // Watches the same channels the bot posts to and records what it sees, so a
   // story reaches the ledger even when the path that sent it never reported.
   // Constructed always, started only by server.js, and a no-op that logs when
@@ -611,6 +617,14 @@ function createApp() {
       requireLedgerKey,
       ledgerKey: config.broadcastLedger.apiKey,
       adminKey: config.admin.apiKey,
+      rateLimitPerMinute: config.broadcastLedger.rateLimitPerMinute,
+    }),
+  );
+  app.use(
+    "/api/reporter-news",
+    createReporterNewsLogRouter({
+      newsLogStore: reporterNewsLogStore,
+      requireLedgerKey,
       rateLimitPerMinute: config.broadcastLedger.rateLimitPerMinute,
     }),
   );
