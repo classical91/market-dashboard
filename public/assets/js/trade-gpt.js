@@ -166,17 +166,10 @@
     if (button) {
       copied.then(function (ok) {
         flash(button, ok ? "Copied ✓ · opened GPT" : "Opened GPT",
-          ok ? "Card copied — paste into Analysis Trader if the message isn't prefilled" : "Copy failed — use Copy to try again");
+          ok ? "Card copied — paste into Analysis Trader if the message isn't prefilled" : "Copy failed — select the card text manually");
       });
     }
     return copied;
-  }
-
-  function copyOnly(card, button) {
-    return copyText(buildBrief(card)).then(function (ok) {
-      if (button) flash(button, ok ? "Copied ✓" : "Copy failed");
-      return ok;
-    });
   }
 
   var api = {
@@ -186,7 +179,6 @@
     buildBrief: buildBrief,
     gptUrl: gptUrl,
     sendToGpt: sendToGpt,
-    copyOnly: copyOnly,
   };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   root.TradeGpt = api;

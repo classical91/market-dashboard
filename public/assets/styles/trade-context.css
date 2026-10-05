@@ -211,8 +211,7 @@
 }
 
 .tc-gpt-send,
-.tc-gpt-copy,
-.tc-gpt-link {
+.tc-superchart {
   min-height: 28px;
   border: 1px solid rgba(16, 163, 127, 0.4);
   border-radius: 6px;
@@ -227,15 +226,11 @@
   display: inline-flex;
   align-items: center;
 }
-.tc-gpt-copy,
-.tc-gpt-link { border-color: rgba(137, 146, 166, 0.35); background: transparent; color: #a8b6cf; }
-.tc-gpt-link { margin-left: auto; }
+.tc-superchart { margin-left: auto; border-color: rgba(137, 146, 166, 0.35); background: transparent; color: #a8b6cf; }
 .tc-gpt-send:hover { background: rgba(16, 163, 127, 0.2); }
-.tc-gpt-copy:hover,
-.tc-gpt-link:hover { background: rgba(137, 146, 166, 0.12); }
+.tc-superchart:hover { background: rgba(137, 146, 166, 0.12); }
 .tc-gpt-send:focus-visible,
-.tc-gpt-copy:focus-visible,
-.tc-gpt-link:focus-visible { outline: 2px solid #5fd4b0; outline-offset: 2px; }
+.tc-superchart:focus-visible { outline: 2px solid #5fd4b0; outline-offset: 2px; }
 
 @media (max-width: 720px) {
   .tc-grid { grid-template-columns: 1fr; gap: 12px; }

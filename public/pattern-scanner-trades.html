@@ -53,7 +53,7 @@
           <li><strong>Star a setup in Pattern Scanner, or add it here.</strong> This page collects those saved symbol/timeframe pairs and reports the full state of each one. For trades that didn't come from a screener, search the top 30 tokens (or type any Binance USDT pair) above the cards and press Track.</li>
           <li><strong>Read the three engines separately.</strong> Directional bias is the environment, local extremes are where price sits inside it, and the pattern is the structure forming &mdash; they measure different things and are never merged.</li>
           <li><strong>Use the context strip for agreement, not instruction.</strong> ALIGNED, MIXED, CONFLICT, QUIET and PARTIAL describe whether the engines currently point the same way &mdash; PARTIAL means an engine is down and there is too little left to compare. Deciding what to do with any of it is yours.</li>
-          <li><strong>Hand a card to Analysis Trader (GPT).</strong> The &#129302; button at the foot of each card copies that card's bias, extremes, patterns, OI, RSI, evidence and data age as text, then opens the Analysis Trader custom GPT with it prefilled. If ChatGPT opens with an empty box, just paste &mdash; it's already on your clipboard. Copy does the copy alone.</li>
+          <li><strong>Hand a card to Analysis Trader (GPT).</strong> The &#129302; button at the foot of each card copies that card's bias, extremes, patterns, OI, RSI, evidence and data age as text, then opens the Analysis Trader custom GPT with it prefilled. If ChatGPT opens with an empty box, just paste &mdash; it's already on your clipboard. CoinGlass Super Chart opens that token's Binance perp chart on CoinGlass.</li>
           <li><strong>Check the DATA line before you trust the card.</strong> It reports how long ago the newest closed candle closed and how long ago each engine last recalculated. A card flagged STALE is showing evidence the feed or the cache has stopped advancing &mdash; the numbers are real, but they are not now.</li>
           <li><strong>Unstar to remove it.</strong> This is a research watchlist; it does not place, manage, or close trades.</li>
         </ol>
@@ -301,10 +301,17 @@
         '<div class="tc-gpt">' +
           '<button class="tc-gpt-send" type="button" data-role="gpt-send" data-card-index="' + index + '" title="Copy this card and open ' +
             escapeHtml(TradeGpt.GPT_NAME) + ' with it prefilled" aria-label="' + label + '">&#129302; ' + escapeHtml(TradeGpt.GPT_NAME) + '</button>' +
-          '<button class="tc-gpt-copy" type="button" data-role="gpt-copy" data-card-index="' + index + '" title="Copy this card as text for the GPT">Copy</button>' +
-          '<a class="tc-gpt-link" href="' + TradeGpt.GPT_URL + '" target="_blank" rel="noopener" title="Open ' + escapeHtml(TradeGpt.GPT_NAME) + ' without card data">Open GPT &#8599;</a>' +
+          superChartLink(card.symbol) +
         '</div>'
       );
+    }
+
+    // CoinGlass Super Chart for the card's token: Binance perp, same pair.
+    function superChartLink(symbol) {
+      var url = 'https://www.coinglass.com/tv/Binance_' + encodeURIComponent(symbol);
+      var label = 'Open ' + escapeHtml(symbol) + ' on CoinGlass Super Chart';
+      return '<a class="tc-superchart" href="' + url + '" target="_blank" rel="noopener" title="' + label + '" aria-label="' + label + '">' +
+        '&#128202; CoinGlass Super Chart &#8599;</a>';
     }
 
     var currentCards = [];
@@ -336,12 +343,11 @@
     grid.addEventListener('click', function (e) {
       var btn = e.target.closest('[data-role="untrack"]');
       if (btn) { untrack(btn); return; }
-      var gpt = e.target.closest('[data-role="gpt-send"], [data-role="gpt-copy"]');
+      var gpt = e.target.closest('[data-role="gpt-send"]');
       if (!gpt) return;
       var card = currentCards[Number(gpt.getAttribute('data-card-index'))];
       if (!card) return;
-      if (gpt.getAttribute('data-role') === 'gpt-send') TradeGpt.sendToGpt(card, gpt);
-      else TradeGpt.copyOnly(card, gpt);
+      TradeGpt.sendToGpt(card, gpt);
     });
 
     function load() {
