@@ -42,16 +42,18 @@ const VERIFICATION_STATUSES = ["unverified", "verified", "disputed"];
 const APPROVAL_STATUSES = ["pending", "approved", "rejected"];
 
 // Allowed workflow moves. Re-sending the current status is always accepted
-// (idempotent retries); anything not listed here is a 409.
+// (idempotent retries); anything not listed here is a 409. `failed` has no
+// fixed row: a failure remembers the stage it failed at (`failedFrom`) and may
+// only resume from that stage — see allowedTransitions().
 const TRANSITIONS = {
   discovered: ["verified", "rejected", "failed"],
   verified: ["approved", "rejected", "failed"],
   approved: ["queued", "rejected", "failed"],
   queued: ["posted", "failed"],
-  failed: ["approved", "queued", "rejected"],
   posted: [],
   rejected: [],
 };
+const FAILABLE_STATUSES = ["discovered", "verified", "approved", "queued"];
 
 const MAX_TITLE_LEN = 300;
 const MAX_URL_LEN = 2000;
@@ -175,6 +177,40 @@ function hasPublicationProof(farmbot) {
   return Boolean(pub && (pub.receiptId || pub.postId || pub.url));
 }
 
+/**
+ * The stage a failed record failed at. Records written before `failedFrom`
+ * existed fall back to what their approval field proves: approved if it was
+ * ever approved, otherwise verified — never further than the evidence goes.
+ */
+function failedStage(record) {
+  if (FAILABLE_STATUSES.includes(record.failedFrom)) return record.failedFrom;
+  return record.approval === "approved" ? "approved" : "verified";
+}
+
+/**
+ * Where a record may move next. A failed record resumes only at the stage it
+ * failed from, or that stage's own next step — so a failure can never be used
+ * to skip verification or approval (discovered → failed → queued is refused).
+ */
+function allowedTransitions(record) {
+  if (record.status !== "failed") return TRANSITIONS[record.status] || [];
+  const stage = failedStage(record);
+  return [stage, ...TRANSITIONS[stage].filter((status) => status !== "failed")];
+}
+
+/**
+ * Evidence each status must carry for as long as the record holds it — not
+ * only at the moment of transition, so a later metadata PATCH cannot erase it.
+ */
+function evidenceError(status, farmbot, error) {
+  if (status === "queued" && !farmbot?.queueId) return "Queued requires farmbot.queueId.";
+  if (status === "posted" && !hasPublicationProof(farmbot)) {
+    return "Posted requires farmbot.publication with a receiptId, postId or url.";
+  }
+  if (status === "failed" && !error) return "Failed requires the exact error.";
+  return null;
+}
+
 class ReporterNewsLogStore {
   constructor({ dataDir, logger = console, cap = DEFAULT_CAP, timeZone = DEFAULT_TIMEZONE } = {}) {
     this._dataDir = dataDir;
@@ -223,7 +259,9 @@ class ReporterNewsLogStore {
   /** The dedupe identity: canonical URL first, then source + sourceId. */
   static dedupeKey({ canonicalUrl, source, sourceId }) {
     if (canonicalUrl) return `url:${canonicalUrl}`;
-    if (sourceId) return `src:${(source || "").toLowerCase()}:${sourceId}`;
+    // Without a URL, an ID only identifies a story within its source: two
+    // providers can both have item "123", so both halves are required.
+    if (source && sourceId) return `src:${source.toLowerCase()}:${sourceId}`;
     return null;
   }
 
@@ -233,11 +271,11 @@ class ReporterNewsLogStore {
    * source ID updates the existing record — filling blanks, refreshing the
    * summary — and never moves its workflow status backwards.
    */
-  intake(input = {}) {
-    return this._withLock(() => this._intake(input));
+  intake(input = {}, { actor = "system" } = {}) {
+    return this._withLock(() => this._intake(input, { actor }));
   }
 
-  _intake(input) {
+  _intake(input, { actor }) {
     const headline = clampString(input.headline || input.title, MAX_TITLE_LEN);
     const url = normalizeUrl(input.url || input.canonicalUrl);
     const canonicalUrl = canonicalizeUrl(input.canonicalUrl || input.url);
@@ -246,7 +284,7 @@ class ReporterNewsLogStore {
     const key = ReporterNewsLogStore.dedupeKey({ canonicalUrl, source, sourceId });
 
     if (!headline) throw makeError("headline is required.", 400);
-    if (!key) throw makeError("A valid http(s) url or a sourceId is required for deduplication.", 400);
+    if (!key) throw makeError("A valid http(s) url, or both source and sourceId, is required for deduplication.", 400);
 
     const requestedStatus = input.status === undefined ? "verified" : normalizeStatus(input.status);
     if (!requestedStatus || !INTAKE_STATUSES.includes(requestedStatus)) {
@@ -286,7 +324,7 @@ class ReporterNewsLogStore {
       });
       // discovered -> verified is the only status a repeat intake may advance.
       if (existing.status === "discovered" && requestedStatus === "verified") {
-        this._applyStatus(existing, "verified", { actor: fields.capturedBy || "intake", at: now });
+        this._applyStatus(existing, "verified", { actor, claimedBy: fields.capturedBy, at: now });
       }
       existing.intakeCount = (existing.intakeCount || 1) + 1;
       existing.lastSeenAt = now;
@@ -301,7 +339,10 @@ class ReporterNewsLogStore {
       dedupeKey: key,
       ...fields,
       capturedAt,
-      reporterDate: isDayKey(input.reporterDate) ? input.reporterDate : dayKey(capturedAt, this._timeZone),
+      // Always derived, never taken from the caller: the nightly close
+      // depends on every record landing on the Vancouver day it was captured.
+      // Backfills supply a historical capturedAt instead.
+      reporterDate: dayKey(capturedAt, this._timeZone),
       status: requestedStatus,
       verification: requestedStatus === "verified" ? "verified" : "unverified",
       approval: "pending",
@@ -311,84 +352,102 @@ class ReporterNewsLogStore {
       lastSeenAt: now,
       createdAt: now,
       updatedAt: now,
-      history: [{ at: now, status: requestedStatus, actor: fields.capturedBy || "intake", note: "logged" }],
+      history: [{
+        at: now,
+        status: requestedStatus,
+        actor,
+        ...(fields.capturedBy ? { claimedBy: fields.capturedBy } : {}),
+        note: "logged",
+      }],
     };
     records.unshift(record);
     this._write(records);
     return { record, created: true, deduplicated: false };
   }
 
-  _applyStatus(record, status, { actor, at, note } = {}) {
+  _applyStatus(record, status, { actor, claimedBy, at, note } = {}) {
+    if (status === "failed") record.failedFrom = record.status;
+    else delete record.failedFrom;
     record.status = status;
     if (status === "verified") record.verification = "verified";
     if (status === "approved" || status === "queued" || status === "posted") record.approval = "approved";
     if (status === "rejected") record.approval = "rejected";
     record.history = [
       ...(record.history || []),
-      { at, status, actor: actor || "unknown", ...(note ? { note } : {}) },
+      {
+        at,
+        status,
+        actor: actor || "system",
+        ...(claimedBy ? { claimedBy } : {}),
+        ...(note ? { note } : {}),
+      },
     ].slice(-MAX_HISTORY_PER_RECORD);
   }
 
   /**
    * Advance a record's workflow and/or link FarmBot receipts. Enforces the
-   * state machine and the evidence each state needs:
+   * state machine and the evidence each state needs, checked against the
+   * record as it would be saved — on every PATCH, not only on transitions:
    *   queued  -> a FarmBot queue ID
    *   posted  -> a publication receipt (receipt ID, post ID or URL) — never
    *              inferred from a helper response alone
    *   failed  -> the exact error
+   *
+   * `actor` is the trusted channel the write came through (set by the route);
+   * `claimedBy` is the caller's own, unverified attribution, kept apart so a
+   * key holder cannot write a trusted identity into the history.
    */
-  update(id, patch = {}, { actor = "unknown" } = {}) {
-    return this._withLock(() => this._update(id, patch, { actor }));
+  update(id, patch = {}, { actor = "system", claimedBy = null } = {}) {
+    return this._withLock(() => this._update(id, patch, { actor, claimedBy }));
   }
 
-  _update(id, patch, { actor }) {
+  _update(id, patch, { actor, claimedBy }) {
     const records = this._read();
     const record = records.find((item) => item.id === id);
     if (!record) return null;
     const now = nowIso();
 
-    let nextStatus = null;
+    let nextStatus = record.status;
     if (patch.status !== undefined) {
       nextStatus = normalizeStatus(patch.status);
       if (!nextStatus) throw makeError(`status must be one of ${STATUSES.join(", ")}.`, 400);
-      if (nextStatus !== record.status && !TRANSITIONS[record.status]?.includes(nextStatus)) {
+      if (nextStatus !== record.status && !allowedTransitions(record).includes(nextStatus)) {
         throw makeError(`Cannot move a ${record.status} record to ${nextStatus}.`, 409, { currentStatus: record.status });
       }
     }
+    const changing = nextStatus !== record.status;
 
     const farmbot = patch.farmbot ? mergeFarmbot(record.farmbot, patch.farmbot) : record.farmbot || emptyFarmbot();
-    const error = patch.error !== undefined ? clampString(patch.error, MAX_ERROR_LEN) || null : record.error;
+    let error = patch.error !== undefined ? clampString(patch.error, MAX_ERROR_LEN) || null : record.error;
+    // A record that leaves `failed` keeps its history but sheds the stale error.
+    if (changing && record.status === "failed" && patch.error === undefined) error = null;
 
-    if (nextStatus && nextStatus !== record.status) {
-      if (nextStatus === "queued" && !farmbot.queueId) {
-        throw makeError("Queued requires farmbot.queueId.", 400);
-      }
-      if (nextStatus === "posted" && !hasPublicationProof(farmbot)) {
-        throw makeError("Posted requires farmbot.publication with a receiptId, postId or url.", 400);
-      }
-      if (nextStatus === "failed" && !error) {
-        throw makeError("Failed requires the exact error.", 400);
-      }
-    }
+    const missing = evidenceError(nextStatus, farmbot, error);
+    if (missing) throw makeError(missing, 400);
 
+    let verification = record.verification;
     if (patch.verification !== undefined) {
-      const verification = clampString(patch.verification, 20).toLowerCase();
+      verification = clampString(patch.verification, 20).toLowerCase();
       if (!VERIFICATION_STATUSES.includes(verification)) {
         throw makeError(`verification must be one of ${VERIFICATION_STATUSES.join(", ")}.`, 400);
       }
-      record.verification = verification;
     }
+
+    // Everything is validated; only now mutate.
+    record.verification = verification;
     if (patch.symbols !== undefined) record.symbols = normalizeSymbols(patch.symbols);
     if (patch.market !== undefined) record.market = normalizeMarket(patch.market);
     if (patch.summary !== undefined) record.summary = clampString(patch.summary, MAX_SUMMARY_LEN) || null;
-
     record.farmbot = farmbot;
     record.error = error;
-    if (nextStatus && nextStatus !== record.status) {
-      this._applyStatus(record, nextStatus, { actor, at: now, note: clampString(patch.note, 200) || undefined });
+    if (changing) {
+      this._applyStatus(record, nextStatus, {
+        actor,
+        claimedBy: clampString(claimedBy, 60) || null,
+        at: now,
+        note: clampString(patch.note, 200) || undefined,
+      });
     }
-    // A record that leaves `failed` keeps its history but sheds the stale error.
-    if (nextStatus && nextStatus !== "failed" && patch.error === undefined) record.error = null;
     record.updatedAt = now;
     this._write(records);
     return record;
@@ -463,6 +522,7 @@ module.exports = {
   INTAKE_STATUSES,
   MARKETS,
   TRANSITIONS,
+  allowedTransitions,
   dayKey,
   normalizeMarket,
   normalizeSymbols,

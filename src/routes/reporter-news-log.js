@@ -17,7 +17,14 @@ const { createRateLimit } = require("../middleware/rate-limit");
  *
  * Writes reuse the broadcast ledger's machine key: ShareBot already holds it
  * and it can only write receipts, not spend credits or broadcast.
+ *
+ * History attribution: the key is shared, so the only identity the server can
+ * vouch for is "a holder of the shared key" (TRUSTED_ACTOR). A caller's own
+ * `actor` / `capturedBy` is stored separately as `claimedBy`, never as the
+ * trusted actor.
  */
+const TRUSTED_ACTOR = "shared-key";
+
 function createReporterNewsLogRouter({ newsLogStore, requireLedgerKey, rateLimitPerMinute = 60 }) {
   const router = Router();
   const limiter = createRateLimit({ limit: rateLimitPerMinute, windowMs: 60 * 1000 });
@@ -36,7 +43,7 @@ function createReporterNewsLogRouter({ newsLogStore, requireLedgerKey, rateLimit
 
   router.post("/intake", requireLedgerKey, limiter, (req, res, next) => {
     try {
-      const result = newsLogStore.intake(req.body || {});
+      const result = newsLogStore.intake(req.body || {}, { actor: TRUSTED_ACTOR });
       res.status(result.created ? 201 : 200).json(receipt(result));
     } catch (err) {
       next(err);
@@ -90,7 +97,10 @@ function createReporterNewsLogRouter({ newsLogStore, requireLedgerKey, rateLimit
   router.patch("/:id", requireLedgerKey, limiter, (req, res, next) => {
     try {
       const body = req.body || {};
-      const record = newsLogStore.update(req.params.id, body, { actor: String(body.actor || "api").slice(0, 60) });
+      const record = newsLogStore.update(req.params.id, body, {
+        actor: TRUSTED_ACTOR,
+        claimedBy: typeof body.actor === "string" ? body.actor : null,
+      });
       if (!record) {
         res.status(404).json({ error: "Record not found" });
         return;
