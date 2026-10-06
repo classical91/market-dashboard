@@ -73,4 +73,5 @@ When operating as the FarmClaw agent, X posts queued from the dashboard's FarmCl
 
 - Poll `POST /api/farmclaw/handoffs/claim` (same host, `x-broadcast-key`) with `{ "agent": "farmclaw" }`.
 - After the item is durably in FarmClaw's own workflow, acknowledge it with `POST /api/farmclaw/handoffs/:id/receipt` and FarmClaw's own `receiptId`. The dashboard shows success only after this receipt.
+- Run `node scripts/farmclaw-collector.js watch` (or `run` from cron) on FarmClaw's host. It does the claim → durable task → receipt loop, with tasks in `FARMCLAW_INTAKE_FILE`. Work tasks with `node scripts/farmclaw-collector.js tasks` and `task <id> --status in_progress|done|dropped`.
 - If FarmClaw can't take an item, send `POST /api/farmclaw/handoffs/:id/fail` with the exact `error`. Never acknowledge an item that wasn't taken. An unacknowledged claim is handed out again after its lease expires. See `docs/farmclaw-handoff.md`.
