@@ -85,6 +85,30 @@ An earlier version stopped at step 2: it claimed links and wrote local tasks
 that the FarmClaw agent never saw. `run` and `watch` therefore refuse to start
 without a delivery configured, unless `--local-only` is passed explicitly.
 
+### When nothing reaches FarmClaw: `doctor`
+
+Run this on FarmClaw's host, with the same environment as `watch`:
+
+```bash
+node scripts/farmclaw-collector.js doctor
+```
+
+It checks every hop and prints `PASS`/`FAIL`/`WARN` lines. It starts no agent
+run.
+
+- Is a delivery configured?
+- Does the dashboard answer, does it accept the machine key, and what is in the
+  queue?
+- When did a collector last poll? "Never" or "an hour ago" means `watch` isn't
+  running.
+- Does the gateway hook answer, are hooks enabled, and is the token accepted?
+  The probe has no `message`, so the gateway rejects it with
+  `400 message required` after the token check and before any dispatch.
+- Are any deliveries in the task file stuck as unknown or failing?
+
+It exits `0` when every hop answers. The agent id itself is only proven by
+`deliver-test`, which starts one real test run.
+
 ### Delivering to the FarmClaw OpenClaw agent (gateway hook)
 
 The OpenClaw gateway accepts external agent turns on `POST <hooks.path>/agent`.

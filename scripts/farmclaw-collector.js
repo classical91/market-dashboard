@@ -8,6 +8,7 @@
  *   node scripts/farmclaw-collector.js run              one claim → task → deliver → receipt pass
  *   node scripts/farmclaw-collector.js watch [--interval 60]
  *                                                        the recurring collector
+ *   node scripts/farmclaw-collector.js doctor           check every hop to the FarmClaw agent; starts no run
  *   node scripts/farmclaw-collector.js deliver-test --link <url>
  *                                                        run only the delivery command, no dashboard calls
  *   node scripts/farmclaw-collector.js tasks [--status open] [--limit 50] [--json]
@@ -47,6 +48,7 @@ const {
 } = require("../src/services/farmclaw-collector");
 const { createCommandDeliverer, buildDeliveryPayload, DEFAULT_TIMEOUT_MS } = require("../src/services/farmclaw-delivery");
 const { openclawDelivererFromEnv } = require("../src/services/farmclaw-openclaw");
+const { runDoctor } = require("../src/services/farmclaw-doctor");
 
 const DEFAULT_DASHBOARD_URL = "https://market-dashboard-production-b2f4.up.railway.app";
 const DEFAULT_INTERVAL_SECONDS = 60;
@@ -82,7 +84,7 @@ function intakeFile(args) {
 
 function usage(code = 1) {
   console.error(
-    "usage: farmclaw-collector.js run | watch [--interval 60] | deliver-test --link <url> | tasks [--status s] [--json]" +
+    "usage: farmclaw-collector.js run | watch [--interval 60] | doctor | deliver-test --link <url> | tasks [--status s] [--json]" +
       " | task <id> [--status s] [--note text] [--delivery delivered|retry] [--delivery-id id]",
   );
   process.exit(code);
@@ -179,6 +181,17 @@ async function main() {
         await new Promise((resolve) => setTimeout(resolve, Math.min(1000, until - Date.now())));
       }
     }
+    return;
+  }
+
+  if (command === "doctor") {
+    const { ok, lines } = await runDoctor({
+      env: process.env,
+      dashboardUrl: (args.url || process.env.FARMCLAW_DASHBOARD_URL || DEFAULT_DASHBOARD_URL).replace(/\/+$/, ""),
+      store,
+    });
+    lines.forEach(([level, text]) => console.log(`[${level}] ${text}`));
+    process.exitCode = ok ? 0 : 2;
     return;
   }
 
