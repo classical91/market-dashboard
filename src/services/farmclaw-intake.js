@@ -26,6 +26,10 @@
  * - Writes are fsynced (file and directory) and then read back before
  *   `intake` returns, so the receipt is only sent for a task that verifiably
  *   reached the disk.
+ * - `delivery` tracks handing the task to the live FarmClaw session (see
+ *   farmclaw-collector.js). `startedAt` is written before the delivery
+ *   command runs, so a crash mid-delivery leaves a visible "outcome unknown"
+ *   instead of a silent re-send that could duplicate the message.
  *
  * File shape:
  *   { "version": 1, "tasks": [ <newest first> ] }
@@ -151,6 +155,7 @@ class FarmclawIntakeStore {
         updatedAt: now,
         receiptSentAt: null,
         receiptError: null,
+        delivery: null,
         note: null,
         history: [],
       };
@@ -162,6 +167,92 @@ class FarmclawIntakeStore {
       if (!persisted) throw makeError("FarmClaw intake task did not persist", 500);
       return { task: persisted, created: true };
     });
+  }
+
+  _mutate(id, event, change) {
+    return this._withLock(() => {
+      const state = this._read();
+      const task = state.tasks.find((entry) => entry.id === id || entry.handoffId === id);
+      if (!task) return null;
+      task.updatedAt = this._iso();
+      const detail = change(task) || {};
+      this._push(task, event, detail);
+      this._write(state);
+      return task;
+    });
+  }
+
+  _delivery(task) {
+    task.delivery = { startedAt: null, deliveredAt: null, deliveryId: null, attempts: 0, lastError: null, ...(task.delivery || {}) };
+    return task.delivery;
+  }
+
+  /** Written before the delivery command runs. */
+  beginDelivery(id) {
+    return this._mutate(id, "delivery_started", (task) => {
+      const delivery = this._delivery(task);
+      delivery.startedAt = task.updatedAt;
+      delivery.attempts += 1;
+      return { attempt: delivery.attempts };
+    });
+  }
+
+  deliverySucceeded(id, { deliveryId } = {}) {
+    const ref = clampString(deliveryId, MAX_NOTE_LEN);
+    if (!ref) throw makeError("deliveryId is required", 400);
+    return this._mutate(id, "delivered", (task) => {
+      const delivery = this._delivery(task);
+      delivery.deliveredAt = task.updatedAt;
+      delivery.deliveryId = ref;
+      delivery.lastError = null;
+      return { deliveryId: ref };
+    });
+  }
+
+  /** The command said it did not deliver: safe to try again. */
+  deliveryFailed(id, { error } = {}) {
+    const message = clampString(error, MAX_NOTE_LEN) || "delivery failed";
+    return this._mutate(id, "delivery_failed", (task) => {
+      const delivery = this._delivery(task);
+      delivery.startedAt = null;
+      delivery.lastError = message;
+      return { error: message };
+    });
+  }
+
+  /** Nobody knows whether it was delivered: keep startedAt so it isn't re-sent blindly. */
+  deliveryUnknown(id, { error } = {}) {
+    const message = clampString(error, MAX_NOTE_LEN) || "delivery outcome unknown";
+    return this._mutate(id, "delivery_unknown", (task) => {
+      this._delivery(task).lastError = message;
+      return { error: message };
+    });
+  }
+
+  /** After the failure was reported to the dashboard, a re-tap starts a fresh round of attempts. */
+  resetDeliveryAttempts(id) {
+    return this._mutate(id, "delivery_attempts_reset", (task) => {
+      this._delivery(task).attempts = 0;
+    });
+  }
+
+  /**
+   * A person or FarmClaw checked the session after an unknown outcome.
+   * `delivered` records it (with the session's message id when known);
+   * `retry` clears the in-flight mark so the next pass delivers again.
+   */
+  resolveDelivery(id, { outcome, deliveryId } = {}) {
+    if (outcome === "delivered") {
+      return this.deliverySucceeded(id, { deliveryId: deliveryId || "confirmed-manually" });
+    }
+    if (outcome === "retry") {
+      return this._mutate(id, "delivery_retry", (task) => {
+        const delivery = this._delivery(task);
+        delivery.startedAt = null;
+        delivery.attempts = 0;
+      });
+    }
+    throw makeError("outcome must be delivered or retry", 400);
   }
 
   /** Note the dashboard's answer to the receipt, for `tasks` listings. */
