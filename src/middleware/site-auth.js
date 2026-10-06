@@ -136,8 +136,9 @@ function isAlphaReadApi(req) {
 // enforce their own key; this only stops site auth from short-circuiting
 // them first.
 // The reporter news log's intake is called by the same machine callers with
-// the same key, so it shares the bypass.
-const LEDGER_API_PREFIXES = ["/api/broadcast-ledger", "/api/reporter-news"];
+// the same key, so it shares the bypass, as does the FarmClaw handoff queue
+// that the FarmClaw agent polls with it.
+const LEDGER_API_PREFIXES = ["/api/broadcast-ledger", "/api/reporter-news", "/api/farmclaw"];
 
 function isLedgerApiPath(req) {
   return LEDGER_API_PREFIXES.some((prefix) => req.path === prefix || req.path.startsWith(`${prefix}/`));

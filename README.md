@@ -37,6 +37,7 @@ The app is intentionally lightweight: no bundler, no frontend framework, and no 
 - `/api/broadcast-ledger/preflight` - answers the environment, persistence and routing half of [docs/production-verification.md](docs/production-verification.md) from inside the running service. Sends nothing, echoes no secret. `node scripts/verify-broadcast-ledger.js --url <host> --key <key>` runs it plus the read-only endpoint checks and prints a verdict.
 - `/api/broadcast-ledger/broadcast` - sends a broadcast to Telegram **and** records the receipt in one call, from the real send result. Telegram never reports a bot's own messages back through `getUpdates`, so anything sent through this bot cannot be picked up by the channel watch and must go through here.
 - `/api/broadcast-ledger/manual` - operational Broadcast Ledger with date/category/status filters, search, daily summaries, destination labels, attempt history, edit/delete, copy, and failed retry. **Ledger Settings** controls exact categories, per-category limits and duplicate windows, blocked-attempt recording, retention, sources, and destination names. See [docs/broadcast-ledger.md](docs/broadcast-ledger.md).
+- `/api/farmclaw/handoffs` - X posts queued for the FarmClaw agent from the X Intelligence card button. FarmClaw claims them with the ledger key and acknowledges each with a receipt; the button shows success only after that receipt. See [docs/farmclaw-handoff.md](docs/farmclaw-handoff.md).
 - `/api/reporter-news` - canonical Reporter news log: ShareBot/FarmClaw log each verified item through `POST /intake` (deduplicated on canonical URL), then approval, FarmBot queueing and publication receipts are patched onto the same record. Shown as **Daily News Log** in the Reporter Room, grouped by America/Vancouver day. See [docs/reporter-news-log.md](docs/reporter-news-log.md).
 
 ## Setup
@@ -464,11 +465,13 @@ Sends are not written to the Broadcast Ledger: it is built around news categorie
 
 ### Sending a post to FarmClaw
 
-Each post card also carries a **FarmClaw** button. One tap sends that post's `x.com/.../status/...` link — nothing else — to the single Telegram chat or topic FarmClaw reads.
+Each post card also carries a **FarmClaw** button. One tap queues that post's link for the FarmClaw agent; it does not message anyone.
 
-- `FARMCLAW_TELEGRAM_CHAT` - `chatId` or `chatId:threadId`. Sent through `TELEGRAM_BOT_TOKEN`. Blank keeps the button visible but it reports that FarmClaw is not configured.
+- **Queued is not done.** The button shows `FarmClaw queued` until FarmClaw itself claims the item and posts a receipt, and only then shows `FarmClaw ✓`. While it waits, the tooltip says when FarmClaw last checked in, or that it never has, so a FarmClaw that isn't polling is visible instead of silent.
+- Taps are idempotent on the canonical post URL. A repeat tap returns the same handoff, re-queues a failed one, and leaves a received one as received.
+- FarmClaw pulls with the existing `BROADCAST_LEDGER_API_KEY`; no new variable is needed. The contract is in [docs/farmclaw-handoff.md](docs/farmclaw-handoff.md).
 
-`POST /api/x/farmclaw` (`{ "url": "https://x.com/..." }`) is admin-gated like the Broadcast endpoints. Note that Telegram does not deliver one bot's group messages to another bot, so if FarmClaw is itself a Telegram bot, point this at a chat where it can see the dashboard bot's posts (for example a DM chat it reads, or a channel it administers).
+`POST /api/farmclaw/handoffs` (`{ "url": "https://x.com/..." }`, owner session or admin key) queues a post; `POST /api/x/farmclaw` is kept as an alias. Earlier versions relayed the link through `TELEGRAM_BOT_TOKEN` to `FARMCLAW_TELEGRAM_CHAT` and reported success as soon as Telegram accepted it. FarmClaw never received those messages, because a bot's outbound message is not an inbound event for another bot or agent. `FARMCLAW_TELEGRAM_CHAT` is no longer read and can be removed.
 
 ### Railway Deployment
 
