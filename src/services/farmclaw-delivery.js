@@ -34,7 +34,7 @@ function buildMessage({ url, handle, text, taskId, handoffId }) {
   const lines = ["FarmClaw handoff from X Intelligence", url];
   const snippet = String(text || "").replace(/\s+/g, " ").trim().slice(0, MAX_TEXT_IN_MESSAGE);
   if (snippet) lines.push(`${handle ? `@${handle}: ` : ""}${snippet}`);
-  lines.push(`Ref: ${taskId} (handoff ${handoffId})`);
+  lines.push(taskId && taskId !== handoffId ? `Ref: ${taskId} (handoff ${handoffId})` : `Ref: handoff ${handoffId}`);
   return lines.join("\n");
 }
 

@@ -69,7 +69,7 @@ When operating as OpenClaw agent `newsreporter`, focus on the reporter workflow:
 
 ## FarmClaw Handoff Contract
 
-When operating as the FarmClaw agent, X posts queued from the dashboard's FarmClaw button arrive through a pull queue, not Telegram:
+When the dashboard has `FARMCLAW_OPENCLAW_HOOKS_URL` + `FARMCLAW_OPENCLAW_HOOK_TOKEN`, a FarmClaw tap arrives as an OpenClaw agent turn through the gateway's `/hooks/agent` (message: "FarmClaw handoff from X Intelligence", the post URL, handle and text, `Ref: handoff fch_…`); nothing to poll. Otherwise, X posts queued from the dashboard's FarmClaw button arrive through a pull queue, not Telegram:
 
 - Poll `POST /api/farmclaw/handoffs/claim` (same host, `x-broadcast-key`) with `{ "agent": "farmclaw" }`.
 - After the item is durably in FarmClaw's own workflow, acknowledge it with `POST /api/farmclaw/handoffs/:id/receipt` and FarmClaw's own `receiptId`. The dashboard shows success only after this receipt.

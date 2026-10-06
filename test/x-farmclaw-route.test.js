@@ -133,7 +133,7 @@ test("FarmClaw claims, acknowledges with a receipt, and only then is it received
 
   const received = await call(`/api/farmclaw/handoffs/${id}/receipt`, {
     headers: farmclaw,
-    body: { receiptId: "task_42", agent: "farmclaw" },
+    body: { receiptId: "task_42", agent: "farmclaw", note: "Delivered to the FarmClaw session: run_1" },
   });
   assert.strictEqual(received.status, 200);
   assert.strictEqual(received.body.status, "received");
@@ -150,6 +150,21 @@ test("FarmClaw claims, acknowledges with a receipt, and only then is it received
   const tapAgain = await call("/api/farmclaw/handoffs", { headers: admin, body: { url } });
   assert.strictEqual(tapAgain.body.status, "received");
   assert.deepStrictEqual(outboundCalls, []);
+});
+
+test("a receipt with no proof of delivery to the agent is re-sent on the next tap", async () => {
+  // Earlier collectors acknowledged links they had only written to a local
+  // file; the button showed ✓ for posts FarmClaw never saw.
+  const url = nextPostUrl();
+  const { body: { id } } = await call("/api/farmclaw/handoffs", { headers: admin, body: { url } });
+  await call("/api/farmclaw/handoffs/claim", { headers: farmclaw, body: { agent: "farmclaw", limit: 25 } });
+  await call(`/api/farmclaw/handoffs/${id}/receipt`, { headers: farmclaw, body: { receiptId: "fct_local_only" } });
+
+  const tapAgain = await call("/api/farmclaw/handoffs", { headers: admin, body: { url } });
+  assert.strictEqual(tapAgain.body.status, "pending");
+  assert.strictEqual(tapAgain.body.requeued, true);
+  assert.strictEqual(tapAgain.body.record.receipt, null);
+  assert.strictEqual(tapAgain.body.record.history[0].event, "requeued_without_delivery_proof");
 });
 
 test("a FarmClaw failure needs the exact error and a repeat tap re-queues it", async () => {

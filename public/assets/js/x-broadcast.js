@@ -361,10 +361,11 @@
   }
 
   /* FarmClaw handoff. v1 of these keys marked a post "sent" once Telegram
-     accepted the dashboard bot's message, which never reached FarmClaw — so
-     those marks are not carried over. */
-  var FARMCLAW_SENT_KEY = "xIntelligence:farmclawReceived:v2";
-  var FARMCLAW_QUEUED_KEY = "xIntelligence:farmclawQueued:v2";
+     accepted the dashboard bot's message, which never reached FarmClaw; v2
+     marked receipts from collectors that only wrote a local file the agent
+     never read. Neither is carried over. */
+  var FARMCLAW_SENT_KEY = "xIntelligence:farmclawReceived:v3";
+  var FARMCLAW_QUEUED_KEY = "xIntelligence:farmclawQueued:v3";
   var FARMCLAW_LABELS = {
     idle: "FarmClaw",
     busy: "Sending…",
@@ -383,6 +384,16 @@
     if (minutes < 60) return minutes + " min ago";
     var hours = Math.round(minutes / 60);
     return hours < 48 ? hours + " h ago" : Math.round(hours / 24) + " d ago";
+  }
+
+  /* A receipt counts as ✓ only with proof the link reached the FarmClaw
+     agent: the gateway run id from the dashboard's push, or the collector's
+     "Delivered to the FarmClaw session" note. Mirrors hasDeliveryProof() in
+     src/services/farmclaw-handoffs.js. */
+  function hasDeliveryProof(receipt) {
+    if (!receipt) return false;
+    if (String(receipt.receiptId || "").indexOf("openclaw-run:") === 0) return true;
+    return String(receipt.note || "").indexOf("Delivered to the FarmClaw session") === 0;
   }
 
   /* The button's tooltip while a handoff waits. Whether FarmClaw has polled
@@ -412,9 +423,13 @@
     function settle(handoff) {
       var record = (handoff && handoff.record) || handoff || {};
       if (record.status === "received") {
-        rememberSent(url, null, FARMCLAW_SENT_KEY);
         var receipt = record.receipt || {};
-        show(FARMCLAW_LABELS.sent, "FarmClaw received it" + (receipt.receiptId ? " (receipt " + receipt.receiptId + ")" : "") + ".");
+        if (!hasDeliveryProof(receipt)) {
+          show(FARMCLAW_LABELS.idle, "Acknowledged without reaching the FarmClaw agent — tap to send it.");
+          return true;
+        }
+        rememberSent(url, null, FARMCLAW_SENT_KEY);
+        show(FARMCLAW_LABELS.sent, "Sent to the FarmClaw agent (" + receipt.receiptId + ").");
         return true;
       }
       if (record.status === "failed") {
@@ -422,7 +437,11 @@
         return true;
       }
       rememberSent(url, null, FARMCLAW_QUEUED_KEY);
-      show(FARMCLAW_LABELS.queued, describeFarmclawWait({ status: record.status, agent: handoff && handoff.agent }));
+      if (handoff && handoff.push && handoff.push.enabled) {
+        show(FARMCLAW_LABELS.busy, "Sending to the FarmClaw agent…");
+      } else {
+        show(FARMCLAW_LABELS.queued, describeFarmclawWait({ status: record.status, agent: handoff && handoff.agent }));
+      }
       return false;
     }
 
@@ -472,6 +491,7 @@
     FARMCLAW_QUEUED_KEY: FARMCLAW_QUEUED_KEY,
     FARMCLAW_LABELS: FARMCLAW_LABELS,
     describeFarmclawWait: describeFarmclawWait,
+    hasDeliveryProof: hasDeliveryProof,
     bindFarmclawButton: bindFarmclawButton,
     SENT_KEY: SENT_KEY,
     channelIds: channelIds,

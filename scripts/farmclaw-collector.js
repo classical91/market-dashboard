@@ -17,9 +17,10 @@
  *
  * run/watch need a way to reach the FarmClaw agent: the OpenClaw gateway hook
  * (FARMCLAW_OPENCLAW_HOOKS_URL + FARMCLAW_OPENCLAW_HOOK_TOKEN, preferred) or a
- * custom command (FARMCLAW_DELIVER_CMD). Without one, a claimed link only lands
- * in the local file, which nothing reads, so they refuse to start unless
- * --local-only is passed explicitly.
+ * custom command (FARMCLAW_DELIVER_CMD). Without one they refuse to start: a
+ * claimed link would only land in the local file, which nothing reads.
+ * (Earlier versions had a --local-only mode that acknowledged such links, and
+ * the button showed ✓ for posts the agent never saw.)
  *
  * Environment:
  *   BROADCAST_LEDGER_API_KEY    machine key (required for run/watch)
@@ -54,8 +55,8 @@ const DEFAULT_DASHBOARD_URL = "https://market-dashboard-production-b2f4.up.railw
 const DEFAULT_INTERVAL_SECONDS = 60;
 const MIN_INTERVAL_SECONDS = 15;
 
-// Flags that never take a value, so `--local-only run` doesn't eat the command.
-const BOOLEAN_FLAGS = new Set(["local-only", "json"]);
+// Flags that never take a value, so `--json run` doesn't eat the command.
+const BOOLEAN_FLAGS = new Set(["json"]);
 
 function parseArgs(argv) {
   const args = { _: [] };
@@ -111,12 +112,12 @@ function deliveryTarget() {
 
 function requireDeliverer(args) {
   const deliver = deliverer(args);
-  if (deliver || args["local-only"]) return deliver;
+  if (deliver) return deliver;
   throw new Error(
     "no delivery to FarmClaw configured: set FARMCLAW_OPENCLAW_HOOKS_URL and FARMCLAW_OPENCLAW_HOOK_TOKEN" +
       " (the OpenClaw gateway hook), or FARMCLAW_DELIVER_CMD." +
-      " Without one a claimed link only reaches the local task file and FarmClaw never sees it." +
-      " Pass --local-only to run that way on purpose.",
+      " Without one a claimed link would only reach the local task file and FarmClaw would never see it." +
+      " If the dashboard pushes to the gateway itself (FARMCLAW_OPENCLAW_* set on the dashboard), no collector is needed.",
   );
 }
 
@@ -163,7 +164,7 @@ async function main() {
     const intervalMs = Math.max(MIN_INTERVAL_SECONDS, Number(args.interval) || DEFAULT_INTERVAL_SECONDS) * 1000;
     console.log(
       `[farmclaw-collector] watching every ${intervalMs / 1000}s; tasks in ${store.file};` +
-        ` ${deliver ? `delivering to ${deliveryTarget()}` : "LOCAL ONLY, nothing is delivered"}`,
+        ` delivering to ${deliveryTarget()}`,
     );
     let stopping = false;
     const stop = () => { stopping = true; };

@@ -31,4 +31,12 @@ app.listen(config.port, () => {
   // The RSI Matrix samples CoinGecko /global to build the dominance and TOTAL
   // history no free API serves. A timer, so it starts here too.
   if (app.locals.rsiMatrix) app.locals.rsiMatrix.startSampler();
+  // The FarmClaw push sweep (handoffs queued before the hook was set, or
+  // left mid-push by a restart) is a timer as well.
+  if (app.locals.farmclawPusher?.enabled) {
+    app.locals.farmclawPusher.start();
+    console.log(`[FarmclawPusher] Sending FarmClaw taps to OpenClaw agent "${config.farmclawOpenclaw.agentId}"`);
+  } else {
+    console.log("[FarmclawPusher] Off: FarmClaw taps only queue (set FARMCLAW_OPENCLAW_HOOKS_URL and FARMCLAW_OPENCLAW_HOOK_TOKEN)");
+  }
 });
