@@ -64,6 +64,56 @@ If FarmClaw crashes between claiming and acknowledging, do nothing. The lease
 runs out and the next claim hands the item out again. Its `attempts` count goes
 up. A receipt for a handoff whose lease expired is still accepted.
 
+## FarmClaw's collector and task store
+
+The loop above needs somewhere durable for step 2. Without one, FarmClaw can
+claim items but must never acknowledge them, so they bounce between `claimed`
+and `pending` forever. `scripts/farmclaw-collector.js` is that consumer. Run it
+on FarmClaw's host, not on the dashboard:
+
+```bash
+export BROADCAST_LEDGER_API_KEY=...                 # the machine key
+export FARMCLAW_INTAKE_FILE=~/.farmclaw/intake.json  # default shown
+# FARMCLAW_DASHBOARD_URL defaults to the production dashboard.
+
+node scripts/farmclaw-collector.js watch --interval 60   # the recurring collector
+node scripts/farmclaw-collector.js run                   # one pass, e.g. from cron
+```
+
+Each pass claims, writes every item to FarmClaw's task store
+(`FARMCLAW_INTAKE_FILE`), and only then sends the receipt. The `receiptId` is
+the task id (`fct_...`).
+
+- The task file is written atomically and fsynced, then read back before the
+  receipt is sent. A receipt therefore always names a task that is on disk.
+- Intake is idempotent on the handoff id. If the receipt is lost (network,
+  crash, 5xx), the task is kept. The lease expires, the item is handed out
+  again, and the same receipt id is re-sent. No duplicate task is created.
+- If the store can't be written (disk error, or a corrupt file that it refuses
+  to overwrite), the collector calls `/fail` with
+  `FarmClaw intake store write failed: <error>` and sends no receipt.
+- A `409` on the receipt (another receipt already exists) is recorded on the
+  task as `receiptError` and is never retried with a different id.
+- `run` exits `2` if any item had an error. `watch` logs a failed pass and
+  tries again on the next tick. Overlapping runs are safe, because leases
+  prevent double claims and the store is locked.
+
+FarmClaw works its tasks from the same file:
+
+```bash
+node scripts/farmclaw-collector.js tasks --status open        # add --json for machines
+node scripts/farmclaw-collector.js task fct_... --status in_progress
+node scripts/farmclaw-collector.js task fct_... --status done --note "drafted"
+```
+
+Task statuses are `open`, `in_progress`, `done` and `dropped`. `task` also
+accepts the handoff id. These statuses are FarmClaw's own and are not reported
+back to the dashboard. The dashboard's contract ends at the receipt.
+
+To keep `watch` running, use a process manager, for example a systemd user
+unit or `pm2 start scripts/farmclaw-collector.js -- watch`. Alternatively, run
+`run` every minute from cron. Only one of the two is needed.
+
 ## Endpoints
 
 | Method | Path | Who | Purpose |
