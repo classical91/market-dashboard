@@ -66,42 +66,97 @@ up. A receipt for a handoff whose lease expired is still accepted.
 
 ## FarmClaw's collector and task store
 
-The loop above needs somewhere durable for step 2. Without one, FarmClaw can
-claim items but must never acknowledge them, so they bounce between `claimed`
-and `pending` forever. `scripts/farmclaw-collector.js` is that consumer. Run it
-on FarmClaw's host, not on the dashboard:
+`scripts/farmclaw-collector.js` is the consumer. Run it on FarmClaw's host,
+not on the dashboard. Each pass does four things, in order:
+
+1. **Claim** pending handoffs.
+2. **Write a task** for each one to FarmClaw's task store
+   (`FARMCLAW_INTAKE_FILE`).
+3. **Deliver** the task into the live FarmClaw session by running
+   `FARMCLAW_DELIVER_CMD`.
+4. **Send the receipt** (`receiptId` = the task id `fct_...`, `note` = the
+   session's delivery id).
+
+The collector owns the claim and receipt payloads. The delivery command never
+talks to the dashboard, so it can't send them wrong.
+
+A task file on its own is not FarmClaw's workflow, because nothing reads it.
+An earlier version stopped at step 2: it claimed links and wrote local tasks
+that the FarmClaw agent never saw. `run` and `watch` therefore refuse to start
+without a delivery command, unless `--local-only` is passed explicitly.
 
 ```bash
-export BROADCAST_LEDGER_API_KEY=...                 # the machine key
+export BROADCAST_LEDGER_API_KEY=...                  # the machine key
+export FARMCLAW_DELIVER_CMD='...'                    # posts into the FarmClaw session
 export FARMCLAW_INTAKE_FILE=~/.farmclaw/intake.json  # default shown
 # FARMCLAW_DASHBOARD_URL defaults to the production dashboard.
 
-node scripts/farmclaw-collector.js watch --interval 60   # the recurring collector
-node scripts/farmclaw-collector.js run                   # one pass, e.g. from cron
+node scripts/farmclaw-collector.js deliver-test --link https://x.com/...   # try delivery alone first
+node scripts/farmclaw-collector.js watch --interval 60                     # the recurring collector
+node scripts/farmclaw-collector.js run                                     # one pass, e.g. from cron
 ```
 
-Each pass claims, writes every item to FarmClaw's task store
-(`FARMCLAW_INTAKE_FILE`), and only then sends the receipt. The `receiptId` is
-the task id (`fct_...`).
+### Delivery command contract
 
-- The task file is written atomically and fsynced, then read back before the
-  receipt is sent. A receipt therefore always names a task that is on disk.
-- Intake is idempotent on the handoff id. If the receipt is lost (network,
-  crash, 5xx), the task is kept. The lease expires, the item is handed out
-  again, and the same receipt id is re-sent. No duplicate task is created.
-- If the store can't be written (disk error, or a corrupt file that it refuses
-  to overwrite), the collector calls `/fail` with
-  `FarmClaw intake store write failed: <error>` and sends no receipt.
-- A `409` on the receipt (another receipt already exists) is recorded on the
-  task as `receiptError` and is never retried with a different id.
-- `run` exits `2` if any item had an error. `watch` logs a failed pass and
-  tries again on the next tick. Overlapping runs are safe, because leases
-  prevent double claims and the store is locked.
+`FARMCLAW_DELIVER_CMD` is a shell command, for example the OpenClaw call that
+posts a message into FarmClaw's Telegram session. For each task:
 
-FarmClaw works its tasks from the same file:
+- **stdin** gets one JSON object:
+  `{ version, handoffId, taskId, url, canonicalUrl, handle, text, attempt, message }`.
+  `message` is ready to post:
+
+  ```
+  FarmClaw handoff from X Intelligence
+  <url>
+  @handle: <post text>
+  Ref: fct_... (handoff fch_...)
+  ```
+
+- The environment gets `FARMCLAW_HANDOFF_ID`, `FARMCLAW_TASK_ID`,
+  `FARMCLAW_URL` and `FARMCLAW_MESSAGE`.
+- **Exit 0** means delivered. The last stdout line must be
+  `{"deliveryId": "<the session's message or run id>"}`.
+- **Non-zero exit** means nothing was sent. The last stderr line is the error.
+
+`deliver-test` runs only this command, with a payload marked `"test": true`. It
+makes no dashboard calls and writes no task. Use it to check a command before
+`watch` uses it.
+
+### Outcomes
+
+| What happened | Collector does | Dashboard shows |
+| --- | --- | --- |
+| Delivered, receipt accepted | Records `deliveryId`, sends the receipt | `received` |
+| Command exited non-zero | No receipt. Retried after each lease expiry, 3 attempts in total | `claimed`, then `failed` with `Delivery to the FarmClaw session failed 3 times: <stderr>` |
+| Timed out (`FARMCLAW_DELIVER_TIMEOUT_MS`, default 60s), or exit 0 without a `deliveryId` | Reports `/fail` and **never re-sends on its own**, because the message may already be in the session | `failed` with "unknown outcome … Not re-sent" |
+| Delivered, receipt lost | Next claim skips delivery and re-sends the same receipt | `received` |
+| Task file can't be written | `/fail` with `FarmClaw intake store write failed: <error>` | `failed` |
+| Receipt `409` | Recorded on the task as `receiptError`; never retried with another id | unchanged |
+
+A re-tap of a `failed` handoff starts a fresh round of delivery attempts. The
+one exception is an unknown outcome: check the FarmClaw session first, then
+resolve it:
 
 ```bash
-node scripts/farmclaw-collector.js tasks --status open        # add --json for machines
+# It did arrive: record it and send the receipt now (the dashboard flips to received).
+node scripts/farmclaw-collector.js task fct_... --delivery delivered --delivery-id <session msg id>
+# It did not arrive: clear the in-flight mark, then tap FarmClaw on the post again.
+node scripts/farmclaw-collector.js task fct_... --delivery retry
+```
+
+Network errors keep their cause, for example
+`fetch failed (ENOTFOUND getaddrinfo ENOTFOUND host)` instead of a bare
+`fetch failed`.
+
+The task file is written atomically and fsynced, then read back. Intake is
+idempotent on the handoff id. `run` exits `2` if any item had an error. `watch`
+logs a failed pass and tries again on the next tick. Overlapping runs are safe,
+because leases prevent double claims and the store is locked.
+
+### Working tasks
+
+```bash
+node scripts/farmclaw-collector.js tasks --status open --json
 node scripts/farmclaw-collector.js task fct_... --status in_progress
 node scripts/farmclaw-collector.js task fct_... --status done --note "drafted"
 ```
