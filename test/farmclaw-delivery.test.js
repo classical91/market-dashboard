@@ -245,10 +245,10 @@ test("network errors keep their cause instead of a bare 'fetch failed'", async (
 });
 
 test("the CLI will not run without a delivery command unless told to stay local", () => {
-  const env = { ...process.env, FARMCLAW_DELIVER_CMD: "", FARMCLAW_INTAKE_FILE: path.join(tmpDir(), "intake.json") };
+  const env = { ...process.env, FARMCLAW_DELIVER_CMD: "", FARMCLAW_OPENCLAW_HOOKS_URL: "", FARMCLAW_OPENCLAW_HOOK_TOKEN: "", FARMCLAW_INTAKE_FILE: path.join(tmpDir(), "intake.json") };
   const refused = spawnSync(process.execPath, [CLI, "run"], { env, encoding: "utf8" });
   assert.strictEqual(refused.status, 1);
-  assert.match(refused.stderr, /no delivery command/);
+  assert.match(refused.stderr, /no delivery to FarmClaw configured/);
 
   const local = spawnSync(process.execPath, [CLI, "--local-only", "run", "--url", "http://127.0.0.1:1"], { env, encoding: "utf8" });
   assert.strictEqual(local.status, 1);

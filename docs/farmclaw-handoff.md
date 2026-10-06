@@ -72,18 +72,78 @@ not on the dashboard. Each pass does four things, in order:
 1. **Claim** pending handoffs.
 2. **Write a task** for each one to FarmClaw's task store
    (`FARMCLAW_INTAKE_FILE`).
-3. **Deliver** the task into the live FarmClaw session by running
-   `FARMCLAW_DELIVER_CMD`.
+3. **Deliver** the task to the FarmClaw OpenClaw agent, through the gateway's
+   `POST /hooks/agent` (built in) or a custom `FARMCLAW_DELIVER_CMD`.
 4. **Send the receipt** (`receiptId` = the task id `fct_...`, `note` = the
-   session's delivery id).
+   delivery id, e.g. `openclaw-run:<runId>`).
 
-The collector owns the claim and receipt payloads. The delivery command never
+The collector owns the claim and receipt payloads. The delivery step never
 talks to the dashboard, so it can't send them wrong.
 
 A task file on its own is not FarmClaw's workflow, because nothing reads it.
 An earlier version stopped at step 2: it claimed links and wrote local tasks
 that the FarmClaw agent never saw. `run` and `watch` therefore refuse to start
-without a delivery command, unless `--local-only` is passed explicitly.
+without a delivery configured, unless `--local-only` is passed explicitly.
+
+### Delivering to the FarmClaw OpenClaw agent (gateway hook)
+
+The OpenClaw gateway accepts external agent turns on `POST <hooks.path>/agent`.
+Hooks are off by default. On FarmClaw's gateway host, enable them for the
+FarmClaw agent only, with a dedicated token (not the gateway auth token):
+
+```json5
+// openclaw config
+{
+  hooks: {
+    enabled: true,
+    token: "<long-random-hook-token>",
+    path: "/hooks",
+    allowedAgentIds: ["farmclaw"],     // the FarmClaw agent's configured id
+    allowRequestSessionKey: false,
+  },
+}
+```
+
+Then run `openclaw config validate` and `openclaw gateway restart`. Start the
+collector on the same host:
+
+```bash
+export BROADCAST_LEDGER_API_KEY=...                                  # dashboard machine key
+export FARMCLAW_OPENCLAW_HOOKS_URL=http://127.0.0.1:18789/hooks      # gateway port + hooks.path
+export FARMCLAW_OPENCLAW_HOOK_TOKEN=<long-random-hook-token>         # same as hooks.token
+export FARMCLAW_OPENCLAW_AGENT_ID=farmclaw                           # default shown
+# Optional: also announce the run's result to a chat (both or neither):
+# export FARMCLAW_OPENCLAW_CHANNEL=telegram FARMCLAW_OPENCLAW_TO=<chat id>
+
+node scripts/farmclaw-collector.js deliver-test --link https://x.com/...   # starts one TEST run; check FarmClaw saw it
+node scripts/farmclaw-collector.js watch --interval 60                     # the recurring collector
+```
+
+Each delivery is one isolated FarmClaw agent turn whose message is the handoff
+text below. With no announce destination, OpenClaw posts the completion to the
+FarmClaw agent's main session (`deliver: true`). The gateway answers
+`200 { ok: true, runId }` once the run is admitted. That `runId` becomes the
+delivery id, and only then is the dashboard receipt sent. Admission means the
+agent has the link, not that its turn finished. FarmClaw's own next steps, such
+as its FarmBot intake, are not tracked by the dashboard.
+
+Duplicates: each request carries `Idempotency-Key: farmclaw-<taskId>` and an
+identical body, so the gateway replays the same run for a repeated request.
+It keeps that replay entry while the run is active and for 5 minutes after it
+settles, and forgets it on restart. A lost response is therefore retried right
+away (3 attempts in total). If none is answered, the outcome is **unknown** and
+the collector does not re-send it later; see Outcomes.
+
+| Gateway answer | Outcome |
+| --- | --- |
+| `200 { ok: true, runId }` | delivered |
+| `400` (bad agent id or destination), `401` (token), `404` (hooks off or wrong path), `409`, `413`, `429`, `502`, `503` | failed: the run was not admitted. Retried on lease expiry, then reported with the gateway's error |
+| No response after 3 attempts, or a `200` without `runId` | unknown: reported and not re-sent |
+
+### Other runtimes: a delivery command
+
+Instead of the hook, `FARMCLAW_DELIVER_CMD` can be any command that posts the
+item into the agent. Setting both is an error.
 
 ```bash
 export BROADCAST_LEDGER_API_KEY=...                  # the machine key
