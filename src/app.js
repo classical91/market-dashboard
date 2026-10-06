@@ -47,6 +47,7 @@ const { createMarketSessionRouter } = require("./routes/market-session");
 const { createBroadcastLedgerRouter } = require("./routes/broadcast-ledger");
 const { createReporterRouter } = require("./routes/reporter");
 const { createReporterNewsLogRouter } = require("./routes/reporter-news-log");
+const { createFarmclawHandoffRouter } = require("./routes/farmclaw-handoffs");
 const { createNewsroomRouter } = require("./routes/newsroom");
 const { createTelegramRouter } = require("./routes/telegram");
 const { createYoutubeRouter } = require("./routes/youtube");
@@ -102,6 +103,7 @@ const { BroadcastLedgerStore } = require("./services/broadcast-ledger");
 const { BroadcastLedgerNotificationService } = require("./services/broadcast-ledger-notifications");
 const { ReporterService } = require("./services/reporter");
 const { ReporterNewsLogStore } = require("./services/reporter-news-log");
+const { FarmclawHandoffStore } = require("./services/farmclaw-handoffs");
 const { NewsroomCycleStore } = require("./services/newsroom-cycles");
 const { NewsroomService } = require("./services/newsroom");
 const { createAgentRoutePreflight } = require("./services/newsroom-agent-preflight");
@@ -161,6 +163,8 @@ function createApp() {
   // (approved, FarmBot-queued, posted). Separate from the broadcast ledger:
   // logging an item here never implies it was sent.
   const reporterNewsLogStore = new ReporterNewsLogStore({ dataDir });
+  // X posts queued for the FarmClaw agent, which pulls and acknowledges them.
+  const farmclawHandoffStore = new FarmclawHandoffStore({ dataDir });
   // Watches the same channels the bot posts to and records what it sees, so a
   // story reaches the ledger even when the path that sent it never reported.
   // Constructed always, started only by server.js, and a no-op that logs when
@@ -629,6 +633,17 @@ function createApp() {
     }),
   );
   app.use(
+    "/api/farmclaw/handoffs",
+    createFarmclawHandoffRouter({
+      handoffStore: farmclawHandoffStore,
+      requireAdmin: requireXAdmin,
+      requireLedgerKey,
+      ledgerKey: config.broadcastLedger.apiKey,
+      adminKey: config.admin.apiKey,
+      rateLimitPerMinute: config.broadcastLedger.rateLimitPerMinute,
+    }),
+  );
+  app.use(
     "/api/daily-report",
     createReporterRouter({ reporterService, telegramService, broadcastLedgerStore, requireAdmin }),
   );
@@ -663,7 +678,7 @@ function createApp() {
       // on.
       telegramService,
       broadcastChannels: config.xBroadcast.channels,
-      farmclawTarget: config.farmclaw.target,
+      farmclawHandoffStore,
     }),
   );
 

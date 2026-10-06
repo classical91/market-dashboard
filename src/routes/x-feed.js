@@ -4,6 +4,7 @@ const { DEFAULT_CATEGORIES } = require("../services/x-account-registry");
 const { DEFAULT_TEMPLATE_ID } = require("../services/x-template-registry");
 const { selectTargets } = require("../services/x-broadcast-channels");
 const { createServiceError } = require("../utils/errors");
+const { handoffResponse } = require("./farmclaw-handoffs");
 
 function asyncRoute(handler) {
   return (req, res, next) => {
@@ -115,7 +116,7 @@ function createXFeedRouter({
   requireAdmin,
   telegramService = null,
   broadcastChannels = [],
-  farmclawTarget = null,
+  farmclawHandoffStore = null,
 }) {
   const router = express.Router();
 
@@ -425,30 +426,22 @@ function createXFeedRouter({
     );
   }
 
-  /* Send one post's link to FarmClaw. One fixed destination and the link
-     alone, so there is no picker: the card button is the whole interface.
-     Goes through the same postXPost path as Broadcast, which already
-     refuses an empty target list rather than widening to every chat. */
+  /* Queue one post for FarmClaw. Kept as an alias of POST
+     /api/farmclaw/handoffs: it used to relay the link through the dashboard's
+     Telegram bot and call that success, but a bot's outbound message is not
+     an inbound event FarmClaw acts on. Now it only queues; success is
+     FarmClaw's own receipt on the handoff, which the button polls for. */
   if (requireAdmin) {
     router.post(
       "/farmclaw",
       requireAdmin,
       asyncRoute(async (req, res) => {
-        const url = typeof req.body?.url === "string" ? req.body.url.trim() : "";
-        if (!/^https?:\/\//i.test(url)) {
-          throw createServiceError("url must be an http(s) link to the post", 400);
+        if (!farmclawHandoffStore) {
+          throw createServiceError("FarmClaw handoff queue is not available", 503);
         }
-        if (!farmclawTarget) {
-          throw createServiceError("FarmClaw is not configured (set FARMCLAW_TELEGRAM_CHAT)", 400);
-        }
-        if (!telegramService || !telegramService._botToken) {
-          throw createServiceError("Telegram is not configured (set TELEGRAM_BOT_TOKEN)", 400);
-        }
-        const target = farmclawTarget.threadId
-          ? { chatId: farmclawTarget.chatId, threadId: farmclawTarget.threadId }
-          : { chatId: farmclawTarget.chatId };
-        const result = await telegramService.postXPost({ url }, { targets: [target] });
-        res.json({ ok: true, sent: result.posted });
+        const body = req.body || {};
+        const result = farmclawHandoffStore.request({ url: body.url, handle: body.handle, text: body.text });
+        res.status(result.created ? 201 : 200).json(handoffResponse(farmclawHandoffStore, result));
       }),
     );
   }

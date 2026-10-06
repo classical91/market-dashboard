@@ -544,13 +544,13 @@
       actions.appendChild(openLink);
       actions.appendChild(copyButton);
 
-      // Link-only hand-off to the FarmClaw agent; wired by x-broadcast.js.
+      // Queued hand-off to the FarmClaw agent; wired by x-broadcast.js.
       if (onFarmclaw && post.url) {
         var farmclawButton = document.createElement("button");
         farmclawButton.type = "button";
         farmclawButton.className = "x-post-farmclaw";
         farmclawButton.textContent = "FarmClaw";
-        farmclawButton.title = "Send this post's link to FarmClaw";
+        farmclawButton.title = "Queue this post's link for FarmClaw";
         onFarmclaw(post, farmclawButton);
         actions.appendChild(farmclawButton);
       }

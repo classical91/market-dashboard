@@ -360,40 +360,107 @@
     });
   }
 
-  var FARMCLAW_SENT_KEY = "xIntelligence:farmclawSent:v1";
+  /* FarmClaw handoff. v1 of these keys marked a post "sent" once Telegram
+     accepted the dashboard bot's message, which never reached FarmClaw — so
+     those marks are not carried over. */
+  var FARMCLAW_SENT_KEY = "xIntelligence:farmclawReceived:v2";
+  var FARMCLAW_QUEUED_KEY = "xIntelligence:farmclawQueued:v2";
   var FARMCLAW_LABELS = {
     idle: "FarmClaw",
     busy: "Sending…",
+    queued: "FarmClaw queued",
     sent: "FarmClaw ✓",
     failure: "FarmClaw failed",
   };
+  var FARMCLAW_POLL_MS = 5000;
+  var FARMCLAW_POLL_LIMIT = 36; // three minutes; a later tap resumes it
 
-  /* One tap, one fixed destination, the link alone — so no picker. The
-     server's error is put in the title, because the button label has room
-     for "failed" and not for why. */
+  function ago(iso, nowMs) {
+    var then = Date.parse(iso || "");
+    if (!isFinite(then)) return null;
+    var minutes = Math.max(0, Math.round(((nowMs || Date.now()) - then) / 60000));
+    if (minutes < 1) return "just now";
+    if (minutes < 60) return minutes + " min ago";
+    var hours = Math.round(minutes / 60);
+    return hours < 48 ? hours + " h ago" : Math.round(hours / 24) + " d ago";
+  }
+
+  /* The button's tooltip while a handoff waits. Whether FarmClaw has polled
+     at all is the difference between "it will be picked up" and "nothing is
+     listening", so it is said either way. */
+  function describeFarmclawWait(handoff, nowMs) {
+    var agent = (handoff && handoff.agent) || {};
+    var status = handoff && (handoff.status || (handoff.record && handoff.record.status));
+    var lead = status === "claimed"
+      ? "FarmClaw has picked this up and has not confirmed it yet"
+      : "Queued for FarmClaw, not yet picked up";
+    var seen = ago(agent.lastPollAt, nowMs);
+    return lead + (seen ? " — FarmClaw last checked in " + seen + "." : " — FarmClaw has not checked in yet.");
+  }
+
+  /* Success is FarmClaw's receipt, never the dashboard's own write: the
+     POST only queues, and the button polls until FarmClaw acknowledges. */
   function bindFarmclawButton(button, post) {
     var url = post && post.url;
-    var resting = wasSent(url, null, FARMCLAW_SENT_KEY) ? FARMCLAW_LABELS.sent : FARMCLAW_LABELS.idle;
-    button.textContent = resting;
+    var timer = null;
+
+    function show(label, title) {
+      button.textContent = label;
+      button.title = title || "";
+    }
+
+    function settle(handoff) {
+      var record = (handoff && handoff.record) || handoff || {};
+      if (record.status === "received") {
+        rememberSent(url, null, FARMCLAW_SENT_KEY);
+        var receipt = record.receipt || {};
+        show(FARMCLAW_LABELS.sent, "FarmClaw received it" + (receipt.receiptId ? " (receipt " + receipt.receiptId + ")" : "") + ".");
+        return true;
+      }
+      if (record.status === "failed") {
+        show(FARMCLAW_LABELS.failure, "FarmClaw could not take it: " + (record.error || "unknown error") + " — tap to retry.");
+        return true;
+      }
+      rememberSent(url, null, FARMCLAW_QUEUED_KEY);
+      show(FARMCLAW_LABELS.queued, describeFarmclawWait({ status: record.status, agent: handoff && handoff.agent }));
+      return false;
+    }
+
+    function poll(id, remaining) {
+      if (timer) clearTimeout(timer);
+      if (remaining <= 0) return;
+      timer = setTimeout(function () {
+        request("/api/farmclaw/handoffs/" + encodeURIComponent(id)).then(
+          function (handoff) {
+            if (!settle(handoff)) poll(id, remaining - 1);
+          },
+          function () { poll(id, remaining - 1); },
+        );
+      }, FARMCLAW_POLL_MS);
+    }
+
+    if (wasSent(url, null, FARMCLAW_SENT_KEY)) show(FARMCLAW_LABELS.sent, "FarmClaw received it.");
+    else if (wasSent(url, null, FARMCLAW_QUEUED_KEY)) show(FARMCLAW_LABELS.queued, "Queued for FarmClaw — tap to check.");
+    else show(FARMCLAW_LABELS.idle, "Queue this post's link for FarmClaw");
+
     button.addEventListener("click", function () {
       if (button.disabled || !url) return;
       button.disabled = true;
       button.textContent = FARMCLAW_LABELS.busy;
-      request("/api/x/farmclaw", {
+      // Idempotent on the post url: a repeat tap returns the same handoff,
+      // re-queues a failed one, and reports a received one as received.
+      request("/api/farmclaw/handoffs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: url }),
+        body: JSON.stringify({ url: url, handle: post.handle || null, text: post.text || null }),
       }).then(
-        function () {
-          rememberSent(url, null, FARMCLAW_SENT_KEY);
+        function (handoff) {
           button.disabled = false;
-          button.textContent = FARMCLAW_LABELS.sent;
-          button.title = "Sent to FarmClaw — tap to send again";
+          if (!settle(handoff)) poll(handoff.id, FARMCLAW_POLL_LIMIT);
         },
         function (err) {
           button.disabled = false;
-          button.textContent = FARMCLAW_LABELS.failure;
-          button.title = (err && err.message) || "Could not send to FarmClaw";
+          show(FARMCLAW_LABELS.failure, (err && err.message) || "Could not queue for FarmClaw");
         },
       );
     });
@@ -402,7 +469,9 @@
   return {
     SELECTION_KEY: SELECTION_KEY,
     FARMCLAW_SENT_KEY: FARMCLAW_SENT_KEY,
+    FARMCLAW_QUEUED_KEY: FARMCLAW_QUEUED_KEY,
     FARMCLAW_LABELS: FARMCLAW_LABELS,
+    describeFarmclawWait: describeFarmclawWait,
     bindFarmclawButton: bindFarmclawButton,
     SENT_KEY: SENT_KEY,
     channelIds: channelIds,
