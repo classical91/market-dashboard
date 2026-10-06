@@ -22,7 +22,7 @@ carries the key.
 
 ```
 discovered → verified → approved → queued → posted
-     └──────────┴───────────┴─────────┴──→ failed  (failed → approved | queued | rejected)
+     └──────────┴───────────┴─────────┴──→ failed
      └──────────┴───────────┴──→ rejected
 ```
 
@@ -30,11 +30,21 @@ discovered → verified → approved → queued → posted
   in the workflow must come through `PATCH`.
 - Re-sending the current status is accepted, so retries are idempotent. Any
   other move that isn't listed above returns `409` with `currentStatus`.
-- `queued` requires `farmbot.queueId`.
-- `posted` requires `farmbot.publication` with a `receiptId`, `postId` or
-  `url`. Success is never inferred from a helper response alone.
-- `failed` requires the exact `error` text, for example the TLS or network
-  error. A failure stays `failed`. It is never turned into `queued`.
+- A failure records the stage it failed at as `failedFrom`. A `failed` record
+  can only go back to that stage, move on to that stage's next step, or be
+  rejected. For example, `approved → failed → queued` is allowed, but
+  `discovered → failed → queued` and `verified → failed → queued` return
+  `409`. A failure can never be used to skip verification or approval.
+- Each status must keep its evidence for as long as the record holds it. This
+  is checked on every `PATCH`, including patches that only change metadata, so
+  evidence can't be erased after the status is set:
+  - `queued` needs `farmbot.queueId`.
+  - `posted` needs `farmbot.publication` with a `receiptId`, `postId` or
+    `url`. Success is never inferred from a helper response alone.
+  - `failed` needs the exact `error` text, for example the TLS or network
+    error. A failure stays `failed` until it is retried, and it is never
+    recorded as `queued` without a real queue ID.
+- A `PATCH` that is refused changes nothing.
 
 ## Endpoints
 
@@ -62,7 +72,8 @@ anything else, which is stored as `general`.
 
 Deduplication uses the canonical URL. That means https, lowercase host, no
 `www.`, no tracking params, no fragment and no trailing slash. When an item
-has no URL, `source` + `sourceId` is used instead.
+has no URL, both `source` and `sourceId` are required, because an ID on its
+own is only unique within one source. Sending only one of them returns `400`.
 
 The response is a durable receipt. `201` means a new record was created and
 `200` means it was deduplicated:
@@ -76,7 +87,9 @@ On a repeat intake, blank fields are filled in, `summary`, `imageUrl` and
 `symbols` are refreshed, and `intakeCount` goes up. The status can only move
 from `discovered` to `verified`; it never moves backwards.
 
-`reporterDate` is the America/Vancouver calendar day of `capturedAt`.
+`reporterDate` is always the America/Vancouver calendar day of `capturedAt`.
+Any `reporterDate` the caller sends is ignored. To backfill a past day, send
+the historical `capturedAt`.
 
 ### `PATCH /api/reporter-news/:id`
 
@@ -94,6 +107,11 @@ from `discovered` to `verified`; it never moves backwards.
 ```json
 { "status": "failed", "error": "TLS handshake timeout to farmbot backend" }
 ```
+
+History attribution: the key is shared, so the server can only vouch that
+"a holder of the shared key" made a write. Each history entry stores that as
+`actor: "shared-key"`. The caller's own `actor` (on `PATCH`) or `capturedBy`
+(on intake) is stored separately as `claimedBy`, and it is not verified.
 
 `farmbot` fields are merged. A reconciler that only sends `status` or
 `lastCheckedAt` keeps the queue ID that was already stored. Other fields you

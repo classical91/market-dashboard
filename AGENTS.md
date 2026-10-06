@@ -64,4 +64,5 @@ When operating as OpenClaw agent `newsreporter`, focus on the reporter workflow:
 
 - After verifying a news item, log it with `POST /api/reporter-news/intake` (same host and `x-broadcast-key`). Keep the returned `id`; a repeat intake of the same canonical URL returns the same record with `deduplicated: true`.
 - Logging is not approval. Record approval, FarmBot queueing (`farmbot.queueId`), and publication (`farmbot.publication` receipt) with `PATCH /api/reporter-news/:id`. Never mark `posted` from a helper response alone.
-- Network/TLS failures go to `failed` with the exact `error`; never record them as `queued`. See `docs/reporter-news-log.md`.
+- Network/TLS failures go to `failed` with the exact `error`; never record them as `queued`.
+- A `failed` item resumes only at the stage it failed from (or that stage's next step); retries cannot skip approval. Queue IDs, publication receipts and errors cannot be cleared while the status depends on them. Without a URL, send both `source` and `sourceId`. `reporterDate` is derived from `capturedAt`; backfills send the historical `capturedAt`. See `docs/reporter-news-log.md`.
