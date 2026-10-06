@@ -69,6 +69,20 @@ function leaseExpired(record, now) {
   return record.status === "claimed" && (!record.claimExpiresAt || Date.parse(record.claimExpiresAt) <= now);
 }
 
+/**
+ * Whether a receipt proves the link reached the FarmClaw agent, rather than
+ * only a consumer's own file. Receipts from the dashboard's direct push carry
+ * the gateway run id; the collector's carry "Delivered to the FarmClaw
+ * session: …". Earlier collector versions acknowledged links they had only
+ * written to a local file, which the agent never read, and the button showed
+ * those as ✓.
+ */
+function hasDeliveryProof(receipt) {
+  if (!receipt) return false;
+  if (String(receipt.receiptId || "").startsWith("openclaw-run:")) return true;
+  return String(receipt.note || "").startsWith("Delivered to the FarmClaw session");
+}
+
 class FarmclawHandoffStore {
   constructor({ dataDir, logger = console, cap = DEFAULT_CAP, leaseMs = DEFAULT_LEASE_MS, now = () => Date.now() } = {}) {
     this._file = path.join(dataDir, "farmclaw-handoffs.json");
@@ -146,6 +160,13 @@ class FarmclawHandoffStore {
           existing.updatedAt = now;
           this._push(existing, "requeued");
           requeued = true;
+        } else if (existing.status === "received" && !hasDeliveryProof(existing.receipt)) {
+          // Acknowledged without ever reaching the agent: a tap sends it.
+          this._push(existing, "requeued_without_delivery_proof", { receiptId: existing.receipt?.receiptId || null });
+          existing.status = "pending";
+          existing.receipt = null;
+          existing.updatedAt = now;
+          requeued = true;
         }
         this._write(state);
         return { record: existing, created: false, requeued };
@@ -204,6 +225,43 @@ class FarmclawHandoffStore {
       state.meta = { ...state.meta, lastPollAt: now, lastPollAgent: claimant };
       this._write(state);
       return claimable;
+    });
+  }
+
+  /**
+   * Claim one specific handoff (the dashboard's own push on a tap). Returns
+   * the claimed record, or null when it isn't claimable: unknown id, already
+   * received or failed, or under someone else's live lease.
+   */
+  claimById(id, { agent } = {}) {
+    const claimant = clampString(agent, MAX_SHORT_LEN) || "farmclaw";
+    return this._withLock(() => {
+      const state = this._read();
+      const nowMs = this._now();
+      const record = state.records.find((entry) => entry.id === id);
+      if (!record || !(record.status === "pending" || leaseExpired(record, nowMs))) return null;
+      const now = this._iso();
+      record.status = "claimed";
+      record.attempts = (record.attempts || 0) + 1;
+      record.claimedAt = now;
+      record.claimedBy = claimant;
+      record.claimExpiresAt = new Date(nowMs + this._leaseMs).toISOString();
+      record.updatedAt = now;
+      this._push(record, "claimed", { by: claimant });
+      this._write(state);
+      return record;
+    });
+  }
+
+  /** Claim without recording a FarmClaw poll (the dashboard's own sweep). */
+  claimPending({ agent, limit } = {}) {
+    return this._withLock(() => {
+      const before = this._read().meta;
+      const records = this.claim({ agent, limit });
+      const state = this._read();
+      state.meta = before;
+      this._write(state);
+      return records;
     });
   }
 
@@ -276,4 +334,4 @@ class FarmclawHandoffStore {
   }
 }
 
-module.exports = { FarmclawHandoffStore, STATUSES, DEFAULT_LEASE_MS };
+module.exports = { FarmclawHandoffStore, hasDeliveryProof, STATUSES, DEFAULT_LEASE_MS };

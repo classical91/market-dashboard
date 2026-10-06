@@ -104,6 +104,8 @@ const { BroadcastLedgerNotificationService } = require("./services/broadcast-led
 const { ReporterService } = require("./services/reporter");
 const { ReporterNewsLogStore } = require("./services/reporter-news-log");
 const { FarmclawHandoffStore } = require("./services/farmclaw-handoffs");
+const { FarmclawPusher } = require("./services/farmclaw-pusher");
+const { createOpenclawHookDeliverer } = require("./services/farmclaw-openclaw");
 const { NewsroomCycleStore } = require("./services/newsroom-cycles");
 const { NewsroomService } = require("./services/newsroom");
 const { createAgentRoutePreflight } = require("./services/newsroom-agent-preflight");
@@ -115,6 +117,30 @@ const { resolveDataDir } = require("./utils/data-dir");
 const { createRequireAdmin } = require("./middleware/admin-auth");
 const { createRequireLedgerKey } = require("./middleware/ledger-auth");
 const { createSiteAuth } = require("./middleware/site-auth");
+
+/**
+ * The FarmClaw button's direct push to the FarmClaw OpenClaw agent. Disabled
+ * (handoffs only queue) when the gateway hook isn't configured; a half or
+ * invalid configuration is logged rather than taking the app down.
+ */
+function createFarmclawPusher(store, settings) {
+  if (!settings.hooksUrl && !settings.hookToken) return new FarmclawPusher({ store, deliver: null });
+  try {
+    const deliver = createOpenclawHookDeliverer({
+      url: settings.hooksUrl,
+      token: settings.hookToken,
+      agentId: settings.agentId,
+      channel: settings.channel || undefined,
+      to: settings.to || undefined,
+      accountId: settings.accountId || undefined,
+      timeoutMs: settings.timeoutMs,
+    });
+    return new FarmclawPusher({ store, deliver, agentId: settings.agentId });
+  } catch (err) {
+    console.error(`[FarmclawPusher] Not started: ${err.message}`);
+    return new FarmclawPusher({ store, deliver: null });
+  }
+}
 
 function createApp() {
   const app = express();
@@ -165,6 +191,7 @@ function createApp() {
   const reporterNewsLogStore = new ReporterNewsLogStore({ dataDir });
   // X posts queued for the FarmClaw agent, which pulls and acknowledges them.
   const farmclawHandoffStore = new FarmclawHandoffStore({ dataDir });
+  const farmclawPusher = createFarmclawPusher(farmclawHandoffStore, config.farmclawOpenclaw);
   // Watches the same channels the bot posts to and records what it sees, so a
   // story reaches the ledger even when the path that sent it never reported.
   // Constructed always, started only by server.js, and a no-op that logs when
@@ -636,6 +663,7 @@ function createApp() {
     "/api/farmclaw/handoffs",
     createFarmclawHandoffRouter({
       handoffStore: farmclawHandoffStore,
+      pusher: farmclawPusher,
       requireAdmin: requireXAdmin,
       requireLedgerKey,
       ledgerKey: config.broadcastLedger.apiKey,
@@ -679,6 +707,7 @@ function createApp() {
       telegramService,
       broadcastChannels: config.xBroadcast.channels,
       farmclawHandoffStore,
+      farmclawPusher,
     }),
   );
 
@@ -708,6 +737,7 @@ function createApp() {
   app.locals.liveScanner = liveScannerService;
   app.locals.liveResearch = liveResearchService;
   app.locals.rsiMatrix = rsiMatrixService;
+  app.locals.farmclawPusher = farmclawPusher;
 
   return app;
 }

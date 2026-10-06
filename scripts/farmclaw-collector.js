@@ -8,19 +8,28 @@
  *   node scripts/farmclaw-collector.js run              one claim → task → deliver → receipt pass
  *   node scripts/farmclaw-collector.js watch [--interval 60]
  *                                                        the recurring collector
+ *   node scripts/farmclaw-collector.js doctor           check every hop to the FarmClaw agent; starts no run
  *   node scripts/farmclaw-collector.js deliver-test --link <url>
  *                                                        run only the delivery command, no dashboard calls
  *   node scripts/farmclaw-collector.js tasks [--status open] [--limit 50] [--json]
  *   node scripts/farmclaw-collector.js task <id> [--status in_progress|done|dropped|open] [--note "..."]
  *   node scripts/farmclaw-collector.js task <id> --delivery delivered|retry [--delivery-id <id>]
  *
- * run/watch need a delivery command (FARMCLAW_DELIVER_CMD or --deliver). Without
- * one, a claimed link only lands in the local file, which nothing reads, so
- * they refuse to start unless --local-only is passed explicitly.
+ * run/watch need a way to reach the FarmClaw agent: the OpenClaw gateway hook
+ * (FARMCLAW_OPENCLAW_HOOKS_URL + FARMCLAW_OPENCLAW_HOOK_TOKEN, preferred) or a
+ * custom command (FARMCLAW_DELIVER_CMD). Without one they refuse to start: a
+ * claimed link would only land in the local file, which nothing reads.
+ * (Earlier versions had a --local-only mode that acknowledged such links, and
+ * the button showed ✓ for posts the agent never saw.)
  *
  * Environment:
  *   BROADCAST_LEDGER_API_KEY    machine key (required for run/watch)
- *   FARMCLAW_DELIVER_CMD        shell command that posts into the FarmClaw session
+ *   FARMCLAW_OPENCLAW_HOOKS_URL gateway hooks base, e.g. http://127.0.0.1:18789/hooks
+ *   FARMCLAW_OPENCLAW_HOOK_TOKEN the gateway's hooks.token
+ *   FARMCLAW_OPENCLAW_AGENT_ID  agent to run (default: farmclaw)
+ *   FARMCLAW_OPENCLAW_CHANNEL / FARMCLAW_OPENCLAW_TO / FARMCLAW_OPENCLAW_ACCOUNT_ID
+ *                               optional announce destination (both channel and to)
+ *   FARMCLAW_DELIVER_CMD        alternative: shell command that posts into the FarmClaw session
  *                               (contract in src/services/farmclaw-delivery.js)
  *   FARMCLAW_DELIVER_TIMEOUT_MS delivery command timeout (default 60000)
  *   FARMCLAW_DASHBOARD_URL      dashboard base URL (default: production)
@@ -39,13 +48,15 @@ const {
   DEFAULT_AGENT,
 } = require("../src/services/farmclaw-collector");
 const { createCommandDeliverer, buildDeliveryPayload, DEFAULT_TIMEOUT_MS } = require("../src/services/farmclaw-delivery");
+const { openclawDelivererFromEnv } = require("../src/services/farmclaw-openclaw");
+const { runDoctor } = require("../src/services/farmclaw-doctor");
 
 const DEFAULT_DASHBOARD_URL = "https://market-dashboard-production-b2f4.up.railway.app";
 const DEFAULT_INTERVAL_SECONDS = 60;
 const MIN_INTERVAL_SECONDS = 15;
 
-// Flags that never take a value, so `--local-only run` doesn't eat the command.
-const BOOLEAN_FLAGS = new Set(["local-only", "json"]);
+// Flags that never take a value, so `--json run` doesn't eat the command.
+const BOOLEAN_FLAGS = new Set(["json"]);
 
 function parseArgs(argv) {
   const args = { _: [] };
@@ -74,7 +85,7 @@ function intakeFile(args) {
 
 function usage(code = 1) {
   console.error(
-    "usage: farmclaw-collector.js run | watch [--interval 60] | deliver-test --link <url> | tasks [--status s] [--json]" +
+    "usage: farmclaw-collector.js run | watch [--interval 60] | doctor | deliver-test --link <url> | tasks [--status s] [--json]" +
       " | task <id> [--status s] [--note text] [--delivery delivered|retry] [--delivery-id id]",
   );
   process.exit(code);
@@ -82,18 +93,31 @@ function usage(code = 1) {
 
 function deliverer(args) {
   const command = args.deliver || process.env.FARMCLAW_DELIVER_CMD;
+  const openclaw = openclawDelivererFromEnv(process.env);
+  if (openclaw && command) {
+    throw new Error("set either the OpenClaw hook (FARMCLAW_OPENCLAW_*) or FARMCLAW_DELIVER_CMD, not both");
+  }
+  if (openclaw) return openclaw;
   if (!command) return null;
   const timeoutMs = Number(args["deliver-timeout-ms"] || process.env.FARMCLAW_DELIVER_TIMEOUT_MS) || DEFAULT_TIMEOUT_MS;
   return createCommandDeliverer({ command, timeoutMs });
 }
 
+function deliveryTarget() {
+  if (process.env.FARMCLAW_OPENCLAW_HOOKS_URL) {
+    return `OpenClaw agent "${process.env.FARMCLAW_OPENCLAW_AGENT_ID || "farmclaw"}" via ${process.env.FARMCLAW_OPENCLAW_HOOKS_URL}`;
+  }
+  return "the FarmClaw session via FARMCLAW_DELIVER_CMD";
+}
+
 function requireDeliverer(args) {
   const deliver = deliverer(args);
-  if (deliver || args["local-only"]) return deliver;
+  if (deliver) return deliver;
   throw new Error(
-    "no delivery command: set FARMCLAW_DELIVER_CMD (or --deliver) to the command that posts into the FarmClaw session." +
-      " Without it a claimed link only reaches the local task file and FarmClaw never sees it." +
-      " Pass --local-only to run that way on purpose.",
+    "no delivery to FarmClaw configured: set FARMCLAW_OPENCLAW_HOOKS_URL and FARMCLAW_OPENCLAW_HOOK_TOKEN" +
+      " (the OpenClaw gateway hook), or FARMCLAW_DELIVER_CMD." +
+      " Without one a claimed link would only reach the local task file and FarmClaw would never see it." +
+      " If the dashboard pushes to the gateway itself (FARMCLAW_OPENCLAW_* set on the dashboard), no collector is needed.",
   );
 }
 
@@ -140,7 +164,7 @@ async function main() {
     const intervalMs = Math.max(MIN_INTERVAL_SECONDS, Number(args.interval) || DEFAULT_INTERVAL_SECONDS) * 1000;
     console.log(
       `[farmclaw-collector] watching every ${intervalMs / 1000}s; tasks in ${store.file};` +
-        ` ${deliver ? "delivering to the FarmClaw session" : "LOCAL ONLY, nothing is delivered"}`,
+        ` delivering to ${deliveryTarget()}`,
     );
     let stopping = false;
     const stop = () => { stopping = true; };
@@ -161,11 +185,22 @@ async function main() {
     return;
   }
 
+  if (command === "doctor") {
+    const { ok, lines } = await runDoctor({
+      env: process.env,
+      dashboardUrl: (args.url || process.env.FARMCLAW_DASHBOARD_URL || DEFAULT_DASHBOARD_URL).replace(/\/+$/, ""),
+      store,
+    });
+    lines.forEach(([level, text]) => console.log(`[${level}] ${text}`));
+    process.exitCode = ok ? 0 : 2;
+    return;
+  }
+
   if (command === "deliver-test") {
     // Exercises only the delivery command with a marked test item: no claim,
     // no receipt, no task written.
     const deliver = deliverer(args);
-    if (!deliver) throw new Error("set FARMCLAW_DELIVER_CMD (or --deliver) first");
+    if (!deliver) throw new Error("set FARMCLAW_OPENCLAW_HOOKS_URL + FARMCLAW_OPENCLAW_HOOK_TOKEN, or FARMCLAW_DELIVER_CMD, first");
     const link = args.link || "https://x.com/i/status/0";
     const stamp = Date.now().toString(36);
     const payload = buildDeliveryPayload(

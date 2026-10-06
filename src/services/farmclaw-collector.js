@@ -169,6 +169,10 @@ async function collectOnce({
   maxDeliveryAttempts = DEFAULT_MAX_DELIVERY_ATTEMPTS,
   logger = console,
 }) {
+  // Never claim without a way to reach the agent: a receipt for a link that
+  // only reached a local file is how the button came to show ✓ for posts
+  // FarmClaw never saw.
+  if (typeof deliver !== "function") throw new Error("collectOnce needs a deliver function");
   const summary = { claimed: 0, delivered: 0, received: 0, alreadyReceived: 0, failed: 0, unknown: 0, pendingRetry: 0, errors: [] };
 
   let claim;
@@ -194,12 +198,10 @@ async function collectOnce({
       continue;
     }
 
-    if (deliver) {
-      const wasDelivered = Boolean(task.delivery?.deliveredAt);
-      task = await deliverTask({ client, store, deliver, handoff, task, agent, maxDeliveryAttempts, summary, logger });
-      if (!task) continue;
-      if (!wasDelivered) summary.delivered += 1;
-    }
+    const wasDelivered = Boolean(task.delivery?.deliveredAt);
+    task = await deliverTask({ client, store, deliver, handoff, task, agent, maxDeliveryAttempts, summary, logger });
+    if (!task) continue;
+    if (!wasDelivered) summary.delivered += 1;
 
     let res;
     try {

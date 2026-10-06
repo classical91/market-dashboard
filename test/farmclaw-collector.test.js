@@ -24,6 +24,8 @@ const { FarmclawIntakeStore } = require("../src/services/farmclaw-intake");
 const { createHandoffClient, collectOnce } = require("../src/services/farmclaw-collector");
 
 const quiet = { log() {}, warn() {}, error() {} };
+// These tests are about the task store and the receipt; delivery always works here.
+const deliver = async (payload) => ({ outcome: "delivered", deliveryId: `run_${payload.taskId}` });
 
 function tmpFile(name) {
   return path.join(fs.mkdtempSync(path.join(os.tmpdir(), "md-farmclaw-intake-")), name);
@@ -77,7 +79,7 @@ test("end to end against the app: queued link becomes a FarmClaw task, then rece
 
     const store = new FarmclawIntakeStore({ file: tmpFile("intake.json") });
     const client = createHandoffClient({ baseUrl: base, key: "collector-test-ledger" });
-    const summary = await collectOnce({ client, store, logger: quiet });
+    const summary = await collectOnce({ client, store, deliver, logger: quiet });
     assert.strictEqual(summary.claimed, 1);
     assert.strictEqual(summary.received, 1);
     assert.deepStrictEqual(summary.errors, []);
@@ -95,12 +97,12 @@ test("end to end against the app: queued link becomes a FarmClaw task, then rece
     assert.strictEqual(after.status, "received");
     assert.strictEqual(after.receipt.receiptId, task.id);
 
-    const empty = await collectOnce({ client, store, logger: quiet });
+    const empty = await collectOnce({ client, store, deliver, logger: quiet });
     assert.strictEqual(empty.claimed, 0);
     assert.strictEqual(store.list().length, 1);
 
     const badKey = createHandoffClient({ baseUrl: base, key: "wrong" });
-    await assert.rejects(collectOnce({ client: badKey, store, logger: quiet }), /claim failed: HTTP 401/);
+    await assert.rejects(collectOnce({ client: badKey, store, deliver, logger: quiet }), /claim failed: HTTP 401/);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
@@ -117,17 +119,17 @@ test("a lost receipt is re-sent with the same task id after the lease expires", 
   const store = new FarmclawIntakeStore({ file: tmpFile("intake.json") });
   const client = storeClient(handoffs, { failReceipts: 1 });
 
-  const first = await collectOnce({ client, store, logger: quiet });
+  const first = await collectOnce({ client, store, deliver, logger: quiet });
   assert.strictEqual(first.pendingRetry, 1);
   assert.strictEqual(handoffs.get(record.id).status, "claimed", "no receipt landed, so not received");
   const [task] = store.list();
   assert.strictEqual(task.receiptSentAt, null);
 
-  const leased = await collectOnce({ client, store, logger: quiet });
+  const leased = await collectOnce({ client, store, deliver, logger: quiet });
   assert.strictEqual(leased.claimed, 0, "an active lease is not handed out again");
 
   now += 61 * 1000;
-  const second = await collectOnce({ client, store, logger: quiet });
+  const second = await collectOnce({ client, store, deliver, logger: quiet });
   assert.strictEqual(second.claimed, 1);
   assert.strictEqual(second.received, 1);
   assert.strictEqual(store.list().length, 1, "the re-handed item reuses the existing task");
@@ -145,7 +147,7 @@ test("an intake store that can't be written reports a failure and never a receip
   const store = new FarmclawIntakeStore({ file });
   const client = storeClient(handoffs);
 
-  const summary = await collectOnce({ client, store, logger: quiet });
+  const summary = await collectOnce({ client, store, deliver, logger: quiet });
   assert.strictEqual(summary.failed, 1);
   assert.ok(!client.calls.some((call) => call[0] === "receipt"));
   const failed = handoffs.get(record.id);
@@ -178,7 +180,7 @@ test("a conflicting receipt is recorded on the task, not papered over", async ()
     return res;
   };
 
-  const summary = await collectOnce({ client, store, logger: quiet });
+  const summary = await collectOnce({ client, store, deliver, logger: quiet });
   assert.strictEqual(summary.received, 1);
   assert.strictEqual(summary.errors.length, 1);
   const conflicted = store.get(record.id);
@@ -203,4 +205,9 @@ test("FarmClaw works its tasks through open → in_progress → done", () => {
   assert.strictEqual(store.list({ status: "open" }).length, 0);
   assert.strictEqual(store.list({ status: "done" }).length, 1);
   assert.strictEqual(store.update("nope", { status: "done" }), null);
+});
+
+test("collectOnce refuses to run without a delivery, so it can't acknowledge an undelivered link", async () => {
+  const store = new FarmclawIntakeStore({ file: tmpFile("intake.json") });
+  await assert.rejects(collectOnce({ client: {}, store, logger: quiet }), /needs a deliver function/);
 });

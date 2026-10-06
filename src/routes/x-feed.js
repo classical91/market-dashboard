@@ -4,7 +4,7 @@ const { DEFAULT_CATEGORIES } = require("../services/x-account-registry");
 const { DEFAULT_TEMPLATE_ID } = require("../services/x-template-registry");
 const { selectTargets } = require("../services/x-broadcast-channels");
 const { createServiceError } = require("../utils/errors");
-const { handoffResponse } = require("./farmclaw-handoffs");
+const { handoffResponse, requestAndPush } = require("./farmclaw-handoffs");
 
 function asyncRoute(handler) {
   return (req, res, next) => {
@@ -117,6 +117,7 @@ function createXFeedRouter({
   telegramService = null,
   broadcastChannels = [],
   farmclawHandoffStore = null,
+  farmclawPusher = null,
 }) {
   const router = express.Router();
 
@@ -429,8 +430,9 @@ function createXFeedRouter({
   /* Queue one post for FarmClaw. Kept as an alias of POST
      /api/farmclaw/handoffs: it used to relay the link through the dashboard's
      Telegram bot and call that success, but a bot's outbound message is not
-     an inbound event FarmClaw acts on. Now it only queues; success is
-     FarmClaw's own receipt on the handoff, which the button polls for. */
+     an inbound event FarmClaw acts on. Now it queues and, when the OpenClaw
+     hook is configured, sends the post to the FarmClaw agent right away;
+     success is a receipt on the handoff, which the button polls for. */
   if (requireAdmin) {
     router.post(
       "/farmclaw",
@@ -439,9 +441,8 @@ function createXFeedRouter({
         if (!farmclawHandoffStore) {
           throw createServiceError("FarmClaw handoff queue is not available", 503);
         }
-        const body = req.body || {};
-        const result = farmclawHandoffStore.request({ url: body.url, handle: body.handle, text: body.text });
-        res.status(result.created ? 201 : 200).json(handoffResponse(farmclawHandoffStore, result));
+        const result = await requestAndPush(farmclawHandoffStore, farmclawPusher, req.body || {});
+        res.status(result.created ? 201 : 200).json(handoffResponse(farmclawHandoffStore, result, farmclawPusher));
       }),
     );
   }

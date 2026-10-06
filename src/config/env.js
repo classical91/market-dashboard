@@ -238,6 +238,18 @@ const config = {
   // are labelled destinations; when this is unset they are derived from
   // TELEGRAM_CHAT_IDS so an existing deploy needs no new configuration.
   // See src/services/x-broadcast-channels.js for the accepted shape.
+  // The FarmClaw button sends the post straight to the FarmClaw OpenClaw
+  // agent through the gateway's POST <hooks>/agent when both are set. Unset,
+  // handoffs only queue for a pull collector (docs/farmclaw-handoff.md).
+  farmclawOpenclaw: {
+    hooksUrl: process.env.FARMCLAW_OPENCLAW_HOOKS_URL || "",
+    hookToken: process.env.FARMCLAW_OPENCLAW_HOOK_TOKEN || "",
+    agentId: process.env.FARMCLAW_OPENCLAW_AGENT_ID || "farmclaw",
+    channel: process.env.FARMCLAW_OPENCLAW_CHANNEL || "",
+    to: process.env.FARMCLAW_OPENCLAW_TO || "",
+    accountId: process.env.FARMCLAW_OPENCLAW_ACCOUNT_ID || "",
+    timeoutMs: parseNumber(process.env.FARMCLAW_OPENCLAW_TIMEOUT_MS, 30_000),
+  },
   xBroadcast: {
     channels: resolveBroadcastChannels({
       channelsJson: process.env.X_BROADCAST_CHANNELS || "",

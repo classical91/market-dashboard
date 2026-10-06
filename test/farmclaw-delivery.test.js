@@ -241,18 +241,19 @@ test("network errors keep their cause instead of a bare 'fetch failed'", async (
   await new Promise((resolve) => closed.close(resolve));
   const client = createHandoffClient({ baseUrl: `http://127.0.0.1:${port}`, key: "k" });
   const store = new FarmclawIntakeStore({ file: path.join(tmpDir(), "intake.json") });
-  await assert.rejects(collectOnce({ client, store, logger: quiet }), /claim failed: fetch failed \(ECONNREFUSED/);
+  const deliver = async () => ({ outcome: "delivered", deliveryId: "x" });
+  await assert.rejects(collectOnce({ client, store, deliver, logger: quiet }), /claim failed: fetch failed \(ECONNREFUSED/);
 });
 
-test("the CLI will not run without a delivery command unless told to stay local", () => {
-  const env = { ...process.env, FARMCLAW_DELIVER_CMD: "", FARMCLAW_INTAKE_FILE: path.join(tmpDir(), "intake.json") };
+test("the CLI will not run without a delivery, and --local-only no longer exists", () => {
+  const env = { ...process.env, FARMCLAW_DELIVER_CMD: "", FARMCLAW_OPENCLAW_HOOKS_URL: "", FARMCLAW_OPENCLAW_HOOK_TOKEN: "", FARMCLAW_INTAKE_FILE: path.join(tmpDir(), "intake.json") };
   const refused = spawnSync(process.execPath, [CLI, "run"], { env, encoding: "utf8" });
   assert.strictEqual(refused.status, 1);
-  assert.match(refused.stderr, /no delivery command/);
+  assert.match(refused.stderr, /no delivery to FarmClaw configured/);
 
-  const local = spawnSync(process.execPath, [CLI, "--local-only", "run", "--url", "http://127.0.0.1:1"], { env, encoding: "utf8" });
+  const local = spawnSync(process.execPath, [CLI, "--local-only", "run"], { env, encoding: "utf8" });
   assert.strictEqual(local.status, 1);
-  assert.match(local.stderr, /claim failed/, "--local-only gets past the guard");
+  assert.match(local.stderr, /no delivery to FarmClaw configured/, "--local-only no longer bypasses the guard");
 
   const dir = tmpDir();
   const tested = spawnSync(process.execPath, [CLI, "deliver-test", "--link", "https://x.com/a/status/14"], {

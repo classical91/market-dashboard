@@ -465,12 +465,13 @@ Sends are not written to the Broadcast Ledger: it is built around news categorie
 
 ### Sending a post to FarmClaw
 
-Each post card also carries a **FarmClaw** button. One tap queues that post's link for the FarmClaw agent; it does not message anyone.
+Each post card also carries a **FarmClaw** button. One tap sends that post's link to the FarmClaw OpenClaw agent.
 
-- **Queued is not done.** The button shows `FarmClaw queued` until FarmClaw itself claims the item and posts a receipt, and only then shows `FarmClaw ✓`. While it waits, the tooltip says when FarmClaw last checked in, or that it never has, so a FarmClaw that isn't polling is visible instead of silent.
+- **Direct push.** With `FARMCLAW_OPENCLAW_HOOKS_URL` and `FARMCLAW_OPENCLAW_HOOK_TOKEN` set (the agent's gateway `hooks` URL and token; `FARMCLAW_OPENCLAW_AGENT_ID` defaults to `farmclaw`), the dashboard posts the link to the gateway's `POST /hooks/agent` on tap. `FarmClaw ✓` means the gateway admitted a FarmClaw agent run for it; a rejection shows the gateway's exact error on the button. Setup is in [docs/farmclaw-handoff.md](docs/farmclaw-handoff.md#direct-push-recommended).
+- **Queued is not done.** Without the hook, the button shows `FarmClaw queued` until a FarmClaw-side collector delivers it and posts a receipt. While it waits, the tooltip says when FarmClaw last checked in, or that it never has. `✓` always needs proof that the link reached the agent.
 - Taps are idempotent on the canonical post URL. A repeat tap returns the same handoff, re-queues a failed one, and leaves a received one as received.
 - FarmClaw pulls with the existing `BROADCAST_LEDGER_API_KEY`; no new variable is needed. The contract is in [docs/farmclaw-handoff.md](docs/farmclaw-handoff.md).
-- FarmClaw's side runs `node scripts/farmclaw-collector.js watch` on its own host. It claims queued links, records each as a durable task in `FARMCLAW_INTAKE_FILE` (default `~/.farmclaw/intake.json`), delivers it into the live FarmClaw session through `FARMCLAW_DELIVER_CMD`, and sends the receipt only after that delivery is confirmed. Until the collector runs with a delivery command, links stay `FarmClaw queued`.
+- For a gateway the dashboard can't reach, FarmClaw's side runs `node scripts/farmclaw-collector.js watch` on its own host. It claims queued links, records each as a durable task in `FARMCLAW_INTAKE_FILE` (default `~/.farmclaw/intake.json`), starts a FarmClaw OpenClaw agent run for it through the gateway's `POST /hooks/agent` (`FARMCLAW_OPENCLAW_HOOKS_URL`, `FARMCLAW_OPENCLAW_HOOK_TOKEN`), or through a custom `FARMCLAW_DELIVER_CMD`, and sends the receipt only after the gateway admits the run. Until the collector runs with one of these, nothing reaches FarmClaw and links stay `FarmClaw queued`.
 
 `POST /api/farmclaw/handoffs` (`{ "url": "https://x.com/..." }`, owner session or admin key) queues a post; `POST /api/x/farmclaw` is kept as an alias. Earlier versions relayed the link through `TELEGRAM_BOT_TOKEN` to `FARMCLAW_TELEGRAM_CHAT` and reported success as soon as Telegram accepted it. FarmClaw never received those messages, because a bot's outbound message is not an inbound event for another bot or agent. `FARMCLAW_TELEGRAM_CHAT` is no longer read and can be removed.
 

@@ -3,6 +3,57 @@
 How the **FarmClaw** button on X Intelligence cards gets a post to the FarmClaw
 agent, and how the dashboard knows it got there.
 
+## Direct push (recommended)
+
+When the FarmClaw OpenClaw gateway has an HTTPS address the dashboard can
+reach, the dashboard sends the post itself. No process runs on FarmClaw's side.
+
+1. On the gateway, enable inbound hooks for the FarmClaw agent with a dedicated
+   token, then run `openclaw config validate` and `openclaw gateway restart`:
+
+   ```json5
+   hooks: { enabled: true, token: "<long-random-hook-token>", path: "/hooks", allowedAgentIds: ["farmclaw"] }
+   ```
+
+2. In the dashboard's Railway variables set:
+
+   | Variable | Value |
+   | --- | --- |
+   | `FARMCLAW_OPENCLAW_HOOKS_URL` | `https://<gateway host>/hooks` |
+   | `FARMCLAW_OPENCLAW_HOOK_TOKEN` | the same token as `hooks.token` |
+   | `FARMCLAW_OPENCLAW_AGENT_ID` | the agent's configured id (default `farmclaw`) |
+   | `FARMCLAW_OPENCLAW_CHANNEL` + `FARMCLAW_OPENCLAW_TO` | optional, both or neither: also announce the run's result to that chat |
+
+A tap then works like this:
+
+1. The tap queues the handoff and sends it at once to
+   `POST <hooks>/agent`. The request carries
+   `{ message, agentId, deliver: true }` and
+   `Idempotency-Key: farmclaw-<handoff id>`.
+2. The gateway answers `200 { ok: true, runId }` once the FarmClaw agent's run
+   is admitted. The handoff is then marked received with receipt
+   `openclaw-run:<runId>`, and the button shows `FarmClaw ✓`.
+3. If the gateway rejects the run, the button shows `FarmClaw failed` with the
+   gateway's exact error, for example `HTTP 401` for a wrong token or `HTTP 404`
+   when hooks are off. The next tap tries again.
+4. If the gateway never answers, the request is retried twice with the same key.
+   If there is still no answer, the button shows a failure saying the run may
+   already exist. Check FarmClaw before tapping again. A re-tap within a few
+   minutes is replayed by the gateway rather than run twice.
+
+The tap waits up to 20 seconds for the gateway, and the button keeps polling
+after that. Once a minute the dashboard also sweeps for handoffs queued before
+the hook was configured, and for pushes interrupted by a restart.
+
+`✓` needs proof that the post reached the agent: an `openclaw-run:` receipt, or
+the pull collector's `Delivered to the FarmClaw session` note. Earlier
+collectors acknowledged links they had only written to a local file, and the
+button showed `✓` for posts FarmClaw never saw. A tap on such a post sends it
+now.
+
+The pull collector below is for a gateway the dashboard can't reach. It uses
+the same claim lease, so the two never deliver the same handoff twice.
+
 ## Why it is a queue
 
 The button used to send the post link through the dashboard's Telegram bot
@@ -72,18 +123,103 @@ not on the dashboard. Each pass does four things, in order:
 1. **Claim** pending handoffs.
 2. **Write a task** for each one to FarmClaw's task store
    (`FARMCLAW_INTAKE_FILE`).
-3. **Deliver** the task into the live FarmClaw session by running
-   `FARMCLAW_DELIVER_CMD`.
+3. **Deliver** the task to the FarmClaw OpenClaw agent, through the gateway's
+   `POST /hooks/agent` (built in) or a custom `FARMCLAW_DELIVER_CMD`.
 4. **Send the receipt** (`receiptId` = the task id `fct_...`, `note` = the
-   session's delivery id).
+   delivery id, e.g. `openclaw-run:<runId>`).
 
-The collector owns the claim and receipt payloads. The delivery command never
+The collector owns the claim and receipt payloads. The delivery step never
 talks to the dashboard, so it can't send them wrong.
 
 A task file on its own is not FarmClaw's workflow, because nothing reads it.
 An earlier version stopped at step 2: it claimed links and wrote local tasks
 that the FarmClaw agent never saw. `run` and `watch` therefore refuse to start
-without a delivery command, unless `--local-only` is passed explicitly.
+without a delivery configured, and a receipt only counts as delivered with
+proof of delivery to the agent (see below).
+
+### When nothing reaches FarmClaw: `doctor`
+
+Run this on FarmClaw's host, with the same environment as `watch`:
+
+```bash
+node scripts/farmclaw-collector.js doctor
+```
+
+It checks every hop and prints `PASS`/`FAIL`/`WARN` lines. It starts no agent
+run.
+
+- Is a delivery configured?
+- Does the dashboard answer, does it accept the machine key, and what is in the
+  queue?
+- When did a collector last poll? "Never" or "an hour ago" means `watch` isn't
+  running.
+- Does the gateway hook answer, are hooks enabled, and is the token accepted?
+  The probe has no `message`, so the gateway rejects it with
+  `400 message required` after the token check and before any dispatch.
+- Are any deliveries in the task file stuck as unknown or failing?
+
+It exits `0` when every hop answers. The agent id itself is only proven by
+`deliver-test`, which starts one real test run.
+
+### Delivering to the FarmClaw OpenClaw agent (gateway hook)
+
+The OpenClaw gateway accepts external agent turns on `POST <hooks.path>/agent`.
+Hooks are off by default. On FarmClaw's gateway host, enable them for the
+FarmClaw agent only, with a dedicated token (not the gateway auth token):
+
+```json5
+// openclaw config
+{
+  hooks: {
+    enabled: true,
+    token: "<long-random-hook-token>",
+    path: "/hooks",
+    allowedAgentIds: ["farmclaw"],     // the FarmClaw agent's configured id
+    allowRequestSessionKey: false,
+  },
+}
+```
+
+Then run `openclaw config validate` and `openclaw gateway restart`. Start the
+collector on the same host:
+
+```bash
+export BROADCAST_LEDGER_API_KEY=...                                  # dashboard machine key
+export FARMCLAW_OPENCLAW_HOOKS_URL=http://127.0.0.1:18789/hooks      # gateway port + hooks.path
+export FARMCLAW_OPENCLAW_HOOK_TOKEN=<long-random-hook-token>         # same as hooks.token
+export FARMCLAW_OPENCLAW_AGENT_ID=farmclaw                           # default shown
+# Optional: also announce the run's result to a chat (both or neither):
+# export FARMCLAW_OPENCLAW_CHANNEL=telegram FARMCLAW_OPENCLAW_TO=<chat id>
+
+node scripts/farmclaw-collector.js deliver-test --link https://x.com/...   # starts one TEST run; check FarmClaw saw it
+node scripts/farmclaw-collector.js watch --interval 60                     # the recurring collector
+```
+
+Each delivery is one isolated FarmClaw agent turn whose message is the handoff
+text below. With no announce destination, OpenClaw posts the completion to the
+FarmClaw agent's main session (`deliver: true`). The gateway answers
+`200 { ok: true, runId }` once the run is admitted. That `runId` becomes the
+delivery id, and only then is the dashboard receipt sent. Admission means the
+agent has the link, not that its turn finished. FarmClaw's own next steps, such
+as its FarmBot intake, are not tracked by the dashboard.
+
+Duplicates: each request carries `Idempotency-Key: farmclaw-<taskId>` and an
+identical body, so the gateway replays the same run for a repeated request.
+It keeps that replay entry while the run is active and for 5 minutes after it
+settles, and forgets it on restart. A lost response is therefore retried right
+away (3 attempts in total). If none is answered, the outcome is **unknown** and
+the collector does not re-send it later; see Outcomes.
+
+| Gateway answer | Outcome |
+| --- | --- |
+| `200 { ok: true, runId }` | delivered |
+| `400` (bad agent id or destination), `401` (token), `404` (hooks off or wrong path), `409`, `413`, `429`, `502`, `503` | failed: the run was not admitted. Retried on lease expiry, then reported with the gateway's error |
+| No response after 3 attempts, or a `200` without `runId` | unknown: reported and not re-sent |
+
+### Other runtimes: a delivery command
+
+Instead of the hook, `FARMCLAW_DELIVER_CMD` can be any command that posts the
+item into the agent. Setting both is an error.
 
 ```bash
 export BROADCAST_LEDGER_API_KEY=...                  # the machine key

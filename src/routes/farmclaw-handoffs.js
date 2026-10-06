@@ -3,6 +3,7 @@
 const { Router } = require("express");
 const { createRateLimit } = require("../middleware/rate-limit");
 const { isLedgerRequest } = require("../middleware/ledger-auth");
+const { pushWithin } = require("../services/farmclaw-pusher");
 
 /**
  * FarmClaw handoff queue — see src/services/farmclaw-handoffs.js.
@@ -18,7 +19,7 @@ const { isLedgerRequest } = require("../middleware/ledger-auth");
  * already carry, so no new secret is needed.
  */
 
-function handoffResponse(store, result) {
+function handoffResponse(store, result, pusher = null) {
   return {
     ok: true,
     id: result.record.id,
@@ -27,10 +28,25 @@ function handoffResponse(store, result) {
     requeued: result.requeued,
     record: result.record,
     agent: store.agentStatus(),
+    push: { enabled: Boolean(pusher?.enabled) },
   };
 }
 
-function createFarmclawHandoffRouter({ handoffStore, requireAdmin, requireLedgerKey, ledgerKey, adminKey, rateLimitPerMinute = 60 }) {
+/**
+ * Queue a post, then, when the OpenClaw hook is configured, send it to the
+ * FarmClaw agent right away and answer with the outcome (✓ or the gateway's
+ * error). Shared by POST /api/farmclaw/handoffs and its /api/x/farmclaw alias.
+ */
+async function requestAndPush(store, pusher, body) {
+  const result = store.request({ url: body.url, handle: body.handle, text: body.text });
+  if (pusher?.enabled && result.record.status === "pending") {
+    await pushWithin(pusher, result.record.id);
+    return { ...result, record: store.get(result.record.id) || result.record };
+  }
+  return result;
+}
+
+function createFarmclawHandoffRouter({ handoffStore, pusher = null, requireAdmin, requireLedgerKey, ledgerKey, adminKey, rateLimitPerMinute = 60 }) {
   const router = Router();
   const limiter = createRateLimit({ limit: rateLimitPerMinute, windowMs: 60 * 1000 });
 
@@ -45,9 +61,9 @@ function createFarmclawHandoffRouter({ handoffStore, requireAdmin, requireLedger
   }
 
   function handle(fn) {
-    return (req, res, next) => {
+    return async (req, res, next) => {
       try {
-        fn(req, res);
+        await fn(req, res);
       } catch (err) {
         if (err.statusCode === 409) {
           res.status(409).json({ error: err.message, currentStatus: err.currentStatus });
@@ -58,10 +74,9 @@ function createFarmclawHandoffRouter({ handoffStore, requireAdmin, requireLedger
     };
   }
 
-  router.post("/", requireAdmin, limiter, handle((req, res) => {
-    const body = req.body || {};
-    const result = handoffStore.request({ url: body.url, handle: body.handle, text: body.text });
-    res.status(result.created ? 201 : 200).json(handoffResponse(handoffStore, result));
+  router.post("/", requireAdmin, limiter, handle(async (req, res) => {
+    const result = await requestAndPush(handoffStore, pusher, req.body || {});
+    res.status(result.created ? 201 : 200).json(handoffResponse(handoffStore, result, pusher));
   }));
 
   router.get("/", requireEither, handle((req, res) => {
@@ -83,7 +98,7 @@ function createFarmclawHandoffRouter({ handoffStore, requireAdmin, requireLedger
       res.status(404).json({ error: "Handoff not found" });
       return;
     }
-    res.json({ ...record, agent: handoffStore.agentStatus() });
+    res.json({ ...record, agent: handoffStore.agentStatus(), push: { enabled: Boolean(pusher?.enabled) } });
   }));
 
   router.post("/:id/receipt", requireLedgerKey, limiter, handle((req, res) => {
@@ -107,4 +122,4 @@ function createFarmclawHandoffRouter({ handoffStore, requireAdmin, requireLedger
   return router;
 }
 
-module.exports = { createFarmclawHandoffRouter, handoffResponse };
+module.exports = { createFarmclawHandoffRouter, handoffResponse, requestAndPush };
