@@ -326,6 +326,12 @@ class FarmclawHandoffStore {
     return this._read().records.find((record) => record.id === id) || null;
   }
 
+  findByUrl(url) {
+    const canonicalUrl = canonicalizeUrl(clampString(url, MAX_URL_LEN));
+    if (!canonicalUrl) throw makeError("url must be an http(s) link to the post", 400);
+    return this._read().records.find((record) => record.canonicalUrl === canonicalUrl) || null;
+  }
+
   list({ status, limit = 50 } = {}) {
     const max = Math.max(1, Math.min(Number(limit) || 50, 500));
     return this._read().records

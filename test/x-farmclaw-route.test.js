@@ -108,6 +108,25 @@ test("refuses a missing or non-http url without queueing", async () => {
   }
 });
 
+test("status lookup is authenticated, canonical, and never retries a failed handoff", async () => {
+  const url = nextPostUrl();
+  const { body: queued } = await call("/api/farmclaw/handoffs", { headers: admin, body: { url } });
+  await call(`/api/farmclaw/handoffs/${queued.id}/fail`, { headers: farmclaw, body: { error: "connection unavailable" } });
+  const lookup = `/api/farmclaw/handoffs/lookup?url=${encodeURIComponent(`${url}?s=20`)}`;
+  assert.strictEqual((await call(lookup, { method: "GET" })).status, 401);
+  const before = await call(`/api/farmclaw/handoffs/${queued.id}`, { method: "GET", headers: admin });
+  const found = await call(lookup, { method: "GET", headers: admin });
+  assert.strictEqual(found.status, 200);
+  assert.strictEqual(found.body.id, queued.id);
+  assert.strictEqual(found.body.status, "failed");
+  assert.deepStrictEqual(found.body, before.body);
+  const machine = await call(lookup, { method: "GET", headers: farmclaw });
+  assert.strictEqual(machine.status, 200);
+  assert.strictEqual((await call(`/api/farmclaw/handoffs/lookup?url=${encodeURIComponent(nextPostUrl())}`, { method: "GET", headers: admin })).status, 404);
+  assert.strictEqual((await call("/api/farmclaw/handoffs/lookup?url=javascript:bad", { method: "GET", headers: admin })).status, 400);
+  assert.deepStrictEqual(outboundCalls, []);
+});
+
 test("FarmClaw claims, acknowledges with a receipt, and only then is it received", async () => {
   const url = nextPostUrl();
   const queued = await call("/api/farmclaw/handoffs", { headers: admin, body: { url } });

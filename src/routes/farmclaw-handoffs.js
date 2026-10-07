@@ -10,6 +10,7 @@ const { pushWithin } = require("../services/farmclaw-pusher");
  *
  *   POST /                queue a post (dashboard owner / admin key).
  *   GET  /:id             one handoff, for the button to poll (either side).
+ *   GET  /lookup?url=     restore a button's status without requeueing it.
  *   GET  /                list, optionally ?status= (either side).
  *   POST /claim           FarmClaw takes pending items (machine key).
  *   POST /:id/receipt     FarmClaw acknowledges with its own receipt id.
@@ -90,6 +91,17 @@ function createFarmclawHandoffRouter({ handoffStore, pusher = null, requireAdmin
     const body = req.body || {};
     const records = handoffStore.claim({ agent: body.agent, limit: body.limit });
     res.json({ ok: true, records });
+  }));
+
+  // Unlike POST, a page reload must never retry a failed handoff or push it
+  // again. Lookup uses the same canonical URL as request(), without writes.
+  router.get("/lookup", requireEither, handle((req, res) => {
+    const record = handoffStore.findByUrl(req.query.url);
+    if (!record) {
+      res.status(404).json({ error: "Handoff not found" });
+      return;
+    }
+    res.json({ ...record, agent: handoffStore.agentStatus(), push: { enabled: Boolean(pusher?.enabled) } });
   }));
 
   router.get("/:id", requireEither, handle((req, res) => {

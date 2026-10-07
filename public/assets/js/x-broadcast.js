@@ -96,6 +96,12 @@
     return Boolean(url) && readSent(storage, key).indexOf(url) !== -1;
   }
 
+  function forgetSent(url, key) {
+    try {
+      localStorage.setItem(key, JSON.stringify(readSent(null, key).filter(function (entry) { return entry !== url; })));
+    } catch (err) {}
+  }
+
   /* What to tell the reader about a completed send. A partial delivery is
      named channel by channel: "sent to 2 of 3" without saying which one failed
      is not something anyone can act on. */
@@ -370,11 +376,11 @@
     idle: "FarmClaw",
     busy: "Sending…",
     queued: "FarmClaw queued",
-    sent: "FarmClaw ✓",
+    sent: "FarmClaw received",
     failure: "FarmClaw failed",
   };
   var FARMCLAW_POLL_MS = 5000;
-  var FARMCLAW_POLL_LIMIT = 36; // three minutes; a later tap resumes it
+  var FARMCLAW_POLL_LIMIT = 36; // three minutes; a reload or later tap resumes it
 
   function ago(iso, nowMs) {
     var then = Date.parse(iso || "");
@@ -414,6 +420,7 @@
   function bindFarmclawButton(button, post) {
     var url = post && post.url;
     var timer = null;
+    var version = 0;
 
     function show(label, title) {
       button.textContent = label;
@@ -425,18 +432,21 @@
       if (record.status === "received") {
         var receipt = record.receipt || {};
         if (!hasDeliveryProof(receipt)) {
+          forgetSent(url, FARMCLAW_SENT_KEY);
           show(FARMCLAW_LABELS.idle, "Acknowledged without reaching the FarmClaw agent — tap to send it.");
           return true;
         }
         rememberSent(url, null, FARMCLAW_SENT_KEY);
-        show(FARMCLAW_LABELS.sent, "Sent to the FarmClaw agent (" + receipt.receiptId + ").");
+        forgetSent(url, FARMCLAW_QUEUED_KEY);
+        show(FARMCLAW_LABELS.sent, "Received by the FarmClaw agent (" + receipt.receiptId + "). FarmBot queueing and broadcasting are not confirmed here.");
         return true;
       }
+      forgetSent(url, FARMCLAW_SENT_KEY);
+      rememberSent(url, null, FARMCLAW_QUEUED_KEY);
       if (record.status === "failed") {
         show(FARMCLAW_LABELS.failure, "FarmClaw could not take it: " + (record.error || "unknown error") + " — tap to retry.");
         return true;
       }
-      rememberSent(url, null, FARMCLAW_QUEUED_KEY);
       if (handoff && handoff.push && handoff.push.enabled) {
         show(FARMCLAW_LABELS.busy, "Sending to the FarmClaw agent…");
       } else {
@@ -445,25 +455,46 @@
       return false;
     }
 
-    function poll(id, remaining) {
+    function check(target, remaining, checkingVersion) {
+      // Auto-refresh must not open an admin-key prompt on every restored card.
+      window.AdminKey.fetchSilent(target, { cache: "no-store" }).then(readJson).then(
+        function (handoff) {
+          if (checkingVersion !== version) return;
+          if (!settle(handoff)) poll("/api/farmclaw/handoffs/" + encodeURIComponent(handoff.id), remaining - 1, checkingVersion);
+        },
+        function (err) {
+          if (checkingVersion !== version) return;
+          if (err.status === 404) {
+            forgetSent(url, FARMCLAW_SENT_KEY);
+            forgetSent(url, FARMCLAW_QUEUED_KEY);
+            show(FARMCLAW_LABELS.idle, "Previous handoff was not found — tap to send this link to FarmClaw.");
+            return;
+          }
+          button.title = "Could not refresh FarmClaw status: " + (err.message || "network error") + ". The displayed status is the last known one; tap to check.";
+          if (err.status !== 401 && err.status !== 403) poll(target, remaining - 1, checkingVersion);
+        },
+      );
+    }
+
+    function poll(target, remaining, checkingVersion) {
       if (timer) clearTimeout(timer);
       if (remaining <= 0) return;
       timer = setTimeout(function () {
-        request("/api/farmclaw/handoffs/" + encodeURIComponent(id)).then(
-          function (handoff) {
-            if (!settle(handoff)) poll(id, remaining - 1);
-          },
-          function () { poll(id, remaining - 1); },
-        );
+        if (checkingVersion !== version || button.isConnected === false) return;
+        check(target, remaining, checkingVersion);
       }, FARMCLAW_POLL_MS);
     }
 
-    if (wasSent(url, null, FARMCLAW_SENT_KEY)) show(FARMCLAW_LABELS.sent, "FarmClaw received it.");
-    else if (wasSent(url, null, FARMCLAW_QUEUED_KEY)) show(FARMCLAW_LABELS.queued, "Queued for FarmClaw — tap to check.");
+    var remembered = wasSent(url, null, FARMCLAW_SENT_KEY) || wasSent(url, null, FARMCLAW_QUEUED_KEY);
+    if (wasSent(url, null, FARMCLAW_SENT_KEY)) show(FARMCLAW_LABELS.sent, "Last confirmed received by FarmClaw; refreshing status. FarmBot queueing and broadcasting are not confirmed here.");
+    else if (remembered) show(FARMCLAW_LABELS.queued, "Refreshing FarmClaw status…");
     else show(FARMCLAW_LABELS.idle, "Queue this post's link for FarmClaw");
+    if (remembered) check("/api/farmclaw/handoffs/lookup?url=" + encodeURIComponent(url), FARMCLAW_POLL_LIMIT, version);
 
     button.addEventListener("click", function () {
       if (button.disabled || !url) return;
+      version += 1;
+      if (timer) clearTimeout(timer);
       button.disabled = true;
       button.textContent = FARMCLAW_LABELS.busy;
       // Idempotent on the post url: a repeat tap returns the same handoff,
@@ -475,7 +506,7 @@
       }).then(
         function (handoff) {
           button.disabled = false;
-          if (!settle(handoff)) poll(handoff.id, FARMCLAW_POLL_LIMIT);
+          if (!settle(handoff)) poll("/api/farmclaw/handoffs/" + encodeURIComponent(handoff.id), FARMCLAW_POLL_LIMIT, version);
         },
         function (err) {
           button.disabled = false;

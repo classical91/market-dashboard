@@ -32,7 +32,7 @@ A tap then works like this:
    `Idempotency-Key: farmclaw-<handoff id>`.
 2. The gateway answers `200 { ok: true, runId }` once the FarmClaw agent's run
    is admitted. The handoff is then marked received with receipt
-   `openclaw-run:<runId>`, and the button shows `FarmClaw ✓`.
+   `openclaw-run:<runId>`, and the button shows `FarmClaw received`.
 3. If the gateway rejects the run, the button shows `FarmClaw failed` with the
    gateway's exact error, for example `HTTP 401` for a wrong token or `HTTP 404`
    when hooks are off. The next tap tries again.
@@ -57,7 +57,7 @@ the same claim lease, so the two never deliver the same handoff twice.
 ## Why it is a queue
 
 The button used to send the post link through the dashboard's Telegram bot
-(`TELEGRAM_BOT_TOKEN`) to `FARMCLAW_TELEGRAM_CHAT` and show `FarmClaw ✓` as soon
+(`TELEGRAM_BOT_TOKEN`) to `FARMCLAW_TELEGRAM_CHAT` and show `FarmClaw received` as soon
 as Telegram accepted the message. That proved only that the message was
 delivered to Telegram. A message the dashboard bot sends is outbound, so it is
 never an inbound event that the FarmClaw bot or agent acts on. The relay failed
@@ -65,7 +65,7 @@ in one of two ways:
 
 1. Telegram rejected the send because the bot couldn't reach that chat, and the
    button showed `FarmClaw failed`.
-2. Telegram accepted the send, the button showed `FarmClaw ✓`, and FarmClaw
+2. Telegram accepted the send, the button showed `FarmClaw received`, and FarmClaw
    never saw it.
 
 Now the dashboard only queues, FarmClaw pulls with its machine key, and the
