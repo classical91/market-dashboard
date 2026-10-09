@@ -55,11 +55,15 @@ test("the Lab is renamed and points at where the moved panels went", () => {
   assert.doesNotMatch(html, /&#129514; Trading Lab/);
   assert.match(read("public/assets/js/sidebar.js"), /label: "Trading Lab Backtest"/);
   const sidebar = read("public/assets/js/sidebar.js");
+  const trades = sidebar.slice(
+    sidebar.indexOf('label: "Trades"'),
+    sidebar.indexOf('label: "TradeHunter"'),
+  );
+  assert.match(trades, /href: "\/trading-lab\.html", label: "Trading Lab Backtest"/);
   const aiAnalysis = sidebar.slice(
     sidebar.indexOf('label: "AI Analysis"'),
     sidebar.indexOf('label: "Reporter"'),
   );
-  assert.match(aiAnalysis, /href: "\/trading-lab\.html", label: "Trading Lab Backtest"/);
   assert.doesNotMatch(aiAnalysis, /label: "Trading"/);
 
   // The CARDS are gone from the Lab. Checked as card titles rather than as bare

@@ -11,6 +11,7 @@ test("primary sidebar order and removed links stay exact", () => {
   const labels = [
     "Terminal Suite",
     "Overview",
+    "Trades",
     "TradeHunter",
     "AI Analysis",
     "Reporter",
@@ -45,6 +46,25 @@ test("the Reporter menu can actually reach the Reporter Room", () => {
   }
 });
 
+test("Trades sits above TradeHunter and holds the trade workflow", () => {
+  const tradesStart = sidebar.indexOf('label: "Trades"');
+  const tradeHunterStart = sidebar.indexOf('label: "TradeHunter"');
+  const trades = sidebar.slice(tradesStart, tradeHunterStart);
+
+  assert.ok(tradesStart > -1, "Trades is missing");
+  assert.ok(tradeHunterStart > tradesStart, "Trades must sit above TradeHunter");
+  assert.match(trades, /href: "\/pattern-scanner-trades\.html", label: "My Trades"/);
+  assert.match(trades, /label: "Decision Engine"/);
+  assert.match(trades, /href: "\/trading-lab\.html", label: "Trading Lab Backtest"/);
+  let cursor = -1;
+  for (const label of ["My Trades", "Decision Engine", "Trading Lab Backtest"]) {
+    const next = trades.indexOf(`label: "${label}"`, cursor + 1);
+    assert.ok(next > cursor, `${label} is missing or out of order in Trades`);
+    cursor = next;
+    assert.equal(sidebar.match(new RegExp(`label: "${label}"`, "g")).length, 1, `${label} is duplicated`);
+  }
+});
+
 test("TradeHunter sits above AI Analysis and owns the scanner workflow", () => {
   const tradeHunterStart = sidebar.indexOf('label: "TradeHunter"');
   const aiAnalysisStart = sidebar.indexOf('label: "AI Analysis"');
@@ -52,7 +72,7 @@ test("TradeHunter sits above AI Analysis and owns the scanner workflow", () => {
 
   assert.ok(tradeHunterStart > -1, "TradeHunter is missing");
   assert.ok(aiAnalysisStart > tradeHunterStart, "TradeHunter must sit above AI Analysis");
-  const labels = ["Screeners", "Directional Bias", "Local Extremes", "Pattern Scanner", "Crypto Open Interest", "Cross-Market Open Interest", "My Trades", "Track Record", "Decision Engine"];
+  const labels = ["Screeners", "Directional Bias", "Local Extremes", "Pattern Scanner", "Crypto Open Interest", "Cross-Market Open Interest", "Track Record"];
   let cursor = -1;
   for (const label of labels) {
     const next = tradeHunter.indexOf(`label: "${label}"`, cursor + 1);
@@ -76,7 +96,6 @@ test("the Screeners group holds one entry per screener and no combined page", ()
   assert.match(menu, /href: "\/pattern-scanner\.html"/);
   assert.match(menu, /href: "\/open-interest\.html", label: "Crypto Open Interest"/);
   assert.match(menu, /href: "\/cross-market-oi\.html", label: "Cross-Market Open Interest"/);
-  assert.match(menu, /href: "\/pattern-scanner-trades\.html"/);
   assert.doesNotMatch(sidebar, /label: "Signal Screener"/);
   // Future screeners join this group; none of them may ship as a dead link yet.
   for (const unbuilt of ["Derivatives", "Volatility", "Relative Strength"]) {
@@ -94,15 +113,15 @@ test("both screener pages are available in Alpha review mode", () => {
   assert.match(body, /"\/pattern-scanner\.html"/);
 });
 
-test("AI Analysis owns presets, layouts, Backtest, and Signal Diagnostics", () => {
+test("AI Analysis owns presets, layouts, and Signal Diagnostics", () => {
   const start = sidebar.indexOf('label: "AI Analysis"');
   const end = sidebar.indexOf('label: "Reporter"', start);
   const menu = sidebar.slice(start, end);
 
   assert.match(menu, /label: "Presets"/);
   assert.match(menu, /label: "My Layouts"/);
-  assert.match(menu, /label: "Trading Lab Backtest"/);
   assert.match(menu, /label: "Signal Diagnostics"/);
+  assert.doesNotMatch(menu, /Trading Lab Backtest/);
   assert.doesNotMatch(menu, /label: "Trading"/);
   assert.doesNotMatch(menu, /Decision Engine/);
 });
