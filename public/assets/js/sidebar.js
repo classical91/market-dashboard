@@ -55,10 +55,23 @@
       ],
     },
     {
+      // The trade workflow in one place: the trades you are running, the
+      // engine that plans them, and the lab that backtests the setups.
+      label: "Trades",
+      children: [
+        { href: "/pattern-scanner-trades.html", label: "My Trades" },
+        {
+          href: "https://trading-strategy-production-1b41.up.railway.app/",
+          label: "Decision Engine",
+        },
+        { href: "/trading-lab.html", label: "Trading Lab Backtest" },
+      ],
+    },
+    {
       label: "TradeHunter",
       children: [
         // Each screener answers one question — direction, location, structure
-        // — and My Trades is where the three are read together. Future
+        // — and My Trades (under Trades) is where the three are read together. Future
         // screeners (Derivatives, Volatility, Relative Strength) join this
         // group rather than the level above it.
         {
@@ -79,12 +92,7 @@
         // Not a screener: four live charts side by side (TOTAL / DXY / BTC /
         // USDT.D by default) for cross-market confirmation.
         { href: "/tradehunter/market-matrix", label: "Market Matrix" },
-        { href: "/pattern-scanner-trades.html", label: "My Trades" },
         { href: "/pattern-scanner-stats.html", label: "Track Record" },
-        {
-          href: "https://trading-strategy-production-1b41.up.railway.app/",
-          label: "Decision Engine",
-        },
       ],
     },
     {
@@ -92,7 +100,6 @@
       children: [
         { href: "/ai-analysis.html", label: "Presets" },
         { href: "/layout-analysis.html", label: "My Layouts" },
-        { href: "/trading-lab.html", label: "Trading Lab Backtest" },
         { href: "/signal-diagnostics.html", label: "Signal Diagnostics" },
       ],
     },
