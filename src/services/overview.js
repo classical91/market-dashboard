@@ -1,3 +1,5 @@
+const { buildMarketState } = require("./market-state");
+
 const VALID_RANGES = ["1D", "1W", "1M", "3M"];
 
 class OverviewService {
@@ -109,6 +111,10 @@ class OverviewService {
       return { ...row, type: source };
     });
 
+    // The canonical regime — the Decision Engine's model, annotated with where
+    // each input came from. marketStatus below is the older crypto-only read,
+    // kept until the pages that show it move over.
+    const marketState = buildMarketState({ crypto, equities, macro, calendar });
     const marketStatus = buildMarketStatus(crypto.items);
     const kpis = buildKpis({ crypto: crypto.items, onchain });
     const heatmap = buildHeatmap({ crypto: crypto.items, equities: equities.items, macro: macro.items });
@@ -153,6 +159,7 @@ class OverviewService {
       status: "ok",
       updatedAt: new Date().toISOString(),
       range,
+      marketState,
       marketStatus,
       kpis,
       ticker,
