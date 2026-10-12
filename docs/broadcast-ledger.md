@@ -123,9 +123,13 @@ Base path: `/api/broadcast-ledger`
 
 ### `POST /broadcast/guard` — category and daily-limit preflight
 
-Send a stable `idempotencyKey`, `source`, exact `newsType`, and the story
-headline/text before Telegram is contacted. The endpoint returns `200` with a
-pending receipt when allowed. A category-policy or daily-limit violation
+Send a stable `idempotencyKey` (or `attemptId`), `source`, exact `newsType`,
+the story headline/text and, optionally, the intended `destinations` before
+Telegram is contacted. The endpoint returns `200` with a pending receipt when
+allowed. That receipt **is** the attempt's receipt: finalize it, never open a
+second one (see [one attempt, one receipt](#one-attempt-one-receipt)).
+Destinations sent to the guard are recorded as `pending` whatever status they
+carry, so the pending card shows where the story is headed. A category-policy or daily-limit violation
 returns `409` and, when blocked-attempt recording is enabled, stores a visible
 `blocked` receipt with the reason in its attempt history.
 
@@ -430,11 +434,65 @@ destination. Geopolitics uses the guard first, with a stable attempt key:
 ```
 POST /api/broadcast-ledger/broadcast/guard
 { "source": "sharebot67", "newsType": "Geopolitics", "headline": "...",
-  "text": "...", "idempotencyKey": "sharebot67-<run id>-<story id>" }
+  "text": "...", "idempotencyKey": "sharebot67-<report hash>",
+  "destinations": [ { "channel": "telegram", "chatId": "-1001941064823",
+                      "threadId": "984", "label": "Geopolitics" } ] }
 ```
 
 A `409` means stop before Telegram. The blocked attempt and reason are already
-visible in the ledger. Other categories use the duplicate lookup:
+visible in the ledger. A `200` returns `receipt.id`: keep it, and skip the
+"pending receipt" step below — the guard already wrote it.
+
+#### One attempt, one receipt
+
+Generate **one** idempotency key per report and use it for the guard and for
+every later write about that attempt. Never derive a second key for
+finalization (`sharebot67-attempt-<hash>` for the guard and
+`sharebot67-<hash>` afterwards was exactly the bug that left a stale pending
+"Destination not reported" card beside every posted Geopolitics receipt). The
+ledger dedupes only on the exact key and never merges receipts on a guess.
+
+After Telegram answers:
+
+| Telegram outcome | Ledger write |
+| --- | --- |
+| Confirmed sent | `PATCH /receipts/<guard receipt id>` with `status: "posted"` and the destination: `channel`, `chatId`, `threadId`, `label`, `status: "posted"`, `messageId` |
+| Confirmed rejected | `PATCH /receipts/<guard receipt id>` with `status: "failed"`, `error`, and the destination with `status: "failed"` and the same `error` |
+| No answer / timeout (ambiguous) | Write nothing and **do not resend**. The receipt stays pending; reconcile decides |
+
+```
+PATCH /api/broadcast-ledger/receipts/<guard receipt id>
+{ "source": "sharebot67", "status": "posted",
+  "destinations": [ { "channel": "telegram", "chatId": "-1001941064823",
+                      "threadId": "984", "label": "Geopolitics",
+                      "status": "posted", "messageId": "92657" } ] }
+```
+
+If the receipt id was lost (the guard's response never parsed, the process
+restarted), `POST /receipts` with the **same** `idempotencyKey` and the same
+body is equivalent: an existing key updates that receipt and returns
+`created: false`. Both writes are idempotent — repeating either leaves one
+receipt with one row per destination.
+
+If Telegram confirmed the send but the ledger write fails, report that as a
+ledger failure, not a delivery failure: log the message id, chat and thread
+so the receipt can be finalized by hand or by a later run, and leave the
+Telegram post alone.
+
+In `post_report.ps1` terms (a sketch — `Invoke-Ledger` stands for the script's own HTTP helper):
+
+```powershell
+$attemptKey = "sharebot67-$reportHash"          # one key, used everywhere below
+$guard = Invoke-Ledger POST '/broadcast/guard' @{ source='sharebot67'; newsType='Geopolitics';
+          headline=$headline; text=$text; idempotencyKey=$attemptKey; destinations=@($dest) }
+# 409 → stop here, no Telegram.
+$receiptId = $guard.receipt.id
+# … send to Telegram once …
+Invoke-Ledger PATCH "/receipts/$receiptId" @{ source='sharebot67'; status='posted';
+          destinations=@($dest + @{ status='posted'; messageId="$messageId" }) }
+```
+
+Other categories use the duplicate lookup:
 
 ```
 POST /api/broadcast-ledger/lookup   { "url": "...", "headline": "...", "text": "..." }
@@ -447,6 +505,9 @@ POST /api/broadcast-ledger/lookup   { "url": "...", "headline": "...", "text": "
 | `match: "none"` | Proceed. |
 
 ### Then write a pending receipt *before* posting
+
+(Non-guarded categories only. A Geopolitics attempt already has its pending
+receipt from the guard — finalize that one.)
 
 ```
 POST /api/broadcast-ledger/receipts

@@ -383,16 +383,20 @@ class BroadcastLedgerStore {
     const data = this._readDocument();
     const receipts = data.receipts;
     const settings = data.settings;
-    const idempotencyKey = clampString(input.idempotencyKey, 200);
+    // `attemptId` is the guard's name for the same key. Accepting it here too
+    // means a sender that guards with `attemptId` and finalizes with it lands
+    // on the guard's receipt instead of forking a second one.
+    const idempotencyKey = clampString(input.idempotencyKey || input.attemptId, 200);
 
     if (idempotencyKey) {
       const existing = receipts.find((r) => r.idempotencyKey === idempotencyKey);
       if (existing) {
         // A repeat of the same key is an update, not a duplicate: a shortcut
         // that posts "pending" then re-posts "posted" under one key should
-        // advance the receipt rather than fork it.
+        // advance the receipt rather than fork it. This is also how a guard's
+        // pending receipt is finalized when the sender POSTs instead of PATCHes.
         const updated = this.updateReceipt(existing.id, input, { actor: input.source || "unknown" });
-        return { receipt: updated || existing, created: false };
+        return { receipt: updated || existing, created: false, previous: existing };
       }
     }
 
@@ -819,12 +823,28 @@ class BroadcastLedgerStore {
       return { allowed: false, reason, receipt, settings: { newsType, dailyLimit: dailyLimit || null } };
     }
 
+    // Intended destinations, when the sender names them, go on the pending
+    // card so it says where the story is headed rather than "Destination not
+    // reported". Forced to pending: the guard runs before Telegram, so nothing
+    // it records can claim a delivery.
+    const destinations = Array.isArray(input.destinations)
+      ? input.destinations
+        .filter((destination) => destination && typeof destination === "object")
+        .map((destination) => ({
+          channel: destination.channel || destination.platform,
+          chatId: destination.chatId ?? destination.chat_id,
+          threadId: destination.threadId ?? destination.thread_id,
+          label: destination.label || destination.name,
+          status: "pending",
+        }))
+      : [];
     const receipt = this.createReceipt({
       source,
       newsType,
       title,
       text,
       url,
+      destinations,
       status: "pending",
       idempotencyKey,
       action: "guard",

@@ -681,8 +681,10 @@ function createBroadcastLedgerRouter({
     (async () => {
       const invalid = validateReceiptPayload(req.body, broadcastLedgerStore.getSettings());
       if (invalid) return badRequest(res, invalid);
-      const { receipt, created } = broadcastLedgerStore.createReceipt(req.body);
-      if (created) await notifyReceiptChange(receipt);
+      const { receipt, created, previous } = broadcastLedgerStore.createReceipt(req.body);
+      // A repeat key updates the existing receipt (e.g. finalizing a guard's
+      // pending receipt), so a transition to failed or blocked still notifies.
+      await notifyReceiptChange(receipt, created ? null : previous || receipt);
       res.status(created ? 201 : 200).json({ receipt, created });
     })().catch(next);
   });
