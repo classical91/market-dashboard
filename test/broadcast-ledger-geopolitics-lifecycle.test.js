@@ -29,7 +29,7 @@ const DESTINATION = {
   label: "Geopolitics",
 };
 
-async function withLedger(run) {
+async function withLedger(run, { telegramService = { configured: false } } = {}) {
   const store = new BroadcastLedgerStore({
     dataDir: fs.mkdtempSync(path.join(os.tmpdir(), "md-ledger-geo-")),
     logger: { error() {} },
@@ -39,7 +39,7 @@ async function withLedger(run) {
   app.use(express.json());
   app.use("/api/broadcast-ledger", createBroadcastLedgerRouter({
     broadcastLedgerStore: store,
-    telegramService: { configured: false },
+    telegramService,
     notificationService: { async notify(kind, receipt) { notifications.push({ kind, id: receipt?.id }); } },
     requireLedgerKey(req, res, next) {
       if (req.get("x-broadcast-key") === LEDGER_KEY) return next();
@@ -337,4 +337,41 @@ test("the guard never records delivery evidence the sender supplied early", asyn
     assert.equal(guard.body.receipt.destinations[0].status, "pending");
     assert.equal(guard.body.receipt.destinations[0].messageId, null);
   });
+});
+
+test("POST /broadcast ignores caller destinations at the guard, so a delivered story ends posted", async () => {
+  // /broadcast picks its targets from the category. Forwarding the caller's
+  // destinations to the guard left a pending row the send never filled.
+  const telegramService = {
+    configured: true,
+    async postText(text, options = {}) {
+      const targets = options.targets || [{ chatId: "-100111", threadId: "1" }];
+      return {
+        posted: targets.length,
+        failed: 0,
+        destinations: targets.map((target) => ({
+          channel: "telegram",
+          chatId: String(target.chatId),
+          threadId: target.threadId == null ? null : String(target.threadId),
+          status: "posted",
+          messageId: "42",
+        })),
+      };
+    },
+  };
+  await withLedger(async ({ store, call }) => {
+    const sent = await call("POST", "/broadcast", {
+      text: "Talks collapse in Geneva https://example.com/geneva",
+      source: "sharebot67",
+      newsType: "Geopolitics",
+      idempotencyKey: "sharebot67-r12",
+      parseMode: "none",
+      destinations: [{ channel: "telegram", chatId: "-100999", threadId: "7" }],
+    });
+    assert.equal(sent.status, 201);
+    assert.equal(sent.body.receipt.status, "posted");
+    assert.ok(sent.body.receipt.destinations.every((destination) => destination.status === "posted"));
+    assert.ok(!sent.body.receipt.destinations.some((destination) => destination.chatId === "-100999"));
+    assert.equal(store.count(), 1);
+  }, { telegramService });
 });
