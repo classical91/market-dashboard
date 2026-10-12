@@ -785,6 +785,10 @@ function createBroadcastLedgerRouter({
       if (settings.categoryLimits[exactNewsType] && body.force !== true) {
         const guarded = broadcastLedgerStore.guard({
           ...body,
+          // This route picks its own targets from the category. A caller's
+          // destinations would become pending rows the send never fills,
+          // leaving a delivered story looking "partial".
+          destinations: undefined,
           source,
           title,
           url,
