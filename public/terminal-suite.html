@@ -53,6 +53,20 @@
           <div class="terminal-tape-track" id="terminalTape"></div>
         </section>
 
+        <!-- The trading workflow: Terminal reads the regime, then each step
+             links to the page that owns it. Nothing here re-computes them. -->
+        <nav class="terminal-workflow" id="trading-workflow" aria-label="Trading workflow">
+          <span class="terminal-section-label">Trading Workflow</span>
+          <ol class="terminal-workflow-steps">
+            <li><a href="#macro-regime" aria-current="step"><small>Regime</small>Terminal</a></li>
+            <li><a href="/directional-bias.html"><small>Direction</small>Directional Bias</a></li>
+            <li><a href="/local-extremes.html"><small>Location</small>Local Extremes</a></li>
+            <li><a href="/pattern-scanner.html"><small>Pattern</small>Pattern Scanner</a></li>
+            <li><a href="https://trading-strategy-production-1b41.up.railway.app/" target="_blank" rel="noopener"><small>Decision</small>Decision Engine ↗</a></li>
+            <li><a href="/pattern-scanner-trades.html"><small>Trade</small>My Trades</a></li>
+          </ol>
+        </nav>
+
         <section class="terminal-layout">
           <aside class="terminal-panel terminal-side" id="cross-asset">
             <div class="terminal-panel-head">
