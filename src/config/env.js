@@ -121,6 +121,12 @@ const config = {
     sitePassword: process.env.MARKET_DASHBOARD_LOGIN_PASSWORD || "",
     alphaAccessCode: process.env.ALPHA_TEAM_ACCESS_CODE || "",
   },
+  reporterNews: {
+    // Human approval of reporter news. Held only by the approval path, never
+    // by the agents that prepare drafts. No fallback to the ledger or admin
+    // key: unset means approval is disabled.
+    approverKey: process.env.REPORTER_NEWS_APPROVER_KEY || "",
+  },
   broadcastLedger: {
     // Deliberately its own secret rather than reusing ADMIN_API_KEY: this key
     // lives on a phone (the iOS/GPT shortcut) and in the ShareBot67 agent

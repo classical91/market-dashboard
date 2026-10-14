@@ -2,6 +2,7 @@
 
 const { Router } = require("express");
 const { createRateLimit } = require("../middleware/rate-limit");
+const { contentHash, present } = require("../services/reporter-news-log");
 
 /**
  * Reporter news log — the canonical, deduplicated record of every news
@@ -10,6 +11,10 @@ const { createRateLimit } = require("../middleware/rate-limit");
  *   POST  /intake      log a discovered/verified item (ledger key). Returns a
  *                      durable receipt: { id, created, deduplicated, record }.
  *   PATCH /:id         advance workflow / link FarmBot receipts (ledger key).
+ *                      Cannot approve, and cannot edit approved content.
+ *   POST  /:id/approval
+ *                      human decision (approver key only): approved with the
+ *                      reviewed contentHash, or rejected.
  *   GET   /daily       one reporter day with counts and filters.
  *   GET   /days        recent days with totals.
  *   GET   /lookup      find by url or source+sourceId, never creates.
@@ -25,7 +30,7 @@ const { createRateLimit } = require("../middleware/rate-limit");
  */
 const TRUSTED_ACTOR = "shared-key";
 
-function createReporterNewsLogRouter({ newsLogStore, requireLedgerKey, rateLimitPerMinute = 60 }) {
+function createReporterNewsLogRouter({ newsLogStore, requireLedgerKey, requireApproverKey, rateLimitPerMinute = 60 }) {
   const router = Router();
   const limiter = createRateLimit({ limit: rateLimitPerMinute, windowMs: 60 * 1000 });
 
@@ -37,7 +42,8 @@ function createReporterNewsLogRouter({ newsLogStore, requireLedgerKey, rateLimit
       deduplicated: result.deduplicated,
       status: result.record.status,
       reporterDate: result.record.reporterDate,
-      record: result.record,
+      contentHash: contentHash(result.record),
+      record: present(result.record),
     };
   }
 
@@ -75,7 +81,7 @@ function createReporterNewsLogRouter({ newsLogStore, requireLedgerKey, rateLimit
   router.get("/lookup", (req, res, next) => {
     try {
       const record = newsLogStore.find({ url: req.query.url, source: req.query.source, sourceId: req.query.sourceId });
-      res.json({ found: Boolean(record), record });
+      res.json({ found: Boolean(record), record: present(record) });
     } catch (err) {
       next(err);
     }
@@ -88,7 +94,7 @@ function createReporterNewsLogRouter({ newsLogStore, requireLedgerKey, rateLimit
         res.status(404).json({ error: "Record not found" });
         return;
       }
-      res.json(record);
+      res.json(present(record));
     } catch (err) {
       next(err);
     }
@@ -105,10 +111,47 @@ function createReporterNewsLogRouter({ newsLogStore, requireLedgerKey, rateLimit
         res.status(404).json({ error: "Record not found" });
         return;
       }
-      res.json({ ok: true, id: record.id, status: record.status, record });
+      res.json({ ok: true, id: record.id, status: record.status, record: present(record) });
     } catch (err) {
       if (err.statusCode === 409) {
         res.status(409).json({ error: err.message, currentStatus: err.currentStatus });
+        return;
+      }
+      next(err);
+    }
+  });
+
+  // No approver key configured means approval is unavailable, not open.
+  const approverGuard = requireApproverKey || ((req, res) => {
+    res.status(503).json({ error: "Reporter news approval is not configured." });
+  });
+
+  router.post("/:id/approval", approverGuard, limiter, (req, res, next) => {
+    try {
+      const body = req.body || {};
+      const result = newsLogStore.decide(req.params.id, body, {
+        claimedBy: typeof body.approver === "string" ? body.approver : null,
+      });
+      if (!result) {
+        res.status(404).json({ error: "Record not found" });
+        return;
+      }
+      const { record, changed } = result;
+      res.json({
+        ok: true,
+        id: record.id,
+        status: record.status,
+        changed,
+        approvalReceipt: record.approvalReceipt,
+        record: present(record),
+      });
+    } catch (err) {
+      if (err.statusCode === 409) {
+        res.status(409).json({
+          error: err.message,
+          currentStatus: err.currentStatus,
+          ...(err.currentContentHash ? { currentContentHash: err.currentContentHash } : {}),
+        });
         return;
       }
       next(err);

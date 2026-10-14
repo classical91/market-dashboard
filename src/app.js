@@ -116,6 +116,7 @@ const { XFeedService } = require("./services/x-feed");
 const { resolveDataDir } = require("./utils/data-dir");
 const { createRequireAdmin } = require("./middleware/admin-auth");
 const { createRequireLedgerKey } = require("./middleware/ledger-auth");
+const { createRequireApproverKey } = require("./middleware/approver-auth");
 const { createSiteAuth } = require("./middleware/site-auth");
 
 /**
@@ -497,9 +498,16 @@ function createApp() {
     ledgerKey: config.broadcastLedger.apiKey,
     adminKey: config.admin.apiKey,
   });
+  const approverKeys = {
+    approverKey: config.reporterNews.approverKey,
+    ledgerKey: config.broadcastLedger.apiKey,
+    adminKey: config.admin.apiKey,
+  };
+  const requireApproverKey = createRequireApproverKey(approverKeys);
   const siteAuth = createSiteAuth({
     adminKey: config.admin.apiKey,
     ledgerKey: config.broadcastLedger.apiKey,
+    approverKeys,
     sitePassword: config.access.sitePassword,
     alphaAccessCode: config.access.alphaAccessCode,
   });
@@ -656,6 +664,7 @@ function createApp() {
     createReporterNewsLogRouter({
       newsLogStore: reporterNewsLogStore,
       requireLedgerKey,
+      requireApproverKey,
       rateLimitPerMinute: config.broadcastLedger.rateLimitPerMinute,
     }),
   );

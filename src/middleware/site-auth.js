@@ -2,6 +2,7 @@
 
 const crypto = require("crypto");
 const { isLedgerRequest, isLedgerParamRequest } = require("./ledger-auth");
+const { isApproverRequest } = require("./approver-auth");
 const { isAdminRequest } = require("./admin-auth");
 
 const COOKIE_NAME = "market_dashboard_session";
@@ -142,6 +143,13 @@ const LEDGER_API_PREFIXES = ["/api/broadcast-ledger", "/api/reporter-news", "/ap
 
 function isLedgerApiPath(req) {
   return LEDGER_API_PREFIXES.some((prefix) => req.path === prefix || req.path.startsWith(`${prefix}/`));
+}
+
+// The approval path presents only the approver key (it need not hold the
+// ledger key), so its one route shares the bypass for that key alone. The
+// route still enforces the key itself.
+function isReporterApprovalPath(req) {
+  return req.method === "POST" && /^\/api\/reporter-news\/[^/]+\/approval\/?$/.test(req.path);
 }
 
 // The manual receipt form is opened in a phone browser, which can't set a
@@ -357,6 +365,10 @@ function createSiteAuth(config) {
       if (isLedgerApiPath(req)) {
         const keys = { ledgerKey: config.ledgerKey, adminKey: config.adminKey };
         if (isLedgerRequest(req, keys) || (isLedgerFormPath(req) && isLedgerParamRequest(req, keys))) {
+          next();
+          return;
+        }
+        if (isReporterApprovalPath(req) && config.approverKeys && isApproverRequest(req, config.approverKeys)) {
           next();
           return;
         }
