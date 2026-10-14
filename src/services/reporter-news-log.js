@@ -61,6 +61,22 @@ const MAX_SHORT_LEN = 120;
 const MAX_ERROR_LEN = 500;
 const MAX_SYMBOLS = 25;
 
+// The fields an approver reviews. Their hash is what an approval is bound to,
+// and once a record is approved none of them may change again.
+const CONTENT_FIELDS = [
+  "headline",
+  "url",
+  "canonicalUrl",
+  "source",
+  "sourceId",
+  "publishedAt",
+  "market",
+  "symbols",
+  "summary",
+  "imageUrl",
+];
+const APPROVER_ACTOR = "approver-key";
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -169,6 +185,30 @@ function mergeFarmbot(current, input) {
       : null;
   }
   return next;
+}
+
+/**
+ * sha256 over the reviewed content, in a fixed field order so the same
+ * content always hashes the same way. An approver sends back the hash of what
+ * they reviewed; a record whose content has moved on no longer matches it.
+ */
+function contentHash(record) {
+  const content = CONTENT_FIELDS.map((field) => {
+    const value = record?.[field];
+    if (field === "symbols") return [field, Array.isArray(value) ? value : []];
+    return [field, value === undefined || value === "" ? null : value];
+  });
+  return `sha256:${crypto.createHash("sha256").update(JSON.stringify(content)).digest("hex")}`;
+}
+
+/** Approved content is frozen: neither PATCH nor a repeat intake may change it. */
+function isContentFrozen(record) {
+  return record?.approval === "approved";
+}
+
+/** The record as callers see it: stored fields plus its current content hash. */
+function present(record) {
+  return record ? { ...record, contentHash: contentHash(record) } : record;
 }
 
 function hasPublicationProof(farmbot) {
@@ -308,7 +348,11 @@ class ReporterNewsLogStore {
 
     if (existing) {
       // Fill blanks and refresh descriptive fields; identity and dates stay.
+      // An approved record's content is frozen: a repeat intake may still
+      // fill capturedBy and bump the counters, but not touch what was approved.
+      const frozen = isContentFrozen(existing);
       Object.entries(fields).forEach(([field, value]) => {
+        if (frozen && CONTENT_FIELDS.includes(field)) return;
         if (field === "symbols") {
           if (value.length) existing.symbols = [...new Set([...(existing.symbols || []), ...value])].slice(0, MAX_SYMBOLS);
           return;
@@ -411,6 +455,39 @@ class ReporterNewsLogStore {
       }
     }
     const changing = nextStatus !== record.status;
+    const fromStage = record.status === "failed" ? failedStage(record) : record.status;
+
+    // Approval is a separate credential's decision (decide()). The only way
+    // a PATCH reaches `approved` is a failed record resuming at the stage it
+    // had already been approved at.
+    if (changing && nextStatus === "approved" && fromStage !== "approved") {
+      throw makeError(
+        "Approval cannot be recorded with PATCH. Use POST /api/reporter-news/:id/approval with x-approver-key.",
+        403,
+      );
+    }
+
+    if (isContentFrozen(record)) {
+      const edited = ["symbols", "market", "summary"].filter((field) => patch[field] !== undefined);
+      if (edited.length) {
+        throw makeError(`Approved content is frozen; ${edited.join(", ")} cannot change.`, 409, { currentStatus: record.status });
+      }
+    }
+
+    // Queueing is only ever of exactly what was approved.
+    if (changing && nextStatus === "queued" && fromStage === "approved") {
+      const approvedHash = record.approvalReceipt?.contentHash;
+      if (!approvedHash) {
+        throw makeError(
+          "This record has no approval receipt bound to its content. Confirm it with POST /api/reporter-news/:id/approval before queueing.",
+          409,
+          { currentStatus: record.status },
+        );
+      }
+      if (approvedHash !== contentHash(record)) {
+        throw makeError("Content no longer matches what was approved; it cannot be queued.", 409, { currentStatus: record.status });
+      }
+    }
 
     const farmbot = patch.farmbot ? mergeFarmbot(record.farmbot, patch.farmbot) : record.farmbot || emptyFarmbot();
     let error = patch.error !== undefined ? clampString(patch.error, MAX_ERROR_LEN) || null : record.error;
@@ -446,6 +523,82 @@ class ReporterNewsLogStore {
     record.updatedAt = now;
     this._write(records);
     return record;
+  }
+
+  /**
+   * Record a human decision on a record. Only the approval route calls this,
+   * behind the approver key that FarmClaw and ShareBot do not hold.
+   *
+   * `approved` must carry the `contentHash` the approver reviewed; a record
+   * whose content no longer hashes to it is a 409, never an approval of
+   * something else. Re-sending the same approval is idempotent. A record
+   * approved before approval receipts existed can be confirmed here once,
+   * which binds its current (frozen) content to the receipt.
+   */
+  decide(id, input = {}, { claimedBy = null } = {}) {
+    return this._withLock(() => this._decide(id, input, { claimedBy }));
+  }
+
+  _decide(id, input, { claimedBy }) {
+    const records = this._read();
+    const record = records.find((item) => item.id === id);
+    if (!record) return null;
+
+    const decision = clampString(input.decision, 20).toLowerCase();
+    if (decision !== "approved" && decision !== "rejected") {
+      throw makeError("decision must be approved or rejected.", 400);
+    }
+    const now = nowIso();
+    const note = clampString(input.note, 200) || undefined;
+    const by = clampString(claimedBy, 60) || null;
+    const fromStage = record.status === "failed" ? failedStage(record) : record.status;
+
+    if (decision === "rejected") {
+      if (record.status === "rejected") return { record, changed: false };
+      if (!allowedTransitions(record).includes("rejected")) {
+        throw makeError(`Cannot reject a ${record.status} record.`, 409, { currentStatus: record.status });
+      }
+      record.approvalReceipt = { decision: "rejected", contentHash: contentHash(record), actor: APPROVER_ACTOR, claimedBy: by, at: now };
+      this._applyStatus(record, "rejected", { actor: APPROVER_ACTOR, claimedBy: by, at: now, note });
+      record.updatedAt = now;
+      this._write(records);
+      return { record, changed: true };
+    }
+
+    const expected = clampString(input.contentHash, 80);
+    if (!expected) throw makeError("contentHash of the reviewed content is required to approve.", 400);
+    const current = contentHash(record);
+    if (expected !== current) {
+      throw makeError("contentHash does not match the record's current content; review it again.", 409, {
+        currentStatus: record.status,
+        currentContentHash: current,
+      });
+    }
+
+    if (isContentFrozen(record)) {
+      if (record.approvalReceipt?.decision === "approved") return { record, changed: false };
+      // A legacy approval with no receipt: bind it now, without moving status.
+      record.approvalReceipt = { decision: "approved", contentHash: current, actor: APPROVER_ACTOR, claimedBy: by, at: now, confirmedLegacy: true };
+      record.history = [
+        ...(record.history || []),
+        { at: now, status: record.status, actor: APPROVER_ACTOR, ...(by ? { claimedBy: by } : {}), note: note || "approval confirmed" },
+      ].slice(-MAX_HISTORY_PER_RECORD);
+      record.updatedAt = now;
+      this._write(records);
+      return { record, changed: true };
+    }
+
+    if (fromStage !== "verified" || !allowedTransitions(record).includes("approved")) {
+      throw makeError(`Cannot approve a ${record.status} record; only verified records can be approved.`, 409, {
+        currentStatus: record.status,
+      });
+    }
+    record.approvalReceipt = { decision: "approved", contentHash: current, actor: APPROVER_ACTOR, claimedBy: by, at: now };
+    record.error = null;
+    this._applyStatus(record, "approved", { actor: APPROVER_ACTOR, claimedBy: by, at: now, note });
+    record.updatedAt = now;
+    this._write(records);
+    return { record, changed: true };
   }
 
   get(id) {
@@ -493,7 +646,7 @@ class ReporterNewsLogStore {
       timeZone: this._timeZone,
       total: scoped.length,
       counts,
-      records: records.map(({ history, dedupeKey, ...rest }) => rest),
+      records: records.map(({ history, dedupeKey, ...rest }) => ({ ...rest, contentHash: contentHash(rest) })),
       facets: { sources, symbols, markets: MARKETS },
     };
   }
@@ -518,6 +671,9 @@ module.exports = {
   MARKETS,
   TRANSITIONS,
   allowedTransitions,
+  contentHash,
+  present,
+  CONTENT_FIELDS,
   dayKey,
   normalizeMarket,
   normalizeSymbols,

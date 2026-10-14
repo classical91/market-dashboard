@@ -9,15 +9,21 @@ const fs = require("node:fs");
 
 const LEDGER_KEY = "test-ledger-key";
 const ADMIN_KEY = "test-admin-key";
+const APPROVER_KEY = "test-approver-key";
 
 process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "md-news-log-routes-"));
 process.env.BROADCAST_LEDGER_API_KEY = LEDGER_KEY;
 process.env.ADMIN_API_KEY = ADMIN_KEY;
+process.env.REPORTER_NEWS_APPROVER_KEY = APPROVER_KEY;
 // Site login ON so the machine-caller bypass is exercised.
 process.env.MARKET_DASHBOARD_LOGIN_PASSWORD = "site-password";
 
 const { createApp } = require("../src/app");
-const { ReporterNewsLogStore, dayKey } = require("../src/services/reporter-news-log");
+const { ReporterNewsLogStore, dayKey, contentHash } = require("../src/services/reporter-news-log");
+
+function approve(store, id, claimedBy = "jason") {
+  return store.decide(id, { decision: "approved", contentHash: contentHash(store.get(id)) }, { claimedBy }).record;
+}
 
 function newStore() {
   return new ReporterNewsLogStore({
@@ -101,7 +107,7 @@ test("intake cannot claim approved, queued or posted", () => {
 test("repeat intake never regresses a record's workflow", () => {
   const store = newStore();
   const { record } = store.intake(baseItem);
-  store.update(record.id, { status: "approved" });
+  approve(store, record.id);
   const again = store.intake({ ...baseItem, status: "discovered" });
   assert.equal(again.record.status, "approved");
 });
@@ -110,7 +116,7 @@ test("workflow requires evidence for queued, posted and failed", () => {
   const store = newStore();
   const { record } = store.intake(baseItem);
   assert.throws(() => store.update(record.id, { status: "queued" }), (err) => err.statusCode === 409);
-  store.update(record.id, { status: "approved" });
+  approve(store, record.id);
   assert.throws(() => store.update(record.id, { status: "queued" }), /queueId/);
   const queued = store.update(record.id, { status: "queued", farmbot: { queueId: "fb_1", scheduledAt: "2026-10-05T18:00:00Z", status: "scheduled" } });
   assert.equal(queued.farmbot.queueId, "fb_1");
@@ -126,7 +132,7 @@ test("workflow requires evidence for queued, posted and failed", () => {
 test("network failure stays failed with its exact error", () => {
   const store = newStore();
   const { record } = store.intake(baseItem);
-  store.update(record.id, { status: "approved" });
+  approve(store, record.id);
   const failed = store.update(record.id, { status: "failed", error: "TLS handshake timeout to farmbot" });
   assert.equal(failed.status, "failed");
   assert.equal(failed.error, "TLS handshake timeout to farmbot");
@@ -159,7 +165,7 @@ function advance(store, id, statuses) {
     queued: { farmbot: { queueId: "fb_1" } },
     posted: { farmbot: { publication: { receiptId: "rcpt_1" } } },
   };
-  statuses.forEach((status) => store.update(id, { status, ...evidence[status] }));
+  statuses.forEach((status) => (status === "approved" ? approve(store, id) : store.update(id, { status, ...evidence[status] })));
 }
 
 test("a failure resumes only at the stage it failed from", () => {
@@ -172,17 +178,22 @@ test("a failure resumes only at the stage it failed from", () => {
   assert.equal(store.get(discovered.id).failedFrom, "discovered");
   assert.throws(() => store.update(discovered.id, queue), (err) => err.statusCode === 409);
   assert.throws(() => store.update(discovered.id, { status: "approved" }), (err) => err.statusCode === 409);
+  assert.throws(() => approve(store, discovered.id), (err) => err.statusCode === 409);
   assert.equal(store.update(discovered.id, { status: "verified" }).status, "verified");
 
   const verified = store.intake({ ...baseItem, url: "https://example.com/b" }).record;
   store.update(verified.id, fail);
   assert.throws(() => store.update(verified.id, queue), (err) => err.statusCode === 409);
-  assert.equal(store.update(verified.id, { status: "approved" }).status, "approved");
+  assert.throws(() => store.update(verified.id, { status: "approved" }), (err) => err.statusCode === 403);
+  assert.equal(approve(store, verified.id).status, "approved");
 
   const approved = store.intake({ ...baseItem, url: "https://example.com/c" }).record;
   advance(store, approved.id, ["approved"]);
   store.update(approved.id, fail);
   assert.throws(() => store.update(approved.id, { status: "queued" }), /queueId/);
+  // Resuming at the stage it was already approved at needs no new approval.
+  assert.equal(store.update(approved.id, { status: "approved" }).status, "approved");
+  store.update(approved.id, fail);
   const requeued = store.update(approved.id, queue);
   assert.equal(requeued.status, "queued");
   assert.equal(requeued.error, null, "the stale error is cleared on recovery");
@@ -204,7 +215,7 @@ test("legacy failed records without failedFrom cannot skip approval", () => {
   delete doc.records[0].failedFrom;
   fs2.writeFileSync(store._file, JSON.stringify(doc));
   assert.throws(() => store.update(record.id, { status: "queued", farmbot: { queueId: "x" } }), (err) => err.statusCode === 409);
-  assert.equal(store.update(record.id, { status: "approved" }).status, "approved");
+  assert.equal(approve(store, record.id).status, "approved");
 });
 
 test("receipt evidence cannot be erased after the status is set", () => {
@@ -249,10 +260,69 @@ test("reporterDate is always derived from capturedAt in Vancouver", () => {
 test("caller attribution is kept apart from the trusted actor", () => {
   const store = newStore();
   const { record } = store.intake({ ...baseItem, capturedBy: "sharebot67" }, { actor: "shared-key" });
-  const updated = store.update(record.id, { status: "approved" }, { actor: "shared-key", claimedBy: "penny" });
-  const [logged, approved] = updated.history;
+  approve(store, record.id, "penny");
+  const updated = store.update(record.id, { status: "rejected" }, { actor: "shared-key", claimedBy: "sharebot67" });
+  const [logged, approved, rejected] = updated.history;
   assert.deepEqual([logged.actor, logged.claimedBy], ["shared-key", "sharebot67"]);
-  assert.deepEqual([approved.actor, approved.claimedBy], ["shared-key", "penny"]);
+  assert.deepEqual([approved.actor, approved.claimedBy], ["approver-key", "penny"]);
+  assert.deepEqual([rejected.actor, rejected.claimedBy], ["shared-key", "sharebot67"]);
+});
+
+test("approval is bound to the reviewed content hash", () => {
+  const store = newStore();
+  const { record } = store.intake(baseItem);
+  const reviewed = contentHash(record);
+  store.update(record.id, { summary: "Edited after review" });
+  assert.throws(
+    () => store.decide(record.id, { decision: "approved", contentHash: reviewed }),
+    (err) => err.statusCode === 409 && err.currentContentHash === contentHash(store.get(record.id)),
+  );
+  assert.equal(store.get(record.id).status, "verified", "a stale approval changes nothing");
+  assert.throws(() => store.decide(record.id, { decision: "approved" }), (err) => err.statusCode === 400);
+
+  const first = approve(store, record.id);
+  assert.equal(first.approvalReceipt.contentHash, contentHash(first));
+  assert.equal(first.approvalReceipt.actor, "approver-key");
+  const again = store.decide(record.id, { decision: "approved", contentHash: contentHash(first) });
+  assert.equal(again.changed, false, "a repeated approval is idempotent");
+  assert.equal(store.get(record.id).history.filter((entry) => entry.status === "approved").length, 1);
+});
+
+test("approved content is frozen against PATCH and repeat intake", () => {
+  const store = newStore();
+  const { record } = store.intake(baseItem);
+  const approved = approve(store, record.id);
+  const hash = contentHash(approved);
+  for (const field of ["summary", "symbols", "market"]) {
+    assert.throws(() => store.update(record.id, { [field]: "BTC" }), (err) => err.statusCode === 409);
+  }
+  const again = store.intake({ ...baseItem, summary: "Rewritten", imageUrl: "https://example.com/new.png", symbols: ["BTC"] });
+  assert.equal(again.deduplicated, true);
+  assert.equal(contentHash(store.get(record.id)), hash, "a repeat intake cannot rewrite approved content");
+  assert.equal(store.get(record.id).intakeCount, 2);
+});
+
+test("only approved content with a matching receipt can be queued", () => {
+  const store = newStore();
+  const { record } = store.intake(baseItem);
+  approve(store, record.id);
+  // Tamper with the stored content directly, as a bad migration or hand edit would.
+  const doc = JSON.parse(fs.readFileSync(store._file, "utf8"));
+  doc.records[0].summary = "tampered";
+  fs.writeFileSync(store._file, JSON.stringify(doc));
+  assert.throws(() => store.update(record.id, { status: "queued", farmbot: { queueId: "fb_1" } }), /no longer matches/);
+
+  // A record approved before receipts existed must be confirmed before queueing.
+  const legacy = store.intake({ ...baseItem, url: "https://example.com/legacy" }).record;
+  approve(store, legacy.id);
+  const legacyDoc = JSON.parse(fs.readFileSync(store._file, "utf8"));
+  delete legacyDoc.records.find((item) => item.id === legacy.id).approvalReceipt;
+  fs.writeFileSync(store._file, JSON.stringify(legacyDoc));
+  assert.throws(() => store.update(legacy.id, { status: "queued", farmbot: { queueId: "fb_2" } }), /approval receipt/);
+  const confirmed = store.decide(legacy.id, { decision: "approved", contentHash: contentHash(store.get(legacy.id)) });
+  assert.equal(confirmed.record.approvalReceipt.confirmedLegacy, true);
+  assert.equal(confirmed.record.status, "approved");
+  assert.equal(store.update(legacy.id, { status: "queued", farmbot: { queueId: "fb_2" } }).status, "queued");
 });
 
 test("a failed write is not reported as a durable receipt", () => {
@@ -296,11 +366,37 @@ test("routes: intake receipt, dedupe, auth and daily view", async () => {
     const bad = await send("PATCH", `/api/reporter-news/${receipt.id}`, { status: "posted" });
     assert.equal(bad.status, 409);
 
-    const approved = await send("PATCH", `/api/reporter-news/${receipt.id}`, { status: "approved", actor: "penny" });
+    const patchApprove = await send("PATCH", `/api/reporter-news/${receipt.id}`, { status: "approved", actor: "penny" });
+    assert.equal(patchApprove.status, 403, "the ledger key cannot approve");
+
+    const approval = (key, body) => fetch(`${base}/api/reporter-news/${receipt.id}/approval`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(key ? { "x-approver-key": key } : {}) },
+      body: JSON.stringify(body),
+    });
+    const approveBody = { decision: "approved", contentHash: receipt.contentHash, approver: "penny" };
+    assert.equal((await approval(null, approveBody)).status, 401);
+    assert.equal((await approval(LEDGER_KEY, approveBody)).status, 401, "the ledger key is not an approver key");
+    const ledgerOnly = await fetch(`${base}/api/reporter-news/${receipt.id}/approval`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-broadcast-key": LEDGER_KEY },
+      body: JSON.stringify(approveBody),
+    });
+    assert.equal(ledgerOnly.status, 401);
+    const stale = await approval(APPROVER_KEY, { ...approveBody, contentHash: "sha256:stale" });
+    assert.equal(stale.status, 409);
+    assert.equal((await stale.json()).currentContentHash, receipt.contentHash);
+
+    const approved = await approval(APPROVER_KEY, approveBody);
     assert.equal(approved.status, 200);
-    const approvedEntry = (await approved.json()).record.history.at(-1);
-    assert.equal(approvedEntry.actor, "shared-key", "the body cannot set the trusted actor");
+    const approvedBody = await approved.json();
+    const approvedEntry = approvedBody.record.history.at(-1);
+    assert.equal(approvedEntry.actor, "approver-key", "the body cannot set the trusted actor");
     assert.equal(approvedEntry.claimedBy, "penny");
+    assert.equal(approvedBody.approvalReceipt.contentHash, receipt.contentHash);
+
+    const frozen = await send("PATCH", `/api/reporter-news/${receipt.id}`, { summary: "rewritten" });
+    assert.equal(frozen.status, 409);
 
     const sourceless = await send("POST", "/api/reporter-news/intake", { headline: "No source", sourceId: "9" });
     assert.equal(sourceless.status, 400);
@@ -325,4 +421,19 @@ test("routes: intake receipt, dedupe, auth and daily view", async () => {
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
+});
+
+test("approver key: unset or shared with the ledger/admin key disables approval", () => {
+  const { createRequireApproverKey } = require("../src/middleware/approver-auth");
+  const run = (keys, header) => {
+    let status = 200;
+    const res = { status(code) { status = code; return this; }, json() {} };
+    createRequireApproverKey(keys)({ get: (name) => (name === "x-approver-key" ? header : "") }, res, () => {});
+    return status;
+  };
+  assert.equal(run({ approverKey: "", ledgerKey: "l" }, ""), 503);
+  assert.equal(run({ approverKey: "same", ledgerKey: "same" }, "same"), 503);
+  assert.equal(run({ approverKey: "same", ledgerKey: "", adminKey: "same" }, "same"), 503);
+  assert.equal(run({ approverKey: "a", ledgerKey: "l", adminKey: "x" }, "l"), 401);
+  assert.equal(run({ approverKey: "a", ledgerKey: "l", adminKey: "x" }, "a"), 200);
 });

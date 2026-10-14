@@ -64,7 +64,8 @@ When operating as OpenClaw agent `newsreporter`, focus on the reporter workflow:
 ### Reporter news log contract
 
 - After verifying a news item, log it with `POST /api/reporter-news/intake` (same host and `x-broadcast-key`). Keep the returned `id`; a repeat intake of the same canonical URL returns the same record with `deduplicated: true`.
-- Logging is not approval. Record approval, FarmBot queueing (`farmbot.queueId`), and publication (`farmbot.publication` receipt) with `PATCH /api/reporter-news/:id`. Never mark `posted` from a helper response alone.
+- Logging is not approval, and agents cannot approve. Approval is a human decision recorded with `POST /api/reporter-news/:id/approval` and `x-approver-key` (`REPORTER_NEWS_APPROVER_KEY`); agents must never hold or request that key, and `PATCH` with `status: "approved"` returns `403`. Approval binds the record's `contentHash`; approved content is frozen and cannot be edited; if it is wrong, ask the human approver to reject it.
+- Record FarmBot queueing (`farmbot.queueId`) and publication (`farmbot.publication` receipt) with `PATCH /api/reporter-news/:id`. Only approved content with a matching `approvalReceipt` can be queued. Never mark `posted` from a helper response alone.
 - Network/TLS failures go to `failed` with the exact `error`; never record them as `queued`.
 - A `failed` item resumes only at the stage it failed from (or that stage's next step); retries cannot skip approval. Queue IDs, publication receipts and errors cannot be cleared while the status depends on them. Without a URL, send both `source` and `sourceId`. `reporterDate` is derived from `capturedAt`; backfills send the historical `capturedAt`. See `docs/reporter-news-log.md`.
 
