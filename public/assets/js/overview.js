@@ -164,12 +164,36 @@
       .join("");
   }
 
+  // Regime label and volatility come from the canonical market state — the
+  // Decision Engine's multi-asset model — so Overview, Terminal and the
+  // Decision Engine cannot show different regimes for the same feeds.
+  function regimeOf(data) {
+    return data.marketState?.regime || null;
+  }
+
+  function regimeClass(label) {
+    return label === "Risk-On" ? "up" : label === "Risk-Off" ? "down" : "flat";
+  }
+
+  // One line naming any input that isn't live, so a proxy or fallback reading
+  // never looks the same as a live one.
+  function regimeQualityNote(data) {
+    const dq = data.marketState?.dataQuality;
+    if (!dq) return "";
+    const parts = [];
+    if (dq.fallbackInputs?.length) parts.push(`Fallback: ${dq.fallbackInputs.join(", ")}`);
+    if (dq.proxyInputs?.length) parts.push(`Proxy: ${dq.proxyInputs.join(", ")}`);
+    return parts.join(" · ");
+  }
+
   function renderPulse(data) {
-    const status = data.marketStatus || {};
-    els.pulseStatus.textContent = status.label || "—";
-    els.pulseStatus.className = status.label === "Risk-On" ? "up" : status.label === "Risk-Off" ? "down" : "flat";
-    els.pulseVolatility.textContent = status.volatilityLabel || "—";
-    els.pulseVolatility.className = status.volatilityLabel === "High" ? "down" : "flat";
+    const regime = regimeOf(data);
+    const label = regime?.label || "—";
+    els.pulseStatus.textContent = label;
+    els.pulseStatus.className = regimeClass(label);
+    els.pulseStatus.title = [regime?.summary, regimeQualityNote(data)].filter(Boolean).join(" ");
+    els.pulseVolatility.textContent = regime?.volatility || "—";
+    els.pulseVolatility.className = regime?.volatility === "High" ? "down" : "flat";
     const change = Number(data.marketPulse?.changePercent || 0);
     els.pulseChange.textContent = `${change > 0 ? "+" : ""}${change.toFixed(2)}%`;
     els.pulseChange.className = change > 0 ? "up" : change < 0 ? "down" : "flat";
@@ -177,11 +201,15 @@
 
   function renderRiskBox(data) {
     const factors = data.riskFactors || [];
-    const score = data.marketStatus?.riskScore ?? 50;
+    const regime = regimeOf(data);
+    const known = regime && regime.inputsUsed > 0;
+    const score = known ? regime.score : "—";
+    const note = regimeQualityNote(data);
     els.riskBox.innerHTML = `
-      <div class="gauge" role="img" aria-label="Risk score ${score}">
-        <div class="gauge-value">${score}<small>Risk Score</small></div>
+      <div class="gauge" role="img" aria-label="${known ? `Regime score ${score} of 100, ${escapeHtml(regime.label)}` : "Regime unavailable"}">
+        <div class="gauge-value">${score}<small>${known ? escapeHtml(regime.label) : "No regime inputs"}</small></div>
       </div>
+      <p class="risk-regime-note">Regime score 0–100 · higher is risk-on${known ? ` · ${regime.inputsUsed} inputs` : ""}${note ? `<br><span class="flat">${escapeHtml(note)}</span>` : ""}</p>
       <div class="risk-list">
         ${factors
           .map(

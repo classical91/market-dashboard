@@ -775,7 +775,52 @@
   text-decoration: none;
 }
 
+/* Technical Ratings — TradingView widgets moved from Overview. */
+.terminal-ta {
+  margin-top: 16px;
+}
+
+.terminal-ta-note {
+  margin: 0;
+  padding: 10px 18px;
+  color: var(--term-muted);
+  font-size: 12px;
+  border-bottom: 1px dotted rgba(255, 255, 255, 0.1);
+}
+
+.terminal-ta-note a {
+  color: var(--term-green);
+}
+
+.terminal-ta-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.terminal-ta-item {
+  border-right: 1px solid var(--term-line);
+  border-bottom: 1px solid var(--term-line);
+  min-width: 0;
+}
+
+.terminal-ta-symbol {
+  padding: 10px 14px;
+  color: var(--term-muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  border-bottom: 1px dotted rgba(255, 255, 255, 0.1);
+}
+
+.terminal-ta-body {
+  height: 420px;
+}
+
 @media (max-width: 1320px) {
+  .terminal-ta-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .terminal-layout {
     grid-template-columns: minmax(230px, 0.85fr) minmax(420px, 1.6fr);
   }
@@ -818,6 +863,10 @@
 @media (max-width: 620px) {
   .terminal-page {
     padding: 12px;
+  }
+
+  .terminal-ta-grid {
+    grid-template-columns: 1fr;
   }
 
   .terminal-chrome {
