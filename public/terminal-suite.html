@@ -33,6 +33,7 @@
           <a class="terminal-tab active" href="#macro-regime">Macro Regime</a>
           <a class="terminal-tab" href="#confluence">Confluence</a>
           <a class="terminal-tab" href="#cross-asset">Cross-Asset</a>
+          <a class="terminal-tab" href="#technical-analysis">Technical Ratings</a>
           <a class="terminal-tab" href="#calendar">Calendar</a>
           <a class="terminal-tab" href="/crypto.html#interactive-dashboards">Dashboards</a>
           <a class="terminal-tab" href="/traditional.html#macro">Traditional Macro</a>
@@ -155,7 +156,90 @@
           </aside>
         </section>
 
-        <p class="terminal-footer">Terminal Suite uses the existing Market Command overview feed. Strategy backtests live in the Trading Lab.</p>
+        <!-- Moved from Overview: per-asset technical ratings belong with the
+             deeper analysis, not on the 30-second market read. These are
+             TradingView's oscillator/moving-average ratings, not this app's
+             own analysis — Directional Bias is the in-house direction for crypto. -->
+        <section class="terminal-panel terminal-ta" id="technical-analysis">
+          <div class="terminal-panel-head">
+            <div>
+              <div class="terminal-section-label">Technical Ratings · TradingView</div>
+              <h2>Oscillator &amp; Moving-Average Ratings</h2>
+            </div>
+            <span class="terminal-mini-tag" title="Third-party ratings from TradingView, not computed by this dashboard">Third-party</span>
+          </div>
+          <p class="terminal-ta-note">TradingView's own ratings, not this dashboard's analysis. For crypto direction, see <a href="/directional-bias.html">Directional Bias</a>.</p>
+          <div class="terminal-ta-grid">
+          <div class="terminal-ta-item">
+            <div class="terminal-ta-symbol">BTCUSDT</div>
+            <div class="terminal-ta-body">
+              <div class="tradingview-widget-container">
+                <div class="tradingview-widget-container__widget"></div>
+                <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js" async>
+                { "interval": "1h", "width": "100%", "isTransparent": true, "height": "100%", "symbol": "BINANCE:BTCUSDT", "showIntervalTabs": true, "displayMode": "single", "locale": "en", "colorTheme": "dark" }
+                </script>
+              </div>
+            </div>
+          </div>
+          <div class="terminal-ta-item">
+            <div class="terminal-ta-symbol">ETHUSDT</div>
+            <div class="terminal-ta-body">
+              <div class="tradingview-widget-container">
+                <div class="tradingview-widget-container__widget"></div>
+                <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js" async>
+                { "interval": "1h", "width": "100%", "isTransparent": true, "height": "100%", "symbol": "BINANCE:ETHUSDT", "showIntervalTabs": true, "displayMode": "single", "locale": "en", "colorTheme": "dark" }
+                </script>
+              </div>
+            </div>
+          </div>
+          <div class="terminal-ta-item">
+            <div class="terminal-ta-symbol">SOLUSDT</div>
+            <div class="terminal-ta-body">
+              <div class="tradingview-widget-container">
+                <div class="tradingview-widget-container__widget"></div>
+                <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js" async>
+                { "interval": "1h", "width": "100%", "isTransparent": true, "height": "100%", "symbol": "BINANCE:SOLUSDT", "showIntervalTabs": true, "displayMode": "single", "locale": "en", "colorTheme": "dark" }
+                </script>
+              </div>
+            </div>
+          </div>
+          <div class="terminal-ta-item">
+            <div class="terminal-ta-symbol">SPY</div>
+            <div class="terminal-ta-body">
+              <div class="tradingview-widget-container">
+                <div class="tradingview-widget-container__widget"></div>
+                <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js" async>
+                { "interval": "1h", "width": "100%", "isTransparent": true, "height": "100%", "symbol": "AMEX:SPY", "showIntervalTabs": true, "displayMode": "single", "locale": "en", "colorTheme": "dark" }
+                </script>
+              </div>
+            </div>
+          </div>
+          <div class="terminal-ta-item">
+            <div class="terminal-ta-symbol">QQQ</div>
+            <div class="terminal-ta-body">
+              <div class="tradingview-widget-container">
+                <div class="tradingview-widget-container__widget"></div>
+                <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js" async>
+                { "interval": "1h", "width": "100%", "isTransparent": true, "height": "100%", "symbol": "NASDAQ:QQQ", "showIntervalTabs": true, "displayMode": "single", "locale": "en", "colorTheme": "dark" }
+                </script>
+              </div>
+            </div>
+          </div>
+          <div class="terminal-ta-item">
+            <div class="terminal-ta-symbol">DXY</div>
+            <div class="terminal-ta-body">
+              <div class="tradingview-widget-container">
+                <div class="tradingview-widget-container__widget"></div>
+                <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js" async>
+                { "interval": "1h", "width": "100%", "isTransparent": true, "height": "100%", "symbol": "TVC:DXY", "showIntervalTabs": true, "displayMode": "single", "locale": "en", "colorTheme": "dark" }
+                </script>
+              </div>
+            </div>
+          </div>
+          </div>
+        </section>
+
+        <p class="terminal-footer">Terminal Suite uses the existing Market Command overview feed, plus TradingView technical ratings. Strategy backtests live in the Trading Lab.</p>
       </main>
     </div>
 

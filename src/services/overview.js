@@ -112,11 +112,11 @@ class OverviewService {
     });
 
     // The canonical regime — the Decision Engine's model, annotated with where
-    // each input came from. marketStatus below is the older crypto-only read,
-    // kept until the pages that show it move over.
+    // each input came from. Overview reads it; marketStatus below is the older
+    // crypto-only read, kept in the payload for API consumers.
     const marketState = buildMarketState({ crypto, equities, macro, calendar });
     const marketStatus = buildMarketStatus(crypto.items);
-    const kpis = buildKpis({ crypto: crypto.items, onchain });
+    const kpis = buildKpis({ crypto: crypto.items, onchain, marketState });
     const heatmap = buildHeatmap({ crypto: crypto.items, equities: equities.items, macro: macro.items });
     const riskFactors = buildRiskFactors({ crypto: crypto.items, macro: macro.items });
     const alerts = buildAlerts({ crypto: crypto.items, macro: macro.items, onchain });
@@ -181,7 +181,7 @@ class OverviewService {
       scopes: {
         crypto: {
           marketStatus: buildMarketStatus(crypto.items),
-          kpis: buildKpis({ crypto: crypto.items, onchain }),
+          kpis: buildKpis({ crypto: crypto.items, onchain, marketState }),
           ticker: cryptoTicker,
           watchlist: cryptoTicker,
           marketPulse,
@@ -250,7 +250,7 @@ function buildMarketStatus(crypto) {
   };
 }
 
-function buildKpis({ crypto, onchain }) {
+function buildKpis({ crypto, onchain, marketState }) {
   const btc = crypto.find((row) => row.symbol === "BTC");
   const eth = crypto.find((row) => row.symbol === "ETH");
   const avgChange = crypto.length
@@ -275,11 +275,17 @@ function buildKpis({ crypto, onchain }) {
       note: "24h change",
     });
   }
+  // Crypto breadth is read off the canonical regime's own breadth input, so
+  // this tile cannot call the market "Bullish" while the regime says
+  // otherwise. A vote of ±0.25 is the bar buildRegime uses for an input to
+  // count as having an opinion.
+  const breadth = (marketState?.regime?.components || []).find((c) => c.symbol === "AVG");
   kpis.push({
-    label: "Crypto Sentiment",
-    value: avgChange >= 1 ? "Bullish" : avgChange <= -1 ? "Bearish" : "Mixed",
+    label: "Crypto Breadth",
+    value: !breadth ? "—" : breadth.vote >= 0.25 ? "Positive" : breadth.vote <= -0.25 ? "Negative" : "Mixed",
     changePercent: Number(avgChange.toFixed(2)),
-    note: "Avg 24h move across majors",
+    note: breadth ? `Avg 24h across ${crypto.length} majors` : "No crypto breadth input",
+    ...(breadth ? { quality: breadth.quality } : {}),
   });
 
   if (stablecoinNetflow != null) {

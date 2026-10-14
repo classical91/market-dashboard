@@ -37,9 +37,6 @@
             { href: "/#risk-meter", label: "Risk Meter" },
             { href: "/#alerts", label: "Alerts" },
             { href: "/#ovh-market-overview", label: "TV Market Overview" },
-            { href: "/#ovh-technical-analysis", label: "Technical Analysis" },
-            { href: "/#ovh-derivatives", label: "Derivatives & Positioning" },
-            { href: "/#ovh-liquidity", label: "Liquidity & Volatility" },
           ],
         },
         {
