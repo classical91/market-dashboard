@@ -22,10 +22,9 @@
  * headline — so the ledger can dedupe without holding private text.
  */
 
-const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
-const { withExclusiveLock, writeJsonAtomic } = require("./json-file-lock");
+const { withExclusiveLock, writeJsonAtomic, readJsonStore } = require("./json-file-lock");
 
 const LEDGER_VERSION = 2;
 const DEFAULT_CAP = 5000;
@@ -301,18 +300,15 @@ class BroadcastLedgerStore {
   }
 
   _readDocument() {
-    try {
-      const parsed = JSON.parse(fs.readFileSync(this._file, "utf8"));
-      // Tolerate a bare array so a hand-edited or pre-version-1 file still
-      // loads rather than silently starting over.
-      if (Array.isArray(parsed)) return { receipts: parsed, settings: cloneDefaults() };
-      return {
-        receipts: Array.isArray(parsed?.receipts) ? parsed.receipts : [],
-        settings: normalizeSettings(parsed?.settings),
-      };
-    } catch {
-      return { receipts: [], settings: cloneDefaults() };
-    }
+    const parsed = readJsonStore(this._file, this._logger, "[BroadcastLedger]");
+    if (parsed === null) return { receipts: [], settings: cloneDefaults() };
+    // Tolerate a bare array so a hand-edited or pre-version-1 file still
+    // loads rather than silently starting over.
+    if (Array.isArray(parsed)) return { receipts: parsed, settings: cloneDefaults() };
+    return {
+      receipts: Array.isArray(parsed?.receipts) ? parsed.receipts : [],
+      settings: normalizeSettings(parsed?.settings),
+    };
   }
 
   _read() {

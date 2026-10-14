@@ -22,10 +22,9 @@
  *   { "version": 1, "records": [ <newest first> ] }
  */
 
-const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
-const { withExclusiveLock, writeJsonAtomic } = require("./json-file-lock");
+const { withExclusiveLock, writeJsonAtomic, readJsonStore } = require("./json-file-lock");
 const { canonicalizeUrl } = require("./broadcast-ledger");
 
 const LOG_VERSION = 1;
@@ -226,12 +225,8 @@ class ReporterNewsLogStore {
   }
 
   _read() {
-    try {
-      const parsed = JSON.parse(fs.readFileSync(this._file, "utf8"));
-      return Array.isArray(parsed?.records) ? parsed.records : [];
-    } catch {
-      return [];
-    }
+    const parsed = readJsonStore(this._file, this._logger, "[ReporterNewsLog]");
+    return Array.isArray(parsed?.records) ? parsed.records : [];
   }
 
   _write(records) {
