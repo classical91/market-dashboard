@@ -20,7 +20,6 @@
   var accountState = null;
 
   var workspace = [
-    { href: "/terminal-suite.html", label: "Terminal Suite" },
     {
       // The label itself opens Overview; the caret beside it expands the
       // widget jump links and the Heatmaps page.
@@ -51,6 +50,9 @@
         },
       ],
     },
+    // Overview answers "what is happening?"; Terminal, one step deeper,
+    // answers "why, and what does it mean for a trade?".
+    { href: "/terminal-suite.html", label: "Terminal Suite" },
     {
       // The trade workflow in one place: the trades you are running, the
       // engine that plans them, and the lab that backtests the setups.

@@ -426,6 +426,12 @@ body {
   width: max-content;
   animation: scroll 60s linear infinite;
 }
+/* Ticker items link to Terminal, so the tape holds still while the pointer
+   or keyboard focus is on it. */
+.ticker:hover .ticker-track,
+.ticker:focus-within .ticker-track {
+  animation-play-state: paused;
+}
 .ticker-item {
   display: flex;
   align-items: center;
@@ -436,6 +442,25 @@ body {
 }
 .ticker-item strong {
   color: var(--text);
+}
+a.ticker-item {
+  text-decoration: none;
+}
+a.ticker-item:hover strong,
+a.ticker-item:focus-visible strong {
+  color: var(--accent);
+}
+.card-link {
+  flex-shrink: 0;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.card-link:hover,
+.card-link:focus-visible {
+  text-decoration: underline;
 }
 .up {
   color: var(--green);

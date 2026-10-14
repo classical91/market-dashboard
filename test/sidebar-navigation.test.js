@@ -9,8 +9,8 @@ const sidebar = fs.readFileSync(path.join(__dirname, "..", "public/assets/js/sid
 
 test("primary sidebar order and removed links stay exact", () => {
   const labels = [
-    "Terminal Suite",
     "Overview",
+    "Terminal Suite",
     "Trades",
     "TradeHunter",
     "AI Analysis",

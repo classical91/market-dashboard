@@ -139,7 +139,7 @@
     els.ticker.innerHTML = doubled
       .map(
         (s) =>
-          `<div class="ticker-item"><strong>${escapeHtml(s.symbol)}</strong><span>${money(s.price)}</span>${pct(s.changePercent)}</div>`,
+          `<a class="ticker-item" href="/terminal-suite.html?symbol=${encodeURIComponent(s.symbol)}" title="Analyse ${escapeHtml(s.symbol)} in Terminal"><strong>${escapeHtml(s.symbol)}</strong><span>${money(s.price)}</span>${pct(s.changePercent)}</a>`,
       )
       .join("");
   }

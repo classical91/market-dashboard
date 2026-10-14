@@ -104,7 +104,19 @@
     VIX: "TVC:VIX",
   };
 
+  // Overview links here as /terminal-suite.html?symbol=BTC: the first load
+  // opens that asset's drawer, so a click on Overview lands on the analysis.
+  const requestedSymbol = (() => {
+    try {
+      const value = new URLSearchParams(window.location.search).get("symbol");
+      return value ? value.trim().toUpperCase().slice(0, 16) : null;
+    } catch {
+      return null;
+    }
+  })();
+
   const state = {
+    handoffDone: false,
     data: null,
     search: "",
     preset: "default",
@@ -188,6 +200,7 @@
 
       state.data = await response.json();
       renderAll();
+      openRequestedAsset();
     } catch (error) {
       els.banner.className = "terminal-banner show error";
       els.banner.innerHTML = `<strong>Terminal feed failed:</strong> ${escapeHtml(error.message)}. The page will recover on the next refresh.`;
@@ -197,6 +210,12 @@
       state.loading = false;
       els.refresh.disabled = false;
     }
+  }
+
+  function openRequestedAsset() {
+    if (state.handoffDone || !requestedSymbol) return;
+    state.handoffDone = true;
+    openDrawer(requestedSymbol);
   }
 
   function renderAll() {
@@ -583,7 +602,9 @@
     const data = state.data;
     const asset = data ? getAsset(data, drawerState.symbol) : null;
     if (!asset) {
-      els.drawerBody.innerHTML = `<div class="terminal-empty">Asset no longer in the feed.</div>`;
+      els.drawerSymbol.textContent = drawerState.symbol || "--";
+      els.drawerName.textContent = "";
+      els.drawerBody.innerHTML = `<div class="terminal-empty">${escapeHtml(drawerState.symbol || "This asset")} isn't in the Terminal feed.</div>`;
       return;
     }
 
@@ -629,6 +650,7 @@
       <div class="terminal-drawer-section terminal-drawer-links">
         <div class="terminal-section-label">Quick Actions</div>
         <a class="terminal-button" href="${escapeAttr(tvUrl)}" target="_blank" rel="noopener">TradingView ↗</a>
+        ${type === "crypto" ? `<a class="terminal-button" href="/directional-bias.html">Directional Bias</a>` : ""}
         <a class="terminal-button" href="/ai-analysis.html">AI Analysis</a>
         <a class="terminal-button" href="/pattern-scanner.html">Pattern Scanner</a>
       </div>`;
