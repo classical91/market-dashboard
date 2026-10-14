@@ -2,8 +2,9 @@
   "use strict";
 
   const REFRESH_INTERVAL_MS = 90_000;
-  const DEFAULT_RANGE = "1W";
-  const RANGES = ["1D", "1W", "1M", "3M"];
+  // Terminal has no chart, so it asks for the same snapshot Overview does:
+  // one server cache entry, so both pages show the same numbers.
+  const OVERVIEW_RANGE = "1D";
 
   // Presets re-weight the confluence factors and re-order the asset monitor
   // for a specific workflow. Weights multiply each factor's 1-5 points; the
@@ -105,7 +106,6 @@
 
   const state = {
     data: null,
-    range: DEFAULT_RANGE,
     search: "",
     preset: "default",
     loading: false,
@@ -161,17 +161,6 @@
       if (event.key === "Escape") closeDrawer();
     });
 
-    document.querySelectorAll(".terminal-range-btn").forEach((button) => {
-      button.addEventListener("click", () => {
-        const nextRange = button.dataset.range;
-        if (!RANGES.includes(nextRange)) return;
-        state.range = nextRange;
-        document.querySelectorAll(".terminal-range-btn").forEach((b) => b.classList.remove("active"));
-        button.classList.add("active");
-        loadOverview();
-      });
-    });
-
     els.search.addEventListener("input", (event) => {
       state.search = event.target.value.trim().toLowerCase();
       renderAssetList();
@@ -192,7 +181,7 @@
     els.refresh.disabled = true;
 
     try {
-      const response = await fetch(`/api/overview?range=${encodeURIComponent(state.range)}`, {
+      const response = await fetch(`/api/overview?range=${OVERVIEW_RANGE}`, {
         headers: { Accept: "application/json" },
       });
       if (!response.ok) throw new Error(`API ${response.status}`);
@@ -395,26 +384,61 @@
       .map((entry) => entry.asset);
   }
 
-  function renderRegime(confluence, data) {
-    els.regimeLabel.textContent = confluence.label;
-    els.regimeLabel.className = confluence.className;
-    els.regimeScore.textContent = confluence.score;
-    els.regimeSummary.textContent = confluence.summary;
+  // The regime is the canonical market state — the Decision Engine's model —
+  // so Terminal, Overview and the Decision Engine show one regime. The
+  // preset-weighted confluence below it is the trading interpretation layer:
+  // it re-weights the same tape for a workflow but does not relabel the regime.
+  function canonicalRegime(data) {
+    return data.marketState?.regime || null;
+  }
 
+  function regimeClassName(label) {
+    return label === "Risk-On" ? "risk-on" : label === "Risk-Off" ? "risk-off" : "risk-mixed";
+  }
+
+  function qualityNote(data) {
+    const dq = data.marketState?.dataQuality;
+    if (!dq) return "";
+    const parts = [];
+    if (dq.fallbackInputs?.length) parts.push(`fallback inputs: ${dq.fallbackInputs.join(", ")}`);
+    if (dq.proxyInputs?.length) parts.push(`proxy inputs: ${dq.proxyInputs.join(", ")}`);
+    return parts.length ? ` Data: ${parts.join("; ")}.` : "";
+  }
+
+  function renderRegime(confluence, data) {
+    const regime = canonicalRegime(data);
+    const known = regime && regime.inputsUsed > 0;
+    els.regimeLabel.textContent = known ? regime.label.toUpperCase() : "UNAVAILABLE";
+    els.regimeLabel.className = known ? regimeClassName(regime.label) : "risk-mixed";
+    els.regimeScore.textContent = known ? regime.score : "--";
+    els.regimeSummary.textContent = known
+      ? `${regime.summary}${regime.modifiers?.length ? ` Modifiers: ${regime.modifiers.join(", ")}.` : ""}${qualityNote(data)}`
+      : "No regime inputs in the feed.";
+
+    const dxyRow = getAsset(data, "DXY");
     const vixRow = getAsset(data, "VIX");
     const miniCards = [
-      { label: "Confidence", value: `${confluence.confidence}%`, note: `${state.range} · ${confluence.preset.label}` },
-      { label: "BTC Pulse", value: assetChange(data, "BTC"), note: "24h crypto" },
-      { label: "Dollar", value: assetChange(data, "DXY"), note: "DXY pressure" },
       {
-        label: "Volatility",
+        label: "Confluence",
+        value: confluence.score == null ? "—" : `${confluence.score}/30`,
+        note: `${confluence.preset.label} · ${confluence.confidence}% conf.`,
+        title: "Preset-weighted 24h confluence after data-quality penalties — not a win probability.",
+      },
+      { label: "BTC Pulse", value: assetChange(data, "BTC"), note: "24h crypto" },
+      {
+        label: dxyRow?.proxy ? "Dollar Proxy" : "Dollar",
+        value: assetChange(data, "DXY"),
+        note: dxyRow?.proxy ? "USD proxy 24h" : "DXY pressure",
+      },
+      {
+        label: vixRow?.proxy ? "VIX Proxy" : "Volatility",
         value: vixRow?.proxy ? assetChange(data, "VIX") : assetValue(data, "VIX"),
-        note: vixRow?.proxy ? "VIX proxy 24h" : "VIX level",
+        note: vixRow?.proxy ? "ETF proxy 24h" : "VIX level",
       },
     ];
 
     els.regimeMiniCards.innerHTML = miniCards
-      .map((card) => `<div class="terminal-micro-card">
+      .map((card) => `<div class="terminal-micro-card"${card.title ? ` title="${escapeAttr(card.title)}"` : ""}>
         <span>${escapeHtml(card.label)}</span>
         <strong>${escapeHtml(card.value)}</strong>
         <small>${escapeHtml(card.note)}</small>
@@ -423,40 +447,45 @@
   }
 
   function renderConfluenceRows(confluence) {
-    els.factorCount.textContent = `${confluence.factors.length} factors`;
+    const scored = confluence.factors.filter((factor) => factor.points != null).length;
+    els.factorCount.textContent = `${scored} of ${confluence.factors.length} scored · 24h`;
     els.confluenceRows.innerHTML = confluence.factors
-      .map((factor) => `<tr>
+      .map((factor) => `<tr${factor.points == null ? ' class="terminal-factor-missing"' : ""}>
         <td><strong>${escapeHtml(factor.label)}</strong><small>${escapeHtml(factor.subLabel)}</small></td>
         <td>${escapeHtml(factor.reading)}<small>${escapeHtml(factor.note)}</small></td>
-        <td><span class="terminal-bias ${factor.bias.toLowerCase()}">${escapeHtml(factor.bias)}</span></td>
-        <td><strong>${factor.points}</strong><small>/5 · ×${escapeHtml(String(factor.weight))}</small></td>
+        <td><span class="terminal-bias ${factor.bias.toLowerCase().replace(/\s+/g, "-")}">${escapeHtml(factor.bias)}</span></td>
+        <td><strong>${factor.points == null ? "—" : factor.points}</strong><small>${factor.points == null ? "not scored" : `/5 · ×${escapeHtml(String(factor.weight))}`}</small></td>
       </tr>`)
       .join("");
   }
 
   function renderThesis(confluence, data) {
-    const leading = confluence.factors
-      .filter((factor) => factor.points >= 4)
-      .map((factor) => factor.label)
-      .slice(0, 3);
-    const drag = confluence.factors
-      .filter((factor) => factor.points <= 2)
-      .map((factor) => factor.label)
-      .slice(0, 2);
+    const scored = confluence.factors.filter((factor) => factor.points != null);
+    const leading = scored.filter((factor) => factor.points >= 4).map((factor) => factor.label).slice(0, 3);
+    const drag = scored.filter((factor) => factor.points <= 2).map((factor) => factor.label).slice(0, 2);
+    const missing = confluence.factors.filter((factor) => factor.points == null).map((factor) => factor.label);
+    const regime = canonicalRegime(data);
 
     const updated = data.updatedAt ? new Date(data.updatedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : "now";
+    const regimeText = regime && regime.inputsUsed > 0
+      ? `<strong>${escapeHtml(regime.label)}</strong> regime at ${escapeHtml(String(regime.score))}/100.`
+      : "<strong>Regime unavailable.</strong>";
+    const confluenceText = confluence.score == null
+      ? "No confluence factor has data."
+      : `${escapeHtml(confluence.preset.label)} confluence ${escapeHtml(String(confluence.score))}/30 (${escapeHtml(String(confluence.confidence))}% confidence). Supportive inputs: ${escapeHtml(leading.join(", ") || "none yet")}.`;
     els.terminalThesis.innerHTML = `
-      <p><strong>${escapeHtml(confluence.label)}</strong> at ${escapeHtml(String(confluence.score))}/30 (${escapeHtml(confluence.preset.label)} weighting, ${escapeHtml(String(confluence.confidence))}% confidence). Supportive inputs: ${escapeHtml(leading.join(", ") || "none yet")}.</p>
-      <p>${drag.length ? `Main drag: ${escapeHtml(drag.join(", "))}.` : "No major drag factor is flashing red."} Last refresh ${escapeHtml(updated)}.</p>
-      <p class="terminal-small-note">Use this as a fast dashboard read, not a standalone trade signal. Confirm structure on TradingView before acting.</p>`;
+      <p>${regimeText} ${confluenceText}</p>
+      <p>${drag.length ? `Main drag: ${escapeHtml(drag.join(", "))}.` : "No major drag factor is flashing red."}${missing.length ? ` Not scored (no data): ${escapeHtml(missing.join(", "))}.` : ""} Last refresh ${escapeHtml(updated)}.</p>
+      <p class="terminal-small-note">Confluence uses 24h asset moves. Use this as a fast read, not a standalone trade signal; confirm structure on TradingView before acting.</p>`;
   }
 
   function renderIndicators(data) {
-    const calendar = Array.isArray(data.calendar) ? data.calendar : [];
-    const events = calendar.slice(0, 5);
+    const dxy = getAsset(data, "DXY");
+    const vix = getAsset(data, "VIX");
+    const proxyNote = (row, symbol) => `${assetChange(data, symbol)}${row?.proxy ? " · proxy" : ""}`;
     const macroRows = [
-      { label: "Dollar Index", value: assetValue(data, "DXY"), detail: assetChange(data, "DXY") },
-      { label: "Volatility Index", value: assetValue(data, "VIX"), detail: assetChange(data, "VIX") },
+      { label: dxy?.proxy ? "Dollar Proxy" : "Dollar Index", value: assetValue(data, "DXY"), detail: proxyNote(dxy, "DXY") },
+      { label: vix?.proxy ? "VIX Proxy" : "Volatility Index", value: assetValue(data, "VIX"), detail: proxyNote(vix, "VIX") },
       { label: "Gold", value: assetValue(data, "XAU"), detail: assetChange(data, "XAU") },
       { label: "Crude Oil", value: assetValue(data, "WTI"), detail: assetChange(data, "WTI") },
     ];
@@ -468,29 +497,41 @@
       </div>`)
       .join("");
 
-    const calendarHtml = events.length
-      ? events.map((event) => `<div class="terminal-event-row">
-          <span class="terminal-event-time">${escapeHtml(event.time || "--")}</span>
-          <span>${escapeHtml(event.title || "Market event")}</span>
-          <em class="impact-${escapeHtml(String(event.impact || "low").toLowerCase())}">${escapeHtml(event.impact || "Low")}</em>
-        </div>`).join("")
-      : `<div class="terminal-empty">No macro calendar events configured.</div>`;
+    // The fallback calendar is sample rows, not scheduled releases: listing
+    // them with times would read as real catalysts.
+    const calendarLive = data.dataQuality?.modules?.calendar === "live";
+    const events = calendarLive && Array.isArray(data.calendar) ? data.calendar.slice(0, 5) : [];
+    const calendarHtml = !calendarLive
+      ? `<div class="terminal-empty">No live calendar feed. See the <a href="/reporter.html#economic-calendar">Reporter Room</a> for catalysts.</div>`
+      : events.length
+        ? events.map((event) => `<div class="terminal-event-row">
+            <span class="terminal-event-time">${escapeHtml(event.time || "--")}</span>
+            <span>${escapeHtml(event.title || "Market event")}</span>
+            <em class="impact-${escapeHtml(String(event.impact || "low").toLowerCase())}">${escapeHtml(event.impact || "Low")}</em>
+          </div>`).join("")
+        : `<div class="terminal-empty">No macro calendar events today.</div>`;
 
     els.indicatorList.innerHTML = macroHtml + `<div class="terminal-divider"></div>` + calendarHtml;
   }
 
   function renderCryptoPulse(data) {
-    const allocation = data.allocation?.segments || [];
+    // Dominance has its own feed (CoinGecko /global) with its own fallback —
+    // hard-coded shares that must not pass for a live reading.
+    const dominanceLive = Boolean(data.allocation?.live);
+    const allocation = dominanceLive ? data.allocation?.segments || [] : [];
     const btcDom = allocation.find((entry) => String(entry.label).toUpperCase() === "BTC")?.percent;
     const ethDom = allocation.find((entry) => String(entry.label).toUpperCase() === "ETH")?.percent;
+    const domNote = dominanceLive ? "market share" : "dominance feed not live";
     const cards = [
       { label: "BTC", value: assetValue(data, "BTC"), note: assetChange(data, "BTC") },
       { label: "ETH", value: assetValue(data, "ETH"), note: assetChange(data, "ETH") },
-      { label: "BTC Dom", value: btcDom != null ? `${Number(btcDom).toFixed(2)}%` : "—", note: "market share" },
-      { label: "ETH Dom", value: ethDom != null ? `${Number(ethDom).toFixed(2)}%` : "—", note: "market share" },
+      { label: "BTC Dom", value: btcDom != null ? `${Number(btcDom).toFixed(2)}%` : "—", note: domNote },
+      { label: "ETH Dom", value: ethDom != null ? `${Number(ethDom).toFixed(2)}%` : "—", note: domNote },
     ];
 
-    els.cryptoLiveTag.textContent = data.dataQuality?.live ? "Live" : "Fallback";
+    const cryptoStatus = String(data.dataQuality?.modules?.crypto || (data.dataQuality?.live ? "live" : "fallback"));
+    els.cryptoLiveTag.textContent = (MODULE_STATUS_META[cryptoStatus] || { label: cryptoStatus }).label;
+    els.cryptoLiveTag.title = dominanceLive ? "Prices and dominance" : "Prices only — dominance feed is not live";
     els.cryptoPulse.innerHTML = cards
       .map((card) => `<div class="terminal-crypto-card">
         <span>${escapeHtml(card.label)}</span>
@@ -574,7 +615,7 @@
     els.drawerBody.innerHTML = `
       <div class="terminal-drawer-stats">
         <div class="terminal-micro-card"><span>Last</span><strong>${escapeHtml(formatLast(asset))}</strong><small>${escapeHtml(asset.volume ? `vol ${asset.volume}` : "")}</small></div>
-        <div class="terminal-micro-card"><span>24h Change</span><strong class="${cls}">${escapeHtml(formatPercent(change))}</strong><small>${escapeHtml(state.range)} view</small></div>
+        <div class="terminal-micro-card"><span>24h Change</span><strong class="${cls}">${escapeHtml(formatPercent(change))}</strong><small>24h feed</small></div>
         <div class="terminal-micro-card"><span>Feed Status</span><strong>${escapeHtml(statusMeta.label)}</strong><small class="tone-${statusMeta.tone}">${escapeHtml(moduleKey)} module</small></div>
       </div>
       <div class="terminal-drawer-section">
@@ -623,10 +664,16 @@
         : dxyChange < -0.2
           ? "a softer dollar is a tailwind"
           : "the dollar is neutral";
-    const regime = buildConfluence(data, currentPreset());
-    return `${asset.symbol} is ${direction} (${formatPercent(change)} over 24h) while the ${currentPreset().label} read is ${regime.label} at ${regime.score}/30 — ${dollarNote}. Confirm structure on TradingView before acting.`;
+    const regime = canonicalRegime(data);
+    const regimeText = regime && regime.inputsUsed > 0 ? `the market regime is ${regime.label} (${regime.score}/100)` : "the market regime is unavailable";
+    return `${asset.symbol} is ${direction} (${formatPercent(change)} over 24h) while ${regimeText} — ${dollarNote}. Confirm structure on TradingView before acting.`;
   }
 
+  // Every factor scores only from data that is actually in the feed. A missing
+  // row used to read as a 0% move — DXY absent scored "Dollar softening,
+  // Bullish 4/5" — so a factor with no data is now left out of the score and
+  // shown as "No data", and the total is normalized over the factors that
+  // were scored.
   function buildConfluence(data, preset = PRESETS.default) {
     const dxy = getAsset(data, "DXY");
     const vix = getAsset(data, "VIX");
@@ -637,93 +684,114 @@
     const btc = getAsset(data, "BTC");
     const eth = getAsset(data, "ETH");
 
-    const dxyChange = changeNum(dxy);
-    const vixChange = changeNum(vix);
+    const dxyChange = changeOf(dxy);
+    const vixChange = changeOf(vix);
     // When VIX comes from an ETF proxy (e.g. VIXY) the price is not the real
     // index level, so score direction only instead of absolute-level bands.
     const vixIsProxy = Boolean(vix?.proxy);
-    const vixLevel = vixIsProxy ? 0 : Number(vix?.price);
-    const equityAvg = avg([changeNum(spy), changeNum(qqq)]);
-    const cryptoAvg = avg([changeNum(btc), changeNum(eth)]);
-    const goldChange = changeNum(gold);
-    const oilChange = changeNum(oil);
-    const highImpactEvents = (data.calendar || []).filter((event) => /^high/i.test(event.impact || "")).length;
+    const vixLevel = vixIsProxy ? null : Number(vix?.price);
+    const vixHasLevel = Number.isFinite(vixLevel) && vixLevel > 0;
+    const equityAvg = avg([changeOf(spy), changeOf(qqq)]);
+    const cryptoAvg = avg([changeOf(btc), changeOf(eth)]);
+    const goldChange = changeOf(gold);
+    const oilChange = changeOf(oil);
     const weights = preset.weights || PRESETS.default.weights;
+
+    // Calendar risk is the Decision Engine's news-risk read (timed high-impact
+    // releases), and only when the calendar feed is live: the fallback
+    // calendar is sample rows, not scheduled events.
+    const newsRisk = data.marketState?.newsRisk || null;
+    const calendarLive = newsRisk && newsRisk.quality === "live";
+    const NEWS_POINTS = { low: 5, medium: 3, high: 1 };
 
     const factors = [
       buildFactor({
         key: "dxy",
-        label: "Dollar (DXY)",
-        subLabel: "USD pressure",
-        reading: dxy ? `${formatLast(dxy)} (${formatPercent(dxyChange)})` : "No DXY row",
-        note: dxyChange <= 0 ? "Dollar softening supports risk." : "Dollar strength can pressure crypto/equities.",
-        rawScore: dxyChange <= -0.4 ? 5 : dxyChange <= 0 ? 4 : dxyChange < 0.5 ? 2 : 1,
+        label: dxy?.proxy ? "Dollar (DXY proxy)" : "Dollar (DXY)",
+        subLabel: dxy?.proxy ? "USD pressure proxy" : "USD pressure",
+        reading: dxy && dxyChange != null ? `${formatLast(dxy)} (${formatPercent(dxyChange)})` : "No DXY row",
+        note: dxyChange == null ? "Not in the feed." : dxyChange <= 0 ? "Dollar softening supports risk." : "Dollar strength can pressure crypto/equities.",
+        rawScore: dxyChange == null ? null : dxyChange <= -0.4 ? 5 : dxyChange <= 0 ? 4 : dxyChange < 0.5 ? 2 : 1,
         weight: weights.dxy,
       }),
       buildFactor({
         key: "vix",
-        label: "Volatility (VIX)",
-        subLabel: vixIsProxy ? "market stress (ETF proxy)" : "market stress",
-        reading: vix ? `${formatLast(vix)} (${formatPercent(vixChange)})` : "No VIX row",
+        label: vixIsProxy ? "Volatility (VIX proxy)" : "Volatility (VIX)",
+        subLabel: vixIsProxy ? "market stress ETF proxy" : "market stress",
+        reading: vix && vixChange != null ? `${formatLast(vix)} (${formatPercent(vixChange)})` : "No VIX row",
         note:
-          (vixIsProxy ? vixChange <= 0 : vixLevel && vixLevel < 20 && vixChange <= 0)
-            ? "Calm volatility backdrop."
-            : "Volatility is not fully relaxed.",
-        rawScore: vixIsProxy
-          ? vixChange <= -2 ? 5 : vixChange <= 0 ? 4 : vixChange < 3 ? 2 : 1
-          : vixLevel && vixLevel < 18 && vixChange <= 0 ? 5 : vixLevel && vixLevel < 22 ? 4 : vixLevel && vixLevel < 28 ? 2 : 1,
+          vixChange == null
+            ? "Not in the feed."
+            : (vixIsProxy ? vixChange <= 0 : vixHasLevel && vixLevel < 20 && vixChange <= 0)
+              ? "Calm volatility backdrop."
+              : "Volatility is not fully relaxed.",
+        rawScore:
+          vixChange == null
+            ? null
+            : vixIsProxy
+              ? vixChange <= -2 ? 5 : vixChange <= 0 ? 4 : vixChange < 3 ? 2 : 1
+              : !vixHasLevel
+                ? null
+                : vixLevel < 18 && vixChange <= 0 ? 5 : vixLevel < 22 ? 4 : vixLevel < 28 ? 2 : 1,
         weight: weights.vix,
       }),
       buildFactor({
         key: "equities",
         label: "Equity Breadth",
         subLabel: "SPY + QQQ tape",
-        reading: `Avg ${formatPercent(equityAvg)}`,
-        note: equityAvg >= 0 ? "Equities are confirming risk appetite." : "Equities are dragging the read.",
-        rawScore: equityAvg >= 0.7 ? 5 : equityAvg >= 0 ? 4 : equityAvg > -0.7 ? 2 : 1,
+        reading: equityAvg == null ? "No SPY/QQQ rows" : `Avg ${formatPercent(equityAvg)}`,
+        note: equityAvg == null ? "Not in the feed." : equityAvg >= 0 ? "Equities are confirming risk appetite." : "Equities are dragging the read.",
+        rawScore: equityAvg == null ? null : equityAvg >= 0.7 ? 5 : equityAvg >= 0 ? 4 : equityAvg > -0.7 ? 2 : 1,
         weight: weights.equities,
       }),
       buildFactor({
         key: "crypto",
         label: "Crypto Impulse",
         subLabel: "BTC + ETH",
-        reading: `Avg ${formatPercent(cryptoAvg)}`,
-        note: cryptoAvg >= 0 ? "Major crypto is bid." : "Major crypto momentum is negative.",
-        rawScore: cryptoAvg >= 3 ? 5 : cryptoAvg >= 0 ? 4 : cryptoAvg > -3 ? 2 : 1,
+        reading: cryptoAvg == null ? "No BTC/ETH rows" : `Avg ${formatPercent(cryptoAvg)}`,
+        note: cryptoAvg == null ? "Not in the feed." : cryptoAvg >= 0 ? "Major crypto is bid." : "Major crypto momentum is negative.",
+        rawScore: cryptoAvg == null ? null : cryptoAvg >= 3 ? 5 : cryptoAvg >= 0 ? 4 : cryptoAvg > -3 ? 2 : 1,
         weight: weights.crypto,
       }),
       buildFactor({
         key: "commodities",
         label: "Commodities",
         subLabel: "gold / oil balance",
-        reading: `Au ${formatPercent(goldChange)} · Oil ${formatPercent(oilChange)}`,
-        note: oilChange <= 0 ? "Oil pressure is easing inflation impulse." : "Oil bid can complicate the macro tape.",
-        rawScore: oilChange <= -0.8 && goldChange <= 0.8 ? 5 : oilChange <= 0.5 ? 4 : oilChange < 1.5 ? 2 : 1,
+        reading: oilChange == null ? "No oil row" : `Au ${formatPercent(goldChange)} · Oil ${formatPercent(oilChange)}`,
+        note: oilChange == null ? "Not in the feed." : oilChange <= 0 ? "Oil pressure is easing inflation impulse." : "Oil bid can complicate the macro tape.",
+        // Scored off oil; gold only tightens the top band, so a missing gold
+        // row just means that band can't be reached.
+        rawScore:
+          oilChange == null
+            ? null
+            : oilChange <= -0.8 && goldChange != null && goldChange <= 0.8 ? 5 : oilChange <= 0.5 ? 4 : oilChange < 1.5 ? 2 : 1,
         weight: weights.commodities,
       }),
       buildFactor({
         key: "calendar",
         label: "Calendar Risk",
         subLabel: "scheduled catalysts",
-        reading: `${highImpactEvents} high-impact event${highImpactEvents === 1 ? "" : "s"}`,
-        note: highImpactEvents ? "Event risk can override clean signals." : "No major scheduled catalyst in the feed.",
-        rawScore: highImpactEvents === 0 ? 5 : highImpactEvents <= 1 ? 4 : highImpactEvents <= 3 ? 2 : 1,
+        reading: calendarLive ? `News risk ${newsRisk.level}` : "Calendar feed not live",
+        note: calendarLive ? newsRisk.reason : "Fallback calendar rows are samples, not releases — not scored.",
+        rawScore: calendarLive ? NEWS_POINTS[newsRisk.level] ?? null : null,
         weight: weights.calendar,
       }),
     ];
 
-    // Weighted total, normalized back to the familiar /30 scale so the regime
-    // thresholds stay comparable across presets.
-    const weightedScore = factors.reduce((sum, factor) => sum + factor.points * factor.weight, 0);
-    const weightedMax = factors.reduce((sum, factor) => sum + 5 * factor.weight, 0);
-    const score = Math.round((weightedScore / weightedMax) * 30);
+    // Weighted total over the scored factors, normalized back to the familiar
+    // /30 scale so presets stay comparable.
+    const scored = factors.filter((factor) => factor.points != null);
+    const weightedScore = scored.reduce((sum, factor) => sum + factor.points * factor.weight, 0);
+    const weightedMax = scored.reduce((sum, factor) => sum + 5 * factor.weight, 0);
+    const score = weightedMax ? Math.round((weightedScore / weightedMax) * 30) : null;
 
     // Confidence starts from the weighted read but is penalized when the data
-    // underneath is degraded, so fallback macro/calendar can't fake conviction.
+    // underneath is degraded or factors are missing, so fallback or absent
+    // inputs can't fake conviction.
     const dq = data.dataQuality || {};
     const modules = dq.modules || {};
     const penalties = [];
-    let confidence = Math.round((weightedScore / weightedMax) * 100);
+    let confidence = weightedMax ? Math.round((weightedScore / weightedMax) * 100) : 0;
     if (!dq.live || dq.partial) {
       confidence -= 15;
       penalties.push("degraded feed");
@@ -732,32 +800,29 @@
       confidence -= 10;
       penalties.push("macro fallback");
     }
-    if (modules.calendar && modules.calendar !== "live") {
-      confidence -= 5;
-      penalties.push("calendar fallback");
+    const missing = factors.length - scored.length;
+    if (missing) {
+      confidence -= 5 * missing;
+      penalties.push(`${missing} factor${missing === 1 ? "" : "s"} without data`);
     }
     confidence = Math.max(5, Math.min(100, confidence));
 
-    const label = score >= 21 ? "RISK-ON" : score <= 12 ? "RISK-OFF" : "MIXED / NEUTRAL";
-    const className = score >= 21 ? "risk-on" : score <= 12 ? "risk-off" : "risk-mixed";
-    const supportive = factors.filter((factor) => factor.points >= 4).length;
-    const bearish = factors.filter((factor) => factor.points <= 2).length;
+    const supportive = scored.filter((factor) => factor.points >= 4).length;
+    const bearish = scored.filter((factor) => factor.points <= 2).length;
     const penaltyNote = penalties.length ? ` Confidence reduced: ${penalties.join(", ")}.` : "";
 
     return {
       factors,
       score,
       confidence,
-      label,
-      className,
       preset,
       summary: `${supportive} supportive factor${supportive === 1 ? "" : "s"}, ${bearish} drag factor${bearish === 1 ? "" : "s"} under the ${preset.label} weighting.${penaltyNote}`,
     };
   }
 
   function buildFactor({ key, label, subLabel, reading, note, rawScore, weight }) {
-    const points = Math.max(1, Math.min(5, Number(rawScore) || 3));
-    const bias = points >= 4 ? "Bullish" : points <= 2 ? "Bearish" : "Neutral";
+    const points = rawScore == null || !Number.isFinite(Number(rawScore)) ? null : Math.max(1, Math.min(5, Number(rawScore)));
+    const bias = points == null ? "No data" : points >= 4 ? "Bullish" : points <= 2 ? "Bearish" : "Neutral";
     const safeWeight = Number.isFinite(Number(weight)) && Number(weight) > 0 ? Number(weight) : 1;
     return { key, label, subLabel, reading, note, points, bias, weight: safeWeight };
   }
@@ -779,9 +844,17 @@
     return Number.isFinite(value) ? value : 0;
   }
 
+  // A row's 24h change, or null when the row is missing or carries no number —
+  // never a made-up 0%.
+  function changeOf(asset) {
+    if (!asset) return null;
+    const value = Number(asset.changePercent);
+    return Number.isFinite(value) ? value : null;
+  }
+
   function avg(values) {
     const clean = values.filter(Number.isFinite);
-    if (!clean.length) return 0;
+    if (!clean.length) return null;
     return clean.reduce((sum, value) => sum + value, 0) / clean.length;
   }
 
@@ -806,6 +879,7 @@
   }
 
   function formatPercent(value) {
+    if (value == null) return "—";
     const n = Number(value);
     if (!Number.isFinite(n)) return "—";
     const sign = n > 0 ? "+" : "";
@@ -858,6 +932,12 @@
 
   function escapeAttr(value) {
     return escapeHtml(value);
+  }
+
+  // Exposed for the unit tests only; the browser has no `module`.
+  if (typeof module === "object" && module.exports) {
+    module.exports = { buildConfluence, PRESETS };
+    return;
   }
 
   if (document.readyState === "loading") {

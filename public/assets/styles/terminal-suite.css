@@ -100,7 +100,6 @@
 .terminal-pill,
 .terminal-button,
 .terminal-tab,
-.terminal-range-btn,
 .terminal-mini-tag {
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
   text-transform: uppercase;
@@ -188,7 +187,7 @@
 
 .terminal-filterbar {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr;
   align-items: center;
   border-top: 0;
   border-radius: 0;
@@ -207,28 +206,6 @@
 
 .terminal-search::placeholder {
   color: var(--term-muted);
-}
-
-.terminal-range {
-  display: flex;
-  align-items: stretch;
-  height: 100%;
-  border-left: 1px solid var(--term-line);
-}
-
-.terminal-range-btn {
-  min-width: 58px;
-  border: 0;
-  border-right: 1px solid var(--term-line);
-  background: transparent;
-  color: var(--term-muted);
-  cursor: pointer;
-}
-
-.terminal-range-btn.active,
-.terminal-range-btn:hover {
-  background: rgba(165, 50, 50, 0.14);
-  color: var(--term-red);
 }
 
 .terminal-presets {
@@ -530,6 +507,9 @@
 .terminal-bias.bullish { color: var(--term-green); }
 .terminal-bias.bearish { color: var(--term-red); }
 .terminal-bias.neutral { color: var(--term-amber); }
+.terminal-bias.no-data { color: var(--term-muted); }
+.terminal-empty a { color: var(--term-green); }
+.terminal-factor-missing td { opacity: 0.6; }
 
 .terminal-asset-list,
 .terminal-indicator-list,
@@ -884,16 +864,6 @@
 
   .terminal-filterbar {
     display: block;
-  }
-
-  .terminal-range {
-    border-left: 0;
-    border-top: 1px solid var(--term-line);
-  }
-
-  .terminal-range-btn {
-    flex: 1;
-    padding: 12px 0;
   }
 
   .terminal-micro-grid,
