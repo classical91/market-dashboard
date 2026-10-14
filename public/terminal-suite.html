@@ -41,12 +41,6 @@
 
         <section class="terminal-filterbar" aria-label="Terminal filters">
           <input id="terminalSearch" class="terminal-search" placeholder="filter cross-asset table · e.g. DXY, BTC, VIX, GOLD" />
-          <div class="terminal-range" role="group" aria-label="BTC chart range" title="Chart range only; confluence factors use 24h asset moves.">
-            <button class="terminal-range-btn" type="button" data-range="1D">1D</button>
-            <button class="terminal-range-btn active" type="button" data-range="1W">1W</button>
-            <button class="terminal-range-btn" type="button" data-range="1M">1M</button>
-            <button class="terminal-range-btn" type="button" data-range="3M">3M</button>
-          </div>
         </section>
 
         <section class="terminal-presets" id="terminalPresets" role="group" aria-label="Terminal presets"></section>
@@ -78,20 +72,20 @@
                   <div class="terminal-section-label">Macro Regime</div>
                   <h2 id="regimeLabel">Loading…</h2>
                 </div>
-                <div class="terminal-score">
+                <div class="terminal-score" title="Decision Engine regime score, 0–100, higher is risk-on">
                   <strong id="regimeScore">--</strong>
-                  <span>of 30</span>
+                  <span>of 100</span>
                 </div>
               </div>
-              <p class="terminal-regime-summary" id="regimeSummary">Building the macro confluence engine from /api/overview.</p>
+              <p class="terminal-regime-summary" id="regimeSummary">Loading the market regime from /api/overview.</p>
               <div class="terminal-micro-grid" id="regimeMiniCards"></div>
             </article>
 
             <article class="terminal-panel" id="confluence">
               <div class="terminal-panel-head">
                 <div>
-                  <div class="terminal-section-label">Macro Confluence</div>
-                  <h2>6-Factor Read</h2>
+                  <div class="terminal-section-label">Macro Confluence · 24h factors</div>
+                  <h2>6-Factor Trading Read</h2>
                 </div>
                 <span class="terminal-mini-tag" id="factorCount">6 factors</span>
               </div>
@@ -258,7 +252,6 @@
 
     <script src="/assets/js/ui.js"></script>
     <script src="/assets/js/sidebar.js"></script>
-    <script src="/assets/js/terminal-suite-fixes.js"></script>
     <script src="/assets/js/terminal-suite.js"></script>
   </body>
 </html>
