@@ -75,6 +75,56 @@ function withExclusiveLock(file, state, operation, { busyMessage } = {}) {
   }
 }
 
+// Directory fsync is best-effort: some platforms (Windows) and filesystems
+// refuse to open or sync a directory, and the rename has already happened.
+function fsyncDir(dir) {
+  let fd = null;
+  try {
+    fd = fs.openSync(dir, "r");
+    fs.fsyncSync(fd);
+  } catch {
+    // Not supported here; nothing more we can do.
+  } finally {
+    if (fd !== null) {
+      try { fs.closeSync(fd); } catch {}
+    }
+  }
+}
+
+/**
+ * Read and parse a JSON store file, failing closed.
+ *
+ * Returns null only when the file does not exist yet (a fresh store). Any
+ * other read error, or a file that is not valid JSON, throws a 503 instead of
+ * reading as an empty store: an empty read would report receipts and
+ * approvals as missing, and the next write would overwrite the unreadable
+ * file with that empty state, destroying what was in it.
+ */
+function readJsonStore(file, logger = console, label = "") {
+  let raw;
+  try {
+    raw = fs.readFileSync(file, "utf8");
+  } catch (err) {
+    if (err.code === "ENOENT") return null;
+    throw unreadableStoreError(file, err, logger, label);
+  }
+  try {
+    return JSON.parse(raw);
+  } catch (err) {
+    throw unreadableStoreError(file, err, logger, label);
+  }
+}
+
+function unreadableStoreError(file, cause, logger, label) {
+  const name = path.basename(file);
+  logger.error?.(`${label ? `${label} ` : ""}Could not read ${name}:`, cause.message);
+  const err = new Error(`${name} is unreadable; refusing to treat it as empty. Restore or repair the file.`);
+  err.statusCode = 503;
+  err.expose = true;
+  err.code = "STORE_UNREADABLE";
+  return err;
+}
+
 /**
  * Write JSON to `file` via a uniquely named temp file and a rename, so a
  * reader never observes a half-written document and a crash mid-write leaves
@@ -89,9 +139,19 @@ function writeJsonAtomic(file, payload, logger = console, label = "") {
   try {
     ensureDir(file);
     tempFile = `${file}.${process.pid}.${crypto.randomBytes(4).toString("hex")}.tmp`;
-    fs.writeFileSync(tempFile, JSON.stringify(payload, null, 2), "utf8");
+    // fsync the temp file before the rename and the directory after it, so a
+    // power loss or container kill cannot leave the rename durable but the
+    // bytes behind it empty, or lose the rename itself.
+    const fd = fs.openSync(tempFile, "w");
+    try {
+      fs.writeFileSync(fd, JSON.stringify(payload, null, 2), "utf8");
+      fs.fsyncSync(fd);
+    } finally {
+      fs.closeSync(fd);
+    }
     fs.renameSync(tempFile, file);
     tempFile = null;
+    fsyncDir(path.dirname(file));
     return true;
   } catch (err) {
     logger.error?.(`${label ? `${label} ` : ""}Failed to write ${path.basename(file)}:`, err.message);
@@ -106,6 +166,7 @@ function writeJsonAtomic(file, payload, logger = console, label = "") {
 module.exports = {
   withExclusiveLock,
   writeJsonAtomic,
+  readJsonStore,
   WRITE_LOCK_WAIT_MS,
   WRITE_LOCK_STALE_MS,
 };

@@ -34,10 +34,9 @@
  *   { "version": 1, "meta": { "lastPollAt", "lastPollAgent" }, "records": [ <newest first> ] }
  */
 
-const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
-const { withExclusiveLock, writeJsonAtomic } = require("./json-file-lock");
+const { withExclusiveLock, writeJsonAtomic, readJsonStore } = require("./json-file-lock");
 const { canonicalizeUrl } = require("./broadcast-ledger");
 
 const STORE_VERSION = 1;
@@ -94,15 +93,11 @@ class FarmclawHandoffStore {
   }
 
   _read() {
-    try {
-      const parsed = JSON.parse(fs.readFileSync(this._file, "utf8"));
-      return {
-        meta: parsed && typeof parsed.meta === "object" && parsed.meta ? parsed.meta : {},
-        records: Array.isArray(parsed?.records) ? parsed.records : [],
-      };
-    } catch {
-      return { meta: {}, records: [] };
-    }
+    const parsed = readJsonStore(this._file, this._logger, "[FarmclawHandoffs]");
+    return {
+      meta: parsed && typeof parsed.meta === "object" && parsed.meta ? parsed.meta : {},
+      records: Array.isArray(parsed?.records) ? parsed.records : [],
+    };
   }
 
   _write(state) {
