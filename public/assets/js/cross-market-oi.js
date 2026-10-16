@@ -354,13 +354,13 @@
     var pts = vals.map(function (v, i) { return v == null ? null : project(g, i, n, frac(v, scale)); });
     var complete = pts.every(Boolean);
 
-    // Zero-split wedges: between each pair of neighbours, the area between
-    // the zero band and the joining line — orange where OI increased, grey
-    // where it decreased — split exactly where the line crosses zero. Pairs
-    // next to a missing market are left unfilled.
+    // One spike per market, as on the reference: from the zero band out to
+    // the point (orange, OI increased) or in to it (grey, OI decreased). Each
+    // spike's base spans halfway to its neighbours, so one market's move is
+    // never merged with the next one's. A missing market draws nothing.
     if (n >= 3) {
-      var wedges = window.OiWedges.buildWedges(vals.map(function (v, i) {
-        return { value: v, point: pts[i], zero: project(g, i, n, zf), offset: v == null ? null : frac(v, scale) - zf };
+      var wedges = window.OiWedges.buildSpikes(vals.map(function (v, i) {
+        return { value: v, point: pts[i], zero: project(g, i, n, zf) };
       }));
       var fills = svgEl("g", { class: "xoi-fills", "aria-hidden": "true" });
       wedges.forEach(function (w) {
@@ -370,18 +370,8 @@
       svg.insertBefore(fills, svg.firstChild);
     }
 
-    if (n >= 3 && complete) {
-      svg.appendChild(svgEl("polygon", { points: pointsAttr(pts), class: "xoi-poly" }));
-    } else {
-      var d = "";
-      var pen = false;
-      pts.concat(n >= 3 ? [pts[0]] : []).forEach(function (p) {
-        if (!p) { pen = false; return; }
-        d += (pen ? "L" : "M") + p[0].toFixed(1) + "," + p[1].toFixed(1);
-        pen = true;
-      });
-      if (d) svg.appendChild(svgEl("path", { d: d, class: "xoi-poly xoi-poly--open" }));
-    }
+    // No line joins the points: it would cut across the spikes. A missing
+    // market simply has no spike, and the note under the plot names it.
 
     items.forEach(function (it, i) {
       var row = it.row;

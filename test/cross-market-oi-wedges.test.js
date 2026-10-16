@@ -153,3 +153,58 @@ test("a straight-sided zero band is required: two small increases would dip unde
   assert.ok(Math.hypot(mid[0], mid[1]) < ZF, "inside the circular zero ring");
   assertSides([2, 2, 2, 2, 2, 2], buildWedges(ax));
 });
+
+// ── spikes: one triangle per market, as on the reference ──
+
+const { buildSpikes } = require("../public/assets/js/oi-wedges");
+
+/** Signed area: > 0 means p is left of a→b. */
+function cross(a, b, p) {
+  return (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]);
+}
+
+/** Is p outside (or on) the convex zero band given by its corners? */
+function outsideBand(zeros, p) {
+  const n = zeros.length;
+  const inside = zeros.every((z, i) => cross(z, zeros[(i + 1) % n], [0, 0]) * cross(z, zeros[(i + 1) % n], p) >= -1e-12);
+  return !inside || zeros.some((z, i) => Math.abs(cross(z, zeros[(i + 1) % n], p)) < 1e-12);
+}
+
+test("spikes: one per market, outward for an increase and inward for a decrease", () => {
+  // The values from the reported screenshot.
+  const values = [9.37, 5.69, -2.55, 1.9, 1.91, -0.68];
+  const ax = axes(values, 10);
+  const spikes = buildSpikes(ax);
+  assert.deepEqual(spikes.map((s) => s.axis), [0, 1, 2, 3, 4, 5]);
+  assert.deepEqual(spikes.map((s) => s.direction), ["up", "up", "down", "up", "up", "down"]);
+  const zeros = ax.map((a) => a.zero);
+  for (const s of spikes) {
+    assert.equal(s.points.length, 4, "base midpoint, tip, base midpoint, band corner");
+    assert.deepEqual(s.points[1], ax[s.axis].point, "the tip is the observation");
+    assert.deepEqual(s.points[3], ax[s.axis].zero, "the base passes through the band corner");
+    const tipOutside = outsideBand(zeros, s.points[1]);
+    assert.equal(tipOutside, s.direction === "up", `axis ${s.axis} tip is on its own side of zero`);
+  }
+});
+
+test("spikes tile the zero band: neighbours share base midpoints and never overlap", () => {
+  const ax = axes([9.37, 5.69, -2.55, 1.9, 1.91, -0.68], 10);
+  const spikes = buildSpikes(ax);
+  for (let i = 0; i < spikes.length; i += 1) {
+    const next = spikes[(i + 1) % spikes.length];
+    assert.deepEqual(spikes[i].points[2], next.points[0], `spike ${i} ends where spike ${next.axis} begins`);
+  }
+});
+
+test("spikes: a missing market or an exactly-zero change draws nothing, and neighbours are unaffected", () => {
+  const spikes = buildSpikes(axes([5, null, -5, 0, 5, 5]));
+  assert.deepEqual(spikes.map((s) => s.axis), [0, 2, 4, 5]);
+  assert.deepEqual(buildSpikes(axes([1, 2])), [], "fewer than three axes: no shape");
+});
+
+test("spikes never change the data they are given", () => {
+  const ax = axes([15.22, -1.47, 3, -8, 0, 25]);
+  const before = JSON.stringify(ax);
+  buildSpikes(ax);
+  assert.equal(JSON.stringify(ax), before);
+});
