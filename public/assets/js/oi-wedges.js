@@ -17,7 +17,9 @@
  * Classification is by the value's sign alone (> 0 increase, < 0 decrease).
  * Nothing here reads price, so nothing here is bullish or bearish.
  *
- * The wedges are drawing only: values, dates and scale are never changed.
+ * The page draws buildSpikes (one triangle per market, below); buildWedges
+ * is kept for its tests and callers. Both are drawing only: values, dates
+ * and scale are never changed.
  */
 (function (root, factory) {
   var api = factory();
@@ -67,5 +69,39 @@
     return out;
   }
 
-  return { buildWedges: buildWedges };
+  function mid(a, b) { return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; }
+
+  /**
+   * One spike per market, as on the reference indicator: the tip is the
+   * observation P_i and the base runs along the zero band from the midpoint
+   * of the side before axis i, through the band's corner Z_i, to the
+   * midpoint of the side after it. Neighbouring spikes share base midpoints,
+   * so they tile the band and never overlap; each spike lies entirely on its
+   * own side of zero — outward ("up") for an increase, inward ("down") for a
+   * decrease — because the band is straight-sided and convex.
+   *
+   * axes: [{ value, point, zero }] in slot order. A missing value, or a value
+   * of exactly zero, draws nothing; its neighbours are unaffected.
+   *
+   * Returns [{ direction: "up" | "down", axis, points: [[x, y], …] }].
+   */
+  function buildSpikes(axes) {
+    var n = axes.length;
+    var out = [];
+    if (n < 3) return out;
+    for (var i = 0; i < n; i += 1) {
+      var a = axes[i];
+      if (!a.point || !isNum(a.value) || sign(a.value) === 0) continue;
+      var before = mid(axes[(i - 1 + n) % n].zero, a.zero);
+      var after = mid(a.zero, axes[(i + 1) % n].zero);
+      out.push({
+        direction: a.value > 0 ? "up" : "down",
+        axis: i,
+        points: [before, a.point, after, a.zero],
+      });
+    }
+    return out;
+  }
+
+  return { buildWedges: buildWedges, buildSpikes: buildSpikes };
 });

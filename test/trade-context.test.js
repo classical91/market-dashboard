@@ -626,9 +626,12 @@ test("untracking a pair drops its history rather than resuming it later", async 
 });
 
 test("an unreadable store costs the change block and nothing else", async () => {
+  // This test asserts FRESH against the real clock, so its candle closed
+  // minutes ago rather than at the fixed BAR_A, which ages into STALE.
+  const justClosed = Date.now() - 10 * MINUTE;
   const engines = stubEngines({
-    screener: timestamped(screenerRow(), BAR_A),
-    pattern: timestamped(patternRow(), BAR_A, "scannedAt"),
+    screener: timestamped(screenerRow(), justClosed),
+    pattern: timestamped(patternRow(), justClosed, "scannedAt"),
   });
   const unreadable = { statusCode: 503 };
   const service = new TradeContextService({
