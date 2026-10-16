@@ -86,6 +86,7 @@ const { LiveScannerService } = require("./services/trading/live-scanner");
 const { LiveResearchService } = require("./services/trading/live-research-runner");
 const { WatchlistService } = require("./services/watchlist");
 const { TradeContextService } = require("./services/trade-context");
+const { TradeObservationStore } = require("./services/trade-observations");
 const { BotCommandsService } = require("./services/bot-commands");
 const { PatternTrackerService } = require("./services/pattern-tracker");
 const { MemoryCache } = require("./services/cache");
@@ -385,6 +386,7 @@ function createApp() {
     patternScannerService,
     openInterestService,
     rsiMatrixService,
+    observationStore: new TradeObservationStore({ dataDir }),
   });
   const botCommandsService = new BotCommandsService({ dataDir });
   const patternTrackerService = new PatternTrackerService({ dataDir, fetchPrice: fetchBinancePrice });

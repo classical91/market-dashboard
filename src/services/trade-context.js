@@ -14,6 +14,7 @@
 // agree — and that state never becomes an instruction to buy or sell.
 
 const { assessFreshness } = require("./data-freshness");
+const { observeCard, advanceRecord, pairKey } = require("./trade-observations");
 
 // The bias engine speaks in LONG / SHORT / FLAT on the wire; the dashboards
 // read it as BULLISH / BEARISH / NEUTRAL.
@@ -345,13 +346,59 @@ function buildCard({ item, screenerRow, patternRow, oiRow, rsiRow, now = Date.no
 }
 
 class TradeContextService {
-  constructor({ watchlistService, signalScreenerService, patternScannerService, openInterestService = null, rsiMatrixService = null } = {}) {
+  constructor({ watchlistService, signalScreenerService, patternScannerService, openInterestService = null, rsiMatrixService = null, observationStore = null } = {}) {
     this._watchlist = watchlistService;
     this._screener = signalScreenerService;
     this._patterns = patternScannerService;
     // Optional: a card without them keeps its original three sections.
     this._openInterest = openInterestService;
     this._rsi = rsiMatrixService;
+    // Optional too: without it the cards simply carry no change section.
+    this._observations = observationStore;
+  }
+
+  /**
+   * Attaches "what changed since the last closed candle" to each card.
+   *
+   * Deliberately failure-tolerant in one direction only: an unreadable store
+   * costs the change section and nothing else, because a page full of current
+   * market context is worth more than the transitions layered on top of it. It
+   * does not write in that case — overwriting an unreadable file with a fresh
+   * baseline would turn a recoverable read error into lost history.
+   */
+  _attachChanges(cards, now) {
+    if (!this._observations) return;
+
+    let pairs;
+    try {
+      pairs = this._observations.read();
+    } catch (err) {
+      const message = err.statusCode === 503 ? "Change history unavailable" : err.message;
+      for (const card of cards) card.changes = { state: "UNAVAILABLE", lines: [], since: null, error: message };
+      return;
+    }
+
+    const next = {};
+    let dirty = false;
+    for (const card of cards) {
+      const key = pairKey(card.symbol, card.interval);
+      const result = advanceRecord(pairs[key] || null, observeCard(card), now);
+      next[key] = result.record;
+      card.changes = { ...result.changes, error: null };
+      if (result.dirty) dirty = true;
+    }
+    // Untracking a pair drops its history: re-starring it is a new pair to
+    // watch, not a resumption of one the reader stopped following.
+    if (!dirty) dirty = Object.keys(pairs).some((key) => !(key in next));
+    if (dirty) {
+      try {
+        this._observations.write(next);
+      } catch (err) {
+        // A busy store means another request is mid-write; the cards are
+        // already correct for this read, so report nothing and move on.
+        if (err.statusCode !== 503) throw err;
+      }
+    }
   }
 
   /**
@@ -383,6 +430,8 @@ class TradeContextService {
         rsiRow: !this._rsi ? undefined : rsi.status === "fulfilled" ? rsi.value : { error: rsi.reason?.message || "RSI engine failed" },
       });
     }));
+
+    this._attachChanges(cards, now);
 
     return { items, cards };
   }
