@@ -33,6 +33,12 @@
     </div>
 
     <div class="reporter-link-row" id="reporterExternalLinks"></div>
+    <section class="intel-panel farmclaw-preview-panel" aria-label="FarmClaw saved news previews">
+      <div class="intel-panel-head"><span class="intel-panel-title">FarmClaw news previews</span><button class="open-all-btn" type="button" id="farmclawPreviewRefresh">Refresh</button></div>
+      <p>Saved in FarmBot. Open a preview there to review and approve; queue items stay on hold.</p>
+      <div id="farmclawPreviewList" role="status">Loading saved previews…</div>
+    </section>
+    <script src="/assets/js/farmclaw-previews.js" defer></script>
 
     <!-- ── News Intelligence workspace ───────────────────────
          Raw news -> market reaction -> what the desks made of it.

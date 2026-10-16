@@ -48,6 +48,7 @@ const { createBroadcastLedgerRouter } = require("./routes/broadcast-ledger");
 const { createReporterRouter } = require("./routes/reporter");
 const { createReporterNewsLogRouter } = require("./routes/reporter-news-log");
 const { createFarmclawHandoffRouter } = require("./routes/farmclaw-handoffs");
+const { createFarmclawNewsPreviewsRouter } = require("./routes/farmclaw-news-previews");
 const { createNewsroomRouter } = require("./routes/newsroom");
 const { createTelegramRouter } = require("./routes/telegram");
 const { createYoutubeRouter } = require("./routes/youtube");
@@ -670,6 +671,7 @@ function createApp() {
       rateLimitPerMinute: config.broadcastLedger.rateLimitPerMinute,
     }),
   );
+  app.use("/api/farmclaw/news-previews", createFarmclawNewsPreviewsRouter());
   app.use(
     "/api/farmclaw/handoffs",
     createFarmclawHandoffRouter({
