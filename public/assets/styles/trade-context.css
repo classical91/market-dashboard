@@ -68,6 +68,66 @@
 .tc-data--stale .tc-data-label { color: #ffb55f; }
 .tc-data--unknown .tc-data-summary { color: #8892a6; }
 
+/* Changes sit under the DATA line and above every section, because "what is
+   new" is read before "what is true" on a watchlist of any length. */
+.tc-changes {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid rgba(42, 42, 74, 0.7);
+  font-size: 10px;
+}
+
+.tc-changes-label {
+  flex: 0 0 auto;
+  color: #8892a6;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+.tc-changes-note { color: #8892a6; }
+
+.tc-changes-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; }
+.tc-change { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px; }
+.tc-change-kind {
+  flex: 0 0 auto;
+  min-width: 74px;
+  color: #8892a6;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.tc-change-label {
+  flex: 0 0 auto;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 800;
+  color: #73d7ff;
+  background: rgba(115, 215, 255, 0.16);
+}
+.tc-change-text { color: #e4ecf8; font-variant-numeric: tabular-nums; }
+
+/* A pair that moved is the one thing on this page worth interrupting for, so
+   it gets the page's one attention colour. */
+.tc-changes--changed { background: rgba(115, 215, 255, 0.07); }
+.tc-changes--changed .tc-changes-label { color: #73d7ff; }
+.tc-change--new .tc-change-label { color: #79f2c0; background: rgba(121, 242, 192, 0.16); }
+.tc-change--cleared .tc-change-label { color: #8892a6; background: rgba(137, 146, 166, 0.16); }
+.tc-changes--unavailable .tc-changes-note { color: #ffb55f; }
+
+.tc-changed-badge {
+  flex: 0 0 auto;
+  padding: 3px 7px;
+  border-radius: 5px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: #73d7ff;
+  background: rgba(115, 215, 255, 0.16);
+  border: 1px solid rgba(115, 215, 255, 0.4);
+}
+
 /* The badge repeats the DATA line's verdict where the eye lands first, so a
    stale card is caught before its scores are read. */
 .tc-stale {
@@ -238,6 +298,8 @@
      claiming one, so the head stays two lines on a phone. */
   .tc-price { margin-left: 0; flex: 1 1 auto; }
   .tc-data { font-size: 9px; }
+  /* The kind column's fixed width buys nothing once the line wraps. */
+  .tc-change-kind { min-width: 0; }
   .tc-context { flex-direction: column; gap: 6px; }
 }
 

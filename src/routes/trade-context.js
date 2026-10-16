@@ -14,7 +14,8 @@ function createTradeContextRouter({ tradeContextService }) {
       // claim about the data, which carries its own age per card. A page that
       // only prints the response time makes cached evidence look current.
       const stale = cards.filter((card) => card.freshness && card.freshness.state === "STALE").length;
-      res.json({ count: cards.length, stale, items, cards, updatedAt: new Date().toISOString() });
+      const changed = cards.filter((card) => card.changes && card.changes.state === "CHANGED").length;
+      res.json({ count: cards.length, stale, changed, items, cards, updatedAt: new Date().toISOString() });
     } catch (err) {
       next(err);
     }

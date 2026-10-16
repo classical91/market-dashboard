@@ -115,3 +115,50 @@ test("a card with failed engines still produces a brief rather than throwing", (
   });
   assert.match(brief, /unavailable: bias engine down/);
 });
+
+test("each card carries a changes block above the sections it qualifies", () => {
+  assert.match(page, /function changesBlock\(changes\)/);
+  assert.match(page, /changesBlock\(card\.changes\)/);
+  const changes = page.indexOf("changesBlock(card.changes)");
+  const bias = page.indexOf("biasSection(card.directionalBias)");
+  const data = page.indexOf("freshnessLine(card.freshness)");
+  assert.ok(data < changes, "the data's age is read before what changed in it");
+  assert.ok(changes < bias, "and both are read before the states they qualify");
+});
+
+test("a first look is not dressed up as 'nothing changed'", () => {
+  assert.match(page, /FIRST_OBSERVATION/);
+  assert.match(page, /First look at this pair/);
+  assert.match(page, /Nothing changed on the last closed candle/);
+});
+
+test("a changed card is flagged in the head with how many transitions it has", () => {
+  assert.match(page, /function changedBadge\(changes\)/);
+  assert.match(page, /changedBadge\(card\.changes\)/);
+  assert.match(page, /' CHANGE' \+ \(count === 1 \? '' : 'S'\)/);
+});
+
+test("an unavailable change history is reported, not rendered as no changes", () => {
+  assert.match(page, /tc-changes--unavailable/);
+  assert.match(page, /changes\.error/);
+});
+
+test("the header counts changed cards alongside stale ones", () => {
+  assert.match(page, /data\.changed \|\| 0/);
+  assert.match(page, /' card' \+ \(changed === 1 \? '' : 's'\) \+ ' changed'/);
+});
+
+test("the explainer states the baseline rolls on candles and that outages are not changes", () => {
+  assert.match(page, /Scan the CHANGED blocks first/);
+  assert.match(page, /per closed candle, not per page load/);
+  assert.match(page, /A broken engine never counts as a change/);
+});
+
+test("changes are styled as the card's one attention signal and survive a phone", () => {
+  assert.match(css, /\.tc-changes\s*\{/);
+  assert.match(css, /\.tc-changes--changed\s*\{/);
+  assert.match(css, /\.tc-changed-badge\s*\{/);
+  assert.match(css, /\.tc-change--new \.tc-change-label\s*\{/);
+  const mobile = css.slice(css.indexOf("@media (max-width: 720px) {"));
+  assert.match(mobile, /\.tc-change-kind\s*\{\s*min-width:\s*0/);
+});

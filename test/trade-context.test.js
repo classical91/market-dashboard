@@ -538,3 +538,121 @@ test("without the optional engines the card keeps its original sections", async 
   assert.equal(cards[0].rsi, null);
   assert.deepEqual(cards[0].errors, []);
 });
+
+// --- Changed since last scan -------------------------------------------
+
+const os = require("node:os");
+const fsp = require("node:fs");
+const nodePath = require("node:path");
+const { TradeObservationStore } = require("../src/services/trade-observations");
+
+const BAR_A = Date.UTC(2026, 9, 16, 4, 0, 0) - 1;
+const BAR_B = BAR_A + 4 * HOUR;
+
+function timestamped(row, candle, key = "computedAt") {
+  return { ...row, candleCloseTime: candle, [key]: new Date(candle + MINUTE).toISOString() };
+}
+
+function serviceWithStore(items, engines, dataDir) {
+  return new TradeContextService({
+    watchlistService: { list: () => items },
+    signalScreenerService: engines.signalScreenerService,
+    patternScannerService: engines.patternScannerService,
+    observationStore: new TradeObservationStore({ dataDir, logger: { error() {} } }),
+  });
+}
+
+test("changes persist across a restart, keyed by symbol and timeframe", async () => {
+  const dataDir = fsp.mkdtempSync(nodePath.join(os.tmpdir(), "trade-context-"));
+  try {
+    const items = [{ symbol: "APTUSDT", interval: "4h" }];
+    const atBarA = stubEngines({
+      screener: timestamped(screenerRow({ state: "WATCH" }), BAR_A),
+      pattern: timestamped(patternRow({ divergence: null }), BAR_A, "scannedAt"),
+    });
+    const first = await serviceWithStore(items, atBarA, dataDir).list();
+    assert.equal(first.cards[0].changes.state, "FIRST_OBSERVATION");
+
+    // A brand new service instance, as after a deploy: the baseline comes off
+    // disk rather than starting over and calling everything a first look.
+    const atBarB = stubEngines({
+      screener: timestamped(screenerRow({ state: "CONFIRMED" }), BAR_B),
+      pattern: timestamped(patternRow({ divergence: "Regular Bearish" }), BAR_B, "scannedAt"),
+    });
+    const second = await serviceWithStore(items, atBarB, dataDir).list();
+    const changes = second.cards[0].changes;
+    assert.equal(changes.state, "CHANGED");
+    assert.equal(changes.lines.find((l) => l.kind === "EXTREME").text, "TOP WATCH → TOP CONFIRMED");
+    assert.equal(changes.lines.find((l) => l.kind === "DIVERGENCE").label, "NEW");
+  } finally {
+    fsp.rmSync(dataDir, { recursive: true, force: true });
+  }
+});
+
+test("the same pair on two timeframes keeps separate histories", async () => {
+  const dataDir = fsp.mkdtempSync(nodePath.join(os.tmpdir(), "trade-context-"));
+  try {
+    const items = [{ symbol: "APTUSDT", interval: "4h" }, { symbol: "APTUSDT", interval: "1h" }];
+    const engines = stubEngines({
+      screener: (symbol, interval) => timestamped(screenerRow({ state: interval === "4h" ? "WATCH" : "CONFIRMED" }), BAR_A),
+      pattern: (symbol, interval) => timestamped({ ...patternRow(), interval }, BAR_A, "scannedAt"),
+    });
+    await serviceWithStore(items, engines, dataDir).list();
+
+    const stored = new TradeObservationStore({ dataDir, logger: { error() {} } }).read();
+    assert.deepEqual(Object.keys(stored).sort(), ["APTUSDT:1h", "APTUSDT:4h"]);
+    assert.equal(stored["APTUSDT:4h"].screener.values.extremeState, "WATCH");
+    assert.equal(stored["APTUSDT:1h"].screener.values.extremeState, "CONFIRMED");
+  } finally {
+    fsp.rmSync(dataDir, { recursive: true, force: true });
+  }
+});
+
+test("untracking a pair drops its history rather than resuming it later", async () => {
+  const dataDir = fsp.mkdtempSync(nodePath.join(os.tmpdir(), "trade-context-"));
+  try {
+    const engines = stubEngines({
+      screener: timestamped(screenerRow(), BAR_A),
+      pattern: timestamped(patternRow(), BAR_A, "scannedAt"),
+    });
+    await serviceWithStore([{ symbol: "APTUSDT", interval: "4h" }, { symbol: "ETHUSDT", interval: "4h" }], engines, dataDir).list();
+    await serviceWithStore([{ symbol: "APTUSDT", interval: "4h" }], engines, dataDir).list();
+
+    const stored = new TradeObservationStore({ dataDir, logger: { error() {} } }).read();
+    assert.deepEqual(Object.keys(stored), ["APTUSDT:4h"], "a pair the reader stopped following is not kept forever");
+  } finally {
+    fsp.rmSync(dataDir, { recursive: true, force: true });
+  }
+});
+
+test("an unreadable store costs the change block and nothing else", async () => {
+  const engines = stubEngines({
+    screener: timestamped(screenerRow(), BAR_A),
+    pattern: timestamped(patternRow(), BAR_A, "scannedAt"),
+  });
+  const unreadable = { statusCode: 503 };
+  const service = new TradeContextService({
+    watchlistService: { list: () => [{ symbol: "APTUSDT", interval: "4h" }] },
+    signalScreenerService: engines.signalScreenerService,
+    patternScannerService: engines.patternScannerService,
+    observationStore: {
+      read() { const err = new Error("trade-observations.json is unreadable"); Object.assign(err, unreadable); throw err; },
+      write() { throw new Error("must not write over an unreadable store"); },
+    },
+  });
+
+  const { cards } = await service.list();
+  // Losing transitions is not a reason to blank a page of live market context.
+  assert.equal(cards[0].changes.state, "UNAVAILABLE");
+  assert.match(cards[0].changes.error, /unavailable/i);
+  assert.equal(cards[0].directionalBias.score, 67);
+  assert.equal(cards[0].context.state, "CONFLICT");
+  assert.equal(cards[0].freshness.state, "FRESH");
+});
+
+test("without a store wired in, cards simply carry no change section", async () => {
+  const { service } = serviceWith([{ symbol: "APTUSDT", interval: "4h" }]);
+  const { cards } = await service.list();
+  assert.equal(cards[0].changes, undefined);
+  assert.equal(cards[0].context.state, "CONFLICT");
+});
