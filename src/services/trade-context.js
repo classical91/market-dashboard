@@ -15,6 +15,7 @@
 
 const { assessFreshness } = require("./data-freshness");
 const { observeCard, advanceRecord, pairKey } = require("./trade-observations");
+const { attachAttention } = require("./trade-attention");
 
 // The bias engine speaks in LONG / SHORT / FLAT on the wire; the dashboards
 // read it as BULLISH / BEARISH / NEUTRAL.
@@ -432,6 +433,8 @@ class TradeContextService {
     }));
 
     this._attachChanges(cards, now);
+    // Ranked last, because the rank reads the change state attached above.
+    attachAttention(cards);
 
     return { items, cards };
   }

@@ -1,4 +1,5 @@
 const { Router } = require("express");
+const { tagCounts } = require("../services/trade-attention");
 
 function createTradeContextRouter({ tradeContextService }) {
   const router = Router();
@@ -15,7 +16,9 @@ function createTradeContextRouter({ tradeContextService }) {
       // only prints the response time makes cached evidence look current.
       const stale = cards.filter((card) => card.freshness && card.freshness.state === "STALE").length;
       const changed = cards.filter((card) => card.changes && card.changes.state === "CHANGED").length;
-      res.json({ count: cards.length, stale, changed, items, cards, updatedAt: new Date().toISOString() });
+      // Per-tag totals so the toolbar can label and disable its filters
+      // without the page re-deriving the tagging rules.
+      res.json({ count: cards.length, stale, changed, tagCounts: tagCounts(cards), items, cards, updatedAt: new Date().toISOString() });
     } catch (err) {
       next(err);
     }
