@@ -26,8 +26,19 @@
 
     <div class="ps-toolbar">
       <button class="aia-run-btn" type="button" id="tc-refresh-btn">Refresh</button>
+      <label class="tc-sort-label" for="tc-sort">Sort</label>
+      <select class="aia-select tc-sort" id="tc-sort" aria-label="Sort cards by">
+        <option value="attention">Attention</option>
+        <option value="changed">Changed first</option>
+        <option value="symbol">Symbol</option>
+        <option value="interval">Timeframe</option>
+      </select>
       <span class="ps-updated" id="tc-updated"></span>
     </div>
+
+    <!-- Filters narrow a long watchlist to the cards worth opening; they never
+         reorder what a filter leaves behind. -->
+    <div class="tc-filters" id="tc-filters" role="group" aria-label="Filter cards"></div>
 
     <form class="ps-toolbar tc-add" id="tc-add-form" autocomplete="off">
       <input class="aia-select tc-add-search" type="search" id="tc-add-symbol" list="tc-add-tokens"
@@ -54,6 +65,7 @@
           <li><strong>Read the three engines separately.</strong> Directional bias is the environment, local extremes are where price sits inside it, and the pattern is the structure forming &mdash; they measure different things and are never merged.</li>
           <li><strong>Use the context strip for agreement, not instruction.</strong> ALIGNED, MIXED, CONFLICT, QUIET and PARTIAL describe whether the engines currently point the same way &mdash; PARTIAL means an engine is down and there is too little left to compare. Deciding what to do with any of it is yours.</li>
           <li><strong>Hand a card to Analysis Trader (GPT).</strong> The &#129302; button at the foot of each card copies that card's bias, extremes, patterns, OI, RSI, evidence and data age as text, then opens the Analysis Trader custom GPT with it prefilled. If ChatGPT opens with an empty box, just paste &mdash; it's already on your clipboard. CoinGlass Super Chart opens that token's Binance perp chart on CoinGlass.</li>
+          <li><strong>Let the order do the triage.</strong> Attention sorting puts a pair that just moved above one that merely disagrees, and disagreement above agreement &mdash; CONFLICT is the reading worth stopping for, ALIGNED the least urgent thing a card can say. The filters narrow a long watchlist to the cards worth opening; neither decides anything about a trade, they only decide what you look at first.</li>
           <li><strong>Scan the CHANGED blocks first.</strong> They report what moved since the previous closed candle &mdash; a context state flipping, a bias check turning over, a divergence appearing. On a long watchlist this is what narrows fifteen pairs down to the few worth opening; the states below tell you where things stand, not what is new.</li>
           <li><strong>Check the DATA line before you trust the card.</strong> It reports how long ago the newest closed candle closed and how long ago each engine last recalculated. A card flagged STALE is showing evidence the feed or the cache has stopped advancing &mdash; the numbers are real, but they are not now.</li>
           <li><strong>Unstar to remove it.</strong> This is a research watchlist; it does not place, manage, or close trades.</li>
@@ -61,6 +73,7 @@
         <ul class="aia-how-notes">
           <li><strong>Changes are measured per closed candle, not per page load.</strong> A transition stays on the card for the whole of the current bar, so refreshing does not consume it; the baseline rolls forward only when a new candle closes. Continuous readings are left out on purpose &mdash; raw extreme scores, OI percentages and RSI values drift every bar, and reporting that as change would bury the transitions that matter. The directional score is the exception, because it moves in whole confluence checks.</li>
           <li><strong>A broken engine never counts as a change.</strong> An outage is not a transition, so a failed read is skipped rather than recorded as "BULLISH 67 &rarr; unavailable" &mdash; and the last good values are kept, so the real change still surfaces once the engine recovers.</li>
+          <li><strong>Stale is a filter, not a rank.</strong> A card whose feed has stopped advancing needs attention for a different reason than a market event, so staleness never lifts a card up the order &mdash; folding the two together would let an outage outrank a real transition. It stays a filter you can select when you want exactly those cards.</li>
           <li><strong>Candle age is not the same as staleness.</strong> On a 4h card the newest closed candle is normally anything up to four hours old &mdash; that is the timeframe, not a fault. STALE appears only once the age runs past a whole bar plus half a bar of slack, which means the feed is behind rather than simply mid-bar.</li>
           <li><strong>No combined score.</strong> Averaging direction, exhaustion and structure into one number would hide exactly the disagreement worth seeing &mdash; a BULLISH bias beside a confirmed top is information, not an error.</li>
           <li><strong>Open interest and multi-timeframe RSI sit beside the three engines, not inside the context strip.</strong> OI says whether perp positions are opening or closing on the horizon matching the card (daily and weekly cards use 24H); RSI shows RSI 14 on each timeframe enabled on the <a href="/rsi-matrix.html">RSI Matrix</a>. Neither changes ALIGNED, MIXED or CONFLICT.</li>
@@ -83,6 +96,8 @@
     var notice = document.getElementById('tc-notice');
     var updatedEl = document.getElementById('tc-updated');
     var refreshBtn = document.getElementById('tc-refresh-btn');
+    var filtersEl = document.getElementById('tc-filters');
+    var sortEl = document.getElementById('tc-sort');
     var escapeHtml = PatternRender.escapeHtml;
 
     var TV_INTERVALS = { '15m': '15', '1h': '60', '4h': '240', '1D': 'D', '1W': 'W' };
@@ -312,6 +327,11 @@
           '<div class="tc-head">' +
             '<span class="tc-symbol">' + escapeHtml(card.symbol) + '</span>' +
             '<span class="tc-interval">' + escapeHtml(card.interval) + '</span>' +
+            // The context state is the card's single most important output,
+            // so it reads beside the symbol rather than below every piece of
+            // evidence it summarises. The reasoning stays at the bottom.
+            '<span class="tc-head-state tc-head-state--' + escapeHtml(String(context.state).toLowerCase()) + '">' +
+              escapeHtml(context.state) + '</span>' +
             chartLink(card.symbol, card.interval) +
             '<span class="tc-price">' + fmtPrice(card.price) + '</span>' +
             changedBadge(card.changes) +
@@ -335,8 +355,10 @@
               card.evidence.map(function (line) { return '<li>' + escapeHtml(line) + '</li>'; }).join('') + '</ul></div>'
             : '') +
           (card.chart ? '<canvas class="tc-chart" data-chart-index="' + index + '"></canvas>' : '') +
+          // Why it reads that way, under the evidence it is drawn from. The
+          // state itself now lives in the head, so repeating it here would
+          // just be the same word twice on one card.
           '<div class="tc-context tc-context--' + escapeHtml(String(context.state).toLowerCase()) + '">' +
-            '<span class="tc-context-state">' + escapeHtml(context.state) + '</span>' +
             '<span class="tc-context-summary">' + escapeHtml(context.summary || '') + '</span>' +
           '</div>' +
           (card.errors && card.errors.length
@@ -369,11 +391,86 @@
     }
 
     var currentCards = [];
+    var currentCounts = null;
+    // What the grid last drew, in the order it drew it. The card buttons
+    // carry their position in THIS array, not in the unsorted watchlist, so
+    // sorting or filtering cannot hand a different card to the GPT button.
+    var renderedCards = [];
+    var activeSort = 'attention';
+    var activeFilter = 'ALL';
 
-    function render(cards) {
-      currentCards = cards;
-      if (!cards.length) {
+    // Sorting and filtering run on the rank and tags the API already
+    // attached, so the page never re-derives the ordering rules and a change
+    // of order costs no round trip.
+    var FILTERS = [
+      { tag: 'ALL', label: 'All' },
+      { tag: 'CHANGED', label: 'Changed' },
+      { tag: 'CONFLICT', label: 'Conflict' },
+      { tag: 'MIXED', label: 'Mixed' },
+      { tag: 'ALIGNED', label: 'Aligned' },
+      { tag: 'EXTREME_CONFIRMED', label: 'Extreme confirmed' },
+      { tag: 'STALE', label: 'Stale' }
+    ];
+
+    function cardTags(card) {
+      return (card.attention && card.attention.tags) || [];
+    }
+
+    function bySymbol(a, b) {
+      return a.symbol.localeCompare(b.symbol) || String(a.interval).localeCompare(String(b.interval));
+    }
+
+    var SORTS = {
+      // The composite order: a transition first, then disagreement, then a
+      // confirmed extreme as the tie-break — symbol last so the order is
+      // stable rather than dependent on watchlist insertion.
+      attention: function (a, b) {
+        var ra = (a.attention && a.attention.rank) || 0;
+        var rb = (b.attention && b.attention.rank) || 0;
+        return rb - ra || bySymbol(a, b);
+      },
+      // Same idea, but how much moved outranks what the state says.
+      changed: function (a, b) {
+        var ca = (a.attention && a.attention.changeCount) || 0;
+        var cb = (b.attention && b.attention.changeCount) || 0;
+        return cb - ca || SORTS.attention(a, b);
+      },
+      symbol: bySymbol,
+      interval: function (a, b) {
+        return String(a.interval).localeCompare(String(b.interval)) || bySymbol(a, b);
+      }
+    };
+
+    function visibleCards() {
+      var cards = activeFilter === 'ALL'
+        ? currentCards.slice()
+        : currentCards.filter(function (card) { return cardTags(card).indexOf(activeFilter) !== -1; });
+      return cards.sort(SORTS[activeSort] || SORTS.attention);
+    }
+
+    function renderFilters() {
+      var counts = currentCounts || {};
+      filtersEl.innerHTML = FILTERS.map(function (f) {
+        var count = f.tag === 'ALL' ? currentCards.length : (counts[f.tag] || 0);
+        // A filter that would empty the grid is shown but not selectable:
+        // hiding it would make the set of filters change shape between loads.
+        var disabled = count === 0 && f.tag !== 'ALL';
+        return '<button class="tc-filter' + (activeFilter === f.tag ? ' tc-filter--on' : '') + '" type="button"' +
+          ' data-filter="' + f.tag + '"' + (disabled ? ' disabled' : '') +
+          ' aria-pressed="' + (activeFilter === f.tag ? 'true' : 'false') + '">' +
+          escapeHtml(f.label) + '<span class="tc-filter-count">' + count + '</span></button>';
+      }).join('');
+    }
+
+    function renderGrid() {
+      var cards = visibleCards();
+      renderedCards = cards;
+      if (!currentCards.length) {
         grid.innerHTML = '<div class="tc-empty">Nothing tracked yet. Star a card on <a href="/pattern-scanner.html">Pattern Scanner</a> to follow it here.</div>';
+        return;
+      }
+      if (!cards.length) {
+        grid.innerHTML = '<div class="tc-empty">No tracked pair matches this filter right now.</div>';
         return;
       }
       grid.innerHTML = cards.map(renderCard).join('');
@@ -381,6 +478,13 @@
         var card = cards[Number(canvas.getAttribute('data-chart-index'))];
         if (card && card.chart) PatternRender.drawChart(canvas, card.chart);
       });
+    }
+
+    function render(cards, counts) {
+      currentCards = cards;
+      if (counts) currentCounts = counts;
+      renderFilters();
+      renderGrid();
     }
 
     function untrack(btn) {
@@ -399,9 +503,24 @@
       if (btn) { untrack(btn); return; }
       var gpt = e.target.closest('[data-role="gpt-send"]');
       if (!gpt) return;
-      var card = currentCards[Number(gpt.getAttribute('data-card-index'))];
+      var card = renderedCards[Number(gpt.getAttribute('data-card-index'))];
       if (!card) return;
       TradeGpt.sendToGpt(card, gpt);
+    });
+
+    // Re-ordering is local to what is already loaded: the engines have not
+    // moved, so re-fetching to sort would cost a spinner for nothing.
+    sortEl.addEventListener('change', function () {
+      activeSort = sortEl.value;
+      renderGrid();
+    });
+
+    filtersEl.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-filter]');
+      if (!btn || btn.disabled) return;
+      activeFilter = btn.getAttribute('data-filter');
+      renderFilters();
+      renderGrid();
     });
 
     function load() {
@@ -412,7 +531,7 @@
         .then(function (res) { return res.json(); })
         .then(function (data) {
           var cards = data.cards || [];
-          render(cards);
+          render(cards, data.tagCounts || {});
           // "Page refreshed" rather than "updated": the data's own age lives
           // on each card and can be far older than this timestamp.
           var stale = data.stale || 0;

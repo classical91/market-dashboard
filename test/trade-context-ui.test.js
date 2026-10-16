@@ -162,3 +162,68 @@ test("changes are styled as the card's one attention signal and survive a phone"
   const mobile = css.slice(css.indexOf("@media (max-width: 720px) {"));
   assert.match(mobile, /\.tc-change-kind\s*\{\s*min-width:\s*0/);
 });
+
+test("the context state reads in the card head, with its reasoning left at the bottom", () => {
+  const head = page.indexOf("tc-head-state tc-head-state--");
+  const bias = page.indexOf("biasSection(card.directionalBias)");
+  const strip = page.indexOf("tc-context tc-context--");
+  assert.ok(head > -1 && head < bias, "the state is met before the evidence it summarises");
+  assert.ok(strip > bias, "the explanation stays under the evidence it is drawn from");
+  // The same word twice on one card is noise, so the bottom strip keeps the
+  // sentence and drops the duplicated state badge.
+  assert.doesNotMatch(page, /tc-context-state">/);
+  assert.match(page, /tc-context-summary">/);
+});
+
+test("the head state is coloured per state, matching the strip it was promoted from", () => {
+  ["aligned", "mixed", "conflict", "partial", "quiet"].forEach((state) => {
+    assert.match(css, new RegExp("\\.tc-head-state--" + state + "\\s*\\{"));
+  });
+});
+
+test("the toolbar offers attention sorting and the audit's filters", () => {
+  assert.match(page, /id="tc-sort"/);
+  ["attention", "changed", "symbol", "interval"].forEach((value) => {
+    assert.match(page, new RegExp('value="' + value + '"'));
+  });
+  assert.match(page, /id="tc-filters"/);
+  ["CHANGED", "CONFLICT", "MIXED", "ALIGNED", "EXTREME_CONFIRMED", "STALE"].forEach((tag) => {
+    assert.match(page, new RegExp("tag: '" + tag + "'"));
+  });
+});
+
+test("sorting reads the rank the API attached rather than re-deriving it", () => {
+  assert.match(page, /\(a\.attention && a\.attention\.rank\) \|\| 0/);
+  assert.match(page, /\(a\.attention && a\.attention\.changeCount\) \|\| 0/);
+  assert.match(page, /\(card\.attention && card\.attention\.tags\) \|\| \[\]/);
+});
+
+test("re-ordering is local — it never refetches, and the filters carry counts", () => {
+  assert.match(page, /sortEl\.addEventListener\('change'/);
+  assert.match(page, /renderGrid\(\);/);
+  assert.match(page, /data\.tagCounts \|\| \{\}/);
+  assert.match(page, /tc-filter-count/);
+  // A filter that would empty the grid is visible but not selectable.
+  assert.match(page, /disabled = count === 0/);
+  assert.match(page, /No tracked pair matches this filter right now/);
+});
+
+test("card buttons index the rendered order, not the unsorted watchlist", () => {
+  // Sorting would otherwise hand a different card to the GPT button than the
+  // one the reader pressed.
+  assert.match(page, /renderedCards\[Number\(gpt\.getAttribute\('data-card-index'\)\)\]/);
+  assert.match(page, /renderedCards = cards;/);
+  assert.doesNotMatch(page, /currentCards\[Number\(gpt/);
+});
+
+test("the explainer says what the order means and that stale never lifts a card", () => {
+  assert.match(page, /Let the order do the triage/);
+  assert.match(page, /Stale is a filter, not a rank/);
+});
+
+test("the filter controls are reachable by keyboard and state their selection", () => {
+  assert.match(page, /aria-pressed="/);
+  assert.match(page, /role="group"/);
+  assert.match(css, /\.tc-filter:focus-visible\s*\{[^}]*outline/s);
+  assert.match(css, /\.tc-filter:disabled\s*\{/);
+});
