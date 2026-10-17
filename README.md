@@ -600,3 +600,15 @@ another repository.
 - Extract more repeated card/link HTML into data-driven renderers.
 - Add visual regression checks for core pages.
 - Consider a TypeScript migration only after agreeing on a build pipeline and module boundary.
+
+## FarmClaw durable preview view
+
+Reporter Room includes a read-only list of previews stored in FarmBot. Configure
+`FARMBOT_NEWS_API_URL` (HTTPS API origin), `FARMBOT_NEWS_READER_TOKEN` (distinct
+read-only secret matching farmbot-api `NEWS_BATCH_READER_TOKEN`, at least 32
+characters), and `FARMBOT_NEWS_APPROVAL_BASE_URL` (HTTPS FarmBot web origin).
+Missing or invalid state shows an unavailable message and never enables approval.
+The browser receives no service credential; review links open FarmBot's existing
+Supabase login and `/news-batches/<id>` approval page. This dashboard stores no
+second copy and accepts no preview approval/queue writes. Keep
+`REPORTER_NEWS_APPROVER_KEY` separate, protected, and unavailable to FarmClaw.
