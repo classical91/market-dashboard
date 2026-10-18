@@ -109,32 +109,17 @@
     }, []);
   }
 
-  /* What the Add form's category box offers, and what it starts on. The
-     suggestion comes from the theme being edited — the category most of its
-     accounts already carry, else the theme's own name — because the server's
-     defaults are all market categories, and starting on the first of them is
-     how every account added to a non-market theme ended up filed as
-     "Market Data". Only with no theme at all does the first default stand. */
+  /* What the Add form's category box offers, and what it starts on. It
+     starts on the name of the theme being edited, since the themes are how
+     posts are sorted. The server's defaults are all market categories, and
+     starting on the first of them is how every account added to another
+     theme ended up filed as "Market Data". Only with no theme does the first
+     default stand. */
   function categoryChoices(accounts, template, defaults) {
-    var members = template ? accountsInTemplate(accounts, template) : [];
-    var counts = {};
-    var memberCategories = [];
-    members.forEach(function (account) {
-      var category = account && account.category;
-      if (!category) return;
-      if (!counts[category]) memberCategories.push(category);
-      counts[category] = (counts[category] || 0) + 1;
-    });
-    // Ties go to whichever the theme lists first.
-    var suggested = memberCategories.reduce(function (best, category) {
-      return best && counts[best] >= counts[category] ? best : category;
-    }, "");
-    if (!suggested && template && template.name) suggested = template.name;
-    if (!suggested) suggested = (defaults && defaults[0]) || "";
-
+    var suggested = (template && template.name) || (defaults && defaults[0]) || "";
     var seen = {};
     var options = [];
-    [suggested].concat(memberCategories, defaults || [], (accounts || []).map(function (account) {
+    [suggested].concat(defaults || [], (accounts || []).map(function (account) {
       return account && account.category;
     })).forEach(function (category) {
       if (!category || seen[category]) return;

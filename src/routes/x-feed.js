@@ -138,7 +138,11 @@ function createXFeedRouter({
             ...post,
             handle: account.handle,
             label: account.label,
-            category: account.category,
+            // The card's tag names the template the feed was asked for, which
+            // is how posts are sorted into themes. The account's own category
+            // is free text, and every account added from the form used to
+            // start on "Market Data" whatever theme it joined.
+            category: template.name,
           })),
         ),
       );

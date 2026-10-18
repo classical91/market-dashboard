@@ -143,26 +143,18 @@ test("the two removals are worded by blast radius, not interchangeably", () => {
   assert.notEqual(fromTheme, everywhere);
 });
 
-test("the category box starts on the theme's own category, not the first market default", () => {
+test("the category box starts on the theme's name, not the first market default", () => {
   const defaults = ["Market Data", "Crypto Traders", "TA & Signals"];
-  const tracked = [
-    ...TRACKED,
-    { handle: "RealAlexJones", label: "Alex Jones", category: "Deep State" },
-    { handle: "ShadowofEzra", label: "Shadow of Ezra", category: "QAnon" },
-    { handle: "JamesWe70210481", label: "James West", category: "Deep State" },
-  ];
-  const conspiracy = { id: "conspiracy", name: "Conspiracy", handles: ["RealAlexJones", "ShadowofEzra", "JamesWe70210481"] };
+  const tracked = [...TRACKED, { handle: "0ccultbot", label: "0ccultbot", category: "Market Data" }];
+  const positivity = { id: "positivity", name: "Positivity", handles: ["0ccultbot"] };
 
-  const choices = accountsAdmin.categoryChoices(tracked, conspiracy, defaults);
-  assert.equal(choices.suggested, "Deep State");
-  assert.deepEqual(choices.options.slice(0, 2), ["Deep State", "QAnon"], "the theme's categories come first");
+  const choices = accountsAdmin.categoryChoices(tracked, positivity, defaults);
+  assert.equal(choices.suggested, "Positivity", "a theme still holding mislabelled accounts is not copied");
+  assert.equal(choices.options[0], "Positivity");
   assert.ok(choices.options.includes("Market Data"), "the defaults are still offered");
   assert.equal(new Set(choices.options).size, choices.options.length, "no category is offered twice");
 });
 
-test("an empty theme suggests its own name; no theme falls back to the first default", () => {
-  const defaults = ["Market Data", "Crypto Traders"];
-  const occult = { id: "occult", name: "Occult", handles: [] };
-  assert.equal(accountsAdmin.categoryChoices(TRACKED, occult, defaults).suggested, "Occult");
-  assert.equal(accountsAdmin.categoryChoices(TRACKED, null, defaults).suggested, "Market Data");
+test("with no theme the first default stands", () => {
+  assert.equal(accountsAdmin.categoryChoices(TRACKED, null, ["Market Data"]).suggested, "Market Data");
 });

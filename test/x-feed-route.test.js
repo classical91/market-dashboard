@@ -208,6 +208,8 @@ test("a template scopes accounts, posts, counts and failures", async () => {
   // no section to override it with, and the sidebar renders a flat list.
   assert.equal(scoped.body.accounts[0].category, "Crypto Traders");
   assert.equal(scoped.body.posts.length, 1);
+  // A post card is tagged with the theme it is shown under.
+  assert.equal(scoped.body.posts[0].category, "Tech & AI");
   assert.equal(Object.values(scoped.body.counts).reduce((sum, count) => sum + count, 0), 1);
   assert.ok(scoped.body.failedFeeds.every((account) => account.handle === "TechDev_52"));
 
