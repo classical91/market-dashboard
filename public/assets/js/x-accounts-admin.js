@@ -109,6 +109,41 @@
     }, []);
   }
 
+  /* What the Add form's category box offers, and what it starts on. The
+     suggestion comes from the theme being edited — the category most of its
+     accounts already carry, else the theme's own name — because the server's
+     defaults are all market categories, and starting on the first of them is
+     how every account added to a non-market theme ended up filed as
+     "Market Data". Only with no theme at all does the first default stand. */
+  function categoryChoices(accounts, template, defaults) {
+    var members = template ? accountsInTemplate(accounts, template) : [];
+    var counts = {};
+    var memberCategories = [];
+    members.forEach(function (account) {
+      var category = account && account.category;
+      if (!category) return;
+      if (!counts[category]) memberCategories.push(category);
+      counts[category] = (counts[category] || 0) + 1;
+    });
+    // Ties go to whichever the theme lists first.
+    var suggested = memberCategories.reduce(function (best, category) {
+      return best && counts[best] >= counts[category] ? best : category;
+    }, "");
+    if (!suggested && template && template.name) suggested = template.name;
+    if (!suggested) suggested = (defaults && defaults[0]) || "";
+
+    var seen = {};
+    var options = [];
+    [suggested].concat(memberCategories, defaults || [], (accounts || []).map(function (account) {
+      return account && account.category;
+    })).forEach(function (category) {
+      if (!category || seen[category]) return;
+      seen[category] = true;
+      options.push(category);
+    });
+    return { suggested: suggested, options: options };
+  }
+
   function themeName(template) {
     return (template && template.name) || "this theme";
   }
@@ -306,13 +341,14 @@
     /* The account's own category — descriptive metadata the registry requires,
        not a second filter. Templates have no sections to file it under. */
     function syncCategoryOptions() {
+      var choices = categoryChoices(accounts, template, categories);
       categoryList.innerHTML = "";
-      (categories || []).forEach(function (name) {
+      choices.options.forEach(function (name) {
         var option = doc.createElement("option");
         option.value = name;
         categoryList.appendChild(option);
       });
-      if (!categoryInput.value && categories.length) categoryInput.value = categories[0];
+      if (!categoryInput.value && choices.suggested) categoryInput.value = choices.suggested;
     }
 
     /* Keeps the duplicate warning, the adopt button and the Add button in step
@@ -620,6 +656,7 @@
     findDuplicate: findDuplicate,
     isMember: isMember,
     accountsInTemplate: accountsInTemplate,
+    categoryChoices: categoryChoices,
     duplicateMessage: duplicateMessage,
     trackedElsewhereMessage: trackedElsewhereMessage,
     alreadyInThemeMessage: alreadyInThemeMessage,
