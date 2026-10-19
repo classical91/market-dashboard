@@ -1,0 +1,143 @@
+/* Aurora Glass — shared sidebar identity. Compact charcoal glass; CSS-only motion. */
+:is(.sidebar,.mob-drawer,.cmd-sidebar,.cmd-drawer) a.aurora-brand {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  margin-bottom: 24px;
+  padding: 10px 9px;
+  border: 1px solid rgba(226,250,248,.14);
+  border-radius: 12px;
+  color: var(--text);
+  text-decoration: none;
+  overflow: hidden;
+  background: linear-gradient(114deg,rgba(210,246,239,.10),rgba(153,180,191,.07) 53%,rgba(130,139,169,.045)),rgba(30,40,44,.78);
+  box-shadow: inset 0 1px rgba(255,255,255,.07), 0 7px 22px rgba(0,0,0,.12);
+  transition: border-color .25s ease,box-shadow .25s ease,transform .25s ease;
+}
+a.aurora-brand:not(.aurora-brand--mobile)::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -35% -10%;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 24% 30%,rgba(167,219,216,.17),transparent 60%);
+  animation: aurora-ambient 12s ease-in-out infinite alternate;
+}
+:is(.sidebar,.mob-drawer,.cmd-sidebar,.cmd-drawer) a.aurora-brand:hover {
+  border-color: rgba(231,254,250,.28);
+  box-shadow: inset 0 1px rgba(255,255,255,.12),0 11px 28px rgba(0,0,0,.20);
+  transform: translateY(-1px);
+}
+a.aurora-brand:focus-visible { outline: 2px solid var(--accent,var(--blue,#79bddc)); outline-offset: 3px; }
+a.aurora-brand :is(.brand-mark,.cmd-brand-mark,.mob-brand-mark,.cmd-mobile-brand-mark) {
+  position: relative;
+  isolation: isolate;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(246,255,255,.68);
+  border-radius: 11px;
+  background: radial-gradient(circle at 20% 10%,rgba(255,255,255,.59),transparent 47%),linear-gradient(136deg,#9ab2b0,#697f84 38%,#394c59 66%,#7080a5);
+  box-shadow: inset 0 1px rgba(255,255,255,.49),inset 0 -1px 8px rgba(1,20,28,.21),0 3px 13px rgba(149,204,209,.16);
+  color: #f6fcff;
+  font-size: 18px;
+  line-height: 1;
+  font-weight: 900;
+  text-shadow: 0 1px 6px rgba(14,32,42,.55);
+  transition: transform .25s ease,box-shadow .25s ease;
+}
+a.aurora-brand :is(.brand-mark,.cmd-brand-mark,.mob-brand-mark,.cmd-mobile-brand-mark)::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  top: -40%;
+  bottom: -40%;
+  left: -95%;
+  width: 48%;
+  pointer-events: none;
+  background: linear-gradient(90deg,transparent,rgba(255,255,255,.44),transparent);
+  transform: skewX(-24deg);
+  animation: aurora-shimmer 6.8s ease-in-out infinite;
+}
+a.aurora-brand:hover :is(.brand-mark,.cmd-brand-mark,.mob-brand-mark,.cmd-mobile-brand-mark) {
+  box-shadow: inset 0 1px rgba(255,255,255,.62),0 3px 17px rgba(156,216,232,.27);
+}
+a.aurora-brand :is(.brand-text,.cmd-brand-text) { min-width: 0; }
+a.aurora-brand :is(.brand-text,.cmd-brand-text) h1 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -.035em;
+  line-height: 1.22;
+  white-space: nowrap;
+  color: var(--text);
+}
+a.aurora-brand :is(.brand-text,.cmd-brand-text) span {
+  display: block;
+  margin-top: 2px;
+  font-size: 10px;
+  line-height: 1.25;
+  white-space: nowrap;
+  color: var(--soft);
+}
+/* Mobile top bars keep their existing height, layout, and hamburger. */
+:is(.cmd-mobile-bar,.mob-bar) a.aurora-brand--mobile {
+  width: auto;
+  max-width: calc(100% - 66px);
+  gap: 9px;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+  background: none;
+  box-shadow: none;
+}
+:is(.cmd-mobile-bar,.mob-bar) a.aurora-brand--mobile:hover {
+  border: 0;
+  box-shadow: none;
+  transform: none;
+}
+a.aurora-brand--mobile :is(.cmd-mobile-brand-mark,.mob-brand-mark) {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  font-size: 14px;
+}
+a.aurora-brand--mobile :is(.cmd-mobile-brand-name,.mob-brand-name) {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -.025em;
+  white-space: nowrap;
+  color: var(--text);
+}
+[data-theme="light"] a.aurora-brand:not(.aurora-brand--mobile) {
+  border-color: rgba(49,83,102,.18);
+  background: linear-gradient(114deg,rgba(230,250,249,.96),rgba(224,234,241,.91));
+  box-shadow: inset 0 1px rgba(255,255,255,.84),0 6px 20px rgba(31,55,78,.10);
+}
+@keyframes aurora-ambient {
+  from { transform: translateX(-8px); opacity: .48; }
+  to { transform: translateX(14px); opacity: .90; }
+}
+@keyframes aurora-shimmer {
+  0%,18% { left: -95%; opacity: 0; }
+  26% { opacity: .65; }
+  48%,100% { left: 150%; opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  a.aurora-brand,a.aurora-brand::before,
+  a.aurora-brand :is(.brand-mark,.cmd-brand-mark,.mob-brand-mark,.cmd-mobile-brand-mark),
+  a.aurora-brand :is(.brand-mark,.cmd-brand-mark,.mob-brand-mark,.cmd-mobile-brand-mark)::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  a.aurora-brand:hover { transform: none !important; }
+}
