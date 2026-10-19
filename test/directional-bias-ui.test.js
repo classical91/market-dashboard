@@ -99,6 +99,36 @@ test("USDT.D rides along as context with its scored columns visibly empty", () =
   assert.doesNotMatch(dominanceRow, /track-btn|watchlist\.button/, "My Trades cannot scan a row with no OHLCV");
 });
 
+test("a failed row is never filtered as if it were NEUTRAL", () => {
+  // bias is null on an error row. Defaulting it to NEUTRAL both listed broken
+  // symbols among the genuinely neutral ones and hid them from the bullish and
+  // bearish views, so a feed failure looked like a reading.
+  const filters = script.slice(script.indexOf("function matchesFilters"), script.indexOf("function dominanceMatchesFilters"));
+  assert.doesNotMatch(filters, /entry\.bias \|\| "NEUTRAL"/);
+  assert.match(filters, /if \(entry\.error\) return true;/);
+  // And the error check comes before any bias or strength comparison.
+  assert.ok(filters.indexOf("entry.error") < filters.indexOf("biasFilter !== \"ALL\""));
+});
+
+test("the USDT.D context row answers to the toolbar like every other row", () => {
+  // It has no bias and no ADX, so a filter selecting on either excludes it;
+  // the search matches it by name. It used to ignore both and sit above a
+  // board it was no longer part of.
+  assert.match(script, /function dominanceMatchesFilters\(\)/);
+  const fn = script.slice(script.indexOf("function dominanceMatchesFilters"), script.indexOf("function renderSummary"));
+  assert.match(fn, /biasFilter !== "ALL" \|\| strengthFilter !== "ALL"/);
+  assert.match(fn, /"USDT\.D"\.indexOf\(query\)/);
+  assert.match(script, /dominanceMatchesFilters\(\) \? renderDominanceRow/);
+});
+
+test("a filter that matches nothing says so, even behind a pinned row", () => {
+  // The note is keyed to the ranked list: counting rendered rows meant the
+  // always-present context row suppressed the empty state entirely.
+  assert.match(script, /if \(!ranked\.length\) \{/);
+  assert.match(script, /No ranked pair matches these filters\./);
+  assert.match(script, /Nothing matches these filters\./);
+});
+
 test("filters cover bias and trend strength without hiding the rest", () => {
   for (const filter of ["ALL", "BULLISH", "BEARISH", "NEUTRAL"]) {
     assert.match(page, new RegExp(`data-filter="${filter}"`));

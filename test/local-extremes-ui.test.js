@@ -125,6 +125,25 @@ test("BTC stays pinned as context even when the filters would hide it", () => {
   assert.match(script, /ranked\.map\(function \(entry, index\) \{ return renderRow\(entry, index \+ 1\); \}\)/);
 });
 
+test("a filter that matches nothing says so, even behind the pinned row", () => {
+  // BTC is pinned through every filter, so counting rendered rows meant
+  // "Confirmed" with nothing confirmed rendered as a lone BTC row — which
+  // reads as BTC being the match.
+  assert.match(script, /if \(!ranked\.length\) \{/);
+  assert.match(script, /No ranked pair matches these filters\./);
+  assert.match(script, /Nothing matches these filters\./);
+});
+
+test("the pinned row is tinted by the extreme, never by the trend", () => {
+  // Hue from the leading side, intensity from how far the evidence has got.
+  const tint = script.slice(script.indexOf("function pinTintClass"), script.indexOf("function renderRow"));
+  assert.match(tint, /entry\.state/);
+  assert.doesNotMatch(tint, /trend|bias|signal/i);
+  assert.match(css, /\.lx-row--pinned\.lx-row--pin-confirmed \{ --pin-alpha/);
+  assert.match(css, /\.lx-row--pinned\.lx-row--top \{ --pin-rgb: 255, 93, 93/);
+  assert.match(css, /\.lx-row--pinned\.lx-row--bottom \{ --pin-rgb: 0, 184, 148/);
+});
+
 test("freshness is shown per row, in the project's existing states", () => {
   assert.match(script, /S\.freshnessBadge\(entry\.freshness\)/);
   assert.match(shared, /FRESHNESS_LABELS/);

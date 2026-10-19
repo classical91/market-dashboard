@@ -18,8 +18,10 @@ const { observeCard, advanceRecord, pairKey } = require("./trade-observations");
 const { attachAttention } = require("./trade-attention");
 
 // The bias engine speaks in LONG / SHORT / FLAT on the wire; the dashboards
-// read it as BULLISH / BEARISH / NEUTRAL.
-const BIAS_LABELS = { LONG: "BULLISH", SHORT: "BEARISH", FLAT: "NEUTRAL" };
+// read it as BULLISH / BEARISH / NEUTRAL. One shared map, so a card, a
+// screener row and a Telegram alert can never name the same signal
+// differently. Re-exported below: callers have always read it from here.
+const { BIAS_LABELS } = require("./screener-projections");
 
 // Which direction each piece of evidence leans, so disagreement can be
 // detected without any of them being treated as a trade signal.
