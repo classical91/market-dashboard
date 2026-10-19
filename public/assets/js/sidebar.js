@@ -421,7 +421,7 @@
       return item.children ? dropdown(item, mode, instance + "-tools-" + index) : navItem(item, mode);
     }).join("");
     return (
-      '<a class="' + prefix + 'brand" href="/">' +
+      '<a class="' + prefix + 'brand aurora-brand" href="/">' +
       '<div class="' + prefix + 'brand-mark">M</div>' +
       '<div class="' + prefix + 'brand-text"><h1>Market Command</h1><span>Live dashboard system</span></div></a>' +
       accountHtml(mode) + '<div class="' + prefix + 'account-divider"></div>' +
@@ -517,7 +517,7 @@
     var bar = document.createElement("div");
     bar.className = command ? "cmd-mobile-bar" : "mob-bar";
     bar.id = stem + (command ? "-mobile-bar" : "-bar");
-    bar.innerHTML = '<a class="' + (command ? 'cmd-mobile-brand' : 'mob-brand') + '" href="/"><div class="' +
+    bar.innerHTML = '<a class="' + (command ? 'cmd-mobile-brand' : 'mob-brand') + ' aurora-brand aurora-brand--mobile" href="/"><div class="' +
       (command ? 'cmd-mobile-brand-mark' : 'mob-brand-mark') + '">M</div><span class="' +
       (command ? 'cmd-mobile-brand-name' : 'mob-brand-name') + '">Market Command</span></a>' +
       '<button class="' + (command ? 'cmd-hamburger' : 'mob-ham') + '" type="button" aria-label="Open navigation" aria-controls="' + stem + '-drawer" aria-expanded="false">&#9776;</button>';
