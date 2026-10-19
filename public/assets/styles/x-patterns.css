@@ -1,0 +1,81 @@
+/* Four X Intelligence-only background skins. All layers are CSS gradients:
+   no remote images, no animation, and no changes to account/feed data.
+   Keep linework faint so the text and post status are always the focus.
+   A template's existing accent remains independently configurable. */
+
+body[data-x-pattern] .cmd-main {
+  background-position: center top;
+}
+
+/* 1. Crypto & Stocks — chart-paper grid and emerald price movement. */
+body[data-x-pattern="markets"] .cmd-main {
+  background-image:
+    radial-gradient(ellipse at 26% 5%, rgba(0, 227, 150, .105), transparent 44%),
+    linear-gradient(145deg, transparent 49.85%, rgba(0, 227, 150, .052) 50%, transparent 50.15%),
+    linear-gradient(90deg, rgba(0, 227, 150, .055) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(0, 227, 150, .045) 1px, transparent 1px);
+  background-size: auto, auto, 72px 72px, 72px 72px;
+}
+body[data-x-pattern="markets"] {
+  --x-pattern-pane:
+    linear-gradient(90deg, rgba(0, 227, 150, .033) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(0, 227, 150, .026) 1px, transparent 1px);
+  --x-pane-size: 48px 48px;
+}
+
+/* 2. War — tactical radar sweep, rings and a map-coordinate grid. */
+body[data-x-pattern="war"] .cmd-main {
+  background-image:
+    radial-gradient(ellipse at 78% 4%, rgba(231, 104, 65, .14), transparent 42%),
+    repeating-radial-gradient(circle at 79% 18%, transparent 0 53px, rgba(236, 142, 72, .07) 54px 55px, transparent 56px 108px),
+    linear-gradient(135deg, transparent 49.9%, rgba(236, 142, 72, .045) 50%, transparent 50.1%),
+    linear-gradient(90deg, rgba(236, 142, 72, .029) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(236, 142, 72, .029) 1px, transparent 1px);
+  background-size: auto, auto, auto, 84px 84px, 84px 84px;
+}
+body[data-x-pattern="war"] {
+  --x-pattern-pane:
+    repeating-radial-gradient(circle at 80% 8%, transparent 0 49px, rgba(236, 142, 72, .04) 50px 51px, transparent 52px 100px);
+  --x-pane-size: auto;
+}
+
+/* 3. Conspiracy — investigation board: fine connections and scattered nodes. */
+body[data-x-pattern="conspiracy"] .cmd-main {
+  background-image:
+    radial-gradient(ellipse at 40% 0%, rgba(214, 106, 145, .115), transparent 44%),
+    radial-gradient(circle, rgba(214, 106, 145, .13) 1.5px, transparent 2px),
+    repeating-linear-gradient(35deg, transparent 0 95px, rgba(214, 106, 145, .037) 96px 97px, transparent 98px 190px),
+    repeating-linear-gradient(-35deg, transparent 0 95px, rgba(214, 106, 145, .037) 96px 97px, transparent 98px 190px);
+  background-size: auto, 86px 86px, auto, auto;
+}
+body[data-x-pattern="conspiracy"] {
+  --x-pattern-pane:
+    radial-gradient(circle, rgba(214, 106, 145, .08) 1px, transparent 2px),
+    repeating-linear-gradient(35deg, transparent 0 75px, rgba(214, 106, 145, .027) 76px 77px, transparent 78px 150px);
+  --x-pane-size: 82px 82px, auto;
+}
+
+/* 4. Positivity — golden light and calm, expanding green-gold circles. */
+body[data-x-pattern="positivity"] .cmd-main {
+  background-image:
+    radial-gradient(circle at 76% 6%, rgba(245, 197, 66, .145), transparent 35%),
+    radial-gradient(ellipse at 18% 20%, rgba(0, 227, 150, .08), transparent 47%),
+    repeating-radial-gradient(circle at 76% 6%, transparent 0 57px, rgba(165, 215, 149, .061) 58px 59px, transparent 60px 116px);
+  background-size: auto, auto, auto;
+}
+body[data-x-pattern="positivity"] {
+  --x-pattern-pane:
+    repeating-radial-gradient(circle at 78% 8%, transparent 0 55px, rgba(165, 215, 149, .045) 56px 57px, transparent 58px 112px);
+  --x-pane-size: auto;
+}
+
+/* The pane is a readable, solid surface with quieter linework than the canvas.
+   Cards keep their existing backgrounds; patterns cannot obscure post text. */
+body[data-x-pattern] .x-timeline-pane {
+  background-color: var(--surface);
+  background-image: var(--x-pattern-pane);
+  background-size: var(--x-pane-size, auto);
+}
+
+/* The command.css light palette is supported too; use the same very faint
+   patterns without forcing a dark page background or altering text colors. */
