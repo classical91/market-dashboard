@@ -55,6 +55,21 @@
     }
     : null;
 
+  /* Card state that belongs to this page session rather than the feed: posts
+     the reader expanded, and which posts are NEW for the template on screen.
+     Both survive re-renders; neither changes what the server reported. */
+  var FeedView = window.XFeedView;
+  var expandedPosts = {};
+  var newPostKeys = {};
+  cardOptions = cardOptions || {};
+  cardOptions.keyOf = FeedView.postKey;
+  cardOptions.expanded = expandedPosts;
+  cardOptions.isNew = function (post) { return !!newPostKeys[FeedView.postKey(post)]; };
+
+  function store() {
+    try { return window.localStorage; } catch (err) { return null; }
+  }
+
   function showPosts(root, posts, emptyText) {
     renderPostCards(root, posts, emptyText, cardOptions);
   }
@@ -304,6 +319,8 @@
       loaded: !!cached,
       templates: templates,
       templateId: initialTemplateId,
+      filters: FeedView.readFilters(store(), initialTemplateId),
+      view: FeedView.readView(store()),
     };
 
     function activeTemplate() {
@@ -386,6 +403,12 @@
       state.mode = ALL_MODE;
       state.transport = { ok: true };
       state.serverOutage = null;
+      // Time and media filters are remembered per template; the search box
+      // carries over, since it is what the reader is looking for right now.
+      var query = state.filters.query;
+      state.filters = FeedView.readFilters(store(), templateId);
+      state.filters.query = query;
+      markNewPosts(templateId, state.feedData.posts, false);
       selectAll();
       renderTemplateSwitcher();
       refresh();
@@ -401,8 +424,90 @@
       });
     }
 
+    /* Re-rendering replaces every card, which can jump the page. The reader's
+       place is put back afterwards, so a refresh or a filter change does not
+       throw them to the top of the feed. */
     function renderPane() {
+      var x = window.pageXOffset;
+      var y = window.pageYOffset;
+      renderPaneContent();
+      syncToolbar();
+      layoutMasonry();
+      scheduleMasonry();
+      if (window.pageYOffset !== y || window.pageXOffset !== x) window.scrollTo(x, y);
+    }
+
+    /* Order-preserving masonry for the multi-column views. Each card spans as
+       many 4px grid rows as it is tall, and the grid's ordinary (sparse,
+       never `dense`) auto-placement does the rest: a card always lands at or
+       below the top of the card before it, so the newest-first order still
+       reads top to bottom, and DOM, tab and screen-reader order are
+       untouched. Without JavaScript, or in Focus view, the grid falls back to
+       plain rows of top-aligned cards. */
+    var MASONRY_ROW_PX = 4;
+    var masonryFrame = 0;
+
+    function layoutMasonry() {
+      var grid = pane.querySelector(".x-post-grid");
+      if (!grid) return;
+      var cards = grid.querySelectorAll(".x-post-card");
+      grid.classList.remove("is-masonry");
+      var columns = window.getComputedStyle(grid).gridTemplateColumns.split(" ").filter(Boolean).length;
+      var on = state.view !== "focus" && columns > 1 && cards.length > 1;
+      if (!on) {
+        Array.prototype.forEach.call(cards, function (card) { card.style.gridRowEnd = ""; });
+        return;
+      }
+      var gap = parseFloat(window.getComputedStyle(grid).rowGap) || 0;
+      grid.classList.add("is-masonry");
+      // Every read before any write, so the browser lays out once.
+      var heights = Array.prototype.map.call(cards, function (card) { return card.getBoundingClientRect().height; });
+      Array.prototype.forEach.call(cards, function (card, i) {
+        card.style.gridRowEnd = "span " + Math.max(1, Math.ceil((heights[i] + gap) / MASONRY_ROW_PX));
+      });
+    }
+
+    // After the renderer's own post-layout pass (which may hide Read more).
+    function scheduleMasonry() {
+      if (!window.requestAnimationFrame) return;
+      if (masonryFrame) window.cancelAnimationFrame(masonryFrame);
+      masonryFrame = window.requestAnimationFrame(function () {
+        masonryFrame = 0;
+        layoutMasonry();
+      });
+    }
+
+    pane.addEventListener("click", function (event) {
+      if (event.target.closest && event.target.closest(".x-post-expand")) scheduleMasonry();
+    });
+    // A dead image is removed from its card, which shortens it.
+    pane.addEventListener("error", scheduleMasonry, true);
+    if (window.ResizeObserver) {
+      var lastWidth = 0;
+      new window.ResizeObserver(function (entries) {
+        var width = Math.round(entries[0].contentRect.width);
+        if (width === lastWidth) return;
+        lastWidth = width;
+        scheduleMasonry();
+      }).observe(pane);
+    }
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(scheduleMasonry);
+
+    var FILTERED_EMPTY = "No loaded posts match these filters.";
+
+    // The posts on screen after the toolbar's filters. `shownCount` and
+    // `loadedCount` feed the summary line.
+    function applyFilters(posts) {
+      var shown = FeedView.filterPosts(posts, state.filters);
+      state.loadedCount = posts.length;
+      state.shownCount = shown.length;
+      return shown;
+    }
+
+    function renderPaneContent() {
       syncPanelLabel();
+      state.loadedCount = 0;
+      state.shownCount = 0;
       if (!state.loaded) {
         showPosts(pane, [], "Loading latest posts…");
         return;
@@ -415,12 +520,15 @@
         // count: it is what the feed actually ran against, so it stays right
         // when a membership points at an account that no longer exists.
         var unpopulated = state.transport.ok && !(state.feedData.accounts || []).length;
+        var shownAll = applyFilters(state.feedData.posts);
         showPosts(
           pane,
-          state.feedData.posts,
-          unpopulated
-            ? "No accounts in this theme yet \u2014 add some from Manage Accounts."
-            : state.transport.ok ? "No posts found yet." : "Couldn't load posts."
+          shownAll,
+          state.feedData.posts.length && !shownAll.length
+            ? FILTERED_EMPTY
+            : unpopulated
+              ? "No accounts in this theme yet \u2014 add some from Manage Accounts."
+              : state.transport.ok ? "No posts found yet." : "Couldn't load posts."
         );
         renderFeedError(pane, state.feedData.failedFeeds);
         renderStaleNotice(pane, state.feedData.staleFeeds);
@@ -430,10 +538,13 @@
       var handlePosts = state.feedData.posts.filter(function (p) { return p.handle === state.handle; });
       var failed = (state.feedData.failedFeeds || []).some(function (a) { return a.handle === state.handle; });
       var stale = (state.feedData.staleFeeds || []).filter(function (a) { return a.handle === state.handle; });
+      var shownHandle = applyFilters(handlePosts);
       showPosts(
         pane,
-        handlePosts,
-        failed || !state.transport.ok
+        shownHandle,
+        handlePosts.length && !shownHandle.length
+          ? FILTERED_EMPTY
+          : failed || !state.transport.ok
           ? "Couldn't load current posts for @" + state.handle + " right now."
           : "No recent posts found for @" + state.handle + "."
       );
@@ -522,6 +633,207 @@
       renderLiveReference();
     }
 
+    /* ── New-post awareness ──────────────────────────────────────────────
+       "New" means a post identifier this device had not been shown for the
+       template before this page load — never "the refresh succeeded". The
+       baseline is read once per template per page load, so flags stay put
+       across re-renders until the reader marks them seen. A template this
+       device has never shown has no baseline and flags nothing. */
+    var seenBaselines = {};
+
+    function markNewPosts(templateId, posts, authoritative) {
+      var storage = store();
+      if (!Object.prototype.hasOwnProperty.call(seenBaselines, templateId)) {
+        seenBaselines[templateId] = FeedView.readSeen(storage, templateId);
+      }
+      newPostKeys = FeedView.findNewPosts(seenBaselines[templateId], posts || []);
+      // Only what the server just returned is recorded as shown. Browser-cached
+      // posts were recorded when they were first fetched.
+      if (authoritative) {
+        FeedView.writeSeen(storage, templateId, FeedView.mergeSeen(FeedView.readSeen(storage, templateId), posts || []));
+      }
+    }
+
+    function markAllSeen() {
+      seenBaselines[state.templateId] = FeedView.mergeSeen(FeedView.readSeen(store(), state.templateId), state.feedData.posts);
+      newPostKeys = {};
+      renderPane();
+    }
+
+    /* ── Toolbar ─────────────────────────────────────────────────────────── */
+    var searchInput = document.getElementById("xFeedSearch");
+    var accountSelect = document.getElementById("xFeedAccount");
+    var timeGroup = document.getElementById("xFeedTime");
+    var mediaButton = document.getElementById("xFeedMedia");
+    var viewGroup = document.getElementById("xFeedView");
+    var motionButton = document.getElementById("xFeedMotion");
+    var resetButton = document.getElementById("xFeedReset");
+    var summary = document.getElementById("xFeedSummary");
+    var reducedMotionQuery = window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
+
+    function setPressed(group, attrName, value) {
+      if (!group) return;
+      Array.prototype.forEach.call(group.querySelectorAll("button[" + attrName + "]"), function (button) {
+        button.setAttribute("aria-pressed", button.getAttribute(attrName) === value ? "true" : "false");
+      });
+    }
+
+    function syncAccountSelect() {
+      if (!accountSelect) return;
+      var accounts = accountsOf(state.feedData);
+      var wanted = state.mode === ALL_MODE ? "" : state.handle;
+      var signature = accounts.map(function (a) { return a.handle; }).join(",");
+      if (accountSelect.getAttribute("data-accounts") !== signature) {
+        accountSelect.innerHTML = "";
+        var all = document.createElement("option");
+        all.value = "";
+        all.textContent = "All accounts";
+        accountSelect.appendChild(all);
+        accounts.forEach(function (account) {
+          var option = document.createElement("option");
+          option.value = account.handle;
+          option.textContent = "@" + account.handle;
+          accountSelect.appendChild(option);
+        });
+        accountSelect.setAttribute("data-accounts", signature);
+      }
+      accountSelect.value = accounts.some(function (a) { return a.handle === wanted; }) ? wanted : "";
+    }
+
+    function renderSummary() {
+      if (!summary) return;
+      summary.innerHTML = "";
+      if (!state.loaded) return;
+      var parts = document.createElement("span");
+      var filtered = state.shownCount !== state.loadedCount;
+      parts.textContent = filtered
+        ? "Showing " + state.shownCount + " of " + state.loadedCount + " loaded posts"
+        : state.loadedCount + (state.loadedCount === 1 ? " post" : " posts");
+      summary.appendChild(parts);
+      var fresh = FeedView.countKeys(newPostKeys);
+      if (fresh) {
+        var badge = document.createElement("span");
+        badge.className = "x-feed-new-count";
+        badge.textContent = fresh + " new since your last visit";
+        summary.appendChild(badge);
+        var clear = document.createElement("button");
+        clear.type = "button";
+        clear.className = "x-feed-mark-seen";
+        clear.textContent = "Mark seen";
+        clear.addEventListener("click", markAllSeen);
+        summary.appendChild(clear);
+      }
+    }
+
+    function syncToolbar() {
+      if (searchInput && searchInput.value !== state.filters.query) searchInput.value = state.filters.query;
+      syncAccountSelect();
+      setPressed(timeGroup, "data-time", state.filters.time);
+      if (mediaButton) mediaButton.setAttribute("aria-pressed", state.filters.media ? "true" : "false");
+      setPressed(viewGroup, "data-view", state.view);
+      pane.setAttribute("data-x-view", state.view);
+      if (resetButton) resetButton.disabled = FeedView.isDefaultFilters(state.filters) && state.mode === ALL_MODE;
+      renderSummary();
+    }
+
+    function setFilters(patch) {
+      for (var k in patch) if (Object.prototype.hasOwnProperty.call(patch, k)) state.filters[k] = patch[k];
+      FeedView.writeFilters(store(), state.templateId, state.filters);
+      renderPane();
+    }
+
+    var searchTimer = null;
+    if (searchInput) {
+      searchInput.addEventListener("input", function () {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(function () { setFilters({ query: searchInput.value }); }, 140);
+      });
+      searchInput.addEventListener("keydown", function (event) {
+        if (event.key === "Escape" && searchInput.value) {
+          searchInput.value = "";
+          setFilters({ query: "" });
+        }
+      });
+    }
+    if (accountSelect) {
+      accountSelect.addEventListener("change", function () {
+        if (accountSelect.value) selectHandle(accountSelect.value);
+        else selectAll();
+      });
+    }
+    if (timeGroup) {
+      timeGroup.addEventListener("click", function (event) {
+        var button = event.target.closest && event.target.closest("button[data-time]");
+        if (button) setFilters({ time: button.getAttribute("data-time") });
+      });
+    }
+    if (mediaButton) mediaButton.addEventListener("click", function () { setFilters({ media: !state.filters.media }); });
+    if (viewGroup) {
+      viewGroup.addEventListener("click", function (event) {
+        var button = event.target.closest && event.target.closest("button[data-view]");
+        if (!button) return;
+        state.view = FeedView.normalizeView(button.getAttribute("data-view"));
+        FeedView.writeView(store(), state.view);
+        renderPane();
+      });
+    }
+    if (resetButton) {
+      resetButton.addEventListener("click", function () {
+        state.filters = FeedView.defaultFilters();
+        FeedView.writeFilters(store(), state.templateId, state.filters);
+        if (state.mode !== ALL_MODE) selectAll(); else renderPane();
+      });
+    }
+
+    /* Background motion: the reader's explicit choice, else the OS setting.
+       Paused while the tab is hidden, when nobody can see it anyway. */
+    function applyMotion() {
+      var stored = null;
+      try { stored = store() && store().getItem(FeedView.KEYS.motion); } catch (err) {}
+      var motion = FeedView.resolveMotion(stored, !!(reducedMotionQuery && reducedMotionQuery.matches));
+      document.body.setAttribute("data-x-motion", motion);
+      if (motionButton) {
+        motionButton.setAttribute("aria-pressed", motion === "on" ? "true" : "false");
+        motionButton.textContent = "Motion: " + (motion === "on" ? "On" : "Off");
+      }
+    }
+    if (motionButton) {
+      motionButton.addEventListener("click", function () {
+        FeedView.writeMotion(store(), document.body.getAttribute("data-x-motion") === "on" ? "off" : "on");
+        applyMotion();
+      });
+    }
+    if (reducedMotionQuery && reducedMotionQuery.addEventListener) reducedMotionQuery.addEventListener("change", applyMotion);
+    document.addEventListener("visibilitychange", function () {
+      document.body.toggleAttribute("data-x-motion-paused", document.hidden);
+    });
+    applyMotion();
+
+    /* Focus view reads one post at a time: j / k step between cards without
+       reaching for the mouse. The arrow keys are left to scroll the page. */
+    document.addEventListener("keydown", function (event) {
+      if (state.view !== "focus" || event.altKey || event.ctrlKey || event.metaKey) return;
+      var tag = event.target && event.target.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (event.target && event.target.isContentEditable)) return;
+      if (document.querySelector(".manage-overlay, .x-live-modal")) return;
+      var step = event.key === "j" ? 1 : event.key === "k" ? -1 : 0;
+      if (!step) return;
+      var cards = Array.prototype.slice.call(pane.querySelectorAll(".x-post-card"));
+      if (!cards.length) return;
+      var current = cards.findIndex(function (card) { return card.contains(document.activeElement); });
+      if (current < 0) {
+        current = cards.findIndex(function (card) { return card.getBoundingClientRect().bottom > 80; });
+        current = current < 0 ? 0 : current - (step > 0 ? 1 : 0);
+      }
+      var next = cards[Math.max(0, Math.min(cards.length - 1, current + step))];
+      event.preventDefault();
+      next.setAttribute("tabindex", "-1");
+      next.focus({ preventScroll: true });
+      var smooth = document.body.getAttribute("data-x-motion") === "on";
+      next.scrollIntoView({ block: "start", behavior: smooth ? "smooth" : "auto" });
+    });
+
+    markNewPosts(state.templateId, state.feedData.posts, false);
     refreshList();
     renderTemplateSwitcher();
     if (state.mode === ALL_MODE || !state.handle) selectAll(); else selectHandle(state.handle);
@@ -578,6 +890,7 @@
         state.serverOutage = null;
         state.cache = null;
         writeCachedFeed(state.templateId, payload);
+        markNewPosts(state.templateId, payload.posts, true);
         reconcileSelection();
         renderPane();
         refreshList();

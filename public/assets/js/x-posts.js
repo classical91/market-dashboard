@@ -471,32 +471,131 @@
     }, 1800);
   }
 
+  /* ── Display text ─────────────────────────────────────────────────────
+
+     The card shows a cleaned preview; the post object is never touched, so
+     Copy, FarmClaw and Broadcast all keep working from the original text and
+     URL. Two kinds of link are dropped from the preview only:
+       - links back to this same post (X sometimes repeats the permalink);
+       - the run of t.co links at the very end, which is where X appends the
+         media and quote attachments the card already shows or opens.
+     A t.co link in the middle of a sentence is kept: it may be the only
+     pointer to the article the post is about. */
+  var URL_PATTERN = /https?:\/\/[^\s]+/g;
+  var TRAILING_TCO = /(?:\s*https?:\/\/t\.co\/[A-Za-z0-9]+)+\s*$/;
+
+  function normalizeLink(url) {
+    return String(url || "")
+      .replace(/^https?:\/\//i, "")
+      .replace(/^(www\.|mobile\.)/i, "")
+      .replace(/^twitter\.com\//i, "x.com/")
+      .replace(/[?#].*$/, "")
+      .replace(/[).,;:!]+$/, "")
+      .replace(/\/+$/, "")
+      .toLowerCase();
+  }
+
+  function cleanPreviewText(text, post) {
+    var source = String(text === null || text === undefined ? "" : text);
+    var own = post && post.url ? normalizeLink(post.url) : "";
+    var cleaned = source.replace(URL_PATTERN, function (url) {
+      var link = normalizeLink(url);
+      if (own && (link === own || link.indexOf(own + "/") === 0)) return "";
+      return url;
+    });
+    cleaned = cleaned.replace(TRAILING_TCO, "");
+    cleaned = cleaned
+      .replace(/[ \t]+\n/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .replace(/[ \t]{2,}/g, " ")
+      .trim();
+    return cleaned;
+  }
+
+  // Long enough that the clamp in Compact or Cards view may hide some of it.
+  // Over-offering is corrected after layout (see trimUnneededToggles), so this
+  // errs towards showing the control.
+  function mayNeedExpand(text) {
+    if (!text) return false;
+    return text.length > 140 || (text.match(/\n/g) || []).length >= 2;
+  }
+
+  function attr(s) {
+    return esc(s).replace(/"/g, "&quot;");
+  }
+
+  function metaHtml(post, isNew) {
+    var date = post.publishedAt ? new Date(post.publishedAt) : null;
+    var valid = date && !isNaN(date.getTime());
+    var when = formatRelativeDate(post.publishedAt);
+    return (
+      '<span class="x-tag">@' + esc(post.handle) + "</span>" +
+      (post.category ? '<span class="x-post-category">' + esc(post.category) + "</span>" : "") +
+      (when
+        ? '<time class="x-post-time"' +
+          (valid ? ' datetime="' + attr(date.toISOString()) + '" title="' + attr(date.toLocaleString()) + '"' : "") +
+          ">" + esc(when) + "</time>"
+        : "") +
+      (isNew ? '<span class="x-post-new" title="Not in this feed at your last visit">New</span>' : "")
+    );
+  }
+
+  var textIdSeq = 0;
+
+  /* A text block is only clamped in some views and at some widths, so after
+     layout the Read more control is hidden wherever nothing is actually cut
+     off. Skipped where there is no layout (Node tests), leaving the control. */
+  function trimUnneededToggles(pairs) {
+    var raf = typeof window !== "undefined" && window.requestAnimationFrame;
+    if (!raf || !pairs.length) return;
+    raf.call(window, function () {
+      pairs.forEach(function (pair) {
+        if (pair.state.expanded) return;
+        var clipped = pair.text.scrollHeight > pair.text.clientHeight + 1;
+        pair.button.hidden = !clipped;
+      });
+    });
+  }
+
   /* `options.onBroadcast(post, button)` adds a Broadcast action to every card.
      Optional, and injected rather than imported, so this renderer keeps
      knowing nothing about Telegram — and a page that has no business
-     broadcasting simply does not pass it. */
+     broadcasting simply does not pass it.
+
+     Also optional: `options.isNew(post)` marks a card NEW, and
+     `options.expanded` (a plain object keyed by `options.keyOf(post)`)
+     remembers which posts the reader opened up, so a re-render keeps them
+     open. */
   function renderPostCards(root, posts, emptyText, options) {
     var onBroadcast = options && typeof options.onBroadcast === "function" ? options.onBroadcast : null;
     var onFarmclaw = options && typeof options.onFarmclaw === "function" ? options.onFarmclaw : null;
+    var isNew = options && typeof options.isNew === "function" ? options.isNew : null;
+    var keyOf = options && typeof options.keyOf === "function"
+      ? options.keyOf
+      : function (post) { return String(post.id || post.url || ""); };
+    var expandedPosts = options && options.expanded && typeof options.expanded === "object" ? options.expanded : {};
+    var togglePairs = [];
     root.innerHTML = "";
     root.classList.toggle("is-empty", !posts.length);
     var grid = document.createElement("div");
     grid.className = "x-post-grid";
 
     sortByPublishedDesc(posts).forEach(function (post) {
+      var key = keyOf(post);
+      var fresh = !!(isNew && isNew(post));
       var card = document.createElement("article");
       card.className = "x-post-card";
+      card.setAttribute("data-has-media", post.image ? "true" : "false");
+      if (fresh) card.setAttribute("data-new", "true");
 
       var meta = document.createElement("div");
       meta.className = "x-post-meta";
-      meta.innerHTML =
-        '<span class="x-tag">@' + esc(post.handle) + "</span> &middot; " +
-        (post.category ? esc(post.category) + " &middot; " : "") +
-        formatRelativeDate(post.publishedAt);
+      meta.innerHTML = metaHtml(post, fresh);
 
-      var text = document.createElement("div");
-      text.className = "x-post-text";
-      text.textContent = post.text;
+      var preview = cleanPreviewText(post.text, post);
+      // A post that was nothing but a link keeps that link rather than
+      // rendering as a blank card.
+      if (!preview && !post.image) preview = String(post.text || "");
 
       card.appendChild(meta);
       if (post.image) {
@@ -504,10 +603,47 @@
         img.className = "x-post-image";
         img.src = post.image;
         img.loading = "lazy";
+        img.decoding = "async";
         img.alt = "";
+        // A dead media URL drops the frame rather than leaving a broken icon.
+        img.onerror = function () {
+          if (img.parentNode) img.parentNode.removeChild(img);
+          card.setAttribute("data-has-media", "false");
+        };
         card.appendChild(img);
       }
-      card.appendChild(text);
+
+      if (preview) {
+        var text = document.createElement("div");
+        text.className = "x-post-text";
+        text.id = "x-post-text-" + (textIdSeq += 1);
+        text.textContent = preview;
+        card.appendChild(text);
+
+        if (mayNeedExpand(preview)) {
+          var toggleState = { expanded: !!expandedPosts[key] };
+          var toggle = document.createElement("button");
+          toggle.type = "button";
+          toggle.className = "x-post-expand";
+          toggle.setAttribute("aria-controls", text.id);
+          var applyToggle = function (button, block, s) {
+            block.classList.toggle("is-expanded", s.expanded);
+            button.setAttribute("aria-expanded", s.expanded ? "true" : "false");
+            button.textContent = s.expanded ? "Show less" : "Read more";
+          };
+          applyToggle(toggle, text, toggleState);
+          toggle.addEventListener("click", (function (button, block, s) {
+            return function () {
+              s.expanded = !s.expanded;
+              if (s.expanded) expandedPosts[key] = true;
+              else delete expandedPosts[key];
+              applyToggle(button, block, s);
+            };
+          })(toggle, text, toggleState));
+          card.appendChild(toggle);
+          togglePairs.push({ text: text, button: toggle, state: toggleState });
+        }
+      }
 
       // The permalink, visible on the card rather than hidden behind the
       // Open button — it gets pasted into reports and chats constantly, and
@@ -579,6 +715,7 @@
     }
 
     root.appendChild(grid);
+    trimUnneededToggles(togglePairs);
   }
 
   function renderFeedError(root, failedFeeds) {
@@ -644,6 +781,7 @@
     formatRelativeDate: formatRelativeDate,
     formatRelativeTime: formatRelativeTime,
     sortByPublishedDesc: sortByPublishedDesc,
+    cleanPreviewText: cleanPreviewText,
     copyPostToClipboard: copyPostToClipboard,
     copyPostLinkToClipboard: copyPostLinkToClipboard,
     bindCopyLinkButton: bindCopyLinkButton,
