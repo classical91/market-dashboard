@@ -65,6 +65,9 @@ body[data-x-accent] .x-account-card--all.active { border-color: var(--x-accent);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
+  /* clip, not hidden: hidden makes the pane a scroll container, which would
+     pin the sticky freshness banner to a box that never scrolls. */
+  overflow: clip;
 }
 
 .x-timeline-head {
@@ -516,6 +519,12 @@ body[data-x-accent] .x-account-card--all.active { border-color: var(--x-accent);
    them: the reader must be able to tell confirmed-current data from cached
    data without reading timestamps off individual cards. */
 .x-feed-status {
+  /* Stays pinned while scrolling the posts it qualifies. Opaque so cards
+     don't show through it. */
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--surface);
   display: flex;
   align-items: baseline;
   gap: 8px;
@@ -725,6 +734,11 @@ body[data-x-accent] .x-account-card--all.active { border-color: var(--x-accent);
 
 /* After the base rules above so these win the cascade. Manage stays put when
    the list folds away and is sized as a comfortable tap target. */
+/* Clear the sticky mobile top bar (command.css, 56px at 1024px and below). */
+@media (max-width: 1024px) {
+  .x-feed-status { top: 56px; }
+}
+
 @media (max-width: 980px) {
   .x-account-rail-toggle { display: none; }
   .x-account-panel-head { margin-bottom: 0; }
