@@ -632,17 +632,6 @@ body[data-x-accent] .x-account-card--all.active { border-color: var(--x-accent);
 
   .x-account-panel.is-collapsed .x-account-list { display: none; }
 
-  /* Stays put when the list folds away — adding or removing an account must
-     not require finding and opening the account picker first. Sized like the
-     toggle above it so both are comfortable tap targets. */
-  .x-account-manage {
-    margin-bottom: 0;
-    padding: 11px 14px;
-    font-size: 13px;
-    font-weight: 600;
-    -webkit-tap-highlight-color: transparent;
-  }
-
   .x-account-list {
     max-height: 260px;
     overflow-y: auto;
@@ -679,24 +668,82 @@ body[data-x-accent] .x-account-card--all.active { border-color: var(--x-accent);
 /* ── Manage Accounts ─────────────────────────────────────────────────────
    The tracked list is server-persisted, so this is an admin action rather
    than a local preference. */
-.x-account-manage {
-  display: block;
-  width: 100%;
+.x-account-panel-head {
+  display: flex;
+  gap: 6px;
   margin-bottom: 10px;
-  padding: 9px 12px;
-  border: 0.5px solid var(--border);
+}
+
+/* Accent-filled so the one admin action on the page reads as a button, not
+   as another row of the account list beneath it. */
+.x-account-manage {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--x-accent, var(--blue)) 60%, transparent);
   border-radius: 8px;
-  background: transparent;
-  color: var(--muted);
+  background: color-mix(in srgb, var(--x-accent, var(--blue)) 18%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+  color: var(--text);
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 700;
   text-align: left;
   cursor: pointer;
 }
+.x-account-manage-icon { color: var(--x-accent, var(--blue)); font-size: 15px; line-height: 1; }
 
 .x-account-manage:hover {
+  border-color: var(--x-accent, var(--blue));
+  background: color-mix(in srgb, var(--x-accent, var(--blue)) 28%, transparent);
+}
+.x-account-manage:focus-visible,
+.x-account-rail-toggle:focus-visible {
+  outline: 2px solid var(--x-accent, var(--blue));
+  outline-offset: 2px;
+}
+
+.x-account-rail-toggle {
+  flex: 0 0 auto;
+  width: 38px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.04);
+  color: var(--muted);
+  font: inherit;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.x-account-rail-toggle:hover {
   border-color: var(--border-hover);
-  color: var(--text, inherit);
+  color: var(--text);
+}
+
+/* After the base rules above so these win the cascade. Manage stays put when
+   the list folds away and is sized as a comfortable tap target. */
+@media (max-width: 980px) {
+  .x-account-rail-toggle { display: none; }
+  .x-account-panel-head { margin-bottom: 0; }
+  .x-account-manage { padding: 11px 14px; -webkit-tap-highlight-color: transparent; }
+}
+
+@media (min-width: 981px) {
+  .x-split { transition: grid-template-columns 0.2s ease; }
+
+  /* Collapsed rail: just the expand toggle and an icon-only Manage button. */
+  .x-split.is-rail-collapsed { grid-template-columns: minmax(0, 1fr) 44px; }
+  .x-split.is-rail-collapsed .x-account-panel-head { flex-direction: column-reverse; }
+  .x-split.is-rail-collapsed .x-account-rail-toggle { width: 100%; height: 38px; }
+  .x-split.is-rail-collapsed .x-account-manage { justify-content: center; padding: 10px 0; }
+  .x-split.is-rail-collapsed .x-account-manage-label,
+  .x-split.is-rail-collapsed .x-account-list { display: none; }
+
+  /* The width the rail gives back goes to a third column of posts. */
+  .x-split.is-rail-collapsed .x-post-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 /* ── Manage Templates ────────────────────────────────────────────────── */
