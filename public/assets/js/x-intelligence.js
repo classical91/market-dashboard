@@ -292,6 +292,7 @@
       if (templateTriggerLabel) templateTriggerLabel.textContent = current.name;
       if (templateDescription) templateDescription.textContent = current.description || "Curated X intelligence workspace";
       document.body.setAttribute("data-x-accent", current.accent || "market");
+      if (window.XIntelligencePatterns) window.XIntelligencePatterns.apply(document.body, current);
       if (!templateMenu) return;
       templateMenu.innerHTML = "";
       state.templates.forEach(function (template) {
