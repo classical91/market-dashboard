@@ -1,7 +1,12 @@
-/* Four X Intelligence-only background skins. All layers are CSS gradients:
-   no remote images, no animation, and no changes to account/feed data.
+/* Four X Intelligence-only background skins. All layers are CSS gradients or
+   inline SVG: no remote images and no changes to account/feed data.
    Keep linework faint so the text and post status are always the focus.
-   A template's existing accent remains independently configurable. */
+   A template's existing accent remains independently configurable.
+
+   The static canvas below is the skin with motion off. The animated part is
+   the .x-ambient element further down: a few viewport-sized layers behind
+   the content whose gradients are painted once and then only moved with
+   transform and opacity, which the compositor handles without repainting. */
 
 body[data-x-pattern] .cmd-main {
   background-position: center top;
@@ -72,10 +77,215 @@ body[data-x-pattern="positivity"] {
 /* The pane is a readable, solid surface with quieter linework than the canvas.
    Cards keep their existing backgrounds; patterns cannot obscure post text. */
 body[data-x-pattern] .x-timeline-pane {
-  background-color: var(--surface);
+  /* Near-opaque: the ambient motion shows faintly between cards, never
+     under them — cards keep their own solid backgrounds. */
+  background-color: color-mix(in srgb, var(--surface) 90%, transparent);
   background-image: var(--x-pattern-pane);
   background-size: var(--x-pane-size, auto);
 }
 
 /* The command.css light palette is supported too; use the same very faint
    patterns without forcing a dark page background or altering text colors. */
+
+/* ── Ambient motion ──────────────────────────────────────────────────────
+   Fixed to the viewport beside the sidebar, behind everything, never
+   interactive. Only exists for the four skinned templates. */
+.x-ambient { display: none; }
+
+body[data-x-pattern] .x-ambient {
+  display: block;
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 260px;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  contain: strict;
+}
+@media (max-width: 1024px) {
+  body[data-x-pattern] .x-ambient { left: 0; }
+}
+
+/* The shared sidebar blurs whatever is behind it. With anything animating on
+   the page that blur is recomputed every frame — measured at roughly half
+   the scroll frame rate — so while motion is on this page gives the sidebar
+   its solid panel colour instead. It was already 86% opaque. */
+body[data-x-pattern][data-x-motion="on"] .cmd-sidebar {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: var(--panel);
+}
+
+.x-ambient-layer {
+  position: absolute;
+  inset: 0;
+  display: block;
+  opacity: 0;
+  backface-visibility: hidden;
+}
+
+/* Motion is opt-out (and off by default when the OS asks for reduced
+   motion — x-intelligence.js resolves that into data-x-motion). With motion
+   off the layers rest at a still frame instead of disappearing. */
+body[data-x-motion="off"] .x-ambient-layer,
+body[data-x-motion-paused] .x-ambient-layer { animation-play-state: paused !important; }
+body[data-x-motion="off"] .x-ambient-layer { animation: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  body:not([data-x-motion="on"]) .x-ambient-layer { animation: none !important; }
+}
+
+/* 1. Crypto & Stocks — a drifting chart grid, a slow price trace and an
+   occasional emerald glow. */
+body[data-x-pattern="markets"] .x-ambient-a {
+  inset: -72px 0 0 -72px;
+  opacity: .9;
+  background-image:
+    linear-gradient(90deg, rgba(0, 227, 150, .05) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(0, 227, 150, .04) 1px, transparent 1px);
+  background-size: 72px 72px;
+  animation: x-amb-drift-72 28s linear infinite;
+}
+body[data-x-pattern="markets"] .x-ambient-b {
+  inset: auto -50% 8% 0;
+  height: 220px;
+  opacity: .55;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='220' viewBox='0 0 600 220'%3E%3Cpath d='M0 150 L40 138 L80 146 L120 112 L160 120 L200 96 L240 104 L280 70 L320 86 L360 64 L400 78 L440 52 L480 66 L520 40 L560 58 L600 150' fill='none' stroke='%2300e396' stroke-opacity='.16' stroke-width='1.5'/%3E%3C/svg%3E");
+  background-size: 600px 220px;
+  background-repeat: repeat-x;
+  animation: x-amb-ticker 60s linear infinite;
+}
+body[data-x-pattern="markets"] .x-ambient-c {
+  background: radial-gradient(circle at 30% 30%, rgba(0, 227, 150, .12), transparent 34%);
+  animation: x-amb-glow 16s ease-in-out infinite;
+}
+
+/* 2. War — a slow radar sweep with a ping ring and a creeping map grid. */
+body[data-x-pattern="war"] .x-ambient-a {
+  inset: -84px 0 0 -84px;
+  opacity: .9;
+  background-image:
+    linear-gradient(90deg, rgba(236, 142, 72, .032) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(236, 142, 72, .032) 1px, transparent 1px);
+  background-size: 84px 84px;
+  animation: x-amb-drift-84 46s linear infinite;
+}
+body[data-x-pattern="war"] .x-ambient-b {
+  inset: auto;
+  top: calc(18% - 45vmax);
+  left: calc(79% - 45vmax);
+  width: 90vmax;
+  height: 90vmax;
+  border-radius: 50%;
+  opacity: 1;
+  background: conic-gradient(from 0deg, rgba(236, 142, 72, .11), rgba(236, 142, 72, .03) 38deg, transparent 60deg 360deg);
+  -webkit-mask-image: radial-gradient(circle, #000 0 55%, transparent 70%);
+  mask-image: radial-gradient(circle, #000 0 55%, transparent 70%);
+  animation: x-amb-spin 14s linear infinite;
+}
+body[data-x-pattern="war"] .x-ambient-c {
+  inset: auto;
+  top: calc(18% - 30vmax);
+  left: calc(79% - 30vmax);
+  width: 60vmax;
+  height: 60vmax;
+  border-radius: 50%;
+  border: 1px solid rgba(236, 142, 72, .16);
+  box-shadow: 0 0 40px rgba(231, 104, 65, .06) inset;
+  animation: x-amb-ping 7s ease-out infinite;
+}
+
+/* 3. Conspiracy — an investigation network: faint threads that drift, and
+   pins that light up in turn. */
+body[data-x-pattern="conspiracy"] .x-ambient-a {
+  inset: -360px 0 0 -360px;
+  opacity: 1;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='360' height='360' viewBox='0 0 360 360'%3E%3Cg stroke='%23d66a91' stroke-opacity='.11' stroke-width='1' fill='none'%3E%3Cpath d='M40 60 L170 30 L300 110 L220 230 L80 200 Z M170 30 L220 230 M40 60 L80 200 M300 110 L340 300 L220 230 M80 200 L120 330 L220 230'/%3E%3C/g%3E%3Cg fill='%23b78cff' fill-opacity='.2'%3E%3Ccircle cx='40' cy='60' r='2'/%3E%3Ccircle cx='170' cy='30' r='2'/%3E%3Ccircle cx='300' cy='110' r='2'/%3E%3Ccircle cx='220' cy='230' r='2.5'/%3E%3Ccircle cx='80' cy='200' r='2'/%3E%3Ccircle cx='340' cy='300' r='2'/%3E%3Ccircle cx='120' cy='330' r='2'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: 360px 360px;
+  animation: x-amb-drift-360 90s linear infinite;
+}
+body[data-x-pattern="conspiracy"] .x-ambient-b,
+body[data-x-pattern="conspiracy"] .x-ambient-c {
+  background-image: radial-gradient(circle, rgba(214, 106, 145, .5) 0 2px, rgba(214, 106, 145, .12) 3px, transparent 9px);
+  background-size: 360px 360px;
+  animation: x-amb-twinkle 6s ease-in-out infinite;
+}
+body[data-x-pattern="conspiracy"] .x-ambient-b { background-position: 40px 60px; }
+body[data-x-pattern="conspiracy"] .x-ambient-c {
+  background-image: radial-gradient(circle, rgba(183, 140, 255, .45) 0 2px, rgba(183, 140, 255, .1) 3px, transparent 9px);
+  background-position: 220px 230px;
+  animation-delay: -3s;
+}
+
+/* 4. Positivity — warm golden light that breathes, and soft circles that
+   widen and fade. */
+body[data-x-pattern="positivity"] .x-ambient-a {
+  background: radial-gradient(circle at 76% 8%, rgba(245, 197, 66, .13), transparent 38%);
+  transform-origin: 76% 8%;
+  animation: x-amb-breathe 11s ease-in-out infinite;
+}
+body[data-x-pattern="positivity"] .x-ambient-b,
+body[data-x-pattern="positivity"] .x-ambient-c {
+  inset: auto;
+  top: calc(8% - 26vmax);
+  left: calc(76% - 26vmax);
+  width: 52vmax;
+  height: 52vmax;
+  border-radius: 50%;
+  border: 1px solid rgba(245, 197, 66, .18);
+  animation: x-amb-ripple 13s ease-out infinite;
+}
+body[data-x-pattern="positivity"] .x-ambient-c {
+  border-color: rgba(165, 215, 149, .16);
+  animation-delay: -6.5s;
+}
+
+/* Still frames for motion off: the same identity, nothing moving. */
+body[data-x-motion="off"][data-x-pattern="markets"] .x-ambient-c,
+body[data-x-motion="off"][data-x-pattern="positivity"] .x-ambient-a { opacity: .7; }
+body[data-x-motion="off"][data-x-pattern="war"] .x-ambient-b { transform: rotate(35deg); }
+body[data-x-motion="off"][data-x-pattern="war"] .x-ambient-c,
+body[data-x-motion="off"][data-x-pattern="positivity"] .x-ambient-b { opacity: .5; transform: scale(.7); }
+body[data-x-motion="off"][data-x-pattern="positivity"] .x-ambient-c { opacity: 0; }
+body[data-x-motion="off"][data-x-pattern="conspiracy"] .x-ambient-b,
+body[data-x-motion="off"][data-x-pattern="conspiracy"] .x-ambient-c { opacity: .6; }
+@media (prefers-reduced-motion: reduce) {
+  body:not([data-x-motion="on"])[data-x-pattern="markets"] .x-ambient-c,
+  body:not([data-x-motion="on"])[data-x-pattern="positivity"] .x-ambient-a { opacity: .7; }
+  body:not([data-x-motion="on"])[data-x-pattern="conspiracy"] .x-ambient-b,
+  body:not([data-x-motion="on"])[data-x-pattern="conspiracy"] .x-ambient-c { opacity: .6; }
+}
+
+/* The light palette gets the same layers at lower strength, so linework
+   stays a texture rather than a pattern competing with dark text. */
+[data-theme="light"] body[data-x-pattern] .x-ambient { opacity: .6; }
+
+@keyframes x-amb-drift-72 { to { transform: translate3d(72px, 72px, 0); } }
+@keyframes x-amb-drift-84 { to { transform: translate3d(84px, 0, 0); } }
+@keyframes x-amb-drift-360 { to { transform: translate3d(360px, 360px, 0); } }
+@keyframes x-amb-ticker { to { transform: translate3d(-600px, 0, 0); } }
+@keyframes x-amb-glow {
+  0%, 100% { opacity: 0; transform: translate3d(0, 0, 0); }
+  45% { opacity: 1; transform: translate3d(6vw, 4vh, 0); }
+  70% { opacity: .2; }
+}
+@keyframes x-amb-spin { to { transform: rotate(360deg); } }
+@keyframes x-amb-ping {
+  0% { opacity: 0; transform: scale(.15); }
+  15% { opacity: 1; }
+  100% { opacity: 0; transform: scale(1); }
+}
+@keyframes x-amb-twinkle {
+  0%, 100% { opacity: .15; }
+  50% { opacity: 1; }
+}
+@keyframes x-amb-breathe {
+  0%, 100% { opacity: .55; transform: scale(.94); }
+  50% { opacity: 1; transform: scale(1.06); }
+}
+@keyframes x-amb-ripple {
+  0% { opacity: 0; transform: scale(.2); }
+  20% { opacity: .9; }
+  100% { opacity: 0; transform: scale(1.25); }
+}

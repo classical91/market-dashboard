@@ -14,6 +14,13 @@
 <div class="app">
   <aside class="cmd-sidebar"></aside>
   <main class="cmd-main">
+    <!-- Decorative, template-driven background motion (x-patterns.css).
+         Behind the content, never interactive, and still when motion is off. -->
+    <div class="x-ambient" aria-hidden="true">
+      <span class="x-ambient-layer x-ambient-a"></span>
+      <span class="x-ambient-layer x-ambient-b"></span>
+      <span class="x-ambient-layer x-ambient-c"></span>
+    </div>
 
     <div class="cmd-page-header">
       <div>
@@ -41,7 +48,41 @@
             <a href="https://commentfarm-production-fc8b.up.railway.app/queue" target="_blank" rel="noopener">Open FarmQueue &#8599;</a>
           </div>
         </div>
-        <div class="x-timeline-frame" id="xTimelinePane"></div>
+        <!-- Filters only the posts already loaded; nothing here fetches. -->
+        <div class="x-feed-toolbar" id="xFeedToolbar" role="group" aria-label="Feed filters and display">
+          <div class="x-feed-toolbar-row">
+            <label class="x-feed-search">
+              <span class="x-visually-hidden">Search loaded posts</span>
+              <input type="search" id="xFeedSearch" placeholder="Search loaded posts&hellip;" autocomplete="off" spellcheck="false" />
+            </label>
+            <label class="x-feed-account">
+              <span class="x-visually-hidden">Account</span>
+              <select id="xFeedAccount"><option value="">All accounts</option></select>
+            </label>
+            <div class="x-segment" id="xFeedTime" role="group" aria-label="Time window">
+              <button type="button" data-time="all" aria-pressed="true">All</button>
+              <button type="button" data-time="1h" aria-pressed="false">1h</button>
+              <button type="button" data-time="6h" aria-pressed="false">6h</button>
+              <button type="button" data-time="24h" aria-pressed="false">24h</button>
+              <button type="button" data-time="7d" aria-pressed="false">7d</button>
+            </div>
+          </div>
+          <div class="x-feed-toolbar-row">
+            <div class="x-segment" id="xFeedView" role="group" aria-label="Display mode">
+              <button type="button" data-view="compact" aria-pressed="true">Compact</button>
+              <button type="button" data-view="cards" aria-pressed="false">Cards</button>
+              <button type="button" data-view="focus" aria-pressed="false">Focus</button>
+            </div>
+            <button type="button" class="x-feed-chip" id="xFeedMedia" aria-pressed="false"
+                    title="Show only posts with media">Media</button>
+            <button type="button" class="x-feed-chip" id="xFeedMotion" aria-pressed="true"
+                    title="Animated background for this template">Motion: On</button>
+            <button type="button" class="x-feed-chip x-feed-reset" id="xFeedReset" disabled
+                    title="Clear search, time, media and account filters">Reset</button>
+            <div class="x-feed-summary" id="xFeedSummary" aria-live="polite"></div>
+          </div>
+        </div>
+        <div class="x-timeline-frame" id="xTimelinePane" data-x-view="compact"></div>
         <!-- What X itself currently shows, for comparison against what the
              ingestion above captured. Hidden until a single account is
              selected; never presented as proof the two agree. -->
@@ -85,6 +126,7 @@
 <script src="/assets/js/admin-key.js"></script>
 <script src="/assets/js/x-freshness.js"></script>
 <script src="/assets/js/x-posts.js"></script>
+<script src="/assets/js/x-feed-view.js"></script>
 <script src="/assets/js/x-broadcast.js"></script>
 <script src="/assets/js/x-live-reference.js"></script>
 <script src="/assets/js/x-accounts-admin.js"></script>
