@@ -159,7 +159,27 @@
   white-space: nowrap;
 }
 
-.lx-row--pinned { background: rgba(77, 163, 255, 0.05); }
+/* ── Pinned context row ───────────────────────────────────────────────────
+   BTC is read as the weather for the board rather than as a candidate, so its
+   row sits above the ranking with a heavier tint and a left accent. The hue
+   follows the leading side and the alpha follows the state, so the colour
+   says "how far along is this extreme", never "which way to trade it".
+───────────────────────────────────────────────────────────────────────── */
+.lx-row--pinned {
+  --pin-rgb: 137, 146, 166;
+  --pin-alpha: 0.1;
+  background: rgba(var(--pin-rgb), var(--pin-alpha));
+  box-shadow: inset 4px 0 rgb(var(--pin-rgb));
+}
+
+.lx-row--pinned td { border-bottom-color: rgba(var(--pin-rgb), 0.35); }
+.lx-row--pinned.lx-row--bottom { --pin-rgb: 0, 184, 148; }
+.lx-row--pinned.lx-row--top { --pin-rgb: 255, 93, 93; }
+.lx-row--pinned.lx-row--pin-watch { --pin-alpha: 0.12; }
+.lx-row--pinned.lx-row--pin-candidate { --pin-alpha: 0.18; }
+.lx-row--pinned.lx-row--pin-confirming { --pin-alpha: 0.24; }
+.lx-row--pinned.lx-row--pin-confirmed { --pin-alpha: 0.32; }
+.lx-row--pinned:hover { background: rgba(var(--pin-rgb), calc(var(--pin-alpha) + 0.06)); }
 
 /* Phone: the table restacks as labelled cards rather than scrolling sideways,
    the same way the extremes table always has. */
@@ -197,6 +217,7 @@
   }
   .lx-evidence { max-width: none; flex-direction: column; align-items: flex-start; }
   .lx-reasons { white-space: normal; }
+  .lx-row--pinned { box-shadow: inset 4px 0 rgb(var(--pin-rgb)); }
   .lx-filter { padding: 5px 10px; font-size: 10px; }
 }
 

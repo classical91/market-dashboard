@@ -143,10 +143,10 @@
     if (!dominance || dominance.percent == null) return "";
     var direction = dominance.direction;
     var change = (dominance.changes && (dominance.changes.h24 || dominance.changes.h4)) || null;
-    var window = dominance.changes && dominance.changes.h24 ? "24h" : "4h";
+    var changeWindow = dominance.changes && dominance.changes.h24 ? "24h" : "4h";
     var readout = direction
       ? '<span class="ss-dom-direction ss-dom-direction--' + direction.toLowerCase() + '">' + escapeHtml(direction) +
-          (change ? ' <span class="ss-dom-delta">' + (change.delta > 0 ? "+" : "") + change.delta.toFixed(2) + "pp/" + window + "</span>" : "") +
+          (change ? ' <span class="ss-dom-delta">' + (change.delta > 0 ? "+" : "") + change.delta.toFixed(2) + "pp/" + changeWindow + "</span>" : "") +
         "</span>"
       : '<span class="ss-dom-direction ss-dom-direction--pending" title="Direction needs snapshots spanning at least 4h; the server is collecting them">BUILDING HISTORY</span>';
     var unscored = '<span class="ss-dom-na" title="Not scored — USDT.D has no OHLCV, so the candle-based engine cannot run on it">&mdash;</span>';
@@ -180,14 +180,38 @@
     );
   }
 
+  function searchQuery() {
+    return (searchInput.value || "").trim().toUpperCase();
+  }
+
+  function matchesSearch(symbol) {
+    var query = searchQuery();
+    return !query || String(symbol || "").indexOf(query) !== -1;
+  }
+
   function matchesFilters(entry) {
-    if (biasFilter !== "ALL" && (entry.bias || "NEUTRAL") !== biasFilter) return false;
+    if (!matchesSearch(entry.symbol)) return false;
+    // A row whose scan failed has no bias to filter on, and a failure is not
+    // a NEUTRAL reading — treating it as one both hid broken symbols from the
+    // bullish and bearish views and listed them among the genuinely neutral
+    // ones. It stays visible under every filter instead, so a symbol the feed
+    // is failing on cannot quietly look like a symbol with nothing to say.
+    if (entry.error) return true;
+    if (biasFilter !== "ALL" && entry.bias !== biasFilter) return false;
     if (strengthFilter === "TRENDING" && entry.trendRegime !== "TREND_UP" && entry.trendRegime !== "TREND_DOWN") return false;
     if (strengthFilter === "STRONG_ADX" && !(entry.adx != null && entry.adx >= 25)) return false;
     if (strengthFilter === "WEAK_TREND" && !(entry.adx != null && entry.adx < 20)) return false;
-    var query = (searchInput.value || "").trim().toUpperCase();
-    if (query && String(entry.symbol || "").indexOf(query) === -1) return false;
     return true;
+  }
+
+  // USDT.D is market context, not a scored row: it has no bias and no ADX, so
+  // a filter that selects on either excludes it the same way it excludes a
+  // token with no reading. It used to ignore the toolbar entirely and sit
+  // above a filtered or searched board it was no longer part of.
+  function dominanceMatchesFilters() {
+    if (biasFilter !== "ALL" || strengthFilter !== "ALL") return false;
+    var query = searchQuery();
+    return !query || "USDT.D".indexOf(query) !== -1;
   }
 
   /**
@@ -234,13 +258,22 @@
       .sort(compare);
 
     var rows = pinned.map(function (entry) { return renderRow(entry, null); })
-      .concat([renderDominanceRow(context && context.usdtDominance)])
+      .concat([dominanceMatchesFilters() ? renderDominanceRow(context && context.usdtDominance) : ""])
       .filter(Boolean)
       .concat(ranked.map(function (entry, index) { return renderRow(entry, index + 1); }));
 
-    tbody.innerHTML = rows.length
-      ? rows.join("")
-      : '<tr><td colspan="13" class="ss-empty-row">Nothing matches these filters.</td></tr>';
+    // The note is keyed to the ranked list, not to the row count: a pinned
+    // context row is always on screen, so counting rows meant a filter that
+    // matched nothing rendered as a one-row result with no explanation.
+    if (!ranked.length) {
+      rows = rows.concat(
+        '<tr><td colspan="13" class="ss-empty-row">' +
+        (pinned.length ? "No ranked pair matches these filters." : "Nothing matches these filters.") +
+        "</td></tr>",
+      );
+    }
+
+    tbody.innerHTML = rows.join("");
     renderSummary(results.filter(function (entry) { return !entry.error; }));
   }
 

@@ -184,7 +184,12 @@ function dashboardLink(baseUrl, path) {
 // checks agreeing — not an entry trigger, and "Bias: LONG" in a phone
 // notification reads as an instruction. The alert says what the dashboards
 // say; the wire values, the bot's state and the trade bridge are unchanged.
-const ALERT_BIAS_LABELS = { LONG: "BULLISH", SHORT: "BEARISH", FLAT: "NEUTRAL" };
+//
+// The map is the dashboards' own, so an alert and the page it links to can
+// never disagree about a signal. The fallback is deliberately not theirs: a
+// value this bot has never seen is shown as itself rather than called
+// NEUTRAL, because an unrecognised transition is not a flat market.
+const { BIAS_LABELS: ALERT_BIAS_LABELS } = require("./screener-projections");
 
 function alertBiasLabel(signal) {
   return ALERT_BIAS_LABELS[signal] || String(signal || "NEUTRAL");

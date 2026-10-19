@@ -163,9 +163,12 @@ function toLocalExtremes(row, interval, now = Date.now()) {
       error: (extreme && extreme.error) || (row && row.error) || "Local extremes unavailable",
     };
   }
-  const dominantSide = extreme.dominant ? extreme[extreme.dominant] : null;
   const bottom = sideView(extreme.bottom);
   const top = sideView(extreme.top);
+  // The leading side's own view, reused for all three of its fields: building
+  // it once per field invited the three to drift apart under a later edit,
+  // and they must describe one side or the row contradicts itself.
+  const dominantSide = extreme.dominant === "bottom" ? bottom : extreme.dominant === "top" ? top : null;
   const context = extreme.context || {};
   return {
     symbol: row.symbol,
@@ -182,9 +185,9 @@ function toLocalExtremes(row, interval, now = Date.now()) {
     trend: context.trend || null,
     priceAboveEma200: context.priceAboveEma200 ?? null,
     mainReason: extreme.mainReason || null,
-    reasons: dominantSide ? sideView(dominantSide).reasons : [],
-    metrics: dominantSide ? sideView(dominantSide).metrics : { ...EMPTY_METRICS },
-    components: dominantSide ? sideView(dominantSide).components : {},
+    reasons: dominantSide ? dominantSide.reasons : [],
+    metrics: dominantSide ? dominantSide.metrics : { ...EMPTY_METRICS },
+    components: dominantSide ? dominantSide.components : {},
     bottom,
     top,
     candleCloseTime: row.candleCloseTime ?? null,

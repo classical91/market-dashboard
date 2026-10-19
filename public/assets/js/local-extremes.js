@@ -150,6 +150,15 @@
       S.tickerLink(symbol, intervalSelect.value) + watchlist.button(symbol) + "</span></td>";
   }
 
+  // The pinned row's tint tracks the extreme, never the bias: hue from the
+  // leading side, intensity from how far its evidence has got. A row that
+  // went green whenever the trend was bullish would rebuild exactly the
+  // confusion these two pages were split to remove.
+  function pinTintClass(entry) {
+    if (entry.error) return "";
+    return " lx-row--pin-" + String(entry.state || "none").toLowerCase();
+  }
+
   function renderRow(entry, rank) {
     if (entry.error) {
       return '<tr class="ss-error-row">' + tokenCell(entry.symbol, rank) +
@@ -158,7 +167,8 @@
     }
     var pinned = rank == null;
     return (
-      '<tr class="lx-row lx-row--' + escapeHtml(entry.dominant || "none") + (pinned ? " lx-row--pinned" : "") + '">' +
+      '<tr class="lx-row lx-row--' + escapeHtml(entry.dominant || "none") +
+        (pinned ? " lx-row--pinned" + pinTintClass(entry) : "") + '">' +
         tokenCell(entry.symbol, rank) +
         '<td data-label="Price">' + S.fmtPrice(entry.price) + "</td>" +
         '<td data-label="Bottom">' + scoreMeter(entry.bottomScore, "bottom") + "</td>" +
@@ -236,9 +246,18 @@
     var rows = pinned.map(function (entry) { return renderRow(entry, null); })
       .concat(ranked.map(function (entry, index) { return renderRow(entry, index + 1); }));
 
-    tbody.innerHTML = rows.length
-      ? rows.join("")
-      : '<tr><td colspan="12" class="ss-empty-row">Nothing matches these filters.</td></tr>';
+    // Keyed to the ranked list, not the row count: BTC is pinned through
+    // every filter, so counting rows meant "Confirmed" with nothing confirmed
+    // rendered as a lone BTC row — which reads as BTC being the match.
+    if (!ranked.length) {
+      rows = rows.concat(
+        '<tr><td colspan="12" class="ss-empty-row">' +
+        (pinned.length ? "No ranked pair matches these filters." : "Nothing matches these filters.") +
+        "</td></tr>",
+      );
+    }
+
+    tbody.innerHTML = rows.join("");
     renderSummary();
   }
 
