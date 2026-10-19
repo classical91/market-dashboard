@@ -59,7 +59,20 @@
         <!-- Outside the list on purpose: the list collapses on mobile, and
              adding or removing accounts has to stay reachable when it is
              folded away. -->
-        <button type="button" class="x-account-manage" id="xManageAccounts">&#9881; Manage Accounts</button>
+        <div class="x-account-panel-head">
+          <button type="button" class="x-account-manage" id="xManageAccounts"
+                  title="Manage Accounts" aria-label="Manage Accounts">
+            <span class="x-account-manage-icon" aria-hidden="true">&#9881;</span>
+            <span class="x-account-manage-label">Manage Accounts</span>
+          </button>
+          <!-- Desktop only: folds the account rail to the side so the feed
+               gets the width (and a third column of posts). -->
+          <button type="button" class="x-account-rail-toggle" id="xAccountRailToggle"
+                  aria-expanded="true" aria-controls="xAccountList"
+                  title="Collapse accounts" aria-label="Collapse accounts">
+            <span aria-hidden="true">&#187;</span>
+          </button>
+        </div>
         <div class="x-account-list" id="xAccountList"></div>
       </div>
     </div>

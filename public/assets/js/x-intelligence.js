@@ -14,6 +14,7 @@
   // unset mode meant "first account" — devices that had never explicitly
   // chosen were stuck on a single handle's 8 posts.
   var localModeKey = "xIntelligence:lastMode:v2";
+  var localRailKey = "xIntelligence:railCollapsed:v1";
   var localKey = "xIntelligence:lastHandle";
   // Bumped to :v4 for the timestamped schema. The v3 entries it replaces had
   // no saved-at time, so a browser could show them indefinitely with nothing
@@ -114,6 +115,14 @@
 
   function writeLastHandle(handle) {
     try { localStorage.setItem(localKey, handle); } catch (err) {}
+  }
+
+  function readRailCollapsed() {
+    try { return localStorage.getItem(localRailKey) === "1"; } catch (err) { return false; }
+  }
+
+  function writeRailCollapsed(collapsed) {
+    try { localStorage.setItem(localRailKey, collapsed ? "1" : "0"); } catch (err) {}
   }
 
   function readLastMode() {
@@ -237,6 +246,28 @@
     if (panelToggle && panel) {
       panelToggle.addEventListener("click", function () {
         setPanelOpen(panel.classList.contains("is-collapsed"));
+      });
+    }
+
+    // Desktop only (CSS hides the rail toggle at 980px and below): folds the
+    // account panel into a narrow rail so the feed widens to three columns.
+    var split = panel ? panel.parentNode : null;
+    var railToggle = document.getElementById("xAccountRailToggle");
+    function setRailCollapsed(collapsed) {
+      if (!split || !railToggle) return;
+      split.classList.toggle("is-rail-collapsed", collapsed);
+      railToggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+      var label = collapsed ? "Expand accounts" : "Collapse accounts";
+      railToggle.setAttribute("aria-label", label);
+      railToggle.title = label;
+      railToggle.firstElementChild.innerHTML = collapsed ? "&#171;" : "&#187;";
+    }
+    if (railToggle) {
+      setRailCollapsed(readRailCollapsed());
+      railToggle.addEventListener("click", function () {
+        var collapsed = !split.classList.contains("is-rail-collapsed");
+        setRailCollapsed(collapsed);
+        writeRailCollapsed(collapsed);
       });
     }
 
