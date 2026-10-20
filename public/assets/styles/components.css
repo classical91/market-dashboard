@@ -362,6 +362,28 @@
   white-space: nowrap;
 }
 
+/* Copy is read-only, so it sits in the neutral text colour. */
+.manage-list-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin: 8px 0 6px;
+}
+
+.manage-copy {
+  flex: none;
+  padding: 6px 10px;
+  border: 0.5px solid var(--border);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text, inherit);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.manage-copy:focus-visible { outline: 2px solid var(--accent, currentColor); outline-offset: 1px; }
+.manage-copy:disabled { opacity: 0.5; cursor: default; }
+
 .manage-row-add { color: var(--green, #2ECC71); }
 .manage-row-remove { color: var(--muted); }
 .manage-row-add:disabled,

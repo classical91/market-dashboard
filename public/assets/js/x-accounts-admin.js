@@ -173,6 +173,40 @@
     );
   }
 
+  /* One "@handle" per line, in list order: pastes cleanly into a note, a
+     message, or back into the add field one handle at a time. */
+  function handleListText(accounts) {
+    return (accounts || [])
+      .filter(function (account) { return account && account.handle; })
+      .map(function (account) { return "@" + account.handle; })
+      .join("\n");
+  }
+
+  function legacyCopy(doc, text) {
+    var area = doc.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    doc.body.appendChild(area);
+    area.select();
+    var ok = false;
+    try { ok = doc.execCommand("copy"); } catch (err) { ok = false; }
+    doc.body.removeChild(area);
+    return ok;
+  }
+
+  function copyText(doc, text) {
+    var nav = window.navigator;
+    if (nav && nav.clipboard && typeof nav.clipboard.writeText === "function" && window.isSecureContext) {
+      return nav.clipboard.writeText(text).then(
+        function () { return true; },
+        function () { return legacyCopy(doc, text); }
+      );
+    }
+    return Promise.resolve(legacyCopy(doc, text));
+  }
+
   function el(doc, tag, className, text) {
     var node = doc.createElement(tag);
     if (className) node.className = className;
@@ -267,10 +301,17 @@
     form.appendChild(categoryList);
     form.appendChild(submit);
 
+    var listBar = el(doc, "div", "manage-list-bar");
+    var copyAll = el(doc, "button", "manage-copy", "Copy all");
+    copyAll.type = "button";
+    copyAll.title = "Copy every handle in this list, one per line";
+    listBar.appendChild(copyAll);
+
     var listRoot = el(doc, "div", "manage-list");
 
     box.appendChild(form);
     box.appendChild(status);
+    box.appendChild(listBar);
     box.appendChild(listRoot);
     overlay.appendChild(box);
     doc.body.appendChild(overlay);
@@ -448,6 +489,33 @@
         });
     }
 
+    function copyHandles(text, count, button) {
+      copyText(doc, text).then(function (ok) {
+        if (!ok) {
+          say("Could not copy — select and copy manually: " + text.replace(/\n/g, " "), "error");
+          return;
+        }
+        say(count === 1 ? "Copied " + text + "." : "Copied " + count + " handles.", "ok");
+        var resting = button.getAttribute("data-label") || button.textContent;
+        button.setAttribute("data-label", resting);
+        button.textContent = "Copied";
+        clearTimeout(button._copyTimer);
+        button._copyTimer = setTimeout(function () { button.textContent = resting; }, 1500);
+      });
+    }
+
+    function visibleRows() {
+      return scope === THEME_SCOPE && template
+        ? accountsInTemplate(accounts, template)
+        : accounts;
+    }
+
+    copyAll.addEventListener("click", function () {
+      var rows = visibleRows();
+      if (!rows.length) return;
+      copyHandles(handleListText(rows), rows.length, copyAll);
+    });
+
     function emptyMessage() {
       if (scope === ALL_SCOPE || !template) return "No accounts are tracked yet.";
       return "No accounts in " + template.name + " yet — add one above.";
@@ -463,6 +531,13 @@
       row.appendChild(text);
 
       var actions = el(doc, "div", "manage-row-actions");
+      var copy = el(doc, "button", "manage-copy", "Copy");
+      copy.type = "button";
+      copy.setAttribute("aria-label", "Copy @" + account.handle);
+      copy.addEventListener("click", function () {
+        copyHandles("@" + account.handle, 1, copy);
+      });
+      actions.appendChild(copy);
       if (template && scope === ALL_SCOPE && !isMember(template, account.handle)) {
         // The reason the "All tracked" scope exists: an account can be pulled
         // into the theme on screen from here, without retyping it.
@@ -492,9 +567,8 @@
       syncHead();
       syncCategoryOptions();
       refreshDuplicateHint();
-      var rows = scope === THEME_SCOPE && template
-        ? accountsInTemplate(accounts, template)
-        : accounts;
+      var rows = visibleRows();
+      copyAll.disabled = !rows.length;
       if (!rows.length) {
         listRoot.appendChild(el(doc, "div", "manage-empty", emptyMessage()));
         return;
@@ -647,5 +721,6 @@
     alreadyInThemeMessage: alreadyInThemeMessage,
     confirmationMessage: confirmationMessage,
     removeFromThemeMessage: removeFromThemeMessage,
+    handleListText: handleListText,
   };
 });
