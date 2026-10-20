@@ -6,8 +6,8 @@ const { createRateLimit } = require("../middleware/rate-limit");
 const { isLedgerRequest, isLedgerParamRequest } = require("../middleware/ledger-auth");
 const { deriveTitle, firstUrl } = require("../services/broadcast-ingest");
 const { buildPreflight } = require("../services/broadcast-preflight");
-const { SOURCES, KINDS, STATUSES, DEFAULT_SETTINGS, canonicalizeUrl, isPostedStatus } = require("../services/broadcast-ledger");
-const { destinationsForNewsType } = require("../services/news-routing");
+const { SOURCES, KINDS, STATUSES, DEFAULT_SETTINGS, ALLOWED_CATEGORIES, canonicalizeUrl, isPostedStatus } = require("../services/broadcast-ledger");
+const { destinationsForNewsType, defaultDestinationsForNewsType } = require("../services/news-routing");
 
 const MAX_IDS = 200;
 // Default to the operator-approved 42-hour window so rewritten coverage cannot
@@ -509,7 +509,14 @@ function createBroadcastLedgerRouter({
 
   router.get("/settings", requireManualAccess, (req, res) => {
     res.setHeader("Cache-Control", "no-store");
-    res.json({ settings: broadcastLedgerStore.getSettings() });
+    const settings = broadcastLedgerStore.getSettings();
+    // The shipped route per category, so Settings can show what an override
+    // replaces and offer "reset to default". null = configured chat list.
+    const categories = [...new Set([...ALLOWED_CATEGORIES, ...settings.allowedCategories])];
+    res.json({
+      settings,
+      routingDefaults: Object.fromEntries(categories.map((category) => [category, defaultDestinationsForNewsType(category)])),
+    });
   });
 
   router.put("/settings", requireWatchlistAdmin, (req, res, next) => {

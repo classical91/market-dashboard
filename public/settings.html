@@ -261,6 +261,20 @@
       .xbc-row.head { display: none; }
     }
 
+    /* ── News category routing ──────────────────────────── */
+    .ncr-list { margin-top: 14px; display: grid; gap: 10px; }
+    .ncr-category { border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; background: rgba(255,255,255,0.02); }
+    .ncr-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .ncr-name { font-size: 13px; font-weight: 700; color: var(--text); }
+    .ncr-badge { font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--border); border-radius: 6px; padding: 1px 6px; }
+    .ncr-badge.custom { color: var(--blue); border-color: rgba(77,163,255,0.36); }
+    .ncr-badge.fallback { color: var(--amber); border-color: rgba(245,197,66,0.3); }
+    .ncr-head .screener-mini { margin-left: auto; }
+    .ncr-head .screener-mini + .screener-mini { margin-left: 0; }
+    .xbc-row.ncr-row { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 30px; min-width: 0; border-bottom: 0; }
+    .xbc-row.ncr-row > input:first-child { grid-column: auto; }
+    .ncr-fallback { font-size: 12px; color: var(--muted); padding: 6px 0 2px; }
+
     /* ── RSI Matrix instruments ─────────────────────────── */
     .rsi-tf-row { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 14px; font-size: 13px; color: var(--soft); }
     .rsi-tf-row label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
@@ -596,7 +610,7 @@
               <label class="ledger-control checkbox"><input id="ledgerExactCategory" type="checkbox"> Require exact category</label>
               <label class="ledger-control checkbox"><input id="ledgerRecordBlocked" type="checkbox"> Record blocked attempts</label>
               <label class="ledger-control checkbox"><input id="ledgerFinanceRouting" type="checkbox"> Restrict news categories to their approved topics</label>
-              <div class="settings-row-sub"><strong>Finance route:</strong> only <code>-1001841650798 / 6297</code> and <code>-1001941064823 / 984</code>. Geopolitics continues through its separate Telegram route. This setting also controls retries.</div>
+              <div class="settings-row-sub">Each category&rsquo;s groups and topics are set under <a href="#news-routing-settings">Telegram &rarr; News Category Routing</a>. Unchecked, every category uses <code>TELEGRAM_CHAT_IDS</code>. This setting also controls retries.</div>
               <label class="ledger-control checkbox"><input id="ledgerBlockedNotifications" type="checkbox"> Blocked-attempt notifications</label>
               <label class="ledger-control checkbox"><input id="ledgerFailureNotifications" type="checkbox"> Failure notifications</label>
               <label class="ledger-control checkbox"><input id="ledgerMissingNotifications" type="checkbox"> Missing-category notifications</label>
@@ -682,6 +696,27 @@
             2. Add the bot to each channel as an <strong>admin</strong>.<br>
             3. Set <code>TELEGRAM_BOT_TOKEN</code> and <code>TELEGRAM_CHAT_IDS</code> (comma-separated channel IDs) in your Railway environment variables.<br>
             4. Redeploy — the next fresh report will auto-post to all channels.
+          </div>
+        </div>
+        <div class="settings-card" id="news-routing-settings" style="margin-top:14px">
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-label">News Category Routing</div>
+              <div class="settings-row-sub">
+                Which Telegram groups and topics each news category is sent to. Ledger broadcasts (ShareBot67,
+                the receipt form, retries), the Daily Reporter and the newsroom all follow this. A category with
+                no destinations uses <code>TELEGRAM_CHAT_IDS</code>. Saved on the server.
+              </div>
+            </div>
+          </div>
+          <div class="tg-status-row">
+            <span class="status-pill off" id="ncrPill">&#9203; Loading&hellip;</span>
+            <button class="tg-test-btn" id="ncrKeyBtn" type="button" style="display:none">Enter Admin Key</button>
+          </div>
+          <div class="ncr-list" id="ncrList"></div>
+          <div class="screener-actions">
+            <button class="settings-action-btn primary" id="ncrSave" type="button" disabled>Save Routing</button>
+            <span class="screener-note" id="ncrStatus"></span>
           </div>
         </div>
       </div>
@@ -2142,6 +2177,245 @@
     openAll: false,
     defaultCollapsed: ['screeners', 'reporter', 'broadcast-ledger']
   });
+
+  /* ── News category routing ──────────────────────────── */
+  (function () {
+    var API = '/api/broadcast-ledger/settings';
+    var listEl = document.getElementById('ncrList');
+    var pill = document.getElementById('ncrPill');
+    var keyBtn = document.getElementById('ncrKeyBtn');
+    var saveBtn = document.getElementById('ncrSave');
+    var statusEl = document.getElementById('ncrStatus');
+    // [{ name, custom, destinations: [{ chatId, threadId }], defaults }]
+    var categories = [];
+    var dirty = false;
+
+    function setStatus(message, isError) {
+      statusEl.textContent = message || '';
+      statusEl.classList.toggle('error', Boolean(isError));
+    }
+
+    function failure(res) {
+      return res.json().catch(function () { return {}; }).then(function (body) {
+        throw new Error(body.error || ('Request failed (HTTP ' + res.status + ')'));
+      });
+    }
+
+    function copy(list) {
+      return (list || []).map(function (d) { return { chatId: d.chatId || '', threadId: d.threadId || '' }; });
+    }
+
+    function markDirty(category) {
+      if (category) category.custom = true;
+      dirty = true;
+      setStatus('Unsaved changes.');
+    }
+
+    function field(value, placeholder, label, onChange, category) {
+      var el = document.createElement('input');
+      el.type = 'text';
+      el.value = value || '';
+      el.placeholder = placeholder;
+      el.setAttribute('aria-label', label);
+      el.autocomplete = 'off';
+      el.spellcheck = false;
+      el.addEventListener('input', function () {
+        onChange(el.value.trim());
+        var wasCustom = category.custom;
+        markDirty(category);
+        // Only the badge changes; re-rendering would steal focus mid-typing.
+        if (!wasCustom) renderBadge(category);
+      });
+      return el;
+    }
+
+    function mini(text, onClick) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'screener-mini';
+      btn.textContent = text;
+      btn.addEventListener('click', onClick);
+      return btn;
+    }
+
+    function renderBadge(category) {
+      var badge = category.badgeEl;
+      if (!badge) return;
+      var filled = category.destinations.some(function (d) { return d.chatId; });
+      if (!filled) {
+        badge.className = 'ncr-badge fallback';
+        badge.textContent = 'Uses TELEGRAM_CHAT_IDS';
+      } else if (category.custom) {
+        badge.className = 'ncr-badge custom';
+        badge.textContent = 'Custom';
+      } else {
+        badge.className = 'ncr-badge';
+        badge.textContent = 'Default';
+      }
+      if (category.resetEl) category.resetEl.style.display = category.custom ? '' : 'none';
+    }
+
+    function render() {
+      listEl.innerHTML = '';
+      categories.forEach(function (category) {
+        var box = document.createElement('div');
+        box.className = 'ncr-category';
+
+        var head = document.createElement('div');
+        head.className = 'ncr-head';
+        var name = document.createElement('span');
+        name.className = 'ncr-name';
+        name.textContent = category.name;
+        category.badgeEl = document.createElement('span');
+        head.appendChild(name);
+        head.appendChild(category.badgeEl);
+        head.appendChild(mini('+ Add', function () {
+          category.destinations.push({ chatId: '', threadId: '' });
+          markDirty(category);
+          render();
+          var inputs = listEl.children[categories.indexOf(category)].querySelectorAll('input');
+          if (inputs.length >= 2) inputs[inputs.length - 2].focus();
+        }));
+        category.resetEl = mini('Reset to default', function () {
+          category.custom = false;
+          category.destinations = copy(category.defaults);
+          dirty = true;
+          setStatus('Unsaved changes.');
+          render();
+        });
+        head.appendChild(category.resetEl);
+        box.appendChild(head);
+
+        if (!category.destinations.length) {
+          var note = document.createElement('div');
+          note.className = 'ncr-fallback';
+          note.textContent = 'No group of its own — sent to the TELEGRAM_CHAT_IDS list.';
+          box.appendChild(note);
+        }
+        category.destinations.forEach(function (destination, index) {
+          var row = document.createElement('div');
+          row.className = 'xbc-row ncr-row';
+          var where = category.name + ' destination ' + (index + 1);
+          row.appendChild(field(destination.chatId, 'Chat id (-100…)', where + ' chat id', function (v) { destination.chatId = v; }, category));
+          row.appendChild(field(destination.threadId, 'Topic (optional)', where + ' topic id', function (v) { destination.threadId = v; }, category));
+          var remove = document.createElement('button');
+          remove.type = 'button';
+          remove.className = 'screener-remove';
+          remove.textContent = '✕';
+          remove.title = 'Remove destination';
+          remove.setAttribute('aria-label', 'Remove ' + where);
+          remove.addEventListener('click', function () {
+            category.destinations.splice(index, 1);
+            markDirty(category);
+            render();
+          });
+          row.appendChild(remove);
+          box.appendChild(row);
+        });
+        renderBadge(category);
+        listEl.appendChild(box);
+      });
+    }
+
+    function adopt(data) {
+      var settings = data.settings || {};
+      var overrides = settings.categoryDestinations || {};
+      var defaults = data.routingDefaults || {};
+      categories = Object.keys(defaults).map(function (name) {
+        var custom = Object.prototype.hasOwnProperty.call(overrides, name);
+        return {
+          name: name,
+          custom: custom,
+          defaults: defaults[name] || [],
+          destinations: copy(custom ? overrides[name] : defaults[name])
+        };
+      });
+      dirty = false;
+      var customCount = categories.filter(function (c) { return c.custom; }).length;
+      keyBtn.style.display = 'none';
+      if (settings.financeTopicRoutingEnabled === false) {
+        pill.className = 'status-pill off';
+        pill.textContent = '⚠ Routing off in Ledger Settings';
+        setStatus('“Restrict news categories to their approved topics” is unchecked, so every category currently uses TELEGRAM_CHAT_IDS. Routes saved here apply once it is on.', true);
+      } else {
+        pill.className = 'status-pill ok';
+        pill.textContent = '✅ Active · ' + (customCount ? customCount + ' custom' : 'defaults');
+        setStatus('');
+      }
+      render();
+      saveBtn.disabled = false;
+    }
+
+    function load() {
+      saveBtn.disabled = true;
+      return AdminKey.fetchSilent(API)
+        .then(function (res) {
+          if (res.status === 401) {
+            pill.className = 'status-pill off';
+            pill.textContent = '🔒 Admin access needed';
+            keyBtn.style.display = '';
+            setStatus('Chat and topic ids are private; enter the admin key to view and edit routing.');
+            return null;
+          }
+          if (res.status === 503) {
+            pill.className = 'status-pill off';
+            pill.textContent = '⚠ Ledger not configured';
+            setStatus('Set BROADCAST_LEDGER_API_KEY or ADMIN_API_KEY to manage category routing.', true);
+            return null;
+          }
+          return res.ok ? res.json().then(adopt) : failure(res);
+        })
+        .catch(function (err) {
+          pill.className = 'status-pill off';
+          pill.textContent = '⚠ Unavailable';
+          setStatus('⚠ ' + err.message, true);
+        });
+    }
+
+    keyBtn.addEventListener('click', function () {
+      AdminKey.prompt('Enter the admin key to manage news category routing:').then(function (key) {
+        if (key) load();
+      });
+    });
+
+    saveBtn.addEventListener('click', function () {
+      var payload = {};
+      categories.forEach(function (category) {
+        if (!category.custom) return;
+        // A row left entirely blank is an unused "+ Add", not an error.
+        payload[category.name] = category.destinations.filter(function (d) {
+          return d.chatId || d.threadId;
+        });
+      });
+      saveBtn.disabled = true;
+      setStatus('Saving…');
+      AdminKey.fetchOrSession(API, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ categoryDestinations: payload })
+      }).then(function (res) {
+        return res.ok ? res.json() : failure(res);
+      }).then(function () {
+        // Re-read so the defaults and the saved overrides come from the server.
+        return load().then(function () {
+          // Keep the "routing is off" warning visible rather than covering it.
+          if (!statusEl.classList.contains('error')) setStatus('Saved.');
+          showToast();
+        });
+      }).catch(function (err) {
+        saveBtn.disabled = false;
+        setStatus('⚠ ' + err.message, true);
+      });
+    });
+
+    window.addEventListener('beforeunload', function (e) {
+      if (!dirty) return;
+      e.preventDefault();
+      e.returnValue = '';
+    });
+
+    load();
+  })();
 
   /* ── Telegram status ────────────────────────────────── */
   (function () {

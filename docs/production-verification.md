@@ -155,7 +155,9 @@ because each one puts a real message in a real room.
       for Geopolitics. The repository does not prove these are right — it only
       proves the code routes to exactly these and nowhere else. All three now
       come from one shared table in `src/services/news-routing.js`, so the
-      ledger and the Daily Reporter cannot drift apart.
+      ledger and the Daily Reporter cannot drift apart. Overrides saved in
+      Settings → Telegram → News Category Routing replace these per category;
+      the preflight report prints whatever is actually in effect.
 - [ ] Confirm the news bot is an admin in both chats and may post to those
       topics.
 - [ ] Confirm **only one consumer polls each bot token.** A second consumer *(automated: a shared token and an active 409 are both reported)*

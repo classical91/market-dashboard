@@ -623,9 +623,10 @@ The ledger key can only post to the news sender's own destinations —
 sender on `TELEGRAM_*`. Moving the Shortcut onto this endpoint is a net
 reduction in what the phone holds.
 
-Categorized broadcasts are narrower than the general Telegram list. When
-`newsType` is exactly `Stock`, `Crypto` or `Economics`, `/broadcast` posts only
-to `-1001841650798:6297` and `-1001941064823:984`. When it is `Geopolitics`, it
+Categorized broadcasts are narrower than the general Telegram list. By
+default, when `newsType` is exactly `Stock`, `Crypto` or `Economics`,
+`/broadcast` posts only to `-1001841650798:6297` and `-1001941064823:984`.
+When it is `Geopolitics`, it
 posts only to the War Room topic, `-1001841650798:75972`. Either way the receipt
 records only the destinations that category actually reached, and these targets
 *replace* the configured chat list rather than adding to it — a broader
@@ -633,6 +634,16 @@ records only the destinations that category actually reached, and these targets
 
 The two sets do not overlap: finance news never reaches the War Room, and
 Geopolitics never reaches the finance topics.
+
+**Settings → Telegram → News Category Routing** overrides any category with its
+own chat/topic list (admin only). It is stored as `categoryDestinations` in the
+ledger settings, e.g. `{ "Crypto": [{ "chatId": "-1001941064823", "threadId": "45111" }] }`,
+and saved with `PUT /api/broadcast-ledger/settings`. A category without an
+override keeps the default above; an override that is an empty list sends that
+category to `TELEGRAM_CHAT_IDS`. Bad chat or topic ids, repeats and unknown
+categories are refused with `400` and nothing is saved.
+`GET /api/broadcast-ledger/settings` returns `routingDefaults` alongside the
+settings so the defaults stay visible.
 
 The **Restrict news categories to their approved topics** option in Ledger
 Settings governs all of the above, is enabled by default, and is read by both

@@ -766,13 +766,127 @@ test("ledger settings can be read and updated by an administrator", async () => 
   assert.equal(body.settings.destinationLabels["telegram:-1001:44"], "War Room");
 });
 
-test("the Settings page exposes the persisted finance-routing control and exact topics", () => {
+test("the Settings page exposes the persisted finance-routing control and the per-category routing editor", () => {
   const source = fs.readFileSync(path.join(__dirname, "..", "public", "settings.html"), "utf8");
   assert.match(source, /id="ledgerFinanceRouting"/);
   assert.match(source, /financeTopicRoutingEnabled/);
-  assert.match(source, /-1001841650798 \/ 6297/);
-  assert.match(source, /-1001941064823 \/ 984/);
   assert.match(source, /This setting also controls retries/);
+  // The exact topics are no longer static text (an override would make it a
+  // lie); the editor renders them from the settings API below.
+  assert.match(source, /id="news-routing-settings"/);
+  assert.match(source, /categoryDestinations/);
+  assert.match(source, /routingDefaults/);
+});
+
+test("the settings API names the exact default topic for every category", async () => {
+  await withScopedBroadcastApp(async (scopedBase) => {
+    const res = await fetch(`${scopedBase}/api/broadcast-ledger/settings`, { headers: { "x-broadcast-key": LEDGER_KEY } });
+    const body = await res.json();
+    assert.equal(res.status, 200);
+    assert.deepEqual(body.routingDefaults.Stock, [
+      { chatId: "-1001841650798", threadId: "6297" },
+      { chatId: "-1001941064823", threadId: "984" },
+    ]);
+    assert.deepEqual(body.routingDefaults.Geopolitics, [{ chatId: "-1001841650798", threadId: "75972" }]);
+    assert.equal(body.routingDefaults.Markets, null, "no default topic: uses the configured chat list");
+    assert.deepEqual(body.settings.categoryDestinations, {});
+  });
+});
+
+test("a category routed in Settings is sent only to its own groups, and others keep their defaults", async () => {
+  await withScopedBroadcastApp(async (scopedBase, calls) => {
+    const saved = await fetch(`${scopedBase}/api/broadcast-ledger/settings`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", "x-broadcast-key": LEDGER_KEY },
+      body: JSON.stringify({ categoryDestinations: {
+        Crypto: [{ chatId: "-1001941064823", threadId: "45111" }],
+        Markets: [{ chatId: "@marketsdesk" }],
+      } }),
+    });
+    assert.equal(saved.status, 200);
+
+    const send = (newsType, key) => fetch(`${scopedBase}/api/broadcast-ledger/broadcast`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-broadcast-key": LEDGER_KEY },
+      body: JSON.stringify({
+        source: "sharebot67",
+        newsType,
+        title: `${newsType} routing ${key}`,
+        text: `${newsType} routing ${key} https://example.com/${key}`,
+        idempotencyKey: key,
+      }),
+    });
+
+    assert.equal((await send("Crypto", "crypto-override")).status, 201);
+    assert.deepEqual(calls[0].options.targets, [{ chatId: "-1001941064823", threadId: "45111" }]);
+
+    assert.equal((await send("Markets", "markets-override")).status, 201);
+    assert.deepEqual(calls[1].options.targets, [{ chatId: "@marketsdesk" }]);
+
+    assert.equal((await send("Stock", "stock-default")).status, 201);
+    assert.deepEqual(calls[2].options.targets, [
+      { chatId: "-1001841650798", threadId: "6297" },
+      { chatId: "-1001941064823", threadId: "984" },
+    ], "a category without an override keeps its shipped route");
+  });
+});
+
+test("an empty override sends that category to the configured chat list", async () => {
+  await withScopedBroadcastApp(async (scopedBase, calls) => {
+    await fetch(`${scopedBase}/api/broadcast-ledger/settings`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", "x-broadcast-key": LEDGER_KEY },
+      body: JSON.stringify({ categoryDestinations: { Economics: [] } }),
+    });
+    const res = await fetch(`${scopedBase}/api/broadcast-ledger/broadcast`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-broadcast-key": LEDGER_KEY },
+      body: JSON.stringify({
+        source: "sharebot67",
+        newsType: "Economics",
+        title: "Economics fallback",
+        text: "Economics fallback https://example.com/economics-fallback",
+        idempotencyKey: "economics-fallback",
+      }),
+    });
+    assert.equal(res.status, 201);
+    assert.equal(calls[0].options.targets, undefined);
+  });
+});
+
+test("a routing save with a bad id is refused whole and changes nothing", async () => {
+  await withScopedBroadcastApp(async (scopedBase, calls, store) => {
+    for (const categoryDestinations of [
+      { Crypto: [{ chatId: "crypto room" }] },
+      { Crypto: [{ chatId: "-1001941064823", threadId: "general" }] },
+      { Crypto: [{ chatId: "-100123" }, { chatId: "-100123" }] },
+      { Sports: [{ chatId: "-100123" }] },
+      { Crypto: "-100123" },
+    ]) {
+      const res = await fetch(`${scopedBase}/api/broadcast-ledger/settings`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "x-broadcast-key": LEDGER_KEY },
+        body: JSON.stringify({ categoryDestinations }),
+      });
+      assert.equal(res.status, 400, JSON.stringify(categoryDestinations));
+    }
+    assert.deepEqual(store.getSettings().categoryDestinations, {});
+  });
+});
+
+test("saving the other ledger settings keeps the category routes", async () => {
+  await withScopedBroadcastApp(async (scopedBase, calls, store) => {
+    const put = (body) => fetch(`${scopedBase}/api/broadcast-ledger/settings`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", "x-broadcast-key": LEDGER_KEY },
+      body: JSON.stringify(body),
+    });
+    await put({ categoryDestinations: { Technology: [{ chatId: "-100555", threadId: "7" }] } });
+    await put({ editDeleteEnabled: false, allowedCategories: ["Stock", "Crypto"] });
+    assert.deepEqual(store.getSettings().categoryDestinations, {
+      Technology: [{ chatId: "-100555", threadId: "7" }],
+    }, "disallowing a category does not lose where it was routed");
+  });
 });
 
 /* ── the page must always say whether anything was sent ── */
