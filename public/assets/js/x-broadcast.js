@@ -292,7 +292,7 @@
         if (!channels.length) {
           say(
             body && body.botConfigured
-              ? "No broadcast channels configured — set X_BROADCAST_CHANNELS or TELEGRAM_CHAT_IDS."
+              ? "No broadcast channels configured — add them in Settings → X Intelligence."
               : "Telegram is not configured — set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_IDS.",
             "error",
           );
