@@ -158,3 +158,11 @@ test("the category box starts on the theme's name, not the first market default"
 test("with no theme the first default stands", () => {
   assert.equal(accountsAdmin.categoryChoices(TRACKED, null, ["Market Data"]).suggested, "Market Data");
 });
+
+test("copy-all text lists one @handle per line in list order", () => {
+  assert.strictEqual(
+    accountsAdmin.handleListText([{ handle: "Ya_Basta369" }, { handle: "vegastarr" }, null, {}]),
+    "@Ya_Basta369\n@vegastarr"
+  );
+  assert.strictEqual(accountsAdmin.handleListText([]), "");
+});
