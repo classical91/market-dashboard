@@ -116,10 +116,23 @@ function createXFeedRouter({
   requireAdmin,
   telegramService = null,
   broadcastChannels = [],
+  broadcastChannelStore = null,
   farmclawHandoffStore = null,
   farmclawPusher = null,
 }) {
   const router = express.Router();
+
+  // Read per request: the list is editable from Settings, so channels
+  // captured at boot would keep offering a room someone just removed.
+  function currentChannels() {
+    return broadcastChannelStore ? broadcastChannelStore.list() : broadcastChannels;
+  }
+
+  function channelSnapshot() {
+    return broadcastChannelStore
+      ? broadcastChannelStore.snapshot()
+      : { source: "env", channels: broadcastChannels, envChannels: broadcastChannels };
+  }
 
   router.get(
     "/accounts",
@@ -363,14 +376,39 @@ function createXFeedRouter({
       "/broadcast/channels",
       requireAdmin,
       asyncRoute(async (req, res) => {
+        const snapshot = channelSnapshot();
         res.json({
           // Two separate failures, reported separately: no bot to send with,
           // and nowhere configured to send to. A picker that just says
           // "unavailable" leaves the operator guessing which one to fix.
-          configured: Boolean(telegramService && telegramService._botToken && broadcastChannels.length),
+          configured: Boolean(telegramService && telegramService._botToken && snapshot.channels.length),
           botConfigured: Boolean(telegramService && telegramService._botToken),
-          channels: broadcastChannels,
+          ...snapshot,
         });
+      }),
+    );
+
+    // The Settings page edits the list. Saved, it replaces the environment's
+    // channels for this button only; reset hands control back to them.
+    router.put(
+      "/broadcast/channels",
+      requireAdmin,
+      asyncRoute(async (req, res) => {
+        if (!broadcastChannelStore) {
+          throw createServiceError("Broadcast channels are set by the environment on this deploy", 503);
+        }
+        res.json(broadcastChannelStore.save((req.body || {}).channels));
+      }),
+    );
+
+    router.post(
+      "/broadcast/channels/reset",
+      requireAdmin,
+      asyncRoute(async (req, res) => {
+        if (!broadcastChannelStore) {
+          throw createServiceError("Broadcast channels are set by the environment on this deploy", 503);
+        }
+        res.json(broadcastChannelStore.reset());
       }),
     );
 
@@ -395,7 +433,7 @@ function createXFeedRouter({
         const image = typeof body.image === "string" ? body.image.trim() : "";
         const photoUrl = /^https?:\/\//i.test(image) ? image : "";
 
-        const selection = selectTargets(broadcastChannels, body.channels);
+        const selection = selectTargets(currentChannels(), body.channels);
         if (!selection.ok) throw createServiceError(selection.reason, 400);
 
         if (!telegramService || !telegramService._botToken) {

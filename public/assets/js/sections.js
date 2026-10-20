@@ -1,6 +1,12 @@
 /**
  * Collapsible sections with localStorage persistence.
  * Usage: initSections('mi_collapsed')
+ *
+ * Options (both optional; the defaults keep the link-hub behaviour):
+ *   openAll: false            no "Open All" button, for panels that are
+ *                             settings rather than lists of links.
+ *   defaultCollapsed: [ids]   which sections start closed before the visitor
+ *                             has toggled anything. Defaults to all of them.
  */
 function showOpenAllHint(header, blocked, total) {
   let note = header.nextElementSibling;
@@ -15,7 +21,8 @@ function showOpenAllHint(header, blocked, total) {
   note.style.display = 'block';
 }
 
-function initSections(storeKey) {
+function initSections(storeKey, options) {
+  const opts = options || {};
   function getCollapsed() {
     try { return JSON.parse(localStorage.getItem(storeKey) || '[]'); } catch { return []; }
   }
@@ -26,7 +33,7 @@ function initSections(storeKey) {
   const stored = localStorage.getItem(storeKey);
   const headers = document.querySelectorAll('.section-header[data-section]');
   const allIds = Array.from(headers).map(h => h.dataset.section);
-  const collapsed = stored ? JSON.parse(stored) : allIds;
+  const collapsed = stored ? JSON.parse(stored) : (opts.defaultCollapsed || allIds);
 
   function cardsFor(id) {
     return document.getElementById('cards-' + id) ||
@@ -38,12 +45,22 @@ function initSections(storeKey) {
     const id = decodeURIComponent(window.location.hash.slice(1));
     if (!id) return;
 
-    const header = Array.from(headers).find(h => h.dataset.section === id);
+    let header = Array.from(headers).find(h => h.dataset.section === id);
+    // A link can also point at something inside a section (Settings'
+    // #rsi-matrix-settings card); open whichever section holds it.
+    const inner = header ? null : document.getElementById(id);
+    if (!header && inner) {
+      header = Array.from(headers).find(h => {
+        const panel = cardsFor(h.dataset.section);
+        return panel && panel !== h && panel.contains(inner);
+      });
+    }
     if (!header) return;
 
-    const cards = cardsFor(id);
+    const cards = cardsFor(header.dataset.section);
     if (!cards) return;
 
+    const wasCollapsed = cards.classList.contains('collapsed');
     header.classList.remove('collapsed');
     cards.classList.remove('collapsed');
     header.setAttribute('aria-expanded', 'true');
@@ -52,6 +69,8 @@ function initSections(storeKey) {
         .filter(sectionHeader => sectionHeader.classList.contains('collapsed'))
         .map(sectionHeader => sectionHeader.dataset.section)
     );
+    // The browser's own jump happened while the target was still hidden.
+    if (inner && wasCollapsed) inner.scrollIntoView();
   }
 
   headers.forEach(header => {
@@ -76,7 +95,7 @@ function initSections(storeKey) {
     header.setAttribute('aria-expanded', collapsed.includes(id) ? 'false' : 'true');
 
     // "Open All" button — opens every link in this section in new tabs.
-    const links = Array.from(cards.querySelectorAll('a[href]'));
+    const links = opts.openAll === false ? [] : Array.from(cards.querySelectorAll('a[href]'));
     if (links.length) {
       const chevron = header.querySelector('.section-chevron');
       const btn = document.createElement('button');

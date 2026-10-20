@@ -453,6 +453,7 @@ The channels are ticked rather than assumed, which is the one difference from th
   `threadId` targets a forum topic and is optional. When this is unset the picker falls back to `TELEGRAM_CHAT_IDS`, so an existing deploy gets a working button with no new configuration — the labels are just the raw ids until someone names them.
 
 - `TELEGRAM_BOT_TOKEN` is what actually sends. `TELEGRAM_CHAT_IDS` is *not* required when `X_BROADCAST_CHANNELS` is set.
+- **Settings → X Intelligence → Broadcast Channels** edits the list at runtime (label, chat id, optional topic id). A saved list is stored in `DATA_DIR/x-broadcast-channels.json` and replaces the environment's channels for this button only; **Reset to Environment** deletes it so `X_BROADCAST_CHANNELS` / `TELEGRAM_CHAT_IDS` apply again. Report auto-posts, the broadcast ledger and news routing are unaffected. Endpoints: `PUT /api/x/broadcast/channels` with `{ "channels": [...] }` and `POST /api/x/broadcast/channels/reset`, both admin-gated.
 
 Both endpoints (`GET /api/x/broadcast/channels`, `POST /api/x/broadcast`) are admin-gated, for the same reason `/api/telegram/diagnose` is: the channel list names private chat and topic ids.
 

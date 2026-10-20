@@ -7,14 +7,12 @@
   <script src="/assets/js/settings.js"></script>
   <link rel="stylesheet" href="/assets/styles/command.css" />
   <style>
+    /* Each section is a collapsible header over its cards (sections.js), so
+       closed sections stack as a compact list. */
     .settings-section {
-      margin-bottom: 28px;
+      margin-bottom: 16px;
     }
-    .settings-label {
-      font-size: 11px; font-weight: 700; letter-spacing: 0.14em;
-      text-transform: uppercase; color: var(--muted);
-      margin-bottom: 12px;
-    }
+    .settings-section > .section-header.collapsed { margin-bottom: 0; }
     .settings-card {
       background:
         linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015)),
@@ -28,6 +26,7 @@
     }
     .settings-row-label { font-size: 14px; font-weight: 600; color: var(--text); }
     .settings-row-sub   { font-size: 12px; color: var(--muted); margin-top: 3px; }
+    .settings-row-sub a { color: var(--blue); }
 
     /* ── Theme swatches ─────────────────────────────────── */
     .theme-grid {
@@ -236,6 +235,32 @@
       .ledger-destination-row { grid-template-columns: 1fr; }
     }
 
+    /* ── Collapsible sections ───────────────────────────── */
+    .settings-panel.collapsed { display: none; }
+
+    /* ── X Intelligence broadcast channels ──────────────── */
+    .xbc-list { margin-top: 16px; overflow-x: auto; }
+    .xbc-row {
+      display: grid;
+      grid-template-columns: minmax(140px, 1.3fr) minmax(160px, 1fr) minmax(90px, 0.6fr) 30px;
+      gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border);
+      min-width: 480px; font-size: 12px;
+    }
+    .xbc-row.head { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; border-bottom-color: rgba(255,255,255,0.12); }
+    .xbc-row input {
+      min-width: 0; width: 100%; box-sizing: border-box; border: 1px solid var(--border); border-radius: 8px;
+      padding: 7px 9px; background: rgba(255,255,255,.04); color: var(--text); font: inherit; font-size: 12px;
+    }
+    .xbc-row input:focus { outline: none; border-color: rgba(77,163,255,0.42); box-shadow: 0 0 0 3px var(--blue-bg); }
+    .xbc-empty { padding: 16px 2px; font-size: 13px; color: var(--muted); }
+    .xbc-add { margin-top: 12px; }
+    @media (max-width: 640px) {
+      /* Label on its own line, ids and remove beneath it: nothing scrolls off. */
+      .xbc-row { min-width: 0; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 30px; }
+      .xbc-row > input:first-child { grid-column: 1 / -1; }
+      .xbc-row.head { display: none; }
+    }
+
     /* ── RSI Matrix instruments ─────────────────────────── */
     .rsi-tf-row { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 14px; font-size: 13px; color: var(--soft); }
     .rsi-tf-row label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
@@ -375,235 +400,294 @@
 
     <!-- Appearance -->
     <div class="settings-section">
-      <div class="settings-label">Appearance</div>
-      <div class="settings-card">
-        <div class="settings-row-label">Theme</div>
-        <div class="settings-row-sub">Applies instantly across all pages</div>
-        <div class="theme-grid" id="themeGrid"></div>
+      <div class="section-header" data-section="appearance" id="appearance">
+        <span class="section-label">Appearance</span>
+        <span class="section-chevron">&#9660;</span>
       </div>
-      <div class="settings-card" style="margin-top:14px">
-        <div class="settings-row-label">Accent</div>
-        <div class="settings-row-sub">
-          Colours the section labels, chevrons and sidebar group headings, plus
-          every hover and active state. &ldquo;Theme&rdquo; keeps each theme&rsquo;s own accent.
+      <div class="settings-panel" id="cards-appearance">
+        <div class="settings-card">
+          <div class="settings-row-label">Theme</div>
+          <div class="settings-row-sub">Applies instantly across all pages</div>
+          <div class="theme-grid" id="themeGrid"></div>
         </div>
-        <div class="accent-grid" id="accentGrid"></div>
+        <div class="settings-card" style="margin-top:14px">
+          <div class="settings-row-label">Accent</div>
+          <div class="settings-row-sub">
+            Colours the section labels, chevrons and sidebar group headings, plus
+            every hover and active state. &ldquo;Theme&rdquo; keeps each theme&rsquo;s own accent.
+          </div>
+          <div class="accent-grid" id="accentGrid"></div>
+        </div>
       </div>
     </div>
 
     <!-- Screeners -->
     <div class="settings-section">
-      <div class="settings-label">Screeners</div>
-      <div class="settings-card">
-        <div class="settings-row">
-          <div>
-            <div class="settings-row-label">Token Universe</div>
-            <div class="settings-row-sub">
-              Which tokens each screener scans. Saved on the server, so the scanners and the
-              signal bot follow it too &mdash; not just this browser.
-              <strong>USDT.D</strong> is not listed: it has no Binance candles to scan and
-              already rides along with Directional Bias as market context.
-            </div>
-          </div>
-        </div>
-
-        <div class="screener-counts" id="screenerCounts"></div>
-
-        <div class="screener-toolbar">
-          <input class="screener-search" id="screenerSearch" type="search" placeholder="Search tokens…" aria-label="Search tokens" />
-        </div>
-
-        <div class="screener-matrix">
-          <div class="screener-grid" id="screenerGrid"></div>
-        </div>
-
-        <div class="screener-add">
-          <input id="screenerAddInput" type="text" placeholder="RENDERUSDT" aria-label="Add a Binance USDT pair" autocomplete="off" spellcheck="false" />
-          <button class="settings-action-btn" id="screenerAddBtn" type="button">Add Token</button>
-          <span class="screener-note" id="screenerAddNote">Verified against Binance before it is saved, then enabled on every screener.</span>
-        </div>
-
-        <div class="screener-actions">
-          <button class="settings-action-btn primary" id="screenerSave" type="button">Save Universes</button>
-          <button class="settings-action-btn" id="screenerResetAll" type="button">Reset All to Defaults</button>
-          <span class="screener-note" id="screenerStatus">Loading…</span>
-        </div>
+      <div class="section-header" data-section="screeners" id="screeners">
+        <span class="section-label">Screeners</span>
+        <span class="section-chevron">&#9660;</span>
       </div>
-      <div class="settings-card" id="rsi-matrix-settings" style="margin-top: 14px;">
-        <div class="settings-row">
-          <div>
-            <div class="settings-row-label">RSI Matrix</div>
-            <div class="settings-row-sub">
-              Instruments and timeframes on the <a href="/rsi-matrix.html">RSI Matrix</a>. Separate from the token
-              universe above on purpose: this list mixes indices, futures, dominance series and stablecoins from
-              several sources, while that one stays Binance USDT spot pairs. Each row is a display label, a
-              source and the symbol <em>that source</em> uses. Saved on the server.
+      <div class="settings-panel" id="cards-screeners">
+        <div class="settings-card">
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-label">Token Universe</div>
+              <div class="settings-row-sub">
+                Which tokens each screener scans. Saved on the server, so the scanners and the
+                signal bot follow it too &mdash; not just this browser.
+                <strong>USDT.D</strong> is not listed: it has no Binance candles to scan and
+                already rides along with Directional Bias as market context.
+              </div>
             </div>
           </div>
+
+          <div class="screener-counts" id="screenerCounts"></div>
+
+          <div class="screener-toolbar">
+            <input class="screener-search" id="screenerSearch" type="search" placeholder="Search tokens…" aria-label="Search tokens" />
+          </div>
+
+          <div class="screener-matrix">
+            <div class="screener-grid" id="screenerGrid"></div>
+          </div>
+
+          <div class="screener-add">
+            <input id="screenerAddInput" type="text" placeholder="RENDERUSDT" aria-label="Add a Binance USDT pair" autocomplete="off" spellcheck="false" />
+            <button class="settings-action-btn" id="screenerAddBtn" type="button">Add Token</button>
+            <span class="screener-note" id="screenerAddNote">Verified against Binance before it is saved, then enabled on every screener.</span>
+          </div>
+
+          <div class="screener-actions">
+            <button class="settings-action-btn primary" id="screenerSave" type="button">Save Universes</button>
+            <button class="settings-action-btn" id="screenerResetAll" type="button">Reset All to Defaults</button>
+            <span class="screener-note" id="screenerStatus">Loading…</span>
+          </div>
         </div>
+        <div class="settings-card" id="rsi-matrix-settings" style="margin-top: 14px;">
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-label">RSI Matrix</div>
+              <div class="settings-row-sub">
+                Instruments and timeframes on the <a href="/rsi-matrix.html">RSI Matrix</a>. Separate from the token
+                universe above on purpose: this list mixes indices, futures, dominance series and stablecoins from
+                several sources, while that one stays Binance USDT spot pairs. Each row is a display label, a
+                source and the symbol <em>that source</em> uses. Saved on the server.
+              </div>
+            </div>
+          </div>
 
-        <div class="rsi-tf-row" id="rsiTimeframes" role="group" aria-label="RSI Matrix timeframes"></div>
+          <div class="rsi-tf-row" id="rsiTimeframes" role="group" aria-label="RSI Matrix timeframes"></div>
 
-        <div id="rsiGroups"></div>
+          <div id="rsiGroups"></div>
 
-        <div class="rsi-add" id="rsiAdd">
-          <input id="rsiAddLabel" type="text" placeholder="Display name (GOLD)" aria-label="Display name" autocomplete="off" />
-          <select id="rsiAddProvider" aria-label="Source / provider"></select>
-          <input id="rsiAddSymbol" type="text" placeholder="Provider symbol" aria-label="Provider symbol" autocomplete="off" spellcheck="false" />
-          <select id="rsiAddGroup" aria-label="Group"></select>
-          <button class="settings-action-btn" id="rsiAddBtn" type="button">Add Instrument</button>
-        </div>
-        <div class="screener-note" id="rsiAddNote" style="margin-top: 8px;">The symbol is checked against the chosen source before it is saved.</div>
+          <div class="rsi-add" id="rsiAdd">
+            <input id="rsiAddLabel" type="text" placeholder="Display name (GOLD)" aria-label="Display name" autocomplete="off" />
+            <select id="rsiAddProvider" aria-label="Source / provider"></select>
+            <input id="rsiAddSymbol" type="text" placeholder="Provider symbol" aria-label="Provider symbol" autocomplete="off" spellcheck="false" />
+            <select id="rsiAddGroup" aria-label="Group"></select>
+            <button class="settings-action-btn" id="rsiAddBtn" type="button">Add Instrument</button>
+          </div>
+          <div class="screener-note" id="rsiAddNote" style="margin-top: 8px;">The symbol is checked against the chosen source before it is saved.</div>
 
-        <div class="screener-actions">
-          <button class="settings-action-btn primary" id="rsiSave" type="button">Save RSI Matrix</button>
-          <button class="settings-action-btn" id="rsiReset" type="button">Reset to Defaults</button>
-          <span class="screener-note" id="rsiStatus">Loading…</span>
+          <div class="screener-actions">
+            <button class="settings-action-btn primary" id="rsiSave" type="button">Save RSI Matrix</button>
+            <button class="settings-action-btn" id="rsiReset" type="button">Reset to Defaults</button>
+            <span class="screener-note" id="rsiStatus">Loading…</span>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Reporter -->
     <div class="settings-section">
-      <div class="settings-label">Reporter</div>
-      <div class="settings-card">
-        <div class="settings-row">
-          <div>
-            <div class="settings-row-label">Refresh Frequency</div>
-            <div class="settings-row-sub">
-              The shortest gap between two briefings for the same desk. Generating again inside the
-              window returns the saved report instead of spending another OpenAI call. Saved in this
-              browser, so it applies to generations started from this device.
+      <div class="section-header" data-section="reporter" id="reporter">
+        <span class="section-label">Reporter</span>
+        <span class="section-chevron">&#9660;</span>
+      </div>
+      <div class="settings-panel" id="cards-reporter">
+        <div class="settings-card">
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-label">Refresh Frequency</div>
+              <div class="settings-row-sub">
+                The shortest gap between two briefings for the same desk. Generating again inside the
+                window returns the saved report instead of spending another OpenAI call. Saved in this
+                browser, so it applies to generations started from this device.
+              </div>
             </div>
           </div>
-        </div>
-        <div class="freq-options" id="freqOptions">
-          <button class="freq-btn" data-hours="24">Daily (24h)</button>
-          <button class="freq-btn" data-hours="48">Every 2 Days (48h)</button>
-        </div>
-        <div class="prompt-editor">
-          <div>
-            <div class="settings-row-label">Report Prompts</div>
-            <div class="settings-row-sub">
-              Add, rename and delete the requests the reporter sends. Each prompt belongs to one desk,
-              and the desk generates with whichever of its prompts is in use. Use <code>{date}</code>
-              where today&apos;s date should appear. Every desk ships with a default prompt that can be
-              retitled, rewritten and reset, but not deleted.
+          <div class="freq-options" id="freqOptions">
+            <button class="freq-btn" data-hours="24">Daily (24h)</button>
+            <button class="freq-btn" data-hours="48">Every 2 Days (48h)</button>
+          </div>
+          <div class="prompt-editor">
+            <div>
+              <div class="settings-row-label">Report Prompts</div>
+              <div class="settings-row-sub">
+                Add, rename and delete the requests the reporter sends. Each prompt belongs to one desk,
+                and the desk generates with whichever of its prompts is in use. Use <code>{date}</code>
+                where today&apos;s date should appear. Every desk ships with a default prompt that can be
+                retitled, rewritten and reset, but not deleted.
+              </div>
             </div>
-          </div>
 
-          <div class="prompt-field">
-            <label class="prompt-field-label" for="promptPicker">Prompt</label>
-            <select id="promptPicker" aria-label="Report prompt"></select>
-          </div>
-
-          <div class="prompt-field-row">
             <div class="prompt-field">
-              <label class="prompt-field-label" for="promptTitle">Title</label>
-              <input id="promptTitle" type="text" maxlength="80" autocomplete="off" placeholder="Emerging Markets" />
+              <label class="prompt-field-label" for="promptPicker">Prompt</label>
+              <select id="promptPicker" aria-label="Report prompt"></select>
             </div>
+
+            <div class="prompt-field-row">
+              <div class="prompt-field">
+                <label class="prompt-field-label" for="promptTitle">Title</label>
+                <input id="promptTitle" type="text" maxlength="80" autocomplete="off" placeholder="Emerging Markets" />
+              </div>
+              <div class="prompt-field">
+                <label class="prompt-field-label" for="promptDesk">Reporter desk</label>
+                <select id="promptDesk" aria-label="Reporter desk"></select>
+              </div>
+            </div>
+
             <div class="prompt-field">
-              <label class="prompt-field-label" for="promptDesk">Reporter desk</label>
-              <select id="promptDesk" aria-label="Reporter desk"></select>
+              <label class="prompt-field-label" for="reportPromptText">Prompt text</label>
+              <textarea id="reportPromptText" spellcheck="true" aria-label="Reporter prompt"></textarea>
             </div>
-          </div>
 
-          <div class="prompt-field">
-            <label class="prompt-field-label" for="reportPromptText">Prompt text</label>
-            <textarea id="reportPromptText" spellcheck="true" aria-label="Reporter prompt"></textarea>
+            <div class="prompt-actions">
+              <button class="settings-action-btn primary" id="saveReportPrompt" type="button">Save Prompt</button>
+              <button class="settings-action-btn" id="usePromptBtn" type="button">Use for This Desk</button>
+              <button class="settings-action-btn" id="newPromptBtn" type="button">New Prompt</button>
+              <button class="settings-action-btn" id="duplicatePromptBtn" type="button">Duplicate</button>
+              <button class="settings-action-btn" id="resetReportPrompt" type="button">Reset Default</button>
+              <button class="settings-action-btn danger" id="deletePromptBtn" type="button">Delete</button>
+            </div>
+            <div class="screener-note" id="promptStatus"></div>
           </div>
-
-          <div class="prompt-actions">
-            <button class="settings-action-btn primary" id="saveReportPrompt" type="button">Save Prompt</button>
-            <button class="settings-action-btn" id="usePromptBtn" type="button">Use for This Desk</button>
-            <button class="settings-action-btn" id="newPromptBtn" type="button">New Prompt</button>
-            <button class="settings-action-btn" id="duplicatePromptBtn" type="button">Duplicate</button>
-            <button class="settings-action-btn" id="resetReportPrompt" type="button">Reset Default</button>
-            <button class="settings-action-btn danger" id="deletePromptBtn" type="button">Delete</button>
-          </div>
-          <div class="screener-note" id="promptStatus"></div>
         </div>
       </div>
     </div>
 
     <!-- Broadcast Ledger -->
     <div class="settings-section">
-      <div class="settings-label">Broadcast Ledger</div>
-      <div class="settings-card">
-        <div class="settings-row">
-          <div>
-            <div class="settings-row-label">Broadcast Receipts</div>
-            <div class="settings-row-sub">The shared record that stops ShareBot67 repeating a story or reporting one as failed</div>
+      <div class="section-header" data-section="broadcast-ledger" id="broadcast-ledger">
+        <span class="section-label">Broadcast Ledger</span>
+        <span class="section-chevron">&#9660;</span>
+      </div>
+      <div class="settings-panel" id="cards-broadcast-ledger">
+        <div class="settings-card">
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-label">Broadcast Receipts</div>
+              <div class="settings-row-sub">The shared record that stops ShareBot67 repeating a story or reporting one as failed</div>
+            </div>
+          </div>
+          <div class="tg-status-row">
+            <span class="status-pill off" id="ledgerStatusPill">⏳ Checking…</span>
+            <a class="tg-test-btn" id="ledgerFormLink" href="/api/broadcast-ledger/manual" target="_blank" rel="noopener" style="display:none">Open Receipt Form</a>
+            <button class="tg-test-btn" id="ledgerKeyBtn" type="button" style="display:none">Enter Admin Key</button>
+          </div>
+          <div class="settings-row-sub" id="ledgerWatch" style="margin-top:12px; display:none"></div>
+          <div id="ledgerWatchTargets" style="margin-top:10px; display:none"></div>
+          <button class="settings-action-btn primary" id="ledgerWatchSave" type="button" style="margin-top:10px; display:none">Save Ledger Watchlist</button>
+          <div class="settings-row-sub" id="ledgerSources" style="margin-top:6px; display:none"></div>
+          <div class="settings-row-sub" id="ledgerLatest" style="margin-top:6px; display:none"></div>
+          <details class="ledger-policy" id="ledgerPolicy" style="display:none">
+            <summary>Ledger Settings</summary>
+            <div class="ledger-policy-grid">
+              <label class="ledger-control checkbox"><input id="ledgerExactCategory" type="checkbox"> Require exact category</label>
+              <label class="ledger-control checkbox"><input id="ledgerRecordBlocked" type="checkbox"> Record blocked attempts</label>
+              <label class="ledger-control checkbox"><input id="ledgerFinanceRouting" type="checkbox"> Restrict news categories to their approved topics</label>
+              <div class="settings-row-sub"><strong>Finance route:</strong> only <code>-1001841650798 / 6297</code> and <code>-1001941064823 / 984</code>. Geopolitics continues through its separate Telegram route. This setting also controls retries.</div>
+              <label class="ledger-control checkbox"><input id="ledgerBlockedNotifications" type="checkbox"> Blocked-attempt notifications</label>
+              <label class="ledger-control checkbox"><input id="ledgerFailureNotifications" type="checkbox"> Failure notifications</label>
+              <label class="ledger-control checkbox"><input id="ledgerMissingNotifications" type="checkbox"> Missing-category notifications</label>
+              <div class="settings-row-sub">Alerts are delivered only to private targets configured with <code>BROADCAST_LEDGER_NOTIFICATION_CHAT_IDS</code>.</div>
+              <label class="ledger-control checkbox"><input id="ledgerEditDelete" type="checkbox"> Allow edit and delete</label>
+              <label class="ledger-control">Reset timezone<select id="ledgerTimezone"><option>America/Vancouver</option><option>UTC</option><option>America/New_York</option></select></label>
+              <label class="ledger-control">Keep history for<select id="ledgerHistory"><option value="forever">Forever</option><option value="30">30 days</option><option value="90">90 days</option><option value="180">180 days</option></select></label>
+            </div>
+            <div class="settings-row-sub" style="margin-top:16px">Allowed categories, daily successful-broadcast limits, and duplicate windows</div>
+            <div class="ledger-category-table" id="ledgerCategories"></div>
+            <div class="settings-row-sub">Sources shown in the ledger</div>
+            <div class="ledger-destinations" id="ledgerVisibleSources"></div>
+            <div class="settings-row-sub">Destination labels</div>
+            <div class="ledger-destinations" id="ledgerDestinationLabels"></div>
+            <button class="settings-action-btn primary" id="ledgerPolicySave" type="button">Save Ledger Settings</button>
+          </details>
+          <div class="tg-instructions" id="ledgerInstructions" style="display:none">
+            <strong>Setup:</strong><br>
+            1. Set <code>BROADCAST_LEDGER_API_KEY</code> in your Railway environment variables (<code>openssl rand -hex 32</code>). It falls back to <code>ADMIN_API_KEY</code> if left blank.<br>
+            2. Point <code>DATA_DIR</code> at the mounted volume (usually <code>/app/data</code>) — on ephemeral storage the ledger is wiped on every deploy.<br>
+            3. Redeploy, then reload this page.<br>
+            See <code>docs/broadcast-ledger.md</code> for the endpoint contract, the ShareBot67 preflight steps, and the iOS Shortcut request.
           </div>
         </div>
-        <div class="tg-status-row">
-          <span class="status-pill off" id="ledgerStatusPill">⏳ Checking…</span>
-          <a class="tg-test-btn" id="ledgerFormLink" href="/api/broadcast-ledger/manual" target="_blank" rel="noopener" style="display:none">Open Receipt Form</a>
-          <button class="tg-test-btn" id="ledgerKeyBtn" type="button" style="display:none">Enter Admin Key</button>
-        </div>
-        <div class="settings-row-sub" id="ledgerWatch" style="margin-top:12px; display:none"></div>
-        <div id="ledgerWatchTargets" style="margin-top:10px; display:none"></div>
-        <button class="settings-action-btn primary" id="ledgerWatchSave" type="button" style="margin-top:10px; display:none">Save Ledger Watchlist</button>
-        <div class="settings-row-sub" id="ledgerSources" style="margin-top:6px; display:none"></div>
-        <div class="settings-row-sub" id="ledgerLatest" style="margin-top:6px; display:none"></div>
-        <details class="ledger-policy" id="ledgerPolicy" style="display:none">
-          <summary>Ledger Settings</summary>
-          <div class="ledger-policy-grid">
-            <label class="ledger-control checkbox"><input id="ledgerExactCategory" type="checkbox"> Require exact category</label>
-            <label class="ledger-control checkbox"><input id="ledgerRecordBlocked" type="checkbox"> Record blocked attempts</label>
-            <label class="ledger-control checkbox"><input id="ledgerFinanceRouting" type="checkbox"> Restrict news categories to their approved topics</label>
-            <div class="settings-row-sub"><strong>Finance route:</strong> only <code>-1001841650798 / 6297</code> and <code>-1001941064823 / 984</code>. Geopolitics continues through its separate Telegram route. This setting also controls retries.</div>
-            <label class="ledger-control checkbox"><input id="ledgerBlockedNotifications" type="checkbox"> Blocked-attempt notifications</label>
-            <label class="ledger-control checkbox"><input id="ledgerFailureNotifications" type="checkbox"> Failure notifications</label>
-            <label class="ledger-control checkbox"><input id="ledgerMissingNotifications" type="checkbox"> Missing-category notifications</label>
-            <div class="settings-row-sub">Alerts are delivered only to private targets configured with <code>BROADCAST_LEDGER_NOTIFICATION_CHAT_IDS</code>.</div>
-            <label class="ledger-control checkbox"><input id="ledgerEditDelete" type="checkbox"> Allow edit and delete</label>
-            <label class="ledger-control">Reset timezone<select id="ledgerTimezone"><option>America/Vancouver</option><option>UTC</option><option>America/New_York</option></select></label>
-            <label class="ledger-control">Keep history for<select id="ledgerHistory"><option value="forever">Forever</option><option value="30">30 days</option><option value="90">90 days</option><option value="180">180 days</option></select></label>
+      </div>
+    </div>
+
+    <!-- X Intelligence -->
+    <div class="settings-section">
+      <div class="section-header" data-section="x-intelligence" id="x-intelligence">
+        <span class="section-label">X Intelligence</span>
+        <span class="section-chevron">&#9660;</span>
+      </div>
+      <div class="settings-panel" id="cards-x-intelligence">
+        <div class="settings-card">
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-label">Broadcast Channels</div>
+              <div class="settings-row-sub">
+                The Telegram groups and topics the Broadcast button on <a href="/x-intelligence.html">X Intelligence</a>
+                offers. Only that button reads this list &mdash; report auto-posts and the broadcast ledger keep their
+                own routes. The label is what the picker shows; the topic id is optional and targets a forum topic.
+                Saved on the server.
+              </div>
+            </div>
           </div>
-          <div class="settings-row-sub" style="margin-top:16px">Allowed categories, daily successful-broadcast limits, and duplicate windows</div>
-          <div class="ledger-category-table" id="ledgerCategories"></div>
-          <div class="settings-row-sub">Sources shown in the ledger</div>
-          <div class="ledger-destinations" id="ledgerVisibleSources"></div>
-          <div class="settings-row-sub">Destination labels</div>
-          <div class="ledger-destinations" id="ledgerDestinationLabels"></div>
-          <button class="settings-action-btn primary" id="ledgerPolicySave" type="button">Save Ledger Settings</button>
-        </details>
-        <div class="tg-instructions" id="ledgerInstructions" style="display:none">
-          <strong>Setup:</strong><br>
-          1. Set <code>BROADCAST_LEDGER_API_KEY</code> in your Railway environment variables (<code>openssl rand -hex 32</code>). It falls back to <code>ADMIN_API_KEY</code> if left blank.<br>
-          2. Point <code>DATA_DIR</code> at the mounted volume (usually <code>/app/data</code>) — on ephemeral storage the ledger is wiped on every deploy.<br>
-          3. Redeploy, then reload this page.<br>
-          See <code>docs/broadcast-ledger.md</code> for the endpoint contract, the ShareBot67 preflight steps, and the iOS Shortcut request.
+          <div class="tg-status-row">
+            <span class="status-pill off" id="xbcSourcePill">&#9203; Loading&hellip;</span>
+            <button class="tg-test-btn" id="xbcKeyBtn" type="button" style="display:none">Enter Admin Key</button>
+          </div>
+          <div class="xbc-list" id="xbcList"></div>
+          <button class="settings-action-btn xbc-add" id="xbcAdd" type="button" disabled>Add Channel</button>
+          <div class="screener-actions">
+            <button class="settings-action-btn primary" id="xbcSave" type="button" disabled>Save Channels</button>
+            <button class="settings-action-btn" id="xbcReset" type="button" disabled>Reset to Environment</button>
+            <span class="screener-note" id="xbcStatus"></span>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Telegram -->
     <div class="settings-section">
-      <div class="settings-label">Telegram</div>
-      <div class="settings-card">
-        <div class="settings-row">
-          <div>
-            <div class="settings-row-label">Auto-Post to Channels</div>
-            <div class="settings-row-sub">Sends each report section to your configured Telegram channels when a fresh briefing is generated</div>
+      <div class="section-header" data-section="telegram" id="telegram">
+        <span class="section-label">Telegram</span>
+        <span class="section-chevron">&#9660;</span>
+      </div>
+      <div class="settings-panel" id="cards-telegram">
+        <div class="settings-card">
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-label">Auto-Post to Channels</div>
+              <div class="settings-row-sub">Sends each report section to your configured Telegram channels when a fresh briefing is generated</div>
+            </div>
           </div>
-        </div>
-        <div class="tg-status-row">
-          <span class="status-pill off" id="tgStatusPill">⏳ Checking…</span>
-          <button class="tg-test-btn" id="tgTestBtn" disabled>Send Test Message</button>
-        </div>
-        <div class="tg-instructions" id="tgInstructions" style="display:none">
-          <strong>Setup:</strong><br>
-          1. Create a bot via <a href="https://t.me/BotFather" target="_blank" rel="noopener" style="color:var(--blue)">@BotFather</a> and copy the token.<br>
-          2. Add the bot to each channel as an <strong>admin</strong>.<br>
-          3. Set <code>TELEGRAM_BOT_TOKEN</code> and <code>TELEGRAM_CHAT_IDS</code> (comma-separated channel IDs) in your Railway environment variables.<br>
-          4. Redeploy — the next fresh report will auto-post to all channels.
+          <div class="tg-status-row">
+            <span class="status-pill off" id="tgStatusPill">⏳ Checking…</span>
+            <button class="tg-test-btn" id="tgTestBtn" disabled>Send Test Message</button>
+          </div>
+          <div class="tg-instructions" id="tgInstructions" style="display:none">
+            <strong>Setup:</strong><br>
+            1. Create a bot via <a href="https://t.me/BotFather" target="_blank" rel="noopener" style="color:var(--blue)">@BotFather</a> and copy the token.<br>
+            2. Add the bot to each channel as an <strong>admin</strong>.<br>
+            3. Set <code>TELEGRAM_BOT_TOKEN</code> and <code>TELEGRAM_CHAT_IDS</code> (comma-separated channel IDs) in your Railway environment variables.<br>
+            4. Redeploy — the next fresh report will auto-post to all channels.
+          </div>
         </div>
       </div>
     </div>
 
-    <footer>Market Command — appearance and reporter preferences are saved in this browser; screener, ledger and Telegram settings are saved on the server</footer>
+    <footer>Market Command — appearance and reporter preferences are saved in this browser; screener, ledger, X broadcast channel and Telegram settings are saved on the server</footer>
   </main>
 </div>
 
@@ -611,6 +695,7 @@
 
 <script src="/assets/js/sidebar.js"></script>
 <script src="/assets/js/admin-key.js"></script>
+<script src="/assets/js/sections.js"></script>
 <script>
   /* ── Toast ─────────────────────────────────────────────── */
   function showToast() {
@@ -1841,6 +1926,222 @@
 
     probe();
   })();
+
+  /* ── X Intelligence broadcast channels ──────────────── */
+  (function () {
+    var API = '/api/x/broadcast/channels';
+    var listEl = document.getElementById('xbcList');
+    var pill = document.getElementById('xbcSourcePill');
+    var keyBtn = document.getElementById('xbcKeyBtn');
+    var addBtn = document.getElementById('xbcAdd');
+    var saveBtn = document.getElementById('xbcSave');
+    var resetBtn = document.getElementById('xbcReset');
+    var statusEl = document.getElementById('xbcStatus');
+    var rows = [];
+    var snapshot = null;
+    var dirty = false;
+
+    function setStatus(message, isError) {
+      statusEl.textContent = message || '';
+      statusEl.classList.toggle('error', Boolean(isError));
+    }
+
+    function setEnabled(on) {
+      [addBtn, saveBtn, resetBtn].forEach(function (btn) { btn.disabled = !on; });
+      if (on && snapshot) resetBtn.disabled = snapshot.source !== 'saved';
+    }
+
+    function failure(res) {
+      return res.json().catch(function () { return {}; }).then(function (body) {
+        throw new Error(body.error || ('Request failed (HTTP ' + res.status + ')'));
+      });
+    }
+
+    function markDirty() {
+      dirty = true;
+      setStatus('Unsaved changes.');
+    }
+
+    function input(value, placeholder, label, onChange) {
+      var el = document.createElement('input');
+      el.type = 'text';
+      el.value = value || '';
+      el.placeholder = placeholder;
+      el.setAttribute('aria-label', label);
+      el.autocomplete = 'off';
+      el.spellcheck = false;
+      el.addEventListener('input', function () { onChange(el.value); markDirty(); });
+      return el;
+    }
+
+    function render() {
+      listEl.innerHTML = '';
+      if (!rows.length) {
+        var empty = document.createElement('div');
+        empty.className = 'xbc-empty';
+        empty.textContent = 'No channels — the Broadcast button has nowhere to send. Add one below.';
+        listEl.appendChild(empty);
+        return;
+      }
+      var head = document.createElement('div');
+      head.className = 'xbc-row head';
+      ['Label', 'Chat ID', 'Topic ID', ''].forEach(function (text) {
+        var cell = document.createElement('span');
+        cell.textContent = text;
+        head.appendChild(cell);
+      });
+      listEl.appendChild(head);
+
+      rows.forEach(function (row, index) {
+        var line = document.createElement('div');
+        line.className = 'xbc-row';
+        line.appendChild(input(row.label, 'Unnamed (shows the ids)', 'Channel ' + (index + 1) + ' label', function (v) { row.label = v; }));
+        line.appendChild(input(row.chatId, '-1001841650798', 'Channel ' + (index + 1) + ' chat id', function (v) { row.chatId = v; }));
+        line.appendChild(input(row.threadId, 'Topic (optional)', 'Channel ' + (index + 1) + ' topic id', function (v) { row.threadId = v; }));
+        var remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'screener-remove';
+        remove.textContent = '✕';
+        remove.title = 'Remove channel';
+        remove.setAttribute('aria-label', 'Remove ' + (row.label || row.chatId || 'channel ' + (index + 1)));
+        remove.addEventListener('click', function () {
+          rows.splice(index, 1);
+          render();
+          markDirty();
+        });
+        line.appendChild(remove);
+        listEl.appendChild(line);
+      });
+    }
+
+    function adopt(data) {
+      snapshot = data;
+      rows = (data.channels || []).map(function (channel) {
+        // An unnamed environment entry carries its generated "Chat …" label;
+        // keep the field blank so saving does not freeze that placeholder in.
+        var generated = channel.threadId
+          ? 'Chat ' + channel.chatId + ' · topic ' + channel.threadId
+          : 'Chat ' + channel.chatId;
+        return {
+          label: channel.label === generated ? '' : channel.label,
+          chatId: channel.chatId,
+          threadId: channel.threadId || ''
+        };
+      });
+      dirty = false;
+      var count = rows.length + ' channel' + (rows.length === 1 ? '' : 's');
+      if (data.source === 'saved') {
+        pill.className = 'status-pill ok';
+        pill.textContent = '✅ Saved list · ' + count;
+      } else {
+        pill.className = 'status-pill off';
+        pill.textContent = 'From environment · ' + count;
+      }
+      keyBtn.style.display = 'none';
+      render();
+      setEnabled(true);
+      if (data.status && data.status.state === 'corrupt') {
+        setStatus('⚠ The saved list could not be read; showing the environment’s channels. Saving will replace it.', true);
+      } else if (data.botConfigured === false) {
+        setStatus('⚠ TELEGRAM_BOT_TOKEN is not set, so broadcasts cannot send until it is.', true);
+      } else if (data.source === 'saved') {
+        setStatus('Saved' + (data.updatedAt ? ' ' + new Date(data.updatedAt).toLocaleString() : '') + '.');
+      } else {
+        setStatus('Using X_BROADCAST_CHANNELS / TELEGRAM_CHAT_IDS. Save to manage the list here.');
+      }
+    }
+
+    function load() {
+      setEnabled(false);
+      setStatus('');
+      pill.className = 'status-pill off';
+      pill.textContent = '⏳ Loading…';
+      return AdminKey.fetchSilent(API)
+        .then(function (res) {
+          if (res.status === 401) {
+            pill.textContent = '🔒 Admin access needed';
+            keyBtn.style.display = '';
+            listEl.innerHTML = '';
+            setStatus('Chat and topic ids are private; enter the admin key to view and edit them.');
+            return null;
+          }
+          return res.ok ? res.json().then(adopt) : failure(res);
+        })
+        .catch(function (err) {
+          pill.textContent = '⚠ Unavailable';
+          listEl.innerHTML = '';
+          setStatus('⚠ ' + err.message, true);
+        });
+    }
+
+    function write(url, options) {
+      return AdminKey.fetchOrSession(url, options).then(function (res) {
+        return res.ok ? res.json() : failure(res);
+      });
+    }
+
+    keyBtn.addEventListener('click', function () {
+      AdminKey.prompt('Enter the admin key to manage X broadcast channels:').then(function (key) {
+        if (key) load();
+      });
+    });
+
+    addBtn.addEventListener('click', function () {
+      rows.push({ label: '', chatId: '', threadId: '' });
+      render();
+      markDirty();
+      var inputs = listEl.querySelectorAll('.xbc-row:last-child input');
+      if (inputs[0]) inputs[0].focus();
+    });
+
+    saveBtn.addEventListener('click', function () {
+      // A row left entirely blank is an unused "Add Channel", not an error.
+      var channels = rows.filter(function (row) {
+        return String(row.label || '').trim() || String(row.chatId || '').trim() || String(row.threadId || '').trim();
+      });
+      if (!channels.length && !window.confirm('Save an empty list? The Broadcast button will have nowhere to send until channels are added or the list is reset.')) return;
+      setEnabled(false);
+      setStatus('Saving…');
+      write(API, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channels: channels })
+      }).then(function (data) {
+        adopt(Object.assign({ botConfigured: snapshot && snapshot.botConfigured }, data));
+        showToast();
+      }).catch(function (err) {
+        setEnabled(true);
+        setStatus('⚠ ' + err.message, true);
+      });
+    });
+
+    resetBtn.addEventListener('click', function () {
+      if (!window.confirm('Discard the saved list and use the channels from X_BROADCAST_CHANNELS / TELEGRAM_CHAT_IDS again?')) return;
+      setEnabled(false);
+      write(API + '/reset', { method: 'POST' }).then(function (data) {
+        adopt(Object.assign({ botConfigured: snapshot && snapshot.botConfigured }, data));
+        showToast();
+      }).catch(function (err) {
+        setEnabled(true);
+        setStatus('⚠ ' + err.message, true);
+      });
+    });
+
+    window.addEventListener('beforeunload', function (e) {
+      if (!dirty) return;
+      e.preventDefault();
+      e.returnValue = '';
+    });
+
+    load();
+  })();
+
+  /* ── Collapsible sections ───────────────────────────── */
+  // The long editors start closed; the choice is remembered per browser.
+  initSections('settings_collapsed', {
+    openAll: false,
+    defaultCollapsed: ['screeners', 'reporter', 'broadcast-ledger']
+  });
 
   /* ── Telegram status ────────────────────────────────── */
   (function () {

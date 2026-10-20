@@ -194,3 +194,72 @@ test("a send that reaches nowhere is an error the page can show", async () => {
   assert.equal(status, 502);
   assert.match(body.error, /failed/i);
 });
+
+test("Settings can replace the channel list, and the send route follows it at once", async () => {
+  const anonymous = await call("/api/x/broadcast/channels", {
+    method: "PUT",
+    body: { channels: [{ label: "Hijack", chatId: "-100999" }] },
+  });
+  assert.equal(anonymous.status, 401, "editing where posts go is admin-only");
+
+  const saved = await call("/api/x/broadcast/channels", {
+    method: "PUT",
+    headers: admin,
+    body: { channels: [
+      { label: "Market Desk", chatId: "-1001841650798", threadId: "6297" },
+      { label: "Alpha Room", chatId: "-1001941064823", threadId: "984" },
+    ] },
+  });
+  assert.equal(saved.status, 200);
+  assert.equal(saved.body.source, "saved");
+  assert.deepEqual(saved.body.channels.map((channel) => channel.label), ["Market Desk", "Alpha Room"]);
+  assert.equal(saved.body.envChannels.length, 2, "the environment's list stays visible for reset");
+
+  const listed = await call("/api/x/broadcast/channels", { headers: admin });
+  assert.equal(listed.body.source, "saved");
+  assert.equal(listed.body.channels[1].id, "tg--1001941064823-t984");
+
+  const removed = await call("/api/x/broadcast", {
+    method: "POST",
+    headers: admin,
+    body: { ...post, channels: ["tg--1001841650798-t75972"] },
+  });
+  assert.equal(removed.status, 400, "a room taken off the list can no longer be broadcast to");
+  assert.equal(telegramCalls.length, 0);
+
+  const sent = await call("/api/x/broadcast", {
+    method: "POST",
+    headers: admin,
+    body: { ...post, channels: ["tg--1001941064823-t984"] },
+  });
+  assert.equal(sent.status, 200);
+  assert.equal(telegramCalls[0].chat_id, "-1001941064823");
+  assert.equal(sent.body.destinations[0].label, "Alpha Room");
+
+  const reset = await call("/api/x/broadcast/channels/reset", { method: "POST", headers: admin });
+  assert.equal(reset.status, 200);
+  assert.equal(reset.body.source, "env");
+  assert.deepEqual(reset.body.channels.map((channel) => channel.label), ["Market Desk", "War Room"]);
+});
+
+test("a channel list Telegram would reject is refused whole", async () => {
+  for (const channels of [
+    [{ label: "No chat", chatId: "" }],
+    [{ label: "Bad chat", chatId: "market desk" }],
+    [{ label: "Bad topic", chatId: "-1001841650798", threadId: "general" }],
+    [
+      { label: "One", chatId: "-1001841650798", threadId: "6297" },
+      { label: "Same room", chatId: "-1001841650798", threadId: "6297" },
+    ],
+  ]) {
+    const { status, body } = await call("/api/x/broadcast/channels", {
+      method: "PUT",
+      headers: admin,
+      body: { channels },
+    });
+    assert.equal(status, 400, JSON.stringify(channels));
+    assert.ok(body.error);
+  }
+  const listed = await call("/api/x/broadcast/channels", { headers: admin });
+  assert.equal(listed.body.source, "env", "a refused save leaves the previous list in place");
+});

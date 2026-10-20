@@ -56,6 +56,7 @@ const { createXFeedRouter } = require("./routes/x-feed");
 const { resolveYoutubeChannels } = require("./config/youtube-channels");
 const { XAccountRegistry } = require("./services/x-account-registry");
 const { XTemplateRegistry } = require("./services/x-template-registry");
+const { XBroadcastChannelStore } = require("./services/x-broadcast-channel-store");
 const { TOP_TOKENS } = require("./config/market-symbols");
 const { AIAnalysisService } = require("./services/ai-analysis");
 const { DecisionEngineService } = require("./services/decision-engine");
@@ -279,6 +280,10 @@ function createApp() {
     seedAccounts: () => xAccountRegistry.list(),
   });
   xTemplateRegistry.ensureSeeded();
+  const xBroadcastChannelStore = new XBroadcastChannelStore({
+    dataDir,
+    envChannels: config.xBroadcast.channels,
+  });
   xAccountRegistry.setMembershipHooks({
     // An account added while a theme is selected joins that theme. Adding it
     // to the default one regardless was the reason a handle added from, say,
@@ -719,6 +724,7 @@ function createApp() {
       // on.
       telegramService,
       broadcastChannels: config.xBroadcast.channels,
+      broadcastChannelStore: xBroadcastChannelStore,
       farmclawHandoffStore,
       farmclawPusher,
     }),
