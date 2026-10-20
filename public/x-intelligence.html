@@ -55,6 +55,16 @@
               <span class="x-visually-hidden">Search loaded posts</span>
               <input type="search" id="xFeedSearch" placeholder="Search loaded posts&hellip;" autocomplete="off" spellcheck="false" />
             </label>
+            <!-- The rest of the controls fold behind this button so the feed
+                 starts higher. The badge counts filters hidden while folded. -->
+            <button type="button" class="x-feed-settings-toggle" id="xFeedSettingsToggle"
+                    aria-expanded="false" aria-controls="xFeedSettings"
+                    title="Feed settings" aria-label="Feed settings">
+              <span aria-hidden="true">&#9881;</span>
+              <span class="x-feed-settings-badge" id="xFeedSettingsBadge" hidden></span>
+            </button>
+          </div>
+          <div class="x-feed-settings" id="xFeedSettings" hidden>
             <label class="x-feed-account">
               <span class="x-visually-hidden">Account</span>
               <select id="xFeedAccount"><option value="">All accounts</option></select>
@@ -66,8 +76,6 @@
               <button type="button" data-time="24h" aria-pressed="false">24h</button>
               <button type="button" data-time="7d" aria-pressed="false">7d</button>
             </div>
-          </div>
-          <div class="x-feed-toolbar-row">
             <div class="x-segment" id="xFeedView" role="group" aria-label="Display mode">
               <button type="button" data-view="compact" aria-pressed="true">Compact</button>
               <button type="button" data-view="cards" aria-pressed="false">Cards</button>
@@ -79,6 +87,8 @@
                     title="Animated background for this template">Motion: On</button>
             <button type="button" class="x-feed-chip x-feed-reset" id="xFeedReset" disabled
                     title="Clear search, time, media and account filters">Reset</button>
+          </div>
+          <div class="x-feed-toolbar-row">
             <div class="x-feed-summary" id="xFeedSummary" aria-live="polite"></div>
           </div>
         </div>
