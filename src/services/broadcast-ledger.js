@@ -25,6 +25,7 @@
 const path = require("path");
 const crypto = require("crypto");
 const { withExclusiveLock, writeJsonAtomic, readJsonStore } = require("./json-file-lock");
+const { normalizeCategoryDestinations } = require("./news-routing");
 
 const LEDGER_VERSION = 2;
 const DEFAULT_CAP = 5000;
@@ -61,6 +62,9 @@ const DEFAULT_SETTINGS = Object.freeze({
   editDeleteEnabled: true,
   visibleSources: ["shortcut", "dashboard", "sharebot67", "manual", "telegram-ingest"],
   destinationLabels: {},
+  // Per-category Telegram overrides; a category absent here keeps the
+  // default route in news-routing.js. See destinationsForNewsType().
+  categoryDestinations: {},
 });
 
 // Query/campaign parameters that never change which story a URL points at.
@@ -130,7 +134,12 @@ function normalizeSettings(input = {}) {
     ? null
     : HISTORY_DAYS.includes(Number(input.historyDays)) ? Number(input.historyDays) : defaults.historyDays;
   const timezone = clampString(input.timezone, 80) || defaults.timezone;
-  try { new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(new Date()); } catch { return { ...defaults, allowedCategories: categories, categoryLimits, duplicateWindows }; }
+  // Routes are kept for every known category, allowed or not, so disallowing
+  // a category and allowing it again does not lose where it was sent.
+  const categoryDestinations = normalizeCategoryDestinations(input.categoryDestinations, {
+    categories: [...new Set([...ALLOWED_CATEGORIES, ...categories])],
+  });
+  try { new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(new Date()); } catch { return { ...defaults, allowedCategories: categories, categoryLimits, duplicateWindows, categoryDestinations }; }
   const destinationLabels = {};
   if (input.destinationLabels && typeof input.destinationLabels === "object") {
     Object.entries(input.destinationLabels).slice(0, 100).forEach(([key, value]) => {
@@ -157,6 +166,7 @@ function normalizeSettings(input = {}) {
       ? input.visibleSources.filter((source) => SOURCES.includes(source))
       : defaults.visibleSources,
     destinationLabels,
+    categoryDestinations,
   };
 }
 
@@ -356,6 +366,15 @@ class BroadcastLedgerStore {
 
   _updateSettings(patch = {}) {
     const data = this._readDocument();
+    if (Object.prototype.hasOwnProperty.call(patch, "categoryDestinations")) {
+      // Refuse rather than drop: a mistyped chat id silently removed would
+      // reroute that category without anyone noticing.
+      const allowed = Array.isArray(patch.allowedCategories) ? patch.allowedCategories : data.settings.allowedCategories;
+      normalizeCategoryDestinations(patch.categoryDestinations, {
+        categories: [...new Set([...ALLOWED_CATEGORIES, ...(allowed || [])])],
+        strict: true,
+      });
+    }
     const settings = normalizeSettings({ ...data.settings, ...patch });
     this._write(data.receipts, settings);
     return settings;

@@ -247,7 +247,10 @@ function buildPreflight({
   if (typeof destinationsForNewsType === "function") {
     const settings = broadcastLedgerStore ? broadcastLedgerStore.getSettings() : {};
     const routing = {};
-    ["Stock", "Crypto", "Economics", "Geopolitics"].forEach((newsType) => {
+    // Plus any category given its own route in Settings, so an override on,
+    // say, Markets is shown alongside the defaults rather than hidden.
+    const categories = new Set(["Stock", "Crypto", "Economics", "Geopolitics", ...Object.keys(settings?.categoryDestinations || {})]);
+    categories.forEach((newsType) => {
       routing[newsType] = destinationsForNewsType(newsType, settings) || "falls back to configured chat list";
     });
     const locked = Object.values(routing).filter((value) => Array.isArray(value)).length;
