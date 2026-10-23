@@ -669,6 +669,9 @@
     var motionButton = document.getElementById("xFeedMotion");
     var resetButton = document.getElementById("xFeedReset");
     var summary = document.getElementById("xFeedSummary");
+    var settingsToggle = document.getElementById("xFeedSettingsToggle");
+    var settingsPanel = document.getElementById("xFeedSettings");
+    var settingsBadge = document.getElementById("xFeedSettingsBadge");
     var reducedMotionQuery = window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
 
     function setPressed(group, attrName, value) {
@@ -733,7 +736,34 @@
       setPressed(viewGroup, "data-view", state.view);
       pane.setAttribute("data-x-view", state.view);
       if (resetButton) resetButton.disabled = FeedView.isDefaultFilters(state.filters) && state.mode === ALL_MODE;
+      syncSettingsBadge();
       renderSummary();
+    }
+
+    /* Filters folded into the settings panel still narrow the feed, so the
+       gear shows how many are active instead of hiding them silently. */
+    function syncSettingsBadge() {
+      if (!settingsBadge) return;
+      var active = (state.mode !== ALL_MODE ? 1 : 0) + (state.filters.time !== "all" ? 1 : 0) + (state.filters.media ? 1 : 0);
+      settingsBadge.hidden = !active;
+      settingsBadge.textContent = active ? String(active) : "";
+      if (settingsToggle) {
+        settingsToggle.setAttribute("aria-label", active ? "Feed settings (" + active + " active)" : "Feed settings");
+      }
+    }
+
+    function setSettingsOpen(open) {
+      if (!settingsPanel || !settingsToggle) return;
+      settingsPanel.hidden = !open;
+      settingsToggle.setAttribute("aria-expanded", open ? "true" : "false");
+    }
+    if (settingsToggle && settingsPanel) {
+      settingsToggle.addEventListener("click", function () { setSettingsOpen(settingsPanel.hidden); });
+      settingsPanel.addEventListener("keydown", function (event) {
+        if (event.key !== "Escape") return;
+        setSettingsOpen(false);
+        settingsToggle.focus();
+      });
     }
 
     function setFilters(patch) {

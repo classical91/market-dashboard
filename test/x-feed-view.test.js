@@ -281,6 +281,14 @@ test("the toolbar is static markup above the feed, and its script loads first", 
   for (const t of FeedView.TIME_KEYS) assert.ok(html.includes('data-time="' + t + '"'));
   for (const v of FeedView.VIEW_MODES) assert.ok(html.includes('data-view="' + v + '"'));
   assert.match(html, /<label class="x-feed-search">\s*<span class="x-visually-hidden">Search loaded posts<\/span>/);
+  // Everything but search and the summary folds behind the settings button.
+  assert.match(html, /id="xFeedSettingsToggle"[^>]*aria-expanded="false"[^>]*aria-controls="xFeedSettings"/);
+  const panel = html.slice(html.indexOf('id="xFeedSettings"'), html.indexOf('id="xFeedSummary"'));
+  assert.match(html, /id="xFeedSettings" hidden/);
+  for (const id of ["xFeedAccount", "xFeedTime", "xFeedView", "xFeedMedia", "xFeedMotion", "xFeedReset"]) {
+    assert.ok(panel.includes('id="' + id + '"'), id + " is inside the settings panel");
+  }
+  assert.ok(html.indexOf('id="xFeedSearch"') < html.indexOf('id="xFeedSettings"'));
   const viewAt = html.indexOf("/assets/js/x-feed-view.js");
   assert.ok(viewAt > html.indexOf("/assets/js/x-posts.js") && viewAt < html.indexOf("/assets/js/x-intelligence.js"));
 });
