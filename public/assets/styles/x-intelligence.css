@@ -485,6 +485,17 @@ body[data-x-accent] .x-account-card--all.active { border-color: var(--x-accent);
   opacity: 0.82;
 }
 
+.x-post-farmclaw-status {
+  flex-basis: 100%;
+  order: 1;
+  color: var(--soft);
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.x-post-farmclaw-status[hidden] { display: none; }
+
 /* The primary action on a card: reads as a send, not as another link
    affordance sitting next to Open and Copy link. */
 .x-post-broadcast {
