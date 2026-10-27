@@ -375,7 +375,9 @@
   var FARMCLAW_LABELS = {
     idle: "FarmClaw",
     busy: "Sending…",
-    queued: "FarmClaw queued",
+    queued: "FarmClaw waiting",
+    disconnected: "FarmClaw not connected",
+    claimed: "FarmClaw picked up",
     sent: "FarmClaw received",
     failure: "FarmClaw failed",
   };
@@ -421,10 +423,23 @@
     var url = post && post.url;
     var timer = null;
     var version = 0;
+    var statusNote = null;
 
-    function show(label, title) {
+    function show(label, title, detail) {
       button.textContent = label;
       button.title = title || "";
+      // Status must be readable on touch screens, where a title is invisible.
+      // Cards bind this button before attaching it, so create the note lazily.
+      if (!statusNote && detail && button.parentNode && button.ownerDocument) {
+        statusNote = button.ownerDocument.createElement("span");
+        statusNote.className = "x-post-farmclaw-status";
+        statusNote.setAttribute("role", "status");
+        button.parentNode.appendChild(statusNote);
+      }
+      if (statusNote) {
+        statusNote.textContent = detail || "";
+        statusNote.hidden = !detail;
+      }
     }
 
     function settle(handoff) {
@@ -438,19 +453,25 @@
         }
         rememberSent(url, null, FARMCLAW_SENT_KEY);
         forgetSent(url, FARMCLAW_QUEUED_KEY);
-        show(FARMCLAW_LABELS.sent, "Received by the FarmClaw agent (" + receipt.receiptId + "). FarmBot queueing and broadcasting are not confirmed here.");
+        show(FARMCLAW_LABELS.sent, "Received by the FarmClaw agent (" + receipt.receiptId + "). FarmBot queueing and broadcasting are not confirmed here.", "FarmClaw received the link. This does not confirm a Farm queue entry.");
         return true;
       }
       forgetSent(url, FARMCLAW_SENT_KEY);
       rememberSent(url, null, FARMCLAW_QUEUED_KEY);
       if (record.status === "failed") {
-        show(FARMCLAW_LABELS.failure, "FarmClaw could not take it: " + (record.error || "unknown error") + " — tap to retry.");
+        var failure = "FarmClaw could not take it: " + (record.error || "unknown error") + " — tap to retry.";
+        show(FARMCLAW_LABELS.failure, failure, failure);
         return true;
       }
       if (handoff && handoff.push && handoff.push.enabled) {
-        show(FARMCLAW_LABELS.busy, "Sending to the FarmClaw agent…");
+        show(FARMCLAW_LABELS.busy, "Sending to the FarmClaw agent…", "Waiting for FarmClaw to confirm delivery.");
       } else {
-        show(FARMCLAW_LABELS.queued, describeFarmclawWait({ status: record.status, agent: handoff && handoff.agent }));
+        var wait = describeFarmclawWait({ status: record.status, agent: handoff && handoff.agent });
+        var disconnected = record.status === "pending" && handoff && handoff.push && handoff.push.enabled === false && !(handoff.agent && handoff.agent.lastPollAt);
+        var label = record.status === "claimed" ? FARMCLAW_LABELS.claimed : disconnected ? FARMCLAW_LABELS.disconnected : FARMCLAW_LABELS.queued;
+        show(label, wait, disconnected
+          ? "Saved on this dashboard. FarmClaw has not checked in; delivery needs reconnecting."
+          : wait + " No Farm queue entry is confirmed.");
       }
       return false;
     }
@@ -470,7 +491,8 @@
             show(FARMCLAW_LABELS.idle, "Previous handoff was not found — tap to send this link to FarmClaw.");
             return;
           }
-          button.title = "Could not refresh FarmClaw status: " + (err.message || "network error") + ". The displayed status is the last known one; tap to check.";
+          var refreshError = "Could not refresh FarmClaw status: " + (err.message || "network error") + ". The displayed status is the last known one; tap to check.";
+          show("FarmClaw status unknown", refreshError, refreshError);
           if (err.status !== 401 && err.status !== 403) poll(target, remaining - 1, checkingVersion);
         },
       );
@@ -487,7 +509,7 @@
 
     var remembered = wasSent(url, null, FARMCLAW_SENT_KEY) || wasSent(url, null, FARMCLAW_QUEUED_KEY);
     if (wasSent(url, null, FARMCLAW_SENT_KEY)) show(FARMCLAW_LABELS.sent, "Last confirmed received by FarmClaw; refreshing status. FarmBot queueing and broadcasting are not confirmed here.");
-    else if (remembered) show(FARMCLAW_LABELS.queued, "Refreshing FarmClaw status…");
+    else if (remembered) show("Checking FarmClaw…", "Refreshing FarmClaw status…");
     else show(FARMCLAW_LABELS.idle, "Queue this post's link for FarmClaw");
     if (remembered) check("/api/farmclaw/handoffs/lookup?url=" + encodeURIComponent(url), FARMCLAW_POLL_LIMIT, version);
 
@@ -496,7 +518,7 @@
       version += 1;
       if (timer) clearTimeout(timer);
       button.disabled = true;
-      button.textContent = FARMCLAW_LABELS.busy;
+      show(FARMCLAW_LABELS.busy, "Sending to FarmClaw…");
       // Idempotent on the post url: a repeat tap returns the same handoff,
       // re-queues a failed one, and reports a received one as received.
       request("/api/farmclaw/handoffs", {
@@ -510,7 +532,8 @@
         },
         function (err) {
           button.disabled = false;
-          show(FARMCLAW_LABELS.failure, (err && err.message) || "Could not queue for FarmClaw");
+          var error = (err && err.message) || "Could not queue for FarmClaw";
+          show(FARMCLAW_LABELS.failure, error, error);
         },
       );
     });

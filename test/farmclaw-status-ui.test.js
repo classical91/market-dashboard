@@ -22,9 +22,13 @@ function fixture() {
   const api = window.XBroadcast;
   values.set(api.FARMCLAW_QUEUED_KEY, JSON.stringify([url]));
   const handlers = {};
-  const button = { textContent: "", title: "", isConnected: true, addEventListener: (name, fn) => { handlers[name] = fn; } };
+  const notes = [];
+  const button = { textContent: "", title: "", isConnected: true,
+    ownerDocument: { createElement: () => ({ setAttribute: () => {} }) },
+    parentNode: { appendChild: (note) => notes.push(note) },
+    addEventListener: (name, fn) => { handlers[name] = fn; } };
   api.bindFarmclawButton(button, { url });
-  return { api, reads, writes, timers, values, button, handlers };
+  return { api, reads, writes, timers, values, button, handlers, notes };
 }
 function response(body, status = 200) { return { ok: status < 400, status, text: async () => JSON.stringify(body) }; }
 const received = { id: "fch_123", status: "received", receipt: { receiptId: "openclaw-run:123" } };
@@ -66,4 +70,35 @@ test("authentication failure never prompts or retries automatically", async () =
   assert.equal(f.writes.length, 0);
   assert.equal(f.timers.length, 0);
   assert.match(f.button.title, /last known/);
+  assert.equal(f.button.textContent, "FarmClaw status unknown");
+  assert.match(f.notes[0].textContent, /Could not refresh/);
+});
+
+test("missing delivery connection is visible on the card and still polls for recovery", async () => {
+  const f = fixture();
+  f.reads[0].resolve(response({ id: "fch_123", status: "pending", push: { enabled: false }, agent: { lastPollAt: null } }));
+  await flush();
+  assert.equal(f.button.textContent, "FarmClaw not connected");
+  assert.match(f.notes[0].textContent, /Saved on this dashboard.*delivery needs reconnecting/);
+  assert.equal(f.timers.length, 1);
+  f.timers[0]();
+  f.reads[1].resolve(response(received));
+  await flush();
+  assert.equal(f.button.textContent, "FarmClaw received");
+  assert.equal(f.notes.length, 1, "updates the same visible status note");
+  assert.match(f.notes[0].textContent, /does not confirm a Farm queue entry/);
+  assert.equal(f.writes.length, 0);
+});
+
+test("a polling collector is waiting rather than disconnected, then shows its exact failure", async () => {
+  const f = fixture();
+  f.reads[0].resolve(response({ id: "fch_123", status: "pending", push: { enabled: false }, agent: { lastPollAt: new Date().toISOString() } }));
+  await flush();
+  assert.equal(f.button.textContent, "FarmClaw waiting");
+  assert.match(f.notes[0].textContent, /not yet picked up/);
+  f.timers[0]();
+  f.reads[1].resolve(response({ id: "fch_123", status: "failed", error: "OpenClaw hook HTTP 401" }));
+  await flush();
+  assert.equal(f.button.textContent, "FarmClaw failed");
+  assert.match(f.notes[0].textContent, /HTTP 401/);
 });
