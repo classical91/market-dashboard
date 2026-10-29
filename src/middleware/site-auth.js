@@ -138,8 +138,9 @@ function isAlphaReadApi(req) {
 // them first.
 // The reporter news log's intake is called by the same machine callers with
 // the same key, so it shares the bypass, as does the FarmClaw handoff queue
-// that the FarmClaw agent polls with it.
-const LEDGER_API_PREFIXES = ["/api/broadcast-ledger", "/api/reporter-news", "/api/farmclaw"];
+// that the FarmClaw agent polls with it, and the phone briefings the same
+// Shortcut pushes after generating them.
+const LEDGER_API_PREFIXES = ["/api/broadcast-ledger", "/api/reporter-news", "/api/farmclaw", "/api/phone-briefings"];
 
 function isLedgerApiPath(req) {
   return LEDGER_API_PREFIXES.some((prefix) => req.path === prefix || req.path.startsWith(`${prefix}/`));

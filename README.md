@@ -33,6 +33,7 @@ The app is intentionally lightweight: no bundler, no frontend framework, and no 
 - `/settings.html` - Appearance, **Reporter -> Report Prompts** (a manageable library of named prompts per reporter desk) and Refresh Frequency, and **Screeners -> Token Universe**: a matrix that decides which tokens Directional Bias, Local Extremes and Pattern Scanner each scan. Saved on the server under `DATA_DIR/screener-settings.json`, so the scanners and the signal bot follow it rather than the browser. Binance USDT pairs can be added (verified against Binance first) beyond the shipped defaults. USDT.D is deliberately not in the matrix: it has no Binance candles to scan and already rides along with Directional Bias as market context.
 - `/indicators.html` - Trading and market glossary.
 - `/reporter.html` - Reporter Room: the newsroom. **News Intelligence** is its first tab — live news, per-asset headlines, scheduled catalysts, a compact market-reaction strip, Master News, desk status and newsroom controls — alongside the four generated desk tabs (Geopolitics, Economics, Stocks, Crypto). See [News Intelligence tab](#news-intelligence-tab).
+- `/briefings/geopolitics`, `/briefings/economics`, `/briefings/stocks`, `/briefings/crypto` - **Phone briefings**: what the iPhone Shortcut generated with ChatGPT, for reading on a computer. Under **Reporter** in the sidebar, replacing the old Emerging Markets / Economics Top 10 / Markets Top 10 desk pages (those URLs redirect here). See [Phone briefings](#phone-briefings).
 - `/api/newsroom` - newsroom cycle records and health for the scheduled reporting run: one durable cycle per run, linking generated sections to broadcast receipts and Telegram message ids. See [docs/newsroom-cycles.md](docs/newsroom-cycles.md).
 - `/api/broadcast-ledger/preflight` - answers the environment, persistence and routing half of [docs/production-verification.md](docs/production-verification.md) from inside the running service. Sends nothing, echoes no secret. `node scripts/verify-broadcast-ledger.js --url <host> --key <key>` runs it plus the read-only endpoint checks and prints a verdict.
 - `/api/broadcast-ledger/broadcast` - sends a broadcast to Telegram **and** records the receipt in one call, from the real send result. Telegram never reports a bot's own messages back through `getUpdates`, so anything sent through this bot cannot be picked up by the channel watch and must go through here.
@@ -95,6 +96,7 @@ When `MARKET_DASHBOARD_LOGIN_PASSWORD` is set, site auth runs ahead of every rou
 - `GET /api/decision` — read-only market decision data, polled by the TraderClaw agent, which authenticates no session cookie. This is the exact path only: `/api/decision/journal` and every mutating journal route still require the owner session (and, for writes, `ADMIN_API_KEY`).
 - `/api/broadcast-ledger*` — machine callers that present `BROADCAST_LEDGER_API_KEY` or `ADMIN_API_KEY`; the ledger routes still enforce that key themselves. See [docs/broadcast-ledger.md](docs/broadcast-ledger.md).
 - `/api/reporter-news*` — same machine-caller bypass and key as the broadcast ledger; writes still require the key. `POST /api/reporter-news/:id/approval` is bypassed only for the approver key, which the route enforces. See [docs/reporter-news-log.md](docs/reporter-news-log.md).
+- `POST /api/phone-briefings*` — the iPhone Shortcut pushing its briefings, with the same machine-caller bypass and key as the broadcast ledger. Reading them still needs the owner session. See [Phone briefings](#phone-briefings).
 - `GET /api/market-session` — which trading session is open right now, read by Main Hub's Daily Dashboard from its server with no cookie to present. Clock arithmetic over published session hours: no account data, no market data, no credential, and the overview chip already computes the same answer in every visitor's browser. The exact path only, read methods only.
 
 Everything else — including all Trading Lab paper-trade and mutation endpoints, settings, and the rest of `/api/decision/*` — needs a session. The Alpha Team role additionally reaches only the shared `?view=alpha` pages (Directional Bias, Local Extremes, Pattern Scanner) and their read-only data APIs; every write on those APIs, including starring a pair into My Trades, still answers `403` for that role.
@@ -247,10 +249,10 @@ tab, open the section if it is collapsed, and scroll to the panel.
 - **A provider outage is contained.** Every panel fails on its own; the AI
   Reporter, generation, Broadcast and saved reports keep working with all of
   them down.
-- **Fixed desk pages open straight into their report.** `/emerging-markets.html`,
-  `/economics-top-10.html` and `/markets-top-10.html` share this template, so
-  they drop the workspace and the News tab entirely and request no third-party
-  panels.
+- **Fixed desk pages open straight into their report.** The template still
+  supports single-desk paths, but `/emerging-markets.html`,
+  `/economics-top-10.html` and `/markets-top-10.html` now redirect to the
+  [phone briefings](#phone-briefings) that replaced them.
 - **Master News is ready for classification it does not have yet.** Cards show
   rank, headline, desk, that desk's last run and its cited source count.
   Impact, affected assets and themes render from an optional
@@ -259,6 +261,32 @@ tab, open the section if it is collapsed, and scroll to the panel.
 
 Page styles live in `public/assets/styles/reporter.css`; shared Market Command
 primitives stay in `command.css`.
+
+### Phone briefings
+
+The Geopolitics, Economics, Stocks and Crypto briefings are generated on the
+phone: an iOS Shortcut asks ChatGPT every two days, and Main Hub's reminder card
+says how long it has been since it last ran. This server only keeps a reading
+copy, so the same briefing can be read on a computer. Nothing here generates,
+spends credits or posts to Telegram.
+
+After each **Ask ChatGPT** step, the Shortcut adds **Get Contents of URL**:
+
+- URL `https://<host>/api/phone-briefings/<desk>` — `geopolitics`, `economics`,
+  `stocks` or `crypto` (`markets` is accepted for stocks).
+- Method `POST`, header `x-broadcast-key: <BROADCAST_LEDGER_API_KEY>` (or
+  `Authorization: Bearer <key>`).
+- Request Body **JSON** with one field, `text`, set to the ChatGPT result
+  (optional `title`). A form field `text` or a raw `text/plain` body also works.
+
+To send all four in one request, `POST /api/phone-briefings` with
+`{ "geopolitics": "…", "economics": "…", "stocks": "…", "crypto": "…" }`.
+
+Re-sending the same text for a desk is stored once. Each desk keeps its last 30
+runs in `<DATA_DIR>/phone-briefings.json`; the page shows the newest, a picker
+for earlier runs, and marks a desk amber once its latest briefing is over 48
+hours old. `GET /api/phone-briefings`, `GET /api/phone-briefings/:desk` and
+`GET /api/phone-briefings/:desk/:id` are the reads behind the page.
 
 ### Newsroom cycles
 

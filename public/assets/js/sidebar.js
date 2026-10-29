@@ -122,9 +122,11 @@
             { href: "/reporter.html#calendars-tools", label: "Calendars & Tools" },
           ],
         },
-        { href: "/emerging-markets.html", label: "Emerging Markets" },
-        { href: "/economics-top-10.html", label: "Economics Top 10" },
-        { href: "/markets-top-10.html", label: "Markets Top 10" },
+        // What the iPhone Shortcut generated with ChatGPT, for reading here.
+        { href: "/briefings/geopolitics", label: "Geopolitics" },
+        { href: "/briefings/economics", label: "Economics" },
+        { href: "/briefings/stocks", label: "Stocks" },
+        { href: "/briefings/crypto", label: "Crypto" },
       ],
     },
     {

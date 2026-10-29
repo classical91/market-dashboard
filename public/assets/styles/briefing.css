@@ -1,0 +1,121 @@
+/* ─────────────────────────────────────────────────────────
+   Phone briefings — /briefings/:category
+   Loaded after command.css. Reads what the iPhone Shortcut
+   generated; shared Market Command primitives stay in command.css.
+───────────────────────────────────────────────────────── */
+
+.briefing-desks {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.briefing-desk {
+  display: grid; gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(9,14,24,0.72);
+  color: var(--soft);
+  text-decoration: none;
+}
+.briefing-desk:hover { border-color: var(--border-hover); color: var(--text); }
+.briefing-desk:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.briefing-desk.active { border-color: rgba(77,163,255,0.45); background: var(--blue-bg); color: var(--text); }
+.briefing-desk-name { font-size: 13px; font-weight: 700; }
+.briefing-desk-meta { font-size: 11px; color: var(--green); }
+.briefing-desk.stale .briefing-desk-meta { color: var(--amber); }
+.briefing-desk.empty .briefing-desk-meta { color: var(--dim); }
+
+.briefing-card {
+  padding: 20px 22px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: rgba(9,14,24,0.72);
+}
+.briefing-toolbar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.briefing-age {
+  font-size: 11px; color: var(--muted);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  padding: 5px 12px; border-radius: 10px;
+}
+.briefing-age.fresh { color: var(--green); }
+.briefing-age.stale { color: var(--amber); font-weight: 700; }
+.briefing-run-picker { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+.briefing-run-picker select,
+.briefing-btn {
+  font: inherit; font-size: 12px;
+  color: var(--text);
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+.briefing-btn { margin-left: auto; cursor: pointer; }
+.briefing-run-picker[hidden],
+.briefing-btn[hidden],
+.briefing-heading[hidden] { display: none; }
+.briefing-btn:hover { border-color: var(--border-hover); }
+.briefing-run-picker select:focus-visible,
+.briefing-btn:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+.briefing-heading { margin: 0 0 12px; font-size: 18px; color: var(--text); }
+.briefing-body {
+  max-width: 860px;
+  color: var(--soft);
+  font-size: 14px;
+  line-height: 1.65;
+}
+.briefing-body.loading { opacity: 0.5; }
+.briefing-body h3, .briefing-body h4, .briefing-body h5, .briefing-body h6 {
+  margin: 22px 0 8px; color: var(--text); line-height: 1.35;
+}
+.briefing-body h3 { font-size: 17px; }
+.briefing-body h4 { font-size: 15px; }
+.briefing-body h5, .briefing-body h6 { font-size: 14px; }
+.briefing-body p { margin: 0 0 10px; }
+.briefing-body strong { color: var(--text); }
+.briefing-body ul { margin: 0 0 14px; padding-left: 20px; }
+.briefing-body li { margin-bottom: 4px; }
+.briefing-body a { color: var(--blue); word-break: break-word; }
+.briefing-body hr { border: 0; border-top: 1px solid var(--border); margin: 18px 0; }
+.briefing-story {
+  display: flex; gap: 10px; align-items: baseline;
+  margin-top: 18px !important;
+  color: var(--text);
+}
+.briefing-rank {
+  flex: none;
+  min-width: 26px; text-align: center;
+  font-size: 12px; font-weight: 800;
+  color: var(--blue); background: var(--blue-bg);
+  border-radius: 8px; padding: 2px 6px;
+}
+.briefing-empty { color: var(--muted); }
+
+.briefing-help {
+  margin-top: 18px;
+  padding: 14px 18px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.briefing-help summary { cursor: pointer; color: var(--soft); font-weight: 600; }
+.briefing-help ol { margin: 12px 0 8px; padding-left: 20px; line-height: 1.7; }
+.briefing-help code {
+  font-size: 12px; color: var(--text);
+  background: rgba(255,255,255,0.06);
+  padding: 1px 6px; border-radius: 6px;
+  word-break: break-all;
+}
+
+@media (max-width: 760px) {
+  .briefing-desks { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .briefing-card { padding: 16px; }
+  .briefing-btn { margin-left: 0; }
+}

@@ -47,6 +47,7 @@ const { createMarketSessionRouter } = require("./routes/market-session");
 const { createBroadcastLedgerRouter } = require("./routes/broadcast-ledger");
 const { createReporterRouter } = require("./routes/reporter");
 const { createReporterNewsLogRouter } = require("./routes/reporter-news-log");
+const { createPhoneBriefingsRouter } = require("./routes/phone-briefings");
 const { createFarmclawHandoffRouter } = require("./routes/farmclaw-handoffs");
 const { createFarmclawNewsPreviewsRouter } = require("./routes/farmclaw-news-previews");
 const { createNewsroomRouter } = require("./routes/newsroom");
@@ -106,6 +107,7 @@ const { BroadcastLedgerStore } = require("./services/broadcast-ledger");
 const { BroadcastLedgerNotificationService } = require("./services/broadcast-ledger-notifications");
 const { ReporterService } = require("./services/reporter");
 const { ReporterNewsLogStore } = require("./services/reporter-news-log");
+const { PhoneBriefingStore, CATEGORIES: PHONE_BRIEFING_CATEGORIES } = require("./services/phone-briefings");
 const { FarmclawHandoffStore } = require("./services/farmclaw-handoffs");
 const { FarmclawPusher } = require("./services/farmclaw-pusher");
 const { createOpenclawHookDeliverer } = require("./services/farmclaw-openclaw");
@@ -121,6 +123,8 @@ const { createRequireAdmin } = require("./middleware/admin-auth");
 const { createRequireLedgerKey } = require("./middleware/ledger-auth");
 const { createRequireApproverKey } = require("./middleware/approver-auth");
 const { createSiteAuth } = require("./middleware/site-auth");
+
+const PHONE_BRIEFING_PAGES = new Set(PHONE_BRIEFING_CATEGORIES.map((category) => category.key));
 
 /**
  * The FarmClaw button's direct push to the FarmClaw OpenClaw agent. Disabled
@@ -193,6 +197,7 @@ function createApp() {
   // (approved, FarmBot-queued, posted). Separate from the broadcast ledger:
   // logging an item here never implies it was sent.
   const reporterNewsLogStore = new ReporterNewsLogStore({ dataDir });
+  const phoneBriefingStore = new PhoneBriefingStore({ dataDir });
   // X posts queued for the FarmClaw agent, which pulls and acknowledges them.
   const farmclawHandoffStore = new FarmclawHandoffStore({ dataDir });
   const farmclawPusher = createFarmclawPusher(farmclawHandoffStore, config.farmclawOpenclaw);
@@ -586,10 +591,20 @@ function createApp() {
   app.use("/layout-screenshots", express.static(layoutScreenshotsDir));
   app.use("/ai-analysis-screenshots", express.static(aiAnalysisScreenshotsDir));
 
-  app.get(["/emerging-markets.html", "/economics-top-10.html", "/markets-top-10.html"], (req, res) => {
+  // The Reporter menu's desk pages now show what the phone Shortcut generated
+  // (see routes/phone-briefings.js) instead of generating through the API.
+  // The old desk URLs stay reachable and land on the page that replaced them.
+  app.get(["/briefings/:category", "/briefings/:category/"], (req, res, next) => {
+    if (!PHONE_BRIEFING_PAGES.has(req.params.category)) {
+      next();
+      return;
+    }
     res.setHeader("Cache-Control", "no-store");
-    res.sendFile(path.join(__dirname, "..", "public", "reporter.html"));
+    res.sendFile(path.join(__dirname, "..", "public", "briefing.html"));
   });
+  app.get("/emerging-markets.html", (req, res) => res.redirect(301, "/briefings/geopolitics"));
+  app.get("/economics-top-10.html", (req, res) => res.redirect(301, "/briefings/economics"));
+  app.get("/markets-top-10.html", (req, res) => res.redirect(301, "/briefings/stocks"));
 
   app.use(
     "/api/health",
@@ -673,6 +688,14 @@ function createApp() {
       newsLogStore: reporterNewsLogStore,
       requireLedgerKey,
       requireApproverKey,
+      rateLimitPerMinute: config.broadcastLedger.rateLimitPerMinute,
+    }),
+  );
+  app.use(
+    "/api/phone-briefings",
+    createPhoneBriefingsRouter({
+      briefingStore: phoneBriefingStore,
+      requireLedgerKey,
       rateLimitPerMinute: config.broadcastLedger.rateLimitPerMinute,
     }),
   );

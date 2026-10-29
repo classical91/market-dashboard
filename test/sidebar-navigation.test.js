@@ -31,18 +31,23 @@ test("primary sidebar order and removed links stay exact", () => {
 });
 
 test("the Reporter menu can actually reach the Reporter Room", () => {
-  // The three desk pages share reporter.html but strip the News Intelligence
-  // tab, Master News, the desk statuses and the newsroom controls. Without a
+  // The four briefing pages only show what the phone Shortcut sent; without a
   // link to /reporter.html the newsroom is unreachable from the navigation.
   const start = sidebar.indexOf('label: "Reporter"');
   const reporter = sidebar.slice(start, sidebar.indexOf('label: "Market Intel Links"'));
   assert.match(reporter, /href: "\/reporter\.html", label: "Reporter Room"/);
-  const order = ["Reporter Room", "Emerging Markets", "Economics Top 10", "Markets Top 10"];
+  const order = ["Reporter Room", "Geopolitics", "Economics", "Stocks", "Crypto"];
   let cursor = -1;
   for (const label of order) {
     const next = reporter.indexOf(`label: "${label}"`, cursor + 1);
     assert.ok(next > cursor, `${label} is missing or out of order under Reporter`);
     cursor = next;
+  }
+  for (const desk of ["geopolitics", "economics", "stocks", "crypto"]) {
+    assert.match(reporter, new RegExp(`href: "/briefings/${desk}"`));
+  }
+  for (const obsolete of ["Emerging Markets", "Economics Top 10", "Markets Top 10"]) {
+    assert.doesNotMatch(reporter, new RegExp(`label: "${obsolete}"`));
   }
 });
 
