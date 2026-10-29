@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Briefing · Market Command</title>
+  <script src="/assets/js/settings.js"></script>
+  <link rel="stylesheet" href="/assets/styles/command.css" />
+  <link rel="stylesheet" href="/assets/styles/briefing.css" />
+</head>
+<body>
+<div class="app">
+  <aside class="cmd-sidebar"></aside>
+  <main class="cmd-main">
+
+    <div class="cmd-page-header">
+      <div>
+        <div class="cmd-page-title" id="briefingTitle">Briefing</div>
+        <div class="cmd-page-subtitle">Generated on your phone with the Shortcut · read here</div>
+      </div>
+    </div>
+
+    <!-- One chip per desk, each with how long ago the phone last sent it. -->
+    <nav class="briefing-desks" id="briefingDesks" aria-label="Briefing desks"></nav>
+
+    <section class="briefing-card" aria-live="polite">
+      <div class="briefing-toolbar">
+        <span class="briefing-age" id="briefingAge">Loading…</span>
+        <label class="briefing-run-picker" id="briefingRunPicker" hidden>
+          <span>Run</span>
+          <select id="briefingRunSelect"></select>
+        </label>
+        <button type="button" class="briefing-btn" id="briefingCopy" hidden>Copy text</button>
+      </div>
+      <h2 class="briefing-heading" id="briefingHeading" hidden></h2>
+      <article class="briefing-body" id="briefingBody"></article>
+    </section>
+
+    <details class="briefing-help" id="briefingHelp">
+      <summary>Send briefings from the iPhone Shortcut</summary>
+      <ol>
+        <li>After the <strong>Ask ChatGPT</strong> step, add <strong>Get Contents of URL</strong>.</li>
+        <li>URL: <code id="briefingEndpoint">/api/phone-briefings/geopolitics</code></li>
+        <li>Method <strong>POST</strong>. Header <code>x-broadcast-key</code> = your <code>BROADCAST_LEDGER_API_KEY</code>.</li>
+        <li>Request Body <strong>JSON</strong>, one field: <code>text</code> = the ChatGPT result.</li>
+        <li>Repeat for each desk, changing the last part of the URL to
+          <code>geopolitics</code>, <code>economics</code>, <code>stocks</code> or <code>crypto</code>.</li>
+      </ol>
+      <p>Sending the same text twice is harmless: it is stored once.</p>
+    </details>
+
+    <footer>Market Command &mdash; briefings generated with ChatGPT on your phone</footer>
+  </main>
+</div>
+
+<script src="/assets/js/sidebar.js"></script>
+<script src="/assets/js/briefing.js"></script>
+</body>
+</html>
