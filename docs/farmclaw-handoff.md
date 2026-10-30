@@ -157,7 +157,10 @@ queue or approver credentials into this file or the agent runtime.
 The scheduled pass does not invoke Railway or depend on an interactive CLI
 login. The optional `-LogFile` records redacted diagnostics and exit status.
 Manual invocation defaults to `doctor`, and scheduled runs claim one handoff
-per pass. Keep the existing one-minute hidden launcher and instance policy.
+per pass. Keep the one-minute hidden launcher and IgnoreNew instance policy,
+but set ExecutionTimeLimit to 15 minutes: a one-minute execution limit kills
+the launcher before source verification and receipt handling can complete.
+The delivery timeout is 12 minutes and the agent timeout is 10 minutes.
 
 The companion `farmclaw-session-deliver.ps1` uses a stable session per handoff,
 preserving retry identity while avoiding a busy Telegram conversation session.
