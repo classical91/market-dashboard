@@ -144,6 +144,27 @@ up. A receipt for a handoff whose lease expired is still accepted.
 
 ## FarmClaw's collector and task store
 
+### Windows scheduled host
+
+Use `scripts/run-farmclaw-collector.ps1 -Mode doctor` for a no-run preflight,
+then `-Mode run` for the scheduled pass. It reads only the dashboard machine
+key from a Windows DPAPI SecureString file at
+`%LOCALAPPDATA%\OpenClaw\Secrets\farmclaw-collector-key.xml`. Provision it as
+the scheduled task's existing Windows user, restrict its ACL to that user and
+SYSTEM, and keep it outside the agent workspace. Do not copy Railway, admin,
+queue or approver credentials into this file or the agent runtime.
+
+The scheduled pass does not invoke Railway or depend on an interactive CLI
+login. The optional `-LogFile` records redacted diagnostics and exit status.
+Manual invocation defaults to `doctor`, and scheduled runs claim one handoff
+per pass. Keep the existing one-minute hidden launcher and instance policy.
+
+The companion `farmclaw-session-deliver.ps1` uses a stable session per handoff,
+preserving retry identity while avoiding a busy Telegram conversation session.
+Reserved delivery tests do not send a Telegram reply or prepare content.
+The collector's current handoff prompt authorizes only a saved preview; human
+approval and timer activation remain in FarmBot.
+
 `scripts/farmclaw-collector.js` is the consumer. Run it on FarmClaw's host,
 not on the dashboard. Each pass does four things, in order:
 
