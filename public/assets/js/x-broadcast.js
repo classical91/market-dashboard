@@ -444,6 +444,18 @@
 
     function settle(handoff) {
       var record = (handoff && handoff.record) || handoff || {};
+      var queue = handoff && handoff.farmbotQueue;
+      if (queue && queue.confirmed === true) {
+        rememberSent(url, null, FARMCLAW_SENT_KEY);
+        forgetSent(url, FARMCLAW_QUEUED_KEY);
+        var detail = "FarmBot Queue #" + queue.queueItemId + (queue.dispatchActive === false ? " — held for your review and activation." : " — " + queue.dispatchStatus + ".");
+        show("FarmBot queued", detail, detail);
+        return true;
+      }
+      if (queue && queue.removed === true) {
+        show("Removed from Queue", "This post was removed from FarmBot Queue.", "Removed from FarmBot Queue; repeated taps will not recreate it.");
+        return true;
+      }
       if (record.status === "received") {
         var receipt = record.receipt || {};
         if (!hasDeliveryProof(receipt)) {
@@ -454,7 +466,7 @@
         rememberSent(url, null, FARMCLAW_SENT_KEY);
         forgetSent(url, FARMCLAW_QUEUED_KEY);
         show(FARMCLAW_LABELS.sent, "Received by the FarmClaw agent (" + receipt.receiptId + "). FarmBot queueing and broadcasting are not confirmed here.", "FarmClaw received the link. This does not confirm a Farm queue entry.");
-        return true;
+        return false;
       }
       forgetSent(url, FARMCLAW_SENT_KEY);
       rememberSent(url, null, FARMCLAW_QUEUED_KEY);
