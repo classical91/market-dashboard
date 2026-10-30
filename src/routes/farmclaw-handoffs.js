@@ -4,6 +4,7 @@ const { Router } = require("express");
 const { createRateLimit } = require("../middleware/rate-limit");
 const { isLedgerRequest } = require("../middleware/ledger-auth");
 const { pushWithin } = require("../services/farmclaw-pusher");
+const { createFarmclawQueueStatus } = require("../services/farmclaw-queue-status");
 
 /**
  * FarmClaw handoff queue — see src/services/farmclaw-handoffs.js.
@@ -47,8 +48,9 @@ async function requestAndPush(store, pusher, body) {
   return result;
 }
 
-function createFarmclawHandoffRouter({ handoffStore, pusher = null, requireAdmin, requireLedgerKey, ledgerKey, adminKey, rateLimitPerMinute = 60 }) {
+function createFarmclawHandoffRouter({ handoffStore, pusher = null, requireAdmin, requireLedgerKey, ledgerKey, adminKey, rateLimitPerMinute = 60, env = process.env, fetcher = fetch }) {
   const router = Router();
+  const queueStatus = createFarmclawQueueStatus({ env, fetcher });
   const limiter = createRateLimit({ limit: rateLimitPerMinute, windowMs: 60 * 1000 });
 
   // Reads serve both the dashboard (owner session or admin key) and FarmClaw
@@ -95,22 +97,22 @@ function createFarmclawHandoffRouter({ handoffStore, pusher = null, requireAdmin
 
   // Unlike POST, a page reload must never retry a failed handoff or push it
   // again. Lookup uses the same canonical URL as request(), without writes.
-  router.get("/lookup", requireEither, handle((req, res) => {
+  router.get("/lookup", requireEither, handle(async (req, res) => {
     const record = handoffStore.findByUrl(req.query.url);
     if (!record) {
       res.status(404).json({ error: "Handoff not found" });
       return;
     }
-    res.json({ ...record, agent: handoffStore.agentStatus(), push: { enabled: Boolean(pusher?.enabled) } });
+    res.json({ ...record, farmbotQueue: await queueStatus(record), agent: handoffStore.agentStatus(), push: { enabled: Boolean(pusher?.enabled) } });
   }));
 
-  router.get("/:id", requireEither, handle((req, res) => {
+  router.get("/:id", requireEither, handle(async (req, res) => {
     const record = handoffStore.get(req.params.id);
     if (!record) {
       res.status(404).json({ error: "Handoff not found" });
       return;
     }
-    res.json({ ...record, agent: handoffStore.agentStatus(), push: { enabled: Boolean(pusher?.enabled) } });
+    res.json({ ...record, farmbotQueue: await queueStatus(record), agent: handoffStore.agentStatus(), push: { enabled: Boolean(pusher?.enabled) } });
   }));
 
   router.post("/:id/receipt", requireLedgerKey, limiter, handle((req, res) => {

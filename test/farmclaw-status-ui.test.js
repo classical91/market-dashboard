@@ -33,6 +33,16 @@ function fixture() {
 function response(body, status = 200) { return { ok: status < 400, status, text: async () => JSON.stringify(body) }; }
 const received = { id: "fch_123", status: "received", receipt: { receiptId: "openclaw-run:123" } };
 
+test("button keeps checking after delivery, then shows the confirmed FarmBot Queue id and hold", async () => {
+  const f = fixture();
+  f.reads[0].resolve(response(received)); await flush();
+  assert.equal(f.button.textContent, "FarmClaw received"); assert.equal(f.timers.length,1);
+  f.timers[0]();
+  f.reads[1].resolve(response({ ...received, farmbotQueue: { confirmed:true,queueItemId:"42",dispatchActive:false,dispatchStatus:"PENDING" } }));
+  await flush(); assert.equal(f.button.textContent,"FarmBot queued");
+  assert.match(f.notes[0].textContent,/Queue #42.*held/); assert.equal(f.writes.length,0);
+});
+
 test("restored queued button reads latest receipt without re-submitting", async () => {
   const f = fixture();
   assert.match(f.reads[0].target, /\/lookup\?url=/);

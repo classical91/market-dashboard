@@ -3,31 +3,25 @@
 How the **FarmClaw** button on X Intelligence cards gets a post to the FarmClaw
 agent, and how the dashboard knows it got there.
 
-## Handoff, preview and posting queue
+## Handoff and FarmBot Queue
 
-The dashboard handoff queue is separate from FarmBot's posting queue. These are
-three different milestones:
+1. The button sends the selected X post to FarmClaw. The collector or hook
+   receipt establishes agent delivery only.
+2. FarmClaw reads and verifies the post, drafts original copy, and runs the
+   installed farmclaw-x-queue.mjs --lookup / --queue helper with its scoped
+   preparer credential. The helper verifies the exact durable receipt and
+   held FarmBot Queue row. Retries keep the status-based identity.
+3. The post appears in FarmBot Queue, held until Jason activates it there.
+   News Preview is exclusively for Top 5 news and keeps its existing human
+   approval flow. Single selected X posts do not require a news approval.
 
-1. A handoff is saved here and delivered to the FarmClaw agent. A receipt proves
-   delivery only; it does not prove a preview was saved or a post was queued.
-2. FarmClaw verifies the supplied link and prepares a one-story durable FarmBot
-   preview with its installed `farmclaw-news-batch.mjs` preparer helper. It returns
-   the saved batch ID, revision, content hash and FarmBot review link, or a blocker.
-3. Jason reviews and approves the exact saved revision in the FarmBot dashboard.
-   Approval creates held posting queue entries; **Start normal timers** is a
-   separate human action. This handoff authorizes preview preparation only.
-
-FarmBot retired `queue-x-link.mjs` and `/api/x-link/queue`; the latter returns
-HTTP 410. Do not use those old direct-queue paths. The preparer uses only its
-configured access, retains a stable supported client batch ID across retries,
-and looks it up before saving. Article/image evidence, honest candidate-pool
-shortfalls and image blockers remain required by FarmBot's preview workflow.
-Missing access or evidence must be reported as a blocker.
-
-Both delivery paths below send this processing request with the link. Source
-excerpts are quoted and labeled as untrusted data. Updating the request does
-not connect an unavailable gateway or start a missing collector; delivery must
-also be configured and verified.
+The dashboard checks FarmBot's authoritative X-link receipt with the existing
+FARMBOT_NEWS_API_URL and FARMBOT_NEWS_READER_TOKEN, and shows FarmBot queued
+only with that proof. Unknown state and agent delivery alone never imply a
+queue row. The read-only lookup uses a short cache and sends no secrets to the
+browser. Source excerpts are quoted as untrusted data. The legacy shared-key
+queue-x-link.mjs and /api/x-link/queue remain retired. The preparer cannot
+activate, broadcast or publish. Missing source evidence/access is a blocker.
 
 ## Direct push (recommended)
 
