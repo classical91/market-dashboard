@@ -10,8 +10,9 @@ agent, and how the dashboard knows it got there.
 2. FarmClaw reads and verifies the post, drafts original copy, and runs the
    installed farmclaw-x-queue.mjs --lookup / --queue helper with its scoped
    preparer credential. The helper verifies the exact durable receipt and
-   held FarmBot Queue row. Retries keep the status-based identity.
-3. The post appears in FarmBot Queue, held until Jason activates it there.
+   timed FarmBot Queue row. Retries keep the status-based identity.
+3. The post appears in FarmBot Queue with an automatic timer on the existing
+   Minutes Between Queue Posts cadence. No extra Activate step is required.
    News Preview is exclusively for Top 5 news and keeps its existing human
    approval flow. Single selected X posts do not require a news approval.
 
@@ -20,8 +21,8 @@ FARMBOT_NEWS_API_URL and FARMBOT_NEWS_READER_TOKEN, and shows FarmBot queued
 only with that proof. Unknown state and agent delivery alone never imply a
 queue row. The read-only lookup uses a short cache and sends no secrets to the
 browser. Source excerpts are quoted as untrusted data. The legacy shared-key
-queue-x-link.mjs and /api/x-link/queue remain retired. The preparer cannot
-activate, broadcast or publish. Missing source evidence/access is a blocker.
+queue-x-link.mjs and /api/x-link/queue remain retired. The preparer cannot edit/reactivate existing Queue rows or invoke an
+immediate broadcast or publication. Retries retain the exact existing timer. Missing source evidence/access is a blocker.
 
 ## Direct push (recommended)
 
