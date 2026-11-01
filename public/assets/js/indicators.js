@@ -1508,6 +1508,421 @@
     },
   ];
 
+  // Everyday trading terms the glossary was still missing: order types,
+  // leverage mechanics, options basics, classic chart/candle patterns,
+  // on-chain valuation, crypto token basics and macro releases.
+  var ESSENTIALS_GLOSSARY = [
+    // ── Order Types & Execution ───────────────────────────────────────
+    {
+      id: "market-order", term: "Market Order", category: "Order Types & Execution",
+      def: "An order to buy or sell immediately at the best price currently available in the order book.",
+      read: "You are guaranteed a fill but not a price. In thin or fast markets a large market order can walk the book and fill well away from the last quoted price, so check depth and spread before using one.",
+      pages: [{ label: "Indicators Glossary → Slippage", href: "/indicators.html#term-slippage" }],
+    },
+    {
+      id: "limit-order", term: "Limit Order", category: "Order Types & Execution",
+      def: "An order to buy at or below, or sell at or above, a price you set. It rests in the order book until price reaches it or you cancel it.",
+      read: "You control the price but not whether you get filled. Limit orders usually pay lower (maker) fees, but in a fast move price can run straight past your level without filling you.",
+      pages: [{ label: "Indicators Glossary → Makers vs. Takers", href: "/indicators.html#term-makers-vs-takers" }],
+    },
+    {
+      id: "stop-loss-order", term: "Stop-Loss Order", category: "Order Types & Execution",
+      def: "A conditional order that closes a position once price reaches a set trigger level, capping the loss on the trade. A stop-market fills at market once triggered; a stop-limit places a limit order instead.",
+      read: "Place stops where the trade idea is proven wrong (beyond structure), not at an arbitrary percentage. A stop-limit can fail to fill in a gap or crash, so a stop-market is the safer protective exit.",
+      pages: [{ label: "Indicators Glossary → Trailing Stop", href: "/indicators.html#term-trailing-stop" }],
+    },
+    {
+      id: "take-profit-order", term: "Take-Profit Order", category: "Order Types & Execution",
+      def: "A conditional order that closes all or part of a position once price reaches a set profit target.",
+      read: "Scaling out with several take-profits (e.g. a third at each target) locks in gains while leaving a runner. Pair it with reduce-only so the order can never open a new position.",
+      pages: [{ label: "Indicators Glossary → Reduce Only", href: "/indicators.html#term-reduce-only" }],
+    },
+
+    // ── Futures & Derivatives ─────────────────────────────────────────
+    {
+      id: "leverage-margin", term: "Leverage & Margin", category: "Futures & Derivatives",
+      def: "Margin is the collateral you post to open a position; leverage is the position size divided by that collateral. $1,000 of margin at 10x controls a $10,000 position.",
+      read: "Leverage multiplies both gains and losses, and at 10x a roughly 10% move against you (less after fees) wipes out the margin. Size the position from your stop and risk first; leverage only decides how much collateral it ties up.",
+      pages: [{ label: "Indicators Glossary → Position Sizing", href: "/indicators.html#term-position-sizing" }],
+    },
+    {
+      id: "isolated-vs-cross-margin", term: "Isolated vs. Cross Margin", category: "Futures & Derivatives",
+      def: "Isolated margin limits a position's possible loss to the collateral assigned to it. Cross margin lets every position draw on the whole account balance to avoid liquidation.",
+      read: "Isolated keeps one bad trade from draining the account but liquidates sooner. Cross survives deeper moves but a single runaway position can take the entire balance with it.",
+    },
+    {
+      id: "liquidation-price", term: "Liquidation Price", category: "Futures & Derivatives",
+      def: "The price at which an exchange force-closes a leveraged position because its margin can no longer cover the losses. It depends on entry, leverage, margin mode and the maintenance-margin rate.",
+      read: "Your stop should always sit well before your liquidation price. Clusters of other traders' liquidation prices show up on liquidation heatmaps and often act as magnets for price.",
+      pages: [{ label: "Indicators Glossary → Liquidations", href: "/indicators.html#term-liquidations" }],
+    },
+    {
+      id: "perpetual-futures", term: "Perpetual Futures (Perps)", category: "Futures & Derivatives",
+      def: "Futures contracts with no expiry date, the most traded crypto derivative. A funding payment between longs and shorts keeps the perp price close to spot.",
+      read: "Because perps never expire, positioning can build up for weeks. Read them together with funding rate and open interest to see whether a move is driven by leverage or by spot buying.",
+      pages: [{ label: "Indicators Glossary → Funding Rate", href: "/indicators.html#term-funding-rate" }],
+    },
+    {
+      id: "mark-price", term: "Mark Price", category: "Futures & Derivatives",
+      def: "A fair-value price that exchanges calculate from spot index prices (plus a funding-based adjustment) and use for unrealized PnL and liquidations, instead of the contract's last traded price.",
+      read: "Mark price stops a single wick on one exchange from liquidating everyone. If the last price spikes but mark price does not, liquidations are not triggered.",
+    },
+    {
+      id: "contango-backwardation", term: "Contango & Backwardation", category: "Futures & Derivatives",
+      def: "Contango is when futures trade above spot (later expiries priced higher); backwardation is when futures trade below spot.",
+      read: "Steep contango in crypto signals heavy leveraged demand for longs. Backwardation is rarer and usually appears during fear or forced selling, when traders pay up to be short or hedged.",
+    },
+    {
+      id: "basis-trade", term: "Basis & Basis Trade", category: "Futures & Derivatives",
+      def: "The basis is the gap between a futures price and the spot price. The basis (cash-and-carry) trade buys spot and shorts the future to collect that gap with little directional exposure.",
+      read: "A high annualised basis shows strong demand for leveraged longs. Large basis trades unwinding can add selling pressure to spot and futures at the same time.",
+      pages: [{ label: "Indicators Glossary → CME Gap", href: "/indicators.html#term-cme-gap" }],
+    },
+    {
+      id: "call-option", term: "Call Option", category: "Futures & Derivatives",
+      def: "An options contract giving the holder the right, not the obligation, to buy the underlying asset at a set strike price before expiration. It gains value as the underlying rises.",
+      read: "Calls offer upside with risk capped at the premium paid, but time decay erodes them every day. Heavy call buying shows bullish positioning; sold calls are often income or hedging trades.",
+      pages: [{ label: "Indicators Glossary → Put Option", href: "/indicators.html#term-put-option" }],
+    },
+    {
+      id: "implied-volatility", term: "Implied Volatility (IV)", category: "Futures & Derivatives",
+      def: "The volatility the options market is pricing in for the future, backed out of option prices. In crypto it is often tracked through Deribit's DVOL index.",
+      read: "High IV makes options expensive and signals the market expects a big move; low IV makes them cheap. IV usually jumps before scheduled events (CPI, FOMC) and collapses after them.",
+      pages: [{ label: "Indicators Glossary → CRVOL", href: "/indicators.html#term-crvol" }],
+    },
+    {
+      id: "options-greeks", term: "Options Greeks", category: "Futures & Derivatives",
+      def: "Sensitivities of an option's price: Delta (to the underlying's price), Gamma (how fast delta changes), Theta (time decay), Vega (to implied volatility) and Rho (to interest rates).",
+      read: "Delta roughly approximates the chance an option expires in the money. Large dealer gamma exposure near a strike can pin price there, or accelerate moves through it once dealers are forced to hedge.",
+    },
+    {
+      id: "max-pain", term: "Max Pain", category: "Futures & Derivatives",
+      def: "The strike price at which the largest total value of options (calls and puts combined) would expire worthless.",
+      read: "Price sometimes drifts toward max pain into a large expiry, but it is a weak tendency, not a target. It matters most for big monthly and quarterly expiries.",
+      pages: [{ label: "Indicators Glossary → Options Expiration", href: "/indicators.html#term-options-expiration" }],
+    },
+    {
+      id: "put-call-ratio", term: "Put/Call Ratio", category: "Futures & Derivatives",
+      def: "Put volume or open interest divided by call volume or open interest for an asset or market.",
+      read: "A high ratio shows heavy hedging or bearish bets, and at extremes it is often read as contrarian bullish. A very low ratio shows call-heavy optimism that can mark froth.",
+    },
+
+    // ── Chart Patterns ────────────────────────────────────────────────
+    {
+      id: "double-top-bottom", term: "Double Top & Double Bottom", category: "Chart Patterns",
+      def: "A reversal pattern where price tests the same high twice and fails (double top, an “M”), or tests the same low twice and holds (double bottom, a “W”).",
+      read: "The pattern only confirms when price breaks the neckline, the swing between the two tests. The usual measured move is the pattern's height projected from the neckline break.",
+      pages: [{ label: "Indicators Glossary → Equal Highs and Lows", href: "/indicators.html#term-equal-highs-lows" }],
+    },
+    {
+      id: "bull-bear-flag", term: "Bull Flag & Bear Flag", category: "Chart Patterns",
+      def: "Continuation patterns: a sharp move (the pole) followed by a small, orderly channel that drifts against it (the flag) before the trend resumes.",
+      read: "The best flags retrace shallowly on falling volume, then break out with a volume expansion. The usual target is the pole's length added from the breakout point.",
+      pages: [{ label: "Indicators Glossary → Bull Pennant", href: "/indicators.html#term-bull-pennant" }],
+    },
+    {
+      id: "descending-triangle", term: "Descending Triangle", category: "Chart Patterns",
+      def: "A pattern with flat support underneath and a series of lower highs pressing down on it.",
+      read: "Usually bearish: sellers keep arriving lower while buyers defend one level until it gives way. A strong close back above the falling trendline invalidates the setup.",
+      pages: [{ label: "Indicators Glossary → Ascending Triangle", href: "/indicators.html#term-ascending-triangle" }],
+    },
+    {
+      id: "symmetrical-triangle", term: "Symmetrical Triangle", category: "Chart Patterns",
+      def: "A pattern of lower highs and higher lows converging toward a point, showing volatility compressing.",
+      read: "It is neutral until it breaks, though it more often continues the prior trend. Wait for a close outside the triangle; breakouts very near the apex tend to be weaker.",
+    },
+    {
+      id: "rising-wedge", term: "Rising Wedge", category: "Chart Patterns",
+      def: "A pattern where price makes higher highs and higher lows inside two upward-sloping, converging lines, with the lows rising faster than the highs.",
+      read: "Usually bearish: each push higher gains less ground, showing fading momentum. A break of the lower line, often with momentum divergence, is the trigger.",
+      pages: [{ label: "Indicators Glossary → Falling Wedge", href: "/indicators.html#term-falling-wedge" }],
+    },
+    {
+      id: "cup-and-handle", term: "Cup and Handle", category: "Chart Patterns",
+      def: "A bullish continuation pattern: a rounded U-shaped base (the cup) followed by a smaller, shallow pullback (the handle) just below the cup's rim.",
+      read: "A breakout above the rim on rising volume is the trigger. A handle that retraces more than about half of the cup weakens the pattern.",
+    },
+    {
+      id: "inverse-head-and-shoulders", term: "Inverse Head & Shoulders", category: "Chart Patterns",
+      def: "The bullish mirror of Head & Shoulders: three lows with the middle one (the head) lowest, and a neckline drawn across the two rally highs.",
+      read: "It confirms on a close above the neckline; a retest of the neckline from above is a common entry. Target is the head-to-neckline depth projected up from the breakout.",
+      pages: [{ label: "Indicators Glossary → Head & Shoulders (H&S)", href: "/indicators.html#term-head-and-shoulders" }],
+    },
+
+    // ── Candlestick Patterns ──────────────────────────────────────────
+    {
+      id: "three-soldiers-crows", term: "Three White Soldiers & Three Black Crows", category: "Candlestick Patterns",
+      def: "Three White Soldiers are three consecutive strong bullish candles, each closing near its high and higher than the last. Three Black Crows are the bearish mirror.",
+      read: "After a downtrend, soldiers signal a strong shift to buyers; after an uptrend, crows signal sellers taking control. Late in an extended move they can instead mark exhaustion.",
+    },
+    {
+      id: "harami", term: "Harami", category: "Candlestick Patterns",
+      def: "A two-candle pattern where a small candle's body sits entirely inside the previous, larger candle's body (Japanese for “pregnant”).",
+      read: "It shows momentum stalling. A bullish harami after a decline or a bearish harami after a rally is an early warning, which needs the next candle to confirm.",
+    },
+    {
+      id: "tweezer-tops-bottoms", term: "Tweezer Tops & Bottoms", category: "Candlestick Patterns",
+      def: "Two consecutive candles with matching (or nearly matching) highs, a tweezer top, or matching lows, a tweezer bottom.",
+      read: "They show the same level rejected twice in a row. They carry the most weight at a known support/resistance level or after a liquidity sweep.",
+    },
+    {
+      id: "marubozu", term: "Marubozu", category: "Candlestick Patterns",
+      def: "A candle with a full body and little or no wick on either end, so it opens at one extreme and closes at the other.",
+      read: "A bullish marubozu shows buyers in control from open to close; a bearish one shows sellers in control. At a breakout it signals strong conviction.",
+    },
+    {
+      id: "spinning-top", term: "Spinning Top", category: "Candlestick Patterns",
+      def: "A candle with a small body and upper and lower wicks of similar length.",
+      read: "It shows indecision, with neither side in control. After a strong trend it can warn of a pause or reversal, but it means little in the middle of a range.",
+      pages: [{ label: "Indicators Glossary → Doji", href: "/indicators.html#term-doji" }],
+    },
+
+    // ── Price Action & Liquidity ──────────────────────────────────────
+    {
+      id: "market-structure", term: "Market Structure (HH / HL / LH / LL)", category: "Price Action & Liquidity",
+      def: "The sequence of swing highs and lows. Higher highs and higher lows define an uptrend; lower highs and lower lows define a downtrend.",
+      read: "Structure is the backbone for every other tool: trade with it until it breaks. Losing the last higher low in an uptrend (or reclaiming the last lower high in a downtrend) is the first sign it is changing.",
+      pages: [
+        { label: "Indicators Glossary → Break of Structure (BOS)", href: "/indicators.html#term-break-of-structure" },
+        { label: "Indicators Glossary → Change of Character (ChoCh)", href: "/indicators.html#term-change-of-character" },
+      ],
+    },
+    {
+      id: "breakout-fakeout", term: "Breakout & Fakeout", category: "Price Action & Liquidity",
+      def: "A breakout is price moving decisively through a key level or pattern boundary. A fakeout (false breakout) pokes through the level and quickly returns inside.",
+      read: "Real breakouts close beyond the level with volume and hold on a retest. Fakeouts often sweep stops just past the level and then reverse hard, which can itself be a trade.",
+      pages: [{ label: "Indicators Glossary → Liquidity Hunt", href: "/indicators.html#term-liquidity-hunt" }],
+    },
+    {
+      id: "retest", term: "Retest", category: "Price Action & Liquidity",
+      def: "Price returning to a level it just broke to test it from the other side, such as old resistance acting as new support.",
+      read: "A clean retest that holds is often a lower-risk entry than chasing the breakout itself. If price slices back through the level, the breakout has failed.",
+      pages: [{ label: "Indicators Glossary → Support & Resistance", href: "/indicators.html#term-support-resistance" }],
+    },
+    {
+      id: "sell-side-liquidity", term: "Sell-Side Liquidity", category: "Price Action & Liquidity",
+      def: "Liquidity resting below price, mostly sell stops from long positions placed under swing lows, equal lows and range lows.",
+      read: "A drop below old lows may be a breakdown or a sweep. If price quickly reclaims the level after triggering those stops, the sweep often fuels a move higher.",
+      pages: [{ label: "Indicators Glossary → Buy-Side Liquidity", href: "/indicators.html#term-buy-side-liquidity" }],
+    },
+    {
+      id: "liquidity-sweep", term: "Liquidity Sweep", category: "Price Action & Liquidity",
+      def: "A quick move beyond an obvious high or low that triggers resting stops, followed by a return back inside the prior range.",
+      read: "The signal is the reclaim, not the wick: a candle closing back inside the range after the sweep suggests the move was a stop run and the opposite side is now the target.",
+      pages: [{ label: "Indicators Glossary → Stop Hunting", href: "/indicators.html#term-stop-hunting" }],
+    },
+    {
+      id: "wyckoff-method", term: "Wyckoff Method", category: "Price Action & Liquidity",
+      def: "A framework that reads markets as cycles of accumulation, markup, distribution and markdown, driven by large operators. Its ranges include named events such as the Spring, Upthrust and Sign of Strength.",
+      read: "In an accumulation range, a Spring (a dip below range support that is quickly reclaimed) is a classic long trigger. In distribution, an Upthrust above resistance that fails is the short equivalent.",
+      pages: [{ label: "Indicators Glossary → AMD / Power of Three (PO3)", href: "/indicators.html#term-amd-power-of-three" }],
+    },
+
+    // ── ICT / Smart Money Concepts ────────────────────────────────────
+    {
+      id: "premium-discount", term: "Premium & Discount Zones", category: "ICT / Smart Money Concepts",
+      def: "Splitting a trading range at its 50% level (equilibrium): the upper half is premium, the lower half is discount.",
+      read: "SMC traders look to buy in discount and sell in premium, in the direction of higher-timeframe structure. Buying in premium means paying up and usually gives a worse risk/reward.",
+      pages: [{ label: "Indicators Glossary → Optimal Trade Entry (OTE)", href: "/indicators.html#term-optimal-trade-entry" }],
+    },
+    {
+      id: "breaker-block", term: "Breaker Block", category: "ICT / Smart Money Concepts",
+      def: "An order block that failed: price broke through it with a structure shift, and the zone flips to act from the other side (a failed bullish block becomes resistance, and vice versa).",
+      read: "Breakers often form after a liquidity sweep and are traded on the return into the zone. They are most reliable when the break was displaced and created a fair value gap.",
+      pages: [{ label: "Indicators Glossary → Order Blocks", href: "/indicators.html#term-order-blocks" }],
+    },
+
+    // ── Technical Indicators ──────────────────────────────────────────
+    {
+      id: "vwap", term: "VWAP (Volume-Weighted Average Price)", category: "Technical Indicators",
+      def: "The average price traded during a session weighted by volume, usually resetting each day. Anchored VWAP starts the calculation from a chosen event such as a swing low or news candle.",
+      read: "Price above VWAP means today's buyers are in profit on average (intraday bullish bias); below it, sellers are. Institutions benchmark fills against VWAP, so it often acts as dynamic support or resistance.",
+    },
+    {
+      id: "golden-death-cross", term: "Golden Cross & Death Cross", category: "Technical Indicators",
+      def: "A golden cross is the 50-day moving average crossing above the 200-day; a death cross is the 50-day crossing below it.",
+      read: "Both lag price badly because they are built from long averages, so they confirm a trend change rather than predict one. They work best as a regime filter, not as entry signals.",
+      pages: [{ label: "Indicators Glossary → SMA (Simple Moving Average)", href: "/indicators.html#term-sma" }],
+    },
+    {
+      id: "supertrend", term: "Supertrend", category: "Technical Indicators",
+      def: "A trend-following overlay built from ATR: a single line that sits below price in an uptrend and flips above price in a downtrend.",
+      read: "A flip of the line gives a simple trend signal, and the line doubles as a trailing stop. Like most trend tools it whipsaws in ranges, so check ADX or structure first.",
+      pages: [{ label: "Indicators Glossary → ATR (Average True Range)", href: "/indicators.html#term-atr" }],
+    },
+    {
+      id: "williams-r", term: "Williams %R", category: "Technical Indicators",
+      def: "A momentum oscillator from 0 to −100 showing where the close sits within the recent high-low range, usually over 14 periods.",
+      read: "Above −20 is overbought and below −80 oversold. Like the stochastic it can stay pinned in strong trends, so use exits from the extremes rather than the extremes themselves.",
+      pages: [{ label: "Indicators Glossary → Stochastic Oscillator", href: "/indicators.html#term-stochastic-oscillator" }],
+    },
+    {
+      id: "keltner-channels", term: "Keltner Channels", category: "Technical Indicators",
+      def: "A volatility envelope: an EMA (often 20-period) with bands set a multiple of ATR above and below it.",
+      read: "Closes outside the channel signal strong momentum in that direction. Bollinger Bands contracting inside Keltner Channels is the classic “squeeze” that often precedes a big move.",
+      pages: [{ label: "Indicators Glossary → Bollinger Bands", href: "/indicators.html#term-bollinger" }],
+    },
+
+    // ── Trading Risk & Strategy ───────────────────────────────────────
+    {
+      id: "win-rate-expectancy", term: "Win Rate & Expectancy", category: "Trading Risk & Strategy",
+      def: "Win rate is the share of trades that make money. Expectancy is the average result per trade: (win rate × average win) − (loss rate × average loss).",
+      read: "A 35% win rate is profitable if winners are three times the size of losers; a 70% win rate loses money if losers are much bigger. Judge a strategy by expectancy over many trades, not by win rate.",
+      pages: [{ label: "Indicators Glossary → Risk/Reward Ratio (R:R)", href: "/indicators.html#term-risk-reward-ratio" }],
+    },
+    {
+      id: "sharpe-ratio", term: "Sharpe Ratio", category: "Trading Risk & Strategy",
+      def: "Return above the risk-free rate divided by the volatility of returns — how much return a strategy earns per unit of risk taken.",
+      read: "Above 1 is decent and above 2 strong for most strategies. It treats upside and downside swings the same, so the Sortino ratio (downside volatility only) is a useful companion.",
+    },
+    {
+      id: "dollar-cost-averaging", term: "Dollar-Cost Averaging (DCA)", category: "Trading Risk & Strategy",
+      def: "Investing a fixed amount at regular intervals regardless of price, instead of buying all at once.",
+      read: "DCA removes timing decisions and buys more units when prices are low. It suits long-term investing; averaging down into a losing leveraged trade is a different and much riskier thing.",
+      pages: [{ label: "Indicators Glossary → Trading vs. Investing", href: "/indicators.html#term-trading-vs-investing" }],
+    },
+    {
+      id: "mean-reversion", term: "Mean Reversion", category: "Trading Risk & Strategy",
+      def: "The tendency of price to return toward an average (a moving average, VWAP or value area) after stretching far away from it, and the strategies that trade that return.",
+      read: "Mean reversion works best in ranges and fails in strong trends, where “stretched” keeps getting more stretched. Define the regime first and keep stops tight.",
+      pages: [{ label: "Indicators Glossary → Ranging Market Indicators", href: "/indicators.html#term-ranging-market-indicators" }],
+    },
+    {
+      id: "trading-styles", term: "Scalping, Day Trading, Swing & Position Trading", category: "Trading Risk & Strategy",
+      def: "Trading styles defined by holding time: scalping (seconds to minutes), day trading (closed before the session ends), swing trading (days to weeks) and position trading (weeks to months).",
+      read: "Shorter holds mean more trades, so fees, spread and slippage matter far more. Pick the style that fits your schedule and stick to the matching timeframes.",
+      pages: [{ label: "Indicators Glossary → Intraday Charts", href: "/indicators.html#term-intraday-charts" }],
+    },
+    {
+      id: "backtesting", term: "Backtesting", category: "Trading Risk & Strategy",
+      def: "Testing a trading strategy's rules on historical data to estimate how it would have performed.",
+      read: "Include fees and slippage and keep out-of-sample data the strategy never saw. Tuning many parameters until the past looks perfect (overfitting) almost always fails live.",
+      pages: [{ label: "Trading Lab", href: "/trading-lab.html" }],
+    },
+    {
+      id: "multi-timeframe-analysis", term: "Multi-Timeframe Analysis (MTF)", category: "Trading Risk & Strategy",
+      def: "Reading the same market on several timeframes: a higher one for bias and key levels, and a lower one for entries.",
+      read: "A common combination is daily for bias, 4-hour for structure and 15-minute for entries. Trades aligned with the higher timeframe tend to have better follow-through.",
+    },
+
+    // ── On-Chain & Cycle ──────────────────────────────────────────────
+    {
+      id: "sopr", term: "SOPR (Spent Output Profit Ratio)", category: "On-Chain & Network",
+      def: "The price coins were sold at divided by the price they were acquired at, averaged over all coins moved on-chain that day.",
+      read: "Above 1 means coins are being sold at a profit on average; below 1 at a loss. In bull markets SOPR tends to bounce off 1 (holders refuse to sell at a loss); in bear markets 1 acts as resistance.",
+      pages: [{ label: "Indicators Glossary → On-Chain Metrics", href: "/indicators.html#term-on-chain-metrics" }],
+    },
+    {
+      id: "exchange-reserves", term: "Exchange Reserves", category: "On-Chain & Network",
+      def: "The total amount of a coin held in known exchange wallets.",
+      read: "Falling reserves over months show coins moving to self-custody, which shrinks the supply readily available to sell. Rising reserves can foreshadow selling, though exchange wallet labeling is never perfect.",
+      pages: [{ label: "Indicators Glossary → Exchange Inflow & Outflow", href: "/indicators.html#term-exchange-netflow" }],
+    },
+    {
+      id: "realized-price", term: "Realized Price & Realized Cap", category: "Cycle & Valuation",
+      def: "Realized cap values every coin at the price it last moved on-chain, approximating the market's total cost basis. Realized price is realized cap divided by supply: the average holder's cost.",
+      read: "Price trading below realized price means the average holder is at a loss, which has historically lined up with deep bear-market bottoms. It is also the denominator in MVRV.",
+      pages: [{ label: "Indicators Glossary → MVRV (Z-Score)", href: "/indicators.html#term-mvrv" }],
+    },
+    {
+      id: "bitcoin-halving", term: "Bitcoin Halving", category: "Cycle & Valuation",
+      def: "The event roughly every four years (every 210,000 blocks) when the new-BTC reward per block is cut in half. The April 2024 halving cut it from 6.25 to 3.125 BTC.",
+      read: "Halvings reduce new supply and have preceded past bull cycles, which is why the four-year cycle is anchored to them. As new issuance shrinks relative to supply and ETF flows, their effect is widely debated.",
+      pages: [{ label: "Indicators Glossary → Stock-to-Flow (S2F)", href: "/indicators.html#term-stock-to-flow" }],
+    },
+    {
+      id: "mayer-multiple", term: "Mayer Multiple", category: "Cycle & Valuation",
+      def: "Bitcoin's price divided by its 200-day moving average.",
+      read: "Readings far above about 2.4 have historically marked overheated markets, and readings below about 0.8 deep value. It is a simple gauge of how stretched price is from its long-term trend.",
+      pages: [{ label: "Indicators Glossary → SMA (Simple Moving Average)", href: "/indicators.html#term-sma" }],
+    },
+    {
+      id: "200-week-ma", term: "200-Week Moving Average", category: "Cycle & Valuation",
+      def: "The average weekly closing price over the last 200 weeks (about four years) — roughly one full Bitcoin cycle.",
+      read: "Bitcoin has historically bottomed near or briefly below the 200-week MA in bear markets, making it a long-term floor reference, not a trading signal.",
+    },
+
+    // ── Crypto Infrastructure ─────────────────────────────────────────
+    {
+      id: "tokenomics", term: "Tokenomics", category: "Crypto Infrastructure",
+      def: "The economics of a token: total and circulating supply, emissions and inflation, allocation to team and investors, vesting schedules, and what the token is actually used for.",
+      read: "A small circulating supply with a much larger fully diluted supply means steady future selling pressure. Check who holds the unlocked supply and what demand the token really has.",
+      pages: [{ label: "Indicators Glossary → Project Fundamentals", href: "/indicators.html#term-project-fundamentals" }],
+    },
+    {
+      id: "fdv", term: "Fully Diluted Valuation (FDV)", category: "Crypto Infrastructure",
+      def: "Token price multiplied by the maximum (or total) supply that will ever exist, rather than just the circulating supply.",
+      read: "A large gap between market cap and FDV means most tokens are still to be released. Compare FDV, not market cap, when judging whether a young token is cheap.",
+      pages: [{ label: "Indicators Glossary → Market Caps", href: "/indicators.html#term-market-caps" }],
+    },
+    {
+      id: "token-unlocks", term: "Token Unlocks", category: "Crypto Infrastructure",
+      def: "Scheduled dates when vested tokens held by teams, investors or treasuries become transferable.",
+      read: "Large unlocks (relative to daily volume and circulating supply) often weigh on price before and after the date. Track unlock calendars before holding small-cap tokens.",
+    },
+    {
+      id: "staking", term: "Staking", category: "Crypto Infrastructure",
+      def: "Locking tokens to help secure a proof-of-stake network in exchange for rewards, either directly as a validator or through a delegation or liquid staking service.",
+      read: "Staking yield is partly paid in newly issued tokens, so real yield is the reward minus inflation. Check lock-up periods and slashing risk before staking.",
+    },
+    {
+      id: "layer-2", term: "Layer 2 (L2)", category: "Crypto Infrastructure",
+      def: "A network built on top of a base blockchain (Layer 1, such as Ethereum) that processes transactions off the main chain and settles back to it, making them cheaper and faster. Examples include Arbitrum, Optimism and Base.",
+      read: "Growing L2 activity can lower Layer-1 fees and change where value accrues. Compare L2 TVL, users and fees to see which ecosystems are actually being used.",
+      pages: [{ label: "Indicators Glossary → Total Value Locked (TVL)", href: "/indicators.html#term-total-value-locked" }],
+    },
+
+    // ── Macro Economics ───────────────────────────────────────────────
+    {
+      id: "yield-curve-inversion", term: "Yield Curve & Inversion", category: "Macro Economics",
+      def: "The yield curve plots Treasury yields across maturities. It is inverted when short-term yields (e.g. the 2-year) are higher than long-term ones (e.g. the 10-year).",
+      read: "An inverted curve has preceded most US recessions, but often by a year or more. The re-steepening after a long inversion has historically been the more immediate warning.",
+      pages: [{ label: "Indicators Glossary → US10Y", href: "/indicators.html#term-us10y" }],
+    },
+    {
+      id: "pce", term: "PCE Price Index", category: "Macro Economics",
+      def: "Personal Consumption Expenditures prices — the inflation gauge the Federal Reserve targets at 2%. Core PCE excludes food and energy.",
+      read: "CPI usually moves markets more because it is released first, but the Fed sets policy against PCE. A core PCE surprise shifts rate-cut expectations.",
+      pages: [{ label: "Indicators Glossary → CPI / Inflation Rate", href: "/indicators.html#term-cpi" }],
+    },
+    {
+      id: "pmi", term: "PMI (Purchasing Managers' Index)", category: "Macro Economics",
+      def: "A monthly survey of purchasing managers on orders, output, employment and prices, published for manufacturing and services (ISM and S&P Global in the US).",
+      read: "Above 50 signals expansion and below 50 contraction. PMIs are released early in the month, so they are one of the first reads on whether the economy is speeding up or slowing down.",
+    },
+    {
+      id: "qe-qt", term: "Quantitative Easing & Tightening (QE / QT)", category: "Macro Economics",
+      def: "QE is a central bank buying bonds to inject liquidity and push down long-term rates; QT is shrinking its balance sheet by letting those bonds run off or selling them.",
+      read: "QE has historically been a tailwind for risk assets including crypto, while QT drains liquidity. Watch the Fed balance sheet alongside rate decisions.",
+      pages: [{ label: "Indicators Glossary → Global Liquidity", href: "/indicators.html#term-global-liquidity" }],
+    },
+    {
+      id: "m2-money-supply", term: "M2 Money Supply", category: "Macro & Global Liquidity",
+      def: "A broad measure of money: cash, checking and savings deposits, and money market funds. Global M2 adds up the largest economies' figures in US dollars.",
+      read: "Bitcoin has tended to track global M2 growth with a lag of a few months, since more money looking for a home tends to lift scarce assets. Treat it as a backdrop, not a timing tool.",
+      pages: [{ label: "Indicators Glossary → Global Liquidity", href: "/indicators.html#term-global-liquidity" }],
+    },
+
+    // ── Traditional Markets ───────────────────────────────────────────
+    {
+      id: "short-interest", term: "Short Interest", category: "Traditional Markets",
+      def: "The number of a stock's shares sold short and not yet covered, often shown as a percentage of the float or as days to cover.",
+      read: "High short interest shows strong bearish conviction, but it is also squeeze fuel: good news can force shorts to buy back at once.",
+      pages: [{ label: "Indicators Glossary → Short Squeeze", href: "/indicators.html#term-short-squeeze" }],
+    },
+    {
+      id: "market-breadth", term: "Market Breadth", category: "Traditional Markets",
+      def: "How many stocks are taking part in a move, measured by the advance/decline line, the share of stocks above their 200-day average, or new highs versus new lows.",
+      read: "An index rising while fewer stocks join in is a narrow, fragile rally. Broad participation confirms a healthy trend.",
+    },
+    {
+      id: "pe-ratio", term: "P/E Ratio (Price-to-Earnings)", category: "Traditional Markets",
+      def: "A stock's price divided by its earnings per share — how many dollars investors pay for each dollar of profit.",
+      read: "A high P/E means the market expects strong growth; a low P/E can mean value or trouble. Compare it with the company's own history and its sector, not across unrelated industries.",
+      pages: [{ label: "Indicators Glossary → Fundamental Analysis", href: "/indicators.html#term-fundamental-analysis" }],
+    },
+  ];
+
   var ALL_GLOSSARY = GLOSSARY.concat(USER_GLOSSARY)
     .concat(DECISION_ENGINE_GLOSSARY)
     .concat(MARKET_FUNDAMENTALS_GLOSSARY)
@@ -1519,7 +1934,8 @@
     .concat(VOLUME_FLOW_GLOSSARY)
     .concat(CHART_PATTERNS_GLOSSARY)
     .concat(CONFLUENCE_GLOSSARY)
-    .concat(DEFINITIONS_LIST_GLOSSARY);
+    .concat(DEFINITIONS_LIST_GLOSSARY)
+    .concat(ESSENTIALS_GLOSSARY);
 
   var CATEGORY_ORDER = [
     "Market Fundamentals",
@@ -1714,6 +2130,83 @@
     });
   }
 
+  // "Random topic": picks a concept the reader hasn't been sent to yet this
+  // session, so repeated taps walk through the glossary without repeats.
+  // Once every candidate has been seen, the history starts over.
+  var RANDOM_SEEN_KEY = "glossary.randomSeen";
+
+  function readSeen() {
+    try {
+      var raw = window.sessionStorage.getItem(RANDOM_SEEN_KEY);
+      var list = raw ? JSON.parse(raw) : [];
+      return Array.isArray(list) ? list : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function writeSeen(list) {
+    try {
+      window.sessionStorage.setItem(RANDOM_SEEN_KEY, JSON.stringify(list.slice(-ALL_GLOSSARY.length)));
+    } catch (_) {
+      /* storage blocked — random still works, just without the no-repeat memory */
+    }
+  }
+
+  // Pure picker (exported for tests): prefers entries not in `seen` and never
+  // returns `currentId` unless it is the only candidate.
+  function pickRandomEntry(pool, seen, currentId, rand) {
+    var random = rand || Math.random;
+    var candidates = (pool || []).filter(function (e) { return e.id !== currentId; });
+    if (!candidates.length) candidates = (pool || []).slice();
+    if (!candidates.length) return null;
+    var seenSet = {};
+    (seen || []).forEach(function (id) { seenSet[id] = true; });
+    var fresh = candidates.filter(function (e) { return !seenSet[e.id]; });
+    var from = fresh.length ? fresh : candidates;
+    return from[Math.floor(random() * from.length) % from.length];
+  }
+
+  // Sends the reader to a random concept page. `pool` defaults to the whole
+  // glossary; the glossary page passes the cards left after a search.
+  function goToRandomConcept(pool, currentId) {
+    var entries = pool && pool.length ? pool : ALL_GLOSSARY;
+    var seen = readSeen();
+    var poolIds = {};
+    entries.forEach(function (e) { poolIds[e.id] = true; });
+    var unseenLeft = entries.some(function (e) { return e.id !== currentId && seen.indexOf(e.id) === -1; });
+    if (!unseenLeft) {
+      // Everything in this pool has been read; forget it and start a new round.
+      seen = seen.filter(function (id) { return !poolIds[id]; });
+    }
+    var pick = pickRandomEntry(entries, seen, currentId);
+    if (!pick) return;
+    seen.push(pick.id);
+    writeSeen(seen);
+    window.location.assign(conceptHref(pick));
+  }
+
+  function setupRandomButton() {
+    var button = document.getElementById("glossaryRandom");
+    if (!button) return;
+    var byId = {};
+    ALL_GLOSSARY.forEach(function (e) { byId[e.id] = e; });
+    button.addEventListener("click", function () {
+      var search = document.getElementById("glossarySearch");
+      var pool = null;
+      if (search && search.value.trim()) {
+        // With a search active, stay within the matching concepts.
+        pool = [];
+        document.querySelectorAll(".glossary-card").forEach(function (card) {
+          if (card.style.display === "none") return;
+          var entry = byId[card.id.replace(/^term-/, "")];
+          if (entry) pool.push(entry);
+        });
+      }
+      goToRandomConcept(pool);
+    });
+  }
+
   function setupSidePanel() {
     var side = document.getElementById("glossarySide");
     var toggle = document.getElementById("glossarySideToggle");
@@ -1752,6 +2245,7 @@
   function init() {
     render();
     populateJumpMenu();
+    setupRandomButton();
     setupSidePanel();
     var search = document.getElementById("glossarySearch");
     if (search) {
@@ -1771,6 +2265,8 @@
     searchIndex: searchIndex,
     queryTokens: queryTokens,
     matchesQuery: matchesQuery,
+    pickRandomEntry: pickRandomEntry,
+    goToRandomConcept: goToRandomConcept,
   };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (typeof window !== "undefined") window.MarketGlossary = api;

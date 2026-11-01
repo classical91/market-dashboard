@@ -103,6 +103,27 @@
     .concept-pager .next { text-align: right; grid-column: 2; }
     .concept-pager-label { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
     .concept-pager-term { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .concept-random {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      margin-top: 10px;
+      padding: 12px 14px;
+      background: var(--blue-bg);
+      border: 1px solid rgba(77, 163, 255, 0.35);
+      border-radius: 14px;
+      color: var(--blue);
+      font-size: 14px;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    .concept-random:hover { border-color: var(--blue); background: rgba(77, 163, 255, 0.22); }
+    .concept-random:focus-visible { outline: none; box-shadow: var(--ui-focus); }
     .concept-related { margin-top: 28px; }
     .concept-related-list { display: flex; flex-wrap: wrap; gap: 6px; }
     .concept-related-list a {

@@ -83,3 +83,57 @@ test("glossary covers the Definitions Indicators list", () => {
     assert.ok(ids.has(id), `missing concept ${id}`);
   }
 });
+
+test("glossary links to other concepts always point at a real term", () => {
+  const { ALL_GLOSSARY } = require("../public/assets/js/indicators.js");
+  const ids = new Set(ALL_GLOSSARY.map((e) => e.id));
+  for (const entry of ALL_GLOSSARY) {
+    for (const page of entry.pages || []) {
+      const m = /^\/indicators\.html#term-(.+)$/.exec(page.href);
+      if (m) assert.ok(ids.has(m[1]), `${entry.id} links to unknown concept ${m[1]}`);
+    }
+  }
+});
+
+test("glossary covers everyday trading essentials", () => {
+  const { ALL_GLOSSARY } = require("../public/assets/js/indicators.js");
+  const ids = new Set(ALL_GLOSSARY.map((e) => e.id));
+  for (const id of [
+    "market-order", "limit-order", "stop-loss-order", "leverage-margin", "liquidation-price", "perpetual-futures",
+    "call-option", "implied-volatility", "double-top-bottom", "bull-bear-flag", "vwap", "golden-death-cross",
+    "market-structure", "liquidity-sweep", "win-rate-expectancy", "sopr", "bitcoin-halving", "tokenomics",
+    "yield-curve-inversion", "pce", "short-interest",
+  ]) {
+    assert.ok(ids.has(id), `missing concept ${id}`);
+  }
+  assert.ok(search("vwap").includes("VWAP (Volume-Weighted Average Price)"));
+  assert.ok(search("stop loss").includes("Stop-Loss Order"));
+});
+
+test("random topic picks unseen concepts and never repeats the current one", () => {
+  const { ALL_GLOSSARY, pickRandomEntry } = require("../public/assets/js/indicators.js");
+  const pool = ALL_GLOSSARY.slice(0, 4);
+  const [a, b, c, d] = pool.map((e) => e.id);
+
+  // Never returns the concept being read, whatever the random draw.
+  for (const r of [0, 0.3, 0.6, 0.999]) {
+    assert.notStrictEqual(pickRandomEntry(pool, [], a, () => r).id, a);
+  }
+  // Prefers concepts not seen yet this session.
+  assert.strictEqual(pickRandomEntry(pool, [b, c], a, () => 0.5).id, d);
+  // Once everything has been seen it still picks something other than the current one.
+  assert.notStrictEqual(pickRandomEntry(pool, [a, b, c, d], a, () => 0).id, a);
+  // A single-entry pool returns that entry; an empty pool returns null.
+  assert.strictEqual(pickRandomEntry([pool[0]], [], a, () => 0).id, a);
+  assert.strictEqual(pickRandomEntry([], [], null, () => 0), null);
+});
+
+test("random topic button is on the glossary page and every concept page", () => {
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const glossaryPage = fs.readFileSync(path.join(__dirname, "..", "public/indicators.html"), "utf8");
+  assert.match(glossaryPage, /<button class="glossary-random" id="glossaryRandom" type="button"/);
+  const conceptJs = fs.readFileSync(path.join(__dirname, "..", "public/assets/js/concept.js"), "utf8");
+  assert.match(conceptJs, /id="conceptRandom"/);
+  assert.match(conceptJs, /G\.goToRandomConcept\(null, id\)/);
+});
