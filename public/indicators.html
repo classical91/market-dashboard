@@ -245,6 +245,30 @@
       .glossary-side.open { transform: translateX(0); visibility: visible; }
       .glossary-side-backdrop.open { display: block; }
     }
+    .glossary-random {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 11px 18px;
+      background: var(--blue-bg);
+      border: 1px solid rgba(77, 163, 255, 0.35);
+      border-radius: 14px;
+      color: var(--blue);
+      font-size: 14px;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      white-space: nowrap;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    .glossary-random:hover { border-color: var(--blue); background: rgba(77, 163, 255, 0.22); }
+    .glossary-random:focus-visible { outline: none; box-shadow: var(--ui-focus); }
+    @media (max-width: 640px) {
+      /* Full-width tap target right under the title on phones. */
+      .glossary-random { width: 100%; }
+    }
     .glossary-card--highlight {
       border-color: var(--blue, #4da3ff);
       box-shadow: 0 0 0 2px rgba(77, 163, 255, 0.35);
@@ -308,6 +332,9 @@
         <div class="cmd-page-title">&#128218; Indicators Glossary</div>
         <div class="cmd-page-subtitle">What each metric means, how to read it, and where it shows up in this dashboard</div>
       </div>
+      <button class="glossary-random" id="glossaryRandom" type="button" title="Open a random concept (stays within your search results when searching)">
+        <span aria-hidden="true">&#127922;</span> Random topic
+      </button>
     </div>
 
     <div class="glossary-layout">

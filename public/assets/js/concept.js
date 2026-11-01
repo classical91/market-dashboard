@@ -15,12 +15,26 @@
   var id = new URLSearchParams(window.location.search).get("id") || "";
   var index = ordered.findIndex(function (entry) { return entry.id === id; });
 
+  function randomButtonHtml(label) {
+    return (
+      '<button class="concept-random" id="conceptRandom" type="button">' +
+      '<span aria-hidden="true">&#127922;</span> ' + label + "</button>"
+    );
+  }
+
+  function bindRandomButton() {
+    var button = document.getElementById("conceptRandom");
+    if (button) button.addEventListener("click", function () { G.goToRandomConcept(null, id); });
+  }
+
   if (index === -1) {
     document.title = "Concept not found · Indicators Glossary · Market Command";
     root.innerHTML =
       '<div class="concept-card"><p class="concept-missing">' +
       (id ? "There is no glossary concept called &ldquo;" + esc(id) + "&rdquo;." : "No concept was chosen.") +
-      ' Browse or search the <a href="/indicators.html">Indicators Glossary</a> instead.</p></div>';
+      ' Browse or search the <a href="/indicators.html">Indicators Glossary</a> instead.</p></div>' +
+      randomButtonHtml("Open a random concept");
+    bindRandomButton();
     return;
   }
 
@@ -66,10 +80,13 @@
     pagerLink(prev, "prev", "&larr; Previous") +
     pagerLink(next, "next", "Next &rarr;") +
     "</nav>" +
+    randomButtonHtml("Random topic") +
     (related
       ? '<section class="concept-related"><h2 class="concept-section-title">More in ' + esc(entry.category) + "</h2>" +
         '<div class="concept-related-list">' + related + "</div></section>"
       : "");
+
+  bindRandomButton();
 
   document.addEventListener("keydown", function (e) {
     if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
