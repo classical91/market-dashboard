@@ -41,7 +41,12 @@
   var entry = ordered[index];
   var prev = ordered[index - 1];
   var next = ordered[index + 1];
-  var categoryHref = "/indicators.html#" + G.slug(entry.category);
+  var categoryHref = G.topicHref(entry.category);
+  // Where this concept sits in its topic explainer, for the "Part of" note.
+  var section = G.topicSections(entry.category).filter(function (s) {
+    return s.entries.some(function (other) { return other.id === entry.id; });
+  })[0];
+  var explainerHref = categoryHref + (section ? "#term-" + encodeURIComponent(entry.id) : "");
   document.title = entry.term + " · Indicators Glossary · Market Command";
 
   crumbs.innerHTML =
@@ -75,6 +80,8 @@
     '<section class="concept-read"><h2 class="concept-section-title">How to read it</h2><p>' + esc(entry.read) + "</p></section>" +
     (entry.illustration ? '<div class="concept-illustration">' + entry.illustration + "</div>" : "") +
     (usedIn ? '<section><h2 class="concept-section-title">Where it shows up</h2><div class="concept-used-in">' + usedIn + "</div></section>" : "") +
+    '<p class="concept-topic-note">Part of the <a href="' + esc(explainerHref) + '">' + esc(entry.category) + " topic explainer</a>" +
+    (section ? " &middot; " + esc(section.title) : "") + "</p>" +
     "</article>" +
     '<nav class="concept-pager" aria-label="Previous and next concept">' +
     pagerLink(prev, "prev", "&larr; Previous") +
@@ -82,7 +89,8 @@
     "</nav>" +
     randomButtonHtml("Random topic") +
     (related
-      ? '<section class="concept-related"><h2 class="concept-section-title">More in ' + esc(entry.category) + "</h2>" +
+      ? '<section class="concept-related"><div class="concept-related-head"><h2 class="concept-section-title">More in ' + esc(entry.category) + "</h2>" +
+        '<a class="concept-topic-link" href="' + esc(categoryHref) + '">Read the topic explainer &rarr;</a></div>' +
         '<div class="concept-related-list">' + related + "</div></section>"
       : "");
 

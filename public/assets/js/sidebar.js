@@ -235,8 +235,8 @@
   function currentPath() {
     var path = window.location.pathname || "/";
     if (path === "/index.html") return "/";
-    // Single-concept pages belong to the Indicators Glossary.
-    if (path === "/concept.html") return "/indicators.html";
+    // Single-concept and topic explainer pages belong to the Indicators Glossary.
+    if (path === "/concept.html" || path === "/topic.html") return "/indicators.html";
     return path;
   }
 

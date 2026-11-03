@@ -125,6 +125,14 @@
     .concept-random:hover { border-color: var(--blue); background: rgba(77, 163, 255, 0.22); }
     .concept-random:focus-visible { outline: none; box-shadow: var(--ui-focus); }
     .concept-related { margin-top: 28px; }
+    .concept-related-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 12px; }
+    .concept-topic-link { font-size: 12px; font-weight: 700; color: var(--blue); text-decoration: none; }
+    .concept-topic-link:hover,
+    .concept-topic-link:focus-visible { text-decoration: underline; text-underline-offset: 3px; outline: none; }
+    .concept-topic-note { font-size: 13px; color: var(--muted); margin: 14px 0 0; line-height: 1.55; }
+    .concept-topic-note a { color: var(--blue); text-decoration: none; }
+    .concept-topic-note a:hover,
+    .concept-topic-note a:focus-visible { text-decoration: underline; outline: none; }
     .concept-related-list { display: flex; flex-wrap: wrap; gap: 6px; }
     .concept-related-list a {
       font-size: 13px;
@@ -186,6 +194,7 @@
 </div>
 
 <script src="/assets/js/sidebar.js"></script>
+<script src="/assets/js/glossary-topics.js"></script>
 <script src="/assets/js/indicators.js"></script>
 <script src="/assets/js/concept.js"></script>
 </body>

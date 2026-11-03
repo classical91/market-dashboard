@@ -35,6 +35,42 @@
       text-transform: uppercase;
       color: var(--muted);
     }
+    .glossary-category-intro {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 4px 12px;
+      margin-top: 6px;
+    }
+    .glossary-category-summary { font-size: 13px; line-height: 1.5; color: var(--soft); }
+    .glossary-topic-link {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--blue);
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .glossary-topic-link::after { content: " \2192"; }
+    .glossary-topic-link:hover,
+    .glossary-topic-link:focus-visible { text-decoration: underline; text-underline-offset: 3px; outline: none; }
+    .glossary-header-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+    .glossary-topics-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 11px 18px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 700;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .glossary-topics-button:hover { border-color: var(--border-hover); }
+    .glossary-topics-button:focus-visible { outline: none; box-shadow: var(--ui-focus); }
     .glossary-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
@@ -268,6 +304,8 @@
     @media (max-width: 640px) {
       /* Full-width tap target right under the title on phones. */
       .glossary-random { width: 100%; }
+      .glossary-header-actions { width: 100%; }
+      .glossary-header-actions > * { flex: 1 1 0; }
     }
     .glossary-card--highlight {
       border-color: var(--blue, #4da3ff);
@@ -332,9 +370,14 @@
         <div class="cmd-page-title">&#128218; Indicators Glossary</div>
         <div class="cmd-page-subtitle">What each metric means, how to read it, and where it shows up in this dashboard</div>
       </div>
-      <button class="glossary-random" id="glossaryRandom" type="button" title="Open a random concept (stays within your search results when searching)">
-        <span aria-hidden="true">&#127922;</span> Random topic
-      </button>
+      <div class="glossary-header-actions">
+        <a class="glossary-topics-button" href="/topic.html" title="Each category explained as one guided read">
+          <span aria-hidden="true">&#128214;</span> Topic explainers
+        </a>
+        <button class="glossary-random" id="glossaryRandom" type="button" title="Open a random concept (stays within your search results when searching)">
+          <span aria-hidden="true">&#127922;</span> Random topic
+        </button>
+      </div>
     </div>
 
     <div class="glossary-layout">
@@ -367,6 +410,7 @@
 </div>
 
 <script src="/assets/js/sidebar.js"></script>
+<script src="/assets/js/glossary-topics.js"></script>
 <script src="/assets/js/indicators.js"></script>
 </body>
 </html>
