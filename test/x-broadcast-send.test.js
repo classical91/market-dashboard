@@ -153,3 +153,49 @@ test("broadcasting needs a bot token, but not TELEGRAM_CHAT_IDS", async () => {
     /bot token/i,
   );
 });
+
+test("a chat that refuses the photo still gets the post, as text, and says so", async () => {
+  const calls = [];
+  global.fetch = async (url, init) => {
+    const body = JSON.parse(init.body);
+    const endpoint = String(url).split("/").pop();
+    calls.push({ endpoint, body });
+    if (endpoint === "sendPhoto" && body.chat_id === "-100222") {
+      return {
+        ok: false,
+        status: 400,
+        text: async () => '{"ok":false,"error_code":400,"description":"Bad Request: not enough rights to send photos to the chat"}',
+      };
+    }
+    return { ok: true, status: 200, json: async () => ({ result: { message_id: 700 + calls.length } }) };
+  };
+
+  const result = await service().postXPost(
+    { handle: "a", text: "chart", url: "https://x.com/a/1", image: "https://pbs.twimg.com/x.jpg" },
+    { targets: [{ chatId: "-100111" }, { chatId: "-100222", threadId: "6297" }] },
+  );
+
+  assert.equal(result.posted, 2);
+  const fallback = result.destinations.find((d) => d.chatId === "-100222");
+  assert.equal(fallback.status, "posted");
+  assert.match(fallback.photoDropped, /not enough rights/);
+  const textSend = calls.find((c) => c.endpoint === "sendMessage");
+  assert.equal(textSend.body.chat_id, "-100222");
+  assert.equal(textSend.body.message_thread_id, 6297, "the fallback stays in the same topic");
+});
+
+test("a photo send that fails in transport is not retried as text, so nothing is sent twice", async () => {
+  const calls = [];
+  global.fetch = async (url, init) => {
+    const endpoint = String(url).split("/").pop();
+    calls.push(endpoint);
+    if (endpoint === "sendPhoto") throw new Error("socket hang up");
+    return { ok: true, status: 200, json: async () => ({ result: { message_id: 1 } }) };
+  };
+
+  await assert.rejects(() => service().postXPost(
+    { handle: "a", text: "chart", url: "https://x.com/a/1", image: "https://pbs.twimg.com/x.jpg" },
+    { targets: [{ chatId: "-100111" }] },
+  ));
+  assert.deepEqual(calls, ["sendPhoto"]);
+});

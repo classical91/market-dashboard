@@ -462,6 +462,7 @@ function createXFeedRouter({
               label: channel ? channel.label : destination.chatId,
               status: destination.status,
               error: destination.error,
+              ...(destination.photoDropped ? { photoDropped: destination.photoDropped } : {}),
             };
           }),
         });

@@ -293,6 +293,7 @@
 
 .manage-status.is-error { color: var(--coral, var(--red)); }
 .manage-status.is-ok { color: var(--green, #2ECC71); }
+.manage-status.is-warn { color: var(--amber, #F5A623); }
 
 .manage-list {
   display: grid;
