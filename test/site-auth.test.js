@@ -245,3 +245,22 @@ test("wrong password stays on login", async () => {
   assert.equal(res.status, 401);
   assert.match(await res.text(), /Password was not accepted/);
 });
+
+test("random-topic link redirects owners to a random concept page and stays behind login", async () => {
+  const { ALL_GLOSSARY } = require("../public/assets/js/indicators.js");
+  const ids = new Set(ALL_GLOSSARY.map((entry) => entry.id));
+
+  const anonymous = await fetch(`${base}/random-topic`, { redirect: "manual" });
+  assert.notStrictEqual(anonymous.headers.get("location") || "", "");
+  assert.doesNotMatch(anonymous.headers.get("location"), /concept\.html/);
+
+  const { cookie } = await login("owner-password");
+  for (const target of ["/random-topic", "/concept/random"]) {
+    const res = await fetch(`${base}${target}`, { redirect: "manual", headers: { cookie } });
+    assert.strictEqual(res.status, 302);
+    assert.strictEqual(res.headers.get("cache-control"), "no-store");
+    const location = new URL(res.headers.get("location"), base);
+    assert.strictEqual(location.pathname, "/concept.html");
+    assert.ok(ids.has(location.searchParams.get("id")));
+  }
+});

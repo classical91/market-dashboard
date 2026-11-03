@@ -581,6 +581,16 @@ function createApp() {
   app.get(["/tradehunter/market-matrix", "/market-matrix"], (req, res) => {
     res.sendFile(path.join(__dirname, "..", "public", "market-matrix.html"));
   });
+  // A stable link for phone Shortcuts (and bookmarks) to the glossary's
+  // "Random topic" button: every hit redirects to a different random concept.
+  // Picked server-side and served no-store, so a cached response can't pin it
+  // to one concept. Stays behind site auth like every other page.
+  app.get(["/random-topic", "/concept/random"], (req, res) => {
+    const { ALL_GLOSSARY, pickRandomEntry, conceptHref } = require("../public/assets/js/indicators.js");
+    const pick = pickRandomEntry(ALL_GLOSSARY, [], null);
+    res.setHeader("Cache-Control", "no-store");
+    res.redirect(302, pick ? conceptHref(pick) : "/indicators.html");
+  });
   app.use(express.static(path.join(__dirname, "..", "public"), {
     setHeaders(res, filePath) {
       if (filePath.endsWith("reporter.html")) {
