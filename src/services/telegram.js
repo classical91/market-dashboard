@@ -260,6 +260,13 @@ function sanitizeBotToken(raw) {
     .trim();
 }
 
+// A definite refusal from the Bot API (4xx other than rate limiting), as
+// opposed to a transport failure whose outcome is unknown.
+function isTelegramRejection(err) {
+  const status = err && err.telegramStatus;
+  return Number.isInteger(status) && status >= 400 && status < 500 && status !== 429;
+}
+
 class TelegramService {
   constructor({ botToken, chatIds, dashboardUrl = "" }) {
     this._botToken = sanitizeBotToken(botToken);
@@ -323,11 +330,27 @@ class TelegramService {
         // caption, so the card the reader sees in Telegram is the card they
         // saw on the dashboard. Both calls answer with the same
         // {result:{message_id}} shape, so the receipt below is unaffected.
-        const response = options && options.photoUrl
-          ? await this._sendPhoto(target, options.photoUrl, text)
-          : await this._send(target, text, options);
+        let response;
+        let photoDropped = null;
+        if (options && options.photoUrl) {
+          try {
+            response = await this._sendPhoto(target, options.photoUrl, text);
+          } catch (photoErr) {
+            // Telegram refused the photo itself (a group that forbids media,
+            // a picture it could not fetch). The post is still worth sending
+            // as text. Only a definite 4xx answer falls back: a network error
+            // may have delivered, and a second send would duplicate it. If
+            // the text send fails too, its error is the one reported.
+            if (!isTelegramRejection(photoErr)) throw photoErr;
+            response = await this._send(target, text, options);
+            photoDropped = photoErr.message;
+          }
+        } else {
+          response = await this._send(target, text, options);
+        }
         results.push({
           ...base,
+          ...(photoDropped ? { photoDropped } : {}),
           status: "posted",
           messageId: response && response.result && response.result.message_id != null
             ? String(response.result.message_id)
@@ -357,7 +380,9 @@ class TelegramService {
     });
     if (!res.ok) {
       const responseBody = await res.text();
-      throw createServiceError(`Telegram sendPhoto failed (${res.status}): ${responseBody.slice(0, 300)}`, 502);
+      const error = createServiceError(`Telegram sendPhoto failed (${res.status}): ${responseBody.slice(0, 300)}`, 502);
+      error.telegramStatus = res.status;
+      throw error;
     }
     return res.json();
   }

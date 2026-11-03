@@ -295,3 +295,31 @@ test("the broadcast button is styled with the other card actions", () => {
   assert.match(css, /\.x-post-broadcast \{/);
   assert.match(css, /\.x-post-broadcast:focus-visible/, "keyboard users get the same focus ring");
 });
+
+test("a failed channel carries Telegram's reason, not just its name", () => {
+  const described = XBroadcast.describeResult({
+    sent: 1,
+    destinations: [
+      { label: "Updates", status: "posted" },
+      {
+        label: "Chat -1001841650798 · topic 6297",
+        status: "failed",
+        error: 'Telegram sendPhoto failed (400): {"ok":false,"error_code":400,"description":"Bad Request: message thread not found"}',
+      },
+    ],
+  });
+  assert.equal(described.tone, "error");
+  assert.match(described.message, /topic 6297 — Bad Request: message thread not found/);
+});
+
+test("a channel that took the post without its picture is reported, not hidden", () => {
+  const described = XBroadcast.describeResult({
+    sent: 2,
+    destinations: [
+      { label: "Updates", status: "posted" },
+      { label: "Stocks", status: "posted", photoDropped: 'Telegram sendPhoto failed (400): {"description":"Bad Request: not enough rights to send photos to the chat"}' },
+    ],
+  });
+  assert.equal(described.tone, "warn");
+  assert.match(described.message, /without the picture to Stocks \(Bad Request: not enough rights/);
+});

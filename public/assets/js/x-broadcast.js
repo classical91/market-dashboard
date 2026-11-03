@@ -105,21 +105,45 @@
   /* What to tell the reader about a completed send. A partial delivery is
      named channel by channel: "sent to 2 of 3" without saying which one failed
      is not something anyone can act on. */
+  /* Telegram's own sentence ("Bad Request: not enough rights to send photos")
+     out of the server's "Telegram sendPhoto failed (400): {...}" wrapper.
+     Without it the reader knows which channel failed but not what to fix. */
+  function telegramReason(error) {
+    var raw = String(error || "").trim();
+    if (!raw) return "";
+    var match = raw.match(/"description"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+    if (match) {
+      try { return JSON.parse('"' + match[1] + '"'); } catch (err) { return match[1]; }
+    }
+    return raw.length > 200 ? raw.slice(0, 200) + "…" : raw;
+  }
+
   function describeResult(result) {
     var destinations = (result && result.destinations) || [];
     var sent = result && typeof result.sent === "number" ? result.sent : 0;
     var failed = destinations.filter(function (destination) { return destination.status !== "posted"; });
+    var textOnly = destinations.filter(function (destination) {
+      return destination.status === "posted" && destination.photoDropped;
+    });
+    var note = textOnly.length
+      ? " Sent without the picture to " +
+        textOnly.map(function (destination) { return destination.label; }).join(", ") +
+        " (" + telegramReason(textOnly[0].photoDropped) + ")."
+      : "";
     if (!failed.length) {
       return {
-        tone: "ok",
-        message: "Broadcast to " + sent + (sent === 1 ? " channel." : " channels."),
+        tone: textOnly.length ? "warn" : "ok",
+        message: "Broadcast to " + sent + (sent === 1 ? " channel." : " channels.") + note,
       };
     }
     return {
       tone: "error",
       message:
         "Sent to " + sent + " of " + destinations.length + ". Failed: " +
-        failed.map(function (destination) { return destination.label; }).join(", ") + ".",
+        failed.map(function (destination) {
+          var reason = telegramReason(destination.error);
+          return destination.label + (reason ? " — " + reason : "");
+        }).join("; ") + "." + note,
     };
   }
 
@@ -334,6 +358,11 @@
           onSent(result);
           if (described.tone === "ok") {
             cleanup();
+            return;
+          }
+          if (described.tone === "warn") {
+            say(described.message, "warn");
+            syncSend();
             return;
           }
           // A partial delivery stays on screen with the failed channels
@@ -568,6 +597,7 @@
     rememberSent: rememberSent,
     wasSent: wasSent,
     describeResult: describeResult,
+    telegramReason: telegramReason,
     previewText: previewText,
     open: open,
     bindBroadcastButton: bindBroadcastButton,
