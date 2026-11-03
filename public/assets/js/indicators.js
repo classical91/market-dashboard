@@ -1982,16 +1982,83 @@
     return "/concept.html?id=" + encodeURIComponent(entry.id);
   }
 
-  // The order concepts appear on the glossary page: categories in
-  // CATEGORY_ORDER, terms A–Z within each. Concept pages page through it.
-  function orderedEntries() {
-    var byCategory = {};
-    ALL_GLOSSARY.forEach(function (entry) {
-      (byCategory[entry.category] = byCategory[entry.category] || []).push(entry);
+  // ── Topic explainers ───────────────────────────────────────────────
+  // Each category doubles as a topic with a written explainer (intro, why it
+  // matters, a guided walk through its concepts, takeaways). The text lives
+  // in glossary-topics.js, which the pages load before this file.
+  var TOPICS =
+    (typeof window !== "undefined" && window.MarketGlossaryTopics) ||
+    (typeof module !== "undefined" && module.exports && typeof require === "function"
+      ? require("./glossary-topics.js")
+      : null) ||
+    {};
+
+  function topicId(category) {
+    return slug(category).replace(/^cat-/, "");
+  }
+
+  function topicHref(category) {
+    return "/topic.html?id=" + encodeURIComponent(topicId(category));
+  }
+
+  function topicFor(category) {
+    return TOPICS[category] || null;
+  }
+
+  function entriesInCategory(category) {
+    return ALL_GLOSSARY.filter(function (entry) { return entry.category === category; })
+      .sort(function (a, b) { return a.term.localeCompare(b.term); });
+  }
+
+  // Categories that have at least one concept, in CATEGORY_ORDER.
+  function topicCategories() {
+    var present = {};
+    ALL_GLOSSARY.forEach(function (entry) { present[entry.category] = true; });
+    return CATEGORY_ORDER.filter(function (category) { return present[category]; });
+  }
+
+  function categoryForTopicId(id) {
+    var match = topicCategories().filter(function (category) { return topicId(category) === id; });
+    return match[0] || null;
+  }
+
+  // The topic's guided sections with entries resolved, in reading order.
+  // Concepts the explainer doesn't place yet land in "Also in this topic"
+  // (A–Z), so no concept ever drops off its topic page.
+  function topicSections(category) {
+    var all = entriesInCategory(category);
+    var byId = {};
+    all.forEach(function (entry) { byId[entry.id] = entry; });
+    var placed = {};
+    var topic = topicFor(category);
+    var sections = ((topic && topic.sections) || []).map(function (section) {
+      var entries = (section.ids || []).filter(function (id) { return byId[id] && !placed[id]; }).map(function (id) {
+        placed[id] = true;
+        return byId[id];
+      });
+      return { title: section.title, note: section.note || "", entries: entries };
+    }).filter(function (section) { return section.entries.length; });
+    var rest = all.filter(function (entry) { return !placed[entry.id]; });
+    if (rest.length) {
+      sections.push({
+        title: sections.length ? "Also in this topic" : "Concepts",
+        note: sections.length ? "More concepts in " + category + ", A–Z." : "",
+        entries: rest,
+      });
+    }
+    return sections.map(function (section, i) {
+      section.anchor = "section-" + (i + 1);
+      return section;
     });
-    return CATEGORY_ORDER.reduce(function (out, category) {
-      var entries = (byCategory[category] || []).slice().sort(function (a, b) { return a.term.localeCompare(b.term); });
-      return out.concat(entries);
+  }
+
+  // The order concepts are read in: categories in CATEGORY_ORDER, and within
+  // each, the topic explainer's reading order. Concept pages page through it,
+  // so "Next" walks the same path as the topic explainer.
+  function orderedEntries() {
+    return topicCategories().reduce(function (out, category) {
+      topicSections(category).forEach(function (section) { out = out.concat(section.entries); });
+      return out;
     }, []);
   }
 
@@ -2012,6 +2079,16 @@
       (entry.illustration ? '<div class="glossary-illustration">' + entry.illustration + "</div>" : "") +
       (usedIn ? '<div class="glossary-used-in">' + usedIn + "</div>" : "") +
       "</article>"
+    );
+  }
+
+  function topicIntroHtml(category) {
+    var topic = topicFor(category);
+    return (
+      '<div class="glossary-category-intro">' +
+      (topic && topic.summary ? '<span class="glossary-category-summary">' + escapeHtml(topic.summary) + "</span>" : "") +
+      '<a class="glossary-topic-link" href="' + escapeHtml(topicHref(category)) + '">Read the topic explainer</a>' +
+      "</div>"
     );
   }
 
@@ -2043,7 +2120,9 @@
       .map(function (c) {
         return (
           '<div class="glossary-category" id="' + slug(c) + '">' +
-          '<div class="glossary-category-label">' + escapeHtml(c) + "</div></div>" +
+          '<div class="glossary-category-label">' + escapeHtml(c) + "</div>" +
+          topicIntroHtml(c) +
+          "</div>" +
           '<div class="glossary-grid">' + byCategory[c].map(cardHtml).join("") + "</div>"
         );
       })
@@ -2260,6 +2339,13 @@
     CATEGORY_ORDER: CATEGORY_ORDER,
     orderedEntries: orderedEntries,
     conceptHref: conceptHref,
+    TOPICS: TOPICS,
+    topicId: topicId,
+    topicHref: topicHref,
+    topicFor: topicFor,
+    topicCategories: topicCategories,
+    categoryForTopicId: categoryForTopicId,
+    topicSections: topicSections,
     escapeHtml: escapeHtml,
     slug: slug,
     searchIndex: searchIndex,
