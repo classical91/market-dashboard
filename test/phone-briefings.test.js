@@ -141,6 +141,40 @@ test("the Shortcut pushes with the ledger key; reads need the site login", async
   }
 });
 
+test("the Shortcut can push to the reading page's own address", async () => {
+  const server = http.createServer(createApp());
+  await new Promise((resolve) => server.listen(0, resolve));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const push = (pathname, body, { key = LEDGER_KEY, type = "text/plain" } = {}) => fetch(`${base}${pathname}`, {
+    method: "POST",
+    redirect: "manual",
+    headers: { "Content-Type": type, ...(key ? { "x-broadcast-key": key } : {}) },
+    body: typeof body === "string" ? body : JSON.stringify(body),
+  });
+  try {
+    // A missing or wrong key is a 401 the Shortcut can show, not a login redirect.
+    assert.equal((await push("/briefings/stocks", "1. Page push", { key: null })).status, 401);
+    assert.equal((await push("/briefings/stocks", "1. Page push", { key: "wrong" })).status, 401);
+
+    const created = await push("/briefings/stocks", "1. Page push");
+    assert.equal(created.status, 201);
+    const receipt = await created.json();
+    assert.equal(receipt.category, "stocks");
+
+    const json = await push("/briefings/markets/", { text: "1. Page push json" }, { type: "application/json" });
+    assert.equal(json.status, 201);
+    assert.equal((await json.json()).category, "stocks");
+
+    assert.equal((await push("/briefings/weather", "x")).status, 400);
+
+    // The page itself still needs the login.
+    const page = await fetch(`${base}/briefings/stocks`, { redirect: "manual", headers: { "x-broadcast-key": LEDGER_KEY } });
+    assert.equal(page.status, 302);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
 test("the page renders ChatGPT markdown without letting it inject HTML", () => {
   const source = fs.readFileSync(path.join(__dirname, "..", "public/assets/js/briefing.js"), "utf8");
   const stub = { textContent: "", innerHTML: "", hidden: false, className: "", classList: { add() {}, remove() {} }, addEventListener() {} };

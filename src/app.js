@@ -612,6 +612,22 @@ function createApp() {
     res.setHeader("Cache-Control", "no-store");
     res.sendFile(path.join(__dirname, "..", "public", "briefing.html"));
   });
+  // A Shortcut pointed at the page's own address pushes there: the same keyed
+  // route as POST /api/phone-briefings/<desk>. Before this the POST was sent
+  // to the login page and the Shortcut reported a lost connection.
+  const phoneBriefingsRouter = createPhoneBriefingsRouter({
+    briefingStore: phoneBriefingStore,
+    requireLedgerKey,
+    rateLimitPerMinute: config.broadcastLedger.rateLimitPerMinute,
+  });
+  app.post(["/briefings/:category", "/briefings/:category/"], (req, res, next) => {
+    const originalUrl = req.url;
+    req.url = `/${encodeURIComponent(req.params.category)}`;
+    phoneBriefingsRouter(req, res, (err) => {
+      req.url = originalUrl;
+      next(err);
+    });
+  });
   app.get("/emerging-markets.html", (req, res) => res.redirect(301, "/briefings/geopolitics"));
   app.get("/economics-top-10.html", (req, res) => res.redirect(301, "/briefings/economics"));
   app.get("/markets-top-10.html", (req, res) => res.redirect(301, "/briefings/stocks"));
@@ -701,14 +717,7 @@ function createApp() {
       rateLimitPerMinute: config.broadcastLedger.rateLimitPerMinute,
     }),
   );
-  app.use(
-    "/api/phone-briefings",
-    createPhoneBriefingsRouter({
-      briefingStore: phoneBriefingStore,
-      requireLedgerKey,
-      rateLimitPerMinute: config.broadcastLedger.rateLimitPerMinute,
-    }),
-  );
+  app.use("/api/phone-briefings", phoneBriefingsRouter);
   app.use("/api/farmclaw/news-previews", createFarmclawNewsPreviewsRouter());
   app.use(
     "/api/farmclaw/handoffs",

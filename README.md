@@ -273,7 +273,10 @@ spends credits or posts to Telegram.
 After each **Ask ChatGPT** step, the Shortcut adds **Get Contents of URL**:
 
 - URL `https://<host>/api/phone-briefings/<desk>` — `geopolitics`, `economics`,
-  `stocks` or `crypto` (`markets` is accepted for stocks).
+  `stocks` or `crypto` (`markets` is accepted for stocks). The reading page's
+  own address, `https://<host>/briefings/<desk>`, takes the same keyed `POST`;
+  without the key either one answers `401` rather than redirecting to the login
+  page (which a Shortcut reports as a lost network connection).
 - Method `POST`, header `x-broadcast-key: <BROADCAST_LEDGER_API_KEY>` (or
   `Authorization: Bearer <key>`).
 - Request Body **JSON** with one field, `text`, set to the ChatGPT result

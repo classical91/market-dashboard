@@ -111,7 +111,11 @@ function clearSessionCookie(res) {
 }
 
 function wantsJson(req) {
-  return req.path.startsWith("/api/") || String(req.get("accept") || "").includes("application/json");
+  // A Shortcut pushing a briefing without its key gets a 401 it can show, not
+  // a redirect to the login page.
+  return req.path.startsWith("/api/")
+    || isBriefingPagePush(req)
+    || String(req.get("accept") || "").includes("application/json");
 }
 
 function isAlphaPage(req) {
@@ -142,8 +146,19 @@ function isAlphaReadApi(req) {
 // Shortcut pushes after generating them.
 const LEDGER_API_PREFIXES = ["/api/broadcast-ledger", "/api/reporter-news", "/api/farmclaw", "/api/phone-briefings"];
 
+// The Shortcut may push to the reading page's own address, /briefings/<desk>,
+// instead of /api/phone-briefings/<desk>; app.js hands those POSTs to the same
+// keyed route. Only POST, and only one path segment: reading the page still
+// needs the owner session.
+const BRIEFING_PAGE_PUSH_PATH = /^\/briefings\/[^/]+\/?$/;
+
+function isBriefingPagePush(req) {
+  return req.method === "POST" && BRIEFING_PAGE_PUSH_PATH.test(req.path);
+}
+
 function isLedgerApiPath(req) {
-  return LEDGER_API_PREFIXES.some((prefix) => req.path === prefix || req.path.startsWith(`${prefix}/`));
+  return isBriefingPagePush(req)
+    || LEDGER_API_PREFIXES.some((prefix) => req.path === prefix || req.path.startsWith(`${prefix}/`));
 }
 
 // The approval path presents only the approver key (it need not hold the
