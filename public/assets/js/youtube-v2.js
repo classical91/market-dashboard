@@ -357,7 +357,12 @@
       })
       .then(function (config) {
         var categories = config.categories || [];
-        var stored = readStoredCategory();
+        // A ?category= link (the Intelligence Portal sends one) wins over the
+        // remembered choice, and becomes it.
+        var linked = "";
+        try { linked = new URL(window.location.href).searchParams.get("category") || ""; } catch (e) {}
+        if (linked && categories.some(function (category) { return category.id === linked; })) storeCategory(linked);
+        var stored = readStoredCategory() || linked;
         var activeId = stored === "all" || categories.some(function (category) { return category.id === stored; })
           ? (stored || "all") : "all";
         function fallbackToAll() {

@@ -189,7 +189,7 @@
       ],
     },
     {
-      label: "YouTube Intelligence",
+      label: "YouTube Links",
       featured: "youtube",
       children: [
         { href: "/youtube-v2.html", label: "YouTube Intelligence" },
@@ -201,12 +201,14 @@
       ],
     },
     {
-      label: "X Intelligence",
+      label: "X Links",
       featured: "x",
       children: [
         { href: "https://x.com/", label: "Open X.com" },
         { href: "/x-intelligence.html", label: "X Intelligence" },
         { href: "/x-search.html", label: "Search X" },
+        // X and YouTube side by side under one synced category list.
+        { href: "/intelligence-portal.html", label: "Intelligence Portal" },
       ],
     },
   ];
