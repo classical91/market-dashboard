@@ -1,22 +1,44 @@
-/* Intelligence Portal: a launcher into X Intelligence and YouTube
-   Intelligence.
+/* Intelligence Portal: two launchers, one for X Intelligence and one for
+   YouTube Intelligence, each with its own category dropdown.
 
-   Two dropdowns — a category and a destination — and an Open button that
-   goes to that page already on the chosen category. No posts or videos load
-   here. The category list is read live from both registries
-   (/api/x/templates and /api/youtube/channels/config) and paired by
-   intelligence-portal-sync.js, so templates and categories added on either
-   page appear here without any copy to keep in step. */
+   Each dropdown is read live from its own registry — X templates from
+   /api/x/templates, YouTube categories from /api/youtube/channels/config —
+   so a template or category added, renamed or deleted on its page shows up
+   here with no copy to keep in step. Open goes to that page already on the
+   chosen category. No posts or videos load here.
+
+   The two portals load and fail independently. Once both lists are in,
+   intelligence-portal-sync.js pairs them by name so each portal can point at
+   the same subject on the other side ("Also on YouTube: War"). */
 (function () {
   "use strict";
 
   var Sync = window.IntelligencePortalSync;
-  var STORAGE_KEY = "intelligencePortal:category:v1";
-  var DEST_KEY = "intelligencePortal:destination:v1";
-  var PAGE_NAMES = { x: "X Intelligence", youtube: "YouTube Intelligence" };
 
+  var PORTALS = {
+    x: {
+      url: "/api/x/templates",
+      read: function (data) { return (data && data.templates) || []; },
+      storageKey: "intelligencePortal:x:v1",
+      page: "X Intelligence",
+      unit: "accounts",
+      count: function (item) { return Array.isArray(item.handles) ? item.handles.length : 0; },
+      other: "youtube",
+    },
+    youtube: {
+      url: "/api/youtube/channels/config",
+      read: function (data) { return (data && data.categories) || []; },
+      storageKey: "intelligencePortal:youtube:v1",
+      page: "YouTube Intelligence",
+      unit: "channels",
+      count: function (item) { return Number(item.channelCount || 0); },
+      other: "x",
+    },
+  };
+
+  var lists = { x: null, youtube: null };
+  var pairs = [];
   var els = {};
-  var state = { entries: [] };
 
   function readStore(key) {
     try { return window.localStorage.getItem(key) || ""; } catch (err) { return ""; }
@@ -33,117 +55,141 @@
     });
   }
 
-  function activeEntry() {
-    var key = els.category.value;
-    return state.entries.filter(function (entry) { return entry.key === key; })[0] || null;
+  function hrefFor(kind, id) {
+    var entry = {};
+    entry[kind] = { id: id };
+    return Sync.destinationHref(entry, kind);
   }
 
-  function optionLabel(entry) {
-    var where = entry.x && entry.youtube ? "X + YouTube" : entry.x ? "X only" : "YouTube only";
-    return entry.name + " — " + where;
+  function selected(kind) {
+    var id = els[kind].select.value;
+    return (lists[kind] || []).filter(function (item) { return String(item.id) === id; })[0] || null;
   }
 
-  function renderCategories(selectedKey) {
-    var select = els.category;
+  /* The same subject on the other page, when the two names pair up. */
+  function counterpart(kind, id) {
+    var entry = pairs.filter(function (pair) { return pair[kind] && pair[kind].id === id; })[0];
+    return entry && entry[PORTALS[kind].other] ? entry[PORTALS[kind].other] : null;
+  }
+
+  function updateHint(kind) {
+    var portal = PORTALS[kind];
+    var hint = els[kind].hint;
+    var item = selected(kind);
+    els[kind].go.disabled = !item;
+    hint.textContent = "";
+    if (!item) return;
+
+    hint.appendChild(document.createTextNode(
+      "Opens " + portal.page + " on “" + (item.name || item.id) + "” (" + portal.count(item) + " " + portal.unit + ")."
+    ));
+
+    var match = counterpart(kind, String(item.id));
+    if (match) {
+      var otherKind = portal.other;
+      hint.appendChild(document.createTextNode(" Also on " + (otherKind === "x" ? "X" : "YouTube") + ": "));
+      var link = document.createElement("a");
+      link.href = hrefFor(otherKind, match.id);
+      link.textContent = match.name;
+      hint.appendChild(link);
+    }
+  }
+
+  function renderSelect(kind, items) {
+    var select = els[kind].select;
+    var portal = PORTALS[kind];
     select.innerHTML = "";
-    state.entries.forEach(function (entry) {
+    items.forEach(function (item) {
       var option = document.createElement("option");
-      option.value = entry.key;
-      option.textContent = optionLabel(entry);
+      option.value = String(item.id);
+      option.textContent = (item.name || item.id) + " (" + portal.count(item) + ")";
       select.appendChild(option);
     });
-    if (!state.entries.length) {
+    if (!items.length) {
       var none = document.createElement("option");
-      none.textContent = "No categories yet";
+      none.textContent = "No categories yet — add one in " + portal.page;
       select.appendChild(none);
     }
-    select.disabled = !state.entries.length;
-    var chosen = Sync.pickEntry(state.entries, { key: selectedKey });
-    if (chosen) select.value = chosen.key;
+    select.disabled = !items.length;
+    var keep = readStore(portal.storageKey);
+    if (items.some(function (item) { return String(item.id) === keep; })) select.value = keep;
   }
 
-  /* A destination with no matching category stays visible but disabled, so
-     it is clear the category exists only on the other page. */
-  function updateDestinations() {
-    var entry = activeEntry();
-    var dest = els.destination;
-    var available = [];
-    Array.prototype.forEach.call(dest.options, function (option) {
-      var ok = !!Sync.destinationHref(entry, option.value);
-      option.disabled = !ok;
-      option.textContent = PAGE_NAMES[option.value] + (ok ? "" : " (no matching category)");
-      if (ok) available.push(option.value);
-    });
-    if (available.indexOf(dest.value) === -1 && available.length) dest.value = available[0];
-    dest.disabled = !entry;
-    els.go.disabled = !entry || !available.length;
-
-    if (!entry) {
-      els.hint.textContent = "";
-      return;
-    }
-    var source = dest.value === "x" ? entry.x : entry.youtube;
-    var count = source ? source.count + (dest.value === "x" ? " accounts" : " channels") : "";
-    els.hint.textContent = source
-      ? "Opens " + PAGE_NAMES[dest.value] + " on “" + source.name + "” (" + count + ")."
-      : "";
+  function loadPortal(kind) {
+    var portal = PORTALS[kind];
+    return getJson(portal.url)
+      .then(function (data) {
+        lists[kind] = portal.read(data);
+        renderSelect(kind, lists[kind]);
+        updateHint(kind);
+      })
+      .catch(function () {
+        lists[kind] = [];
+        els[kind].select.innerHTML = "<option>Unavailable</option>";
+        els[kind].select.disabled = true;
+        els[kind].go.disabled = true;
+        els[kind].hint.textContent = portal.page + " categories are unavailable right now.";
+        els[kind].hint.classList.add("ip-hint--error");
+      });
   }
 
-  function loadCategories() {
-    var failed = [];
-    return Promise.all([
-      getJson("/api/x/templates").then(function (data) { return (data && data.templates) || []; })
-        .catch(function () { failed.push("X Intelligence"); return []; }),
-      getJson("/api/youtube/channels/config").then(function (data) { return (data && data.categories) || []; })
-        .catch(function () { failed.push("YouTube Intelligence"); return []; }),
-    ]).then(function (lists) {
-      var keep = els.category.disabled ? readStore(STORAGE_KEY) : els.category.value;
-      state.entries = Sync.mergeCategories(lists[0], lists[1]);
-      renderCategories(keep);
-      updateDestinations();
-      if (failed.length) {
-        els.hint.textContent = failed.join(" and ") + " categories are unavailable right now"
-          + (state.entries.length ? "; showing the rest." : ".");
-      }
+  function loadAll() {
+    Object.keys(PORTALS).forEach(function (kind) { els[kind].hint.classList.remove("ip-hint--error"); });
+    return Promise.all([loadPortal("x"), loadPortal("youtube")]).then(function () {
+      pairs = Sync.mergeCategories(lists.x, lists.youtube);
+      if (lists.x && lists.x.length) updateHint("x");
+      if (lists.youtube && lists.youtube.length) updateHint("youtube");
     });
+  }
+
+  /* The sidebar's X Portal and YouTube Portal links land on #x and #youtube.
+     Clicking one while already here only changes the hash, so listen for it. */
+  function spotlight() {
+    var kind = (window.location.hash || "").replace(/^#/, "");
+    Object.keys(PORTALS).forEach(function (key) {
+      els[key].form.classList.toggle("is-spotlit", key === kind);
+    });
+    if (PORTALS[kind] && !els[kind].select.disabled) els[kind].select.focus({ preventScroll: true });
   }
 
   function init() {
-    els = {
-      form: document.getElementById("ipLauncher"),
-      category: document.getElementById("ipCategory"),
-      destination: document.getElementById("ipDestination"),
-      go: document.getElementById("ipGo"),
-      hint: document.getElementById("ipHint"),
-    };
-    if (!els.form || !Sync) return;
+    if (!Sync) return;
+    var ok = true;
+    Object.keys(PORTALS).forEach(function (kind) {
+      var form = document.querySelector('[data-portal="' + kind + '"]');
+      if (!form) { ok = false; return; }
+      els[kind] = {
+        form: form,
+        select: form.querySelector("select"),
+        go: form.querySelector(".ip-go"),
+        hint: form.querySelector(".ip-hint"),
+      };
+    });
+    if (!ok) return;
 
-    var storedDest = readStore(DEST_KEY);
-    if (PAGE_NAMES[storedDest]) els.destination.value = storedDest;
+    Object.keys(PORTALS).forEach(function (kind) {
+      var portal = PORTALS[kind];
+      els[kind].select.addEventListener("change", function () {
+        writeStore(portal.storageKey, els[kind].select.value);
+        updateHint(kind);
+      });
+      els[kind].form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        var item = selected(kind);
+        if (!item) return;
+        writeStore(portal.storageKey, String(item.id));
+        window.location.assign(hrefFor(kind, String(item.id)));
+      });
+    });
 
-    els.category.addEventListener("change", function () {
-      writeStore(STORAGE_KEY, els.category.value);
-      updateDestinations();
-    });
-    els.destination.addEventListener("change", function () {
-      writeStore(DEST_KEY, els.destination.value);
-      updateDestinations();
-    });
-    els.form.addEventListener("submit", function (event) {
-      event.preventDefault();
-      var href = Sync.destinationHref(activeEntry(), els.destination.value);
-      if (!href) return;
-      writeStore(STORAGE_KEY, els.category.value);
-      writeStore(DEST_KEY, els.destination.value);
-      window.location.assign(href);
-    });
+    window.addEventListener("hashchange", spotlight);
 
     // Categories edited in another tab show up when this one comes back.
     document.addEventListener("visibilitychange", function () {
-      if (document.visibilityState === "visible" && state.entries.length) loadCategories();
+      if (document.visibilityState === "visible" && (lists.x || lists.youtube)) loadAll();
     });
 
-    loadCategories();
+    loadAll().then(spotlight);
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);

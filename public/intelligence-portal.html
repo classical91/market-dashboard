@@ -17,32 +17,45 @@
     <div class="cmd-page-header">
       <div>
         <div class="cmd-page-title">Intelligence Portal</div>
-        <div class="cmd-page-subtitle">Pick a category and where to open it. Categories are synced from X Intelligence and YouTube Intelligence.</div>
+        <div class="cmd-page-subtitle">Two portals, each with its own category list synced from its page. Pick a category and open it there.</div>
       </div>
     </div>
 
-    <!-- Nothing loads here but the two category lists: choosing opens the
-         real page, already on that category. -->
-    <form class="ip-launcher" id="ipLauncher" novalidate>
-      <div class="ip-field">
-        <label class="ip-label" for="ipCategory">Category</label>
-        <select id="ipCategory" disabled>
-          <option>Loading categories&hellip;</option>
-        </select>
-      </div>
+    <!-- Nothing loads here but the category lists: Open goes to the real
+         page, already on the chosen category. -->
+    <div class="ip-portals">
+      <form class="ip-portal ip-portal--x" id="x" data-portal="x" novalidate>
+        <div class="ip-portal-head">
+          <span class="ip-chip ip-chip--x" aria-hidden="true">X</span>
+          <h2 class="ip-portal-title">X Portal</h2>
+        </div>
+        <p class="ip-portal-sub">Opens X Intelligence on one of its templates.</p>
+        <label class="ip-label" for="ipXCategory">X category</label>
+        <div class="ip-row">
+          <select id="ipXCategory" disabled>
+            <option>Loading X categories&hellip;</option>
+          </select>
+          <button type="submit" class="ip-go" disabled>Open &#8594;</button>
+        </div>
+        <p class="ip-hint" aria-live="polite"></p>
+      </form>
 
-      <div class="ip-field">
-        <label class="ip-label" for="ipDestination">Go to</label>
-        <select id="ipDestination" disabled>
-          <option value="x">X Intelligence</option>
-          <option value="youtube">YouTube Intelligence</option>
-        </select>
-      </div>
-
-      <button type="submit" class="ip-go" id="ipGo" disabled>Open &#8594;</button>
-
-      <p class="ip-hint" id="ipHint" aria-live="polite"></p>
-    </form>
+      <form class="ip-portal ip-portal--youtube" id="youtube" data-portal="youtube" novalidate>
+        <div class="ip-portal-head">
+          <span class="ip-chip ip-chip--yt" aria-hidden="true">YT</span>
+          <h2 class="ip-portal-title">YouTube Portal</h2>
+        </div>
+        <p class="ip-portal-sub">Opens YouTube Intelligence on one of its categories.</p>
+        <label class="ip-label" for="ipYoutubeCategory">YouTube category</label>
+        <div class="ip-row">
+          <select id="ipYoutubeCategory" disabled>
+            <option>Loading YouTube categories&hellip;</option>
+          </select>
+          <button type="submit" class="ip-go" disabled>Open &#8594;</button>
+        </div>
+        <p class="ip-hint" aria-live="polite"></p>
+      </form>
+    </div>
 
     <footer>Intelligence Portal &mdash; <a href="/x-intelligence.html">X Intelligence</a> &middot; <a href="/youtube-v2.html">YouTube Intelligence</a></footer>
 

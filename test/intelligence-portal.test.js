@@ -102,22 +102,23 @@ test("each destination opens its page on the paired category, or not at all", ()
   assert.equal(destinationHref(war, "elsewhere"), null);
 });
 
-test("the portal is a launcher: two dropdowns and an Open button, no feeds", () => {
+test("the portal holds two launchers, each with its own dropdown and no feeds", () => {
   const html = read("public/intelligence-portal.html");
   const js = read("public/assets/js/intelligence-portal.js");
-  assert.match(html, /<select id="ipCategory"/);
-  assert.match(html, /<select id="ipDestination"/);
-  assert.match(html, /<option value="x">X Intelligence<\/option>/);
-  assert.match(html, /<option value="youtube">YouTube Intelligence<\/option>/);
-  assert.match(html, /id="ipGo"/);
+  assert.match(html, /<form class="ip-portal ip-portal--x" id="x" data-portal="x"/);
+  assert.match(html, /<form class="ip-portal ip-portal--youtube" id="youtube" data-portal="youtube"/);
+  assert.match(html, /<select id="ipXCategory"/);
+  assert.match(html, /<select id="ipYoutubeCategory"/);
+  assert.equal(html.match(/class="ip-go"/g).length, 2);
   assert.ok(html.indexOf("intelligence-portal-sync.js") < html.indexOf("intelligence-portal.js\""));
-  // The category lists are the only data the portal loads.
-  assert.match(js, /\/api\/x\/templates/);
-  assert.match(js, /\/api\/youtube\/channels\/config/);
+  // Each portal reads only its own registry; neither loads posts or videos.
+  assert.match(js, /url: "\/api\/x\/templates"/);
+  assert.match(js, /url: "\/api\/youtube\/channels\/config"/);
   assert.doesNotMatch(js, /\/api\/x\/accounts/);
   assert.doesNotMatch(js, /\/api\/youtube\/channels\?/);
   assert.doesNotMatch(html, /x-posts\.js|iframe/);
-  assert.match(js, /window\.location\.assign\(href\)/);
+  assert.match(js, /window\.location\.assign\(hrefFor\(kind/);
+  assert.match(js, /addEventListener\("hashchange"/);
 });
 
 test("YouTube Intelligence opens on the category a ?category= link names", () => {

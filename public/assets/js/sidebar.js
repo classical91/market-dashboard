@@ -198,6 +198,8 @@
           href: "https://yt-summarizer-production-4521.up.railway.app/",
           label: "YouTube Summarizer",
         },
+        // Pick a YouTube category, then open YouTube Intelligence on it.
+        { href: "/intelligence-portal.html#youtube", label: "YouTube Portal" },
       ],
     },
     {
@@ -207,8 +209,8 @@
         { href: "https://x.com/", label: "Open X.com" },
         { href: "/x-intelligence.html", label: "X Intelligence" },
         { href: "/x-search.html", label: "Search X" },
-        // X and YouTube side by side under one synced category list.
-        { href: "/intelligence-portal.html", label: "Intelligence Portal" },
+        // Pick an X category, then open X Intelligence on it.
+        { href: "/intelligence-portal.html#x", label: "X Portal" },
       ],
     },
   ];
