@@ -1,40 +1,63 @@
 /* ─────────────────────────────────────────────────────────
-   Intelligence Portal — a launcher: pick a synced category
-   and a destination, then open X Intelligence or YouTube
-   Intelligence on it. Layered on top of command.css.
+   Intelligence Portal — two launchers, X and YouTube, each
+   with its own synced category dropdown and an Open button.
+   Layered on top of command.css.
 ───────────────────────────────────────────────────────── */
 
-.ip-launcher {
+.ip-portals {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1.4fr) auto;
-  align-items: end;
-  gap: 12px;
-  max-width: 820px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  max-width: 1040px;
   margin-top: 16px;
-  padding: 16px;
+}
+
+.ip-portal {
+  display: flex; flex-direction: column; gap: 8px;
+  min-width: 0; margin: 0; padding: 16px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: color-mix(in srgb, var(--panel) 70%, transparent);
+  scroll-margin-top: 16px;
+  transition: border-color .2s ease, box-shadow .2s ease;
 }
+.ip-portal--x { box-shadow: inset 3px 0 var(--purple); }
+.ip-portal--youtube { box-shadow: inset 3px 0 var(--coral); }
+.ip-portal--x.is-spotlit { border-color: rgba(155,123,255,0.55); }
+.ip-portal--youtube.is-spotlit { border-color: rgba(255,77,109,0.55); }
 
-.ip-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ip-portal-head { display: flex; align-items: center; gap: 9px; }
+.ip-portal-title { margin: 0; font-size: 15px; font-weight: 700; color: var(--text); }
+.ip-portal-sub { margin: 0 0 4px; font-size: 12px; color: var(--muted); }
+
+.ip-chip {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 28px; height: 22px; padding: 0 6px; border-radius: 6px;
+  font-size: 10px; font-weight: 800; letter-spacing: .04em;
+}
+.ip-chip--x { background: var(--purple-bg); color: var(--purple); }
+.ip-chip--yt { background: var(--coral-bg); color: var(--coral); }
+
 .ip-label {
   font-size: 10px; font-weight: 700; letter-spacing: .06em;
   text-transform: uppercase; color: var(--muted);
 }
 
-.ip-launcher select {
-  width: 100%; min-height: 38px;
+.ip-row { display: flex; gap: 10px; min-width: 0; }
+
+.ip-portal select {
+  flex: 1 1 auto; min-width: 0; min-height: 38px;
   padding: 8px 34px 8px 11px;
-  border: 1px solid rgba(155,123,255,0.38); border-radius: 9px;
+  border: 1px solid var(--border-hover); border-radius: 9px;
   background: var(--surface2); color: var(--text);
   font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
 }
-.ip-launcher select:disabled { cursor: not-allowed; opacity: .65; }
-.ip-launcher select option:disabled { color: var(--dim); }
+.ip-portal--x select { border-color: rgba(155,123,255,0.38); }
+.ip-portal--youtube select { border-color: rgba(255,77,109,0.34); }
+.ip-portal select:disabled { cursor: not-allowed; opacity: .65; }
 
 .ip-go {
-  min-height: 38px; padding: 8px 18px;
+  flex: 0 0 auto; min-height: 38px; padding: 8px 16px;
   border: 1px solid rgba(77,163,255,0.5); border-radius: 9px;
   background: var(--blue-bg); color: var(--text);
   font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
@@ -43,15 +66,19 @@
 .ip-go:hover:not(:disabled) { background: rgba(77,163,255,0.22); border-color: var(--blue); }
 .ip-go:disabled { cursor: not-allowed; opacity: .5; }
 
-.ip-launcher select:focus-visible,
-.ip-go:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.ip-portal select:focus-visible,
+.ip-go:focus-visible,
+.ip-hint a:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 
-.ip-hint {
-  grid-column: 1 / -1; margin: 0; min-height: 1.3em;
-  font-size: 12px; color: var(--muted);
+.ip-hint { margin: 0; min-height: 1.3em; font-size: 12px; color: var(--muted); }
+.ip-hint a { color: var(--blue); text-decoration: none; font-weight: 600; }
+.ip-hint a:hover { text-decoration: underline; }
+.ip-hint--error { color: var(--coral); }
+
+@media (max-width: 760px) {
+  .ip-portals { grid-template-columns: minmax(0, 1fr); }
 }
-
-@media (max-width: 640px) {
-  .ip-launcher { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 420px) {
+  .ip-row { flex-direction: column; }
   .ip-go { width: 100%; }
 }

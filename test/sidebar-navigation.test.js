@@ -202,7 +202,7 @@ test("both Open Interest pages sit side by side under Screeners", () => {
   assert.equal(cross > crypto, true, "cross-market OI sits right after crypto OI");
 });
 
-test("the X and YouTube groups are Links menus and X Links reaches the Intelligence Portal", () => {
+test("the X and YouTube groups are Links menus and each reaches its own portal", () => {
   const ytStart = sidebar.indexOf('label: "YouTube Links"');
   const xStart = sidebar.indexOf('label: "X Links"');
   assert.ok(ytStart > -1 && xStart > ytStart, "YouTube Links must sit above X Links");
@@ -211,10 +211,11 @@ test("the X and YouTube groups are Links menus and X Links reaches the Intellige
   // The pages keep their names; only the menu groups were renamed.
   assert.match(ytMenu, /href: "\/youtube-v2\.html", label: "YouTube Intelligence"/);
   assert.match(xMenu, /href: "\/x-intelligence\.html", label: "X Intelligence"/);
-  assert.match(xMenu, /href: "\/intelligence-portal\.html", label: "Intelligence Portal"/);
+  assert.match(ytMenu, /href: "\/intelligence-portal\.html#youtube", label: "YouTube Portal"/);
+  assert.match(xMenu, /href: "\/intelligence-portal\.html#x", label: "X Portal"/);
   assert.ok(
-    xMenu.indexOf('label: "Intelligence Portal"') > xMenu.indexOf('label: "X Intelligence"'),
-    "the portal link sits under X Intelligence",
+    xMenu.indexOf('label: "X Portal"') > xMenu.indexOf('label: "X Intelligence"'),
+    "the X portal link sits under X Intelligence",
   );
-  assert.equal(sidebar.match(/label: "Intelligence Portal"/g).length, 1);
+  assert.doesNotMatch(sidebar, /label: "Intelligence Portal"/);
 });
