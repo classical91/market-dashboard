@@ -16,8 +16,8 @@ test("primary sidebar order and removed links stay exact", () => {
     "AI Analysis",
     "Reporter",
     "Market Intel Links",
-    "YouTube Intelligence",
-    "X Intelligence",
+    "YouTube Links",
+    "X Links",
   ];
   let cursor = sidebar.indexOf("var workspace");
   for (const label of labels) {
@@ -146,7 +146,7 @@ test("Other section holds the external sites above Trading and tools", () => {
 });
 
 test("the intelligence menus are the colour-featured tabs", () => {
-  for (const [label, featured] of [["YouTube Intelligence", "youtube"], ["X Intelligence", "x"]]) {
+  for (const [label, featured] of [["YouTube Links", "youtube"], ["X Links", "x"]]) {
     const start = sidebar.indexOf(`label: "${label}"`);
     assert.ok(start > 0, `${label} is missing`);
     assert.match(sidebar.slice(start, start + 120), new RegExp(`featured: "${featured}"`));
@@ -200,4 +200,21 @@ test("both Open Interest pages sit side by side under Screeners", () => {
   const cross = menu.indexOf('href: "/cross-market-oi.html", label: "Cross-Market Open Interest"');
   assert.ok(crypto > -1, "crypto OI is under Screeners");
   assert.equal(cross > crypto, true, "cross-market OI sits right after crypto OI");
+});
+
+test("the X and YouTube groups are Links menus and X Links reaches the Intelligence Portal", () => {
+  const ytStart = sidebar.indexOf('label: "YouTube Links"');
+  const xStart = sidebar.indexOf('label: "X Links"');
+  assert.ok(ytStart > -1 && xStart > ytStart, "YouTube Links must sit above X Links");
+  const xMenu = sidebar.slice(xStart, sidebar.indexOf("var other", xStart));
+  const ytMenu = sidebar.slice(ytStart, xStart);
+  // The pages keep their names; only the menu groups were renamed.
+  assert.match(ytMenu, /href: "\/youtube-v2\.html", label: "YouTube Intelligence"/);
+  assert.match(xMenu, /href: "\/x-intelligence\.html", label: "X Intelligence"/);
+  assert.match(xMenu, /href: "\/intelligence-portal\.html", label: "Intelligence Portal"/);
+  assert.ok(
+    xMenu.indexOf('label: "Intelligence Portal"') > xMenu.indexOf('label: "X Intelligence"'),
+    "the portal link sits under X Intelligence",
+  );
+  assert.equal(sidebar.match(/label: "Intelligence Portal"/g).length, 1);
 });
