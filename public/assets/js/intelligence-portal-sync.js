@@ -156,8 +156,24 @@
       || null;
   }
 
+  /**
+   * Where a destination opens an entry: the page itself, already on the
+   * entry's template or category. Null when that page has no match for it.
+   */
+  function destinationHref(entry, destination) {
+    if (!entry) return null;
+    if (destination === "x") {
+      return entry.x ? "/x-intelligence.html?template=" + encodeURIComponent(entry.x.id) : null;
+    }
+    if (destination === "youtube") {
+      return entry.youtube ? "/youtube-v2.html?category=" + encodeURIComponent(entry.youtube.id) : null;
+    }
+    return null;
+  }
+
   return {
     normalizedName: normalizedName,
+    destinationHref: destinationHref,
     mergeCategories: mergeCategories,
     pickEntry: pickEntry,
   };
