@@ -8,7 +8,7 @@ const assert = require("node:assert");
 const fs = require("node:fs");
 const path = require("node:path");
 
-const { mergeCategories, pickEntry, normalizedName } = require("../public/assets/js/intelligence-portal-sync");
+const { mergeCategories, pickEntry, normalizedName, destinationHref } = require("../public/assets/js/intelligence-portal-sync");
 
 function read(relativePath) {
   return fs.readFileSync(path.join(__dirname, "..", relativePath), "utf8");
@@ -90,20 +90,34 @@ test("selection prefers the URL, then the remembered key, then a synced entry", 
   assert.deepEqual(mergeCategories(null, undefined), []);
 });
 
-test("the portal page reads both live registries and links back to each page", () => {
+test("each destination opens its page on the paired category, or not at all", () => {
+  const entries = mergeCategories(xTemplates, ytCategories);
+  const war = entries.find((entry) => entry.name === "War");
+  assert.equal(destinationHref(war, "x"), "/x-intelligence.html?template=war");
+  assert.equal(destinationHref(war, "youtube"), "/youtube-v2.html?category=category%3Awar");
+  const underworld = entries.find((entry) => entry.name === "Underworld");
+  assert.equal(destinationHref(underworld, "x"), null);
+  assert.equal(destinationHref(underworld, "youtube"), "/youtube-v2.html?category=category%3Aunderworld");
+  assert.equal(destinationHref(null, "x"), null);
+  assert.equal(destinationHref(war, "elsewhere"), null);
+});
+
+test("the portal is a launcher: two dropdowns and an Open button, no feeds", () => {
   const html = read("public/intelligence-portal.html");
   const js = read("public/assets/js/intelligence-portal.js");
-  assert.match(html, /id="ipCategory"/);
-  for (const script of ["x-freshness.js", "x-posts.js", "intelligence-portal-sync.js", "intelligence-portal.js"]) {
-    assert.match(html, new RegExp(`src="/assets/js/${script.replace(".", "\\.")}"`));
-  }
-  assert.ok(html.indexOf("x-freshness.js") < html.indexOf("x-posts.js"), "x-posts.js needs x-freshness.js first");
+  assert.match(html, /<select id="ipCategory"/);
+  assert.match(html, /<select id="ipDestination"/);
+  assert.match(html, /<option value="x">X Intelligence<\/option>/);
+  assert.match(html, /<option value="youtube">YouTube Intelligence<\/option>/);
+  assert.match(html, /id="ipGo"/);
+  assert.ok(html.indexOf("intelligence-portal-sync.js") < html.indexOf("intelligence-portal.js\""));
+  // The category lists are the only data the portal loads.
   assert.match(js, /\/api\/x\/templates/);
   assert.match(js, /\/api\/youtube\/channels\/config/);
-  assert.match(js, /\/api\/x\/accounts\?template=/);
-  assert.match(js, /\/api\/youtube\/channels\?categoryId=/);
-  assert.match(js, /\/x-intelligence\.html\?template=/);
-  assert.match(js, /\/youtube-v2\.html\?category=/);
+  assert.doesNotMatch(js, /\/api\/x\/accounts/);
+  assert.doesNotMatch(js, /\/api\/youtube\/channels\?/);
+  assert.doesNotMatch(html, /x-posts\.js|iframe/);
+  assert.match(js, /window\.location\.assign\(href\)/);
 });
 
 test("YouTube Intelligence opens on the category a ?category= link names", () => {

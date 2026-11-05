@@ -7,8 +7,6 @@
   <script src="/assets/js/settings.js"></script>
   <link rel="stylesheet" href="/assets/styles/command.css" />
   <link rel="stylesheet" href="/assets/styles/components.css" />
-  <link rel="stylesheet" href="/assets/styles/x-intelligence.css" />
-  <link rel="stylesheet" href="/assets/styles/youtube-v2.css" />
   <link rel="stylesheet" href="/assets/styles/intelligence-portal.css" />
 </head>
 <body>
@@ -18,64 +16,39 @@
 
     <div class="cmd-page-header">
       <div>
-        <div class="ip-title-row">
-          <div class="cmd-page-title">Intelligence Portal</div>
-          <label class="ip-category" for="ipCategory">
-            <span class="sr-only">Category, synced from X Intelligence and YouTube Intelligence</span>
-            <select id="ipCategory" aria-label="Category" disabled>
-              <option>Loading categories&hellip;</option>
-            </select>
-          </label>
-          <button type="button" class="ip-refresh" id="ipRefresh" title="Reload categories and feeds">Refresh</button>
-        </div>
-        <div class="cmd-page-subtitle" id="ipSummary">One category list, synced from X Intelligence and YouTube Intelligence</div>
+        <div class="cmd-page-title">Intelligence Portal</div>
+        <div class="cmd-page-subtitle">Pick a category and where to open it. Categories are synced from X Intelligence and YouTube Intelligence.</div>
       </div>
     </div>
 
-    <div class="ip-sources" id="ipSources" aria-live="polite"></div>
+    <!-- Nothing loads here but the two category lists: choosing opens the
+         real page, already on that category. -->
+    <form class="ip-launcher" id="ipLauncher" novalidate>
+      <div class="ip-field">
+        <label class="ip-label" for="ipCategory">Category</label>
+        <select id="ipCategory" disabled>
+          <option>Loading categories&hellip;</option>
+        </select>
+      </div>
 
-    <div class="ip-grid">
-      <section class="ip-panel" aria-labelledby="ipXTitle">
-        <div class="ip-panel-head">
-          <h2 class="ip-panel-title" id="ipXTitle"><span class="ip-chip ip-chip--x">X</span> Posts</h2>
-          <a class="ip-panel-link" id="ipXLink" href="/x-intelligence.html">Open in X Intelligence &#8599;</a>
-        </div>
-        <div class="ip-panel-status" id="ipXStatus"></div>
-        <div class="x-timeline-frame ip-feed" id="ipXFeed" data-x-view="compact">
-          <div class="ip-empty">Loading X posts&hellip;</div>
-        </div>
-      </section>
+      <div class="ip-field">
+        <label class="ip-label" for="ipDestination">Go to</label>
+        <select id="ipDestination" disabled>
+          <option value="x">X Intelligence</option>
+          <option value="youtube">YouTube Intelligence</option>
+        </select>
+      </div>
 
-      <section class="ip-panel" aria-labelledby="ipYtTitle">
-        <div class="ip-panel-head">
-          <h2 class="ip-panel-title" id="ipYtTitle"><span class="ip-chip ip-chip--yt">YT</span> Videos</h2>
-          <a class="ip-panel-link" id="ipYtLink" href="/youtube-v2.html">Open in YouTube Intelligence &#8599;</a>
-        </div>
-        <div class="ip-player" id="ipPlayer" hidden>
-          <div class="yt-player-frame">
-            <iframe id="ipPlayerFrame" src="" title="YouTube video player" loading="lazy"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                    allowfullscreen></iframe>
-          </div>
-          <div class="ip-player-foot">
-            <a id="ipPlayerLink" href="" target="_blank" rel="noopener">Watch on YouTube &#8599;</a>
-            <button type="button" class="ip-player-close" id="ipPlayerClose">Close player</button>
-          </div>
-        </div>
-        <div class="ip-panel-status" id="ipYtStatus"></div>
-        <div class="ip-feed" id="ipYtFeed">
-          <div class="ip-empty">Loading YouTube videos&hellip;</div>
-        </div>
-      </section>
-    </div>
+      <button type="submit" class="ip-go" id="ipGo" disabled>Open &#8594;</button>
+
+      <p class="ip-hint" id="ipHint" aria-live="polite"></p>
+    </form>
 
     <footer>Intelligence Portal &mdash; <a href="/x-intelligence.html">X Intelligence</a> &middot; <a href="/youtube-v2.html">YouTube Intelligence</a></footer>
 
   </main>
 </div>
 <script src="/assets/js/sidebar.js"></script>
-<script src="/assets/js/x-freshness.js"></script>
-<script src="/assets/js/x-posts.js"></script>
 <script src="/assets/js/intelligence-portal-sync.js"></script>
 <script src="/assets/js/intelligence-portal.js"></script>
 </body>
