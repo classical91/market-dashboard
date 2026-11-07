@@ -87,14 +87,43 @@
     return ($(id).value || "").trim();
   }
 
-  function resetForm() {
+  function clearForm() {
     $("botCommandId").value = "";
     $("botTitle").value = "";
     $("botPurpose").value = "";
     $("botCommand").value = "";
     $("botNotes").value = "";
     $("saveCommandBtn").textContent = "Save Command";
-    $("botTitle").focus();
+    $("botFormTitle").textContent = "New Command";
+  }
+
+  // The editor stays collapsed until it's needed, so the saved list is the
+  // first thing visible (especially on mobile, where the form filled the
+  // whole screen).
+  function setFormOpen(open) {
+    $("botCommandForm").hidden = !open;
+    $("botShell").classList.toggle("is-editing", open);
+    $("newCommandBtn").setAttribute("aria-expanded", open ? "true" : "false");
+    $("newCommandBtn").textContent = open ? "Close Editor" : "+ New Command";
+    if (open) {
+      $("botCommandForm").scrollIntoView({ behavior: "smooth", block: "start" });
+      $("botTitle").focus({ preventScroll: true });
+    }
+  }
+
+  function openNewForm() {
+    clearForm();
+    setFormOpen(true);
+  }
+
+  function closeForm() {
+    clearForm();
+    setFormOpen(false);
+  }
+
+  function toggleNewForm() {
+    if ($("botCommandForm").hidden) openNewForm();
+    else closeForm();
   }
 
   function upsertCommand(event) {
@@ -114,7 +143,7 @@
     else state.commands.unshift(entry);
 
     saveCommands();
-    resetForm();
+    closeForm();
     render();
 
     // Best-effort background sync — the local save above already gives an
@@ -135,7 +164,8 @@
     $("botCommand").value = entry.command || "";
     $("botNotes").value = entry.notes || "";
     $("saveCommandBtn").textContent = "Update Command";
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    $("botFormTitle").textContent = "Edit Command";
+    setFormOpen(true);
   }
 
   function deleteCommand(id) {
@@ -209,7 +239,7 @@
 
     if (!commands.length) {
       list.innerHTML = window.MarketUI
-        ? window.MarketUI.emptyState("No saved bot commands", "Save Telegram bot commands here with a title and purpose.")
+        ? window.MarketUI.emptyState("No saved bot commands", "Tap + New Command to save a Telegram bot command with a title and purpose.")
         : '<div class="bot-empty">No saved bot commands.</div>';
       return;
     }
@@ -232,7 +262,8 @@
   function init() {
     loadCommands();
     $("botCommandForm").addEventListener("submit", upsertCommand);
-    $("resetCommandBtn").addEventListener("click", resetForm);
+    $("newCommandBtn").addEventListener("click", toggleNewForm);
+    $("resetCommandBtn").addEventListener("click", closeForm);
     $("exportCommandsBtn").addEventListener("click", exportCommands);
     $("botCommandList").addEventListener("click", handleListClick);
     $("botSearch").addEventListener("input", function (event) {
