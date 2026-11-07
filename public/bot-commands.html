@@ -18,10 +18,17 @@
         <div class="cmd-page-title">&#128172; Bot Commands</div>
         <div class="cmd-page-subtitle">Telegram bot command library for reusable market workflows</div>
       </div>
+      <div class="bot-toolbar">
+        <button class="bot-btn bot-btn-primary" type="button" id="newCommandBtn" aria-expanded="false" aria-controls="botCommandForm">+ New Command</button>
+        <button class="bot-btn" type="button" id="exportCommandsBtn">Export JSON</button>
+      </div>
     </div>
 
-    <section class="bot-shell" aria-label="Bot command workspace">
-      <form class="bot-form" id="botCommandForm">
+    <section class="bot-shell" id="botShell" aria-label="Bot command workspace">
+      <form class="bot-form" id="botCommandForm" hidden>
+        <div class="bot-form-head bot-form-wide">
+          <div class="bot-section-title" id="botFormTitle">New Command</div>
+        </div>
         <input type="hidden" id="botCommandId" />
         <label>
           <span>Bot title</span>
@@ -41,8 +48,7 @@
         </label>
         <div class="bot-actions bot-form-wide">
           <button class="bot-btn bot-btn-primary" type="submit" id="saveCommandBtn">Save Command</button>
-          <button class="bot-btn" type="button" id="resetCommandBtn">New Entry</button>
-          <button class="bot-btn" type="button" id="exportCommandsBtn">Export JSON</button>
+          <button class="bot-btn" type="button" id="resetCommandBtn">Cancel</button>
         </div>
       </form>
 
