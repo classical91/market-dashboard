@@ -36,6 +36,7 @@ const { createMarketMatrixRouter } = require("./routes/market-matrix");
 const { createStrategyEngineRouter } = require("./routes/strategy-engine");
 const { createTradingLabRouter } = require("./routes/trading-lab");
 const { createWatchlistRouter } = require("./routes/watchlist");
+const { createPotentialBuysRouter } = require("./routes/potential-buys");
 const { createTradeContextRouter } = require("./routes/trade-context");
 const { createBotCommandsRouter } = require("./routes/bot-commands");
 const { createPatternTrackerRouter } = require("./routes/pattern-tracker");
@@ -88,6 +89,7 @@ const { ResearchQueue } = require("./services/trading/research-queue");
 const { LiveScannerService } = require("./services/trading/live-scanner");
 const { LiveResearchService } = require("./services/trading/live-research-runner");
 const { WatchlistService } = require("./services/watchlist");
+const { PotentialBuysStore } = require("./services/potential-buys");
 const { TradeContextService } = require("./services/trade-context");
 const { TradeObservationStore } = require("./services/trade-observations");
 const { BotCommandsService } = require("./services/bot-commands");
@@ -389,6 +391,8 @@ function createApp() {
     cache,
   });
   const watchlistService = new WatchlistService({ dataDir });
+  // Screenshots of stocks/tokens worth a closer look, kept until deleted.
+  const potentialBuysStore = new PotentialBuysStore({ dataDir, urlPrefix: "/potential-buys-images" });
   // Pure aggregation over the engines above — it owns no indicator maths and
   // asks both scanners per tracked symbol rather than for the full universe.
   const tradeContextService = new TradeContextService({
@@ -600,6 +604,13 @@ function createApp() {
   }));
   app.use("/layout-screenshots", express.static(layoutScreenshotsDir));
   app.use("/ai-analysis-screenshots", express.static(aiAnalysisScreenshotsDir));
+  // Behind site auth (registered after requireAccess), like the page itself.
+  app.use("/potential-buys-images", express.static(potentialBuysStore.dir, {
+    setHeaders(res) {
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.setHeader("Cache-Control", "private, max-age=31536000, immutable");
+    },
+  }));
 
   // The Reporter menu's desk pages now show what the phone Shortcut generated
   // (see routes/phone-briefings.js) instead of generating through the API.
@@ -683,6 +694,7 @@ function createApp() {
   app.use("/api/trading-lab", createTradingLabRouter({ tradingLabService, backtestService, signalActionStore, experimentStore, researchQueue, signalScreenerService, tradeJournalService, requireAdmin }));
   app.use("/api/live-scanner", createLiveScannerRouter({ liveScannerService, requireAdmin }));
   app.use("/api/watchlist", createWatchlistRouter({ watchlistService, requireAdmin }));
+  app.use("/api/potential-buys", createPotentialBuysRouter({ potentialBuysStore }));
   app.use("/api/trade-context", createTradeContextRouter({ tradeContextService }));
   app.use("/api/bot-commands", createBotCommandsRouter({ botCommandsService }));
   app.use("/api/pattern-tracker", createPatternTrackerRouter({ patternTrackerService }));

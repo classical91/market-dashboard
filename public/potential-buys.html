@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Potential Buys - Market Command</title>
+  <script src="/assets/js/settings.js"></script>
+  <link rel="stylesheet" href="/assets/styles/command.css" />
+  <link rel="stylesheet" href="/assets/styles/components.css" />
+  <link rel="stylesheet" href="/assets/styles/potential-buys.css" />
+</head>
+<body>
+<div class="app">
+  <aside class="cmd-sidebar"></aside>
+  <main class="cmd-main">
+    <div class="cmd-page-header">
+      <div>
+        <div class="cmd-page-title">Potential Buys</div>
+        <div class="cmd-page-subtitle">Screenshots of stocks and tokens worth a closer look &middot; kept until you delete them</div>
+      </div>
+      <div class="pb-toolbar">
+        <button class="pb-btn" type="button" id="pbRefresh">Refresh</button>
+        <button class="pb-btn pb-btn-primary" type="button" id="pbAdd">+ Add screenshots</button>
+      </div>
+    </div>
+
+    <section
+      class="pb-dropzone"
+      id="pbDropzone"
+      tabindex="0"
+      role="button"
+      aria-label="Add screenshots: paste, drop, or choose files"
+    >
+      <input type="file" id="pbFile" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden />
+      <div class="pb-dropzone-title" id="pbDropzoneTitle">Paste, drag and drop, or tap to add screenshots</div>
+      <div class="pb-dropzone-hint">PNG, JPEG, WebP or GIF up to 15 MB. Paste works anywhere on this page.</div>
+    </section>
+
+    <section class="pb-section" aria-labelledby="pbHeading">
+      <div class="pb-section-head">
+        <h2 class="pb-section-title" id="pbHeading">Watching</h2>
+        <span class="pb-count" id="pbCount">Loading…</span>
+        <input class="pb-search" id="pbSearch" type="search" placeholder="Filter by label" aria-label="Filter screenshots by label" />
+      </div>
+      <div class="pb-grid" id="pbGrid" aria-live="polite"></div>
+    </section>
+
+    <div class="pb-toast" id="pbToast" role="status" aria-live="polite" hidden></div>
+  </main>
+</div>
+
+<dialog class="pb-viewer" id="pbViewer" aria-labelledby="pbViewerLabel">
+  <div class="pb-viewer-bar">
+    <div class="pb-viewer-meta">
+      <div class="pb-viewer-label" id="pbViewerLabel"></div>
+      <div class="pb-viewer-when" id="pbViewerWhen"></div>
+    </div>
+    <a class="pb-btn" id="pbViewerOpen" href="#" target="_blank" rel="noopener">Open original</a>
+    <button class="pb-btn pb-btn-danger" type="button" id="pbViewerDelete">Delete</button>
+    <button class="pb-btn" type="button" id="pbViewerClose" aria-label="Close">Close</button>
+  </div>
+  <img class="pb-viewer-img" id="pbViewerImg" alt="" />
+</dialog>
+
+<script src="/assets/js/sidebar.js"></script>
+<script src="/assets/js/ui.js"></script>
+<script src="/assets/js/potential-buys.js"></script>
+</body>
+</html>
