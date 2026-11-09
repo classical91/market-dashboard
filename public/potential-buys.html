@@ -45,6 +45,29 @@
       <div class="pb-grid" id="pbGrid" aria-live="polite"></div>
     </section>
 
+    <details class="pb-help" id="pbHelp">
+      <summary>Send screenshots from your iPhone (Share Sheet Shortcut)</summary>
+      <p>Opening this page on your phone and tapping <strong>+ Add screenshots</strong> works too. The Shortcut lets you send
+        straight from Photos or a screenshot preview with <strong>Share &rarr; Potential Buys</strong>.</p>
+      <ol>
+        <li>In Shortcuts, make a new shortcut named <strong>Potential Buys</strong>. In its details, turn on
+          <strong>Show in Share Sheet</strong> and set it to receive <strong>Images</strong>.</li>
+        <li>Add <strong>Repeat with Each</strong> item in <strong>Shortcut Input</strong> (so several screenshots go at once).</li>
+        <li>Inside the repeat, add <strong>Convert Image</strong> &rarr; <strong>JPEG</strong> (camera photos are HEIC, which browsers can't show).</li>
+        <li>Then <strong>Get Contents of URL</strong>:
+          <ul>
+            <li>URL: <code id="pbUploadUrl">/api/potential-buys/upload</code></li>
+            <li>Method <strong>POST</strong>. Header <code>x-broadcast-key</code> = your <code>BROADCAST_LEDGER_API_KEY</code>
+              (the same key as the phone briefings Shortcut).</li>
+            <li>Request Body <strong>File</strong> = <strong>Converted Image</strong>.</li>
+          </ul>
+        </li>
+        <li>Optional: add <strong>Ask for Input</strong> before the URL step and put it at the end of the URL as
+          <code>?label=</code> + the answer, to label it with a ticker.</li>
+      </ol>
+      <p>The key can only add screenshots here. Viewing, relabelling and deleting them still needs your login.</p>
+    </details>
+
     <div class="pb-toast" id="pbToast" role="status" aria-live="polite" hidden></div>
   </main>
 </div>
