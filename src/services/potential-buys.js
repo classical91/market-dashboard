@@ -121,9 +121,19 @@ class PotentialBuysStore {
     if (bytes.length > MAX_BYTES) throw httpError("Screenshot is larger than 15 MB.", 413);
     const sniffed = sniffImage(bytes);
     if (sniffed.kind === "heic") {
-      throw httpError("That photo is HEIC, which browsers can't show. Send a PNG or JPEG screenshot instead.", 415);
+      throw httpError(
+        "That photo is HEIC, which browsers can't show. In the Shortcut, add a \"Convert Image\" to JPEG step " +
+          "before Get Contents of URL, or send a PNG/JPEG screenshot.",
+        415,
+      );
     }
-    if (sniffed.kind !== "image") throw httpError("That file isn't a PNG, JPEG, WebP or GIF image.", 415);
+    if (sniffed.kind !== "image") {
+      throw httpError(
+        `That isn't a PNG, JPEG, WebP or GIF image (got ${bytes.length} bytes of something else). ` +
+          "In the Shortcut, set Request Body to File and pick the image (Shortcut Input), not text.",
+        415,
+      );
+    }
 
     const cleanLabel = normalizeLabel(label);
     return this._withLock(() => {

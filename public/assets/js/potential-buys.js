@@ -286,6 +286,9 @@
   // A click on the backdrop (outside the dialog box) closes it.
   el.viewer.addEventListener("click", function (e) { if (e.target === el.viewer) closeViewer(); });
 
+  var uploadUrl = document.getElementById("pbUploadUrl");
+  if (uploadUrl) uploadUrl.textContent = window.location.origin + API + "/upload";
+
   render();
   load();
 })();

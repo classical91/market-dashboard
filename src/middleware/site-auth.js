@@ -156,8 +156,19 @@ function isBriefingPagePush(req) {
   return req.method === "POST" && BRIEFING_PAGE_PUSH_PATH.test(req.path);
 }
 
+// Potential Buys takes screenshots from the iPhone Share Sheet through one
+// keyed route. Only POST, only this exact path: listing, relabelling and
+// deleting screenshots (and the images themselves) still need the owner
+// session.
+const POTENTIAL_BUYS_UPLOAD_PATH = /^\/api\/potential-buys\/upload\/?$/;
+
+function isPotentialBuysUpload(req) {
+  return req.method === "POST" && POTENTIAL_BUYS_UPLOAD_PATH.test(req.path);
+}
+
 function isLedgerApiPath(req) {
   return isBriefingPagePush(req)
+    || isPotentialBuysUpload(req)
     || LEDGER_API_PREFIXES.some((prefix) => req.path === prefix || req.path.startsWith(`${prefix}/`));
 }
 

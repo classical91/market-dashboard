@@ -694,7 +694,14 @@ function createApp() {
   app.use("/api/trading-lab", createTradingLabRouter({ tradingLabService, backtestService, signalActionStore, experimentStore, researchQueue, signalScreenerService, tradeJournalService, requireAdmin }));
   app.use("/api/live-scanner", createLiveScannerRouter({ liveScannerService, requireAdmin }));
   app.use("/api/watchlist", createWatchlistRouter({ watchlistService, requireAdmin }));
-  app.use("/api/potential-buys", createPotentialBuysRouter({ potentialBuysStore }));
+  app.use(
+    "/api/potential-buys",
+    createPotentialBuysRouter({
+      potentialBuysStore,
+      requireLedgerKey,
+      rateLimitPerMinute: config.broadcastLedger.rateLimitPerMinute,
+    }),
+  );
   app.use("/api/trade-context", createTradeContextRouter({ tradeContextService }));
   app.use("/api/bot-commands", createBotCommandsRouter({ botCommandsService }));
   app.use("/api/pattern-tracker", createPatternTrackerRouter({ patternTrackerService }));
