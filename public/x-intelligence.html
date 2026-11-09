@@ -83,6 +83,10 @@
             </div>
             <button type="button" class="x-feed-chip" id="xFeedMedia" aria-pressed="false"
                     title="Show only posts with media">Media</button>
+            <!-- Off by default. Groups loaded posts that share distinctive
+                 keywords; computed in the browser, never fetched. -->
+            <button type="button" class="x-feed-chip" id="xFeedStories" aria-pressed="false"
+                    title="Group loaded posts from different accounts that share distinctive keywords">Developing Stories: Off</button>
             <button type="button" class="x-feed-chip" id="xFeedMotion" aria-pressed="true"
                     title="Animated background for this template">Motion: On</button>
             <button type="button" class="x-feed-chip x-feed-reset" id="xFeedReset" disabled
@@ -137,6 +141,7 @@
 <script src="/assets/js/x-freshness.js"></script>
 <script src="/assets/js/x-posts.js"></script>
 <script src="/assets/js/x-feed-view.js"></script>
+<script src="/assets/js/x-stories.js"></script>
 <script src="/assets/js/x-broadcast.js"></script>
 <script src="/assets/js/x-live-reference.js"></script>
 <script src="/assets/js/x-accounts-admin.js"></script>

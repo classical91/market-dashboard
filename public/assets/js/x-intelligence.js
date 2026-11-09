@@ -66,6 +66,17 @@
   cardOptions.expanded = expandedPosts;
   cardOptions.isNew = function (post) { return !!newPostKeys[FeedView.postKey(post)]; };
 
+  /* Developing Stories (x-stories.js): an optional view over the posts the
+     feed below already shows. Cards inside a group carry Open and Copy link
+     only — Broadcast and FarmClaw stay on the main feed's cards, so nothing
+     about a group can look like a step towards sending it anywhere. */
+  var Stories = window.XStories || null;
+  var storyCardOptions = {
+    keyOf: FeedView.postKey,
+    expanded: expandedPosts,
+    isNew: cardOptions.isNew,
+  };
+
   function store() {
     try { return window.localStorage; } catch (err) { return null; }
   }
@@ -321,7 +332,15 @@
       templateId: initialTemplateId,
       filters: FeedView.readFilters(store(), initialTemplateId),
       view: FeedView.readView(store()),
+      storiesEnabled: Stories ? Stories.readEnabled(store()) : false,
     };
+
+    // Recomputes only when the template or the filtered posts change.
+    var storyCache = Stories ? Stories.createStoryCache({ keyOf: FeedView.postKey }) : null;
+    // Which groups the reader opened, by group id. Groups start collapsed.
+    var expandedStories = {};
+    var storiesOpen = true;
+    var storySeq = 0;
 
     function activeTemplate() {
       return state.templates.find(function (template) { return template.id === state.templateId; }) || state.templates[0] || {
@@ -408,6 +427,9 @@
       var query = state.filters.query;
       state.filters = FeedView.readFilters(store(), templateId);
       state.filters.query = query;
+      // Another template's groups never carry over, open or otherwise.
+      expandedStories = {};
+      if (storyCache) storyCache.clear();
       markNewPosts(templateId, state.feedData.posts, false);
       selectAll();
       renderTemplateSwitcher();
@@ -448,7 +470,8 @@
     var masonryFrame = 0;
 
     function layoutMasonry() {
-      var grid = pane.querySelector(".x-post-grid");
+      // The feed's own grid, not one inside an expanded Developing Story.
+      var grid = pane.querySelector(":scope > .x-post-grid");
       if (!grid) return;
       var cards = grid.querySelectorAll(".x-post-card");
       grid.classList.remove("is-masonry");
@@ -532,7 +555,9 @@
         );
         renderFeedError(pane, state.feedData.failedFeeds);
         renderStaleNotice(pane, state.feedData.staleFeeds);
-        renderFeedStatus(pane, computeStatus(state, null));
+        var allStatus = computeStatus(state, null);
+        renderFeedStatus(pane, allStatus);
+        renderStories(shownAll, allStatus);
         return;
       }
       var handlePosts = state.feedData.posts.filter(function (p) { return p.handle === state.handle; });
@@ -549,7 +574,145 @@
           : "No recent posts found for @" + state.handle + "."
       );
       renderStaleNotice(pane, stale);
-      renderFeedStatus(pane, computeStatus(state, state.handle));
+      var handleStatus = computeStatus(state, state.handle);
+      renderFeedStatus(pane, handleStatus);
+      // One account's posts can never form a group (two accounts minimum),
+      // so this draws nothing; it runs so the rule lives in one place.
+      renderStories(shownHandle, handleStatus);
+    }
+
+    /* ── Developing Stories ──────────────────────────────────────────────
+       Built from exactly the posts the feed below shows, after every filter,
+       and inserted just above that feed. Nothing is removed from the feed,
+       and nothing is drawn at all when there is no reliable group. */
+    function renderStories(posts, status) {
+      if (!Stories || !state.storiesEnabled || !storyCache) return;
+      var result = storyCache.compute(state.templateId, posts);
+      if (!result.groups.length) return;
+      var section = buildStoriesSection(result.groups, status);
+      pane.insertBefore(section, pane.querySelector(":scope > .x-post-grid"));
+    }
+
+    function timeHtml(iso) {
+      var el = document.createElement("time");
+      el.setAttribute("datetime", iso);
+      el.title = new Date(iso).toLocaleString();
+      el.textContent = relativeTime(iso) || "unknown time";
+      return el;
+    }
+
+    function buildStoriesSection(groups, status) {
+      var section = document.createElement("section");
+      section.className = "x-stories";
+      section.setAttribute("aria-label", "Developing Stories");
+
+      var bodyId = "xStoriesBody";
+      var head = document.createElement("button");
+      head.type = "button";
+      head.className = "x-stories-toggle";
+      head.setAttribute("aria-expanded", storiesOpen ? "true" : "false");
+      head.setAttribute("aria-controls", bodyId);
+      head.innerHTML =
+        '<span class="x-stories-chevron" aria-hidden="true">&#9662;</span>' +
+        '<span class="x-stories-title">Developing Stories</span>' +
+        '<span class="x-stories-count"></span>';
+      head.lastChild.textContent = groups.length + (groups.length === 1 ? " keyword group" : " keyword groups");
+      section.appendChild(head);
+
+      var body = document.createElement("div");
+      body.className = "x-stories-body";
+      body.id = bodyId;
+      body.hidden = !storiesOpen;
+
+      var note = document.createElement("p");
+      note.className = "x-stories-note";
+      note.textContent = Stories.NOTE;
+      body.appendChild(note);
+
+      var caveatText = Stories.freshnessCaveat(status, state.cache, relativeTime);
+      if (caveatText) {
+        var caveat = document.createElement("p");
+        caveat.className = "x-stories-caveat";
+        caveat.textContent = caveatText;
+        body.appendChild(caveat);
+      }
+
+      var list = document.createElement("ul");
+      list.className = "x-story-list";
+      groups.forEach(function (group) { list.appendChild(buildStory(group)); });
+      body.appendChild(list);
+      section.appendChild(body);
+
+      head.addEventListener("click", function () {
+        storiesOpen = body.hidden;
+        body.hidden = !storiesOpen;
+        head.setAttribute("aria-expanded", storiesOpen ? "true" : "false");
+      });
+      return section;
+    }
+
+    function buildStory(group) {
+      var item = document.createElement("li");
+      item.className = "x-story";
+      item.setAttribute("data-story-id", group.id);
+      var postsId = "x-story-posts-" + (storySeq += 1);
+
+      var toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = "x-story-toggle";
+      toggle.setAttribute("aria-controls", postsId);
+
+      var top = document.createElement("span");
+      top.className = "x-story-top";
+      var kind = document.createElement("span");
+      kind.className = "x-story-kind";
+      kind.textContent = "Keyword group";
+      var label = document.createElement("span");
+      label.className = "x-story-label";
+      // Quoted so it reads as the words the posts share, not a headline.
+      label.textContent = group.label ? "“" + group.label + "”" : "Posts with overlapping wording";
+      top.appendChild(kind);
+      top.appendChild(label);
+
+      var meta = document.createElement("span");
+      meta.className = "x-story-meta";
+      meta.appendChild(document.createTextNode(
+        group.postCount + " posts · " + group.accountCount + " accounts · first "
+      ));
+      meta.appendChild(timeHtml(group.earliestAt));
+      meta.appendChild(document.createTextNode(" · latest "));
+      meta.appendChild(timeHtml(group.latestAt));
+
+      var handles = document.createElement("span");
+      handles.className = "x-story-handles";
+      handles.textContent = group.handles.map(function (h) { return "@" + h; }).join(", ");
+
+      toggle.appendChild(top);
+      toggle.appendChild(meta);
+      toggle.appendChild(handles);
+      item.appendChild(toggle);
+
+      var postsBox = document.createElement("div");
+      postsBox.className = "x-story-posts";
+      postsBox.id = postsId;
+      item.appendChild(postsBox);
+
+      // Cards are drawn only while a group is open, so a closed group costs
+      // one row, not a second copy of its posts.
+      function apply() {
+        var open = !!expandedStories[group.id];
+        toggle.setAttribute("aria-expanded", open ? "true" : "false");
+        postsBox.hidden = !open;
+        if (open) renderPostCards(postsBox, group.posts, "", storyCardOptions);
+        else postsBox.innerHTML = "";
+      }
+      toggle.addEventListener("click", function () {
+        if (expandedStories[group.id]) delete expandedStories[group.id];
+        else expandedStories[group.id] = true;
+        apply();
+      });
+      apply();
+      return item;
     }
 
     function refreshList() {
@@ -667,6 +830,7 @@
     var mediaButton = document.getElementById("xFeedMedia");
     var viewGroup = document.getElementById("xFeedView");
     var motionButton = document.getElementById("xFeedMotion");
+    var storiesButton = document.getElementById("xFeedStories");
     var resetButton = document.getElementById("xFeedReset");
     var summary = document.getElementById("xFeedSummary");
     var settingsToggle = document.getElementById("xFeedSettingsToggle");
@@ -735,6 +899,10 @@
       if (mediaButton) mediaButton.setAttribute("aria-pressed", state.filters.media ? "true" : "false");
       setPressed(viewGroup, "data-view", state.view);
       pane.setAttribute("data-x-view", state.view);
+      if (storiesButton) {
+        storiesButton.setAttribute("aria-pressed", state.storiesEnabled ? "true" : "false");
+        storiesButton.textContent = "Developing Stories: " + (state.storiesEnabled ? "On" : "Off");
+      }
       if (resetButton) resetButton.disabled = FeedView.isDefaultFilters(state.filters) && state.mode === ALL_MODE;
       syncSettingsBadge();
       renderSummary();
@@ -798,6 +966,15 @@
       });
     }
     if (mediaButton) mediaButton.addEventListener("click", function () { setFilters({ media: !state.filters.media }); });
+    // Hidden, not broken, if x-stories.js failed to load.
+    if (storiesButton && !Stories) storiesButton.hidden = true;
+    if (storiesButton && Stories) {
+      storiesButton.addEventListener("click", function () {
+        state.storiesEnabled = !state.storiesEnabled;
+        Stories.writeEnabled(store(), state.storiesEnabled);
+        renderPane();
+      });
+    }
     if (viewGroup) {
       viewGroup.addEventListener("click", function (event) {
         var button = event.target.closest && event.target.closest("button[data-view]");
@@ -881,7 +1058,13 @@
     }
 
     function refresh() {
-      return loadAccountsFeed(state.templateId).then(function (result) {
+      var requestedTemplateId = state.templateId;
+      return loadAccountsFeed(requestedTemplateId).then(function (result) {
+      // The reader switched templates while this was in flight. Its posts
+      // belong to the old template: applying them would put one template's
+      // posts (and its Developing Stories) under another's name, and write
+      // them into the new template's cache. The newer request owns the pane.
+      if (state.templateId !== requestedTemplateId) return;
       state.loaded = true;
 
       if (result.ok) {

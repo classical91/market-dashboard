@@ -1326,3 +1326,127 @@ body[data-x-accent] .x-account-card--all.active { border-color: var(--x-accent);
   .x-template-menu,
   .x-feed-settings { transition: none; animation: none; }
 }
+
+/* ── Developing Stories ──────────────────────────────────────────────────
+   Optional keyword groups above the feed (x-stories.js). Deliberately quieter
+   than the freshness banner: it qualifies nothing, it only gathers posts that
+   share words. No status colours of its own — a group is never "live",
+   "confirmed" or "verified". */
+.x-stories {
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255,255,255,0.018);
+}
+.x-stories-toggle {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 10px;
+}
+.x-stories-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.x-stories-count { font-size: 12px; color: var(--muted); }
+.x-stories-chevron {
+  display: inline-block;
+  color: var(--muted);
+  font-size: 11px;
+  transition: transform 0.15s;
+}
+.x-stories-toggle[aria-expanded="false"] .x-stories-chevron { transform: rotate(-90deg); }
+.x-stories-body { padding: 0 12px 10px; }
+.x-stories-note,
+.x-stories-caveat {
+  margin: 0 0 8px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.x-stories-caveat {
+  padding: 6px 8px;
+  border-left: 3px solid var(--amber, #d29922);
+  border-radius: 4px;
+  background: rgba(210,153,34,0.06);
+}
+.x-story-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.x-story {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  min-width: 0;
+}
+.x-story-toggle {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+}
+.x-story-toggle:hover .x-story-label { color: var(--text); }
+.x-story-toggle[aria-expanded="true"] {
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--x-hl) 70%, transparent);
+  border-radius: 8px 8px 0 0;
+}
+.x-story-top {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  min-width: 0;
+}
+.x-story-kind {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.x-story-label {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--text) 88%, var(--muted));
+  overflow-wrap: anywhere;
+}
+.x-story-meta,
+.x-story-handles {
+  font-size: 11.5px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.x-story-posts { padding: 4px 8px 8px; }
+.x-story-posts .x-post-grid { margin-bottom: 0; }
+.x-stories-toggle:focus-visible,
+.x-story-toggle:focus-visible {
+  outline: 2px solid var(--x-hl);
+  outline-offset: 1px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .x-stories-chevron { transition: none; }
+}

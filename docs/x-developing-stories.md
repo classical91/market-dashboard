@@ -1,78 +1,143 @@
-# X Intelligence: Developing Stories (proposal)
+# X Intelligence: Developing Stories
 
-Status: **design proposal only — not implemented.** Needs approval before any
-code lands. Nothing here changes the feed, the freshness banner, Broadcast or
-FarmClaw.
+Status: **Option A implemented** (client-side keyword grouping, off by
+default). Option B (server-side embeddings / LLM) remains a separate proposal
+below and is **not** implemented. Nothing here changes the feed, the freshness
+banner, Broadcast or FarmClaw.
 
 ## What it is
 
-An optional, collapsed-by-default section above the post grid on
-`/x-intelligence.html` that groups posts already loaded for the selected
-template when they appear to cover the same event, e.g.:
+An optional section above the post grid on `/x-intelligence.html` that groups
+posts already loaded (and already filtered) for the selected template when
+they share distinctive keywords, e.g.:
 
 ```
-▸ Developing · "bridge crossing reopened"   4 posts · 3 accounts · first 06:10, latest 08:45
+▾ DEVELOPING STORIES  2 keyword groups
+  KEYWORD GROUP  "50bps · ECB · Lagarde"
+  4 posts · 3 accounts · first 55 minutes ago · latest 12 minutes ago
+  @eurowatch, @macrodesk, @ratestrader
 ```
 
-Expanding a group lists every original post in it, newest first, each with its
-own handle, timestamp, permalink and the normal card actions (Open, Copy link).
-The ungrouped feed below is unchanged: grouping is an extra view, not a
-replacement, and a post can always be found in the main feed too.
+Expanding a group shows every original post in it, newest first, each with
+its own handle, timestamp, permalink and the Open / Copy link actions. The
+feed below is unchanged: grouping is an extra view, not a replacement, and
+every grouped post is still in the main feed.
 
-## Ground rules
+## Using it
 
-- **Grouping is not verification.** Several posts about one event are counted
-  as posts, never as "sources confirming" it. The group header says
-  "4 posts · 3 accounts", never "confirmed" or "verified". Accounts that
-  repost or quote each other are not independent, and the UI must not imply
-  they are.
-- **No status is inferred.** The section has no LIVE/CONFIRMED/RUMOR badge of
-  its own. If a post's text says "unconfirmed", that text is shown as written.
-- **Every original stays visible**: source handle, original timestamp, original
-  permalink. The group title is a label for scanning, not a summary that
-  replaces the posts.
-- **No automatic actions.** Groups never post, broadcast or queue for FarmClaw.
-  Broadcast and FarmClaw remain per-post buttons that a person presses.
-- **Basic browsing costs nothing.** Grouping runs in the browser on the loaded
-  posts. No paid AI call is needed to open the page or read a group.
+- Toggle: **Developing Stories: Off/On** in the feed settings panel (gear).
+  Off by default; remembered per browser in `localStorage`
+  (`xIntelligence:developingStories:v1`).
+- The section header folds the whole section; each group starts collapsed.
+  Opened groups stay open across filter and view changes, and reset on a
+  template switch or a reload.
+- No group that meets the rules → no section at all (no empty box).
 
-## Option A — client-side heuristic grouping (recommended first step)
+## Ground rules (as implemented)
 
-Runs in a new pure module (`x-stories.js`, same UMD pattern as
-`x-feed-view.js`) over the posts the page already has. No backend, no new
-credentials, no extra requests.
+- **Grouping is not verification.** The header says "4 posts · 3 accounts",
+  never "confirmed" or "verified". A fixed note under the header says labels
+  are keywords, not headlines, and that posts in a group are not independent
+  confirmation.
+- **No status of its own.** The section carries no LIVE/CONFIRMED badge. When
+  the feed on screen comes from the browser cache, or the latest check was not
+  fully successful, an amber caveat says so ("Built from browser-cached posts
+  saved 22 minutes ago. This is not a live view…").
+- **Originals stay visible and untouched.** Groups hold references to the
+  original post objects; the input array and posts are never modified. Labels
+  are lists of up to three shared terms in quotes, never sentences.
+- **No automatic actions.** Cards inside a group have Open and Copy link only —
+  no Broadcast or FarmClaw button. Those remain on the main feed's cards, as
+  per-post buttons a person presses.
+- **Costs nothing.** Runs in the browser over posts already on the page. No
+  requests, no model, no new environment variables, no dependencies.
 
-1. Normalise each post's preview text (`cleanPreviewText`), lower-case, strip
-   punctuation and stop words, keep tickers/cashtags, hashtags, capitalised
-   multi-word names and numbers.
-2. Candidate pairs: posts within a time window (default 6h) that share a
-   distinctive token (a cashtag, hashtag, or a rare proper-noun bigram).
-3. Score pairs with Jaccard similarity over the token sets (plus a bonus when
-   both posts link to the same expanded URL, if the feed ever provides one).
-4. Union-find over pairs above a threshold (start ~0.35); a group needs
-   ≥ 2 posts from ≥ 2 different accounts — one account posting a thread is not
-   a developing story.
-5. Group label: the most frequent distinctive tokens, shown in quotes so it
-   reads as a keyword label, not a headline.
+## How grouping works
 
-Cost: zero runtime cost beyond a few milliseconds per render for a few hundred
-posts (pairing is bounded by the time window).
+Code: `public/assets/js/x-stories.js` (UMD, same pattern as `x-feed-view.js`).
+Tests: `test/x-stories.test.js` (engine), `test/x-stories-ui.test.js`
+(Playwright, skipped when Chromium cannot launch).
 
-Limitations, stated plainly in the UI's help text:
+1. **Input** is exactly what the feed shows after the toolbar's search, time,
+   media and account filters (`XFeedView.filterPosts`), for the selected
+   template only.
+2. **Eligible posts:** a post object with a stable id (X status id, else
+   permalink), a handle, string text and a valid timestamp. Posts without a
+   timestamp are skipped (their age is unknown, so they cannot be placed in a
+   window). Duplicates by id or permalink count once. Posts with fewer than
+   three content words are skipped. At most the newest 500 are considered.
+3. **Tokens:** URLs and @mentions removed; stop words and filler ("breaking",
+   "says", "update", "confirmed", "verified", …) dropped; plural "s" stemmed.
+4. **Distinctive terms:** cashtags, hashtags, figures (`50bps`, `112%`,
+   `4.6%`; not single digits or bare years), acronyms, and capitalised words
+   that appear capitalised mid-sentence somewhere in the loaded posts. Title
+   Case and ALL-CAPS posts only contribute names the rest of the feed agrees
+   are names.
+5. **Generic terms never count as distinctive:** a built-in list (Bitcoin,
+   BTC, Trump, Ukraine, Russia, China, Fed, market, oil, gold, AI, …) plus any
+   term found in ≥ 20% of the loaded posts (minimum 8) spread across more
+   than 12 hours — the template's own background vocabulary.
+6. **Pair rule:** two posts relate when they are within **6 hours** and share
+   either ≥ 2 distinctive terms with word-overlap (Jaccard) ≥ 0.2, or ≥ 1
+   distinctive term with Jaccard ≥ 0.4. Candidates come from an inverted
+   index on distinctive terms, so unrelated posts are never compared; scoring
+   is capped at 40,000 pairs.
+7. **Grouping without transitive chaining:** strongest pairs merge first, but
+   a merge is accepted only if the whole group still fits in one 6-hour span
+   and **every post relates to a strict majority of the others** (in a group
+   of three, each post must match both others). A post mentioning two events
+   cannot chain them together. Groups stop at 24 posts.
+8. **Output:** groups with ≥ 2 posts from ≥ 2 accounts, ordered by latest post.
+   A single selected account therefore never produces a group.
+9. **Recompute only on change:** results are memoised on template + the
+   filtered posts' ids, timestamps and text lengths; view-mode changes and
+   re-renders reuse them. A template switch clears the cache.
 
-- It matches words, not meaning. Two posts about different events that share
-  a ticker in the same hours will be grouped; the same event described with
-  different words will not.
-- Quote posts and reposts can make one claim look like several posts.
-- Only loaded posts are considered: no history beyond the feed payload.
-- Non-English posts group poorly.
+Measured on synthetic feeds in the test suite (Node 22, CI machines will
+differ): 20 posts ≈ 1 ms, 200 posts ≈ 5 ms, 1,000 posts (500 considered)
+≈ 16 ms.
 
-Tests: deterministic fixtures for "groups", "does not group across the time
-window", "single account never forms a group", "the label never contains
-'confirmed'/'verified'", and that group rendering exposes every original
-permalink.
+## Limitations
 
-## Option B — server-side clustering with embeddings or an LLM (later, if A is not enough)
+Stated so nobody reads more into a group than it is:
+
+- **It matches words, not meaning.** Different events that share two names or
+  figures in the same six hours can be grouped (e.g. two separate ECB
+  officials' comments that both mention "Lagarde" and "50bps"). The same event
+  described in different words, or in another language, will not group.
+- **False-positive risks:** recurring scheduled terms (CPI, FOMC, NFP) on a
+  release day; ticker-heavy posts that list many cashtags; two accounts
+  posting the same press-release wording about different subjects; a name that
+  is not on the generic list but is background for one template.
+- **Not independent:** quote posts, reposts and accounts copying each other
+  look like several posts. Account count is not a confirmation count.
+- **Greedy grouping can split one story** into two smaller groups when posts
+  match different subsets of each other. Precision is preferred over recall.
+- **Labels are raw terms.** Multi-word names are separate terms
+  ("Key · Bridge · Maryland").
+- Only loaded posts are considered: nothing beyond the feed payload.
+
+## Related fix shipped with it
+
+`refresh()` now drops a feed response for a template the reader has already
+switched away from. Previously a slow response could put the old template's
+posts (and their groups) on screen under the new template's name and write
+them into the new template's browser cache.
+
+## Recommended next steps (ranked by production value)
+
+1. **Measure on real feeds.** Turn it on for a week and note wrong and missed
+   groups per template; tune the generic list and thresholds from that rather
+   than guessing.
+2. **Per-template generic terms** in the template registry (e.g. "Solana" for a
+   Solana template) instead of only the global list.
+3. **Join adjacent label terms** into phrases ("Key Bridge") when they appear
+   next to each other in most members.
+4. **Use expanded URLs** if the feed ever provides them: two posts linking the
+   same article are strong evidence.
+5. Option B below, only if keyword grouping proves clearly insufficient.
+
+## Option B — server-side clustering with embeddings or an LLM (proposal, not implemented)
 
 A backend job would cluster recent posts per template using text embeddings
 (or an LLM pass for titles) and expose `/api/x/stories?template=…`.
@@ -87,13 +152,6 @@ A backend job would cluster recent posts per template using text embeddings
   failure behaviour when the provider is down (section hidden, feed
   unaffected), and tests.
 
-Recommendation: ship Option A behind a toolbar toggle ("Developing stories:
-Off/On", default Off), measure how often groups are wrong on real feeds, and
-only consider Option B if keyword grouping is clearly insufficient.
-
-## Open questions for approval
-
-1. Default the section to Off (toggle) or On but collapsed?
-2. Time window and minimum group size (6h / 2 posts / 2 accounts proposed).
-3. Should the group header offer "Open all on X" (opens tabs), or only list
-   links? Proposed: list only.
+Recommendation unchanged: keep Option A, measure how often groups are wrong on
+real feeds, and only consider Option B if keyword grouping is clearly
+insufficient.
