@@ -59,6 +59,8 @@
       label: "Trades",
       children: [
         { href: "/pattern-scanner-trades.html", label: "My Trades" },
+        // Screenshots of stocks/tokens worth a closer look, kept until deleted.
+        { href: "/potential-buys.html", label: "Potential Buys" },
         {
           href: "https://trading-strategy-production-1b41.up.railway.app/",
           label: "Decision Engine",

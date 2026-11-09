@@ -1,0 +1,169 @@
+/* ─────────────────────────────────────────────────────────
+   Potential Buys — /potential-buys.html
+   Loaded after command.css. Screenshot holding area for stocks
+   and tokens worth a closer look.
+───────────────────────────────────────────────────────── */
+
+.pb-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+.pb-btn {
+  font: inherit; font-size: 12px; font-weight: 600;
+  color: var(--text);
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 12px;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.pb-btn:hover { border-color: var(--border-hover); }
+.pb-btn:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.pb-btn-primary { background: var(--blue-bg); border-color: rgba(77,163,255,0.45); }
+.pb-btn-danger { color: var(--red); border-color: rgba(255,77,109,0.35); }
+.pb-btn-danger:hover { background: var(--red-bg); border-color: rgba(255,77,109,0.6); }
+.pb-btn:disabled { opacity: 0.5; cursor: default; }
+
+/* Drop zone */
+.pb-dropzone {
+  display: grid; place-items: center; gap: 6px;
+  min-height: 130px;
+  margin-bottom: 20px;
+  padding: 20px;
+  border: 1.5px dashed var(--border-hover);
+  border-radius: var(--radius);
+  background: rgba(9,14,24,0.72);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.pb-dropzone:hover { border-color: rgba(77,163,255,0.45); }
+.pb-dropzone:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.pb-dropzone.is-dragging { border-color: var(--blue); background: var(--blue-bg); }
+.pb-dropzone.is-uploading .pb-dropzone-title { color: var(--blue); }
+.pb-dropzone-title { color: var(--text); font-size: 14px; font-weight: 600; }
+.pb-dropzone-hint { color: var(--muted); font-size: 12px; }
+
+/* List */
+.pb-section-head {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.pb-section-title {
+  margin: 0;
+  color: var(--soft);
+  font-size: 12px; font-weight: 800;
+  letter-spacing: 0.08em; text-transform: uppercase;
+}
+.pb-count {
+  font-size: 11px; color: var(--muted);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  padding: 3px 10px; border-radius: 10px;
+}
+.pb-search {
+  margin-left: auto;
+  min-width: 0; width: 220px; max-width: 100%;
+  font: inherit; font-size: 12px;
+  color: var(--text);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 10px;
+}
+.pb-search:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+
+.pb-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+.pb-grid > .ui-empty-state,
+.pb-grid > .ui-error-state { grid-column: 1 / -1; }
+
+.pb-card {
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(9,14,24,0.72);
+}
+.pb-card:hover { border-color: var(--border-hover); }
+.pb-thumb {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  padding: 0; border: 0;
+  background: #05080e;
+  cursor: zoom-in;
+}
+.pb-thumb img { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; }
+.pb-thumb:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+.pb-card-body { display: grid; gap: 8px; padding: 10px; }
+.pb-label {
+  font: inherit; font-size: 13px; font-weight: 600;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 5px 6px;
+  /* Bleed the padding out so the text lines up with the date below it. */
+  margin: -5px -6px 0;
+  width: calc(100% + 12px);
+}
+.pb-label::placeholder { color: var(--dim); font-weight: 500; }
+.pb-label:hover { border-color: var(--border); }
+.pb-label:focus { outline: none; border-color: rgba(77,163,255,0.45); background: rgba(255,255,255,0.04); }
+.pb-card-foot { display: flex; align-items: center; gap: 8px; }
+.pb-when { color: var(--muted); font-size: 11px; }
+.pb-card-foot .pb-btn { margin-left: auto; padding: 5px 10px; font-size: 11px; }
+
+/* Viewer */
+.pb-viewer {
+  width: min(1200px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  /* command.css resets every margin to 0, which pins a modal dialog top-left. */
+  margin: auto;
+  padding: 0;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--border-hover);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.pb-viewer::backdrop { background: rgba(3,5,10,0.82); }
+.pb-viewer-bar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.pb-viewer-meta { flex: 1 1 200px; min-width: 0; }
+.pb-viewer-label { font-size: 14px; font-weight: 700; overflow-wrap: anywhere; }
+.pb-viewer-when { font-size: 11px; color: var(--muted); }
+.pb-viewer-img {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100vh - 120px);
+  margin: 0 auto;
+  object-fit: contain;
+}
+
+/* Toast */
+.pb-toast {
+  position: fixed; right: 16px; bottom: 16px; z-index: 50;
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--surface2);
+  border: 1px solid var(--border-hover);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+}
+.pb-toast.is-error { border-color: rgba(255,77,109,0.5); }
+.pb-toast[hidden] { display: none; }
+
+@media (max-width: 640px) {
+  .pb-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .pb-search { margin-left: 0; width: 100%; }
+}

@@ -59,10 +59,11 @@ test("Trades sits above TradeHunter and holds the trade workflow", () => {
   assert.ok(tradesStart > -1, "Trades is missing");
   assert.ok(tradeHunterStart > tradesStart, "Trades must sit above TradeHunter");
   assert.match(trades, /href: "\/pattern-scanner-trades\.html", label: "My Trades"/);
+  assert.match(trades, /href: "\/potential-buys\.html", label: "Potential Buys"/);
   assert.match(trades, /label: "Decision Engine"/);
   assert.match(trades, /href: "\/trading-lab\.html", label: "Trading Lab Backtest"/);
   let cursor = -1;
-  for (const label of ["My Trades", "Decision Engine", "Trading Lab Backtest"]) {
+  for (const label of ["My Trades", "Potential Buys", "Decision Engine", "Trading Lab Backtest"]) {
     const next = trades.indexOf(`label: "${label}"`, cursor + 1);
     assert.ok(next > cursor, `${label} is missing or out of order in Trades`);
     cursor = next;
