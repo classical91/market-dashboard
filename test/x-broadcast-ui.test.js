@@ -272,8 +272,14 @@ test("every post-rendering path on the page carries the broadcast option", () =>
   // A render site that called renderPostCards directly would silently drop the
   // button on that one state — which is how "it works except after a refresh"
   // happens. The wrapper is the only place allowed to invoke it.
-  const calls = js.match(/renderPostCards\(/g) || [];
-  assert.equal(calls.length, 1, "every render site must go through showPosts");
+  // The one deliberate exception: cards inside an expanded Developing Story
+  // are a second view of posts already in the feed, and carry Open and Copy
+  // link only (see test/x-stories.test.js). Named exactly, so any other
+  // direct call still fails here.
+  const storyCall = "renderPostCards(postsBox, group.posts, \"\", storyCardOptions)";
+  assert.equal(js.split(storyCall).length - 1, 1);
+  const calls = js.split(storyCall).join("").match(/renderPostCards\(/g) || [];
+  assert.equal(calls.length, 1, "every feed render site must go through showPosts");
   assert.equal((js.match(/showPosts\(/g) || []).length, 4, "the wrapper and its three render sites");
 });
 
