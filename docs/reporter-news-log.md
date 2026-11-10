@@ -110,7 +110,10 @@ from `discovered` to `verified`; it never moves backwards.
 
 `reporterDate` is always the America/Vancouver calendar day of `capturedAt`.
 Any `reporterDate` the caller sends is ignored. To backfill a past day, send
-the historical `capturedAt`.
+the historical `capturedAt`. The day comes from the runtime's tz database, not
+a fixed offset: British Columbia moved to permanent UTC-7 on 2026-11-01, so
+from then on a Vancouver day starts at 07:00Z all year. A runtime whose tzdata
+predates that change would still apply PST (08:00Z) in winter.
 
 ### `POST /api/reporter-news/:id/approval`
 
