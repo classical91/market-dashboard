@@ -249,13 +249,56 @@ test("reporterDate is always derived from capturedAt in Vancouver", () => {
   // Midnight rollover: 06:59Z is 23:59 PDT on the 5th, 07:00Z is 00:00 on the 6th.
   assert.equal(dayKey("2026-10-06T06:59:59Z", "America/Vancouver"), "2026-10-05");
   assert.equal(dayKey("2026-10-06T07:00:00Z", "America/Vancouver"), "2026-10-06");
-  // DST end (Nov 1 2026, PDT -> PST): midnight moves from 07:00Z to 08:00Z.
-  assert.equal(dayKey("2026-11-02T07:30:00Z", "America/Vancouver"), "2026-11-01");
-  assert.equal(dayKey("2026-11-02T08:00:00Z", "America/Vancouver"), "2026-11-02");
-  // DST start (Mar 8 2026, PST -> PDT).
-  assert.equal(dayKey("2026-03-08T07:30:00Z", "America/Vancouver"), "2026-03-07");
-  assert.equal(dayKey("2026-03-09T07:00:00Z", "America/Vancouver"), "2026-03-09");
 });
+
+test("reporterDate follows Vancouver's DST transitions on both sides", () => {
+  const vancouver = (at) => dayKey(at, "America/Vancouver");
+  // DST end (Nov 2 2025, PDT -> PST). Midnight before the change is 07:00Z,
+  // midnight after it is 08:00Z.
+  assert.equal(vancouver("2025-11-02T06:59:59Z"), "2025-11-01");
+  assert.equal(vancouver("2025-11-02T07:00:00Z"), "2025-11-02");
+  assert.equal(vancouver("2025-11-03T07:59:59Z"), "2025-11-02");
+  assert.equal(vancouver("2025-11-03T08:00:00Z"), "2025-11-03");
+  // DST start (Mar 8 2026, PST -> PDT). Midnight before is 08:00Z, after is 07:00Z.
+  assert.equal(vancouver("2026-03-08T07:59:59Z"), "2026-03-07");
+  assert.equal(vancouver("2026-03-08T08:00:00Z"), "2026-03-08");
+  assert.equal(vancouver("2026-03-09T06:59:59Z"), "2026-03-08");
+  assert.equal(vancouver("2026-03-09T07:00:00Z"), "2026-03-09");
+
+  // The stored record uses the same derivation on each side of the fall-back.
+  const store = newStore();
+  const before = store.intake({ ...baseItem, url: "https://example.com/dst-a", capturedAt: "2025-11-03T07:30:00Z" });
+  const after = store.intake({ ...baseItem, url: "https://example.com/dst-b", capturedAt: "2025-11-03T08:00:00Z" });
+  assert.equal(before.record.reporterDate, "2025-11-02", "23:30 PST is still the 2nd");
+  assert.equal(after.record.reporterDate, "2025-11-03");
+});
+
+// British Columbia moved to permanent UTC-7 on Nov 1 2026, so Vancouver no
+// longer falls back that day (Los Angeles still does). Older runtimes ship
+// tzdata from before that change and still apply PST there.
+const vancouverOnPermanentUtcMinus7 =
+  new Intl.DateTimeFormat("en-GB", { timeZone: "America/Vancouver", hour: "2-digit", hourCycle: "h23" })
+    .format(new Date("2027-01-15T12:00:00Z")) === "05";
+
+test(
+  "reporterDate keeps Vancouver on UTC-7 across Nov 1 2026",
+  { skip: !vancouverOnPermanentUtcMinus7 && "this runtime's tzdata predates BC's permanent UTC-7" },
+  () => {
+    const vancouver = (at) => dayKey(at, "America/Vancouver");
+    // Midnight stays at 07:00Z on both sides of Nov 1 2026.
+    assert.equal(vancouver("2026-11-01T06:59:59Z"), "2026-10-31");
+    assert.equal(vancouver("2026-11-01T07:00:00Z"), "2026-11-01");
+    assert.equal(vancouver("2026-11-02T06:59:59Z"), "2026-11-01");
+    assert.equal(vancouver("2026-11-02T07:00:00Z"), "2026-11-02");
+    assert.equal(vancouver("2026-11-02T07:30:00Z"), "2026-11-02");
+    // Los Angeles fell back the same night, so the same instant is still the 1st there.
+    assert.equal(dayKey("2026-11-02T07:30:00Z", "America/Los_Angeles"), "2026-11-01");
+
+    const store = newStore();
+    const { record } = store.intake({ ...baseItem, url: "https://example.com/dst-c", capturedAt: "2026-11-02T07:30:00Z" });
+    assert.equal(record.reporterDate, "2026-11-02");
+  },
+);
 
 test("caller attribution is kept apart from the trusted actor", () => {
   const store = newStore();
