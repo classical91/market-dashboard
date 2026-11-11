@@ -226,7 +226,7 @@
 
   var tools = [
     {
-      href: "https://t.me/tesr56788",
+      href: "https://t.me/+CG4zdv9ziXZlNDYx",
       label: "Trader Lab Telegram",
     },
     {
