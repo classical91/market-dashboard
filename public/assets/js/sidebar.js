@@ -230,9 +230,17 @@
       label: "Trader Lab Telegram",
     },
     {
-      href: "https://market-dashboard-production-b2f4.up.railway.app/bot-commands.html",
-      label: "Bot Commands",
-      newTab: false,
+      // Command references: the dashboard's own bot commands and the
+      // OpenClaw CLI docs.
+      label: "Commands Codes",
+      children: [
+        {
+          href: "https://market-dashboard-production-b2f4.up.railway.app/bot-commands.html",
+          label: "Bot Commands",
+          newTab: false,
+        },
+        { href: "https://docs.openclaw.ai/cli", label: "OpenClaw CLI" },
+      ],
     },
     { href: "/indicators.html", label: "Indicators Glossary" },
     { href: "/settings.html", label: "Settings" },
