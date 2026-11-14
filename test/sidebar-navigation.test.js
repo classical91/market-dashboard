@@ -45,7 +45,7 @@ test("the Reporter menu can actually reach the Reporter Room", () => {
   }
   // The four desks live together in one Briefings dropdown.
   const briefings = reporter.slice(reporter.indexOf('label: "Briefings"'));
-  assert.match(briefings, /^label: "Briefings",\s*children: \[/);
+  assert.match(briefings, /^label: "Briefings",\s*collapsed: true,\s*children: \[/);
   for (const desk of ["geopolitics", "economics", "stocks", "crypto"]) {
     assert.match(briefings, new RegExp(`href: "/briefings/${desk}"`));
   }
