@@ -124,11 +124,17 @@
             { href: "/reporter.html#calendars-tools", label: "Calendars & Tools" },
           ],
         },
-        // What the iPhone Shortcut generated with ChatGPT, for reading here.
-        { href: "/briefings/geopolitics", label: "Geopolitics" },
-        { href: "/briefings/economics", label: "Economics" },
-        { href: "/briefings/stocks", label: "Stocks" },
-        { href: "/briefings/crypto", label: "Crypto" },
+        {
+          // What the iPhone Shortcut generated with ChatGPT, for reading here.
+          // One dropdown so the four desks don't crowd the Reporter menu.
+          label: "Briefings",
+          children: [
+            { href: "/briefings/geopolitics", label: "Geopolitics" },
+            { href: "/briefings/economics", label: "Economics" },
+            { href: "/briefings/stocks", label: "Stocks" },
+            { href: "/briefings/crypto", label: "Crypto" },
+          ],
+        },
       ],
     },
     {

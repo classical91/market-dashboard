@@ -36,15 +36,18 @@ test("the Reporter menu can actually reach the Reporter Room", () => {
   const start = sidebar.indexOf('label: "Reporter"');
   const reporter = sidebar.slice(start, sidebar.indexOf('label: "Market Intel Links"'));
   assert.match(reporter, /href: "\/reporter\.html", label: "Reporter Room"/);
-  const order = ["Reporter Room", "Geopolitics", "Economics", "Stocks", "Crypto"];
+  const order = ["Reporter Room", "Briefings", "Geopolitics", "Economics", "Stocks", "Crypto"];
   let cursor = -1;
   for (const label of order) {
     const next = reporter.indexOf(`label: "${label}"`, cursor + 1);
     assert.ok(next > cursor, `${label} is missing or out of order under Reporter`);
     cursor = next;
   }
+  // The four desks live together in one Briefings dropdown.
+  const briefings = reporter.slice(reporter.indexOf('label: "Briefings"'));
+  assert.match(briefings, /^label: "Briefings",\s*children: \[/);
   for (const desk of ["geopolitics", "economics", "stocks", "crypto"]) {
-    assert.match(reporter, new RegExp(`href: "/briefings/${desk}"`));
+    assert.match(briefings, new RegExp(`href: "/briefings/${desk}"`));
   }
   for (const obsolete of ["Emerging Markets", "Economics Top 10", "Markets Top 10"]) {
     assert.doesNotMatch(reporter, new RegExp(`label: "${obsolete}"`));
