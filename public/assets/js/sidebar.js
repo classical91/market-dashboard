@@ -127,7 +127,10 @@
         {
           // What the iPhone Shortcut generated with ChatGPT, for reading here.
           // One dropdown so the four desks don't crowd the Reporter menu.
+          // Starts closed even on a briefing page: the page has its own desk
+          // chips, so the sidebar only needs the one Briefings tab.
           label: "Briefings",
+          collapsed: true,
           children: [
             { href: "/briefings/geopolitics", label: "Geopolitics" },
             { href: "/briefings/economics", label: "Economics" },
@@ -395,7 +398,9 @@
       ? " " + prefix + "nav-item--featured " + prefix + "nav-item--" + item.featured
       : "";
     var storedState = getStoredDropdownState(storageKey);
-    var open = storedState ? storedState === "open" : active;
+    // `collapsed` groups stay shut until tapped, even when they hold the
+    // current page; the label still shows as active.
+    var open = storedState ? storedState === "open" : active && !item.collapsed;
     var children = item.children.map(function (child, index) {
       return child.children
         ? dropdown(child, mode, instance + "-" + index, true)
