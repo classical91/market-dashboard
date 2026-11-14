@@ -12,58 +12,113 @@
 <body>
 <div class="app">
   <aside class="cmd-sidebar"></aside>
-  <main class="cmd-main">
+  <main class="cmd-main bot-page">
     <div class="cmd-page-header">
       <div>
         <div class="cmd-page-title">&#128172; Bot Commands</div>
         <div class="cmd-page-subtitle">Telegram bot command library for reusable market workflows</div>
       </div>
-      <div class="bot-toolbar">
-        <button class="bot-btn bot-btn-primary" type="button" id="newCommandBtn" aria-expanded="false" aria-controls="botCommandForm">+ New Command</button>
-        <button class="bot-btn" type="button" id="exportCommandsBtn">Export JSON</button>
-      </div>
+      <span class="bot-status-pill" id="botSyncStatus" role="status"><span class="bot-status-dot"></span><span>Checking sync</span></span>
     </div>
 
-    <section class="bot-shell" id="botShell" aria-label="Bot command workspace">
-      <form class="bot-form" id="botCommandForm" hidden>
-        <div class="bot-form-head bot-form-wide">
-          <div class="bot-section-title" id="botFormTitle">New Command</div>
-        </div>
-        <input type="hidden" id="botCommandId" />
-        <label>
-          <span>Bot title</span>
-          <input id="botTitle" type="text" placeholder="e.g. News Bot, Alert Bot, BotFather" required />
-        </label>
-        <label>
-          <span>What it does</span>
-          <input id="botPurpose" type="text" placeholder="e.g. Sends macro headlines to Telegram" required />
-        </label>
-        <label class="bot-form-wide">
-          <span>Command</span>
-          <textarea id="botCommand" rows="5" placeholder="/command argument example" required></textarea>
-        </label>
-        <label class="bot-form-wide">
-          <span>Notes</span>
-          <textarea id="botNotes" rows="3" placeholder="Optional setup notes, token scope, chat IDs, schedule, or caveats"></textarea>
-        </label>
-        <div class="bot-actions bot-form-wide">
-          <button class="bot-btn bot-btn-primary" type="submit" id="saveCommandBtn">Save Command</button>
-          <button class="bot-btn" type="button" id="resetCommandBtn">Cancel</button>
-        </div>
-      </form>
-
-      <aside class="bot-library">
-        <div class="bot-library-head">
-          <div>
-            <div class="bot-section-title">Saved Commands</div>
-            <div class="bot-muted" id="botCount">0 entries</div>
+    <section class="bot-workspace" id="botShell" aria-label="Bot command workspace">
+      <section class="bot-panel bot-library-panel" aria-labelledby="botLibraryTitle">
+        <div class="bot-panel-head">
+          <div class="bot-panel-heading">
+            <span class="bot-panel-icon" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5z"/><path d="M4 5.5v16M8 7h8M8 11h6"/></svg>
+            </span>
+            <div><div class="bot-panel-title" id="botLibraryTitle">Command library</div><div class="bot-panel-subtitle">Search and reuse</div></div>
           </div>
-          <input id="botSearch" type="search" placeholder="Search bots or commands" />
+          <span class="bot-count-pill" id="botCount" aria-label="Saved commands">0</span>
         </div>
-        <div class="bot-list" id="botCommandList"></div>
-      </aside>
+        <div class="bot-panel-body">
+          <div class="bot-search-box">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input id="botSearch" type="search" placeholder="Search bots or commands..." autocomplete="off" aria-label="Search bots or commands" />
+          </div>
+          <div class="bot-saved-scroll" id="botCommandList"></div>
+          <div class="bot-io-row">
+            <button class="bot-btn bot-btn-ghost bot-btn-small" type="button" id="exportCommandsBtn">Export JSON</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="bot-panel bot-editor-panel is-collapsed" id="botEditorPanel" aria-labelledby="botFormTitle">
+        <div class="bot-panel-head">
+          <div class="bot-panel-heading">
+            <span class="bot-panel-icon" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19.5V15l10.8-10.8a2.1 2.1 0 0 1 3 0l2 2a2.1 2.1 0 0 1 0 3L9 20H4z"/><path d="m13.5 5.5 5 5M4 15l5 5"/></svg>
+            </span>
+            <div><div class="bot-panel-title" id="botFormTitle">Command workspace</div><div class="bot-panel-subtitle">Write and refine</div></div>
+          </div>
+          <div class="bot-editor-head-actions">
+            <span class="bot-editing-badge" id="botEditingBadge">Editing saved command</span>
+            <button class="bot-btn" type="button" id="newCommandBtn" aria-expanded="false" aria-controls="botCommandForm">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+              <span>New command</span>
+            </button>
+          </div>
+        </div>
+        <form class="bot-panel-body bot-form" id="botCommandForm" hidden>
+          <input type="hidden" id="botCommandId" />
+          <div class="bot-field-row">
+            <div class="bot-field">
+              <label for="botTitle">Bot title</label>
+              <input id="botTitle" type="text" placeholder="e.g. News Bot, Alert Bot, BotFather" autocomplete="off" required />
+            </div>
+            <div class="bot-field">
+              <label for="botPurpose">What it does</label>
+              <input id="botPurpose" type="text" placeholder="e.g. Sends macro headlines to Telegram" autocomplete="off" required />
+            </div>
+          </div>
+          <div class="bot-field">
+            <label for="botCommand">Command <span class="bot-label-note">Ctrl/Cmd + S to save</span></label>
+            <textarea id="botCommand" rows="8" placeholder="/command argument example" required></textarea>
+          </div>
+          <div class="bot-field">
+            <label for="botNotes">Notes <span class="bot-label-note">Optional</span></label>
+            <textarea id="botNotes" class="bot-notes-input" rows="3" placeholder="Setup notes, token scope, chat IDs, schedule, or caveats"></textarea>
+          </div>
+          <div class="bot-editor-actions">
+            <button class="bot-btn" type="submit" id="saveCommandBtn">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 3h12l2 2v16H5z"/><path d="M8 3v6h8V3M8 21v-7h8v7"/></svg>
+              <span>Save command</span>
+            </button>
+            <button class="bot-btn bot-btn-secondary" type="button" id="copyCurrentBtn">Copy</button>
+            <span class="bot-spacer"></span>
+            <button class="bot-btn bot-btn-ghost" type="button" id="resetCommandBtn">Cancel</button>
+          </div>
+        </form>
+      </section>
     </section>
   </main>
+</div>
+
+<div class="bot-toast" id="botToast" role="status" aria-live="polite"></div>
+
+<div class="bot-modal-overlay" id="botViewModal">
+  <div class="bot-modal" role="dialog" aria-modal="true" aria-labelledby="botModalName">
+    <div class="bot-modal-head">
+      <div><div class="bot-modal-title" id="botModalName"></div><div class="bot-modal-sub" id="botModalSub"></div></div>
+      <button class="bot-btn bot-btn-ghost bot-btn-icon bot-btn-small" id="botModalClose" type="button" aria-label="Close">&times;</button>
+    </div>
+    <div class="bot-modal-body">
+      <pre class="bot-modal-command" id="botModalCommand"></pre>
+      <div class="bot-modal-notes" id="botModalNotes"></div>
+    </div>
+  </div>
+</div>
+
+<div class="bot-modal-overlay" id="botConfirmModal">
+  <div class="bot-modal bot-confirm-modal" role="alertdialog" aria-modal="true" aria-labelledby="botConfirmTitle" aria-describedby="botConfirmText">
+    <div class="bot-modal-head"><div class="bot-modal-title" id="botConfirmTitle"></div></div>
+    <div class="bot-confirm-text" id="botConfirmText"></div>
+    <div class="bot-confirm-actions">
+      <button class="bot-btn bot-btn-ghost" id="botConfirmCancel" type="button">Cancel</button>
+      <button class="bot-btn bot-btn-danger" id="botConfirmOk" type="button">Delete</button>
+    </div>
+  </div>
 </div>
 
 <script src="/assets/js/sidebar.js"></script>
@@ -71,4 +126,3 @@
 <script src="/assets/js/bot-commands.js"></script>
 </body>
 </html>
-
