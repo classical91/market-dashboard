@@ -26,6 +26,31 @@ function createReporterRouter({ reporterService, telegramService, broadcastLedge
     }
   });
 
+  // Read-only: one section's recent generations, newest first, for the desk
+  // pages' run picker. Prompt bodies stay in the log and are not returned.
+  router.get("/generations", (req, res, next) => {
+    try {
+      const section = String(req.query.section || "").toLowerCase();
+      if (!reporterService.sections.includes(section)) {
+        res.status(400).json({ error: "Unknown section." });
+        return;
+      }
+      const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 30);
+      res.setHeader("Cache-Control", "no-store");
+      res.json({
+        section,
+        generations: reporterService.listGenerations({ section, limit }).map((entry) => ({
+          generatedAt: entry.generatedAt,
+          model: entry.model || null,
+          content: entry.content,
+          customPrompt: Boolean(entry.prompt),
+        })),
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+
   // Explicit generation — triggered only by a user action. Admin-guarded
   // because it spends OpenAI credits.
   router.post("/generate", requireAdmin, async (req, res, next) => {
