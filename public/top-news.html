@@ -16,7 +16,7 @@
     <div class="cmd-page-header">
       <div>
         <div class="cmd-page-title">📰 Today's Top 10</div>
-        <div class="cmd-page-subtitle">Economics, Stocks and Crypto · what your phone sent that day, or tap Run News to write them now</div>
+        <div class="cmd-page-subtitle">10 stories total across Economics, Stocks and Crypto · Geopolitics stays separate</div>
       </div>
     </div>
 
@@ -30,7 +30,7 @@
       <div class="topnews-actions">
         <button type="button" class="briefing-btn topnews-run" id="topNewsRun">⚡ Run News</button>
         <button type="button" class="briefing-btn topnews-run topnews-farmbot-btn" id="topNewsFarmbot">📤 Send to FarmBot</button>
-        <button type="button" class="briefing-btn topnews-copy-all" id="topNewsCopyAll" disabled>Copy all</button>
+        <button type="button" class="briefing-btn topnews-copy-all" id="topNewsCopyAll" disabled>Copy Top 10</button>
       </div>
     </div>
     <div class="topnews-run-message" id="topNewsRunMessage" aria-live="polite" hidden></div>
@@ -43,7 +43,7 @@
     <div id="topNewsStatus" class="briefing-age" aria-live="polite">Loading…</div>
     <div id="topNewsSections"></div>
 
-    <footer>Market Command &mdash; Run News writes the three desks; Send to FarmBot merges them into a Top 10 that waits for your approval in FarmBot</footer>
+    <footer>Market Command &mdash; Top 10 combines the desk rankings and removes repeated headlines and article links. Send to FarmBot prepares a verified batch for your approval.</footer>
   </main>
 </div>
 
@@ -52,6 +52,7 @@
 <script src="/assets/js/desk-prompts.js"></script>
 <script src="/assets/js/briefing-markdown.js"></script>
 <script src="/assets/js/briefing-freshness.js"></script>
+<script src="/assets/js/top-news-selection.js"></script>
 <script src="/assets/js/top-news.js"></script>
 </body>
 </html>

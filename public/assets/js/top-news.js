@@ -95,50 +95,39 @@
         ? (run.stories.length ? run.stories.length + " stories" : "full text") + " · " + sourceLabel(run)
         : "nothing made this day";
       return '<a class="briefing-desk ' + freshness.state(run && run.at) +
-        '" href="#desk-' + desk.key + '">' +
+        '" href="/briefings/' + desk.key + '">' +
         '<span class="briefing-desk-name">' + esc(desk.icon + " " + desk.label) + "</span>" +
         '<span class="briefing-desk-meta">' + esc(meta) + "</span></a>";
     }).join("");
   }
 
-  function renderStories(run) {
-    if (!run.stories.length) {
-      return '<article class="briefing-body">' + renderMarkdown(run.text) + "</article>";
-    }
-    return '<ol class="topnews-stories">' + run.stories.map(function (story) {
-      return '<li class="topnews-story">' +
-        '<span class="briefing-rank">' + story.number + "</span>" +
-        '<div class="topnews-story-main">' +
-        '<h3 class="topnews-story-title">' + inline(story.title) + "</h3>" +
-        (story.body ? '<div class="briefing-body">' + renderMarkdown(story.body) + "</div>" : "") +
-        "</div></li>";
-    }).join("") + "</ol>";
+  function renderSourcePicker(desk) {
+    var run = currentRun(desk);
+    if (!run) return "";
+    var copyButton = '<button type="button" class="briefing-btn" data-copy="' + desk.key + '">Copy ' + esc(desk.label) + '</button>';
+    if (desk.runs.length < 2) return copyButton;
+    return '<label class="briefing-run-picker"><span>' + esc(desk.label) + ' run</span><select data-desk="' + desk.key + '">' +
+      desk.runs.map(function (option) {
+        return '<option value="' + esc(option.id) + '"' + (option.id === run.id ? ' selected' : '') + '>' +
+          esc(sourceLabel(option)) + '</option>';
+      }).join("") + '</select></label>' + copyButton;
   }
 
-  function renderSection(desk) {
-    var run = currentRun(desk);
-    var html = '<section class="briefing-card topnews-section" id="desk-' + desk.key + '" aria-labelledby="desk-' + desk.key + '-title">' +
-      '<div class="briefing-toolbar">' +
-      '<h2 class="topnews-desk-title" id="desk-' + desk.key + '-title">' + esc(desk.icon + " " + desk.label) + "</h2>";
-    if (!run) {
-      return html + "</div>" +
-        '<p class="briefing-empty">Nothing was made for ' + esc(desk.label) + " on " + esc(longDate(state.data.date)) +
-        '. Tap <strong>⚡ Run News</strong> above to write it now, or run the Shortcut on your phone (see <a href="/briefings/' +
-        desk.key + '">' + esc(desk.label) + "</a>).</p></section>";
-    }
-    html += '<span class="briefing-age ' + freshness.state(run.at) + '">' + esc(sourceLabel(run)) + "</span>";
-    if (desk.runs.length > 1) {
-      html += '<label class="briefing-run-picker"><span>Run</span><select data-desk="' + desk.key + '">' +
-        desk.runs.map(function (option) {
-          return '<option value="' + esc(option.id) + '"' + (option.id === run.id ? " selected" : "") + ">" +
-            esc(sourceLabel(option)) + "</option>";
-        }).join("") + "</select></label>";
-    }
-    html += '<button type="button" class="briefing-btn" data-copy="' + desk.key + '">Copy ' + esc(desk.label) + "</button></div>";
-    if (run.stories.length && run.stories.length < 10) {
-      html += '<p class="topnews-note">This run has ' + run.stories.length + " numbered stories.</p>";
-    }
-    return html + renderStories(run) + "</section>";
+  function selectedStories() {
+    return window.TopNewsSelection.select(state.data.desks, state.picked);
+  }
+
+  function renderTop10(stories) {
+    if (!stories.length) return '<p class="briefing-empty">No numbered stories for this day yet. Run News for today, or open a desk to read its full briefing.</p>';
+    return '<section class="briefing-card"><div class="briefing-toolbar"><h2 class="topnews-desk-title">Combined Top 10</h2></div>' +
+      '<p class="topnews-note">Selected from the desks’ existing rankings, alternating desks at each rank. Repeated headlines and article links appear once.</p>' +
+      '<ol class="topnews-stories">' + stories.map(function (story) {
+        return '<li class="topnews-story"><span class="briefing-rank">' + story.number + '</span><div class="topnews-story-main">' +
+          '<h3 class="topnews-story-title">' + inline(story.title) + '</h3>' +
+          '<p class="topnews-source"><a href="/briefings/' + story.desk + '">' + esc(story.icon + ' ' + story.deskLabel) + '</a> · ' +
+          '<span class="briefing-age ' + freshness.state(story.at) + '">' + esc(sourceLabel(story)) + '</span></p>' +
+          (story.body ? '<div class="briefing-body">' + renderMarkdown(story.body) + '</div>' : '') + '</div></li>';
+      }).join('') + '</ol></section>';
   }
 
   function render() {
@@ -150,16 +139,19 @@
     els.next.disabled = data.date >= data.today;
     els.today.hidden = data.date === data.today;
     els.status.className = "briefing-age" + (made ? " fresh" : "");
-    els.status.textContent = longDate(data.date) + " · " + made + " of " + desks.length + " desks have news" +
+    els.status.textContent = longDate(data.date) + " · " + selectedStories().length + " of 10 stories · " + made + " of " + desks.length + " desks have news" +
       (data.timeZone ? " · day counted in " + data.timeZone : "");
-    els.copyAll.disabled = !made;
+    var stories = selectedStories();
+    els.copyAll.disabled = !stories.length;
     // Run News writes today's news; past days can only be read.
     els.run.hidden = data.date !== data.today;
     els.run.disabled = state.running || state.sending;
     els.farmbot.hidden = data.date !== data.today;
     els.farmbot.disabled = state.running || state.sending || !made;
     renderDeskChips(desks);
-    els.sections.innerHTML = desks.map(renderSection).join("");
+    els.sections.innerHTML = renderTop10(stories) +
+      '<details class="briefing-help"><summary>Source runs</summary><div class="briefing-toolbar">' +
+      desks.map(renderSourcePicker).join("") + '</div></details>';
   }
 
   function load(date) {
@@ -283,7 +275,7 @@
           ". Nothing is posted until you approve it and start the timers in FarmBot.</p>";
       }
       if (slip.stories && slip.stories.length) {
-        html += '<ol class="topnews-stories">' + slip.stories.map(function (story) {
+        html += '<details class="briefing-help"><summary>FarmBot batch preview (' + slip.stories.length + ' stories)</summary><ol class="topnews-stories">' + slip.stories.map(function (story) {
           return '<li class="topnews-story"><span class="briefing-rank">' + story.number + "</span>" +
             '<div class="topnews-story-main">' +
             (story.headline ? '<h3 class="topnews-story-title">' + esc((DESK_ICONS[story.desk] || "") + " " + story.headline) + "</h3>" : "") +
@@ -291,7 +283,7 @@
             (story.url ? '<p class="topnews-source"><a href="' + esc(story.url) + '" target="_blank" rel="noopener noreferrer">' +
               esc(story.publisher || story.url) + "</a>" + (story.imageMatches === false ? " · image is generic" : "") + "</p>" : "") +
             "</div></div></li>";
-        }).join("") + "</ol>";
+        }).join("") + "</ol></details>";
       }
       if (slip.skipped && slip.skipped.length) {
         html += '<details class="briefing-help topnews-skipped"><summary>' + slip.skipped.length + " stories skipped</summary><ul>" +
@@ -377,11 +369,10 @@
 
   els.copyAll.addEventListener("click", function () {
     if (!state.data) return;
-    var text = state.data.desks.map(function (desk) {
-      var run = currentRun(desk);
-      return run ? plainText(desk, run) : "";
-    }).filter(Boolean).join("\n\n————————\n\n");
-    copy(text, els.copyAll, "Copy all");
+    var text = 'TOP 10 NEWS · ' + longDate(state.data.date) + '\n\n' + selectedStories().map(function (story) {
+      return story.number + '. ' + story.title + ' (' + story.deskLabel + ')' + (story.body ? '\n' + story.body : '');
+    }).join('\n\n');
+    copy(text, els.copyAll, "Copy Top 10");
   });
 
   load(queryDate());
