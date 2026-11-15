@@ -478,6 +478,15 @@
     function show(label, title, detail) {
       button.textContent = label;
       button.title = title || "";
+      // Colour follows the handoff: green once FarmClaw has picked it up (or
+      // further), red on failure, amber otherwise.
+      var tone = label === FARMCLAW_LABELS.failure ? "failed"
+        : label === FARMCLAW_LABELS.claimed || label === FARMCLAW_LABELS.sent || label === "FarmBot queued" ? "picked"
+        : "";
+      if (typeof button.setAttribute === "function") {
+        if (tone) button.setAttribute("data-state", tone);
+        else button.removeAttribute("data-state");
+      }
       // Status must be readable on touch screens, where a title is invisible.
       // Cards bind this button before attaching it, so create the note lazily.
       if (!statusNote && detail && button.parentNode && button.ownerDocument) {

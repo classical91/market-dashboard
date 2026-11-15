@@ -464,8 +464,8 @@ body[data-x-accent] .x-account-card--all.active { border-color: var(--x-accent);
   outline-offset: 2px;
 }
 
-/* Secondary send: amber so it reads apart from both Copy link and the green
-   Broadcast primary. */
+/* Secondary send: amber so it reads apart from both Copy link and the purple
+   Broadcast primary. Turns green once FarmClaw picks it up, red on failure. */
 .x-post-farmclaw {
   cursor: pointer;
   padding: 8px 11px;
@@ -477,6 +477,28 @@ body[data-x-accent] .x-account-card--all.active { border-color: var(--x-accent);
 .x-post-farmclaw:hover:not(:disabled) {
   border-color: rgba(240, 180, 41, 0.8);
   background: rgba(240, 180, 41, 0.18);
+}
+
+.x-post-farmclaw[data-state="picked"] {
+  border-color: rgba(46, 204, 113, 0.5);
+  background: var(--green-bg, rgba(46, 204, 113, 0.12));
+  color: var(--green, #2ECC71);
+}
+
+.x-post-farmclaw[data-state="picked"]:hover:not(:disabled) {
+  border-color: var(--green, #2ECC71);
+  background: rgba(46, 204, 113, 0.2);
+}
+
+.x-post-farmclaw[data-state="failed"] {
+  border-color: rgba(231, 76, 60, 0.55);
+  background: var(--red-bg, rgba(231, 76, 60, 0.12));
+  color: var(--red, #E74C3C);
+}
+
+.x-post-farmclaw[data-state="failed"]:hover:not(:disabled) {
+  border-color: var(--red, #E74C3C);
+  background: rgba(231, 76, 60, 0.2);
 }
 
 .x-post-farmclaw:disabled {
@@ -523,14 +545,14 @@ body[data-x-accent] .x-account-card--all.active { border-color: var(--x-accent);
 .x-post-broadcast {
   cursor: pointer;
   padding: 8px 11px;
-  border-color: rgba(46, 204, 113, 0.42);
-  background: rgba(46, 204, 113, 0.12);
+  border-color: rgba(127, 119, 221, 0.5);
+  background: var(--purple-bg, rgba(127, 119, 221, 0.12));
   color: var(--text);
 }
 
 .x-post-broadcast:hover:not(:disabled) {
-  border-color: var(--green, #2ECC71);
-  background: rgba(46, 204, 113, 0.2);
+  border-color: var(--purple, #7F77DD);
+  background: rgba(127, 119, 221, 0.22);
 }
 
 .x-post-broadcast:disabled {
