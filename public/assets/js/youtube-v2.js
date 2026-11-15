@@ -2,13 +2,13 @@
   "use strict";
 
   function embedUrl(id) {
-    return "https://www.youtube.com/embed/" + id;
+    return "https://www.youtube.com/embed/" + encodeURIComponent(id) + "?autoplay=1";
   }
   function watchUrl(id) {
-    return "https://youtu.be/" + id;
+    return "https://youtu.be/" + encodeURIComponent(id);
   }
   function thumbUrl(id) {
-    return "https://img.youtube.com/vi/" + id + "/hqdefault.jpg";
+    return "https://img.youtube.com/vi/" + encodeURIComponent(id) + "/hqdefault.jpg";
   }
 
   function formatRelativeDate(iso) {
@@ -59,6 +59,7 @@
         (channel.videos || []).forEach(function (video) {
           uploads.push(
             Object.assign({}, video, {
+              channelHandle: video.channelHandle || channel.handle,
               channelLabel: video.channelLabel || channel.label,
               channelCategory: video.channelCategory || channel.category,
             })
@@ -91,19 +92,39 @@
     return String(value == null ? "" : value).trim().replace(/^@+/, "").toLowerCase();
   }
 
-  function buildCard(item, onSelect) {
+  function videoDetail(video) {
+    if (video.state === "live") return formatViewers(video.concurrentViewers) || "Streaming now";
+    if (video.state === "upcoming") return formatCountdown(video.scheduledStartTime);
+    return formatRelativeDate(video.publishedAt);
+  }
+
+  function buildCard(item, onSelect, activeId) {
     var video = item.video;
     var card = document.createElement("a");
     card.className = "yt-feed-card";
-    if (video.state === "live") card.className += " yt-feed-card-live";
-    if (video.state === "upcoming") card.className += " yt-feed-card-upcoming";
-    card.href = video.url || "https://www.youtube.com/watch?v=" + video.id;
+    card.href = video.url || watchUrl(video.id);
     card.target = "_blank";
     card.rel = "noopener";
+    if (video.id === activeId) card.setAttribute("aria-current", "true");
 
     var thumb = document.createElement("div");
     thumb.className = "yt-feed-thumb";
-    thumb.style.backgroundImage = "url('" + (video.thumbnail || thumbUrl(video.id)) + "')";
+
+    var image = document.createElement("img");
+    image.alt = "";
+    image.loading = "lazy";
+    image.decoding = "async";
+    image.addEventListener("error", function () {
+      image.remove();
+      thumb.classList.add("is-missing");
+    }, { once: true });
+    image.src = video.thumbnail || thumbUrl(video.id);
+    thumb.appendChild(image);
+
+    var play = document.createElement("span");
+    play.className = "yt-thumb-play";
+    play.setAttribute("aria-hidden", "true");
+    thumb.appendChild(play);
 
     if (video.state === "live" || video.state === "upcoming") {
       var badge = document.createElement("span");
@@ -115,67 +136,71 @@
     var body = document.createElement("div");
     body.className = "yt-feed-body";
 
+    var monogram = document.createElement("span");
+    monogram.className = "yt-channel-monogram";
+    monogram.setAttribute("aria-hidden", "true");
+    monogram.textContent = Array.from(item.channelLabel.trim().replace(/^@+/, ""))[0]?.toUpperCase() || "Y";
+    body.appendChild(monogram);
+
+    var copy = document.createElement("div");
     var title = document.createElement("div");
     title.className = "yt-feed-title";
     title.textContent = video.title;
+    title.title = video.title;
+    copy.appendChild(title);
 
     var meta = document.createElement("div");
     meta.className = "yt-feed-meta";
 
-    var tag = document.createElement("span");
-    tag.className = "yt-tag";
-    tag.textContent = item.channelLabel;
-    meta.appendChild(tag);
+    var channel = document.createElement("span");
+    channel.textContent = item.channelLabel;
+    meta.appendChild(channel);
 
-    var detail;
-    if (video.state === "live") {
-      detail = formatViewers(video.concurrentViewers) || "Streaming now";
-    } else if (video.state === "upcoming") {
-      detail = formatCountdown(video.scheduledStartTime);
-    } else {
-      detail = formatRelativeDate(video.publishedAt);
-    }
-
+    var detail = videoDetail(video);
     if (detail) {
       var detailNode = document.createElement("span");
-      detailNode.className = "yt-feed-detail";
-      detailNode.textContent = " · " + detail;
+      detailNode.textContent = detail;
       meta.appendChild(detailNode);
     }
 
-    body.appendChild(title);
-    body.appendChild(meta);
+    copy.appendChild(meta);
+    body.appendChild(copy);
     card.appendChild(thumb);
     card.appendChild(body);
 
     card.addEventListener("click", function (e) {
-      if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0 || !video.id) return;
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0 || !video.id) return;
       e.preventDefault();
-      onSelect(video.id);
+      onSelect(item, card);
     });
 
     return card;
   }
 
-  function renderGrid(root, items, emptyText, onSelect) {
-    if (!root) return;
-    root.innerHTML = "";
+  function setMessage(root, message) {
+    var empty = document.createElement("div");
+    empty.className = "yt-empty";
+    empty.setAttribute("role", "status");
+    empty.textContent = message;
+    root.replaceChildren(empty);
+  }
+
+  function renderGrid(root, items, emptyText, onSelect, activeId, searchTerms) {
+    var matches = items.filter(function (item) {
+      var text = [item.video.title, item.channelLabel, item.channelHandle].join(" ").toLowerCase();
+      return searchTerms.every(function (term) { return text.includes(term); });
+    });
+    if (!matches.length) {
+      setMessage(root, items.length ? "No matches for your search." : emptyText);
+      return;
+    }
 
     var grid = document.createElement("div");
     grid.className = "yt-channel-videos";
-    items.forEach(function (item) {
-      grid.appendChild(buildCard(item, onSelect));
+    matches.forEach(function (item) {
+      grid.appendChild(buildCard(item, onSelect, activeId));
     });
-
-    if (!items.length) {
-      var empty = document.createElement("div");
-      empty.className = "yt-empty";
-      empty.textContent = emptyText;
-      grid.appendChild(empty);
-    }
-
-    root.appendChild(grid);
-    return grid;
+    root.replaceChildren(grid);
   }
 
   // Failure reasons from the API. The server logs the full cause; the page
@@ -244,7 +269,7 @@
     }
   }
 
-  function render(roots, data, onSelect) {
+  function render(roots, data, onSelect, activeId, query) {
     var meta = data.meta || {};
     var failed = data.failedFeeds || [];
     var items = normalizeUploads(data);
@@ -270,29 +295,25 @@
       return item.video.state !== "live" && item.video.state !== "upcoming";
     });
 
-    renderGrid(roots.live, live, emptyLiveText(meta, "live"), onSelect);
-    renderGrid(roots.upcoming, upcoming, emptyLiveText(meta, "upcoming"), onSelect);
-    renderGrid(roots.uploads, uploads, "No videos found yet.", onSelect);
+    var searchTerms = query.toLowerCase().split(/\s+/).map(function (term) {
+      return term.replace(/^@+/, "");
+    }).filter(Boolean);
+    renderGrid(roots.live, live, emptyLiveText(meta, "live"), onSelect, activeId, searchTerms);
+    renderGrid(roots.upcoming, upcoming, emptyLiveText(meta, "upcoming"), onSelect, activeId, searchTerms);
+    renderGrid(roots.uploads, uploads, "No videos found yet.", onSelect, activeId, searchTerms);
     renderFailures(roots.uploads, failed);
-
-    var first = live[0] || upcoming[0] || uploads[0];
-    return first && first.video ? first.video.id : null;
   }
 
-  function setLoading(roots, message) {
-    Object.keys(roots).forEach(function (key) {
-      if (roots[key]) roots[key].innerHTML = '<div class="yt-empty">' + message + "</div>";
-    });
-  }
-
-  function setupCategoryFilter(categories, activeId, onChange) {
-    var select = document.getElementById("ytCategoryFilter");
-    var description = document.getElementById("ytCategoryDescription");
-    if (!select) return;
-    select.innerHTML = "";
-    [{ id: "all", name: "All Categories", channelCount: (categories || []).reduce(function (sum, category) {
-      return sum + Number(category.channelCount || 0);
-    }, 0) }].concat(categories || []).forEach(function (category) {
+  function setupCategoryFilter(select, categories, activeId, onChange) {
+    var all = {
+      id: "all",
+      name: "All Categories",
+      channelCount: categories.reduce(function (sum, category) {
+        return sum + Number(category.channelCount || 0);
+      }, 0),
+    };
+    select.replaceChildren();
+    [all].concat(categories).forEach(function (category) {
       var option = document.createElement("option");
       option.value = category.id;
       option.textContent = category.name + " (" + Number(category.channelCount || 0) + ")";
@@ -300,12 +321,6 @@
     });
     select.value = activeId;
     select.onchange = function () { onChange(select.value); };
-    var active = [{ id: "all", name: "All Categories" }].concat(categories || []).filter(function (item) {
-      return item.id === activeId;
-    })[0];
-    if (description) description.textContent = activeId === "all"
-      ? "Every tracked YouTube source"
-      : "Showing intelligence from " + (active ? active.name : "this category");
   }
 
   // A category deleted in another tab leaves this page holding an ID the server
@@ -315,118 +330,149 @@
     return status === 400 && categoryId && categoryId !== "all";
   }
 
-  function fetchFeed(categoryId, roots, onSelect, onInitialVideo, replaceCurrent, onStale) {
-    setLoading(roots, "Loading YouTube intelligence…");
-    return fetch("/api/youtube/channels?categoryId=" + encodeURIComponent(categoryId))
-      .then(function (res) {
-        if (!res.ok) {
-          var error = new Error("Request failed: " + res.status);
-          error.stale = staleCategoryError(res.status, categoryId);
-          throw error;
-        }
-        return res.json();
-      })
-      .then(function (data) {
-        var payload = data || {};
-        if (!payload.channels || !payload.channels.length) {
-          var name = payload.selectedCategory && payload.selectedCategory.name;
-          var empty = categoryId === "all"
-            ? "Add your first YouTube channel to start building intelligence feeds."
-            : "No channels in " + (name || "this category") + " yet — add a channel.";
-          setLoading(roots, empty);
-          return null;
-        }
-        var firstId = render(roots, payload, onSelect);
-        if (firstId && onInitialVideo) onInitialVideo(firstId, replaceCurrent);
-        return payload;
-      })
-      .catch(function (error) {
-        if (error && error.stale && onStale) {
-          onStale();
-          return null;
-        }
-        setLoading(roots, "Channel feeds are unavailable right now.");
-      });
-  }
-
-  function loadFeeds(roots, onSelect, onInitialVideo) {
-    fetch("/api/youtube/channels/config", { headers: { Accept: "application/json" } })
-      .then(function (res) {
-        if (!res.ok) throw new Error("Request failed: " + res.status);
-        return res.json();
-      })
-      .then(function (config) {
-        var categories = config.categories || [];
-        // A ?category= link (the Intelligence Portal sends one) wins over the
-        // remembered choice, and becomes it.
-        var linked = "";
-        try { linked = new URL(window.location.href).searchParams.get("category") || ""; } catch (e) {}
-        if (linked && categories.some(function (category) { return category.id === linked; })) storeCategory(linked);
-        var stored = readStoredCategory() || linked;
-        var activeId = stored === "all" || categories.some(function (category) { return category.id === stored; })
-          ? (stored || "all") : "all";
-        function fallbackToAll() {
-          if (activeId === "all") {
-            setLoading(roots, "Channel feeds are unavailable right now.");
-            return;
-          }
-          choose("all");
-        }
-        function choose(id) {
-          activeId = id;
-          storeCategory(id);
-          setupCategoryFilter(categories, activeId, choose);
-          fetchFeed(activeId, roots, onSelect, onInitialVideo, true, fallbackToAll);
-        }
-        setupCategoryFilter(categories, activeId, choose);
-        return fetchFeed(activeId, roots, onSelect, onInitialVideo, false, fallbackToAll);
-      })
-      .catch(function () { setLoading(roots, "Channel feeds are unavailable right now."); });
-  }
-
   function init() {
     var player = document.getElementById("ytPlayer");
-    var playerLink = document.getElementById("ytPlayerLink");
     if (!player) return;
 
+    var watch = document.getElementById("ytWatch");
+    var watchTitle = document.getElementById("ytWatchTitle");
+    var watchChannel = document.getElementById("ytWatchChannel");
+    var watchDetail = document.getElementById("ytWatchDetail");
+    var playerLink = document.getElementById("ytPlayerLink");
+    var search = document.getElementById("ytSearch");
+    var select = document.getElementById("ytCategoryFilter");
     var roots = {
       live: document.getElementById("ytLiveFeeds"),
       upcoming: document.getElementById("ytUpcomingFeeds"),
       uploads: document.getElementById("ytChannelFeeds"),
     };
+    var payload;
+    var request;
+    var playingId = null;
 
-    var state = { activeId: null };
-
-    function loadActive() {
-      if (!state.activeId) return;
-      player.src = embedUrl(state.activeId);
-      if (playerLink) playerLink.href = watchUrl(state.activeId);
+    function renderFeed() {
+      if (payload) render(roots, payload, onSelect, playingId, search.value);
     }
 
-    function onSelect(id) {
-      state.activeId = id;
-      loadActive();
-      window.scrollTo({ top: 0, behavior: "smooth" });
+    function setFeedMessage(message) {
+      payload = null;
+      Object.values(roots).forEach(function (root) { setMessage(root, message); });
     }
 
-    function onInitialVideo(id, replaceCurrent) {
-      if (state.activeId && !replaceCurrent) return;
-      state.activeId = id;
-      loadActive();
+    function beginRequest() {
+      if (request) request.abort();
+      request = new AbortController();
+      setFeedMessage("Loading YouTube videos…");
+      return request.signal;
     }
 
-    loadFeeds(roots, onSelect, onInitialVideo);
+    function selectedCard() {
+      return document.querySelector('.yt-feed-card[aria-current="true"]');
+    }
+
+    function onSelect(item, card) {
+      selectedCard()?.removeAttribute("aria-current");
+      card.setAttribute("aria-current", "true");
+      var video = item.video;
+      watchTitle.textContent = video.title;
+      watchChannel.textContent = item.channelLabel;
+      watchDetail.textContent = videoDetail(video);
+      player.title = "YouTube video: " + video.title;
+      playerLink.href = card.href;
+      watch.hidden = false;
+      if (playingId !== video.id) player.src = embedUrl(video.id);
+      playingId = video.id;
+      watch.scrollIntoView({ block: "start" });
+      watchTitle.focus({ preventScroll: true });
+    }
+
+    function closeWatch(restoreFocus) {
+      if (!playingId) return;
+      var card = selectedCard();
+      card?.removeAttribute("aria-current");
+      player.removeAttribute("src");
+      watch.hidden = true;
+      playingId = null;
+      if (restoreFocus) (card || search).focus();
+    }
+
+    async function loadCategory(categoryId, fallbackToAll) {
+      var signal = beginRequest();
+      try {
+        var res = await fetch("/api/youtube/channels?categoryId=" + encodeURIComponent(categoryId), { signal: signal });
+        if (signal.aborted) return;
+        if (staleCategoryError(res.status, categoryId)) {
+          fallbackToAll(categoryId);
+          return;
+        }
+        if (!res.ok) throw new Error("Request failed: " + res.status);
+        var data = await res.json();
+        if (signal.aborted) return;
+        if (!data || !data.channels || !data.channels.length) {
+          var name = data?.selectedCategory?.name;
+          setFeedMessage(categoryId === "all"
+            ? "Add your first YouTube channel to start building intelligence feeds."
+            : "No channels in " + (name || "this category") + " yet — add a channel.");
+          return;
+        }
+        payload = data;
+        renderFeed();
+      } catch (error) {
+        if (!signal.aborted) setFeedMessage("Channel feeds are unavailable right now.");
+      }
+    }
+
+    async function loadFeeds() {
+      select.disabled = true;
+      var signal = beginRequest();
+      try {
+        var res = await fetch("/api/youtube/channels/config", {
+          headers: { Accept: "application/json" },
+          signal: signal,
+        });
+        if (!res.ok) throw new Error("Request failed: " + res.status);
+        var config = await res.json();
+        if (signal.aborted) return;
+        var categories = config.categories || [];
+
+        function hasCategory(id) {
+          return id === "all" || categories.some(function (category) { return category.id === id; });
+        }
+        function fallbackToAll(staleId) {
+          categories = categories.filter(function (category) { return category.id !== staleId; });
+          setupCategoryFilter(select, categories, "all", choose);
+          choose("all");
+        }
+        function choose(id) {
+          storeCategory(id);
+          closeWatch(false);
+          loadCategory(id, fallbackToAll);
+        }
+
+        // The Intelligence Portal's link wins over the remembered category on entry.
+        var linked = new URL(window.location.href).searchParams.get("category");
+        var stored = readStoredCategory();
+        var activeId = hasCategory(linked) && !select.onchange ? linked : stored;
+        if (!hasCategory(activeId)) activeId = "all";
+        storeCategory(activeId);
+        setupCategoryFilter(select, categories, activeId, choose);
+        select.disabled = false;
+        loadCategory(activeId, fallbackToAll);
+      } catch (error) {
+        if (!signal.aborted) setFeedMessage("Channel feeds are unavailable right now.");
+      }
+    }
+
+    search.addEventListener("input", renderFeed);
+    document.getElementById("ytCloseWatch").addEventListener("click", function () { closeWatch(true); });
+    loadFeeds();
 
     var manage = document.getElementById("ytManageChannels");
     if (manage && window.YoutubeChannelsAdmin) {
       manage.addEventListener("click", function () {
         window.YoutubeChannelsAdmin.open({
-          // A channel added or removed changes both the feed and every theme's
-          // count, and the payload in hand is now stale — so refetch rather
-          // than patch, once, when the panel closes.
-          onChange: function () {
-            loadFeeds(roots, onSelect, onInitialVideo);
-          },
+          // Channel management changes the category counts and the feed.
+          onChange: loadFeeds,
         });
       });
     }
