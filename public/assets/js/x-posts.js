@@ -569,6 +569,7 @@
   function renderPostCards(root, posts, emptyText, options) {
     var onBroadcast = options && typeof options.onBroadcast === "function" ? options.onBroadcast : null;
     var onFarmclaw = options && typeof options.onFarmclaw === "function" ? options.onFarmclaw : null;
+    var onFarmbot = options && typeof options.onFarmbot === "function" ? options.onFarmbot : null;
     var isNew = options && typeof options.isNew === "function" ? options.isNew : null;
     var keyOf = options && typeof options.keyOf === "function"
       ? options.keyOf
@@ -689,6 +690,16 @@
         farmclawButton.title = "Queue this post's link for FarmClaw";
         onFarmclaw(post, farmclawButton);
         actions.appendChild(farmclawButton);
+      }
+
+      // Direct to FarmBot Queue, no agent; wired by farmbot-queue.js.
+      if (onFarmbot && post.url) {
+        var farmbotButton = document.createElement("button");
+        farmbotButton.type = "button";
+        farmbotButton.className = "x-post-farmbot";
+        farmbotButton.textContent = "FarmBot";
+        onFarmbot(post, farmbotButton);
+        actions.appendChild(farmbotButton);
       }
 
       // Last, so the primary action sits at the end of a row that is
