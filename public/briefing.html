@@ -16,7 +16,7 @@
     <div class="cmd-page-header">
       <div>
         <div class="cmd-page-title" id="briefingTitle">Briefing</div>
-        <div class="cmd-page-subtitle">Generated on your phone with the Shortcut · read here</div>
+        <div class="cmd-page-subtitle">From your phone Shortcut, or tap ⚡ Run to write it now through the Reporter Room</div>
       </div>
     </div>
 
@@ -31,7 +31,9 @@
           <select id="briefingRunSelect"></select>
         </label>
         <button type="button" class="briefing-btn" id="briefingCopy" hidden>Copy text</button>
+        <button type="button" class="briefing-btn topnews-run briefing-run" id="briefingRun">⚡ Run</button>
       </div>
+      <div class="topnews-run-message" id="briefingRunMessage" aria-live="polite" hidden></div>
       <h2 class="briefing-heading" id="briefingHeading" hidden></h2>
       <article class="briefing-body" id="briefingBody"></article>
     </section>
@@ -50,11 +52,13 @@
         Sending the same text twice is harmless: it is stored once.</p>
     </details>
 
-    <footer>Market Command &mdash; briefings generated with ChatGPT on your phone</footer>
+    <footer>Market Command &mdash; briefings from your phone, or written here through the Reporter Room; nothing on this page is broadcast</footer>
   </main>
 </div>
 
 <script src="/assets/js/sidebar.js"></script>
+<script src="/assets/js/admin-key.js"></script>
+<script src="/assets/js/desk-prompts.js"></script>
 <script src="/assets/js/briefing-markdown.js"></script>
 <script src="/assets/js/briefing.js"></script>
 </body>

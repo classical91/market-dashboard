@@ -57,6 +57,7 @@
   padding: 6px 10px;
 }
 .briefing-btn { margin-left: auto; cursor: pointer; }
+.briefing-btn + .briefing-run { margin-left: 0; }
 .briefing-run-picker[hidden],
 .briefing-btn[hidden],
 .briefing-heading[hidden] { display: none; }
