@@ -445,10 +445,10 @@
       '<a class="' + prefix + 'brand aurora-brand" href="/">' +
       '<div class="' + prefix + 'brand-mark">M</div>' +
       '<div class="' + prefix + 'brand-text"><h1>Market Command</h1><span>Live dashboard system</span></div></a>' +
-      accountHtml(mode) + '<div class="' + prefix + 'account-divider"></div>' +
       '<nav class="' + prefix + 'nav-primary" aria-label="Market Command">' + workspaceHtml + '</nav>' +
       '<nav class="' + prefix + 'nav-other" aria-label="Other"><div class="' + prefix + 'nav-label">Other</div>' + otherHtml + '</nav>' +
-      '<nav class="' + prefix + 'nav-tools" aria-label="Trading and tools"><div class="' + prefix + 'nav-label">Trading &amp; Tools</div>' + toolsHtml + '</nav>'
+      '<nav class="' + prefix + 'nav-tools" aria-label="Trading and tools"><div class="' + prefix + 'nav-label">Trading &amp; Tools</div>' + toolsHtml + '</nav>' +
+      '<div class="' + prefix + 'account-divider"></div>' + accountHtml(mode)
     );
   }
 

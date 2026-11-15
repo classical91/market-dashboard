@@ -389,7 +389,7 @@ body {
 .cmd-account {
   display: grid;
   gap: 7px;
-  padding: 0 12px 14px;
+  padding: 0 12px 4px;
 }
 .cmd-account-label {
   color: var(--muted);
@@ -428,7 +428,8 @@ body {
   background: rgba(77,163,255,0.15);
 }
 .cmd-account-action:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
-.cmd-account-divider { height: 1px; margin: 0 12px 12px; background: var(--border); }
+/* Account sits at the foot of the sidebar, below Trading & Tools. */
+.cmd-account-divider { flex-shrink: 0; height: 1px; margin: 18px 12px 12px; background: var(--border); }
 .cmd-nav-primary { display: block; }
 .cmd-nav-other { display: block; margin-top: auto; padding-top: 18px; }
 .cmd-nav-other .cmd-nav-label { margin-top: 0; }

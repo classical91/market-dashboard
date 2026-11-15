@@ -257,7 +257,7 @@ body {
 .account {
   display: grid;
   gap: 7px;
-  padding: 0 12px 14px;
+  padding: 0 12px 4px;
 }
 .account-label {
   color: var(--muted);
@@ -296,7 +296,8 @@ body {
   background: rgba(77, 163, 255, 0.15);
 }
 .account-action:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
-.account-divider { height: 1px; margin: 0 12px 12px; background: var(--border); }
+/* Account sits at the foot of the sidebar, below Trading & Tools. */
+.account-divider { flex-shrink: 0; height: 1px; margin: 18px 12px 12px; background: var(--border); }
 .nav-primary { display: block; }
 .nav-other { display: block; margin-top: auto; padding-top: 18px; }
 .nav-other .nav-label { margin-top: 0; }
