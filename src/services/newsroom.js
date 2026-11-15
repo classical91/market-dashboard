@@ -622,7 +622,7 @@ class NewsroomService {
     // continueOnError: one dead chat or topic must not cost the other
     // categories their delivery, and each failure is recorded against the
     // cycle with its own classification.
-    const { receipts, destinations, failures } = await broadcastReportSections({
+    const { receipts, destinations, failures, skipped = [] } = await broadcastReportSections({
       report,
       telegramService: this._telegram,
       broadcastLedgerStore: this._ledger,
@@ -669,11 +669,16 @@ class NewsroomService {
     // succeeded: "completed" has to mean the whole newsroom went out, or the
     // health panel reports a missing category as a clean run.
     const anyFailure = failures.length > 0 || failed.length > 0 || reportIncomplete;
+    // Every generated desk is switched off for Telegram in Settings: there was
+    // nothing this cycle was meant to send, which is not a delivery failure.
+    const nothingToSend = !destinations.length && !failures.length && skipped.length > 0 && !receipts.length;
     const status = posted.length
       ? anyFailure
         ? "delivery_partial"
         : "completed"
-      : "delivery_failed";
+      : nothingToSend
+        ? reportIncomplete ? "delivery_partial" : "completed"
+        : "delivery_failed";
 
     this._cycles.setStatus(cycleId, status);
     return {

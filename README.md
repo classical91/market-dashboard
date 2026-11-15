@@ -669,6 +669,17 @@ into one batch for approval:
 4. The receipt is kept in `DATA_DIR/farmbot-top10-slips.json` and each story is
    logged in the Reporter News Log as `verified` (logging is not approval).
 
+### Which desks go to Telegram
+
+Settings → Telegram → News Category Routing has a **Website sends to Telegram**
+switch per desk (Geopolitics, Economics, Stocks, Crypto; all on by default).
+It decides what the Reporter Room's Broadcast, the scheduled newsroom and the
+desk pages' **📣 Send to Telegram** may post; the groups and topics come from
+the same card. Untick Economics, Stocks and Crypto when they go to FarmBot via
+Today's Top 10, and Geopolitics alone goes to the Telegram groups. A desk page
+sends the run it shows (looked up on the server) once; a repeat is recognized
+by its ledger receipt and not resent.
+
 A batch waiting for approval, or already queued, is never prepared twice for
 the same Vancouver day; a rejected or expired one gets a new `-r2` run ID.
 FarmBot must include the Top 10 update (`top10` in its capabilities).
