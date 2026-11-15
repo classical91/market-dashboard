@@ -124,5 +124,5 @@ test("Run News writes the three desks through the Reporter Room, crypto as news"
   assert.doesNotMatch(script, /section: "geopolitics"/);
   assert.match(script, /TOP 10 CRYPTO NEWS/);
   assert.match(script, /not a list of trending tokens/);
-  assert.doesNotMatch(script, /broadcast/i.test(script) ? /\/broadcast/ : /$^/, "Run News never broadcasts");
+  assert.doesNotMatch(script, /\/broadcast/, "Run News never broadcasts");
 });
