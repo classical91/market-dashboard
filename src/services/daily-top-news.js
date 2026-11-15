@@ -15,6 +15,8 @@
  * Each run's text is split into its numbered stories (at most ten).
  */
 
+const { select } = require("../../public/assets/js/top-news-selection");
+
 const DEFAULT_TIME_ZONE = "America/Vancouver";
 const MAX_STORIES = 10;
 
@@ -193,7 +195,7 @@ function buildDailyTopNews({ briefingStore, reporterService, date, timeZone, now
     return { ...publicDesk, runs: [...phoneRuns, ...reporterRuns] };
   });
 
-  return { date: day, today, timeZone: zone, desks };
+  return { date: day, today, timeZone: zone, desks, top10: select(desks) };
 }
 
 module.exports = {

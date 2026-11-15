@@ -78,6 +78,8 @@ test("the day's phone run comes first, the Reporter Room run is the backup, othe
   assert.equal(day.today, "2026-11-15");
   assert.deepEqual(day.desks.map((d) => d.key), ["economics", "stocks", "crypto"]);
 
+  assert.equal(day.top10.length, 10, "one combined ten, not thirty");
+  assert.ok(day.top10.every((story) => story.desk !== "geopolitics"));
   const [economics, stocks, crypto] = day.desks;
   assert.deepEqual(economics.runs.map((r) => r.source), ["phone", "reporter"]);
   assert.equal(economics.runs[0].stories[0].title, "Econ 1");
