@@ -1,338 +1,371 @@
-/* ─────────────────────────────────────────────────────────
-   YouTube V2 — Video Intelligence page, layered on top of
-   command.css
-───────────────────────────────────────────────────────── */
-
-.yt-split {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 16px;
-  align-items: start;
-  margin-bottom: 20px;
+/* YouTube Intelligence feed, layered on top of command.css. */
+.yt-page {
+  --yt-background: #101012;
+  --yt-surface: #1a1a1e;
+  --yt-chip: #242428;
+  --yt-hover: #34343a;
+  --yt-line: #303036;
+  --yt-text: #f5f5f6;
+  --yt-muted: #adadb7;
+  --yt-red: #ff4e61;
+  color: var(--yt-text);
 }
 
-.yt-player-pane {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  overflow: hidden;
+.yt-page .app { background: var(--yt-background); }
+
+[data-theme]:not([data-theme="dark"]) .yt-page {
+  --yt-background: var(--bg);
+  --yt-surface: var(--surface);
+  --yt-chip: color-mix(in srgb, var(--text) 8%, var(--bg));
+  --yt-hover: color-mix(in srgb, var(--text) 15%, var(--bg));
+  --yt-line: var(--border-hover);
+  --yt-text: var(--text);
+  --yt-muted: var(--soft);
 }
 
-.yt-player-frame {
-  position: relative;
+[data-theme="light"] .yt-page { --yt-red: #c50029; }
+[data-theme="light"] .yt-search input { color-scheme: light; }
+[data-theme="light"] .yt-channel-error { color: #a81333; }
+
+.yt-main {
   width: 100%;
-  aspect-ratio: 16 / 9;
+  max-width: 1680px;
+  margin-inline: auto;
 }
-.yt-player-frame iframe {
-  position: absolute; inset: 0;
-  width: 100%; height: 100%;
+
+.yt-main :is(a, button, select, input, [tabindex]):focus-visible {
+  outline: 2px solid var(--yt-red);
+  outline-offset: 4px;
+}
+
+.yt-header {
+  display: grid;
+  grid-template-columns: auto minmax(180px, 560px) auto;
+  justify-content: space-between;
+  align-items: center;
+  gap: clamp(14px, 3vw, 40px);
+  padding-block: 3px 16px;
+}
+
+.yt-brand { display: flex; align-items: center; gap: 10px; }
+.yt-brand h1 {
+  font-size: clamp(18px, 2vw, 25px);
+  font-weight: 800;
+  letter-spacing: -.04em;
+  line-height: 1.12;
+}
+
+.yt-brand-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 34px;
+  height: 23px;
+  border-radius: 7px;
+  background: #e60032;
+}
+
+.yt-brand-icon::after, .yt-thumb-play::after {
+  content: "";
+  width: 0;
+  height: 0;
+  margin-left: 2px;
+  border-block: 5px solid transparent;
+  border-left: 8px solid #fff;
+}
+
+.yt-search { position: relative; min-width: 0; }
+.yt-search input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 16px 0 42px;
+  border: 1px solid var(--yt-line);
+  border-radius: 999px;
+  background: var(--yt-background);
+  color: var(--yt-text);
+  color-scheme: dark;
+  font: inherit;
+}
+
+.yt-search input::placeholder { color: var(--yt-muted); opacity: 1; }
+.yt-search-icon {
+  position: absolute;
+  top: 13px;
+  left: 16px;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--yt-muted);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.yt-search-icon::after {
+  content: "";
+  position: absolute;
+  top: 10px;
+  left: 9px;
+  width: 7px;
+  height: 2px;
+  background: var(--yt-muted);
+  transform: rotate(45deg);
+  transform-origin: left center;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
   border: 0;
 }
 
-.yt-player-foot {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  padding: 10px 14px;
-  border-top: 1px solid var(--border);
-}
-.yt-player-foot a {
-  font-size: 12px;
-  color: var(--muted);
-  text-decoration: none;
+.yt-manage-trigger,
+.yt-toolbar select,
+.yt-jump-links a,
+.yt-watch-actions a,
+.yt-watch-actions button {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-}
-.yt-player-foot a:hover { color: var(--text); }
-
-.yt-queue-pane {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-height: calc(100vh - 150px);
-  overflow-y: auto;
-}
-
-.yt-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.yt-filter {
-  font-family: inherit;
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  font-weight: 600;
-  color: var(--muted);
-  background: rgba(255,255,255,0.035);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 6px 13px;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
-}
-.yt-filter:hover { color: var(--text); border-color: var(--border-hover); }
-.yt-filter.active {
-  color: var(--blue);
-  border-color: rgba(77,163,255,0.45);
-  background: var(--blue-bg);
-}
-
-.yt-card {
-  display: flex;
-  gap: 12px;
-  text-align: left;
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015)),
-    var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 10px;
-  cursor: pointer;
-  font-family: inherit;
-  transition: border-color 0.15s, background 0.15s, transform 0.15s;
-}
-.yt-card:hover {
-  border-color: rgba(77,163,255,0.35);
-  transform: translateY(-1px);
-}
-.yt-card.active {
-  border-color: var(--blue);
-  background:
-    linear-gradient(180deg, rgba(77,163,255,0.08), rgba(77,163,255,0.01)),
-    var(--surface2);
-}
-
-.yt-card-thumb {
-  flex-shrink: 0;
-  width: 108px;
-  aspect-ratio: 16 / 9;
-  border-radius: 9px;
-  background-color: var(--surface2);
-  background-size: cover;
-  background-position: center;
-}
-
-.yt-card-body {
-  display: flex;
-  flex-direction: column;
   justify-content: center;
-  gap: 6px;
-  min-width: 0;
-}
-
-.yt-card-title {
+  gap: 8px;
+  min-height: 38px;
+  padding: 6px 13px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: var(--yt-chip);
+  color: var(--yt-text);
+  font: inherit;
   font-size: 13px;
-  font-weight: 500;
-  color: var(--text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  font-weight: 650;
+  text-decoration: none;
+  cursor: pointer;
 }
 
-.yt-tag {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--blue);
-  background: var(--blue-bg);
-  border-radius: 7px;
-  padding: 3px 8px;
+.yt-manage-trigger { border-color: var(--yt-line); background: transparent; }
+.yt-main :is(.yt-manage-trigger, .yt-jump-links a, .yt-watch-actions button):hover {
+  background: var(--yt-hover);
 }
 
-.yt-empty {
-  font-size: 13px;
-  color: var(--muted);
-  padding: 20px 4px;
+.yt-toolbar, .yt-jump-links { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.yt-toolbar { margin-bottom: 24px; }
+.yt-toolbar select {
+  max-width: 100%;
+  padding-inline: 13px 22px;
+  background: var(--yt-text);
+  color: var(--yt-background);
 }
 
-/* ── Collapsible section panels ───────────────────────────
-   `sections.js` toggles `.collapsed` on the panel a section
-   header controls. These panels are plain wrappers rather than
-   `.cards` lists, so they carry their own open/closed styling.
-──────────────────────────────────────────────────────────── */
-.yt-section-panel {
-  display: grid;
-  grid-template-rows: 1fr;
-  overflow: hidden;
-  opacity: 1;
-  transition: grid-template-rows 0.25s ease, opacity 0.2s ease;
+.yt-live-dot {
+  flex: 0 0 auto;
+  width: .53em;
+  height: .53em;
+  border-radius: 50%;
+  background: var(--yt-red);
 }
-.yt-section-panel > * { min-height: 0; }
-.yt-section-panel.collapsed {
-  grid-template-rows: 0fr;
-  opacity: 0;
-  pointer-events: none;
-}
-/* The list keeps a bottom margin that would otherwise survive the fold. */
-.yt-section-panel.collapsed > * { margin-bottom: 0; }
 
-/* ── Channel RSS feed blocks ─────────────────────────────── */
-.yt-channel-feeds {
+.yt-section, .yt-watch { scroll-margin-top: 74px; }
+.yt-section + .yt-section, .yt-streams + .yt-section {
+  margin-top: 26px;
+  padding-top: 23px;
+  border-top: 1px solid var(--yt-line);
+}
+
+.yt-section h2 {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-bottom: 8px;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 13px;
+  font-size: clamp(19px, 2vw, 23px);
+  letter-spacing: -.035em;
 }
 
 .yt-channel-videos {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 238px), 1fr));
+  gap: 24px 16px;
 }
 
 .yt-feed-card {
-  display: flex;
-  flex-direction: column;
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015)),
-    var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  overflow: hidden;
-  text-decoration: none;
+  min-width: 0;
+  border-radius: 12px;
   color: inherit;
-  cursor: pointer;
-  transition: border-color 0.15s, transform 0.15s;
+  text-decoration: none;
 }
-.yt-feed-card:hover {
-  border-color: rgba(77,163,255,0.35);
-  transform: translateY(-2px);
-}
-
-.yt-feed-card-live { border-color: rgba(255,99,99,0.45); }
-.yt-feed-card-live:hover { border-color: rgba(255,99,99,0.75); }
-.yt-feed-card-upcoming { border-color: rgba(77,163,255,0.35); }
 
 .yt-feed-thumb {
   position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
   width: 100%;
   aspect-ratio: 16 / 9;
-  background-color: var(--surface2);
-  background-size: cover;
-  background-position: center;
+  border-radius: 12px;
+  background: var(--yt-surface);
+}
+
+.yt-feed-thumb img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: filter .15s ease;
+}
+
+.yt-thumb-play {
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 43px;
+  height: 33px;
+  border-radius: 8px;
+  background: #e60032;
+  opacity: 0;
+  transition: opacity .15s ease;
+}
+
+.yt-feed-card:is(:hover, :focus-visible) .yt-feed-thumb img { filter: brightness(.77); }
+.yt-feed-card:is(:hover, :focus-visible) .yt-thumb-play,
+.yt-feed-thumb.is-missing .yt-thumb-play { opacity: 1; }
+.yt-feed-card[aria-current="true"] .yt-feed-thumb::after {
+  position: absolute;
+  inset: 0;
+  border: 2px solid var(--yt-red);
+  border-radius: inherit;
+  content: "";
+  pointer-events: none;
 }
 
 .yt-badge {
   position: absolute;
-  top: 8px;
-  left: 8px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  border-radius: 6px;
-  padding: 3px 7px;
+  bottom: 8px;
+  right: 8px;
+  padding: 4px 6px;
+  border-radius: 5px;
+  background: #18181cf2;
   color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
 }
-.yt-badge-live { background: rgba(214,48,48,0.92); }
-.yt-badge-upcoming { background: rgba(30,84,148,0.92); }
 
-.yt-feed-detail { color: var(--dim); }
+.yt-badge-live { background: #c50029; }
 
-.yt-feed-body { padding: 10px 12px 12px; }
+.yt-feed-body {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  padding: 10px 1px 0;
+}
+
+.yt-channel-monogram {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--yt-line);
+  border-radius: 50%;
+  background: var(--yt-chip);
+  color: var(--yt-text);
+  font-size: 13px;
+  font-weight: 700;
+}
 
 .yt-feed-title {
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--text);
-  overflow: hidden;
-  text-overflow: ellipsis;
   display: -webkit-box;
+  overflow: hidden;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
-  margin-bottom: 6px;
+  color: var(--yt-text);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .yt-feed-meta {
-  font-size: 11px;
-  color: var(--dim);
+  display: grid;
+  gap: 2px;
+  margin-top: 5px;
+  color: var(--yt-muted);
+  font-size: 13px;
 }
 
-.yt-channel-error {
-  font-size: 12px;
-  color: var(--coral);
+.yt-feed-meta span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
-@media (max-width: 980px) {
-  .yt-split { grid-template-columns: 1fr; }
-  .yt-queue-pane { max-height: none; }
+.yt-empty, .yt-channel-error {
+  color: var(--yt-muted);
+  font-size: 13px;
+  line-height: 1.5;
 }
 
-/* ─────────────────────────────────────────────────────────
-   Theme switcher — mirrors the X Intelligence switcher so the
-   two intelligence pages read as one control, not two
-───────────────────────────────────────────────────────── */
+.yt-empty {
+  grid-column: 1 / -1;
+  padding: 13px 15px;
+  border-radius: 10px;
+  background: var(--yt-surface);
+}
 
-.yt-title-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.yt-theme-switcher { position: relative; }
-.yt-theme-trigger {
-  display: inline-flex; align-items: center; gap: 9px; min-height: 34px;
-  padding: 7px 11px; border: 1px solid rgba(155,123,255,0.34); border-radius: 9px;
-  background: rgba(155,123,255,0.08); color: var(--text); font: inherit;
-  font-size: 12px; font-weight: 700; cursor: pointer;
-  transition: border-color .16s ease, background .16s ease;
-}
-.yt-theme-trigger:hover,
-.yt-theme-trigger[aria-expanded="true"] {
-  border-color: var(--yt-accent, var(--purple));
-  background: color-mix(in srgb, var(--yt-accent, var(--purple)) 14%, transparent);
-}
-.yt-theme-trigger:focus-visible,
-.yt-theme-option:focus-visible { outline: 2px solid var(--yt-accent, var(--blue)); outline-offset: 2px; }
-.yt-theme-menu {
-  position: absolute; z-index: 60; top: calc(100% + 7px); left: 0;
-  width: min(320px, calc(100vw - 40px)); padding: 7px; border: 1px solid var(--border);
-  border-radius: 12px; background: var(--surface, #0f1420);
-  box-shadow: 0 18px 48px rgba(0,0,0,.48); animation: yt-theme-menu-in .16s ease-out;
-}
-@keyframes yt-theme-menu-in { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
-.yt-theme-option {
-  display: flex; justify-content: space-between; gap: 12px; width: 100%;
-  padding: 9px 10px; border: 0; border-radius: 8px; background: transparent;
-  color: var(--soft, var(--text)); font: inherit; text-align: left; cursor: pointer;
-}
-.yt-theme-option:hover,
-.yt-theme-option.active { background: rgba(255,255,255,.055); color: var(--text); }
-.yt-theme-option.active { box-shadow: inset 2px 0 var(--yt-accent, var(--purple)); }
-.yt-theme-option-name { font-size: 12px; font-weight: 700; }
-.yt-theme-option-count { font-size: 10px; color: var(--muted); }
+.yt-channel-error { margin-top: 12px; color: #ff9da6; }
 
-body[data-yt-accent="market"] { --yt-accent: var(--accent-market); }
-body[data-yt-accent="world"] { --yt-accent: var(--accent-world); }
-body[data-yt-accent="tech"] { --yt-accent: var(--accent-tech); }
-body[data-yt-accent="relic"] { --yt-accent: var(--accent-relic); }
-body[data-yt-accent="macro"] { --yt-accent: var(--accent-macro); }
-body[data-yt-accent="energy"] { --yt-accent: var(--accent-energy); }
-body[data-yt-accent="neutral"] { --yt-accent: var(--accent-neutral); }
-
-body[data-yt-accent] .yt-feed-card:hover { border-color: var(--yt-accent); }
-
-.yt-manage-trigger {
-  min-height: 34px; padding: 7px 11px; border: 1px solid var(--border);
-  border-radius: 9px; background: transparent; color: var(--soft, var(--text));
-  font: inherit; font-size: 12px; font-weight: 700; cursor: pointer;
-  transition: border-color .16s ease, color .16s ease;
+.yt-watch {
+  width: min(100%, 960px);
+  margin: 0 auto 30px;
 }
-.yt-manage-trigger:hover { border-color: var(--yt-accent, var(--purple)); color: var(--text); }
-.yt-manage-trigger:focus-visible { outline: 2px solid var(--yt-accent, var(--blue)); outline-offset: 2px; }
 
-.sr-only {
-  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
-  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+.yt-player-frame {
+  overflow: hidden;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 14px;
+  background: #000;
 }
-.yt-category-filter select {
-  min-height: 34px; min-width: 174px; padding: 7px 34px 7px 11px;
-  border: 1px solid rgba(46, 204, 113, .32); border-radius: 9px;
-  background: var(--surface2); color: var(--text); font: inherit; font-size: 12px;
-  font-weight: 700; cursor: pointer;
+
+.yt-player-frame iframe { display: block; width: 100%; height: 100%; border: 0; }
+
+.yt-watch-info {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: start;
+  gap: 12px 24px;
+  padding-top: 14px;
 }
-.yt-category-filter select:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
+.yt-watch-copy { flex: 1 1 270px; min-width: 0; }
+.yt-watch-copy h2 { font-size: clamp(19px, 2.1vw, 24px); overflow-wrap: anywhere; }
+.yt-watch-meta { margin-top: 5px; color: var(--yt-muted); font-size: 13px; }
+#ytWatchDetail:not(:empty)::before { content: " · "; }
+.yt-watch-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.yt-watch-actions a { background: #e60032; color: #fff; }
+.yt-watch-actions a:hover { background: #c50029; }
+
+@media (min-width: 1180px) {
+  .yt-streams { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+  .yt-streams .yt-section + .yt-section { margin: 0; padding: 0; border: 0; }
+  .yt-streams .yt-channel-videos { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+}
+
+@media (max-width: 720px) {
+  .yt-header { grid-template-columns: minmax(0, 1fr) auto; gap: 12px; }
+  .yt-search { grid-row: 2; grid-column: 1 / -1; }
+  .yt-manage-trigger { grid-row: 1; grid-column: 2; }
+  .yt-channel-videos {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .yt-feed-thumb img, .yt-thumb-play { transition: none; }
+}
 
 /* YouTube source manager: one quiet workspace, two distinct jobs. */
 .ytm-overlay { backdrop-filter: blur(7px); }
