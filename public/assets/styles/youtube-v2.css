@@ -123,6 +123,7 @@
 }
 
 .yt-manage-trigger,
+.yt-refresh,
 .yt-toolbar select,
 .yt-jump-links a,
 .yt-watch-actions a,
@@ -145,12 +146,16 @@
 }
 
 .yt-manage-trigger { border-color: var(--yt-line); background: transparent; }
-.yt-main :is(.yt-manage-trigger, .yt-jump-links a, .yt-watch-actions button):hover {
+.yt-main :is(.yt-manage-trigger, .yt-refresh, .yt-jump-links a, .yt-watch-actions button):hover {
   background: var(--yt-hover);
 }
 
 .yt-toolbar, .yt-jump-links { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-.yt-toolbar { margin-bottom: 24px; }
+.yt-toolbar { margin-bottom: 10px; }
+.yt-refresh { margin-left: auto; }
+.yt-refresh:disabled { opacity: .6; cursor: wait; }
+.yt-feed-status { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-bottom: 24px; font-size: 12px; line-height: 1.5; color: var(--yt-muted); }
+.yt-feed-status a { color: var(--yt-text); }
 .yt-toolbar select {
   max-width: 100%;
   padding-inline: 13px 22px;
@@ -369,7 +374,8 @@
 
 /* YouTube source manager: one quiet workspace, two distinct jobs. */
 .ytm-overlay { backdrop-filter: blur(7px); }
-.ytm-box { position: relative; max-width: 780px; max-height: min(88vh, 820px); padding: 0; overflow: hidden; }
+.ytm-box { position: relative; display: flex; flex-direction: column; max-width: 780px; max-height: min(88vh, 820px); padding: 0; overflow: hidden; }
+.ytm-head, .ytm-tabs, .ytm-status { flex-shrink: 0; }
 .ytm-head { margin: 0; padding: 20px 22px 16px; border-bottom: 1px solid var(--border); }
 .ytm-subtitle { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
 .ytm-tabs { display: flex; gap: 20px; padding: 0 22px; border-bottom: 1px solid var(--border); }
@@ -380,7 +386,7 @@
 .ytm-tab.active { color: var(--text); }
 .ytm-tab.active::after { content: ""; position: absolute; inset: auto 0 -1px; height: 2px; background: var(--green); }
 .ytm-status { margin: 0; padding: 8px 22px 0; }
-.ytm-content { max-height: calc(min(88vh, 820px) - 132px); overflow-y: auto; }
+.ytm-content { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .ytm-panel { padding: 14px 22px 22px; }
 .ytm-toolbar { display: grid; grid-template-columns: minmax(180px, 1fr) 190px auto; gap: 9px; margin-bottom: 14px; }
 .ytm-btn {
@@ -394,6 +400,7 @@
 .ytm-editor-title, .ytm-inline-error, .ytm-editor .ytm-actions, .ytm-editor .ytm-advanced { grid-column: 1 / -1; }
 .ytm-editor-title { margin: 0; font-size: 14px; }
 .ytm-field { display: grid; align-content: start; gap: 6px; min-width: 0; color: var(--soft); font-size: 12px; }
+.ytm-field[hidden] { display: none; }
 .ytm-label { font-weight: 700; }
 .ytm-hint { color: var(--dim); font-size: 10px; }
 .ytm-inline-error { min-height: 16px; color: var(--coral); font-size: 11px; }
@@ -415,11 +422,12 @@
 .ytm-confirm-title { margin: 0 0 8px; font-size: 15px; }
 .ytm-confirm-copy { margin: 0 0 16px; color: var(--muted); font-size: 12px; line-height: 1.55; }
 .ytm-confirm .ytm-field { margin-bottom: 16px; }
+.ytm-overlay :is(button, input, select, [tabindex]):focus-visible { outline: 2px solid var(--green); outline-offset: 3px; }
+.ytm-channel-name, .ytm-category-name, .ytm-badge { overflow-wrap: anywhere; }
 
 @media (max-width: 680px) {
   .manage-overlay.ytm-overlay { align-items: stretch; padding: 0; }
   .ytm-box { max-height: 100dvh; border-radius: 0; }
-  .ytm-content { max-height: calc(100dvh - 132px); }
   .ytm-toolbar { grid-template-columns: 1fr; }
   .ytm-editor { grid-template-columns: 1fr; }
   .ytm-channel-row { grid-template-columns: 1fr auto; align-items: start; }

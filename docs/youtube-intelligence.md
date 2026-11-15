@@ -62,6 +62,34 @@ selected category, or none matching the search — and each offers Add a channel
 Deletes are confirmed in an in-panel dialog rather than `window.confirm`, and
 every mutation disables its own control while it runs.
 
+Searching or filtering the channel list updates only its rows, keeping keyboard
+focus, the search caret, and any open channel draft intact. Failed saves keep
+the entered fields available for retry. If an inline category was created
+before the channel save failed, the form keeps that category's returned ID so
+retrying does not attempt to create it again.
+
+The manager makes the underlying page inert while open. A delete confirmation
+also makes the manager's background controls inert, traps focus within its own
+controls, and returns focus to the invoking Delete button on cancel. Escape
+cancels the confirmation before it can close the manager. Once a deletion is
+submitted its confirmation stays busy until the result arrives.
+
+## Feed recovery and freshness
+
+`Refresh feeds` reloads the category catalogue and the selected feed without a
+full page reload. It also provides a retry after either request fails. Expired
+sessions expose a login link. Loading state uses `aria-busy`; the status line
+announces search match counts, the response's check time, partial failures, and
+channels served from last-known-good cached uploads. A check time is not a
+promise that cached uploads are current. Refresh retains the selected category
+and search query, and uses the service's existing caches and quota protection.
+
+`test/youtube-v2-browser.test.js` exercises these flows against local fixture
+APIs, including inline playback, category recovery, failed saves, keyboard
+navigation, and layouts from 320 to 1440 pixels. Install Chromium with
+`npx playwright install chromium` if it is missing; that browser suite skips
+when the executable is unavailable.
+
 ## Recovering from a stale selection
 
 A category deleted in another tab leaves the page holding an ID the registry no
