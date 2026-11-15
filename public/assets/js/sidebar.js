@@ -132,6 +132,9 @@
           label: "Briefings",
           collapsed: true,
           children: [
+            // Economics, Stocks and Crypto top 10 for one day, gathered from
+            // what the phone and the Reporter Room already made.
+            { href: "/briefings/top-10", label: "Today's Top 10" },
             { href: "/briefings/geopolitics", label: "Geopolitics" },
             { href: "/briefings/economics", label: "Economics" },
             { href: "/briefings/stocks", label: "Stocks" },

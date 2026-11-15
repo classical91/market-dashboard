@@ -176,6 +176,9 @@ test("the Shortcut can push to the reading page's own address", async () => {
 });
 
 test("the page renders ChatGPT markdown without letting it inject HTML", () => {
+  // The renderer is shared (briefing-markdown.js); load it the way the page
+  // does, followed by the page script, to check both still fit together.
+  const shared = fs.readFileSync(path.join(__dirname, "..", "public/assets/js/briefing-markdown.js"), "utf8");
   const source = fs.readFileSync(path.join(__dirname, "..", "public/assets/js/briefing.js"), "utf8");
   const stub = { textContent: "", innerHTML: "", hidden: false, className: "", classList: { add() {}, remove() {} }, addEventListener() {} };
   const context = {
@@ -183,8 +186,9 @@ test("the page renders ChatGPT markdown without letting it inject HTML", () => {
     document: { getElementById: () => ({ ...stub }), title: "" },
     fetch: () => new Promise(() => {}),
   };
+  vm.runInNewContext(shared, context);
   vm.runInNewContext(source, context);
-  const render = context.window.PhoneBriefing.renderMarkdown;
+  const render = context.window.BriefingMarkdown.renderMarkdown;
 
   const html = render([
     "## Top stories",
