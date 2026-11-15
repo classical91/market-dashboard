@@ -419,6 +419,7 @@ body[data-x-accent] .x-account-card--all.active { border-color: var(--x-accent);
 .x-post-open,
 .x-post-copy,
 .x-post-farmclaw,
+.x-post-farmbot,
 .x-post-broadcast {
   min-height: 30px;
   border-radius: 9px;
@@ -484,6 +485,50 @@ body[data-x-accent] .x-account-card--all.active { border-color: var(--x-accent);
   color: var(--muted);
   opacity: 0.82;
 }
+
+/* Direct send to FarmBot Queue: violet, apart from FarmClaw's amber. */
+.x-post-farmbot {
+  cursor: pointer;
+  padding: 8px 11px;
+  border-color: rgba(155, 125, 255, 0.45);
+  background: rgba(155, 125, 255, 0.10);
+  color: var(--text);
+}
+
+.x-post-farmbot:hover {
+  border-color: rgba(155, 125, 255, 0.85);
+  background: rgba(155, 125, 255, 0.18);
+}
+
+.x-post-farmbot:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+.farmbot-queue-form { display: grid; gap: 10px; }
+.farmbot-queue-field { display: grid; gap: 5px; }
+.farmbot-queue-label { color: var(--soft); font-size: 12px; }
+.farmbot-queue-text,
+.farmbot-queue-select {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel, rgba(255, 255, 255, 0.03));
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  padding: 8px 10px;
+}
+.farmbot-queue-text { resize: vertical; min-height: 110px; line-height: 1.45; }
+.farmbot-queue-text:focus-visible,
+.farmbot-queue-select:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+.farmbot-queue-count { justify-self: end; color: var(--muted); font-size: 11px; }
+.farmbot-queue-count.is-over { color: var(--red, #ff6b6b); font-weight: 600; }
+.farmbot-queue-row { display: flex; flex-wrap: wrap; align-items: end; gap: 10px 16px; }
+.farmbot-queue-inline { flex: 0 1 180px; }
+.farmbot-queue-check { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text); padding-bottom: 8px; }
+.farmbot-queue-view { display: inline-block; margin: 2px 0 6px; }
 
 .x-post-farmclaw-status {
   flex-basis: 100%;
@@ -1129,6 +1174,7 @@ body[data-x-accent] .x-account-card--all.active { border-color: var(--x-accent);
 .x-timeline-frame[data-x-view="compact"] .x-post-open,
 .x-timeline-frame[data-x-view="compact"] .x-post-copy,
 .x-timeline-frame[data-x-view="compact"] .x-post-farmclaw,
+.x-timeline-frame[data-x-view="compact"] .x-post-farmbot,
 .x-timeline-frame[data-x-view="compact"] .x-post-broadcast {
   min-height: 27px;
   padding: 6px 9px;

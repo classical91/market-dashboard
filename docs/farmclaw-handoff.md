@@ -31,6 +31,20 @@ The link is `/queue` on the `FARMBOT_NEWS_APPROVAL_BASE_URL` origin, or
 `https://farm-bot.up.railway.app/queue` when that is unset; it is hidden when
 the handoff failed. Opening it is a link only and confirms nothing.
 
+## Direct to FarmBot (no FarmClaw)
+
+Each X Intelligence card also has a **FarmBot** button. It opens a dialog with
+the post's text (editable, up to 280 characters), a category, and an
+include-photo box when the post has one. **Queue in FarmBot** sends it straight
+to FarmBot's `POST /farmclaw/v1/x-links` with `FARMBOT_NEWS_PREPARER_TOKEN`
+(via the dashboard's admin-only `POST /api/farmbot/x-links`); FarmClaw is not
+involved and does not rewrite or verify it. The dialog is the review: the row
+posts itself on FarmBot's normal Queue timer. Success is FarmBot's read-back of
+the receipt; the dialog and card then show `#<queue id>` and a
+**View in FarmBot ↗** link. FarmBot refuses a second entry for the same post
+(`409`), whichever route queued it first. Needs `FARMBOT_NEWS_API_URL` and
+`FARMBOT_NEWS_PREPARER_TOKEN`; without them the dialog names what is missing.
+
 ## Direct push (recommended)
 
 When the FarmClaw OpenClaw gateway has an HTTPS address the dashboard can

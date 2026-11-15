@@ -56,6 +56,7 @@ const { FarmbotTop10Store } = require("./services/farmbot-top10-store");
 const OpenAI = require("openai");
 const { createFarmclawHandoffRouter } = require("./routes/farmclaw-handoffs");
 const { createFarmclawNewsPreviewsRouter } = require("./routes/farmclaw-news-previews");
+const { createFarmbotXLinksRouter } = require("./routes/farmbot-x-links");
 const { createNewsroomRouter } = require("./routes/newsroom");
 const { createTelegramRouter } = require("./routes/telegram");
 const { createYoutubeRouter } = require("./routes/youtube");
@@ -772,6 +773,8 @@ function createApp() {
     requireAdmin,
   }));
   app.use("/api/farmclaw/news-previews", createFarmclawNewsPreviewsRouter());
+  // Direct X post → FarmBot Queue, bypassing the FarmClaw agent.
+  app.use("/api/farmbot/x-links", createFarmbotXLinksRouter({ requireAdmin: requireXAdmin }));
   app.use(
     "/api/farmclaw/handoffs",
     createFarmclawHandoffRouter({

@@ -54,6 +54,12 @@
       },
     }
     : null;
+  if (window.FarmbotQueue) {
+    cardOptions = cardOptions || {};
+    cardOptions.onFarmbot = function (post, button) {
+      window.FarmbotQueue.bindButton(button, post);
+    };
+  }
 
   /* Card state that belongs to this page session rather than the feed: posts
      the reader expanded, and which posts are NEW for the template on screen.
