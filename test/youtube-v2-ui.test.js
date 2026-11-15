@@ -1,10 +1,8 @@
 "use strict";
 
-// YouTube Intelligence section collapsing. `sections.js` toggles a `collapsed`
-// class on the panel each header controls, so a panel only actually folds if
-// the page ships CSS for that class. These panels are plain wrappers rather
-// than `.cards` lists, which is where the shared rule lives — without their
-// own rule the chevron rotated while the content stayed on screen.
+// YouTube Intelligence sections (Live Now, Upcoming, Latest Uploads) are
+// always open: they keep the shared section-header look but are plain
+// headings, not dropdowns, so `sections.js` must not bind to them.
 
 const test = require("node:test");
 const assert = require("node:assert");
@@ -17,36 +15,27 @@ function read(relativePath) {
 
 const SECTIONS = ["yt-live", "yt-upcoming", "yt-rss"];
 
-test("every section header points at a panel that carries the collapse class", () => {
+test("every section panel is present", () => {
   const html = read("public/youtube-v2.html");
 
   for (const id of SECTIONS) {
-    assert.match(
-      html,
-      new RegExp(`<div class="section-header" data-section="${id}">`),
-      `${id} needs a header for sections.js to bind`,
-    );
-    assert.match(
-      html,
-      new RegExp(`<div class="yt-section-panel" id="${id}">`),
-      `${id}'s panel must carry yt-section-panel, or nothing hides it`,
-    );
+    assert.match(html, new RegExp(`<div class="yt-section-panel" id="${id}">`));
   }
 });
 
-test("the panel class actually folds the panel away", () => {
-  const css = read("public/assets/styles/youtube-v2.css");
+test("section headings are static, not collapsible", () => {
+  const html = read("public/youtube-v2.html");
 
-  assert.match(css, /\.yt-section-panel \{[^}]*grid-template-rows: 1fr;/);
-  assert.match(css, /\.yt-section-panel\.collapsed \{[^}]*grid-template-rows: 0fr;/);
-  assert.match(css, /\.yt-section-panel\.collapsed \{[^}]*pointer-events: none;/);
-  // overflow:hidden is what makes the 0fr row clip its content.
-  assert.match(css, /\.yt-section-panel \{[^}]*overflow: hidden;/);
+  assert.doesNotMatch(html, /data-section=/);
+  assert.doesNotMatch(html, /section-chevron/);
+  assert.doesNotMatch(html, /initSections\(/);
+  assert.doesNotMatch(html, /sections\.js/);
+  assert.equal((html.match(/class="section-header yt-section-heading"/g) || []).length, SECTIONS.length);
 });
 
-test("sections.js resolves each panel by its section id", () => {
-  const js = read("public/assets/js/sections.js");
+test("panels carry no collapse styling", () => {
+  const css = read("public/assets/styles/youtube-v2.css");
 
-  assert.match(js, /document\.getElementById\(id\)/);
-  assert.match(js, /cards\.classList\.toggle\("?'?collapsed'?"?\)/);
+  assert.doesNotMatch(css, /\.yt-section-panel\.collapsed/);
+  assert.match(css, /\.section-header\.yt-section-heading \{[^}]*cursor: default;/);
 });
