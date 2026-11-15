@@ -24,6 +24,13 @@ browser. Source excerpts are quoted as untrusted data. The legacy shared-key
 queue-x-link.mjs and /api/x-link/queue remain retired. The preparer cannot edit/reactivate existing Queue rows or invoke an
 immediate broadcast or publication. Retries retain the exact existing timer. Missing source evidence/access is a blocker.
 
+Once a post is handed off (waiting, picked up, received or queued), the card
+shows a **View in FarmBot ↗** link under the FarmClaw status that opens FarmBot
+Queue in a new tab (**View #42 in FarmBot ↗** once the Queue row is confirmed).
+The link is `/queue` on the `FARMBOT_NEWS_APPROVAL_BASE_URL` origin, or
+`https://farm-bot.up.railway.app/queue` when that is unset; it is hidden when
+the handoff failed. Opening it is a link only and confirms nothing.
+
 ## Direct push (recommended)
 
 When the FarmClaw OpenClaw gateway has an HTTPS address the dashboard can

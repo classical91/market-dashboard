@@ -453,6 +453,27 @@
     var timer = null;
     var version = 0;
     var statusNote = null;
+    var farmbotLink = null;
+
+    /* The "View in FarmBot" prompt under the card. The Queue address comes
+       from the server (FarmBot's configured web origin), only as https. An
+       empty href hides it. */
+    function offerFarmbot(href, text, title) {
+      var safe = typeof href === "string" && /^https:\/\/[^\s"'<>]+$/.test(href) ? href : "";
+      if (!farmbotLink && safe && button.parentNode && button.ownerDocument) {
+        farmbotLink = button.ownerDocument.createElement("a");
+        farmbotLink.className = "x-post-farmbot-link";
+        farmbotLink.target = "_blank";
+        farmbotLink.rel = "noopener noreferrer";
+        button.parentNode.appendChild(farmbotLink);
+      }
+      if (!farmbotLink) return;
+      farmbotLink.hidden = !safe;
+      if (!safe) return;
+      farmbotLink.href = safe;
+      farmbotLink.textContent = text || "View in FarmBot \u2197";
+      farmbotLink.title = title || "Open FarmBot Queue in a new tab";
+    }
 
     function show(label, title, detail) {
       button.textContent = label;
@@ -474,15 +495,18 @@
     function settle(handoff) {
       var record = (handoff && handoff.record) || handoff || {};
       var queue = handoff && handoff.farmbotQueue;
+      var queueUrl = handoff && handoff.farmbot && handoff.farmbot.queueUrl;
       if (queue && queue.confirmed === true) {
         rememberSent(url, null, FARMCLAW_SENT_KEY);
         forgetSent(url, FARMCLAW_QUEUED_KEY);
         var detail = "FarmBot Queue #" + queue.queueItemId + (queue.dispatchActive === false ? " — held for your review and activation." : " — " + queue.dispatchStatus + ".");
         show("FarmBot queued", detail, detail);
+        offerFarmbot(queueUrl, "View #" + queue.queueItemId + " in FarmBot \u2197", "Open FarmBot Queue to see item #" + queue.queueItemId);
         return true;
       }
       if (queue && queue.removed === true) {
         show("Removed from Queue", "This post was removed from FarmBot Queue.", "Removed from FarmBot Queue; repeated taps will not recreate it.");
+        offerFarmbot(queueUrl);
         return true;
       }
       if (record.status === "received") {
@@ -490,11 +514,13 @@
         if (!hasDeliveryProof(receipt)) {
           forgetSent(url, FARMCLAW_SENT_KEY);
           show(FARMCLAW_LABELS.idle, "Acknowledged without reaching the FarmClaw agent — tap to send it.");
+          offerFarmbot("");
           return true;
         }
         rememberSent(url, null, FARMCLAW_SENT_KEY);
         forgetSent(url, FARMCLAW_QUEUED_KEY);
         show(FARMCLAW_LABELS.sent, "Received by the FarmClaw agent (" + receipt.receiptId + "). FarmBot queueing and broadcasting are not confirmed here.", "FarmClaw received the link. This does not confirm a Farm queue entry.");
+        offerFarmbot(queueUrl, null, "Open FarmBot Queue to check whether FarmClaw has added it yet");
         return false;
       }
       forgetSent(url, FARMCLAW_SENT_KEY);
@@ -502,8 +528,11 @@
       if (record.status === "failed") {
         var failure = "FarmClaw could not take it: " + (record.error || "unknown error") + " — tap to retry.";
         show(FARMCLAW_LABELS.failure, failure, failure);
+        offerFarmbot("");
         return true;
       }
+      // Still with FarmClaw: the Queue may not show it yet, so say so.
+      offerFarmbot(queueUrl, null, "Open FarmBot Queue — FarmClaw has not confirmed a Queue entry yet");
       if (handoff && handoff.push && handoff.push.enabled) {
         show(FARMCLAW_LABELS.busy, "Sending to the FarmClaw agent…", "Waiting for FarmClaw to confirm delivery.");
       } else {
@@ -530,6 +559,7 @@
             forgetSent(url, FARMCLAW_SENT_KEY);
             forgetSent(url, FARMCLAW_QUEUED_KEY);
             show(FARMCLAW_LABELS.idle, "Previous handoff was not found — tap to send this link to FarmClaw.");
+            offerFarmbot("");
             return;
           }
           var refreshError = "Could not refresh FarmClaw status: " + (err.message || "network error") + ". The displayed status is the last known one; tap to check.";
