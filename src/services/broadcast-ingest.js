@@ -36,6 +36,8 @@
  * rather than retried.
  */
 
+const { describeNetworkError } = require("../utils/errors");
+
 const STATE_KEY = "broadcastIngest:offset";
 const WATCHLIST_STATE_KEY = "broadcastIngest:watchTargets";
 const STATE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -124,6 +126,9 @@ class BroadcastIngestService {
     this._lastPollAt = null;
     this._lastSummary = null;
     this._lastError = null;
+    // Polls in a row that never got an answer from Telegram. Reset by the
+    // next good poll, which also logs that the watch has recovered.
+    this._consecutiveFailures = 0;
     // Chats posts actually arrived from that are NOT being recorded. If this
     // is non-empty while nothing is landing, TELEGRAM_CHAT_IDS points
     // somewhere other than where the news is going.
@@ -181,11 +186,13 @@ class BroadcastIngestService {
       )}s`,
     );
     this._timer = setInterval(() => {
-      this.runOnce().catch((err) => this._logger.error?.(`[BroadcastIngest] Poll failed: ${err.message}`));
+      this.runOnce().catch((err) => this._logger.error?.(`[BroadcastIngest] Poll failed: ${describeNetworkError(err)}`));
     }, this._intervalMs);
     if (this._timer.unref) this._timer.unref();
     this._startedAt = new Date().toISOString();
-    this.runOnce().catch((err) => this._logger.error?.(`[BroadcastIngest] Initial poll failed: ${err.message}`));
+    this.runOnce().catch((err) =>
+      this._logger.error?.(`[BroadcastIngest] Initial poll failed: ${describeNetworkError(err)}`),
+    );
   }
 
   stop() {
@@ -223,6 +230,7 @@ class BroadcastIngestService {
       lastPollAt: this._lastPollAt,
       lastSummary: this._lastSummary,
       lastError: this._lastError,
+      consecutiveFailures: this._consecutiveFailures,
       conflict: this._conflictReported,
       intervalMs: this._intervalMs,
     };
@@ -250,9 +258,18 @@ class BroadcastIngestService {
         this._lastSummary = { polled: 0, recorded: 0, attached: 0, skipped: 0, conflict: true };
         return { polled: 0, recorded: 0, attached: 0, skipped: 0, conflict: true };
       }
-      this._lastError = err.message;
+      // "fetch failed" alone can't tell DNS from a timeout or a TLS error;
+      // the cause can, so keep it for the log and for describe().
+      this._lastError = describeNetworkError(err);
+      this._consecutiveFailures += 1;
       throw err;
     }
+    if (this._consecutiveFailures > 0) {
+      this._logger.log?.(
+        `[BroadcastIngest] Telegram answered again after ${this._consecutiveFailures} failed poll(s)`,
+      );
+    }
+    this._consecutiveFailures = 0;
     this._conflictReported = false;
     this._lastError = null;
 

@@ -413,3 +413,25 @@ test("a post nobody claims stays unattributed, which is the honest answer", asyn
   assert.equal(bySource["telegram-ingest"], 1);
   assert.equal(unattributed, 1);
 });
+
+/* ── network failures ── */
+
+test("a failed poll logs the fetch cause and the next good poll logs recovery", async () => {
+  const fetchFailed = new TypeError("fetch failed");
+  fetchFailed.cause = Object.assign(new Error("connect ETIMEDOUT 149.154.167.220:443"), { code: "ETIMEDOUT" });
+  const telegram = fakeTelegram([fetchFailed, fetchFailed, []]);
+  const logs = [];
+  const service = makeService(telegram, freshStore(), { logger: { log: (m) => logs.push(m), error() {} } });
+
+  await assert.rejects(service.runOnce(), /fetch failed/);
+  await assert.rejects(service.runOnce(), /fetch failed/);
+  const failing = service.describe();
+  assert.strictEqual(failing.lastError, "fetch failed (ETIMEDOUT connect ETIMEDOUT 149.154.167.220:443)");
+  assert.strictEqual(failing.consecutiveFailures, 2);
+
+  await service.runOnce();
+  const recovered = service.describe();
+  assert.strictEqual(recovered.lastError, null);
+  assert.strictEqual(recovered.consecutiveFailures, 0);
+  assert.ok(logs.includes("[BroadcastIngest] Telegram answered again after 2 failed poll(s)"));
+});
