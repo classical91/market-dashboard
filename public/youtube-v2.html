@@ -38,6 +38,11 @@
         <a href="#yt-upcoming">Upcoming</a>
         <a href="#yt-rss">Latest Uploads</a>
       </nav>
+      <button type="button" class="yt-refresh" id="ytRefresh">Refresh feeds</button>
+    </div>
+    <div class="yt-feed-status">
+      <p id="ytFeedStatus" role="status" aria-live="polite">Loading YouTube sources…</p>
+      <a id="ytLoginLink" href="/login?returnTo=%2Fyoutube-v2.html" hidden>Log in again</a>
     </div>
 
     <section id="ytWatch" class="yt-watch" aria-labelledby="ytWatchTitle" hidden>

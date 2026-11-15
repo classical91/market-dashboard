@@ -192,7 +192,7 @@
     });
     if (!matches.length) {
       setMessage(root, items.length ? "No matches for your search." : emptyText);
-      return;
+      return 0;
     }
 
     var grid = document.createElement("div");
@@ -201,6 +201,7 @@
       grid.appendChild(buildCard(item, onSelect, activeId));
     });
     root.replaceChildren(grid);
+    return matches.length;
   }
 
   // Failure reasons from the API. The server logs the full cause; the page
@@ -298,10 +299,11 @@
     var searchTerms = query.toLowerCase().split(/\s+/).map(function (term) {
       return term.replace(/^@+/, "");
     }).filter(Boolean);
-    renderGrid(roots.live, live, emptyLiveText(meta, "live"), onSelect, activeId, searchTerms);
-    renderGrid(roots.upcoming, upcoming, emptyLiveText(meta, "upcoming"), onSelect, activeId, searchTerms);
-    renderGrid(roots.uploads, uploads, "No videos found yet.", onSelect, activeId, searchTerms);
+    var count = renderGrid(roots.live, live, emptyLiveText(meta, "live"), onSelect, activeId, searchTerms);
+    count += renderGrid(roots.upcoming, upcoming, emptyLiveText(meta, "upcoming"), onSelect, activeId, searchTerms);
+    count += renderGrid(roots.uploads, uploads, "No videos found yet.", onSelect, activeId, searchTerms);
     renderFailures(roots.uploads, failed);
+    return count;
   }
 
   function setupCategoryFilter(select, categories, activeId, onChange) {
@@ -341,6 +343,9 @@
     var playerLink = document.getElementById("ytPlayerLink");
     var search = document.getElementById("ytSearch");
     var select = document.getElementById("ytCategoryFilter");
+    var refresh = document.getElementById("ytRefresh");
+    var status = document.getElementById("ytFeedStatus");
+    var loginLink = document.getElementById("ytLoginLink");
     var roots = {
       live: document.getElementById("ytLiveFeeds"),
       upcoming: document.getElementById("ytUpcomingFeeds"),
@@ -349,9 +354,12 @@
     var payload;
     var request;
     var playingId = null;
+    var feedNote = "";
 
     function renderFeed() {
-      if (payload) render(roots, payload, onSelect, playingId, search.value);
+      if (!payload) return;
+      var count = render(roots, payload, onSelect, playingId, search.value);
+      status.textContent = (search.value.trim() ? count + (count === 1 ? " matching video. " : " matching videos. ") : "") + feedNote;
     }
 
     function setFeedMessage(message) {
@@ -362,8 +370,48 @@
     function beginRequest() {
       if (request) request.abort();
       request = new AbortController();
+      refresh.disabled = true;
+      refresh.textContent = "Refreshing…";
+      status.textContent = "Loading YouTube videos…";
+      loginLink.hidden = true;
+      Object.values(roots).forEach(function (root) { root.setAttribute("aria-busy", "true"); });
       setFeedMessage("Loading YouTube videos…");
       return request.signal;
+    }
+
+    function finishRequest(signal) {
+      if (signal.aborted) return;
+      refresh.disabled = false;
+      refresh.textContent = "Refresh feeds";
+      Object.values(roots).forEach(function (root) { root.removeAttribute("aria-busy"); });
+    }
+
+    function showError(error) {
+      var expired = error.status === 401;
+      var message = expired ? "Your session expired. Log in again to load feeds." : "Channel feeds are unavailable right now. Use Refresh feeds to try again.";
+      setFeedMessage(message);
+      status.textContent = message;
+      loginLink.hidden = !expired;
+    }
+
+    async function fetchJson(url, signal) {
+      var res = await fetch(url, { signal: signal, headers: { Accept: "application/json" } });
+      if (!res.ok) {
+        var error = new Error("Request failed: " + res.status);
+        error.status = res.status;
+        throw error;
+      }
+      return res.json();
+    }
+
+    function describeFeed(data) {
+      var checked = new Date(data.meta?.generatedAt);
+      var note = isNaN(checked.getTime()) ? "Feed loaded." : "Feed checked at " + checked.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) + ".";
+      var stale = data.channels.filter(function (channel) { return channel.stale; }).length;
+      var failed = (data.failedFeeds || []).length;
+      if (stale) note += " " + stale + (stale === 1 ? " channel is" : " channels are") + " showing cached uploads; recent videos may be missing.";
+      if (failed) note += " " + failed + (failed === 1 ? " channel could" : " channels could") + " not be loaded.";
+      return note;
     }
 
     function selectedCard() {
@@ -399,26 +447,26 @@
     async function loadCategory(categoryId, fallbackToAll) {
       var signal = beginRequest();
       try {
-        var res = await fetch("/api/youtube/channels?categoryId=" + encodeURIComponent(categoryId), { signal: signal });
-        if (signal.aborted) return;
-        if (staleCategoryError(res.status, categoryId)) {
-          fallbackToAll(categoryId);
-          return;
-        }
-        if (!res.ok) throw new Error("Request failed: " + res.status);
-        var data = await res.json();
+        var data = await fetchJson("/api/youtube/channels?categoryId=" + encodeURIComponent(categoryId), signal);
         if (signal.aborted) return;
         if (!data || !data.channels || !data.channels.length) {
           var name = data?.selectedCategory?.name;
-          setFeedMessage(categoryId === "all"
+          var message = categoryId === "all"
             ? "Add your first YouTube channel to start building intelligence feeds."
-            : "No channels in " + (name || "this category") + " yet — add a channel.");
+            : "No channels in " + (name || "this category") + " yet — add a channel.";
+          setFeedMessage(message);
+          status.textContent = message;
           return;
         }
         payload = data;
+        feedNote = describeFeed(data);
         renderFeed();
       } catch (error) {
-        if (!signal.aborted) setFeedMessage("Channel feeds are unavailable right now.");
+        if (signal.aborted) return;
+        if (staleCategoryError(error.status, categoryId)) fallbackToAll(categoryId);
+        else showError(error);
+      } finally {
+        finishRequest(signal);
       }
     }
 
@@ -426,12 +474,7 @@
       select.disabled = true;
       var signal = beginRequest();
       try {
-        var res = await fetch("/api/youtube/channels/config", {
-          headers: { Accept: "application/json" },
-          signal: signal,
-        });
-        if (!res.ok) throw new Error("Request failed: " + res.status);
-        var config = await res.json();
+        var config = await fetchJson("/api/youtube/channels/config", signal);
         if (signal.aborted) return;
         var categories = config.categories || [];
 
@@ -459,11 +502,16 @@
         select.disabled = false;
         loadCategory(activeId, fallbackToAll);
       } catch (error) {
-        if (!signal.aborted) setFeedMessage("Channel feeds are unavailable right now.");
+        if (!signal.aborted) {
+          select.disabled = !select.onchange;
+          showError(error);
+          finishRequest(signal);
+        }
       }
     }
 
     search.addEventListener("input", renderFeed);
+    refresh.addEventListener("click", loadFeeds);
     document.getElementById("ytCloseWatch").addEventListener("click", function () { closeWatch(true); });
     loadFeeds();
 
