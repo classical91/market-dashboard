@@ -107,10 +107,7 @@
     {
       label: "Reporter",
       children: [
-        // The Reporter Room itself was reachable only by typing the URL: the
-        // three entries below are single-desk pages that deliberately strip
-        // the News Intelligence tab, Master News, the desk statuses and the
-        // newsroom controls, so none of them can reach the newsroom.
+        // Studio controls, market desks, and standalone news pages.
         { href: "/reporter.html", label: "Reporter Room" },
         {
           // Moved out of Overview: these are newsroom inputs, and the Overview
@@ -125,22 +122,16 @@
           ],
         },
         {
-          // What the iPhone Shortcut generated with ChatGPT, for reading here.
-          // One dropdown so the four desks don't crowd the Reporter menu.
-          // Starts closed even on a briefing page: the page has its own desk
-          // chips, so the sidebar only needs the one Briefings tab.
-          label: "Briefings",
+          label: "Markets",
           collapsed: true,
           children: [
-            // Economics, Stocks and Crypto top 10 for one day, gathered from
-            // what the phone and the Reporter Room already made.
-            { href: "/briefings/top-10", label: "Today's Top 10" },
-            { href: "/briefings/geopolitics", label: "Geopolitics" },
-            { href: "/briefings/economics", label: "Economics" },
-            { href: "/briefings/stocks", label: "Stocks" },
             { href: "/briefings/crypto", label: "Crypto" },
+            { href: "/briefings/stocks", label: "Stocks" },
+            { href: "/briefings/economics", label: "Economics" },
           ],
         },
+        { href: "/briefings/top-10", label: "Top 10 News" },
+        { href: "/briefings/geopolitics", label: "Geopolitics" },
       ],
     },
     {

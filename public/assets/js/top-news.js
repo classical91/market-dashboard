@@ -6,6 +6,7 @@
 (function () {
   "use strict";
 
+  var freshness = window.BriefingFreshness;
   var md = window.BriefingMarkdown;
   var esc = md.esc;
   var inline = md.inline;
@@ -61,7 +62,7 @@
   }
 
   function sourceLabel(run) {
-    return (run.source === "phone" ? "📱 Phone" : "⚡ Reporter Room") + " · " + time(run.at);
+    return (run.source === "phone" ? "📱 Phone" : "⚡ Reporter Room") + " · " + time(run.at) + " · " + freshness.label(run.at);
   }
 
   function currentRun(desk) {
@@ -93,7 +94,7 @@
       var meta = run
         ? (run.stories.length ? run.stories.length + " stories" : "full text") + " · " + sourceLabel(run)
         : "nothing made this day";
-      return '<a class="briefing-desk' + (run ? (run.source === "phone" ? "" : " stale") : " empty") +
+      return '<a class="briefing-desk ' + freshness.state(run && run.at) +
         '" href="#desk-' + desk.key + '">' +
         '<span class="briefing-desk-name">' + esc(desk.icon + " " + desk.label) + "</span>" +
         '<span class="briefing-desk-meta">' + esc(meta) + "</span></a>";
@@ -125,7 +126,7 @@
         '. Tap <strong>⚡ Run News</strong> above to write it now, or run the Shortcut on your phone (see <a href="/briefings/' +
         desk.key + '">' + esc(desk.label) + "</a>).</p></section>";
     }
-    html += '<span class="briefing-age ' + (run.source === "phone" ? "fresh" : "") + '">' + esc(sourceLabel(run)) + "</span>";
+    html += '<span class="briefing-age ' + freshness.state(run.at) + '">' + esc(sourceLabel(run)) + "</span>";
     if (desk.runs.length > 1) {
       html += '<label class="briefing-run-picker"><span>Run</span><select data-desk="' + desk.key + '">' +
         desk.runs.map(function (option) {
