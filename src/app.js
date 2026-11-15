@@ -49,6 +49,7 @@ const { createBroadcastLedgerRouter } = require("./routes/broadcast-ledger");
 const { createReporterRouter } = require("./routes/reporter");
 const { createReporterNewsLogRouter } = require("./routes/reporter-news-log");
 const { createPhoneBriefingsRouter } = require("./routes/phone-briefings");
+const { createDailyTopNewsRouter } = require("./routes/daily-top-news");
 const { createFarmclawHandoffRouter } = require("./routes/farmclaw-handoffs");
 const { createFarmclawNewsPreviewsRouter } = require("./routes/farmclaw-news-previews");
 const { createNewsroomRouter } = require("./routes/newsroom");
@@ -612,6 +613,13 @@ function createApp() {
     },
   }));
 
+  // One page with the day's Economics, Stocks and Crypto top 10, gathered from
+  // what the phone and the Reporter Room already made (routes/daily-top-news.js).
+  app.get(["/briefings/top-10", "/briefings/top-10/"], (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    res.sendFile(path.join(__dirname, "..", "public", "top-news.html"));
+  });
+
   // The Reporter menu's desk pages now show what the phone Shortcut generated
   // (see routes/phone-briefings.js) instead of generating through the API.
   // The old desk URLs stay reachable and land on the page that replaced them.
@@ -737,6 +745,7 @@ function createApp() {
     }),
   );
   app.use("/api/phone-briefings", phoneBriefingsRouter);
+  app.use("/api/daily-top-news", createDailyTopNewsRouter({ briefingStore: phoneBriefingStore, reporterService }));
   app.use("/api/farmclaw/news-previews", createFarmclawNewsPreviewsRouter());
   app.use(
     "/api/farmclaw/handoffs",
