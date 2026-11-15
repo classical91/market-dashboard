@@ -44,11 +44,16 @@ test("missing desks, fewer than ten stories and selected historical runs work wi
 test("the page renders and copies only the combined ten, including historical dates", async () => {
   const nodes = {};
   let copied = "";
+  const writes = [];
   const sources = desks().slice(0,3);
   const context = {
     window: {
       location: { search: "?date=2026-11-13", href: "http://x/briefings/top-10?date=2026-11-13" },
       history: { replaceState() {} },
+      AdminKey: { async fetch(url, options) {
+        writes.push({ url, body: JSON.parse(options.body) });
+        return { ok: true, json: async () => ({ logged: 10 }) };
+      } },
     },
     document: { getElementById(id) { return nodes[id] ||= {
       innerHTML: "", textContent: "", hidden: false, events: {},
@@ -72,4 +77,10 @@ test("the page renders and copies only the combined ten, including historical da
   await new Promise(setImmediate);
   assert.equal((copied.match(/^\d+\. /gm) || []).length, 10);
   assert.ok(!copied.includes("economics news 5"));
+  nodes.topNewsLog.events.click();
+  await new Promise(setImmediate);
+  assert.deepEqual(writes.map((entry) => entry.url), ["/api/daily-top-news/intake"]);
+  assert.equal(writes[0].body.date, "2026-11-13");
+  assert.deepEqual(writes[0].body.runs, { economics: "economics-run", stocks: "stocks-run", crypto: "crypto-run" });
+  assert.match(nodes.topNewsRunMessage.textContent, /10 stories recorded/);
 });

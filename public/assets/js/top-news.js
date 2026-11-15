@@ -22,6 +22,7 @@
     today: document.getElementById("topNewsToday"),
     copyAll: document.getElementById("topNewsCopyAll"),
     run: document.getElementById("topNewsRun"),
+    log: document.getElementById("topNewsLog"),
     farmbot: document.getElementById("topNewsFarmbot"),
     slip: document.getElementById("topNewsSlip"),
     runMessage: document.getElementById("topNewsRunMessage"),
@@ -233,7 +234,7 @@
     });
     chain.then(function () {
       setRunMessage(results.join(" · "), failed ? "error" : "ok");
-      return load("");
+      return load("").then(function () { return logTop10({ quiet: true }); });
     }).finally(function () {
       state.running = false;
       els.run.disabled = false;
@@ -241,6 +242,26 @@
     });
   }
 
+  function logTop10(options) {
+    if (!state.data || !window.AdminKey) return Promise.resolve();
+    var runs = {};
+    state.data.desks.forEach(function (desk) {
+      var run = currentRun(desk);
+      if (run) runs[desk.key] = run.id;
+    });
+    els.log.disabled = true;
+    return window.AdminKey.fetch("/api/daily-top-news/intake", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ date: state.data.date, tz: timeZone, runs: runs }),
+    }).then(readApiJson).then(function (data) {
+      if (options && options.quiet) return;
+      setRunMessage(data.logged + " stories recorded in the Reporter News Log. FarmBot checks and approval are separate.", "ok");
+    }).catch(function (err) {
+      setRunMessage("Could not log Top 10: " + err.message, "error");
+    }).finally(function () { els.log.disabled = false; });
+  }
+
+  els.log.addEventListener("click", function () { logTop10(); });
   els.run.addEventListener("click", runNews);
 
   // ── FarmBot Top 10 ────────────────────────────────────────────────────

@@ -187,3 +187,9 @@ The Reporter Room's **Daily News Log** panel renders `/daily`.
   intake failures.
 - Before scheduling is turned on: backfill one test day, verify
   deduplication, and compare records against FarmBot queue and post receipts.
+
+### Top 10 discovery and FarmBot readiness
+
+`POST /api/daily-top-news/intake` (admin key) accepts `{ date?, tz?, runs? }` and records the same combined selection shown by Top 10, capped at ten. It spends no credits and does not contact FarmBot. Run News calls it after loading the generated desks; Log Top 10 can log existing or historical runs. Sending to FarmBot also logs the selection before checking configuration or verifying articles and images.
+
+Candidates begin as `discovered`, with a stable source ID derived from desk, run and story rank. Their source URL can be added later without replacing their record or history. Failed source/image checks leave the candidate visible as discovered with its exact `error` and `farmbot.status: "blocked"`. Successful checks advance it to `verified` and `ready-for-review`; acceptance of the FarmBot batch records `awaiting-approval`. These readiness labels never imply approval, queueing or publication. Existing approved content and downstream receipts are preserved.

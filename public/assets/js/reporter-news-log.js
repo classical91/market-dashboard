@@ -75,6 +75,10 @@
     var fb = record.farmbot || {};
     var bits = [];
     if (fb.queueId) bits.push('Queue ' + esc(fb.queueId) + (fb.status ? ' · ' + esc(fb.status) : ''));
+    if (!fb.queueId && fb.status) {
+      var readiness = { 'needs-verification': 'Needs checks', 'blocked': 'Blocked', 'ready-for-review': 'Ready for FarmBot', 'awaiting-approval': 'Waiting for approval' };
+      bits.push('FarmBot: ' + esc(readiness[fb.status] || fb.status));
+    }
     if (fb.scheduledAt) bits.push('Sched ' + esc(formatTime(fb.scheduledAt)));
     var pub = fb.publication;
     if (pub) {
@@ -103,7 +107,7 @@
       (record.summary ? '<div class="news-log-summary">' + esc(record.summary) + '</div>' : '') +
       (symbols ? '<div class="news-log-symbols">' + symbols + '</div>' : '') +
       renderFarmbot(record) +
-      (record.status === 'failed' && record.error ? '<div class="news-log-error">' + esc(record.error) + '</div>' : '') +
+      (record.error ? '<div class="news-log-error">' + esc(record.error) + '</div>' : '') +
     '</article>';
   }
 

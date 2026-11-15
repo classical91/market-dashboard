@@ -21,6 +21,7 @@
  */
 
 const crypto = require("crypto");
+const { select } = require("../../public/assets/js/top-news-selection");
 const { buildDailyTopNews } = require("./daily-top-news");
 const { verifyArticle } = require("./article-verifier");
 
@@ -42,7 +43,7 @@ function rankingPrompt({ date, stories }) {
   const list = stories.map((story) => `[${story.ref}] (${story.deskLabel}) ${story.title}${story.body ? `\n${story.body}` : ""}`).join("\n\n");
   return `Today is ${date}. Below are today's Economics, Stocks and Crypto news briefings. Each story has a reference like E3, S1 or C7.
 
-Pick the ${RANKED_STORIES} most important stories overall for a markets audience, best first.
+Pick the ${Math.min(RANKED_STORIES, stories.length)} most important stories overall for a markets audience, best first.
 - Remove duplicates: the same event in two desks counts once.
 - Prefer a useful mix of Economics, Stocks and Crypto, but never force a weak story in.
 - For each pick, use web search to find the ORIGINAL article from a reputable publisher, or the official release, published in the last 48 hours and readable without a login or paywall. Give its exact URL. Never use Investing.com, aggregators, X/Twitter, YouTube or press-release wires when the original is available.
@@ -205,21 +206,16 @@ class FarmbotTop10Service {
 
   _gather(date, timeZone, runIds = {}) {
     const day = buildDailyTopNews({ briefingStore: this._briefings, reporterService: this._reporter, date, timeZone });
-    const stories = [];
     const runs = {};
-    day.desks.forEach((desk) => {
-      const run = desk.runs.find((r) => r.id === runIds[desk.key]) || desk.runs[0];
-      if (!run || !run.stories.length) return;
-      runs[desk.key] = { id: run.id, source: run.source, at: run.at };
-      run.stories.forEach((story) => {
-        stories.push({
-          ref: `${desk.key[0].toUpperCase()}${story.number}`,
-          desk: desk.key,
-          deskLabel: desk.label,
-          title: story.title,
-          body: story.body.slice(0, 600),
-        });
-      });
+    const stories = select(day.desks, runIds).map((story) => {
+      runs[story.desk] = { id: story.runId, source: story.source, at: story.at };
+      return {
+        ref: `${story.desk[0].toUpperCase()}${story.sourceRank}`,
+        sourceId: crypto.createHash("sha256").update(`${story.desk}:${story.runId}:${story.sourceRank}`).digest("hex"),
+        capturedAt: story.at,
+        desk: story.desk, deskLabel: story.deskLabel,
+        title: story.title, body: story.body.slice(0, 600),
+      };
     });
     return { day, stories, runs };
   }
@@ -235,9 +231,14 @@ class FarmbotTop10Service {
     const picks = parsed && Array.isArray(parsed.stories) ? parsed.stories : null;
     if (!picks || !picks.length) throw farmbotError("The ranking step returned no stories; nothing was sent to FarmBot.");
     const byRef = new Map(stories.map((story) => [story.ref, story]));
+    const seen = new Set();
     return picks
       .map((pick) => ({ ...pick, story: byRef.get(String(pick.ref || "").toUpperCase()) }))
-      .filter((pick) => pick.story && typeof pick.url === "string" && pick.post);
+      .filter((pick) => {
+        if (!pick.story || typeof pick.url !== "string" || !pick.post || seen.has(pick.story.ref)) return false;
+        seen.add(pick.story.ref);
+        return true;
+      });
   }
 
   async _describeImage(headline, imageUrl) {
@@ -340,23 +341,58 @@ class FarmbotTop10Service {
     };
   }
 
+  _recordStory(story, { url, article, readiness = "needs-verification", error = null, summary, verified = false } = {}) {
+    if (!this._newsLog) return null;
+    const identity = { source: "today-top-10", sourceId: story.sourceId };
+    const existing = this._newsLog.find(identity);
+    const articleUrl = article?.canonicalUrl || url;
+    const canonical = articleUrl && this._newsLog.find({ url: articleUrl });
+    const duplicate = existing && canonical && existing.id !== canonical.id;
+    // A shared article must not redirect this candidate's failure onto a
+    // different, potentially approved record. Keep its own discovery visible.
+    if (duplicate) {
+      readiness = "blocked";
+      error = error || `Source article is already recorded as ${canonical.id}.`;
+      verified = false;
+    }
+    const { record } = this._newsLog.intake({
+      ...identity,
+      headline: story.title, url: duplicate ? undefined : articleUrl,
+      publishedAt: article?.publishedAt, imageUrl: article?.imageUrl,
+      market: story.desk, capturedAt: story.capturedAt,
+      summary: summary || `Top 10 ${story.ref}. ${story.body}`,
+      capturedBy: "today-top-10", status: "discovered",
+    }, { actor: "today-top-10" });
+    // Approval and downstream receipts always outrank a new preparation attempt.
+    if (!["discovered", "verified"].includes(record.status)) return record;
+    return this._newsLog.update(record.id, {
+      ...(verified ? { status: "verified" } : {}),
+      error, farmbot: { status: readiness },
+      ...(summary ? { summary } : {}),
+    }, { actor: "today-top-10" });
+  }
+
+  logCandidates({ date, timeZone, runIds } = {}) {
+    const gathered = this._gather(date, timeZone, runIds);
+    if (!this._newsLog && gathered.stories.length) throw farmbotError("Reporter News Log is not available.", 503);
+    const records = gathered.stories.map((story) => {
+      const existing = this._newsLog.find({ source: "today-top-10", sourceId: story.sourceId });
+      return existing || this._recordStory(story);
+    });
+    return { ...gathered, records };
+  }
+
   _logStories(accepted, batch) {
-    if (!this._newsLog) return;
     accepted.forEach(({ pick, article }, index) => {
       try {
-        this._newsLog.intake({
-          url: article.canonicalUrl,
-          headline: article.title,
-          source: (article.siteName || pick.publisher || "").slice(0, 80) || new URL(article.canonicalUrl).hostname,
-          publishedAt: article.publishedAt,
-          market: pick.story.desk,
+        this._recordStory(pick.story, {
+          article, verified: true, readiness: "awaiting-approval",
           summary: `Today's Top 10 #${index + 1}, sent to FarmBot for approval in batch ${batch.clientBatchId} (${batch.batchId}). Post: ${fitPost(pick.post)}`,
-          imageUrl: article.imageUrl,
-          capturedBy: "today-top-10",
-          status: "verified",
-        }, { actor: "today-top-10" });
+        });
       } catch (err) {
-        this._logger.warn?.(`[FarmBot Top 10] news log intake failed: ${err.message}`);
+        // The batch is already accepted. Preserve its receipt even if logging
+        // is temporarily unavailable; a retry can reconcile the readiness.
+        this._logger.warn?.(`[FarmBot Top 10] news log update failed: ${err.message}`);
       }
     });
   }
@@ -366,12 +402,13 @@ class FarmbotTop10Service {
    * Throws (with statusCode) only before anything reached FarmBot.
    */
   async send({ date, timeZone, runIds, now = new Date() } = {}) {
-    const missing = this.missingConfig();
-    if (missing.length) throw farmbotError(`Sending to FarmBot needs: ${missing.join(", ")}`, 503);
+    // Discovery is durable before configuration, ranking, article or image checks.
+    const { day, stories, runs } = this.logCandidates({ date, timeZone, runIds });
     if (this._running) throw farmbotError("A Top 10 is already being prepared; wait for it to finish.", 409);
     this._running = true;
     try {
-      const { day, stories, runs } = this._gather(date, timeZone, runIds);
+      const missing = this.missingConfig();
+      if (missing.length) throw farmbotError(`Sending to FarmBot needs: ${missing.join(", ")}`, 503);
       if (day.date !== day.today) throw farmbotError("Only today's news can be sent to FarmBot.", 400);
       if (stories.length < 3) throw farmbotError("Not enough stories today; run the news first.", 400);
 
@@ -388,6 +425,13 @@ class FarmbotTop10Service {
       const resolved = await this._resolveBatchId(batchDate);
       if (resolved.existing) {
         const b = resolved.existing;
+        stories.forEach((story) => {
+          const record = this._newsLog?.find({ source: "today-top-10", sourceId: story.sourceId });
+          const item = (b.payload?.items || []).find((entry) =>
+            record?.canonicalUrl && this._newsLog.find({ url: entry.canonicalUrl })?.id === record.id);
+          if (item) this._logStories([{ pick: { story, post: item.text }, article: { canonicalUrl: item.canonicalUrl } }],
+            { clientBatchId: b.clientBatchId, batchId: b.batchId });
+        });
         return this._slips.record({
           date: day.date, outcome: "already-sent", clientBatchId: b.clientBatchId, batchId: b.batchId,
           farmbotStatus: b.status, payloadHash: b.payloadHash, approvalUrl: this._approvalUrl(b.batchId),
@@ -397,7 +441,18 @@ class FarmbotTop10Service {
       }
 
       const picks = await this._rank(day.date, stories);
+      picks.forEach((pick) => this._recordStory(pick.story, { url: pick.url }));
       let { accepted, skipped } = await this._verifyPicks(picks, now);
+      stories.forEach((story) => {
+        const ok = accepted.find(({ pick }) => pick.story.ref === story.ref);
+        const failure = skipped.find((item) => item.ref === story.ref);
+        this._recordStory(story, ok ? {
+          article: ok.article, verified: true, readiness: "ready-for-review",
+          summary: `Top 10 ${story.ref}. Source and picture checked; FarmBot batch not yet accepted.`,
+        } : {
+          readiness: "blocked", error: failure?.reason || "Ranking did not return a usable source article for this story.",
+        });
+      });
       if (!accepted.length) {
         return this._slips.record({ date: day.date, outcome: "failed", error: "No story's source article could be verified.", stories: [], skipped, runs }, now);
       }
@@ -414,9 +469,14 @@ class FarmbotTop10Service {
         const taken = /Story (\d+) is already selected in active batch/.exec(res.data.error || "");
         if (res.status === 409 && taken) {
           const [removed] = accepted.splice(Number(taken[1]) - 1, 1);
+          this._recordStory(removed.pick.story, { readiness: "blocked", error: "Already in another FarmBot batch" });
           skipped.push({ ref: removed.pick.ref, desk: removed.pick.story.desk, headline: removed.article.title, url: removed.article.canonicalUrl, reason: "Already in another FarmBot batch" });
           continue;
         }
+        accepted.forEach(({ pick, article }) => this._recordStory(pick.story, {
+          article, verified: true, readiness: "blocked",
+          error: `FarmBot refused the batch (HTTP ${res.status}): ${res.data.error || "no reason given"}`,
+        }));
         return this._slips.record({
           date: day.date, outcome: "failed", clientBatchId: resolved.clientBatchId,
           error: `FarmBot refused the batch (HTTP ${res.status}): ${res.data.error || "no reason given"}`, stories: [], skipped, runs,
@@ -454,6 +514,12 @@ class FarmbotTop10Service {
         runs,
         requestId: crypto.randomUUID(),
       }, now);
+    } catch (err) {
+      stories.forEach((story) => {
+        try { this._recordStory(story, { readiness: "blocked", error: err.message }); }
+        catch (logError) { this._logger.warn?.(`[FarmBot Top 10] could not record failure: ${logError.message}`); }
+      });
+      throw err;
     } finally {
       this._running = false;
     }

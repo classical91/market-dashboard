@@ -157,7 +157,7 @@ function setup({ farmbotReply, existing = {}, verify } = {}) {
   return { service, calls, newsLogStore };
 }
 
-test("the day's three desks become one ten-story FarmBot batch waiting for approval, with a receipt", async () => {
+test("the displayed ten are logged first; nine passing stories form the FarmBot batch", async () => {
   const { service, calls, newsLogStore } = setup();
   const slip = await service.send({ timeZone: "America/Vancouver" });
 
@@ -168,18 +168,19 @@ test("the day's three desks become one ten-story FarmBot batch waiting for appro
   assert.match(payload.batchId, /^dashboard-top10-\d{4}-\d{2}-\d{2}$/);
   assert.equal(payload.timezone, "America/Vancouver");
   assert.deepEqual(payload.destinations, DESTINATIONS, "destinations come from FarmBot, never invented");
-  assert.equal(payload.items.length, 10);
-  assert.deepEqual(payload.items.map((i) => i.number), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-  // E1..C3 minus the paywalled /3, then E4: the duplicate E1 at the end never enters.
-  assert.deepEqual(payload.items.map((i) => i.canonicalUrl.split("/").pop()), ["0", "1", "2", "4", "5", "6", "7", "8", "9", "10"]);
+  assert.equal(payload.items.length, 9);
+  assert.deepEqual(payload.items.map((i) => i.number), [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  // Only the displayed ten are considered; the paywalled E2 is retained in
+  // the log and never replaced by an unseen eleventh story.
+  assert.deepEqual(payload.items.map((i) => i.canonicalUrl.split("/").pop()), ["0", "1", "2", "4", "5", "6", "7", "8", "9"]);
   assert.ok(payload.items.every((i) => i.imageUrl && /Vision check/.test(i.imageSubjectEvidence)));
   assert.ok(payload.items.every((i) => !/https?:/.test(i.text) && i.text.length <= 270));
   assert.deepEqual(payload.candidates.map((c) => c.category).slice(0, 3), ["economics", "stocks", "crypto"]);
   assert.ok(payload.candidates.every((c) => c.verificationMethod === "article-body" && c.score.every((n) => n >= 0 && n <= 5)));
-  assert.match(payload.shortfall, /10 Economics, 10 Stocks, 10 Crypto/);
+  assert.match(payload.shortfall, /4 Economics, 3 Stocks, 3 Crypto/);
 
   assert.equal(slip.approvalUrl, "https://farm-bot.test/news-batches/fnb_00000000-0000-4000-8000-000000000001");
-  assert.equal(slip.stories.length, 10);
+  assert.equal(slip.stories.length, 9);
   assert.ok(slip.skipped.some((s) => /paywall/.test(s.reason)));
   assert.equal(service.status(slip.date).slip.id, slip.id, "the receipt is kept for the day");
 
@@ -217,7 +218,7 @@ test("a rejected batch gets a fresh run ID, and a story taken by another batch i
   assert.equal(slip.outcome, "sent");
   assert.equal(calls.posts[0].batchId, `dashboard-top10-${day}-r2`);
   assert.equal(calls.posts.length, 2);
-  assert.equal(calls.posts[1].items.length, 9);
+  assert.equal(calls.posts[1].items.length, 8);
   assert.ok(!calls.posts[1].items.some((i) => i.canonicalUrl.endsWith("/1")));
   assert.ok(slip.skipped.some((s) => s.reason === "Already in another FarmBot batch"));
 });
@@ -238,4 +239,123 @@ test("missing settings stop the send before anything is spent", async () => {
   });
   assert.deepEqual(service.missingConfig(), ["OPENAI_API_KEY", "FARMBOT_NEWS_API_URL", "FARMBOT_NEWS_PREPARER_TOKEN", "FARMBOT_NEWS_APPROVAL_BASE_URL"]);
   await assert.rejects(service.send({}), (err) => err.statusCode === 503 && /needs: OPENAI_API_KEY/.test(err.message));
+});
+
+test("all ten are logged without contacting FarmBot, ranking, or checking images; repeat intake is idempotent", () => {
+  const { service, calls, newsLogStore } = setup();
+  const result = service.logCandidates({});
+  assert.equal(result.records.length, 10);
+  assert.ok(result.records.every((r) => r.status === "discovered" && r.approval === "pending" && r.farmbot.status === "needs-verification" && !r.farmbot.queueId));
+  const again = service.logCandidates({});
+  assert.deepEqual(again.records.map((r) => r.id), result.records.map((r) => r.id));
+  assert.equal(newsLogStore.daily({ date: result.records[0].reporterDate }).total, 10);
+  assert.equal(calls.rank, 0);
+  assert.equal(calls.vision, 0);
+  assert.equal(calls.posts.length, 0);
+});
+
+test("two passing articles still leave all ten visible, with the other eight blocked and exact errors", async () => {
+  const { service, calls, newsLogStore } = setup({ verify: async (url) => {
+    if (!url.endsWith("/0") && !url.endsWith("/1")) {
+      const err = new Error("Article has no preview image"); err.verification = true; throw err;
+    }
+    return { canonicalUrl: url, title: "News", publishedAt: new Date().toISOString(), imageUrl: "https://img.example/pic.jpg", ageMs: 0, excerpt: "Article" };
+  } });
+  const slip = await service.send({});
+  assert.equal(slip.stories.length, 2);
+  const records = newsLogStore.daily({ date: newsLogStore.get(service.logCandidates({}).records[0].id).reporterDate }).records;
+  assert.equal(records.length, 10);
+  assert.equal(records.filter((r) => r.farmbot.status === "awaiting-approval").length, 2);
+  const blocked = records.filter((r) => r.farmbot.status === "blocked");
+  assert.equal(blocked.length, 8);
+  assert.ok(blocked.every((r) => r.status === "discovered" && r.error === "Article has no preview image"));
+  assert.ok(records.every((r) => r.approval === "pending" && !r.farmbot.queueId));
+  assert.equal(calls.posts.length, 1);
+});
+
+test("image check failures stay in the news log even if nothing can be sent", async () => {
+  const { service, newsLogStore, calls } = setup();
+  const create = service._openai.responses.create;
+  service._openai.responses.create = async (req) => {
+    if (Array.isArray(req.input)) throw new Error("image download failed");
+    return create(req);
+  };
+  const slip = await service.send({});
+  assert.equal(slip.outcome, "failed");
+  const records = service.logCandidates({}).records;
+  assert.equal(records.length, 10);
+  assert.ok(records.every((r) => r.farmbot.status === "blocked"));
+  assert.ok(records.some((r) => r.error === "Image could not be checked (image download failed)"));
+  assert.equal(calls.posts.length, 0);
+  assert.ok(newsLogStore.get(records[0].id));
+});
+
+test("missing FarmBot configuration still records the ten without approving or queueing them", async () => {
+  const { service, calls } = setup();
+  service._env = {};
+  await assert.rejects(service.send({}), /Sending to FarmBot needs/);
+  const records = service.logCandidates({}).records;
+  assert.equal(records.length, 10);
+  assert.ok(records.every((r) => r.farmbot.status === "blocked" && /needs/.test(r.error) && r.approval === "pending"));
+  assert.equal(calls.rank, 0);
+  assert.equal(calls.posts.length, 0);
+});
+
+test("repeated preparation preserves human approval and the reviewed content", async () => {
+  const { service, newsLogStore } = setup();
+  await service.send({});
+  const record = service.logCandidates({}).records.find((r) => r.status === "verified");
+  const { contentHash } = require("../src/services/reporter-news-log");
+  const approved = newsLogStore.decide(record.id, { decision: "approved", contentHash: contentHash(record) }).record;
+  await service.send({});
+  const after = newsLogStore.get(record.id);
+  assert.equal(after.status, "approved");
+  assert.equal(contentHash(after), contentHash(approved));
+  assert.equal(after.approvalReceipt.contentHash, approved.approvalReceipt.contentHash);
+  assert.equal(after.farmbot.queueId, null);
+});
+
+test("a temporary post-send log failure preserves the FarmBot receipt and is reconciled on retry", async () => {
+  const { service, newsLogStore } = setup();
+  const update = newsLogStore.update.bind(newsLogStore);
+  newsLogStore.update = (id, patch, actor) => {
+    if (patch.farmbot?.status === "awaiting-approval") throw new Error("temporary log write failure");
+    return update(id, patch, actor);
+  };
+  const slip = await service.send({});
+  assert.equal(slip.outcome, "sent");
+  assert.ok(slip.batchId);
+  newsLogStore.update = update;
+  // Simulate the lookup finding the accepted batch on the next request.
+  service._resolveBatchId = async () => ({ existing: {
+    batchId: slip.batchId, clientBatchId: slip.clientBatchId, status: "validated",
+    payload: { items: slip.stories.map((story) => ({ canonicalUrl: story.url, text: story.post })) },
+  } });
+  const retry = await service.send({});
+  assert.equal(retry.outcome, "already-sent");
+  const records = service.logCandidates({}).records;
+  assert.equal(records.filter((r) => r.farmbot.status === "awaiting-approval").length, 9);
+});
+
+test("a duplicate article failure stays on its candidate and cannot overwrite another story's readiness", async () => {
+  const { service } = setup();
+  const create = service._openai.responses.create;
+  service._openai.responses.create = async (req) => {
+    const reply = await create(req);
+    if (!Array.isArray(req.input)) {
+      const parsed = JSON.parse(reply.output_text);
+      parsed.stories[1].url = parsed.stories[0].url;
+      return { output_text: JSON.stringify(parsed) };
+    }
+    return reply;
+  };
+  await service.send({});
+  const result = service.logCandidates({});
+  assert.equal(result.records.length, 10);
+  const first = result.records.find((r) => r.headline === "Econ story 1");
+  const second = result.records.find((r) => r.headline === "Stock story 1");
+  assert.notEqual(first.id, second.id);
+  assert.equal(first.farmbot.status, "awaiting-approval");
+  assert.equal(second.farmbot.status, "blocked");
+  assert.equal(second.error, "Same article as a higher-ranked story");
 });

@@ -9,6 +9,8 @@ const { buildDailyTopNews } = require("../services/daily-top-news");
  *      the phone Shortcut and the Reporter Room already made. Read-only.
  * GET  /api/daily-top-news/farmbot?date=YYYY-MM-DD
  *      The receipt for the day's Top 10 sent to FarmBot, if any.
+ * POST /api/daily-top-news/intake (admin key; no generation or sending)
+ *      Record the selected Top 10 as discovered, independently of FarmBot.
  * POST /api/daily-top-news/farmbot   (admin key; OpenAI credits)
  *      Merge today's desks into a Top 10 and send it to FarmBot as one batch
  *      for human approval. Body: { tz?, runs?: { economics, stocks, crypto } }.
@@ -34,6 +36,15 @@ function createDailyTopNewsRouter({ briefingStore, reporterService, farmbotTop10
   });
 
   if (farmbotTop10 && requireAdmin) {
+    router.post("/intake", requireAdmin, json, (req, res, next) => {
+      try {
+        const result = farmbotTop10.logCandidates({
+          date: req.body?.date, timeZone: req.body?.tz, runIds: req.body?.runs,
+        });
+        res.json({ ok: true, logged: result.records.length, ids: result.records.map((record) => record.id) });
+      } catch (err) { next(err); }
+    });
+
     router.post("/farmbot", requireAdmin, json, async (req, res, next) => {
       try {
         const body = req.body && typeof req.body === "object" ? req.body : {};
