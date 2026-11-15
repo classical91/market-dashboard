@@ -271,6 +271,8 @@
     .ncr-badge.fallback { color: var(--amber); border-color: rgba(245,197,66,0.3); }
     .ncr-head .screener-mini { margin-left: auto; }
     .ncr-head .screener-mini + .screener-mini { margin-left: 0; }
+    .ncr-desk-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--soft, #c9d3e3); cursor: pointer; }
+    .ncr-desk-toggle input { accent-color: var(--blue, #4da3ff); }
     .xbc-row.ncr-row { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 30px; min-width: 0; border-bottom: 0; }
     .xbc-row.ncr-row > input:first-child { grid-column: auto; }
     .ncr-fallback { font-size: 12px; color: var(--muted); padding: 6px 0 2px; }
@@ -706,6 +708,9 @@
                 Which Telegram groups and topics each news category is sent to. Ledger broadcasts (ShareBot67,
                 the receipt form, retries), the Daily Reporter and the newsroom all follow this. A category with
                 no destinations uses <code>TELEGRAM_CHAT_IDS</code>. Saved on the server.
+                <br><strong>Website sends to Telegram</strong> picks which of the four desks the Reporter Room&rsquo;s
+                Broadcast, the scheduled newsroom and the desk pages&rsquo; Send to Telegram may post. Untick a desk
+                that goes to FarmBot instead (Economics, Stocks and Crypto via Today&rsquo;s Top 10).
               </div>
             </div>
           </div>
@@ -2189,6 +2194,10 @@
     // [{ name, custom, destinations: [{ chatId, threadId }], defaults }]
     var categories = [];
     var dirty = false;
+    // The four website desks, by ledger news type, and which may go to Telegram.
+    var DESK_TYPES = ['Geopolitics', 'Economics', 'Stock', 'Crypto'];
+    var DESK_NAMES = { Geopolitics: 'Geopolitics', Economics: 'Economics', Stock: 'Stocks', Crypto: 'Crypto' };
+    var telegramDesks = DESK_TYPES.slice();
 
     function setStatus(message, isError) {
       statusEl.textContent = message || '';
@@ -2276,6 +2285,24 @@
           var inputs = listEl.children[categories.indexOf(category)].querySelectorAll('input');
           if (inputs.length >= 2) inputs[inputs.length - 2].focus();
         }));
+        if (DESK_TYPES.indexOf(category.name) !== -1) {
+          var toggle = document.createElement('label');
+          toggle.className = 'ncr-desk-toggle';
+          var box2 = document.createElement('input');
+          box2.type = 'checkbox';
+          box2.checked = telegramDesks.indexOf(category.name) !== -1;
+          box2.setAttribute('aria-label', 'Website sends ' + DESK_NAMES[category.name] + ' to Telegram');
+          box2.addEventListener('change', function () {
+            telegramDesks = DESK_TYPES.filter(function (desk) {
+              return desk === category.name ? box2.checked : telegramDesks.indexOf(desk) !== -1;
+            });
+            dirty = true;
+            setStatus('Unsaved changes.');
+          });
+          toggle.appendChild(box2);
+          toggle.appendChild(document.createTextNode(' Website sends to Telegram'));
+          head.appendChild(toggle);
+        }
         category.resetEl = mini('Reset to default', function () {
           category.custom = false;
           category.destinations = copy(category.defaults);
@@ -2321,6 +2348,7 @@
       var settings = data.settings || {};
       var overrides = settings.categoryDestinations || {};
       var defaults = data.routingDefaults || {};
+      telegramDesks = Array.isArray(settings.telegramDesks) ? settings.telegramDesks.slice() : DESK_TYPES.slice();
       categories = Object.keys(defaults).map(function (name) {
         var custom = Object.prototype.hasOwnProperty.call(overrides, name);
         return {
@@ -2392,7 +2420,7 @@
       AdminKey.fetchOrSession(API, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ categoryDestinations: payload })
+        body: JSON.stringify({ categoryDestinations: payload, telegramDesks: telegramDesks })
       }).then(function (res) {
         return res.ok ? res.json() : failure(res);
       }).then(function () {

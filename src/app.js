@@ -50,6 +50,7 @@ const { createReporterRouter } = require("./routes/reporter");
 const { createReporterNewsLogRouter } = require("./routes/reporter-news-log");
 const { createPhoneBriefingsRouter } = require("./routes/phone-briefings");
 const { createDailyTopNewsRouter } = require("./routes/daily-top-news");
+const { createDeskTelegramRouter } = require("./routes/desk-telegram");
 const { FarmbotTop10Service } = require("./services/farmbot-top10");
 const { FarmbotTop10Store } = require("./services/farmbot-top10-store");
 const OpenAI = require("openai");
@@ -757,6 +758,13 @@ function createApp() {
     }),
   );
   app.use("/api/phone-briefings", phoneBriefingsRouter);
+  app.use("/api/desk-telegram", createDeskTelegramRouter({
+    briefingStore: phoneBriefingStore,
+    reporterService,
+    telegramService,
+    broadcastLedgerStore,
+    requireAdmin,
+  }));
   app.use("/api/daily-top-news", createDailyTopNewsRouter({
     briefingStore: phoneBriefingStore,
     reporterService,

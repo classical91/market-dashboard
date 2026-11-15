@@ -46,6 +46,8 @@ const STATUSES = ["pending", "posted", "partial", "failed", "blocked", "reconcil
 const DESTINATION_STATUSES = ["pending", "posted", "failed"];
 const ALLOWED_CATEGORIES = ["Stock", "Crypto", "Geopolitics", "Economics", "Markets", "Technology", "General News"];
 const DUPLICATE_WINDOWS = ["off", "same-day", "6h", "24h", "42h"];
+// The four website desks, by their ledger news type.
+const TELEGRAM_DESKS = Object.freeze(["Geopolitics", "Economics", "Stock", "Crypto"]);
 const HISTORY_DAYS = [30, 90, 180, null];
 const DEFAULT_SETTINGS = Object.freeze({
   requireExactCategory: true,
@@ -65,6 +67,10 @@ const DEFAULT_SETTINGS = Object.freeze({
   // Per-category Telegram overrides; a category absent here keeps the
   // default route in news-routing.js. See destinationsForNewsType().
   categoryDestinations: {},
+  // Which website desks the Reporter Room's Broadcast, the scheduled newsroom
+  // and the desk pages' Send to Telegram may post to Telegram. A desk left out
+  // is never sent to Telegram from the website (e.g. it goes to FarmBot).
+  telegramDesks: TELEGRAM_DESKS,
 });
 
 // Query/campaign parameters that never change which story a URL points at.
@@ -167,6 +173,9 @@ function normalizeSettings(input = {}) {
       : defaults.visibleSources,
     destinationLabels,
     categoryDestinations,
+    telegramDesks: Array.isArray(input.telegramDesks)
+      ? TELEGRAM_DESKS.filter((desk) => input.telegramDesks.includes(desk))
+      : [...(defaults.telegramDesks || TELEGRAM_DESKS)],
   };
 }
 
@@ -918,6 +927,7 @@ class BroadcastLedgerStore {
 }
 
 module.exports = {
+  TELEGRAM_DESKS,
   BroadcastLedgerStore,
   canonicalizeUrl,
   normalizeText,

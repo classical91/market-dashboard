@@ -23,7 +23,10 @@
     endpoint: document.getElementById("briefingEndpoint"),
     run: document.getElementById("briefingRun"),
     runMessage: document.getElementById("briefingRunMessage"),
+    telegram: document.getElementById("briefingTelegram"),
   };
+  var telegramInfo = null;
+  var sending = false;
   var current = null;
   var runs = [];
   var running = false;
@@ -200,6 +203,53 @@
   els.run.textContent = "⚡ Run " + LABELS[desk];
   els.run.addEventListener("click", runDesk);
 
+  /* 📣 Send to Telegram: only on desks switched on in Settings → Telegram →
+     News Category Routing. The server looks the run up itself and sends it
+     to that desk's groups and topics, once per run. */
+  function loadTelegram() {
+    return getJson("/api/desk-telegram").then(function (info) {
+      telegramInfo = info;
+      var mine = info.desks && info.desks[desk];
+      els.telegram.hidden = !(info.telegramConfigured && mine && mine.telegram);
+    }, function () { els.telegram.hidden = true; });
+  }
+
+  function sendTelegram() {
+    if (sending || !window.AdminKey || !telegramInfo) return;
+    if (!current) {
+      setRunMessage("Nothing to send yet: tap ⚡ Run " + LABELS[desk] + " first, or run the phone Shortcut.", "error");
+      return;
+    }
+    var mine = telegramInfo.desks[desk];
+    var where = mine.destinations + (mine.destinations === 1 ? " Telegram group/topic" : " Telegram groups/topics");
+    if (!window.confirm("Send this " + LABELS[desk] + " run (" + stamp(current.at) + ") to " + where + "?")) return;
+    sending = true;
+    els.telegram.disabled = true;
+    els.telegram.textContent = "📣 Sending…";
+    window.AdminKey.fetch("/api/desk-telegram/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ desk: desk, runId: current.id }),
+    }).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (data) {
+        if (!res.ok) throw new Error(data.error || "HTTP " + res.status);
+        return data;
+      });
+    }).then(function (data) {
+      if (data.alreadySent) setRunMessage("This run was already sent to Telegram; nothing was sent again.", "ok");
+      else if (data.failed) setRunMessage("Sent to " + data.posted + " of " + data.destinations + " Telegram destinations; " + data.failed + " failed. See the Broadcast Ledger.", "error");
+      else setRunMessage("Sent to " + data.posted + " Telegram destination" + (data.posted === 1 ? "" : "s") + ". Receipt is in the Broadcast Ledger.", "ok");
+    }).catch(function (err) {
+      setRunMessage("Not sent to Telegram: " + (err.message || "error"), "error");
+    }).finally(function () {
+      sending = false;
+      els.telegram.disabled = false;
+      els.telegram.textContent = "📣 Send to Telegram";
+    });
+  }
+
+  els.telegram.addEventListener("click", sendTelegram);
+
   els.select.addEventListener("change", function () {
     loadRun(els.select.value).catch(function (err) {
       els.body.classList.remove("loading");
@@ -216,4 +266,5 @@
   });
 
   load();
+  loadTelegram();
 })();

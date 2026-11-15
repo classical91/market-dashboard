@@ -117,6 +117,21 @@ test("a cycle that generates every section and delivers completes", async () => 
   assert.equal(broadcastLedgerStore.list({ cycleId: cycle.id, limit: 20 }).length, 3);
 });
 
+test("desks switched off for Telegram in Settings are left out of a cycle's delivery, not failed", async () => {
+  const { newsroom, telegramService, broadcastLedgerStore } = makeNewsroom();
+  broadcastLedgerStore.updateSettings({ telegramDesks: ["Crypto"] });
+  const { cycle } = await newsroom.runCycle({ scheduledAt: SCHEDULED_AT });
+  assert.equal(cycle.status, "completed");
+  assert.deepEqual(telegramService.calls.map((call) => call.newsType), ["Crypto"]);
+
+  // Nothing at all is meant for Telegram (they all go to FarmBot): still a clean run.
+  const quiet = makeNewsroom();
+  quiet.broadcastLedgerStore.updateSettings({ telegramDesks: [] });
+  const { cycle: none } = await quiet.newsroom.runCycle({ scheduledAt: SCHEDULED_AT });
+  assert.equal(none.status, "completed");
+  assert.equal(quiet.telegramService.calls.length, 0);
+});
+
 test("a cycle links its receipts, and the receipts keep their Telegram message ids", async () => {
   const { newsroom, broadcastLedgerStore } = makeNewsroom();
   const { cycle } = await newsroom.runCycle({ scheduledAt: SCHEDULED_AT });

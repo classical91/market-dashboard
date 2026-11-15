@@ -96,13 +96,20 @@ function createReporterRouter({ reporterService, telegramService, broadcastLedge
       // and idempotency keys. `continueOnError` stays off here: an interactive
       // broadcast that fails should surface as an error response rather than
       // reporting ok with a hole in it.
-      const { receipts, destinations } = await broadcastReportSections({
+      const { receipts, destinations, skipped } = await broadcastReportSections({
         report,
         telegramService,
         broadcastLedgerStore,
         source: "dashboard",
         actor: "dashboard",
       });
+      if (!receipts.length && skipped.length) {
+        res.status(400).json({
+          error: `None of the saved desks is set to go to Telegram (${skipped.join(", ")} are switched off in Settings → Telegram → News Category Routing).`,
+          skipped,
+        });
+        return;
+      }
 
       res.json({
         ok: true,
@@ -114,6 +121,7 @@ function createReporterRouter({ reporterService, telegramService, broadcastLedge
         status: receipts.length ? receipts[0].status : null,
         receipts: receipts.map((r) => ({ id: r.id, newsType: r.newsType, status: r.status })),
         destinations,
+        skipped,
       });
     } catch (err) {
       next(err);

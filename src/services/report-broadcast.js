@@ -44,7 +44,9 @@ const REPORT_CATEGORIES = [
  *   route leaves this false so a broken send surfaces as an error response;
  *   a scheduled cycle sets it, because one dead topic must not cost the other
  *   two categories their delivery.
- * @returns {{receipts: object[], destinations: object[], failures: object[]}}
+ * @returns {{receipts: object[], destinations: object[], failures: object[], skipped: string[], alreadyPosted: string[]}}
+ *   `skipped` lists news types switched off for Telegram in Settings;
+ *   `alreadyPosted` those whose receipt had already posted under this key.
  */
 async function broadcastReportSections({
   report,
@@ -58,11 +60,17 @@ async function broadcastReportSections({
   const settings = broadcastLedgerStore ? broadcastLedgerStore.getSettings() : null;
   const stamp = report.generatedAt || report.dateStr || Date.now();
   const date = report.dateStr || new Date().toISOString().slice(0, 10);
-  const sections = REPORT_CATEGORIES.filter((section) => report[section.key]);
+  // Desks switched off for Telegram in Settings are left out, not failed:
+  // they go elsewhere (FarmBot) by choice.
+  const allowed = settings && Array.isArray(settings.telegramDesks) ? settings.telegramDesks : null;
+  const withContent = REPORT_CATEGORIES.filter((section) => report[section.key]);
+  const sections = withContent.filter((section) => !allowed || allowed.includes(section.newsType));
+  const skipped = withContent.filter((section) => !sections.includes(section)).map((section) => section.newsType);
 
   const receipts = [];
   const destinations = [];
   const failures = [];
+  const alreadyPosted = [];
 
   for (const section of sections) {
     // A cycle-scoped key is what lets delivery be retried without regenerating:
@@ -93,6 +101,7 @@ async function broadcastReportSections({
     // Already posted under this key: record it and move on rather than sending
     // the same category twice.
     if (receipt && created.created === false && isPostedStatus(receipt.status)) {
+      alreadyPosted.push(section.newsType);
       receipts.push(receipt);
       destinations.push(...(receipt.destinations || []).map((d) => ({ ...d, newsType: section.newsType })));
       continue;
@@ -130,7 +139,7 @@ async function broadcastReportSections({
     }
   }
 
-  return { receipts, destinations, failures };
+  return { receipts, destinations, failures, skipped, alreadyPosted };
 }
 
 module.exports = { broadcastReportSections, REPORT_CATEGORIES };
