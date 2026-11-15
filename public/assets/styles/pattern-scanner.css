@@ -16,7 +16,7 @@
 
 .ps-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
   gap: 16px;
 }
 
@@ -106,6 +106,7 @@
 
 .ps-card-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
@@ -124,17 +125,24 @@
 .ps-card-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .ps-track-btn {
-  font-size: 16px;
+  height: 24px;
+  min-width: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
   line-height: 1;
   color: var(--muted);
   background: transparent;
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 3px 7px;
+  border-radius: 6px;
+  padding: 0 6px;
   cursor: pointer;
 }
 .ps-track-btn:hover { border-color: var(--amber); color: var(--amber); }
@@ -166,21 +174,33 @@
   font-weight: 700;
   letter-spacing: 0.03em;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  min-width: 0;
 }
 
 .ps-tf {
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  white-space: nowrap;
   font-size: 10px;
   font-weight: 600;
   color: var(--muted);
   background: #202735;
   border: 1px solid rgba(170,183,207,0.28);
   border-radius: 6px;
-  padding: 2px 6px;
+  padding: 0 6px;
 }
 
 .ps-pin {
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  white-space: nowrap;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -188,15 +208,20 @@
   background: rgba(242,177,52,0.12);
   border: 1px solid rgba(242,177,52,0.4);
   border-radius: 6px;
-  padding: 2px 6px;
+  padding: 0 6px;
 }
 
 .ps-bias {
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  white-space: nowrap;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.06em;
-  padding: 4px 10px;
-  border-radius: 8px;
+  padding: 0 8px;
+  border-radius: 6px;
   text-transform: uppercase;
   background: rgba(255,255,255,0.05);
   color: var(--muted);
@@ -206,7 +231,7 @@
 .ps-bias--bearish { background: var(--coral-bg); color: var(--coral); border-color: rgba(255,77,109,0.25); }
 
 .ps-pattern-name {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
   margin-bottom: 4px;
 }
@@ -215,14 +240,18 @@
   font-size: 11px;
   font-weight: 600;
   color: var(--muted);
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 .ps-status--breakout { color: var(--amber); }
 
 .ps-metrics {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px 12px;
+  padding: 8px 10px;
+  background: rgba(255,255,255,0.025);
+  border: 1px solid var(--border);
+  border-radius: 8px;
 }
 
 .ps-metric {
@@ -232,9 +261,16 @@
   font-size: 11px;
   color: var(--dim);
 }
+.ps-metric span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.ps-card { container-type: inline-size; }
+@container (max-width: 300px) {
+  .ps-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 .ps-metric b {
   font-size: 13px;
   color: var(--text);
+  font-variant-numeric: tabular-nums;
 }
 
 .ps-empty {
@@ -258,7 +294,9 @@
   background: var(--blue-bg);
   border: 1px solid rgba(77,163,255,0.35);
   border-radius: 6px;
-  padding: 3px 7px;
+  height: 22px;
+  box-sizing: border-box;
+  padding: 0 7px;
   text-decoration: none;
   white-space: nowrap;
 }
@@ -281,12 +319,15 @@
   padding-top: 12px;
   border-top: 1px dashed var(--border);
 }
-.ps-card-content > .ps-divergence:first-child {
+.ps-card-content > .ps-divergence:first-child,
+.ps-card-content > .ps-chart + .ps-divergence {
   /* Card with only a divergence (no pattern block above it) needs no divider */
   margin-top: 0;
   padding-top: 0;
   border-top: 0;
 }
+
+.ps-divergence .ps-pattern-name { margin-bottom: 8px; }
 
 /* Bullish vs bearish count over the scan's hits — mirrors the Directional
    Bias summary strip. */

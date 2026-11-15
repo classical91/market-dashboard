@@ -92,7 +92,7 @@
       '<div class="ps-card' + (opts.collapsed ? " collapsed" : "") + '">' +
         '<div class="ps-card-head" data-role="head">' +
           '<div class="ps-card-symbol">' + tickerLink(entry) + '<span class="ps-tf">' + escapeHtml(entry.interval) + "</span>" +
-            (opts.pinned ? '<span class="ps-pin" title="Pinned to the top of the scan">&#128204; PINNED</span>' : "") +
+            (opts.pinned ? '<span class="ps-pin" title="Pinned to the top of the scan" aria-label="Pinned">&#128204;</span>' : "") +
           "</div>" +
           '<div class="ps-card-actions">' +
             trackBtn +
