@@ -146,6 +146,13 @@
 .topnews-run-message[hidden] { display: none; }
 .topnews-run-message.ok { color: var(--green); }
 .topnews-run-message.error { color: var(--amber); }
+.topnews-slip { margin-bottom: 18px; }
+.topnews-slip[hidden] { display: none; }
+.topnews-approve { text-decoration: none; font-weight: 700; color: var(--text); background: var(--blue-bg); border-color: rgba(77,163,255,0.45); }
+.topnews-slip-error { color: var(--amber); margin: 0 0 12px; font-size: 13px; }
+.topnews-slip code { font-size: 12px; color: var(--text); background: rgba(255,255,255,0.06); padding: 1px 6px; border-radius: 6px; word-break: break-all; }
+.topnews-source { font-size: 12px; color: var(--muted); }
+.topnews-skipped ul { margin: 10px 0 0; padding-left: 18px; line-height: 1.6; }
 .topnews-today[hidden] { display: none; }
 .topnews-date {
   font: inherit; font-size: 13px; color: var(--text);

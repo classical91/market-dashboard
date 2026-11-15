@@ -21,13 +21,16 @@
     today: document.getElementById("topNewsToday"),
     copyAll: document.getElementById("topNewsCopyAll"),
     run: document.getElementById("topNewsRun"),
+    farmbot: document.getElementById("topNewsFarmbot"),
+    slip: document.getElementById("topNewsSlip"),
     runMessage: document.getElementById("topNewsRunMessage"),
     desks: document.getElementById("topNewsDesks"),
     status: document.getElementById("topNewsStatus"),
     sections: document.getElementById("topNewsSections"),
   };
 
-  var state = { data: null, picked: {}, running: false };
+  var state = { data: null, picked: {}, running: false, sending: false, farmbot: null };
+  var DESK_ICONS = { economics: "🏦", stocks: "📈", crypto: "₿" };
 
   // The Reporter Room's section for each desk; `markets` is Stocks.
   var RUN_DESKS = [
@@ -171,7 +174,9 @@
     els.copyAll.disabled = !made;
     // Run News writes today's news; past days can only be read.
     els.run.hidden = data.date !== data.today;
-    els.run.disabled = state.running;
+    els.run.disabled = state.running || state.sending;
+    els.farmbot.hidden = data.date !== data.today;
+    els.farmbot.disabled = state.running || state.sending || !made;
     renderDeskChips(desks);
     els.sections.innerHTML = desks.map(renderSection).join("");
   }
@@ -195,6 +200,7 @@
       else url.searchParams.set("date", data.date);
       window.history.replaceState(null, "", url.pathname + url.search + url.hash);
       render();
+      loadSlip();
     }).catch(function (err) {
       els.status.className = "briefing-age stale";
       els.status.textContent = "Could not load the day's news (" + err.message + ")";
@@ -263,6 +269,104 @@
   }
 
   els.run.addEventListener("click", runNews);
+
+  // ── FarmBot Top 10 ────────────────────────────────────────────────────
+
+  function when(iso) {
+    return new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  }
+
+  function renderSlip() {
+    var info = state.farmbot;
+    var slip = info && info.slip;
+    if (!info || (!slip && info.configured)) { els.slip.hidden = true; return; }
+    var html = "";
+    if (!slip) {
+      html = '<p class="briefing-empty">Sending to FarmBot needs these settings on the server: <strong>' +
+        esc((info.missing || []).join(", ")) + "</strong>.</p>";
+    } else {
+      var title = slip.outcome === "sent" ? "✅ Sent to FarmBot · waiting for your approval"
+        : slip.outcome === "already-sent" ? "📌 Today's Top 10 is already in FarmBot"
+        : "⚠️ Not sent to FarmBot";
+      html += '<div class="briefing-toolbar"><h2 class="topnews-desk-title">' + esc(title) + "</h2>" +
+        '<span class="briefing-age">' + esc(when(slip.recordedAt)) + "</span>";
+      if (slip.approvalUrl) {
+        html += '<a class="briefing-btn topnews-approve" href="' + esc(slip.approvalUrl) + '" target="_blank" rel="noopener">Open in FarmBot to approve →</a>';
+      }
+      html += "</div>";
+      if (slip.error) html += '<p class="topnews-slip-error">' + esc(slip.error) + "</p>";
+      if (slip.clientBatchId) {
+        html += '<p class="topnews-note">Batch <code>' + esc(slip.clientBatchId) + "</code>" +
+          (slip.farmbotStatus ? " · FarmBot status: " + esc(slip.farmbotStatus) : "") +
+          (slip.stories && slip.stories.length ? " · " + slip.stories.length + " stories" : "") +
+          ". Nothing is posted until you approve it and start the timers in FarmBot.</p>";
+      }
+      if (slip.stories && slip.stories.length) {
+        html += '<ol class="topnews-stories">' + slip.stories.map(function (story) {
+          return '<li class="topnews-story"><span class="briefing-rank">' + story.number + "</span>" +
+            '<div class="topnews-story-main">' +
+            (story.headline ? '<h3 class="topnews-story-title">' + esc((DESK_ICONS[story.desk] || "") + " " + story.headline) + "</h3>" : "") +
+            '<div class="briefing-body"><p>' + esc(story.post || "") + "</p>" +
+            (story.url ? '<p class="topnews-source"><a href="' + esc(story.url) + '" target="_blank" rel="noopener noreferrer">' +
+              esc(story.publisher || story.url) + "</a>" + (story.imageMatches === false ? " · image is generic" : "") + "</p>" : "") +
+            "</div></div></li>";
+        }).join("") + "</ol>";
+      }
+      if (slip.skipped && slip.skipped.length) {
+        html += '<details class="briefing-help topnews-skipped"><summary>' + slip.skipped.length + " stories skipped</summary><ul>" +
+          slip.skipped.map(function (item) {
+            return "<li><strong>" + esc(item.ref || "") + "</strong> " + esc(item.headline || "") + " — " + esc(item.reason || "") + "</li>";
+          }).join("") + "</ul></details>";
+      }
+    }
+    els.slip.innerHTML = html;
+    els.slip.hidden = false;
+  }
+
+  function loadSlip() {
+    if (!state.data) return Promise.resolve();
+    return fetch("/api/daily-top-news/farmbot?date=" + encodeURIComponent(state.data.date), {
+      headers: { Accept: "application/json" }, credentials: "same-origin",
+    }).then(function (res) { return res.ok ? res.json() : null; })
+      .then(function (info) { state.farmbot = info; renderSlip(); })
+      .catch(function () { /* the receipt is optional; the page still works */ });
+  }
+
+  function sendToFarmbot() {
+    if (state.sending || !state.data || !window.AdminKey) return;
+    if (!window.confirm("Merge today's Economics, Stocks and Crypto into a Top 10 and send it to FarmBot for your approval? " +
+      "This uses OpenAI credits. Nothing is posted until you approve it in FarmBot.")) return;
+    state.sending = true;
+    els.farmbot.textContent = "📤 Sending…";
+    render();
+    setRunMessage("Ranking the day's stories, checking each source article and its image, then sending to FarmBot. " +
+      "This can take a few minutes; keep this page open.", "");
+    var runs = {};
+    state.data.desks.forEach(function (desk) {
+      var run = currentRun(desk);
+      if (run) runs[desk.key] = run.id;
+    });
+    window.AdminKey.fetch("/api/daily-top-news/farmbot", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tz: timeZone, runs: runs }),
+    }).then(readApiJson).then(function (data) {
+      var slip = data.slip || {};
+      setRunMessage(slip.outcome === "sent"
+        ? "Sent " + (slip.stories || []).length + " stories to FarmBot. Open the receipt link below to approve them."
+        : slip.outcome === "already-sent" ? "Today's Top 10 was already in FarmBot; nothing new was sent."
+        : "Not sent: " + (slip.error || "see the receipt below"), slip.outcome === "failed" ? "error" : "ok");
+    }).catch(function (err) {
+      setRunMessage("Not sent to FarmBot: " + (err.message || "error"), "error");
+    }).finally(function () {
+      state.sending = false;
+      els.farmbot.textContent = "📤 Send to FarmBot";
+      render();
+      loadSlip();
+    });
+  }
+
+  els.farmbot.addEventListener("click", sendToFarmbot);
 
   els.prev.addEventListener("click", function () {
     if (state.data) load(shiftDate(state.data.date, -1));
