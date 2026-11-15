@@ -331,7 +331,9 @@ class ReporterNewsLogStore {
 
     const records = this._read();
     const now = nowIso();
-    const existing = records.find((record) => record.dedupeKey === key);
+    const existing = records.find((record) => record.dedupeKey === key) ||
+      (sourceId && records.find((record) => record.sourceId === sourceId &&
+        String(record.source || "").toLowerCase() === source.toLowerCase()));
     const fields = {
       headline,
       url,
@@ -351,6 +353,9 @@ class ReporterNewsLogStore {
       // An approved record's content is frozen: a repeat intake may still
       // fill capturedBy and bump the counters, but not touch what was approved.
       const frozen = isContentFrozen(existing);
+      // A discovered candidate may learn its article URL during verification.
+      // Keep the same record and history when its identity becomes canonical.
+      if (!frozen && !existing.canonicalUrl && canonicalUrl) existing.dedupeKey = key;
       Object.entries(fields).forEach(([field, value]) => {
         if (frozen && CONTENT_FIELDS.includes(field)) return;
         if (field === "symbols") {
@@ -613,7 +618,9 @@ class ReporterNewsLogStore {
       sourceId: clampString(sourceId, MAX_SHORT_LEN) || null,
     });
     if (!key) return null;
-    return this._read().find((record) => record.dedupeKey === key) || null;
+    return this._read().find((record) => record.dedupeKey === key ||
+      (!url && sourceId && record.sourceId === sourceId &&
+        String(record.source || "").toLowerCase() === String(source || "").toLowerCase())) || null;
   }
 
   /**

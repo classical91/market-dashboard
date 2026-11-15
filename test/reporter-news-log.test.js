@@ -480,3 +480,17 @@ test("approver key: unset or shared with the ledger/admin key disables approval"
   assert.equal(run({ approverKey: "a", ledgerKey: "l", adminKey: "x" }, "l"), 401);
   assert.equal(run({ approverKey: "a", ledgerKey: "l", adminKey: "x" }, "a"), 200);
 });
+
+test("a discovered source identity gains a URL without creating a new record or losing history", () => {
+  const store = newStore();
+  const identity = { source: "today-top-10", sourceId: "run-e1" };
+  const first = store.intake({ ...identity, headline: "Candidate", status: "discovered" }).record;
+  const enriched = store.intake({ ...identity, headline: "Candidate", url: "https://example.com/story", status: "verified" }).record;
+  assert.equal(enriched.id, first.id);
+  assert.equal(enriched.history[0].status, "discovered");
+  assert.equal(enriched.status, "verified");
+  assert.equal(store.find(identity).id, first.id);
+  assert.equal(store.find({ url: "https://example.com/story" }).id, first.id);
+  assert.equal(store.intake({ ...identity, headline: "Candidate", status: "discovered" }).record.id, first.id);
+  assert.equal(store.daily({ date: enriched.reporterDate }).total, 1);
+});
