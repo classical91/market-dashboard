@@ -30,16 +30,11 @@
  */
 
 const { buildDeliveryPayload } = require("./farmclaw-delivery");
+const { describeNetworkError } = require("../utils/errors");
 
 const DEFAULT_AGENT = "farmclaw";
 const DEFAULT_MAX_DELIVERY_ATTEMPTS = 3;
 
-/** Node's fetch reports every network failure as "fetch failed"; the cause says which. */
-function describeNetworkError(err) {
-  const cause = err?.cause;
-  const detail = cause ? [cause.code, cause.message].filter(Boolean).join(" ") : "";
-  return detail && !String(err.message).includes(detail) ? `${err.message} (${detail})` : String(err?.message || err);
-}
 
 function createHandoffClient({ baseUrl, key, fetchImpl = global.fetch, timeoutMs = 15000 }) {
   const base = String(baseUrl || "").replace(/\/+$/, "");
