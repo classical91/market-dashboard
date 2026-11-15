@@ -648,3 +648,27 @@ The browser receives no service credential; review links open FarmBot's existing
 Supabase login and `/news-batches/<id>` approval page. This dashboard stores no
 second copy and accepts no preview approval/queue writes. Keep
 `REPORTER_NEWS_APPROVER_KEY` separate, protected, and unavailable to FarmClaw.
+
+## Today's Top 10 → FarmBot
+
+`/briefings/top-10` gathers the day's Economics, Stocks and Crypto desks (phone
+first, Reporter Room as backup). **Send to FarmBot** (admin key) merges them
+into one batch for approval:
+
+1. One `OPENAI_API_KEY` call with web search ranks all stories, removes
+   duplicates, writes post copy (≤270 characters, no links: FarmBot strips them)
+   and names each source article.
+2. Each article is fetched (https only, public addresses only, no bypassing
+   paywalls or bot checks) and must be readable, dated within 48 hours and carry
+   its own preview image; a vision call records what the image shows. Failures
+   are skipped and the next-ranked story takes their place.
+3. The batch `dashboard-top10-YYYY-MM-DD` (up to ten stories) is created on
+   farmbot-api with `FARMBOT_NEWS_PREPARER_TOKEN` (the farmbot-api
+   `NEWS_BATCH_PREPARER_TOKEN`). The preparer can't approve: open the link on the
+   receipt, approve on FarmBot's News Preview page, then start the timers there.
+4. The receipt is kept in `DATA_DIR/farmbot-top10-slips.json` and each story is
+   logged in the Reporter News Log as `verified` (logging is not approval).
+
+A batch waiting for approval, or already queued, is never prepared twice for
+the same Vancouver day; a rejected or expired one gets a new `-r2` run ID.
+FarmBot must include the Top 10 update (`top10` in its capabilities).

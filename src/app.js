@@ -50,6 +50,9 @@ const { createReporterRouter } = require("./routes/reporter");
 const { createReporterNewsLogRouter } = require("./routes/reporter-news-log");
 const { createPhoneBriefingsRouter } = require("./routes/phone-briefings");
 const { createDailyTopNewsRouter } = require("./routes/daily-top-news");
+const { FarmbotTop10Service } = require("./services/farmbot-top10");
+const { FarmbotTop10Store } = require("./services/farmbot-top10-store");
+const OpenAI = require("openai");
 const { createFarmclawHandoffRouter } = require("./routes/farmclaw-handoffs");
 const { createFarmclawNewsPreviewsRouter } = require("./routes/farmclaw-news-previews");
 const { createNewsroomRouter } = require("./routes/newsroom");
@@ -221,6 +224,15 @@ function createApp() {
     apiKey: config.reporter.apiKey,
     model: config.reporter.model,
     dataDir,
+  });
+  // Merges Today's Top 10 into one FarmBot news batch for human approval.
+  const farmbotTop10 = new FarmbotTop10Service({
+    briefingStore: phoneBriefingStore,
+    reporterService,
+    slipStore: new FarmbotTop10Store({ dataDir }),
+    newsLogStore: reporterNewsLogStore,
+    openai: config.reporter.apiKey ? new OpenAI({ apiKey: config.reporter.apiKey }) : null,
+    model: config.reporter.model,
   });
   // One durable record per scheduled newsroom run, linking the reporter's
   // generation log to the broadcast ledger's receipts. Storage is the same
@@ -745,7 +757,12 @@ function createApp() {
     }),
   );
   app.use("/api/phone-briefings", phoneBriefingsRouter);
-  app.use("/api/daily-top-news", createDailyTopNewsRouter({ briefingStore: phoneBriefingStore, reporterService }));
+  app.use("/api/daily-top-news", createDailyTopNewsRouter({
+    briefingStore: phoneBriefingStore,
+    reporterService,
+    farmbotTop10,
+    requireAdmin,
+  }));
   app.use("/api/farmclaw/news-previews", createFarmclawNewsPreviewsRouter());
   app.use(
     "/api/farmclaw/handoffs",
