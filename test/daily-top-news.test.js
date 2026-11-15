@@ -111,3 +111,18 @@ test("the page and its API sit behind the site login", async () => {
     await new Promise((resolve) => server.close(resolve));
   }
 });
+
+test("Run News writes the three desks through the Reporter Room, crypto as news", () => {
+  const page = fs.readFileSync(path.join(__dirname, "..", "public/top-news.html"), "utf8");
+  const script = fs.readFileSync(path.join(__dirname, "..", "public/assets/js/top-news.js"), "utf8");
+  assert.match(page, /id="topNewsRun"[^>]*>⚡ Run News</);
+  assert.match(page, /admin-key\.js/, "Run News needs the admin key helper");
+  assert.match(script, /\/api\/daily-report\/generate\?section=/);
+  for (const section of ["economics", "markets", "crypto"]) {
+    assert.match(script, new RegExp(`section: "${section}"`));
+  }
+  assert.doesNotMatch(script, /section: "geopolitics"/);
+  assert.match(script, /TOP 10 CRYPTO NEWS/);
+  assert.match(script, /not a list of trending tokens/);
+  assert.doesNotMatch(script, /broadcast/i.test(script) ? /\/broadcast/ : /$^/, "Run News never broadcasts");
+});

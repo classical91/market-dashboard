@@ -1,7 +1,8 @@
 /* Today's Top 10 — reads /api/daily-top-news and shows the day's Economics,
    Stocks and Crypto stories, one card per story. The phone's run comes
-   first; a Reporter Room run is the backup. Nothing here generates,
-   spends or broadcasts. */
+   first; a Reporter Room run is the backup. Run News writes the three desks
+   through the Reporter Room API (admin key, OpenAI credits); nothing here
+   broadcasts. */
 (function () {
   "use strict";
 
@@ -19,12 +20,41 @@
     date: document.getElementById("topNewsDate"),
     today: document.getElementById("topNewsToday"),
     copyAll: document.getElementById("topNewsCopyAll"),
+    run: document.getElementById("topNewsRun"),
+    runMessage: document.getElementById("topNewsRunMessage"),
     desks: document.getElementById("topNewsDesks"),
     status: document.getElementById("topNewsStatus"),
     sections: document.getElementById("topNewsSections"),
   };
 
-  var state = { data: null, picked: {} };
+  var state = { data: null, picked: {}, running: false };
+
+  // The Reporter Room's section for each desk; `markets` is Stocks.
+  var RUN_DESKS = [
+    { key: "economics", label: "Economics", section: "economics" },
+    { key: "stocks", label: "Stocks", section: "markets" },
+    { key: "crypto", label: "Crypto", section: "crypto", prompt: [
+      "{date}",
+      "TOP 10 CRYPTO NEWS BRIEF (LAST 24-48 HOURS)",
+      "",
+      "Search for current, verified cryptocurrency news from the last 24-48 hours and produce a TOP 10 report.",
+      "This is news, not a list of trending tokens.",
+      "",
+      "PRIORITIZE:",
+      "- Regulation, enforcement and policy (SEC, CFTC, EU MiCA, Asia)",
+      "- ETF flows, approvals and institutional adoption",
+      "- Major price moves in BTC, ETH and large caps, with the reason",
+      "- Exchange, stablecoin and protocol news: hacks, launches, upgrades, listings",
+      "- On-chain or macro developments that moved the market",
+      "",
+      "RULES:",
+      "- Output exactly 10 stories.",
+      "- Use a bold numbered heading: **#[N] [ASSET/TOPIC] — [HEADLINE]**",
+      "- Add 2-3 short hyphen bullets: what happened, why it matters, and the source.",
+      "- Separate confirmed facts from forecasts; no buy/sell advice.",
+      "- Avoid duplicating the same event from multiple sources.",
+    ].join("\n") },
+  ];
 
   function queryDate() {
     var value = new URLSearchParams(window.location.search).get("date") || "";
@@ -109,8 +139,8 @@
     if (!run) {
       return html + "</div>" +
         '<p class="briefing-empty">Nothing was made for ' + esc(desk.label) + " on " + esc(longDate(state.data.date)) +
-        '. Run the Shortcut on your phone (see <a href="/briefings/' + desk.key + '">' + esc(desk.label) + "</a>), " +
-        'or tap <strong>Run Now</strong> in the <a href="/reporter.html">Reporter Room</a>.</p></section>';
+        '. Tap <strong>⚡ Run News</strong> above to write it now, or run the Shortcut on your phone (see <a href="/briefings/' +
+        desk.key + '">' + esc(desk.label) + "</a>).</p></section>";
     }
     html += '<span class="briefing-age ' + (run.source === "phone" ? "fresh" : "") + '">' + esc(sourceLabel(run)) + "</span>";
     if (desk.runs.length > 1) {
@@ -139,6 +169,9 @@
     els.status.textContent = longDate(data.date) + " · " + made + " of " + desks.length + " desks have news" +
       (data.timeZone ? " · day counted in " + data.timeZone : "");
     els.copyAll.disabled = !made;
+    // Run News writes today's news; past days can only be read.
+    els.run.hidden = data.date !== data.today;
+    els.run.disabled = state.running;
     renderDeskChips(desks);
     els.sections.innerHTML = desks.map(renderSection).join("");
   }
@@ -169,6 +202,67 @@
       els.desks.innerHTML = "";
     });
   }
+
+  function setRunMessage(text, tone) {
+    els.runMessage.hidden = !text;
+    els.runMessage.textContent = text || "";
+    els.runMessage.className = "topnews-run-message" + (tone ? " " + tone : "");
+  }
+
+  function readApiJson(res) {
+    return res.json().catch(function () { return {}; }).then(function (data) {
+      if (!res.ok) throw new Error(data.error || "HTTP " + res.status);
+      return data;
+    });
+  }
+
+  /* One desk at a time: the Reporter Room generates a section per request,
+     and running them in order keeps each result readable. */
+  function runDesk(desk) {
+    return window.AdminKey.fetch("/api/daily-report/generate?section=" + desk.section, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(desk.prompt ? { prompt: desk.prompt } : {}),
+    }).then(readApiJson).then(function (data) {
+      if (data.configured === false) throw new Error("the Reporter has no OPENAI_API_KEY on the server");
+      if (data.rateLimited) return desk.label + ": OpenAI is rate-limited, try again later";
+      if (data.generationSkippedReason) return desk.label + ": already written today";
+      if (data.error) throw new Error(data.error);
+      return desk.label + ": done";
+    });
+  }
+
+  function runNews() {
+    if (state.running || !window.AdminKey) return;
+    state.running = true;
+    els.run.disabled = true;
+    els.run.textContent = "⚡ Running…";
+    var results = [];
+    var failed = false;
+    var chain = Promise.resolve();
+    RUN_DESKS.forEach(function (desk, index) {
+      chain = chain.then(function () {
+        setRunMessage("Writing " + desk.label + " (" + (index + 1) + " of " + RUN_DESKS.length +
+          "). Each desk can take a minute; nothing is broadcast.", "");
+        return runDesk(desk).then(function (line) {
+          results.push(line);
+        }, function (err) {
+          failed = true;
+          results.push(desk.label + ": failed (" + (err.message || "error") + ")");
+        });
+      });
+    });
+    chain.then(function () {
+      setRunMessage(results.join(" · "), failed ? "error" : "ok");
+      return load("");
+    }).finally(function () {
+      state.running = false;
+      els.run.disabled = false;
+      els.run.textContent = "⚡ Run News";
+    });
+  }
+
+  els.run.addEventListener("click", runNews);
 
   els.prev.addEventListener("click", function () {
     if (state.data) load(shiftDate(state.data.date, -1));

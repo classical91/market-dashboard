@@ -16,7 +16,7 @@
     <div class="cmd-page-header">
       <div>
         <div class="cmd-page-title">📰 Today's Top 10</div>
-        <div class="cmd-page-subtitle">Economics, Stocks and Crypto · gathered from what your phone and the Reporter Room made that day</div>
+        <div class="cmd-page-subtitle">Economics, Stocks and Crypto · what your phone sent that day, or tap Run News to write them now</div>
       </div>
     </div>
 
@@ -27,8 +27,12 @@
         <button type="button" class="briefing-btn topnews-step" id="topNewsNext" aria-label="Next day">&rsaquo;</button>
         <button type="button" class="briefing-btn topnews-today" id="topNewsToday" hidden>Today</button>
       </div>
-      <button type="button" class="briefing-btn topnews-copy-all" id="topNewsCopyAll" disabled>Copy all</button>
+      <div class="topnews-actions">
+        <button type="button" class="briefing-btn topnews-run" id="topNewsRun">⚡ Run News</button>
+        <button type="button" class="briefing-btn topnews-copy-all" id="topNewsCopyAll" disabled>Copy all</button>
+      </div>
     </div>
+    <div class="topnews-run-message" id="topNewsRunMessage" aria-live="polite" hidden></div>
 
     <!-- One chip per desk: how many stories, and where they came from. -->
     <nav class="briefing-desks topnews-desks" id="topNewsDesks" aria-label="Desks"></nav>
@@ -36,11 +40,12 @@
     <div id="topNewsStatus" class="briefing-age" aria-live="polite">Loading…</div>
     <div id="topNewsSections"></div>
 
-    <footer>Market Command &mdash; nothing on this page is generated or sent; it reads what was already made</footer>
+    <footer>Market Command &mdash; Run News writes Economics, Stocks and Crypto through the Reporter Room; nothing here is broadcast</footer>
   </main>
 </div>
 
 <script src="/assets/js/sidebar.js"></script>
+<script src="/assets/js/admin-key.js"></script>
 <script src="/assets/js/briefing-markdown.js"></script>
 <script src="/assets/js/top-news.js"></script>
 </body>

@@ -129,7 +129,23 @@
 .topnews-day { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .topnews-step { margin-left: 0; min-width: 34px; font-size: 16px; line-height: 1; padding: 5px 10px; }
 .topnews-step:disabled, .topnews-copy-all:disabled { opacity: 0.4; cursor: default; }
-.topnews-today, .topnews-copy-all { margin-left: 0; }
+.topnews-today, .topnews-copy-all, .topnews-run { margin-left: 0; }
+.topnews-actions { display: inline-flex; gap: 8px; flex-wrap: wrap; }
+.topnews-run {
+  font-weight: 700; color: var(--text);
+  background: var(--blue-bg); border-color: rgba(77,163,255,0.45);
+}
+.topnews-run:disabled { opacity: 0.6; cursor: progress; }
+.topnews-run[hidden] { display: none; }
+.topnews-run-message {
+  margin: -6px 0 14px; padding: 8px 12px;
+  font-size: 12px; color: var(--soft);
+  border: 1px solid var(--border); border-radius: 10px;
+  background: rgba(255,255,255,0.03);
+}
+.topnews-run-message[hidden] { display: none; }
+.topnews-run-message.ok { color: var(--green); }
+.topnews-run-message.error { color: var(--amber); }
 .topnews-today[hidden] { display: none; }
 .topnews-date {
   font: inherit; font-size: 13px; color: var(--text);
