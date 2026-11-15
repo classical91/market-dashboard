@@ -32,4 +32,16 @@ function createFarmclawQueueStatus({ env = process.env, fetcher = fetch } = {}) 
     } catch { return null; }
   };
 }
-module.exports = { createFarmclawQueueStatus };
+
+// Where the browser can open FarmBot Queue. FARMBOT_NEWS_APPROVAL_BASE_URL is
+// FarmBot's web origin; without a valid one, the production Queue page the
+// FarmClaw agent is told to report back with. A link only: no credential.
+const DEFAULT_FARMBOT_QUEUE_URL = "https://farm-bot.up.railway.app/queue";
+function farmbotQueueUrl(env = process.env) {
+  try {
+    const web = new URL(env.FARMBOT_NEWS_APPROVAL_BASE_URL);
+    if (web.protocol === "https:" && !web.username && !web.password) return new URL("/queue", web.origin).toString();
+  } catch { /* fall through to the default */ }
+  return DEFAULT_FARMBOT_QUEUE_URL;
+}
+module.exports = { createFarmclawQueueStatus, farmbotQueueUrl, DEFAULT_FARMBOT_QUEUE_URL };

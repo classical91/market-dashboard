@@ -112,3 +112,30 @@ test("a polling collector is waiting rather than disconnected, then shows its ex
   assert.equal(f.button.textContent, "FarmClaw failed");
   assert.match(f.notes[0].textContent, /HTTP 401/);
 });
+
+test("handed-off post offers a View in FarmBot link to the server's Queue URL", async () => {
+  const f = fixture();
+  const farmbot = { queueUrl: "https://farm.example/queue" };
+  f.reads[0].resolve(response({ id: "fch_123", status: "pending", farmbot })); await flush();
+  assert.equal(f.button.textContent, "FarmClaw waiting");
+  const link = f.notes.find((n) => n.className === "x-post-farmbot-link");
+  assert.ok(link); assert.equal(link.hidden, false);
+  assert.equal(link.href, "https://farm.example/queue"); assert.equal(link.target, "_blank");
+  assert.match(link.textContent, /View in FarmBot/);
+  f.timers[0]();
+  f.reads[1].resolve(response({ ...received, farmbot, farmbotQueue: { confirmed: true, queueItemId: "42", dispatchActive: true, dispatchStatus: "SCHEDULED" } }));
+  await flush();
+  assert.match(link.textContent, /View #42 in FarmBot/);
+  assert.equal(f.notes.filter((n) => n.className === "x-post-farmbot-link").length, 1);
+});
+
+test("FarmBot link is hidden on failure and never uses a non-https URL", async () => {
+  const f = fixture();
+  f.reads[0].resolve(response({ id: "fch_123", status: "pending", farmbot: { queueUrl: "javascript:alert(1)" } })); await flush();
+  assert.equal(f.notes.find((n) => n.className === "x-post-farmbot-link"), undefined);
+  const g = fixture();
+  g.reads[0].resolve(response({ id: "fch_123", status: "claimed", farmbot: { queueUrl: "https://farm.example/queue" } })); await flush();
+  g.timers[0]();
+  g.reads[1].resolve(response({ id: "fch_123", status: "failed", error: "boom" })); await flush();
+  assert.equal(g.notes.find((n) => n.className === "x-post-farmbot-link").hidden, true);
+});

@@ -4,7 +4,7 @@ const { Router } = require("express");
 const { createRateLimit } = require("../middleware/rate-limit");
 const { isLedgerRequest } = require("../middleware/ledger-auth");
 const { pushWithin } = require("../services/farmclaw-pusher");
-const { createFarmclawQueueStatus } = require("../services/farmclaw-queue-status");
+const { createFarmclawQueueStatus, farmbotQueueUrl } = require("../services/farmclaw-queue-status");
 
 /**
  * FarmClaw handoff queue — see src/services/farmclaw-handoffs.js.
@@ -21,7 +21,7 @@ const { createFarmclawQueueStatus } = require("../services/farmclaw-queue-status
  * already carry, so no new secret is needed.
  */
 
-function handoffResponse(store, result, pusher = null) {
+function handoffResponse(store, result, pusher = null, env = process.env) {
   return {
     ok: true,
     id: result.record.id,
@@ -31,6 +31,7 @@ function handoffResponse(store, result, pusher = null) {
     record: result.record,
     agent: store.agentStatus(),
     push: { enabled: Boolean(pusher?.enabled) },
+    farmbot: { queueUrl: farmbotQueueUrl(env) },
   };
 }
 
@@ -79,7 +80,7 @@ function createFarmclawHandoffRouter({ handoffStore, pusher = null, requireAdmin
 
   router.post("/", requireAdmin, limiter, handle(async (req, res) => {
     const result = await requestAndPush(handoffStore, pusher, req.body || {});
-    res.status(result.created ? 201 : 200).json(handoffResponse(handoffStore, result, pusher));
+    res.status(result.created ? 201 : 200).json(handoffResponse(handoffStore, result, pusher, env));
   }));
 
   router.get("/", requireEither, handle((req, res) => {
@@ -103,7 +104,7 @@ function createFarmclawHandoffRouter({ handoffStore, pusher = null, requireAdmin
       res.status(404).json({ error: "Handoff not found" });
       return;
     }
-    res.json({ ...record, farmbotQueue: await queueStatus(record), agent: handoffStore.agentStatus(), push: { enabled: Boolean(pusher?.enabled) } });
+    res.json({ ...record, farmbotQueue: await queueStatus(record), agent: handoffStore.agentStatus(), push: { enabled: Boolean(pusher?.enabled) }, farmbot: { queueUrl: farmbotQueueUrl(env) } });
   }));
 
   router.get("/:id", requireEither, handle(async (req, res) => {
@@ -112,7 +113,7 @@ function createFarmclawHandoffRouter({ handoffStore, pusher = null, requireAdmin
       res.status(404).json({ error: "Handoff not found" });
       return;
     }
-    res.json({ ...record, farmbotQueue: await queueStatus(record), agent: handoffStore.agentStatus(), push: { enabled: Boolean(pusher?.enabled) } });
+    res.json({ ...record, farmbotQueue: await queueStatus(record), agent: handoffStore.agentStatus(), push: { enabled: Boolean(pusher?.enabled) }, farmbot: { queueUrl: farmbotQueueUrl(env) } });
   }));
 
   router.post("/:id/receipt", requireLedgerKey, limiter, handle((req, res) => {

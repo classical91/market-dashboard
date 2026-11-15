@@ -496,6 +496,28 @@ body[data-x-accent] .x-account-card--all.active { border-color: var(--x-accent);
 
 .x-post-farmclaw-status[hidden] { display: none; }
 
+/* "View in FarmBot" prompt under the FarmClaw status, once a post is handed off. */
+.x-post-farmbot-link {
+  flex-basis: 100%;
+  order: 2;
+  align-self: flex-start;
+  color: var(--amber, #f5c542);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+  text-decoration: none;
+}
+
+.x-post-farmbot-link:hover { text-decoration: underline; }
+
+.x-post-farmbot-link:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+.x-post-farmbot-link[hidden] { display: none; }
+
 /* The primary action on a card: reads as a send, not as another link
    affordance sitting next to Open and Copy link. */
 .x-post-broadcast {
