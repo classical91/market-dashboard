@@ -5,7 +5,9 @@
 (function () {
   "use strict";
 
-  var STALE_MS = 48 * 60 * 60 * 1000; // the Shortcut runs every two days
+  var freshness = window.BriefingFreshness;
+  var categories = [];
+  var generationsByDesk = {};
   var DESKS = ["geopolitics", "economics", "stocks", "crypto"];
   var desk = (window.location.pathname.split("/")[2] || "").toLowerCase();
   if (DESKS.indexOf(desk) === -1) desk = DESKS[0];
@@ -53,12 +55,8 @@
   function stamp(iso) {
     var d = new Date(iso);
     return d.toLocaleString(undefined, {
-      weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
+      weekday: "short", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short",
     });
-  }
-
-  function isStale(iso) {
-    return Date.now() - new Date(iso).getTime() > STALE_MS;
   }
 
   function getJson(url) {
@@ -70,19 +68,19 @@
 
   function renderDesks(categories) {
     els.desks.innerHTML = categories.map(function (cat) {
-      var latest = cat.latest;
-      var meta = latest ? ago(latest.receivedAt) : "nothing yet";
-      // This desk also counts its Reporter Room runs when they are newer.
-      var newest = cat.key === desk && runs[0];
-      if (newest && newest.source === "reporter" && (!latest || newest.at > latest.receivedAt)) {
-        latest = { receivedAt: newest.at };
-        meta = "⚡ " + ago(newest.at);
-      }
-      var cls = "briefing-desk" + (cat.key === desk ? " active" : "") +
-        (latest && isStale(latest.receivedAt) ? " stale" : "") + (latest ? "" : " empty");
+      var latestAt = cat.latest && cat.latest.receivedAt;
+      // Every card checks both sources, regardless of the desk being read.
+      var newest = (generationsByDesk[cat.key] || [])[0];
+      var reporter = newest && (!latestAt || new Date(newest.generatedAt).getTime() > new Date(latestAt).getTime());
+      if (reporter) latestAt = newest.generatedAt;
+      var tone = freshness.state(latestAt);
+      var meta = tone === "empty" ? "nothing yet" :
+        (reporter ? "⚡ " : "📱 ") + ago(latestAt) + " · " + freshness.label(latestAt);
+      var cls = "briefing-desk" + (cat.key === desk ? " active" : "") + " " + tone;
       return '<a class="' + cls + '" href="/briefings/' + cat.key + '"' + (cat.key === desk ? ' aria-current="page"' : "") + ">" +
         '<span class="briefing-desk-name">' + esc(cat.icon + " " + cat.label) + "</span>" +
-        '<span class="briefing-desk-meta">' + esc(meta) + "</span></a>";
+        '<span class="briefing-desk-meta" title="' + esc(tone === "empty" ? meta : stamp(latestAt)) + '">' + esc(meta) + "</span>" +
+        (tone === "empty" ? "" : '<time class="briefing-desk-time" datetime="' + esc(latestAt) + '">' + esc(stamp(latestAt)) + '</time>') + "</a>";
     }).join("") +
       '<a class="briefing-desk briefing-desk--top10" href="/briefings/top-10">' +
       '<span class="briefing-desk-name">📰 Today\'s Top 10</span>' +
@@ -101,10 +99,14 @@
     els.help.open = true;
   }
 
-  function showRun(entry) {
+  function renderAge(entry) {
     var phone = entry.source === "phone";
-    els.age.className = "briefing-age" + (isStale(entry.at) ? " stale" : " fresh");
-    els.age.textContent = (phone ? "📱 Received " : "⚡ Written by the Reporter Room ") + stamp(entry.at) + " · " + ago(entry.at);
+    els.age.className = "briefing-age " + freshness.state(entry.at);
+    els.age.textContent = (phone ? "📱 Received " : "⚡ Written by the Reporter Room ") + stamp(entry.at) + " · " + ago(entry.at) + " · " + freshness.label(entry.at);
+  }
+
+  function showRun(entry) {
+    renderAge(entry);
     els.heading.hidden = !entry.title;
     els.heading.textContent = entry.title || "";
     els.body.innerHTML = renderMarkdown(entry.text);
@@ -128,16 +130,21 @@
   function load() {
     els.endpoint.textContent = window.location.origin + "/api/phone-briefings/" + desk;
     // The Reporter Room's runs are optional: a desk page still works without them.
-    var reporterRuns = getJson("/api/daily-report/generations?section=" + SECTIONS[desk] + "&limit=10")
-      .then(function (data) { return data.generations || []; }, function () { return []; });
+    var reporterRuns = Promise.all(DESKS.map(function (key) {
+      return getJson("/api/daily-report/generations?section=" + SECTIONS[key] + "&limit=" + (key === desk ? 10 : 1))
+        .then(function (data) { return data.generations || []; }, function () { return []; })
+        .then(function (generations) { return { key: key, generations: generations }; });
+    }));
     return Promise.all([getJson("/api/phone-briefings"), getJson("/api/phone-briefings/" + desk), reporterRuns])
       .then(function (results) {
-        var categories = results[0].categories || [];
+        categories = results[0].categories || [];
+        results[2].forEach(function (result) { generationsByDesk[result.key] = result.generations; });
         runs = (results[1].runs || []).map(function (run) {
           return { source: "phone", id: run.id, at: run.receivedAt };
-        }).concat(results[2].map(function (gen) {
+        }).concat(generationsByDesk[desk].map(function (gen) {
           return { source: "reporter", id: "reporter-" + gen.generatedAt, at: gen.generatedAt, text: gen.content, title: null };
-        })).sort(function (a, b) { return String(b.at).localeCompare(String(a.at)); });
+        })).filter(function (run) { return isFinite(new Date(run.at).getTime()); })
+          .sort(function (a, b) { return new Date(b.at).getTime() - new Date(a.at).getTime(); });
         var mine = categories.filter(function (cat) { return cat.key === desk; })[0];
         if (mine) {
           els.title.textContent = mine.icon + " " + mine.label;
@@ -265,6 +272,12 @@
     });
   });
 
+  // Keep ages and colors current even if the page stays open for days.
+  window.setInterval(function () {
+    if (categories.length) renderDesks(categories);
+    if (current) renderAge(current);
+  }, 60000);
+  window.addEventListener("focus", function () { if (!running) load(); });
   load();
   loadTelegram();
 })();

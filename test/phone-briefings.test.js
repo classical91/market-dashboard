@@ -182,11 +182,12 @@ test("the page renders ChatGPT markdown without letting it inject HTML", () => {
   const source = fs.readFileSync(path.join(__dirname, "..", "public/assets/js/briefing.js"), "utf8");
   const stub = { textContent: "", innerHTML: "", hidden: false, className: "", classList: { add() {}, remove() {} }, addEventListener() {} };
   const context = {
-    window: { location: { pathname: "/briefings/crypto", origin: "http://x" } },
+    window: { location: { pathname: "/briefings/crypto", origin: "http://x" }, setInterval() {}, addEventListener() {} },
     document: { getElementById: () => ({ ...stub }), title: "" },
     fetch: () => new Promise(() => {}),
   };
   vm.runInNewContext(shared, context);
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, "..", "public/assets/js/briefing-freshness.js"), "utf8"), context);
   vm.runInNewContext(source, context);
   const render = context.window.BriefingMarkdown.renderMarkdown;
 

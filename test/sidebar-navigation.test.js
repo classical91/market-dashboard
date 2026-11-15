@@ -36,19 +36,20 @@ test("the Reporter menu can actually reach the Reporter Room", () => {
   const start = sidebar.indexOf('label: "Reporter"');
   const reporter = sidebar.slice(start, sidebar.indexOf('label: "Market Intel Links"'));
   assert.match(reporter, /href: "\/reporter\.html", label: "Reporter Room"/);
-  const order = ["Reporter Room", "Briefings", "Geopolitics", "Economics", "Stocks", "Crypto"];
+  const order = ["Reporter Room", "Markets", "Crypto", "Stocks", "Economics", "Top 10 News", "Geopolitics"];
   let cursor = -1;
   for (const label of order) {
     const next = reporter.indexOf(`label: "${label}"`, cursor + 1);
     assert.ok(next > cursor, `${label} is missing or out of order under Reporter`);
     cursor = next;
   }
-  // The four desks live together in one Briefings dropdown.
-  const briefings = reporter.slice(reporter.indexOf('label: "Briefings"'));
-  assert.match(briefings, /^label: "Briefings",\s*collapsed: true,\s*children: \[/);
-  for (const desk of ["top-10", "geopolitics", "economics", "stocks", "crypto"]) {
-    assert.match(briefings, new RegExp(`href: "/briefings/${desk}"`));
+  const markets = reporter.slice(reporter.indexOf('label: "Markets"'), reporter.indexOf('href: "/briefings/top-10"'));
+  assert.match(markets, /^label: "Markets",\s*collapsed: true,\s*children: \[/);
+  for (const desk of ["crypto", "stocks", "economics"]) {
+    assert.match(markets, new RegExp(`href: "/briefings/${desk}"`));
   }
+  assert.doesNotMatch(markets, /href: "\/briefings\/(top-10|geopolitics)"/);
+  assert.doesNotMatch(reporter, /label: "Briefings"/);
   for (const obsolete of ["Emerging Markets", "Economics Top 10", "Markets Top 10"]) {
     assert.doesNotMatch(reporter, new RegExp(`label: "${obsolete}"`));
   }
