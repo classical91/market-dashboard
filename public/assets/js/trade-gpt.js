@@ -96,7 +96,7 @@
     var context = card.context || {};
     var freshness = card.freshness || {};
     var out = [
-      "Analyse this tracked trade from my Market Command dashboard (My Trades).",
+      "Analyse this tracked trade from my Market Command dashboard (Active Trades).",
       "",
       "Pair: " + (card.symbol || "—") + " (Binance) · Timeframe: " + (card.interval || "—") + " · Price: " + price(card.price),
       "Data freshness: " + (freshness.state || "UNKNOWN") + (freshness.summary ? " — " + freshness.summary : "") +

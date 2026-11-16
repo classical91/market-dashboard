@@ -12,7 +12,7 @@ test("primary sidebar order and removed links stay exact", () => {
     "Terminal Suite",
     "Overview v2",
     "Reporter Room",
-    "Trades",
+    "My Trades",
     "TradeHunter",
     "AI Analysis",
     "Reporter",
@@ -57,18 +57,18 @@ test("the Reporter menu can actually reach the Reporter Room", () => {
 });
 
 test("Trades sits above TradeHunter and holds the trade workflow", () => {
-  const tradesStart = sidebar.indexOf('label: "Trades"');
+  const tradesStart = sidebar.indexOf('label: "My Trades"');
   const tradeHunterStart = sidebar.indexOf('label: "TradeHunter"');
   const trades = sidebar.slice(tradesStart, tradeHunterStart);
 
   assert.ok(tradesStart > -1, "Trades is missing");
   assert.ok(tradeHunterStart > tradesStart, "Trades must sit above TradeHunter");
-  assert.match(trades, /href: "\/pattern-scanner-trades\.html", label: "My Trades"/);
+  assert.match(trades, /href: "\/pattern-scanner-trades\.html", label: "Active Trades"/);
   assert.match(trades, /href: "\/potential-buys\.html", label: "Potential Buys"/);
   assert.match(trades, /label: "Decision Engine"/);
   assert.match(trades, /href: "\/trading-lab\.html", label: "Trading Lab Backtest"/);
   let cursor = -1;
-  for (const label of ["My Trades", "Potential Buys", "Decision Engine", "Trading Lab Backtest"]) {
+  for (const label of ["Active Trades", "Potential Buys", "Decision Engine", "Trading Lab Backtest"]) {
     const next = trades.indexOf(`label: "${label}"`, cursor + 1);
     assert.ok(next > cursor, `${label} is missing or out of order in Trades`);
     cursor = next;
