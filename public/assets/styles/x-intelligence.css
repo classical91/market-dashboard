@@ -104,6 +104,46 @@ body[data-x-accent] .x-account-card--all.active { border-color: var(--x-accent);
   color: var(--text);
   background: rgba(77,163,255,0.10);
 }
+.x-timeline-actions a:focus-visible {
+  outline: 2px solid var(--x-accent, var(--blue));
+  outline-offset: 2px;
+}
+
+.x-account-actions {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: stretch;
+  margin-bottom: 10px;
+}
+.x-account-actions a {
+  --x-shortcut-bg: color-mix(in srgb, var(--x-accent, var(--purple)) 28%, var(--surface));
+  --x-shortcut-border: var(--x-accent, var(--purple));
+  --x-shortcut-text: var(--text);
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 44px;
+  padding: 10px 9px;
+  border-color: var(--x-shortcut-border);
+  background: linear-gradient(135deg, rgba(255,255,255,.06), transparent), var(--x-shortcut-bg);
+  color: var(--x-shortcut-text);
+  font-weight: 800;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 3px 12px rgba(0,0,0,.24);
+  white-space: nowrap;
+}
+.x-account-actions a:hover {
+  border-color: var(--x-shortcut-border);
+  background: color-mix(in srgb, var(--x-accent, var(--purple)) 38%, var(--surface));
+  color: var(--x-shortcut-text);
+  box-shadow: 0 0 0 1px var(--x-shortcut-border), 0 4px 14px rgba(0,0,0,.28);
+}
+.x-account-actions a:focus-visible {
+  outline: 2px solid var(--x-shortcut-border);
+  outline-offset: 3px;
+}
+.x-account-action-icon { display: none; }
 
 .x-timeline-frame {
   min-height: 620px;
@@ -188,6 +228,15 @@ body[data-x-accent] .x-account-card--all.active { border-color: var(--x-accent);
 }
 
 /* ── X Search ─────────────────────────────────────────────── */
+.x-search-panel {
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.x-search-panel > label { font-size: 13px; font-weight: 700; }
+.x-search-panel .x-search-form { margin-top: 8px; }
+.x-search-panel p { margin-top: 7px; color: var(--muted); font-size: 12px; }
 .x-search-form {
   display: flex;
   gap: 10px;
@@ -939,6 +988,10 @@ body[data-x-accent] .x-account-card--all.active { border-color: var(--x-accent);
   .x-split.is-rail-collapsed .x-account-panel-head { flex-direction: column-reverse; }
   .x-split.is-rail-collapsed .x-account-rail-toggle { width: 100%; height: 38px; }
   .x-split.is-rail-collapsed .x-account-manage { justify-content: center; padding: 10px 0; }
+  .x-split.is-rail-collapsed .x-account-actions { flex-direction: column; }
+  .x-split.is-rail-collapsed .x-account-actions a { padding: 6px 3px; font-size: 11px; }
+  .x-split.is-rail-collapsed .x-account-action-icon { display: inline; }
+  .x-split.is-rail-collapsed .x-account-action-label { display: none; }
   .x-split.is-rail-collapsed .x-account-manage-label,
   .x-split.is-rail-collapsed .x-account-list { display: none; }
 
