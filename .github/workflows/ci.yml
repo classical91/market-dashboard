@@ -7,7 +7,9 @@ on:
 
 jobs:
   lint-build:
-    runs-on: ubuntu-latest
+    # Playwright 1.56 cannot install Chromium on ubuntu-latest (now 26.04);
+    # pin a supported image until Playwright is upgraded.
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -20,6 +22,13 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      # The browser regression suites skip themselves when Chromium is missing,
+      # and the postinstall hook swallows install failures (`|| true`), so
+      # install it explicitly here: a failed download fails CI instead of
+      # silently turning those suites into skips.
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
 
       - name: Lint
         run: npm run lint
