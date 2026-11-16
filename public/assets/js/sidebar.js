@@ -20,26 +20,7 @@
   var accountState = null;
 
   var workspace = [
-    {
-      // The label itself opens Overview; the caret beside it expands the
-      // widget jump links.
-      href: "/",
-      label: "Overview",
-      children: [
-        {
-          label: "Widgets",
-          children: [
-            { href: "/#ticker", label: "Ticker" },
-            { href: "/#kpiGrid", label: "Key Indicators" },
-            { href: "/#onchain-intelligence", label: "On-Chain Intelligence" },
-            { href: "/#market-pulse", label: "Market Pulse" },
-            { href: "/#risk-meter", label: "Risk Meter" },
-            { href: "/#alerts", label: "Alerts" },
-            { href: "/#ovh-market-overview", label: "TV Market Overview" },
-          ],
-        },
-      ],
-    },
+    { href: "/", label: "Overview" },
     // Overview answers "what is happening?"; Terminal, one step deeper,
     // answers "why, and what does it mean for a trade?".
     { href: "/overview-v2", label: "Overview v2" },
