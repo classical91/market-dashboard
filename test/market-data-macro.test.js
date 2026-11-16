@@ -101,8 +101,8 @@ test("getCalendar falls back without MACRO_CALENDAR_URL", async () => {
   const service = new MarketDataService({});
   const result = await service.getCalendar();
   assert.equal(result.live, false);
-  assert.equal(result.source, "fallback");
-  assert.ok(result.items.length > 0);
+  assert.equal(result.reason, "not-configured");
+  assert.deepEqual(result.items, []);
 });
 
 // Events now carry `at` — a resolved UTC instant — rather than a bare clock
@@ -114,16 +114,16 @@ test("getCalendar normalizes a JSON calendar feed", async () => {
   const result = await withMockedFetch(
     () => ({
       events: [
-        { time: "08:30", event: "US CPI", importance: "high", country: "US" },
+        { date: "2026-07-06", time: "08:30", event: "US CPI", importance: "high", country: "US" },
         { datetime: "2026-07-06T14:00:00Z", title: "Fed Speaker", impact: "HIGH" },
-        { title: "Minor print", impact: "weird-value" },
+        { date: "2026-07-06", title: "Minor print", impact: "weird-value" },
         { notitle: true },
       ],
     }),
     () => service.getCalendar({ now }),
   );
   assert.equal(result.live, true);
-  assert.equal(result.source, "macro_calendar_url");
+  assert.equal(result.source, "Configured calendar feed");
   assert.equal(result.items.length, 3);
 
   const cpi = result.items.find((item) => item.title === "US CPI");
@@ -154,8 +154,9 @@ test("getCalendar reports fallback with the error when the feed fails", async ()
   try {
     const result = await service.getCalendar();
     assert.equal(result.live, false);
-    assert.equal(result.source, "fallback");
-    assert.match(result.error, /boom/);
+    assert.equal(result.reason, "request-failed");
+    assert.deepEqual(result.items, []);
+    assert.ok(!JSON.stringify(result).includes("boom"));
   } finally {
     global.fetch = originalFetch;
   }

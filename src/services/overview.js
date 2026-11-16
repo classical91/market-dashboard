@@ -24,7 +24,7 @@ class OverviewService {
         safe(() => this.marketDataService.getMarketChart(range, "bitcoin")),
         safe(() => this.marketDataService.getGlobalDominance()),
         safe(() => this.marketDataService.getNews()),
-        safe(() => this.marketDataService.getCalendar()),
+        safe(() => this.marketDataService.getCalendar({ days: 2 })),
         safe(() => (this.onchainService ? this.onchainService.getOverview() : null)),
       ]);
 
@@ -73,9 +73,9 @@ class OverviewService {
     // configured feed that is erroring or empty is a different problem from an
     // unconfigured one, and "set MACRO_CALENDAR_URL" is wrong advice for it.
     else if (calendar.reason && calendar.reason !== "not-configured") {
-      warnings.push(withReason(`Macro calendar using fallback (${calendar.reason})`, calendar.detail || calendar.error));
+      warnings.push(withReason(`Live calendar unavailable (${calendar.reason})`, calendar.detail || calendar.error));
     } else {
-      warnings.push(withReason("Macro calendar using fallback (set MACRO_CALENDAR_URL for live)", calendar.error));
+      warnings.push(withReason("Live calendar unavailable (configure a calendar provider)", calendar.error));
     }
     if (onchainResult.error) warnings.push(withReason("On-chain service unavailable", onchainResult.error.message));
     if (onchain?.meta?.note) warnings.push(onchain.meta.note);
@@ -88,7 +88,7 @@ class OverviewService {
       equities: equities.live ? "live" : "fallback",
       macro: macro.live ? "live" : macro.stale ? "delayed" : "fallback",
       news: news.live ? "live" : "fallback",
-      calendar: calendar.live ? "live" : "fallback",
+      calendar: calendar.live ? "live" : calendar.stale ? "stale" : "unavailable",
       onchain: buildOnchainModuleStatus(onchain),
     };
 
@@ -171,6 +171,7 @@ class OverviewService {
       alerts,
       news: news.items,
       calendar: calendar.items,
+      calendarQuality: { live: calendar.live, stale: Boolean(calendar.stale), source: calendar.source, fetchedAt: calendar.fetchedAt, expiresAt: calendar.expiresAt },
       dataQuality: {
         live,
         partial,

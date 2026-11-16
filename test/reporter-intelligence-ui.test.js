@@ -201,13 +201,12 @@ test("a row the macro feed does not carry says so rather than being guessed", ()
   assert.match(market, /MACRO_SYMBOLS or MACRO_DATA_URL/);
 });
 
-test("catalysts come from the calendar already in the payload", () => {
-  // Same request as the reaction strip — the panel adds no second call, and
-  // no new data dependency was taken on for it.
-  assert.match(market, /state\.calendar = Array\.isArray\(payload\.calendar\)/);
-  assert.equal((market.match(/fetch\(/g) || []).length, 1, "one request feeds both panels");
-  // A fallback calendar has no confirmed times, and must not pretend to.
-  assert.match(market, /item\.precision === 'exact'/);
+test("calendar has its own dated API reader and filters", () => {
+  const calendar = fs.readFileSync(path.join(__dirname, "../public/assets/js/reporter-calendar.js"), "utf8");
+  assert.match(calendar, /api\/macro\/calendar/);
+  for (const id of ["macroCalendarRange", "macroCalendarCountry", "macroCalendarImpact", "macroCalendarTimezone"]) assert.ok(page.includes(id));
+  assert.match(calendar, /Time assumed/);
+  assert.match(calendar, /Live calendar unavailable/);
   assert.match(page, /Earnings calendar ↗/);
 });
 

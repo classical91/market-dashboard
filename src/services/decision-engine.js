@@ -265,9 +265,8 @@ function buildRotation({ crypto = [], equities = [], macro = [] } = {}) {
 // News risk from the macro calendar
 // ---------------------------------------------------------------------------
 
-// Calendar rows carry loose "HH:MM"-style labels rather than full timestamps,
-// so this is deliberately conservative: an unparseable time on a high-impact
-// event still counts as "events today" (medium), never silently low.
+// Only verified exact instants in a fresh provider snapshot can be timed.
+// Unknown/assumed times raise caution; missing/stale calendars are unknown.
 // How long an event counts as "happening now": the run-up chop before a
 // release, and the whipsaw immediately after it. Unchanged from the clock-label
 // version — 45 minutes before, 15 after.
@@ -277,7 +276,7 @@ const NEWS_POST_WINDOW_MIN = 15;
 /**
  * News risk from today's high-impact events.
  *
- * Timed off `item.at` — a real UTC instant — rather than the clock label. The
+ * Timed off verified exact `item.at` instants rather than the clock label. The
  * label version compared "08:30" against `now.getUTCHours()`, so a US feed
  * publishing 08:30 ET was read as 08:30 UTC and the blackout window sat four or
  * five hours from the actual release. It also had no date, so yesterday's
@@ -288,7 +287,10 @@ const NEWS_POST_WINDOW_MIN = 15;
  * on. It still raises the level to medium, because a high-impact release of
  * unknown time is a reason for caution, not for confidence.
  */
-function assessNewsRisk(calendarItems = [], now = new Date()) {
+function assessNewsRisk(calendarItems = [], now = new Date(), calendar = { live: true }) {
+  if (!calendar.live || calendar.stale || (calendar.expiresAt && Date.parse(calendar.expiresAt) <= +now)) {
+    return { level: "unknown", available: false, reason: "Live calendar unavailable — verify releases before trading.", nextHighImpact: null };
+  }
   const highImpact = (calendarItems || []).filter((item) => item && item.impact === "High");
   if (!highImpact.length) {
     return { level: "low", reason: "No high-impact events on today's calendar.", nextHighImpact: null };
@@ -298,7 +300,8 @@ function assessNewsRisk(calendarItems = [], now = new Date()) {
   const timed = [];
   const untimed = [];
   for (const item of highImpact) {
-    const at = item.at ? Date.parse(item.at) : NaN;
+    const dated = typeof item.at === "string" && /^\d{4}-\d{2}-\d{2}T/.test(item.at);
+    const at = dated && item.precision === "exact" && item.verified === true && !item.stale ? Date.parse(item.at) : NaN;
     if (Number.isFinite(at)) timed.push({ ...item, minutesUntil: Math.round((at - nowMs) / 60000) });
     else untimed.push(item);
   }
@@ -335,7 +338,7 @@ function assessNewsRisk(calendarItems = [], now = new Date()) {
     // Every high-impact event today is already well past its window.
     return {
       level: "low",
-      reason: `${highImpact.length} high-impact event${highImpact.length > 1 ? "s" : ""} today, all released.`,
+      reason: `${highImpact.length} high-impact event${highImpact.length > 1 ? "s" : ""} today, all past their scheduled risk windows.`,
       nextHighImpact: null,
     };
   }
@@ -376,7 +379,8 @@ function scoreSetup({ signal, screenerScore, adx, regime, newsRisk }) {
   const setupScore = Math.round(0.45 * confluence + 0.25 * alignment + 0.15 * trend + 0.15 * newsSafety);
 
   let action;
-  if (newsRisk?.level === "high") action = "Stand down — news window";
+  if (newsRisk?.available === false) action = "Wait — verify calendar";
+  else if (newsRisk?.level === "high") action = "Stand down — news window";
   else if (setupScore >= 75) action = "Ready — watch for entry";
   else if (setupScore >= 60) action = "Watch";
   else if (setupScore >= 45) action = "Low edge";
@@ -466,7 +470,8 @@ function buildPlan({ symbol, signal, candles, price, regime, newsRisk, lookback 
   const riskLabel = atrPercent == null ? "Unknown" : atrPercent < 1.5 ? "Low" : atrPercent < 3.5 ? "Medium" : "High";
 
   const doNotTrade = [];
-  if (newsRisk?.level === "high") doNotTrade.push(`High-impact event window: ${newsRisk.reason}`);
+  if (newsRisk?.available === false) doNotTrade.push("Live calendar unavailable — verify releases before trading.");
+  else if (newsRisk?.level === "high") doNotTrade.push(`High-impact event window: ${newsRisk.reason}`);
   else if (newsRisk?.level === "medium" && newsRisk.nextHighImpact) {
     doNotTrade.push(`Check calendar first — ${newsRisk.nextHighImpact.title} at ${newsRisk.nextHighImpact.time}`);
   }
@@ -519,7 +524,7 @@ class DecisionEngineService {
       safe(() => this.marketDataService.getCryptoPrices()),
       safe(() => this.marketDataService.getEquities()),
       safe(() => this.marketDataService.getMacro()),
-      safe(() => this.marketDataService.getCalendar()),
+      safe(() => this.marketDataService.getCalendar({ days: 2 })),
       safe(() => this.signalScreenerService.scanAll(interval)),
     ]);
 
@@ -531,7 +536,7 @@ class DecisionEngineService {
 
     const regime = buildRegime({ crypto: crypto.items, equities: equities.items, macro: macro.items });
     const rotation = buildRotation({ crypto: crypto.items, equities: equities.items, macro: macro.items });
-    const newsRisk = assessNewsRisk(calendar.items);
+    const newsRisk = assessNewsRisk(calendar.items, new Date(), calendar);
 
     const setups = screenRows
       .map((row) => {
@@ -596,7 +601,7 @@ class DecisionEngineService {
           crypto: crypto.live ? "live" : crypto.stale ? "delayed" : "fallback",
           equities: equities.live ? "live" : "fallback",
           macro: macro.live ? "live" : macro.stale ? "delayed" : "fallback",
-          calendar: calendar.live ? "live" : "fallback",
+          calendar: calendar.live ? "live" : calendar.stale ? "stale" : "unavailable",
           signals: screenErrors === 0 ? "live" : screenErrors < screenRows.length ? "partial" : "unavailable",
         },
         // Enough to prove, from the payload alone, whether news risk was scored
@@ -604,7 +609,8 @@ class DecisionEngineService {
         // fell back if it did, and how many of its events are a real instant
         // rather than a time we assumed a zone for.
         calendar: {
-          source: calendar.source || "fallback",
+          source: calendar.source || "unavailable",
+          stale: Boolean(calendar.stale),
           live: Boolean(calendar.live),
           reason: calendar.reason || null,
           detail: calendar.detail || null,
@@ -620,7 +626,7 @@ class DecisionEngineService {
           ...(macro.live || macro.stale ? [] : ["Macro board using fallback data — regime score is degraded"]),
           ...(calendar.live
             ? []
-            : [`Calendar using fallback data (${calendar.reason || "unknown"}) — news risk is not scored off real releases${calendar.detail ? `: ${calendar.detail}` : ""}`]),
+            : [`Live calendar unavailable (${calendar.reason || "unknown"}) — timed news risk is not scored`]),
           ...(screenErrors ? [`${screenErrors} screener symbols failed to scan`] : []),
         ],
       },

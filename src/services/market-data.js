@@ -1,5 +1,5 @@
 const { createServiceError } = require("../utils/errors");
-const { normalizeCalendar, isValidTimeZone } = require("./calendar-normalize");
+const { MacroCalendarService } = require("./macro-calendar");
 
 const DEFAULT_CRYPTOS = [
   { symbol: "BTC", id: "bitcoin", name: "Bitcoin" },
@@ -47,13 +47,6 @@ const FALLBACK_NEWS = [
   },
 ];
 
-const FALLBACK_CALENDAR = [
-  { time: "08:30", title: "US CPI Inflation", impact: "High" },
-  { time: "10:00", title: "Consumer Sentiment", impact: "Medium" },
-  { time: "14:00", title: "Fed Speaker", impact: "High" },
-  { time: "16:30", title: "Oil Inventories", impact: "Medium" },
-];
-
 // Default Finnhub instruments for the macro board. Free-tier Finnhub keys can
 // quote US ETFs, so DXY/VIX/gold/oil default to liquid ETF proxies; rows whose
 // provider symbol is a proxy are flagged so the UI can score on direction
@@ -92,8 +85,14 @@ class MarketDataService {
       macroInstruments: parseMacroInstruments(
         config.macroSymbols || process.env.MACRO_SYMBOLS || "",
       ),
-      calendarUrl: config.calendarUrl || process.env.MACRO_CALENDAR_URL || "",
-      // The zone a feed's bare clock labels ("08:30") are published in. Only
+      calendarUrl: config.calendarUrl ?? process.env.MACRO_CALENDAR_URL ?? "",
+      calendarNextUrl: config.calendarNextUrl ?? process.env.MACRO_CALENDAR_NEXT_URL ?? "",
+      calendarProvider: config.calendarProvider || process.env.MACRO_CALENDAR_PROVIDER || "url",
+      calendarApiKey: config.calendarApiKey || process.env.MACRO_CALENDAR_API_KEY || "",
+      calendarSource: config.calendarSource || process.env.MACRO_CALENDAR_SOURCE || "Configured calendar feed",
+      calendarCacheMs: config.calendarCacheMs || process.env.MACRO_CALENDAR_CACHE_MS,
+      calendarStaleMs: config.calendarStaleMs || process.env.MACRO_CALENDAR_STALE_MS,
+      // The zone a feed's dated wall-clock values are published in. Only
       // consulted when the feed does not state an offset itself; a recognised
       // suffix on the value ("08:30 ET") still wins over this.
       calendarTimezone: config.calendarTimezone || process.env.MACRO_CALENDAR_TIMEZONE || "UTC",
@@ -102,6 +101,8 @@ class MarketDataService {
     // CoinGecko rate-limit (429) serves slightly stale real data instead of
     // overwriting the dashboard with static seed values.
     this.lastGood = new Map();
+    this.calendar = new MacroCalendarService({ config: this.config,
+      fetchJson: url => this.singleFetch(url, { Accept: "application/json" }, "Macro calendar") });
   }
 
   rememberGood(key, value) {
@@ -374,59 +375,10 @@ class MarketDataService {
     }
   }
 
-  /**
-   * Today's macro calendar.
-   *
-   * Every fallback names why. "Calendar is on fallback" used to be a dead end:
-   * a missing URL, a 500 from the provider, a JSON shape we could not read and
-   * a feed with nothing scheduled today all produced the same silent static
-   * list, so there was no way to tell a misconfiguration from an outage from a
-   * quiet Sunday — while news risk carried on being scored off seed data.
-   */
-  async getCalendar({ now = new Date() } = {}) {
-    const url = this.config.calendarUrl;
-    const timezone = isValidTimeZone(this.config.calendarTimezone) ? this.config.calendarTimezone : "UTC";
-    if (!url) {
-      return calendarFallback({
-        reason: "not-configured",
-        detail: "MACRO_CALENDAR_URL is not set",
-        timezone,
-      });
-    }
-    try {
-      const data = await this.singleFetch(url, { Accept: "application/json" }, "Macro calendar");
-      const { items, reason, dropped } = normalizeCalendar(data, { timezone, now });
-      if (!items.length) {
-        return calendarFallback({
-          reason: reason || "empty-feed",
-          detail: reason === "invalid-shape"
-            ? "Feed did not contain an array of events (expected an array, or {events|items|data:[...]})"
-            : reason === "no-events-today"
-              ? `Feed returned ${dropped} event(s), none scheduled today in ${timezone}`
-              : "Feed returned no usable events",
-          timezone,
-        });
-      }
-      return {
-        live: true,
-        source: "macro_calendar_url",
-        items,
-        timezone,
-        reason: null,
-        detail: null,
-        fetchedAt: new Date().toISOString(),
-        // How much of this is a real instant rather than an assumed one.
-        timing: summarizeTiming(items),
-        droppedNotToday: dropped,
-      };
-    } catch (error) {
-      return calendarFallback({
-        reason: "request-failed",
-        detail: error.message,
-        timezone,
-        error: error.message,
-      });
-    }
+  // All readers (Reporter, Main Hub, Overview, Decision Engine) share one
+  // cached provider snapshot and receive a fresh projection of their date range.
+  async getCalendar(options = {}) {
+    return this.calendar.get(options);
   }
 
   async fetchJson(url) {
@@ -516,41 +468,6 @@ function macroFallback() {
     live: false,
     source: "fallback",
     items: FALLBACK_MACRO.map((entry) => ({ ...entry, type: "macro" })),
-  };
-}
-
-function summarizeTiming(items) {
-  return {
-    total: items.length,
-    exact: items.filter((item) => item.precision === "exact").length,
-    assumed: items.filter((item) => item.precision === "assumed").length,
-    untimed: items.filter((item) => item.precision === "unknown").length,
-  };
-}
-
-/**
- * The static calendar, always carrying the reason the live feed was not used.
- *
- * Fallback events are marked `precision: "unknown"` and `at: null` on purpose:
- * they are illustrative seed data, not a schedule, so news risk must never
- * count down to one of them as though a real release were imminent.
- */
-function calendarFallback({ reason = "not-configured", detail = null, timezone = "UTC", error = null } = {}) {
-  return {
-    live: false,
-    source: "fallback",
-    timezone,
-    reason,
-    detail,
-    ...(error ? { error } : {}),
-    items: FALLBACK_CALENDAR.map((item) => ({
-      ...item,
-      at: null,
-      timezone,
-      precision: "unknown",
-    })),
-    timing: { total: FALLBACK_CALENDAR.length, exact: 0, assumed: 0, untimed: FALLBACK_CALENDAR.length },
-    droppedNotToday: 0,
   };
 }
 

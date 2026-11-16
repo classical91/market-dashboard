@@ -95,6 +95,7 @@ function marketStateFromDecision(decision, extra = {}) {
     usdtDominanceSignal: score >= 58 ? "RISK_ON" : score <= 42 ? "RISK_OFF" : "NEUTRAL",
     bearMarket: score <= 35,
     newsBlackout: Boolean(decision && decision.newsRisk && decision.newsRisk.level === "high"),
+    calendarUnavailable: Boolean(decision?.newsRisk?.available === false || decision?.newsRisk?.level === "unknown"),
     ...extra,
   });
 }
