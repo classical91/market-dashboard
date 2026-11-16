@@ -84,7 +84,7 @@
     var trackBtn = (
       '<button class="ps-track-btn' + (opts.tracked ? " ps-track-btn--active" : "") + '" type="button" data-role="track-btn" ' +
       'data-symbol="' + escapeHtml(entry.symbol) + '" data-interval="' + escapeHtml(entry.interval) + '" data-label="' + escapeHtml(entry.label) + '" ' +
-      'title="' + (opts.tracked ? "Remove from My Trades" : "Add to My Trades") + '">' +
+      'title="' + (opts.tracked ? "Remove from Active Trades" : "Add to Active Trades") + '">' +
       (opts.tracked ? "&#9733;" : "&#9734;") +
       "</button>"
     );

@@ -56,7 +56,7 @@ test("the Lab is renamed and points at where the moved panels went", () => {
   assert.match(read("public/assets/js/sidebar.js"), /label: "Trading Lab Backtest"/);
   const sidebar = read("public/assets/js/sidebar.js");
   const trades = sidebar.slice(
-    sidebar.indexOf('label: "Trades"'),
+    sidebar.indexOf('label: "My Trades"'),
     sidebar.indexOf('label: "TradeHunter"'),
   );
   assert.match(trades, /href: "\/trading-lab\.html", label: "Trading Lab Backtest"/);

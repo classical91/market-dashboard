@@ -49,6 +49,6 @@ test("Overview is the first entry in the sidebar, with Terminal right after it",
   const workspace = sidebar.slice(sidebar.indexOf("var workspace"));
   const overview = workspace.indexOf('label: "Overview"');
   const terminalEntry = workspace.indexOf('label: "Terminal Suite"');
-  const trades = workspace.indexOf('label: "Trades"');
+  const trades = workspace.indexOf('label: "My Trades"');
   assert.ok(overview > -1 && terminalEntry > overview && trades > terminalEntry);
 });

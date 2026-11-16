@@ -107,9 +107,9 @@
         '<button class="ss-track-btn' + (tracked ? " ss-track-btn--active" : "") + '" type="button" data-role="track-btn" ' +
         'data-symbol="' + escapeHtml(symbol) + '" data-interval="' + escapeHtml(interval) + '" ' +
         'data-label="' + escapeHtml(symbol.replace(/USDT$/, "")) + '" ' +
-        'title="' + (tracked ? "Remove from My Trades" : "Add to My Trades") + '" ' +
+        'title="' + (tracked ? "Remove from Active Trades" : "Add to Active Trades") + '" ' +
         'aria-label="' + (tracked ? "Remove " : "Add ") + escapeHtml(symbol) + " " + escapeHtml(interval) +
-        (tracked ? " from" : " to") + ' My Trades">' + (tracked ? "&#9733;" : "&#9734;") + "</button>"
+        (tracked ? " from" : " to") + ' Active Trades">' + (tracked ? "&#9733;" : "&#9734;") + "</button>"
       );
     }
 

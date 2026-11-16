@@ -32,9 +32,9 @@
     {
       // The trade workflow in one place: the trades you are running, the
       // engine that plans them, and the lab that backtests the setups.
-      label: "Trades",
+      label: "My Trades",
       children: [
-        { href: "/pattern-scanner-trades.html", label: "My Trades" },
+        { href: "/pattern-scanner-trades.html", label: "Active Trades" },
         // Screenshots of stocks/tokens worth a closer look, kept until deleted.
         { href: "/potential-buys.html", label: "Potential Buys" },
         {
@@ -48,7 +48,7 @@
       label: "TradeHunter",
       children: [
         // Each screener answers one question — direction, location, structure
-        // — and My Trades (under Trades) is where the three are read together. Future
+        // — and Active Trades (under My Trades) is where the three are read together. Future
         // screeners (Derivatives, Volatility, Relative Strength) join this
         // group rather than the level above it.
         {
