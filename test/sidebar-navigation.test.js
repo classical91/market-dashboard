@@ -11,6 +11,7 @@ test("primary sidebar order and removed links stay exact", () => {
   const labels = [
     "Terminal Suite",
     "Overview v2",
+    "Reporter Room",
     "Trades",
     "TradeHunter",
     "AI Analysis",

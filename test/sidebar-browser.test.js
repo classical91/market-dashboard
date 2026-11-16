@@ -62,25 +62,25 @@ test("shared sidebar browser regressions", {
     assert.equal(await toggle(group).getAttribute("aria-expanded"), String(expected));
   }
 
-  await t.test("Terminal leads both navigation shells with Reporter Room, and Overview nests under v2", async (t) => {
+  await t.test("Reporter Room sits directly above Trades in both navigation shells, and Overview nests under v2", async (t) => {
     const page = await open(t);
     for (const [url, root, drawer, prefix] of [["/", ".sidebar", ".mob-drawer", ""], ["/terminal-suite.html", ".cmd-sidebar", ".cmd-drawer", "cmd-"]]) {
       await page.goto(base + url);
       for (const shell of [root, drawer]) {
         const primary = page.locator(`${shell} .${prefix}nav-primary`);
-        assert.deepEqual(await primary.evaluate(nav => Array.from(nav.children).slice(0, 2).map(child => child.dataset.dropdownKey)),
-          ["sidebar_dropdown_terminal_suite", "sidebar_dropdown_overview_v2"]);
-        assert.equal(await menu(page, "terminal_suite", shell).locator('a[data-nav-href="/reporter.html"]').count(), 1);
+        assert.deepEqual(await primary.evaluate(nav => Array.from(nav.children).slice(0, 4).map(child => child.dataset.dropdownKey || child.getAttribute("data-nav-href"))),
+          ["/terminal-suite.html", "sidebar_dropdown_overview_v2", "/reporter.html", "sidebar_dropdown_trades"]);
+        assert.equal(await menu(page, "terminal_suite", shell).count(), 0);
+        assert.equal(await primary.locator(':scope > a[data-nav-href="/reporter.html"]').count(), 1);
         assert.equal(await menu(page, "reporter", shell).locator('a[data-nav-href="/reporter.html"]').count(), 1);
         assert.equal(await menu(page, "overview_v2", shell).locator('a[data-nav-href="/"]').count(), 1);
         assert.equal(await primary.locator(':scope > a[data-nav-href="/"]').count(), 0);
       }
     }
-    await menu(page, "terminal_suite").locator('a[data-nav-href="/reporter.html"]').click();
+    await page.locator('.cmd-sidebar .cmd-nav-primary > a[data-nav-href="/reporter.html"]').click();
     await page.waitForURL(base + "/reporter.html");
-    await state(menu(page, "terminal_suite"), true);
     await state(menu(page, "reporter"), true);
-    if (process.env.SIDEBAR_SCREENSHOT_DIR) await page.locator(".cmd-sidebar").screenshot({ path: path.join(process.env.SIDEBAR_SCREENSHOT_DIR, "sidebar-terminal-first.png") });
+    if (process.env.SIDEBAR_SCREENSHOT_DIR) await page.locator(".cmd-sidebar").screenshot({ path: path.join(process.env.SIDEBAR_SCREENSHOT_DIR, "sidebar-reporter-above-trades.png") });
     const overview = menu(page, "overview_v2");
     await toggle(overview).click();
     assert.equal(page.url(), base + "/reporter.html", "the caret expands without navigating");
