@@ -197,9 +197,7 @@
       label: "X Links",
       featured: "x",
       children: [
-        { href: "https://x.com/", label: "Open X.com" },
         { href: "/x-intelligence.html", label: "X Intelligence" },
-        { href: "/x-search.html", label: "Search X" },
         // Pick an X category, then open X Intelligence on it.
         { href: "/intelligence-portal.html#x", label: "X Portal" },
       ],

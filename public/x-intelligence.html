@@ -39,14 +39,21 @@
       </div>
     </div>
 
+    <section class="x-search-panel" aria-labelledby="xSearchLabel">
+      <label id="xSearchLabel" for="xSearchInput">Search X</label>
+      <form class="x-search-form" id="xSearchForm">
+        <input class="x-search-input" id="xSearchInput" type="search"
+               placeholder="Keyword, $ticker, or from:handle&hellip;" autocomplete="off"
+               aria-describedby="xSearchHint" />
+        <button class="x-search-submit" id="xSearchSubmit" type="submit">Search &#8599;</button>
+      </form>
+      <p id="xSearchHint">Search all of X. Results open in a new tab.</p>
+    </section>
+
     <div class="x-split">
       <div class="x-timeline-pane">
         <div class="x-timeline-head">
           <span id="xTimelineLabel">&mdash;</span>
-          <div class="x-timeline-actions">
-            <a id="xTimelineLink" href="https://x.com/" target="_blank" rel="noopener">Open on X &#8599;</a>
-            <a href="https://farm-bot.up.railway.app/queue" target="_blank" rel="noopener">Open FarmQueue &#8599;</a>
-          </div>
         </div>
         <!-- Filters only the posts already loaded; nothing here fetches. -->
         <div class="x-feed-toolbar" id="xFeedToolbar" role="group" aria-label="Feed filters and display">
@@ -106,6 +113,18 @@
         </p>
       </div>
       <div class="x-account-panel is-collapsed" id="xAccountPanel">
+        <nav class="x-timeline-actions x-account-actions" aria-label="X workspace shortcuts">
+          <a class="x-shortcut--x" id="xTimelineLink" href="https://x.com/" target="_blank" rel="noopener"
+             title="Open on X" aria-label="Open on X">
+            <span class="x-account-action-icon" aria-hidden="true">X</span><span class="x-account-action-label">Open on X</span>
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12 12 4M4 4h8v8" /></svg>
+          </a>
+          <a class="x-shortcut--farmqueue" href="https://farm-bot.up.railway.app/queue" target="_blank" rel="noopener"
+             title="Open FarmQueue" aria-label="Open FarmQueue">
+            <span class="x-account-action-icon" aria-hidden="true">FQ</span><span class="x-account-action-label">Open FarmQueue</span>
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12 12 4M4 4h8v8" /></svg>
+          </a>
+        </nav>
         <button type="button" class="x-account-toggle" id="xAccountToggle"
                 aria-expanded="false" aria-controls="xAccountList">
           <span class="x-account-toggle-label" id="xAccountToggleLabel">Accounts</span>
@@ -137,6 +156,7 @@
   </main>
 </div>
 <script src="/assets/js/sidebar.js"></script>
+<script src="/assets/js/x-search.js"></script>
 <script src="/assets/js/admin-key.js"></script>
 <script src="/assets/js/x-freshness.js"></script>
 <script src="/assets/js/x-posts.js"></script>
