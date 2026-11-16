@@ -45,6 +45,7 @@ const { createHealthRouter } = require("./routes/health");
 const { createOnchainRouter } = require("./routes/onchain");
 const { createOverviewRouter } = require("./routes/overview");
 const { createMarketSessionRouter } = require("./routes/market-session");
+const { createMacroCalendarRouter } = require("./routes/macro-calendar");
 const { createBroadcastLedgerRouter } = require("./routes/broadcast-ledger");
 const { createReporterRouter } = require("./routes/reporter");
 const { createReporterNewsLogRouter } = require("./routes/reporter-news-log");
@@ -735,6 +736,7 @@ function createApp() {
   app.use("/api/onchain", createOnchainRouter({ onchainService, onchainIntelligenceService }));
   app.use("/api/overview", createOverviewRouter({ overviewService }));
   app.use("/api/market-session", createMarketSessionRouter());
+  app.use("/api/macro/calendar", createMacroCalendarRouter({ marketDataService, cache }));
   app.use(
     "/api/broadcast-ledger",
     createBroadcastLedgerRouter({

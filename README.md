@@ -683,3 +683,15 @@ by its ledger receipt and not resent.
 A batch waiting for approval, or already queued, is never prepared twice for
 the same Vancouver day; a rejected or expired one gets a new `-r2` run ID.
 FarmBot must include the Top 10 update (`top10` in its capabilities).
+
+## Main Hub macro calendar widget
+
+`GET /api/macro/calendar` (also `HEAD`) exposes the same normalized schedule
+used by the Newsroom Reporter's Macro Calendar. Main Hub uses this narrow,
+read-only endpoint for its Media & Trends widget above Discord announcements.
+It returns up to eight events, the feed timezone, and an explicit fallback
+flag. Provider URLs, credentials, errors, and unrelated overview data are
+excluded. The endpoint is readable without a browser session, like
+`/api/youtube/live`; other methods and neighbouring routes retain site auth.
+Reads share a one-minute cache. No new environment variables are required.
+Deploy this endpoint before the dependent Main Hub widget.
