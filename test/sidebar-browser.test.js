@@ -69,7 +69,7 @@ test("shared sidebar browser regressions", {
       for (const shell of [root, drawer]) {
         const primary = page.locator(`${shell} .${prefix}nav-primary`);
         assert.deepEqual(await primary.evaluate(nav => Array.from(nav.children).slice(0, 4).map(child => child.dataset.dropdownKey || child.getAttribute("data-nav-href"))),
-          ["/terminal-suite.html", "sidebar_dropdown_overview_v2", "/reporter.html", "sidebar_dropdown_trades"]);
+          ["/terminal-suite.html", "sidebar_dropdown_overview_v2", "/reporter.html", "sidebar_dropdown_my_trades"]);
         assert.equal(await menu(page, "terminal_suite", shell).count(), 0);
         assert.equal(await primary.locator(':scope > a[data-nav-href="/reporter.html"]').count(), 1);
         assert.equal(await menu(page, "reporter", shell).locator('a[data-nav-href="/reporter.html"]').count(), 1);
@@ -94,37 +94,37 @@ test("shared sidebar browser regressions", {
 
   await t.test("open and closed choices survive both page directions and reloads", async (t) => {
     const page = await open(t);
-    await toggle(menu(page, "trades")).click();
+    await toggle(menu(page, "my_trades")).click();
     await toggle(menu(page, "tradehunter")).click();
     await toggle(menu(page, "screeners")).click();
     await toggle(menu(page, "reporter")).click();
     await page.locator('.sidebar a[data-nav-href="/terminal-suite.html"]').click();
-    for (const key of ["trades", "tradehunter", "screeners", "reporter"]) await state(menu(page, key), true);
-    await toggle(menu(page, "trades")).click();
+    for (const key of ["my_trades", "tradehunter", "screeners", "reporter"]) await state(menu(page, key), true);
+    await toggle(menu(page, "my_trades")).click();
     await toggle(menu(page, "screeners")).click();
     await toggle(menu(page, "overview_v2")).click();
     await page.locator('.cmd-sidebar a[data-nav-href="/"]').click();
-    await state(menu(page, "trades"), false);
+    await state(menu(page, "my_trades"), false);
     await state(menu(page, "screeners"), false);
     await state(menu(page, "tradehunter"), true);
     await state(menu(page, "reporter"), true);
     await page.reload();
-    await state(menu(page, "trades"), false);
+    await state(menu(page, "my_trades"), false);
     await state(menu(page, "screeners"), false);
     await state(menu(page, "reporter"), true);
   });
 
   await t.test("legacy preferences migrate once and shared choices take precedence", async (t) => {
     const page = await open(t, { initial: {
-      sidebar_dropdown_overview_trades: "open", sidebar_dropdown_command_trades: "closed",
-      sidebar_dropdown_command_reporter: "open", sidebar_dropdown_trades: "closed",
+      sidebar_dropdown_overview_my_trades: "open", sidebar_dropdown_command_my_trades: "closed",
+      sidebar_dropdown_command_reporter: "open", sidebar_dropdown_my_trades: "closed",
       sidebar_dropdown_overview_tradehunter: "open", sidebar_dropdown_command_tradehunter: "closed",
     } });
-    await state(menu(page, "trades"), false);
+    await state(menu(page, "my_trades"), false);
     await state(menu(page, "reporter"), true);
     await state(menu(page, "tradehunter"), true);
     await page.goto(base + "/terminal-suite.html");
-    await state(menu(page, "trades"), false);
+    await state(menu(page, "my_trades"), false);
     await state(menu(page, "reporter"), true);
     await state(menu(page, "tradehunter"), true);
   });
@@ -176,15 +176,15 @@ test("shared sidebar browser regressions", {
     for (const [url, drawer, sidebar] of [["/", ".mob-drawer", ".sidebar"], ["/terminal-suite.html", ".cmd-drawer", ".cmd-sidebar"]]) {
       await page.setViewportSize({ width: 1440, height: 900 });
       await page.goto(base + url);
-      await toggle(menu(page, "trades", sidebar)).click();
+      await toggle(menu(page, "my_trades", sidebar)).click();
       await page.setViewportSize({ width: 390, height: 850 });
       await page.getByRole("button", { name: "Open navigation", exact: true }).click();
-      await state(menu(page, "trades", drawer), true);
-      await toggle(menu(page, "trades", drawer)).click();
+      await state(menu(page, "my_trades", drawer), true);
+      await toggle(menu(page, "my_trades", drawer)).click();
       await page.keyboard.press("Escape");
       assert.equal(await page.evaluate(() => document.body.style.overflow), "");
       await page.setViewportSize({ width: 1440, height: 900 });
-      await state(menu(page, "trades", sidebar), false);
+      await state(menu(page, "my_trades", sidebar), false);
     }
   });
 
@@ -194,7 +194,7 @@ test("shared sidebar browser regressions", {
       return page.locator(root).evaluate((node) => {
         const take = (el, keys) => Object.fromEntries(keys.map((key) => [key, getComputedStyle(el)[key]]));
         const item = node.querySelector('[data-nav-href="/terminal-suite.html"]');
-        const group = node.querySelector('[data-dropdown-key="sidebar_dropdown_trades"] > button');
+        const group = node.querySelector('[data-dropdown-key="sidebar_dropdown_my_trades"] > button');
         return {
           shell: take(node, ["backgroundColor", "borderRightColor", "padding", "gap", "fontFamily"]),
           item: take(item, ["color", "fontSize", "fontWeight", "lineHeight", "padding", "borderRadius"]),
