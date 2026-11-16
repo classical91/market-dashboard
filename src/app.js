@@ -584,7 +584,12 @@ function createApp() {
   app.get(["/earthwatch", "/earthwatch.html"], (req, res) => {
     res.redirect(302, "https://earth-watch-production-e3c6.up.railway.app/");
   });
-  app.get(["/overview-v2.html", "/overview-hybrid.html"], (req, res) => {
+  // Use a clean URL as well as the file URL: older releases permanently
+  // redirected the latter to /, which browsers may still have cached.
+  app.get(["/overview-v2", "/overview-v2.html"], (req, res) => {
+    res.sendFile(path.join(__dirname, "..", "public", "overview-v2.html"));
+  });
+  app.get("/overview-hybrid.html", (req, res) => {
     res.redirect(301, "/");
   });
   // The Signal Screener's two tabs are now two pages. Every old link — the

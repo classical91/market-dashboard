@@ -52,7 +52,7 @@
     },
     // Overview answers "what is happening?"; Terminal, one step deeper,
     // answers "why, and what does it mean for a trade?".
-    { href: "/overview-v2.html", label: "Overview v2" },
+    { href: "/overview-v2", label: "Overview v2" },
     { href: "/terminal-suite.html", label: "Terminal Suite" },
     {
       // The trade workflow in one place: the trades you are running, the
