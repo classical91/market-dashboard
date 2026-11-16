@@ -180,22 +180,30 @@ test("shared account UI uses the existing auth endpoints", () => {
   assert.match(sidebar, /href="\/login\?returnTo=/);
 });
 
-test("Overview opens its page directly and nests Widgets and Heatmaps", () => {
+test("Overview opens its page directly and nests Widgets", () => {
   const start = sidebar.indexOf('label: "Overview"');
   const menu = sidebar.slice(sidebar.lastIndexOf("{", start), sidebar.indexOf('label: "TradeHunter"'));
   // The label itself is a link; the caret expands the sub-menus.
   assert.match(menu, /href: "\/",\s*label: "Overview"/);
   const widgets = menu.indexOf('label: "Widgets"');
-  const heatmaps = menu.indexOf('label: "Heatmaps"');
-  assert.ok(widgets > -1 && heatmaps > widgets, "Widgets then Heatmaps sit under Overview");
-  assert.match(menu, /href: "\/heatmaps\.html",\s*label: "Heatmaps"/);
-  for (const anchor of ["market-heatmap", "crypto-heatmap", "stock-heatmap", "forex-heatmap"]) {
-    assert.match(menu.slice(heatmaps), new RegExp(`href: "/heatmaps\\.html#${anchor}"`));
-  }
+  assert.ok(widgets > -1, "Widgets sits under Overview");
+  assert.doesNotMatch(menu, /heatmaps\.html|label: "Heatmaps"/, "Heatmaps belongs under Screeners");
   assert.doesNotMatch(menu, /href: "\/#(market-heatmap|ovh-heatmap)"/, "heatmap anchors left Overview");
   // A dropdown with its own href renders as a split link + caret button.
   assert.match(sidebar, /nav-split-link/);
   assert.match(sidebar, /nav-split-toggle/);
+});
+
+test("Screeners nests Heatmaps with all four section links", () => {
+  const start = sidebar.indexOf('label: "Screeners"');
+  const menu = sidebar.slice(start, sidebar.indexOf('label: "Market Matrix"', start));
+  const heatmaps = menu.indexOf('label: "Heatmaps"');
+  assert.ok(start > -1 && heatmaps > -1, "Heatmaps sits under Screeners");
+  assert.equal(sidebar.match(/label: "Heatmaps"/g).length, 1, "Heatmaps is not duplicated");
+  assert.match(menu, /href: "\/heatmaps\.html",\s*label: "Heatmaps"/);
+  for (const anchor of ["market-heatmap", "crypto-heatmap", "stock-heatmap", "forex-heatmap"]) {
+    assert.match(menu.slice(heatmaps), new RegExp(`href: "/heatmaps\\.html#${anchor}"`));
+  }
 });
 
 test("both Open Interest pages sit side by side under Screeners", () => {

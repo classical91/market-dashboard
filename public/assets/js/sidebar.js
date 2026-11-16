@@ -22,7 +22,7 @@
   var workspace = [
     {
       // The label itself opens Overview; the caret beside it expands the
-      // widget jump links and the Heatmaps page.
+      // widget jump links.
       href: "/",
       label: "Overview",
       children: [
@@ -36,16 +36,6 @@
             { href: "/#risk-meter", label: "Risk Meter" },
             { href: "/#alerts", label: "Alerts" },
             { href: "/#ovh-market-overview", label: "TV Market Overview" },
-          ],
-        },
-        {
-          href: "/heatmaps.html",
-          label: "Heatmaps",
-          children: [
-            { href: "/heatmaps.html#market-heatmap", label: "Market Heatmap" },
-            { href: "/heatmaps.html#crypto-heatmap", label: "Crypto Heatmap" },
-            { href: "/heatmaps.html#stock-heatmap", label: "Stock Heatmap" },
-            { href: "/heatmaps.html#forex-heatmap", label: "Forex Heatmap" },
           ],
         },
       ],
@@ -89,6 +79,16 @@
             // Momentum across markets and timeframes at once: RSI 14 on
             // 1W / 1D / 4H / 1H for crypto, indices, commodities and dominance.
             { href: "/rsi-matrix.html", label: "RSI Matrix" },
+            {
+              href: "/heatmaps.html",
+              label: "Heatmaps",
+              children: [
+                { href: "/heatmaps.html#market-heatmap", label: "Market Heatmap" },
+                { href: "/heatmaps.html#crypto-heatmap", label: "Crypto Heatmap" },
+                { href: "/heatmaps.html#stock-heatmap", label: "Stock Heatmap" },
+                { href: "/heatmaps.html#forex-heatmap", label: "Forex Heatmap" },
+              ],
+            },
           ],
         },
         // Not a screener: four live charts side by side (TOTAL / DXY / BTC /
