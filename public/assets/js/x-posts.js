@@ -678,8 +678,9 @@
       // machine, so a fix to either reaches both.
       bindCopyLinkButton(copyButton, post.url, "Copy link");
 
-      actions.appendChild(openLink);
+      // Copy link first, Open after it: Open sits next to the send actions.
       actions.appendChild(copyButton);
+      actions.appendChild(openLink);
 
       // Queued hand-off to the FarmClaw agent; wired by x-broadcast.js.
       if (onFarmclaw && post.url) {
