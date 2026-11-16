@@ -307,19 +307,39 @@
     );
   }
 
-  function dropdownKey(item, mode) {
-    return "sidebar_dropdown_" + mode + "_" + String(item.label || "")
+  var dropdownStates = {};
+
+  function dropdownKey(item) {
+    return "sidebar_dropdown_" + String(item.label || "")
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "_")
       .replace(/^_+|_+$/g, "");
   }
 
   function getStoredDropdownState(key) {
-    try { return localStorage.getItem(key); } catch { return null; }
+    if (Object.prototype.hasOwnProperty.call(dropdownStates, key)) return dropdownStates[key];
+    try {
+      var state = localStorage.getItem(key);
+      return state === "open" || state === "closed" ? state : null;
+    } catch { return null; }
   }
 
   function setStoredDropdownState(key, open) {
-    try { localStorage.setItem(key, open ? "open" : "closed"); } catch {}
+    dropdownStates[key] = open ? "open" : "closed";
+    try { localStorage.setItem(key, dropdownStates[key]); } catch {}
+  }
+
+  function dropdownState(item, mode) {
+    var key = dropdownKey(item);
+    var state = getStoredDropdownState(key);
+    if (state) return state;
+    // Migrate the current layout's preference once, then both layouts and
+    // the mobile drawer use the same choice. Keep the old keys for rollback.
+    var suffix = key.slice("sidebar_dropdown_".length);
+    state = getStoredDropdownState("sidebar_dropdown_" + mode + "_" + suffix)
+      || getStoredDropdownState("sidebar_dropdown_" + (mode === "command" ? "overview" : "command") + "_" + suffix);
+    if (state) setStoredDropdownState(key, state === "open");
+    return state;
   }
 
   function hasActiveDescendant(item) {
@@ -387,12 +407,12 @@
   function dropdown(item, mode, instance, nested) {
     var prefix = mode === "command" ? "cmd-" : "";
     var id = prefix + "apps-menu-" + instance;
-    var storageKey = dropdownKey(item, mode);
+    var storageKey = dropdownKey(item);
     var active = isActive(item.href) || item.children.some(hasActiveDescendant);
     var featuredClass = item.featured
       ? " " + prefix + "nav-item--featured " + prefix + "nav-item--" + item.featured
       : "";
-    var storedState = getStoredDropdownState(storageKey);
+    var storedState = dropdownState(item, mode);
     // `collapsed` groups stay shut until tapped, even when they hold the
     // current page; the label still shows as active.
     var open = storedState ? storedState === "open" : active && !item.collapsed;
@@ -457,9 +477,16 @@
     root.querySelectorAll(".nav-dropdown-toggle, .cmd-nav-dropdown-toggle").forEach(function (toggle) {
       toggle.addEventListener("click", function () {
         var dropdownRoot = toggle.closest(".nav-dropdown, .cmd-nav-dropdown");
-        var open = dropdownRoot.classList.toggle("open");
-        toggle.setAttribute("aria-expanded", open ? "true" : "false");
-        setStoredDropdownState(dropdownRoot.getAttribute("data-dropdown-key"), open);
+        var open = !dropdownRoot.classList.contains("open");
+        var key = dropdownRoot.getAttribute("data-dropdown-key");
+        setStoredDropdownState(key, open);
+        // Desktop and mobile are two views of the same navigation state.
+        document.querySelectorAll("[data-dropdown-key]").forEach(function (peer) {
+          if (peer.getAttribute("data-dropdown-key") !== key) return;
+          peer.classList.toggle("open", open);
+          peer.querySelector(".nav-dropdown-toggle, .cmd-nav-dropdown-toggle")
+            .setAttribute("aria-expanded", open ? "true" : "false");
+        });
       });
     });
   }
@@ -467,6 +494,10 @@
   function fill(root, mode, instance) {
     root.innerHTML = navigationHtml(mode, instance);
     wireDropdowns(root);
+    wireAccount(root, mode);
+  }
+
+  function wireAccount(root, mode) {
     var logoutForm = root.querySelector("." + (mode === "command" ? "cmd-" : "") + "account-form");
     if (logoutForm) {
       logoutForm.addEventListener("submit", function (event) {
@@ -475,7 +506,7 @@
           .then(function (response) {
             if (!response.ok && response.status !== 204) throw new Error("Logout failed");
             accountState = { authenticated: false };
-            refreshSidebars();
+            refreshAccounts();
             window.location.assign("/login?returnTo=" + encodeURIComponent(window.location.pathname + window.location.search));
           })
           .catch(function () { logoutForm.submit(); });
@@ -483,11 +514,15 @@
     }
   }
 
-  function refreshSidebars() {
-    document.querySelectorAll(".cmd-sidebar").forEach(function (root) { fill(root, "command", "desktop"); });
-    document.querySelectorAll(".sidebar").forEach(function (root) { fill(root, "overview", "desktop"); });
-    document.querySelectorAll(".cmd-drawer").forEach(function (root) { fill(root, "command", "mobile"); });
-    document.querySelectorAll(".mob-drawer").forEach(function (root) { fill(root, "overview", "mobile"); });
+  function refreshAccounts() {
+    // Session loading must not replace the menu, reset its scroll, or remove
+    // a focused toggle while the user is navigating.
+    document.querySelectorAll(".account, .cmd-account").forEach(function (account) {
+      var root = account.parentElement;
+      var mode = account.classList.contains("cmd-account") ? "command" : "overview";
+      account.outerHTML = accountHtml(mode);
+      wireAccount(root, mode);
+    });
   }
 
   function loadAccount() {
@@ -496,11 +531,13 @@
       .catch(function () { return { authenticated: false }; })
       .then(function (state) {
         accountState = state;
-        refreshSidebars();
+        refreshAccounts();
       });
   }
 
   function updateActiveStates() {
+    // In-page navigation changes the highlight, never the user's expansion
+    // choices (including groups that started collapsed by default).
     document.querySelectorAll("[data-nav-href]").forEach(function (link) {
       var active = isActive(link.getAttribute("data-nav-href"));
       link.classList.toggle("active", active);
@@ -509,18 +546,16 @@
     });
 
     document.querySelectorAll(".nav-dropdown, .cmd-nav-dropdown").forEach(function (dropdownRoot) {
-      var active = !!dropdownRoot.querySelector("[data-nav-href].active");
-      var storedState = getStoredDropdownState(dropdownRoot.getAttribute("data-dropdown-key"));
-      var open = storedState ? storedState === "open" : active;
+      var active = Array.prototype.some.call(dropdownRoot.querySelectorAll("[data-nav-href]"), function (link) {
+        return isActive(link.getAttribute("data-nav-href"));
+      });
       var toggle = dropdownRoot.querySelector(".nav-dropdown-toggle, .cmd-nav-dropdown-toggle");
       var split = dropdownRoot.querySelector(".nav-split, .cmd-nav-split");
-      dropdownRoot.classList.toggle("open", open);
       if (split && split.parentElement === dropdownRoot) {
         split.classList.toggle("active", active);
       } else if (toggle) {
         toggle.classList.toggle("active", active);
       }
-      if (toggle) toggle.setAttribute("aria-expanded", open ? "true" : "false");
     });
   }
 

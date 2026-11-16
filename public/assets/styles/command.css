@@ -1,4 +1,5 @@
 @import url("./aurora-brand.css");
+@import url("./sidebar-theme.css");
 
 /* ─────────────────────────────────────────────────────────
    Command Center Theme
@@ -316,6 +317,7 @@ body {
 .cmd-nav-text { flex: 1; }
 .cmd-nav-dropdown-toggle {
   width: 100%; border: 0; background: none; font: inherit;
+  font-size: 14px; font-weight: 600; line-height: 1.15;
   text-align: left;
 }
 /* Toggles reset border/background, so featured menus restate both. */
@@ -753,33 +755,6 @@ header, .back, .back-group { display: none !important; }
 /* ------------------------------------------------------
    TERMINAL THEME (v2)
    ------------------------------------------------------ */
-[data-theme="terminal"] body,
-[data-theme="terminal"] .app {
-  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Courier New', monospace !important;
-}
-
-[data-theme="terminal"] .cmd-sidebar {
-  border-right-color: rgba(0, 255, 65, 0.2);
-  background: #000 !important;
-}
-
-[data-theme="terminal"] .cmd-nav-item {
-  border-radius: 4px;
-  letter-spacing: 0.04em;
-}
-
-[data-theme="terminal"] .cmd-nav-item.active {
-  background: rgba(0, 255, 65, 0.12);
-  color: #00ff41;
-  border-left: 2px solid #00ff41;
-  border-radius: 0 4px 4px 0;
-}
-
-[data-theme="terminal"] .cmd-nav-item:hover:not(.active) {
-  background: rgba(0, 255, 65, 0.06);
-  color: #00cc33;
-}
-
 [data-theme="terminal"] .cmd-topbar {
   background: #000 !important;
   border-bottom-color: rgba(0, 255, 65, 0.2);
@@ -902,21 +877,6 @@ header, .back, .back-group { display: none !important; }
 /* ------------------------------------------------------
    MINIMAL THEME (v3)
    ------------------------------------------------------ */
-
-[data-theme="minimal"] .cmd-sidebar {
-  background: #1c1c1e !important;
-  border-right-color: rgba(255,255,255,0.08);
-}
-
-[data-theme="minimal"] .cmd-nav-item.active {
-  background: rgba(212, 168, 67, 0.14);
-  color: #d4a843;
-  font-weight: 700;
-}
-
-[data-theme="minimal"] .cmd-nav-item:hover:not(.active) {
-  background: rgba(255,255,255,0.05);
-}
 
 [data-theme="minimal"] .cmd-topbar {
   background: #1c1c1e !important;
