@@ -44,10 +44,34 @@
 /* ── Workspace + panels ──────────────────────────────── */
 .bot-workspace {
   display: grid;
-  grid-template-columns: 340px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   align-items: start;
 }
+
+/* The editor only takes a column while it is open. */
+.bot-workspace.is-editing { grid-template-columns: 340px minmax(0, 1fr); }
+.bot-editor-panel[hidden] { display: none; }
+
+.bot-library-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bot-library-panel .bot-panel-head { flex-wrap: wrap; }
+.bot-library-panel .bot-panel-heading { flex: 1 0 auto; }
+.bot-workspace.is-editing .bot-library-panel .bot-panel-subtitle { display: none; }
+
+/* Library-only view: spread the cards across the full width and let the
+   page scroll instead of the inner list. */
+.bot-workspace:not(.is-editing) .bot-folder-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0 10px;
+}
+.bot-workspace:not(.is-editing) .bot-saved-scroll { max-height: none; }
+.bot-workspace:not(.is-editing) .bot-library-panel { position: static; }
 
 .bot-panel {
   position: relative;
@@ -653,15 +677,16 @@
 
 /* ── Responsive ──────────────────────────────────────── */
 @media (max-width: 1180px) {
-  .bot-workspace { grid-template-columns: 300px minmax(0, 1fr); }
+  .bot-workspace.is-editing { grid-template-columns: 300px minmax(0, 1fr); }
 }
 
 @media (max-width: 900px) {
-  .bot-workspace { grid-template-columns: 1fr; }
+  .bot-workspace,
+  .bot-workspace.is-editing { grid-template-columns: 1fr; }
   .bot-library-panel { position: static; order: 2; }
-  /* The workspace header carries "New command", so it leads on narrow
-     screens instead of sinking below a long library. */
-  .bot-editor-panel { order: 1; }
+  /* When open, the editor leads on narrow screens instead of sinking
+     below a long library. */
+  .bot-editor-panel { order: 1; scroll-margin-top: 96px; }
   .bot-saved-scroll { max-height: none; min-height: 0; }
 }
 
@@ -672,6 +697,7 @@
   .bot-editor-actions .bot-btn { flex: 1; }
   .bot-editor-panel .bot-panel-head { align-items: flex-start; }
   .bot-editor-head-actions { flex-direction: column-reverse; align-items: flex-end; }
+  .bot-library-panel .bot-panel-subtitle { display: none; }
   .bot-status-pill { min-height: 30px; padding: 0 10px; font-size: 11px; }
 }
 

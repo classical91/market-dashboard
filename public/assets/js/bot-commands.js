@@ -156,11 +156,12 @@
     updateEditingState();
   }
 
-  // The editor stays collapsed until it's needed, so the saved list is the
-  // first thing visible (especially on mobile, where the form filled the
-  // whole screen).
+  // The command library is the default view and fills the workspace. The
+  // editor panel only appears (beside the library on wide screens, above it
+  // on narrow ones) once "New command" or a card's Edit is used.
   function setFormOpen(open) {
     $("botCommandForm").hidden = !open;
+    $("botEditorPanel").hidden = !open;
     $("botEditorPanel").classList.toggle("is-collapsed", !open);
     $("botShell").classList.toggle("is-editing", open);
     $("newCommandBtn").setAttribute("aria-expanded", open ? "true" : "false");
@@ -493,6 +494,7 @@
     $("botCommandForm").addEventListener("submit", upsertCommand);
     $("newCommandBtn").addEventListener("click", function () { openNewForm(""); });
     $("resetCommandBtn").addEventListener("click", closeForm);
+    $("botEditorClose").addEventListener("click", closeForm);
     $("copyCurrentBtn").addEventListener("click", function () { copyText($("botCommand").value); });
     $("exportCommandsBtn").addEventListener("click", exportCommands);
     $("botCommandList").addEventListener("click", handleListClick);
