@@ -516,15 +516,14 @@
       </div>`)
       .join("");
 
-    // The fallback calendar is sample rows, not scheduled releases: listing
-    // them with times would read as real catalysts.
+    // Only fresh provider events are operational catalysts.
     const calendarLive = data.dataQuality?.modules?.calendar === "live";
     const events = calendarLive && Array.isArray(data.calendar) ? data.calendar.slice(0, 5) : [];
     const calendarHtml = !calendarLive
       ? `<div class="terminal-empty">No live calendar feed. See the <a href="/reporter.html#economic-calendar">Reporter Room</a> for catalysts.</div>`
       : events.length
         ? events.map((event) => `<div class="terminal-event-row">
-            <span class="terminal-event-time">${escapeHtml(event.time || "--")}</span>
+            <span class="terminal-event-time">${escapeHtml(event.date || "")} ${escapeHtml(event.time || "--")}${event.precision === "exact" ? "" : "~"} ${escapeHtml(event.timezone || "UTC")}</span>
             <span>${escapeHtml(event.title || "Market event")}</span>
             <em class="impact-${escapeHtml(String(event.impact || "low").toLowerCase())}">${escapeHtml(event.impact || "Low")}</em>
           </div>`).join("")
@@ -794,7 +793,7 @@
         label: "Calendar Risk",
         subLabel: "scheduled catalysts",
         reading: calendarLive ? `News risk ${newsRisk.level}` : "Calendar feed not live",
-        note: calendarLive ? newsRisk.reason : "Fallback calendar rows are samples, not releases — not scored.",
+        note: calendarLive ? newsRisk.reason : "Live calendar unavailable — verify releases before trading.",
         rawScore: calendarLive ? NEWS_POINTS[newsRisk.level] ?? null : null,
         weight: weights.calendar,
       }),

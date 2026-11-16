@@ -160,7 +160,7 @@ test("rotation: missing yields feed degrades to a labelled no-data row", () => {
 test("news risk: high-impact event inside the 45-minute window is high", () => {
   const now = new Date("2026-07-07T08:00:00Z");
   const risk = assessNewsRisk(
-    [{ at: "2026-07-07T08:30:00.000Z", time: "08:30", title: "US CPI Inflation", impact: "High" }],
+    [{ precision: "exact", verified: true, at: "2026-07-07T08:30:00.000Z", time: "08:30", title: "US CPI Inflation", impact: "High" }],
     now,
   );
   assert.equal(risk.level, "high");
@@ -171,8 +171,8 @@ test("news risk: high-impact events later today are medium; none is low", () => 
   const now = new Date("2026-07-07T08:00:00Z");
   const medium = assessNewsRisk(
     [
-      { at: "2026-07-07T14:00:00.000Z", time: "14:00", title: "FOMC Statement", impact: "High" },
-      { at: "2026-07-07T10:00:00.000Z", time: "10:00", title: "Consumer Sentiment", impact: "Medium" },
+      { precision: "exact", verified: true, at: "2026-07-07T14:00:00.000Z", time: "14:00", title: "FOMC Statement", impact: "High" },
+      { precision: "exact", verified: true, at: "2026-07-07T10:00:00.000Z", time: "10:00", title: "Consumer Sentiment", impact: "Medium" },
     ],
     now,
   );
@@ -180,7 +180,7 @@ test("news risk: high-impact events later today are medium; none is low", () => 
   assert.equal(medium.nextHighImpact.title, "FOMC Statement");
 
   const low = assessNewsRisk(
-    [{ at: "2026-07-07T10:00:00.000Z", time: "10:00", title: "Consumer Sentiment", impact: "Medium" }],
+    [{ precision: "exact", verified: true, at: "2026-07-07T10:00:00.000Z", time: "10:00", title: "Consumer Sentiment", impact: "Medium" }],
     now,
   );
   assert.equal(low.level, "low");

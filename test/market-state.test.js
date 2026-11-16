@@ -78,8 +78,8 @@ test("fallback feeds are flagged, and the state is marked degraded", () => {
   assert.equal(quality.QQQ, "fallback");
   assert.deepEqual(state.dataQuality.fallbackInputs, ["SPY", "QQQ"]);
   assert.equal(state.dataQuality.degraded, true);
-  assert.equal(state.dataQuality.modules.calendar, "fallback");
-  assert.equal(state.newsRisk.quality, "fallback");
+  assert.equal(state.dataQuality.modules.calendar, "unavailable");
+  assert.equal(state.newsRisk.quality, "unavailable");
   assert.ok(state.dataQuality.warnings.some((w) => /fallback data for SPY, QQQ/.test(w)));
 });
 

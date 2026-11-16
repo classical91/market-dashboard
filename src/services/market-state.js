@@ -69,7 +69,7 @@ function buildMarketState({ crypto, equities, macro, calendar } = {}, now = new 
 
   const regime = buildRegime(rows);
   const rotation = buildRotation(rows);
-  const newsRisk = assessNewsRisk(itemsOf(calendar), now);
+  const newsRisk = assessNewsRisk(itemsOf(calendar), now, calendar || { live: false });
 
   const components = regime.components.map((component) => ({
     ...component,
@@ -81,7 +81,7 @@ function buildMarketState({ crypto, equities, macro, calendar } = {}, now = new 
     crypto: feedStatus(crypto),
     equities: feedStatus(equities),
     macro: feedStatus(macro),
-    calendar: calendar ? (calendar.live ? "live" : "fallback") : "unavailable",
+    calendar: calendar?.live ? "live" : calendar?.stale ? "stale" : "unavailable",
   };
 
   const fallbackInputs = components.filter((c) => c.quality === "fallback").map((c) => c.symbol);

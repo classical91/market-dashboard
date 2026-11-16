@@ -689,9 +689,21 @@ FarmBot must include the Top 10 update (`top10` in its capabilities).
 `GET /api/macro/calendar` (also `HEAD`) exposes the same normalized schedule
 used by the Newsroom Reporter's Macro Calendar. Main Hub uses this narrow,
 read-only endpoint for its Media & Trends widget above Discord announcements.
-It returns up to eight events, the feed timezone, and an explicit fallback
-flag. Provider URLs, credentials, errors, and unrelated overview data are
+By default it returns today's full schedule, the feed timezone, and explicit
+quality/fallback flags. Provider URLs, credentials, errors, and unrelated overview data are
 excluded. The endpoint is readable without a browser session, like
 `/api/youtube/live`; other methods and neighbouring routes retain site auth.
-Reads share a one-minute cache. No new environment variables are required.
-Deploy this endpoint before the dependent Main Hub widget.
+All consumers share the provider snapshot cache (five minutes by default).
+The existing Main Hub widget remains compatible; no new required settings.
+
+## Accurate macroeconomic calendar
+
+The Reporter Room's Macro Calendar now uses dated provider events, with Local,
+UTC and Eastern timezones, date/country/importance filters, forecast/previous/actual
+values when supplied, and explicit live, stale and unavailable states. No sample
+events are substituted for a quiet day or a failed provider.
+
+Keep the existing `MACRO_CALENDAR_URL` Railway variable for a compatible feed.
+See [calendar operations and provider evaluation](docs/macro-calendar.md) for the
+JSON contract, optional Trading Economics adapter, cache/expiry policy, public
+Main Hub endpoint, deployment audit evidence and trading safeguards.

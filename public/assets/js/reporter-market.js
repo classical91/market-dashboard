@@ -6,9 +6,9 @@
  * already on the schedule, and the wire itself. It is deliberately not a charting surface —
  * "what should I trade?" is the Terminal Suite's and the screeners' job.
  *
- * Both read the dashboard's own /api/overview payload, the same one the Main
- * Hub renders, in one request — so the Reporter adds no market API call of
- * its own and cannot disagree with the hub about a price. Session state is
+ * Reaction and News Pulse read /api/overview in one request. The dated
+ * calendar has its own filtered reader in reporter-calendar.js; all readers
+ * share the backend provider cache. Session state is
  * clock arithmetic from trading-sessions.js, not a request.
  *
  * Rows the configured macro feed does not carry (US 10Y yields, for one) are
@@ -39,10 +39,9 @@
     { symbols: ['US10Y', 'TNX'], label: 'US10Y', format: 'yield' }
   ];
 
-  var MAX_CATALYSTS = 8;
   var MAX_HEADLINES = 12;
 
-  var state = { rows: {}, marketStatus: null, quality: null, calendar: [], news: [], updatedAt: null };
+  var state = { rows: {}, marketStatus: null, quality: null, news: [], updatedAt: null };
 
   function esc(value) {
     return String(value == null ? '' : value)
@@ -161,39 +160,6 @@
     if (quality.warnings && quality.warnings.length) el.title = quality.warnings.join('\n');
   }
 
-  /* ── Scheduled catalysts ───────────────────────────────── */
-
-  /* The macro calendar the overview payload already carries. Earnings are not
-     in it — no embed provider offers an earnings calendar widget and this page
-     will not take on a new data dependency for one — so the panel links out
-     for those and is titled for what it actually shows. */
-  function renderCatalysts() {
-    var el = doc.getElementById('catalystList');
-    if (!el) return;
-
-    var items = (state.calendar || []).slice(0, MAX_CATALYSTS);
-    if (!items.length) {
-      el.innerHTML = '<div class="intel-empty">No scheduled events in today\'s calendar.</div>';
-      return;
-    }
-
-    el.innerHTML = items.map(function (item) {
-      var impact = String(item && item.impact || '').toLowerCase();
-      var impactClass = impact === 'high' ? 'high' : impact === 'medium' ? 'medium' : 'low';
-      // A fallback calendar carries no real clock time; saying "08:30" for an
-      // assumed slot would invent precision the feed does not have.
-      var exact = item && item.precision === 'exact';
-      var time = item && item.time ? esc(item.time) : '—';
-      return '<div class="intel-catalyst">' +
-        '<span class="intel-catalyst-time' + (exact ? '' : ' approx') + '"' +
-        (exact ? '' : ' title="Scheduled slot, not a confirmed release time"') + '>' +
-        time + (exact ? '' : '~') + '</span>' +
-        '<span class="intel-catalyst-title">' + esc(item && item.title || 'Scheduled event') + '</span>' +
-        '<span class="intel-catalyst-impact ' + impactClass + '">' + esc(item && item.impact || '—') + '</span>' +
-        '</div>';
-    }).join('');
-  }
-
   /* News Pulse — the newsroom's own wire, from MARKET_NEWS_URL when it is
      configured. It moved here from the Overview page, which was showing the
      same feed the newsroom actually needs. Same payload as the reaction strip
@@ -235,10 +201,6 @@
     if (reaction && !reaction.dataset.loaded) {
       reaction.innerHTML = '<div class="intel-empty">Market reaction unavailable — ' + esc(message) + '</div>';
     }
-    var catalysts = doc.getElementById('catalystList');
-    if (catalysts && !catalysts.dataset.loaded) {
-      catalysts.innerHTML = '<div class="intel-empty">Calendar unavailable — ' + esc(message) + '</div>';
-    }
     var feed = doc.getElementById('newsFeed');
     if (feed && !feed.dataset.loaded) {
       feed.innerHTML = '<div class="intel-empty">Headlines unavailable — ' + esc(message) + '</div>';
@@ -264,19 +226,15 @@
         state.rows = indexRows(payload);
         state.marketStatus = payload.marketStatus || null;
         state.quality = payload.dataQuality || null;
-        state.calendar = Array.isArray(payload.calendar) ? payload.calendar : [];
         state.news = Array.isArray(payload.news) ? payload.news : [];
         state.updatedAt = payload.updatedAt ? new Date(payload.updatedAt) : new Date();
 
         var reaction = doc.getElementById('marketReaction');
-        var catalysts = doc.getElementById('catalystList');
         if (reaction) reaction.dataset.loaded = 'true';
-        if (catalysts) catalysts.dataset.loaded = 'true';
         var feed = doc.getElementById('newsFeed');
         if (feed) feed.dataset.loaded = 'true';
 
         renderReaction();
-        renderCatalysts();
         renderNewsPulse();
         renderQuality();
       })

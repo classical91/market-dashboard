@@ -133,150 +133,108 @@ function clockInZone(date, timeZone) {
  *              Correct only insofar as that zone is correct.
  *   unknown  — nothing parseable. `at` is null.
  */
-function resolveEventTime(value, { timezone, now }) {
-  if (value == null) return { at: null, precision: "unknown" };
+function validDate(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value || "")) return false;
+  const date = new Date(value + "T00:00:00Z");
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
 
-  // Epoch seconds or milliseconds — already an instant.
+function addDays(day, count) {
+  return new Date(Date.parse(day + "T12:00:00Z") + count * 86400000).toISOString().slice(0, 10);
+}
+
+function resolveEventTime(value, { timezone = "UTC" } = {}) {
+  const unknown = { at: null, precision: "unknown" };
+  if (value == null) return unknown;
   if (typeof value === "number" && Number.isFinite(value)) {
-    const ms = Math.abs(value) < 1e12 ? value * 1000 : value;
-    const date = new Date(ms);
-    return Number.isNaN(date.getTime()) ? { at: null, precision: "unknown" } : { at: date, precision: "exact" };
+    const at = new Date(Math.abs(value) < 1e12 ? value * 1000 : value);
+    return Number.isFinite(at.getTime()) ? { at, precision: "exact" } : unknown;
   }
-
   const text = String(value).trim();
-  if (!text) return { at: null, precision: "unknown" };
-
-  // A numeric string is an epoch too.
-  if (/^\d{9,13}$/.test(text)) return resolveEventTime(Number(text), { timezone, now });
-
-  // An explicit offset (…Z, …+02:00, …-0500) makes the instant unambiguous.
-  if (/\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(text) && /(Z|[+-]\d{2}:?\d{2})\s*$/.test(text)) {
-    const date = new Date(text.replace(" ", "T"));
-    return Number.isNaN(date.getTime()) ? { at: null, precision: "unknown" } : { at: date, precision: "exact" };
+  if (/^\d{9,13}$/.test(text)) return resolveEventTime(Number(text));
+  const day = text.slice(0, 10);
+  if (!validDate(day)) return unknown; // Never assign today's date to a clock label.
+  if (text === day) return { ...unknown, day };
+  if (!/^\d{4}-\d{2}-\d{2}[T ]\d{1,2}:\d{2}/.test(text)) return { ...unknown, day };
+  const clock = /[T ](\d{1,2}):(\d{2})/.exec(text);
+  if (+clock[1] > 23 || +clock[2] > 59) return { ...unknown, day };
+  if (/(Z|[+-]\d{2}:?\d{2})$/i.test(text)) {
+    const at = new Date(text.replace(" ", "T"));
+    return Number.isFinite(at.getTime()) ? { at, precision: "exact" } : { ...unknown, day };
   }
-
-  // Strip a trailing zone label and let it pick the zone, if we recognise it.
-  const labelled = /^(.*?)[\s]+([A-Za-z]{1,4})\s*$/.exec(text);
-  let body = text;
-  let zone = timezone;
-  if (labelled && Object.prototype.hasOwnProperty.call(ZONE_ABBREVIATIONS, labelled[2].toUpperCase())) {
-    body = labelled[1].trim();
-    zone = ZONE_ABBREVIATIONS[labelled[2].toUpperCase()];
-  }
-
-  // Date and wall-clock time, no offset: interpret in the resolved zone.
-  const dateTime = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{1,2}):(\d{2})/.exec(body);
-  if (dateTime) {
-    const at = new Date(wallClockToUtc({
-      year: Number(dateTime[1]),
-      month: Number(dateTime[2]),
-      day: Number(dateTime[3]),
-      hour: Number(dateTime[4]),
-      minute: Number(dateTime[5]),
-    }, zone));
-    return Number.isNaN(at.getTime()) ? { at: null, precision: "unknown" } : { at, precision: "assumed" };
-  }
-
-  // A bare clock label — "08:30", "14:00 ET". Carries no date at all, so it can
-  // only mean today in the resolved zone.
-  const clock = /^(\d{1,2}):(\d{2})/.exec(body);
-  if (clock) {
-    const hour = Number(clock[1]);
-    const minute = Number(clock[2]);
-    if (hour > 23 || minute > 59) return { at: null, precision: "unknown" };
-    const today = datePartsInZone(now, zone);
-    const at = new Date(wallClockToUtc({ ...today, hour, minute }, zone));
-    return Number.isNaN(at.getTime()) ? { at: null, precision: "unknown" } : { at, precision: "assumed" };
-  }
-
-  // A date with no time: real day, unknown hour. Not timeable, so not an
-  // instant — but the date is still enough to rule it in or out of today.
-  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(body);
-  if (dateOnly) {
-    return {
-      at: null,
-      precision: "unknown",
-      day: `${dateOnly[1]}-${dateOnly[2]}-${dateOnly[3]}`,
-    };
-  }
-
-  const parsed = new Date(body);
-  if (!Number.isNaN(parsed.getTime())) return { at: parsed, precision: "assumed" };
-  return { at: null, precision: "unknown" };
+  const match = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{1,2}):(\d{2})(?::\d{2}(?:\.\d+)?)?(?: ([A-Za-z]{1,4}))?$/.exec(text);
+  if (!match) return { ...unknown, day };
+  const zone = match[6] ? ZONE_ABBREVIATIONS[match[6].toUpperCase()] : timezone;
+  if (!isValidTimeZone(zone)) return { ...unknown, day };
+  const at = new Date(wallClockToUtc({ year: +match[1], month: +match[2], day: +match[3], hour: +match[4], minute: +match[5] }, zone));
+  // A spring-forward gap is not a real wall clock time. Do not move it to a
+  // different time and then present that new time as the provider's schedule.
+  const expected = match[4].padStart(2, "0") + ":" + match[5];
+  if (dayKey(at, zone) !== day || clockInZone(at, zone) !== expected) return { ...unknown, day };
+  return { at, precision: "assumed" };
 }
 
-/**
- * Normalize a macro-calendar feed into dated, timed events.
- *
- * Events resolving to a day other than today (in `timezone`) are dropped:
- * yesterday's CPI release must never be scored as an upcoming one. Events with
- * no resolvable time are kept — a high-impact event we cannot time is still a
- * fact worth reporting — but carry `at: null` so nothing downstream can invent
- * a countdown for them.
- */
-function normalizeCalendar(data, { timezone = "UTC", now = new Date(), limit = 10 } = {}) {
-  const zone = isValidTimeZone(timezone) ? timezone : "UTC";
-  const rows = Array.isArray(data) ? data : data?.events || data?.items || data?.data || [];
-  if (!Array.isArray(rows)) return { items: [], reason: "invalid-shape", dropped: 0 };
-  if (!rows.length) return { items: [], reason: "empty-feed", dropped: 0 };
-
-  const today = dayKey(now, zone);
-  let dropped = 0;
-
-  const items = rows
-    .map((row) => {
-      if (!row || typeof row !== "object") return null;
-      const title = String(row.title || row.event || row.name || "").trim();
-      if (!title) return null;
-
-      const impactRaw = String(row.impact || row.importance || "Low").trim();
-      const impact = impactRaw.charAt(0).toUpperCase() + impactRaw.slice(1).toLowerCase();
-
-      // A feed may split date and time; join them so the date is not lost.
-      const rawTime = row.time ?? row.datetime ?? row.date ?? row.timestamp ?? null;
-      const combined = row.date && row.time && !/\d{4}-\d{2}-\d{2}/.test(String(row.time))
-        ? `${String(row.date).trim()} ${String(row.time).trim()}`
-        : rawTime;
-
-      const resolved = resolveEventTime(combined, { timezone: zone, now });
-      const eventDay = resolved.at ? dayKey(resolved.at, zone) : resolved.day || null;
-
-      // Known to be another day — drop it rather than let it pose as today's.
-      if (eventDay && eventDay !== today) {
-        dropped += 1;
-        return null;
-      }
-
-      return {
-        at: resolved.at ? resolved.at.toISOString() : null,
-        time: resolved.at ? clockInZone(resolved.at, zone) : "--",
-        timezone: zone,
-        precision: resolved.precision,
-        title: title.slice(0, 120),
-        impact: IMPACTS.includes(impact) ? impact : "Low",
-        country: row.country ? String(row.country).slice(0, 40) : null,
-      };
-    })
-    .filter(Boolean)
-    .sort((a, b) => {
-      if (a.at && b.at) return Date.parse(a.at) - Date.parse(b.at);
-      if (a.at) return -1;
-      if (b.at) return 1;
-      return 0;
-    })
-    .slice(0, limit);
-
-  if (!items.length) {
-    return { items: [], reason: dropped ? "no-events-today" : "empty-feed", dropped };
-  }
-  return { items, reason: null, dropped };
-}
-
-module.exports = {
-  normalizeCalendar,
-  resolveEventTime,
-  isValidTimeZone,
-  dayKey,
-  clockInZone,
-  ZONE_ABBREVIATIONS,
+const COUNTRY_CODES = {
+  USD: "US", USA: "US", "United States": "US", GBP: "GB", "United Kingdom": "GB",
+  EUR: "EU", "Euro Area": "EU", JPY: "JP", Japan: "JP", CNY: "CN", China: "CN",
+  CAD: "CA", Canada: "CA", AUD: "AU", Australia: "AU", NZD: "NZ", "New Zealand": "NZ",
+  CHF: "CH", Switzerland: "CH", Germany: "DE", France: "FR", Italy: "IT", Spain: "ES",
 };
+const clean = (value, max = 120) => value == null ? null : String(value).trim().slice(0, max) || null;
+const reportedValue = value => /^(null|undefined|n\/a|nan|--|-)$/i.test(String(value).trim()) ? null : clean(value, 60);
+function releaseStatus(item, now = new Date()) {
+  if (item.actual != null) return "Released";
+  if (["Released", "Delayed", "Tentative"].includes(item.status)) return item.status;
+  if (!item.at || item.precision !== "exact") return "Tentative";
+  return Date.parse(item.at) <= now.getTime() ? "Delayed" : "Upcoming";
+}
+
+function compareEvents(a, b) {
+  return a.date.localeCompare(b.date) || (a.at && b.at ? a.at.localeCompare(b.at) : a.at ? -1 : b.at ? 1 : 0);
+}
+
+// All operational rows must carry a real date. Limits apply after date
+// filtering and deduplication; a busy morning cannot hide an afternoon CPI.
+function normalizeCalendar(data, { timezone = "UTC", now = new Date(), days = 1, startDate, limit = 2000, source = "Configured calendar feed" } = {}) {
+  const zone = isValidTimeZone(timezone) ? timezone : "UTC";
+  const rows = Array.isArray(data) ? data : data?.events ?? data?.items ?? data?.data;
+  if (!Array.isArray(rows)) return { items: [], reason: "invalid-shape", dropped: 0 };
+  const from = startDate || dayKey(now, zone);
+  const to = addDays(from, Math.max(1, Math.min(31, Number(days) || 1)) - 1);
+  let dropped = 0, invalid = 0;
+  const unique = new Map();
+  for (const row of rows) {
+    if (!row || typeof row !== "object") { invalid++; continue; }
+    const title = clean(row.title || row.event || row.name);
+    if (!title) { invalid++; continue; }
+    const raw = row.at ?? row.datetime ?? row.timestamp ??
+      (row.date && row.time && !/\d{4}-\d{2}-\d{2}/.test(String(row.time))
+        ? String(row.date).slice(0, 10) + " " + row.time : row.date ?? row.time);
+    const resolved = resolveEventTime(raw, { timezone: zone });
+    const date = resolved.at ? dayKey(resolved.at, zone) : resolved.day;
+    if (!validDate(date)) { invalid++; continue; }
+    if (date < from || date > to) { dropped++; continue; }
+    const precision = row.precision === "unknown" ? "unknown" : row.precision === "assumed" ? "assumed" : resolved.precision;
+    const at = precision === "unknown" ? null : resolved.at?.toISOString() || null;
+    const countryRaw = clean(row.country || row.currency, 40);
+    const country = COUNTRY_CODES[countryRaw] || countryRaw;
+    const impactRaw = String(row.impact || row.importance || "Low").toLowerCase();
+    const impact = ({ "3": "High", "2": "Medium", "1": "Low", high: "High", medium: "Medium", low: "Low" })[impactRaw] || "Low";
+    const status = clean(row.status, 20);
+    const item = {
+      id: clean(row.id, 100) || [country, title, date, at].join("|"),
+      date, at, time: at ? clockInZone(new Date(at), zone) : "--", timezone: zone,
+      precision, verified: precision === "exact" && row.verified !== false && !/^(tentative|delayed|cancelled)$/i.test(String(row.status || "")),
+      title, country, impact, forecast: reportedValue(row.forecast), previous: reportedValue(row.previous),
+      actual: reportedValue(row.actual), source,
+      status: status ? status.charAt(0).toUpperCase() + status.slice(1).toLowerCase() : null,
+    };
+    item.status = releaseStatus(item, now);
+    unique.set([country, title.toLowerCase(), date, at].join("|"), item);
+  }
+  const items = [...unique.values()].sort(compareEvents).slice(0, limit);
+  return { items, reason: !items.length && invalid === rows.length && rows.length ? "invalid-events" :
+    !items.length ? (dropped ? "no-events-today" : "empty-feed") : null, dropped, invalid };
+}
+
+module.exports = { compareEvents, normalizeCalendar, resolveEventTime, isValidTimeZone, dayKey, addDays, clockInZone, validDate, releaseStatus, ZONE_ABBREVIATIONS };

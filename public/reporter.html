@@ -129,11 +129,26 @@
           <div class="intel-grid intel-grid--2">
 
             <article class="intel-panel">
-              <div class="intel-panel-head">
+              <div class="intel-panel-head macro-calendar-head">
                 <span class="intel-panel-title" id="macro-calendar">Macro Calendar</span>
-                <span class="intel-panel-note">Today's scheduled events</span>
+                <span class="intel-panel-note" id="macroCalendarStatus" role="status">Loading live schedule…</span>
               </div>
-              <div class="intel-catalysts" id="catalystList">
+              <div class="macro-filters" aria-label="Economic calendar filters">
+                <label>Date range<select id="macroCalendarRange">
+                  <option value="today">Today</option><option value="tomorrow">Tomorrow</option>
+                  <option value="week">This Week</option><option value="nextweek">Next Week</option>
+                  <option value="7d">Next 7 Days</option><option value="14d">Next 14 Days</option>
+                </select></label>
+                <label>Country<select id="macroCalendarCountry"><option value="">All countries</option></select></label>
+                <label>Importance<select id="macroCalendarImpact"><option value="">All levels</option>
+                  <option>High</option><option>Medium</option><option>Low</option>
+                </select></label>
+                <label>Timezone<select id="macroCalendarTimezone"><option value="local">Local</option>
+                  <option value="UTC">UTC</option><option value="America/New_York">Eastern</option>
+                </select></label>
+              </div>
+              <p class="macro-source" id="macroCalendarSource"></p>
+              <div class="intel-catalysts macro-calendar-events" id="catalystList" aria-live="polite">
                 <div class="intel-empty">Loading scheduled catalysts&hellip;</div>
               </div>
               <div class="intel-catalyst-links">
@@ -383,6 +398,7 @@
 <script src="/assets/js/reporter-widgets.js"></script>
 <script src="/assets/js/tools.js"></script>
 <script src="/assets/js/reporter-market.js"></script>
+<script src="/assets/js/reporter-calendar.js"></script>
 <script src="/assets/js/reporter-news-log.js"></script>
 <script>
   /* ── Reporter ───────────────────────────────────────────── */
@@ -1625,6 +1641,7 @@
     // that runs without one mounts every panel on the spot.
     if (window.ReporterWidgets) window.ReporterWidgets.init();
     if (window.ReporterMarket) window.ReporterMarket.init();
+    if (window.ReporterCalendar) window.ReporterCalendar.init();
     setActiveTab(activeTab);
     openHashTarget();
 

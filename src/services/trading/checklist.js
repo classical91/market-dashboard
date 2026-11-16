@@ -92,6 +92,7 @@ function marketState(rawOverrides = {}) {
     bearMarket: null, // true | false | null
     dxyBullish: false,
     newsBlackout: false,
+    calendarUnavailable: false,
     openPositions: 0,
     totalRiskPct: 0,
     dailyLossPct: 0,
@@ -122,6 +123,9 @@ function runKillSwitches(state, config = getTradingConfig()) {
   }
   if (state.newsBlackout) {
     return "NEWS_WINDOW: High-impact event active";
+  }
+  if (state.calendarUnavailable) {
+    return "CALENDAR_UNAVAILABLE: Verify economic releases before trading";
   }
   if (state.atrRatio > config.maxAtrRatio) {
     return `VOLATILITY_SPIKE: ATR is ${state.atrRatio.toFixed(1)}x average`;

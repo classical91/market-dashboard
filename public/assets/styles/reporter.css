@@ -1201,3 +1201,27 @@ a.intel-feed-item:focus-visible { outline: 2px solid var(--intel-accent); outlin
 .news-log-error { margin-top: 4px; font-size: 12px; color: var(--red); overflow-wrap: anywhere; }
 .news-log-empty,
 .news-log-loading { font-size: 13px; color: var(--muted); padding: 10px 0; }
+
+/* Dated provider releases, read at the panel's own width. */
+.macro-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 12px 14px; }
+.macro-filters label { display: grid; gap: 5px; min-width: 0; color: var(--muted); font-size: 11px; }
+.macro-filters select { width: 100%; min-width: 0; padding: 9px 7px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface, #13232c); color: var(--text); font: inherit; }
+.macro-filters select:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.macro-source { margin: 0; padding: 0 14px 12px; color: var(--muted); font-size: 11px; line-height: 1.6; overflow-wrap: anywhere; }
+.macro-calendar-events { max-height: 620px; overflow-y: auto; }
+.macro-release { padding: 12px 8px; border-bottom: 1px solid var(--border); }
+.macro-release:nth-child(odd) { background: rgba(255,255,255,.018); }
+.macro-release-head { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+.macro-release-time { color: var(--muted); font-size: 11px; line-height: 1.5; }
+.macro-release-title { display: block; margin: 8px 0 5px; font-size: 12px; overflow-wrap: anywhere; }
+.macro-release-meta { color: var(--muted); font-size: 11px; }
+.macro-values { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 10px 0 0; }
+.macro-values dt { color: var(--dim); font-size: 10px; }
+.macro-values dd { margin: 4px 0 0; font-size: 12px; overflow-wrap: anywhere; }
+[data-quality="live"] { color: var(--green); }
+[data-quality="stale"], .macro-stale-warning { color: var(--amber); }
+[data-quality="unavailable"] { color: var(--red); }
+.macro-stale-warning { padding: 10px 8px; font-size: 11px; line-height: 1.6; }
+
+.macro-calendar-head { flex-wrap: wrap; gap: 6px; }
+#macroCalendarStatus { display: block; flex-basis: 100%; margin-left: 0; text-align: left; overflow-wrap: anywhere; }
