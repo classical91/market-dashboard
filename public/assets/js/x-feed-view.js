@@ -15,7 +15,7 @@
 
   var HOUR = 60 * 60 * 1000;
 
-  var VIEW_MODES = ["compact", "cards", "focus"];
+  var VIEW_MODES = ["compact", "cards", "media", "focus"];
   // Compact is the default for anyone who has not chosen: it is the densest
   // monitoring layout and the one that cannot leave a short post in a tall box.
   var DEFAULT_VIEW = "compact";

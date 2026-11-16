@@ -89,7 +89,7 @@ test("Compact is the default view, and a chosen view is persisted", () => {
   storage.setItem(FeedView.KEYS.view, "masonry");
   assert.equal(FeedView.readView(storage), "compact", "an unknown value is not trusted");
   assert.equal(FeedView.readView(null), "compact", "no storage still renders");
-  assert.deepEqual(FeedView.VIEW_MODES, ["compact", "cards", "focus"]);
+  assert.deepEqual(FeedView.VIEW_MODES, ["compact", "cards", "media", "focus"]);
 });
 
 test("background motion follows the OS until the reader chooses", () => {
