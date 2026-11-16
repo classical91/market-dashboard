@@ -79,6 +79,33 @@ function narrowVideo(video, expectedStatus) {
   };
 }
 
+/** The category picker can list this many; the registry allows far fewer. */
+const MAX_CATEGORIES = 50;
+
+/**
+ * The categories, as Main Hub's Live Now category picker needs them: an id to
+ * put in YouTube Intelligence's `?category=` link, a name, and a channel count.
+ *
+ * Only those three travel. The channels themselves — handles, ids, notes — do
+ * not: the picker opens YouTube Intelligence, which lists them behind login.
+ */
+function narrowCategories(categories) {
+  if (!Array.isArray(categories)) return [];
+  return categories
+    .map((category) => {
+      const id = String(category?.id || "").trim().slice(0, 80);
+      if (!id) return null;
+      const count = Number(category?.channelCount);
+      return {
+        id,
+        name: String(category?.name || id).replace(/\s+/g, " ").trim().slice(0, 60),
+        channelCount: Number.isFinite(count) && count > 0 ? Math.floor(count) : 0,
+      };
+    })
+    .filter(Boolean)
+    .slice(0, MAX_CATEGORIES);
+}
+
 /**
  * The live feed, narrowed.
  *
@@ -87,7 +114,7 @@ function narrowVideo(video, expectedStatus) {
  * — but an ordinary upload rendered under a LIVE badge is the one failure this
  * widget must never have, and the check costs nothing.
  */
-function narrowLiveFeed(payload) {
+function narrowLiveFeed(payload, categories) {
   const live = Array.isArray(payload?.live) ? payload.live : [];
   const upcoming = Array.isArray(payload?.upcoming) ? payload.upcoming : [];
 
@@ -104,6 +131,7 @@ function narrowLiveFeed(payload) {
       .slice(0, MAX_UPCOMING)
       .map((video) => narrowVideo(video, "upcoming"))
       .filter(Boolean),
+    categories: narrowCategories(categories),
     meta: {
       // "api" means we checked. "degraded" means the status lookup failed and
       // an empty list proves nothing. "unavailable" means there is no API key,
@@ -114,4 +142,4 @@ function narrowLiveFeed(payload) {
   };
 }
 
-module.exports = { narrowLiveFeed, MAX_LIVE, MAX_UPCOMING };
+module.exports = { narrowLiveFeed, narrowCategories, MAX_LIVE, MAX_UPCOMING, MAX_CATEGORIES };

@@ -139,6 +139,11 @@ added to the feed cannot start travelling to another origin by accident. Video
 IDs, titles, channel names, thumbnails, start times and viewer counts go; the
 API key, per-channel failure reasons, quota state and the wider video feed stay.
 
+`categories` also travels — `{ id, name, channelCount }` per category, nothing
+about the channels in them — for the Live Now card's YouTube Intelligence
+picker, which opens `youtube-v2.html?category=<id>`. Category names and counts
+become public with this route; channel handles and notes do not.
+
 `meta.liveDetection` travels because the widget's empty state depends on it:
 `api` means we checked and nothing is live, `degraded` means the status lookup
 failed so an empty list proves nothing, and `unavailable` means there is no API

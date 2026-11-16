@@ -56,7 +56,9 @@ function createYoutubeRouter({ youtubeService, channelRegistry, channelIdOverrid
       // Two minutes is the live-state TTL the service already keeps, so a
       // shorter cache here would only serve the same answer twice.
       res.set("Cache-Control", "public, max-age=60");
-      res.json(narrowLiveFeed(payload));
+      // The categories ride along for Live Now's "open YouTube Intelligence on a
+      // category" picker: id, name and channel count only (see narrowCategories).
+      res.json(narrowLiveFeed(payload, channelRegistry.listCategories()));
     }),
   );
 

@@ -91,3 +91,13 @@ test("the neighbouring YouTube routes still require a session", async () => {
     assert.equal(response.status, 401, `${path} stays behind the login`);
   }
 });
+
+test("the live feed carries the category list for Live Now's picker", async () => {
+  severUpstream();
+  const body = await (await fetch(`${base}/api/youtube/live`)).json();
+  assert.ok(Array.isArray(body.categories), "categories is a list");
+  assert.ok(body.categories.length > 0, "the seeded categories are listed");
+  for (const category of body.categories) {
+    assert.deepEqual(Object.keys(category).sort(), ["channelCount", "id", "name"]);
+  }
+});
