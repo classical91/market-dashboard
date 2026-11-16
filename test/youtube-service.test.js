@@ -287,6 +287,91 @@ test("D: an RSS outage with no cached feed reports rss-failed", async () => {
   assert.deepEqual(payload.videos, []);
 });
 
+test("a channel with zero public uploads can have an uploads playlist that returns 404", async (t) => {
+  const channel = CHANNELS[0];
+  const meta = channelMeta(channel.channelId, channel.label);
+  meta.items[0].statistics = { videoCount: "0" };
+  let now = Date.now();
+  t.mock.method(Date, "now", () => now);
+  let playlist = jsonResponse({ error: { errors: [{ reason: "playlistNotFound" }] } }, 404);
+  const calls = stubFetch({
+    "/channels?": jsonResponse(meta),
+    "/playlistItems?": () => playlist,
+  });
+  const service = makeService({ ttls: { uploads: 1000 } });
+
+  const empty = await service.getIntelligence([channel]);
+  assert.deepStrictEqual(empty.failedFeeds, []);
+  assert.deepStrictEqual(empty.channels[0].videos, []);
+  assert.equal(empty.channels[0].source, "api");
+  assert.equal(calls.length, 2, "an empty channel should skip RSS");
+  assert.ok(new URL(calls[0]).searchParams.get("part").split(",").includes("statistics"));
+
+  playlist = jsonResponse(playlistItems("new-upload", "First public upload"));
+  await service.getChannelFeed(channel);
+  assert.equal(calls.length, 2, "cache the empty result for the upload TTL");
+  now += 1000;
+  const recovered = await service.getChannelFeed(channel);
+  assert.equal(recovered.videos[0].id, "new-upload");
+});
+
+test("a missing playlist on a channel with public uploads still falls back to RSS", async () => {
+  const channel = CHANNELS[0];
+  const meta = channelMeta(channel.channelId, channel.label);
+  meta.items[0].statistics = { videoCount: "4" };
+  stubFetch({
+    "/channels?": jsonResponse(meta),
+    "/playlistItems?": jsonResponse({ error: { errors: [{ reason: "playlistNotFound" }] } }, 404),
+    "feeds/videos.xml": xmlResponse(rssFeed(channel.label, "rss-upload")),
+  });
+
+  const feed = await makeService().getChannelFeed(channel);
+  assert.equal(feed.source, "rss");
+  assert.equal(feed.videos[0].id, "rss-upload");
+});
+
+test("unresolved handles share an attempt and retry after the failure cache expires", async (t) => {
+  const channel = { ...CHANNELS[0], channelId: "" };
+  let now = Date.now();
+  t.mock.method(Date, "now", () => now);
+  let resolved = false;
+  const calls = stubFetch({
+    forHandle: () => jsonResponse({ items: resolved ? [{ id: CHANNELS[0].channelId }] : [] }),
+    forUsername: jsonResponse({ items: [] }),
+    "/channels?": jsonResponse(channelMeta(CHANNELS[0].channelId, channel.label)),
+    "/playlistItems?": jsonResponse(playlistItems("vid-a", "An upload")),
+  });
+  const warnings = [];
+  const service = makeService({ ttls: { feedFailure: 1000 }, logger: { warn: (message) => warnings.push(message) } });
+
+  const request = () => assert.rejects(service.getChannelFeed(channel), { reason: FAILURE_REASONS.CHANNEL_ID_UNRESOLVED });
+  await Promise.all([request(), request()]);
+  resolved = true;
+  await request();
+  assert.equal(calls.length, 2);
+  assert.equal(warnings.length, 1);
+
+  now += 1000;
+  assert.equal((await service.getChannelFeed(channel)).videos[0].id, "vid-a");
+});
+
+test("correcting a configured channel ID bypasses its cached failure", async () => {
+  const channel = CHANNELS[0];
+  const correctedId = CHANNELS[1].channelId;
+  const calls = stubFetch({
+    "feeds/videos.xml": (url) => url.includes(correctedId)
+      ? xmlResponse(rssFeed(channel.label, "corrected-upload"))
+      : xmlResponse("", 404),
+  });
+  const service = makeService({ apiKey: "" });
+
+  await assert.rejects(service.getChannelFeed(channel), { reason: FAILURE_REASONS.RSS_FAILED });
+  const feed = await service.getChannelFeed({ ...channel, channelId: correctedId });
+  assert.equal(feed.channelId, correctedId);
+  assert.equal(feed.videos[0].id, "corrected-upload");
+  assert.equal(calls.length, 2);
+});
+
 /* ── E. One channel fails, the others work ─────────────────────────────── */
 
 test("E: one broken channel does not take the other channels down", async () => {
