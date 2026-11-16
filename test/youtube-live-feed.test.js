@@ -194,7 +194,7 @@ test("internal state and failure detail never travel", () => {
   assert.ok(!serialized.includes("failedFeeds"), "per-channel failures stay here");
   assert.ok(!serialized.includes("unrelated"), "the wider feed stays here");
 
-  assert.deepEqual(Object.keys(result).sort(), ["live", "meta", "upcoming"]);
+  assert.deepEqual(Object.keys(result).sort(), ["categories", "live", "meta", "upcoming"]);
   assert.deepEqual(Object.keys(result.meta).sort(), ["generatedAt", "liveDetection"]);
   assert.deepEqual(Object.keys(result.live[0]).sort(), [
     "actualStartTime", "channelHandle", "channelName", "scheduledStartTime",
@@ -208,4 +208,24 @@ test("a long live list is capped", () => {
 
   assert.equal(result.live.length, 12);
   assert.equal(result.upcoming.length, 5);
+});
+
+// Live Now's category picker on Main Hub opens YouTube Intelligence on one
+// category. It needs an id, a name and a count — and nothing about the channels.
+test("categories travel as id, name and channel count only", () => {
+  const { narrowCategories } = require("../src/services/youtube-live-feed");
+  const result = narrowLiveFeed(payload(), [
+    { id: "cat-tech", name: "Tech", slug: "tech", createdAt: "2026-01-01T00:00:00.000Z", channelCount: 21 },
+    { id: "uncategorized", name: "Uncategorized", slug: "uncategorized", channelCount: 2, virtual: true },
+    { id: "", name: "No id" },
+    { id: "cat-bad", name: "Bad count", channelCount: -4 },
+  ]);
+
+  assert.deepEqual(result.categories, [
+    { id: "cat-tech", name: "Tech", channelCount: 21 },
+    { id: "uncategorized", name: "Uncategorized", channelCount: 2 },
+    { id: "cat-bad", name: "Bad count", channelCount: 0 },
+  ]);
+  assert.deepEqual(narrowCategories(undefined), []);
+  assert.deepEqual(narrowLiveFeed(payload()).categories, []);
 });
