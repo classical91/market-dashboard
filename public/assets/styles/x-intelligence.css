@@ -116,9 +116,10 @@ body[data-x-accent] .x-account-card--all.active { border-color: var(--x-accent);
   margin-bottom: 10px;
 }
 .x-account-actions a {
-  --x-shortcut-bg: color-mix(in srgb, var(--x-accent, var(--purple)) 28%, var(--surface));
-  --x-shortcut-border: var(--x-accent, var(--purple));
+  --x-shortcut-bg: color-mix(in srgb, var(--x-accent, var(--purple)) 10%, transparent);
+  --x-shortcut-border: color-mix(in srgb, var(--x-accent, var(--purple)) 65%, transparent);
   --x-shortcut-text: var(--text);
+  --x-shortcut-sheen: linear-gradient(180deg, rgba(255,255,255,.14), rgba(255,255,255,.035) 48%, transparent 52%);
   display: flex;
   flex: 1;
   align-items: center;
@@ -127,15 +128,19 @@ body[data-x-accent] .x-account-card--all.active { border-color: var(--x-accent);
   min-height: 44px;
   padding: 10px 9px;
   border-color: var(--x-shortcut-border);
-  background: linear-gradient(135deg, rgba(255,255,255,.06), transparent), var(--x-shortcut-bg);
+  background: var(--x-shortcut-sheen), var(--x-shortcut-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   color: var(--x-shortcut-text);
   font-weight: 800;
   box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 3px 12px rgba(0,0,0,.24);
+  transition: border-color .18s ease, box-shadow .18s ease, background-color .18s ease;
   white-space: nowrap;
 }
 .x-account-actions a:hover {
-  border-color: var(--x-shortcut-border);
-  background: color-mix(in srgb, var(--x-accent, var(--purple)) 38%, var(--surface));
+  --x-shortcut-bg: color-mix(in srgb, var(--x-accent, var(--purple)) 18%, transparent);
+  border-color: var(--x-accent, var(--purple));
+  background: var(--x-shortcut-sheen), var(--x-shortcut-bg);
   color: var(--x-shortcut-text);
   box-shadow: 0 0 0 1px var(--x-shortcut-border), 0 4px 14px rgba(0,0,0,.28);
 }
@@ -229,14 +234,96 @@ body[data-x-accent] .x-account-card--all.active { border-color: var(--x-accent);
 
 /* ── X Search ─────────────────────────────────────────────── */
 .x-search-panel {
-  padding: 12px 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
+  position: relative;
+  z-index: 30;
+  margin-bottom: 10px;
 }
-.x-search-panel > label { font-size: 13px; font-weight: 700; }
-.x-search-panel .x-search-form { margin-top: 8px; }
-.x-search-panel p { margin-top: 7px; color: var(--muted); font-size: 12px; }
+.x-search-trigger {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--x-accent, var(--purple)) 40%, transparent);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(255,255,255,.06), transparent),
+    color-mix(in srgb, var(--x-accent, var(--purple)) 7%, transparent);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+.x-search-trigger > svg:first-child { color: var(--x-accent, var(--purple)); flex-shrink: 0; }
+.x-search-trigger-chevron { margin-left: auto; transition: transform .18s ease; }
+.x-search-trigger[aria-expanded="true"] .x-search-trigger-chevron { transform: rotate(180deg); }
+.x-search-trigger:hover,
+.x-search-trigger[aria-expanded="true"] {
+  border-color: var(--x-accent, var(--purple));
+  box-shadow: 0 0 16px color-mix(in srgb, var(--x-accent, var(--purple)) 16%, transparent);
+}
+.x-search-trigger:focus-visible {
+  outline: 2px solid var(--x-accent, var(--purple));
+  outline-offset: 3px;
+}
+.x-search-popover {
+  position: absolute;
+  top: 0;
+  right: calc(100% + 12px);
+  width: min(360px, calc(100vw - 32px));
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--x-accent, var(--purple)) 65%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 12px 32px rgba(0,0,0,.4),
+    0 0 24px color-mix(in srgb, var(--x-accent, var(--purple)) 23%, transparent);
+  animation: x-search-appear .18s ease-out;
+}
+@property --x-search-angle { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
+.x-search-popover::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  padding: 1px;
+  border-radius: inherit;
+  background: conic-gradient(from var(--x-search-angle), transparent 30%,
+    var(--x-accent, var(--purple)) 48%, rgba(255,255,255,.85) 50%,
+    var(--x-accent, var(--purple)) 52%, transparent 70%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  animation: x-search-border 3s linear infinite;
+}
+@keyframes x-search-border { to { --x-search-angle: 360deg; } }
+@keyframes x-search-appear {
+  from { opacity: 0; transform: translateY(-5px) scale(.98); }
+  to { opacity: 1; transform: none; }
+}
+.x-search-popover > label { font-size: 12px; font-weight: 700; }
+.x-search-popover .x-search-form { gap: 7px; margin-top: 8px; }
+.x-search-popover .x-search-input { padding: 10px 11px; border-radius: 8px; font-size: 12px; }
+.x-search-popover .x-search-input:focus { border-color: var(--x-accent, var(--purple)); }
+.x-search-popover .x-search-submit {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 0 12px; border-radius: 8px; font-size: 12px;
+  border-color: color-mix(in srgb, var(--x-accent, var(--purple)) 55%, transparent);
+  background: color-mix(in srgb, var(--x-accent, var(--purple)) 18%, transparent);
+}
+.x-search-popover .x-search-submit:hover { border-color: var(--x-accent, var(--purple)); }
+.x-search-popover .x-search-submit:focus-visible { outline: 2px solid var(--x-accent, var(--purple)); outline-offset: 2px; }
+.x-search-popover p { margin-top: 8px; color: var(--muted); font-size: 11px; }
+body[data-x-motion="off"] .x-search-popover,
+body[data-x-motion="off"] .x-search-popover::before { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .x-search-popover, .x-search-popover::before { animation: none; }
+  .x-account-actions a, .x-search-trigger-chevron { transition: none; }
+}
 .x-search-form {
   display: flex;
   gap: 10px;
@@ -845,6 +932,8 @@ body[data-x-accent] .x-account-card--all.active { border-color: var(--x-accent);
     gap: 6px;
   }
 
+  .x-search-popover { top: calc(100% + 8px); right: 0; }
+
   .x-account-toggle {
     display: flex;
     align-items: center;
@@ -988,6 +1077,9 @@ body[data-x-accent] .x-account-card--all.active { border-color: var(--x-accent);
   .x-split.is-rail-collapsed .x-account-panel-head { flex-direction: column-reverse; }
   .x-split.is-rail-collapsed .x-account-rail-toggle { width: 100%; height: 38px; }
   .x-split.is-rail-collapsed .x-account-manage { justify-content: center; padding: 10px 0; }
+  .x-split.is-rail-collapsed .x-search-trigger { justify-content: center; padding: 10px; }
+  .x-split.is-rail-collapsed .x-search-trigger-label,
+  .x-split.is-rail-collapsed .x-search-trigger-chevron { display: none; }
   .x-split.is-rail-collapsed .x-account-actions { flex-direction: column; }
   .x-split.is-rail-collapsed .x-account-actions a { padding: 6px 3px; font-size: 11px; }
   .x-split.is-rail-collapsed .x-account-action-icon { display: inline; }

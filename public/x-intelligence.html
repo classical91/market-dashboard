@@ -39,17 +39,6 @@
       </div>
     </div>
 
-    <section class="x-search-panel" aria-labelledby="xSearchLabel">
-      <label id="xSearchLabel" for="xSearchInput">Search X</label>
-      <form class="x-search-form" id="xSearchForm">
-        <input class="x-search-input" id="xSearchInput" type="search"
-               placeholder="Keyword, $ticker, or from:handle&hellip;" autocomplete="off"
-               aria-describedby="xSearchHint" />
-        <button class="x-search-submit" id="xSearchSubmit" type="submit">Search &#8599;</button>
-      </form>
-      <p id="xSearchHint">Search all of X. Results open in a new tab.</p>
-    </section>
-
     <div class="x-split">
       <div class="x-timeline-pane">
         <div class="x-timeline-head">
@@ -113,6 +102,26 @@
         </p>
       </div>
       <div class="x-account-panel is-collapsed" id="xAccountPanel">
+        <section class="x-search-panel" aria-label="Search X">
+          <button type="button" class="x-search-trigger" id="xSearchToggle"
+                  aria-expanded="false" aria-controls="xSearchPopover" aria-label="Search X" title="Search X">
+            <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" /><path d="m13 13 4 4" /></svg>
+            <span class="x-search-trigger-label">Search X</span>
+            <svg class="x-search-trigger-chevron" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="m4 6 4 4 4-4" /></svg>
+          </button>
+          <div class="x-search-popover" id="xSearchPopover" hidden>
+            <label id="xSearchLabel" for="xSearchInput">Search all of X</label>
+            <form class="x-search-form" id="xSearchForm" role="search" aria-label="Search X">
+              <input class="x-search-input" id="xSearchInput" type="search"
+                     placeholder="Keyword, $ticker, from:handle&hellip;" autocomplete="off"
+                     aria-describedby="xSearchHint" />
+              <button class="x-search-submit" id="xSearchSubmit" type="submit">Search
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M4 12 12 4M4 4h8v8" /></svg>
+              </button>
+            </form>
+            <p id="xSearchHint">Results open in a new tab.</p>
+          </div>
+        </section>
         <nav class="x-timeline-actions x-account-actions" aria-label="X workspace shortcuts">
           <a class="x-shortcut--x" id="xTimelineLink" href="https://x.com/" target="_blank" rel="noopener"
              title="Open on X" aria-label="Open on X">
