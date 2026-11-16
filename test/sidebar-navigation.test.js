@@ -9,8 +9,8 @@ const sidebar = fs.readFileSync(path.join(__dirname, "..", "public/assets/js/sid
 
 test("primary sidebar order and removed links stay exact", () => {
   const labels = [
-    "Overview",
     "Terminal Suite",
+    "Overview v2",
     "Trades",
     "TradeHunter",
     "AI Analysis",
@@ -180,11 +180,11 @@ test("shared account UI uses the existing auth endpoints", () => {
   assert.match(sidebar, /href="\/login\?returnTo=/);
 });
 
-test("Overview is a direct link without the Widgets menu", () => {
+test("Overview remains a direct child link without the Widgets menu", () => {
   const start = sidebar.indexOf('label: "Overview"');
   const menu = sidebar.slice(sidebar.lastIndexOf("{", start), sidebar.indexOf('label: "TradeHunter"'));
   assert.match(menu, /href: "\/",\s*label: "Overview"/);
-  const overview = menu.slice(0, menu.indexOf('label: "Overview v2"'));
+  const overview = sidebar.slice(sidebar.lastIndexOf("{", start), sidebar.indexOf("}", start) + 1);
   assert.doesNotMatch(overview, /children:/, "Overview has no empty dropdown");
   assert.doesNotMatch(sidebar, /label: "Widgets"|href: "\/#/, "widget jump links left the sidebar");
   assert.doesNotMatch(menu, /heatmaps\.html|label: "Heatmaps"/, "Heatmaps belongs under Screeners");

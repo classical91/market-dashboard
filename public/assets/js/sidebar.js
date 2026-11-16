@@ -20,11 +20,20 @@
   var accountState = null;
 
   var workspace = [
-    { href: "/", label: "Overview" },
-    // Overview answers "what is happening?"; Terminal, one step deeper,
-    // answers "why, and what does it mean for a trade?".
-    { href: "/overview-v2", label: "Overview v2" },
-    { href: "/terminal-suite.html", label: "Terminal Suite" },
+    {
+      href: "/terminal-suite.html",
+      label: "Terminal Suite",
+      children: [
+        { href: "/reporter.html", label: "Reporter Room" },
+      ],
+    },
+    {
+      href: "/overview-v2",
+      label: "Overview v2",
+      children: [
+        { href: "/", label: "Overview" },
+      ],
+    },
     {
       // The trade workflow in one place: the trades you are running, the
       // engine that plans them, and the lab that backtests the setups.
