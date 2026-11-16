@@ -50,6 +50,8 @@ const { createBroadcastLedgerRouter } = require("./routes/broadcast-ledger");
 const { createReporterRouter } = require("./routes/reporter");
 const { createReporterNewsLogRouter } = require("./routes/reporter-news-log");
 const { createPhoneBriefingsRouter } = require("./routes/phone-briefings");
+const { NewsBatchRequestStore, NewsBatchRequestService } = require("./services/news-batch-requests");
+const { createNewsBatchRequestsRouter } = require("./routes/news-batch-requests");
 const { createDailyTopNewsRouter } = require("./routes/daily-top-news");
 const { createDeskTelegramRouter } = require("./routes/desk-telegram");
 const { FarmbotTop10Service } = require("./services/farmbot-top10");
@@ -772,6 +774,11 @@ function createApp() {
     telegramService,
     broadcastLedgerStore,
     requireAdmin,
+  }));
+  app.locals.newsBatchRequests = new NewsBatchRequestService({ store: new NewsBatchRequestStore({ dataDir }) });
+  app.use("/api/news-batch-requests", createNewsBatchRequestsRouter({
+    service: app.locals.newsBatchRequests,
+    requireOwner: requireXAdmin,
   }));
   app.use("/api/daily-top-news", createDailyTopNewsRouter({
     briefingStore: phoneBriefingStore,
