@@ -41,7 +41,7 @@ function handoffResponse(store, result, pusher = null, env = process.env) {
  * error). Shared by POST /api/farmclaw/handoffs and its /api/x/farmclaw alias.
  */
 async function requestAndPush(store, pusher, body) {
-  const result = store.request({ url: body.url, handle: body.handle, text: body.text });
+  const result = store.request({ url: body.url, handle: body.handle, text: body.text, image: body.image });
   if (pusher?.enabled && result.record.status === "pending") {
     await pushWithin(pusher, result.record.id);
     return { ...result, record: store.get(result.record.id) || result.record };

@@ -7,7 +7,7 @@ const vm = require("node:vm");
 const source = fs.readFileSync(path.join(__dirname, "../public/assets/js/x-broadcast.js"), "utf8");
 const url = "https://x.com/example/status/123";
 const flush = () => new Promise((resolve) => setImmediate(resolve));
-function fixture() {
+function fixture(post = {}) {
   const values = new Map();
   const reads = [];
   const writes = [];
@@ -27,7 +27,7 @@ function fixture() {
     ownerDocument: { createElement: () => ({ setAttribute: () => {} }) },
     parentNode: { appendChild: (note) => notes.push(note) },
     addEventListener: (name, fn) => { handlers[name] = fn; } };
-  api.bindFarmclawButton(button, { url });
+  api.bindFarmclawButton(button, { url, ...post });
   return { api, reads, writes, timers, values, button, handlers, notes };
 }
 function response(body, status = 200) { return { ok: status < 400, status, text: async () => JSON.stringify(body) }; }
@@ -39,7 +39,7 @@ test("button keeps checking after delivery, then shows the confirmed FarmBot Que
   assert.equal(f.button.textContent, "FarmClaw received"); assert.equal(f.timers.length,1);
   f.timers[0]();
   f.reads[1].resolve(response({ ...received, farmbotQueue: { confirmed:true,queueItemId:"42",dispatchActive:false,dispatchStatus:"PENDING" } }));
-  await flush(); assert.equal(f.button.textContent,"FarmBot queued");
+  await flush(); assert.equal(f.button.textContent,"FarmClaw queued");
   assert.match(f.notes[0].textContent,/Queue #42.*held/); assert.equal(f.writes.length,0);
 });
 
@@ -138,4 +138,23 @@ test("FarmBot link is hidden on failure and never uses a non-https URL", async (
   g.timers[0]();
   g.reads[1].resolve(response({ id: "fch_123", status: "failed", error: "boom" })); await flush();
   assert.equal(g.notes.find((n) => n.className === "x-post-farmbot-link").hidden, true);
+});
+
+
+test("FarmClaw button sends the card photo with the source", () => {
+  const image = "https://pbs.twimg.com/media/source.jpg";
+  const f = fixture({ handle: "example", text: "Source caption", image });
+  f.handlers.click();
+  assert.deepEqual(JSON.parse(f.writes[0].options.body), { url, handle: "example", text: "Source caption", image });
+});
+
+
+test("confirmed FarmClaw queue status reports saved photos and text-only rows", async () => {
+  for (const hasImage of [true, false]) {
+    const f = fixture();
+    f.reads[0].resolve(response({ ...received, farmbotQueue: { confirmed: true, queueItemId: "42", dispatchActive: true, dispatchStatus: "PENDING", hasImage } }));
+    await flush();
+    assert.equal(f.button.textContent, "FarmClaw queued");
+    assert.match(f.notes[0].textContent, hasImage ? /Photo included/ : /Text only — no photo saved/);
+  }
 });

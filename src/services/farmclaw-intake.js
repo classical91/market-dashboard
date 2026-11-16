@@ -150,6 +150,7 @@ class FarmclawIntakeStore {
         canonicalUrl: handoff.canonicalUrl || null,
         handle: handoff.handle || null,
         text: handoff.text || null,
+        image: handoff.image || null,
         status: "open",
         createdAt: now,
         updatedAt: now,

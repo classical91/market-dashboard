@@ -408,6 +408,7 @@
     disconnected: "FarmClaw not connected",
     claimed: "FarmClaw picked up",
     sent: "FarmClaw received",
+    confirmed: "FarmClaw queued",
     failure: "FarmClaw failed",
   };
   var FARMCLAW_POLL_MS = 5000;
@@ -481,7 +482,7 @@
       // Colour follows the handoff: green once FarmClaw has picked it up (or
       // further), red on failure, amber otherwise.
       var tone = label === FARMCLAW_LABELS.failure ? "failed"
-        : label === FARMCLAW_LABELS.claimed || label === FARMCLAW_LABELS.sent || label === "FarmBot queued" ? "picked"
+        : label === FARMCLAW_LABELS.claimed || label === FARMCLAW_LABELS.sent || label === FARMCLAW_LABELS.confirmed ? "picked"
         : "";
       if (typeof button.setAttribute === "function") {
         if (tone) button.setAttribute("data-state", tone);
@@ -509,7 +510,9 @@
         rememberSent(url, null, FARMCLAW_SENT_KEY);
         forgetSent(url, FARMCLAW_QUEUED_KEY);
         var detail = "FarmBot Queue #" + queue.queueItemId + (queue.dispatchActive === false ? " — held for your review and activation." : " — " + queue.dispatchStatus + ".");
-        show("FarmBot queued", detail, detail);
+        if (queue.hasImage === true) detail += " Photo included.";
+        else if (queue.hasImage === false) detail += " Text only — no photo saved.";
+        show(FARMCLAW_LABELS.confirmed, detail, detail);
         offerFarmbot(queueUrl, "View #" + queue.queueItemId + " in FarmBot \u2197", "Open FarmBot Queue to see item #" + queue.queueItemId);
         return true;
       }
@@ -604,7 +607,7 @@
       request("/api/farmclaw/handoffs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: url, handle: post.handle || null, text: post.text || null }),
+        body: JSON.stringify({ url: url, handle: post.handle || null, text: post.text || null, image: post.image || null }),
       }).then(
         function (handoff) {
           button.disabled = false;
