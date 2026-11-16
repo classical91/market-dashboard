@@ -20,6 +20,19 @@
       </div>
     </div>
 
+    <section class="briefing-card news-request-panel" aria-labelledby="newsRequestTitle">
+      <h2 class="topnews-desk-title" id="newsRequestTitle">Request FarmClaw News</h2>
+      <p class="topnews-note">Ask Penny to assign a fresh Top 10 across Economics, Stocks and Crypto to FarmClaw. Preview only · Your approval is required before publication.</p>
+      <form id="newsRequestForm" class="news-request-form">
+        <label>Batch type <select disabled><option>Top 10 — Economics, Stocks and Crypto</option></select></label>
+        <label>Research window <select id="newsRequestWindow"><option value="24">Last 24 hours</option><option value="48">Last 48 hours — explain older stories</option></select></label>
+        <label class="news-request-instructions">Additional instructions (optional)<textarea id="newsRequestInstructions" rows="2" maxlength="2000" placeholder="Topics or sources to prioritize"></textarea></label>
+        <button type="submit" class="briefing-btn topnews-run" id="newsRequestSubmit">Request News Batch</button>
+      </form>
+      <p id="newsRequestMessage" class="topnews-note" role="status">Loading requests…</p>
+      <div id="newsRequestList" aria-live="polite"></div>
+    </section>
+
     <div class="topnews-toolbar">
       <div class="topnews-day" role="group" aria-label="Day">
         <button type="button" class="briefing-btn topnews-step" id="topNewsPrev" aria-label="Previous day">&lsaquo;</button>
@@ -56,5 +69,6 @@
 <script src="/assets/js/briefing-freshness.js"></script>
 <script src="/assets/js/top-news-selection.js"></script>
 <script src="/assets/js/top-news.js"></script>
+<script src="/assets/js/news-batch-requests.js"></script>
 </body>
 </html>

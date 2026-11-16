@@ -1,5 +1,14 @@
 # Market Dashboard
 
+On-demand FarmClaw news: Today's Top 10 now has a **Request News Batch** panel.
+It creates a durable Top 10 ticket for Penny to assign to FarmClaw; review and
+approval still happen in FarmBot. Set `NEWS_BATCH_AGENT_OFFICE_URL` (HTTPS) and
+`NEWS_BATCH_SERVICE_TOKEN` (a dedicated 32+ character token shared only with Agent
+Office), plus the existing `FARMBOT_NEWS_API_URL`, `FARMBOT_NEWS_READER_TOKEN` and
+`FARMBOT_NEWS_APPROVAL_BASE_URL`. This path does not need the dashboard's OpenAI
+or FarmBot preparer credentials. Keep `DATA_DIR` on persistent storage. See
+[setup, recovery and approval boundaries](docs/news-batch-requests.md).
+
 Market Dashboard is a Node.js/Express market intelligence workspace. It serves static dashboard pages from `public/` and exposes API routes under `/api/*` for overview data, on-chain analytics, YouTube channel intelligence, Telegram/reporting workflows, and health checks.
 
 The app is intentionally lightweight: no bundler, no frontend framework, and no TypeScript migration yet. Frontend behavior is vanilla JavaScript with shared UI helpers and CSS primitives.
