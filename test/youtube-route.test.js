@@ -3,8 +3,7 @@
 // Boots the real app and checks the /api/youtube/channels contract: that a
 // total outage degrades into `failedFeeds` rather than a 500 or a leaked
 // configuration detail, and that a healthy fetch returns the shape the
-// frontend reads. Order matters — the outage case runs first, while nothing
-// is cached yet.
+// frontend reads. Each test boots a fresh app so its cache starts empty.
 
 const test = require("node:test");
 const assert = require("node:assert");
@@ -35,13 +34,13 @@ function jsonResponse(body, status = 200) {
   };
 }
 
-test.before(async () => {
+test.beforeEach(async () => {
   server = http.createServer(createApp());
   await new Promise((resolve) => server.listen(0, resolve));
   base = `http://127.0.0.1:${server.address().port}`;
 });
 
-test.after(() => {
+test.afterEach(() => {
   global.fetch = originalFetch;
   return new Promise((resolve) => server.close(resolve));
 });

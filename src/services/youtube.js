@@ -44,6 +44,7 @@ const DEFAULT_TTLS = {
   videoStatus: 2 * 60 * 1000,
   // Served only when the live paths are all failing.
   lastGood: 24 * 60 * 60 * 1000,
+  feedFailure: 2 * 60 * 1000,
   liveSearch: 30 * 60 * 1000,
 };
 
@@ -277,10 +278,13 @@ class YouTubeIntelligenceService {
         );
       }
 
-      throw feedError(
+      const error = feedError(
         FAILURE_REASONS.API_REJECTED,
         `${resource}.list returned ${response.status}${apiReason ? ` (${apiReason})` : ""}: ${apiMessage}`,
       );
+      error.providerStatus = response.status;
+      error.providerReason = apiReason;
+      throw error;
     }
 
     try {
@@ -329,7 +333,7 @@ class YouTubeIntelligenceService {
   /** channels.list: uploads playlist + display title. 1 unit, cached 24h. */
   async getChannelMeta(channelId) {
     return this.cache.getOrLoad(`yt:meta:${channelId}`, this.ttls.channelMeta, async () => {
-      const data = await this.apiRequest("channels", { part: "snippet,contentDetails", id: channelId });
+      const data = await this.apiRequest("channels", { part: "snippet,contentDetails,statistics", id: channelId });
       const item = data?.items?.[0];
       if (!item) {
         throw feedError(FAILURE_REASONS.API_REJECTED, `channels.list returned no channel for id ${channelId}`);
@@ -340,6 +344,7 @@ class YouTubeIntelligenceService {
         title: item.snippet?.title || null,
         thumbnail: bestThumbnail(item.snippet?.thumbnails, null),
         uploadsPlaylistId: item.contentDetails?.relatedPlaylists?.uploads || null,
+        hasNoPublicUploads: item.statistics?.videoCount === "0",
       };
     });
   }
@@ -351,18 +356,31 @@ class YouTubeIntelligenceService {
    */
   async getUploadsViaApi(channel, channelId) {
     const meta = await this.getChannelMeta(channelId);
-    if (!meta.uploadsPlaylistId) {
-      throw feedError(FAILURE_REASONS.API_REJECTED, `channel ${channelId} exposes no uploads playlist`);
-    }
 
     return this.cache.getOrLoad(`yt:uploads:${channelId}`, this.ttls.uploads, async () => {
-      const data = await this.apiRequest("playlistItems", {
-        part: "snippet,contentDetails",
-        playlistId: meta.uploadsPlaylistId,
-        maxResults: String(this.maxVideosPerChannel),
-      });
+      const feed = { channelId, title: meta.title || channel.label, videos: [], source: "api" };
+      if (!meta.uploadsPlaylistId) {
+        if (meta.hasNoPublicUploads) return feed;
+        throw feedError(FAILURE_REASONS.API_REJECTED, `channel ${channelId} exposes no uploads playlist`);
+      }
 
-      const videos = (data?.items || [])
+      let data;
+      try {
+        data = await this.apiRequest("playlistItems", {
+          part: "snippet,contentDetails",
+          playlistId: meta.uploadsPlaylistId,
+          maxResults: String(this.maxVideosPerChannel),
+        });
+      } catch (error) {
+        // YouTube can list an uploads playlist ID before the channel has any
+        // public uploads, then answer playlistNotFound when asked for its items.
+        if (meta.hasNoPublicUploads && error.providerStatus === 404 && error.providerReason === "playlistNotFound") {
+          return feed;
+        }
+        throw error;
+      }
+
+      feed.videos = (data?.items || [])
         .map((item) => {
           const videoId = item.contentDetails?.videoId || item.snippet?.resourceId?.videoId;
           if (!videoId) return null;
@@ -378,7 +396,7 @@ class YouTubeIntelligenceService {
         })
         .filter(Boolean);
 
-      return { channelId, title: meta.title || channel.label, videos, source: "api" };
+      return feed;
     });
   }
 
@@ -512,7 +530,34 @@ class YouTubeIntelligenceService {
       throw createServiceError(`Unknown YouTube channel: ${channelOrHandle}`, 404);
     }
 
-    const lastGoodKey = `yt:lastgood:${channel.handle}`;
+    const configuredId = isChannelId(channel.channelId) ? channel.channelId : "";
+    const cacheScope = `${channel.handle}:${configuredId}`;
+    const lastGoodKey = `yt:lastgood:${cacheScope}`;
+    const failureKey = `yt:feed-failure:${cacheScope}`;
+
+    // Share the full attempt across simultaneous page and widget requests.
+    // Successful refreshes already use the uploads caches. Store only failures
+    // here so a bad source cannot start a new provider call on every page load.
+    const result = await this.cache.getOrLoad(failureKey, 0, async () => {
+      try {
+        const feed = await this.loadChannelFeed(channel);
+        this.cache.set(lastGoodKey, feed, this.ttls.lastGood);
+        return { feed };
+      } catch (error) {
+        return this.cache.set(failureKey, { error }, this.ttls.feedFailure);
+      }
+    });
+
+    if (result.feed) return { ...result.feed, handle: channel.handle, stale: false };
+
+    const lastGood = this.cache.get(lastGoodKey);
+    if (lastGood) {
+      return { ...lastGood, handle: channel.handle, source: "cache", stale: true };
+    }
+    throw result.error;
+  }
+
+  async loadChannelFeed(channel) {
     let channelId = null;
     let firstError = null;
 
@@ -525,9 +570,7 @@ class YouTubeIntelligenceService {
 
     if (channelId && this.apiConfigured) {
       try {
-        const feed = await this.getUploadsViaApi(channel, channelId);
-        this.cache.set(lastGoodKey, feed, this.ttls.lastGood);
-        return { ...feed, handle: channel.handle, stale: false };
+        return await this.getUploadsViaApi(channel, channelId);
       } catch (error) {
         this.log(`@${channel.handle}: API uploads failed, trying RSS — ${error.detail || error.message}`);
         firstError = firstError || error;
@@ -536,20 +579,11 @@ class YouTubeIntelligenceService {
 
     if (channelId) {
       try {
-        const feed = await this.getUploadsViaRss(channel, channelId);
-        this.cache.set(lastGoodKey, feed, this.ttls.lastGood);
-        return { ...feed, handle: channel.handle, stale: false };
+        return await this.getUploadsViaRss(channel, channelId);
       } catch (error) {
         this.log(`@${channel.handle}: RSS failed — ${error.detail || error.message}`);
         firstError = firstError || error;
       }
-    }
-
-    // Everything live is down: a slightly old feed beats an empty page.
-    const lastGood = this.cache.get(lastGoodKey);
-    if (lastGood) {
-      this.log(`@${channel.handle}: serving last known good feed (${lastGood.videos.length} videos)`);
-      return { ...lastGood, handle: channel.handle, source: "cache", stale: true };
     }
 
     throw firstError || feedError(FAILURE_REASONS.RSS_FAILED, `no feed available for @${channel.handle}`);
