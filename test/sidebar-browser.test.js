@@ -15,7 +15,7 @@ test("shared sidebar browser regressions", {
 }, async (t) => {
   const app = express();
   const publicDir = path.join(__dirname, "..", "public");
-  for (const [url, file] of [["/", "index.html"], ["/terminal-suite.html", "terminal-suite.html"], ["/briefings/crypto", "terminal-suite.html"]]) {
+  for (const [url, file] of [["/", "index.html"], ["/terminal-suite.html", "terminal-suite.html"], ["/briefings/crypto", "terminal-suite.html"], ["/heatmaps.html", "heatmaps.html"]]) {
     app.get(url, (_req, res) => {
       const html = fs.readFileSync(path.join(publicDir, file), "utf8");
       res.type("html").send(html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, (tag) =>
@@ -100,15 +100,18 @@ test("shared sidebar browser regressions", {
 
   await t.test("hash highlighting preserves defaults, collapsed groups and explicit choices", async (t) => {
     const page = await open(t);
-    await state(menu(page, "overview"), true);
+    assert.equal(await menu(page, "overview").count(), 0);
+    assert.equal(await menu(page, "widgets").count(), 0);
     await page.evaluate(() => { location.hash = "technical-analysis"; });
     await page.waitForFunction(() => document.querySelector('.sidebar [data-nav-href="/"]').classList.contains("active"));
-    await state(menu(page, "overview"), true);
-    await toggle(menu(page, "overview")).click();
-    await page.evaluate(() => { location.hash = "ticker"; });
-    await page.waitForFunction(() => document.querySelector('.sidebar [data-nav-href="/#ticker"]').hasAttribute("aria-current"));
-    await state(menu(page, "overview"), false);
-    await state(menu(page, "widgets"), false);
+    await page.goto(base + "/heatmaps.html#market-heatmap");
+    await state(menu(page, "tradehunter"), true);
+    await state(menu(page, "screeners"), true);
+    await state(menu(page, "heatmaps"), true);
+    await toggle(menu(page, "heatmaps")).click();
+    await page.evaluate(() => { location.hash = "crypto-heatmap"; });
+    await page.waitForFunction(() => document.querySelector('.sidebar [data-nav-href="/heatmaps.html#crypto-heatmap"]').hasAttribute("aria-current"));
+    await state(menu(page, "heatmaps"), false);
     await page.goto(base + "/briefings/crypto");
     await state(menu(page, "reporter"), true);
     await state(menu(page, "markets"), false);

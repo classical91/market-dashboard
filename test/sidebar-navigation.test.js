@@ -180,13 +180,13 @@ test("shared account UI uses the existing auth endpoints", () => {
   assert.match(sidebar, /href="\/login\?returnTo=/);
 });
 
-test("Overview opens its page directly and nests Widgets", () => {
+test("Overview is a direct link without the Widgets menu", () => {
   const start = sidebar.indexOf('label: "Overview"');
   const menu = sidebar.slice(sidebar.lastIndexOf("{", start), sidebar.indexOf('label: "TradeHunter"'));
-  // The label itself is a link; the caret expands the sub-menus.
   assert.match(menu, /href: "\/",\s*label: "Overview"/);
-  const widgets = menu.indexOf('label: "Widgets"');
-  assert.ok(widgets > -1, "Widgets sits under Overview");
+  const overview = menu.slice(0, menu.indexOf('label: "Overview v2"'));
+  assert.doesNotMatch(overview, /children:/, "Overview has no empty dropdown");
+  assert.doesNotMatch(sidebar, /label: "Widgets"|href: "\/#/, "widget jump links left the sidebar");
   assert.doesNotMatch(menu, /heatmaps\.html|label: "Heatmaps"/, "Heatmaps belongs under Screeners");
   assert.doesNotMatch(menu, /href: "\/#(market-heatmap|ovh-heatmap)"/, "heatmap anchors left Overview");
   // A dropdown with its own href renders as a split link + caret button.
