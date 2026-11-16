@@ -7,7 +7,9 @@ on:
 
 jobs:
   lint-build:
-    runs-on: ubuntu-latest
+    # Playwright 1.56 cannot install Chromium on ubuntu-latest (now 26.04);
+    # pin a supported image until Playwright is upgraded.
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
