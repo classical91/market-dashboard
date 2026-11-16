@@ -606,6 +606,11 @@
         img.loading = "lazy";
         img.decoding = "async";
         img.alt = "";
+        // Opens the zoom viewer (image-zoom.js) on click, Enter or Space.
+        img.setAttribute("data-zoomable", "true");
+        img.setAttribute("tabindex", "0");
+        img.setAttribute("role", "button");
+        img.setAttribute("aria-label", "Zoom image");
         // A dead media URL drops the frame rather than leaving a broken icon.
         img.onerror = function () {
           if (img.parentNode) img.parentNode.removeChild(img);

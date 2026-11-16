@@ -1355,6 +1355,46 @@ body[data-x-motion="off"] .x-search-popover::before { animation: none; }
   padding: 6px 9px;
 }
 
+/* Gallery: wider cards where the image fills the left 40% of the card at
+   full card height, text and actions on the right. Absolute positioning
+   keeps the image from setting the card's height, so the masonry pass still
+   measures text-driven heights. Cards without media render as in Cards. */
+.x-timeline-frame[data-x-view="media"] .x-post-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(560px, 100%), 1fr));
+}
+.x-timeline-frame[data-x-view="media"] .x-post-card[data-has-media="true"] {
+  min-height: 230px;
+  padding-left: calc(40% + 14px);
+}
+.x-timeline-frame[data-x-view="media"] .x-post-card[data-has-media="true"] .x-post-image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 40%;
+  height: 100%;
+  max-height: none;
+  aspect-ratio: auto;
+  object-fit: cover;
+  border: 0;
+  border-right: 1px solid var(--border);
+  border-radius: 11px 0 0 11px;
+}
+@media (max-width: 520px) {
+  .x-timeline-frame[data-x-view="media"] .x-post-card[data-has-media="true"] {
+    min-height: 0;
+    padding-left: 14px;
+  }
+  .x-timeline-frame[data-x-view="media"] .x-post-card[data-has-media="true"] .x-post-image {
+    position: static;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 4 / 3;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+  }
+}
+
 /* Focus: one post per row in a readable measure, full text, full image. */
 .x-timeline-frame[data-x-view="focus"] .x-post-grid {
   grid-template-columns: minmax(0, 720px);
