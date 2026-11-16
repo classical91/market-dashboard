@@ -15,7 +15,7 @@ test("shared sidebar browser regressions", {
 }, async (t) => {
   const app = express();
   const publicDir = path.join(__dirname, "..", "public");
-  for (const [url, file] of [["/", "index.html"], ["/terminal-suite.html", "terminal-suite.html"], ["/briefings/crypto", "terminal-suite.html"], ["/heatmaps.html", "heatmaps.html"]]) {
+  for (const [url, file] of [["/", "index.html"], ["/terminal-suite.html", "terminal-suite.html"], ["/overview-v2", "overview-v2.html"], ["/reporter.html", "reporter.html"], ["/briefings/crypto", "terminal-suite.html"], ["/heatmaps.html", "heatmaps.html"]]) {
     app.get(url, (_req, res) => {
       const html = fs.readFileSync(path.join(publicDir, file), "utf8");
       res.type("html").send(html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, (tag) =>
@@ -62,6 +62,36 @@ test("shared sidebar browser regressions", {
     assert.equal(await toggle(group).getAttribute("aria-expanded"), String(expected));
   }
 
+  await t.test("Terminal leads both navigation shells with Reporter Room, and Overview nests under v2", async (t) => {
+    const page = await open(t);
+    for (const [url, root, drawer, prefix] of [["/", ".sidebar", ".mob-drawer", ""], ["/terminal-suite.html", ".cmd-sidebar", ".cmd-drawer", "cmd-"]]) {
+      await page.goto(base + url);
+      for (const shell of [root, drawer]) {
+        const primary = page.locator(`${shell} .${prefix}nav-primary`);
+        assert.deepEqual(await primary.evaluate(nav => Array.from(nav.children).slice(0, 2).map(child => child.dataset.dropdownKey)),
+          ["sidebar_dropdown_terminal_suite", "sidebar_dropdown_overview_v2"]);
+        assert.equal(await menu(page, "terminal_suite", shell).locator('a[data-nav-href="/reporter.html"]').count(), 1);
+        assert.equal(await menu(page, "reporter", shell).locator('a[data-nav-href="/reporter.html"]').count(), 1);
+        assert.equal(await menu(page, "overview_v2", shell).locator('a[data-nav-href="/"]').count(), 1);
+        assert.equal(await primary.locator(':scope > a[data-nav-href="/"]').count(), 0);
+      }
+    }
+    await menu(page, "terminal_suite").locator('a[data-nav-href="/reporter.html"]').click();
+    await page.waitForURL(base + "/reporter.html");
+    await state(menu(page, "terminal_suite"), true);
+    await state(menu(page, "reporter"), true);
+    if (process.env.SIDEBAR_SCREENSHOT_DIR) await page.locator(".cmd-sidebar").screenshot({ path: path.join(process.env.SIDEBAR_SCREENSHOT_DIR, "sidebar-terminal-first.png") });
+    const overview = menu(page, "overview_v2");
+    await toggle(overview).click();
+    assert.equal(page.url(), base + "/reporter.html", "the caret expands without navigating");
+    await overview.locator('a[data-nav-href="/"]').click();
+    await page.waitForURL(base + "/");
+    assert.equal(await menu(page, "overview_v2").locator('a[data-nav-href="/"]').getAttribute("aria-current"), "page");
+    await menu(page, "overview_v2").locator('a[data-nav-href="/overview-v2"]').click();
+    await page.waitForURL(base + "/overview-v2");
+    assert.equal(await menu(page, "overview_v2").locator('a[data-nav-href="/overview-v2"]').getAttribute("aria-current"), "page");
+  });
+
   await t.test("open and closed choices survive both page directions and reloads", async (t) => {
     const page = await open(t);
     await toggle(menu(page, "trades")).click();
@@ -72,6 +102,7 @@ test("shared sidebar browser regressions", {
     for (const key of ["trades", "tradehunter", "screeners", "reporter"]) await state(menu(page, key), true);
     await toggle(menu(page, "trades")).click();
     await toggle(menu(page, "screeners")).click();
+    await toggle(menu(page, "overview_v2")).click();
     await page.locator('.cmd-sidebar a[data-nav-href="/"]').click();
     await state(menu(page, "trades"), false);
     await state(menu(page, "screeners"), false);
