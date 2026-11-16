@@ -226,6 +226,13 @@ function isPublicYoutubeLiveRequest(req) {
   return req.path === "/api/youtube/live" || req.path === "/api/youtube/live/";
 }
 
+// The reporter's public event schedule, narrowed for Main Hub. The overview
+// and all neighbouring routes still require their existing session.
+function isPublicMacroCalendarRequest(req) {
+  if (req.method !== "GET" && req.method !== "HEAD") return false;
+  return req.path === "/api/macro/calendar" || req.path === "/api/macro/calendar/";
+}
+
 function isPublicAuthPath(req) {
   return req.path === "/login"
     || req.path === "/auth/login"
@@ -385,6 +392,7 @@ function createSiteAuth(config) {
         || isPublicDecisionRequest(req)
         || isPublicMarketSessionRequest(req)
         || isPublicYoutubeLiveRequest(req)
+        || isPublicMacroCalendarRequest(req)
       ) {
         next();
         return;
