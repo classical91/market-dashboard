@@ -142,6 +142,17 @@ class FarmclawHandoffStore {
     const canonicalUrl = canonicalizeUrl(url);
     if (!canonicalUrl) throw makeError("url must be an http(s) link to the post", 400);
 
+    let image = null;
+    if (input.image) {
+      try {
+        const parsed = new URL(String(input.image));
+        if (parsed.protocol !== "https:" || parsed.username || parsed.password || parsed.href.length > MAX_URL_LEN) throw new Error("invalid image");
+        image = parsed.href;
+      } catch {
+        throw makeError("image must be an https photo link without credentials", 400);
+      }
+    }
+
     return this._withLock(() => {
       const state = this._read();
       const now = this._iso();
@@ -173,6 +184,7 @@ class FarmclawHandoffStore {
         canonicalUrl,
         handle: clampString(input.handle, MAX_SHORT_LEN).replace(/^@+/, "") || null,
         text: clampString(input.text, MAX_TEXT_LEN) || null,
+        image,
         status: "pending",
         createdAt: now,
         updatedAt: now,

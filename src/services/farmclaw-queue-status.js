@@ -22,7 +22,7 @@ function createFarmclawQueueStatus({ env = process.env, fetcher = fetch } = {}) 
         const r = await response.json();
         if (r.persisted === true && r.statusId === statusId && /^\d+$/.test(r.queueItemId) && /^sha256:[a-f0-9]{64}$/.test(r.payloadHash)) {
           if (r.queued === true && r.queue?.id === r.queueItemId) result = { confirmed: true, queueItemId: r.queueItemId,
-            dispatchActive: r.queue.dispatchActive, dispatchStatus: r.queue.dispatchStatus, xPublishedUrl: r.queue.xPublishedUrl || null };
+            dispatchActive: r.queue.dispatchActive, dispatchStatus: r.queue.dispatchStatus, hasImage: Boolean(r.queue.imageUrl), xPublishedUrl: r.queue.xPublishedUrl || null };
           else if (r.removed === true && r.queued === false) result = { confirmed: false, removed: true, queueItemId: r.queueItemId };
         }
       }

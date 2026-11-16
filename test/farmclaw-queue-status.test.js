@@ -13,7 +13,7 @@ test("FarmBot queue confirmation requires authoritative receipt and scoped read-
     assert.equal(init.headers.Authorization,`Bearer ${env.FARMBOT_NEWS_READER_TOKEN}`);
     return Response.json(receipt);
   }});
-  assert.deepEqual(await lookup(record),{confirmed:true,queueItemId:"42",dispatchActive:false,dispatchStatus:"PENDING",xPublishedUrl:null});
+  assert.deepEqual(await lookup(record),{confirmed:true,queueItemId:"42",dispatchActive:false,dispatchStatus:"PENDING",hasImage:false,xPublishedUrl:null});
   await lookup(record); assert.equal(calls,1);
 });
 test("missing, failed, corrupt or wrong-source receipt never claims queue success",async()=>{
@@ -23,4 +23,13 @@ test("missing, failed, corrupt or wrong-source receipt never claims queue succes
   assert.equal(await createFarmclawQueueStatus({env,fetcher:async()=>{throw new Error("private detail");}})(record),null);
   assert.deepEqual(await createFarmclawQueueStatus({env,fetcher:async()=>Response.json({...receipt,queued:false,removed:true,queue:null})})(record),
     {confirmed:false,removed:true,queueItemId:"42"});
+});
+
+
+test("image status comes from the saved Queue row, not the handoff photo", async () => {
+  for (const imageUrl of [null, "https://pbs.twimg.com/media/saved.jpg"]) {
+    const lookup = createFarmclawQueueStatus({ env, fetcher: async () => Response.json({ ...receipt, queue: { ...receipt.queue, imageUrl } }) });
+    const result = await lookup({ ...record, image: "https://pbs.twimg.com/media/requested.jpg" });
+    assert.equal(result.hasImage, Boolean(imageUrl));
+  }
 });

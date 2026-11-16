@@ -5,8 +5,12 @@ agent, and how the dashboard knows it got there.
 
 ## Handoff and FarmBot Queue
 
-1. The button sends the selected X post to FarmClaw. The collector or hook
-   receipt establishes agent delivery only.
+1. The button sends the selected X post, text and attached photo URL to
+   FarmClaw. The photo is retained through the handoff and collector task.
+   FarmClaw must verify it against the source, include it in the queue draft
+   and confirm the saved `queue.imageUrl`, or report an image blocker rather
+   than silently queueing text-only. The collector or hook receipt establishes
+   agent delivery only.
 2. FarmClaw reads and verifies the post, drafts original copy, and runs the
    installed farmclaw-x-queue.mjs --lookup / --queue helper with its scoped
    preparer credential. The helper verifies the exact durable receipt and
@@ -18,7 +22,9 @@ agent, and how the dashboard knows it got there.
 
 The dashboard checks FarmBot's authoritative X-link receipt with the existing
 FARMBOT_NEWS_API_URL and FARMBOT_NEWS_READER_TOKEN, and shows FarmBot queued
-only with that proof. Unknown state and agent delivery alone never imply a
+only with that proof. The button keeps its **FarmClaw queued** label, and the
+status reports **Photo included** or **Text only — no photo saved** from the
+actual Queue row. Unknown state and agent delivery alone never imply a
 queue row. The read-only lookup uses a short cache and sends no secrets to the
 browser. Source excerpts are quoted as untrusted data. The legacy shared-key
 queue-x-link.mjs and /api/x-link/queue remain retired. The preparer cannot edit/reactivate existing Queue rows or invoke an

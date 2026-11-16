@@ -77,7 +77,7 @@ test("a tap sends the X link to the FarmClaw agent and answers ✓ with the run 
   const before = gateway.runs.length;
   const res = await call("/api/farmclaw/handoffs", {
     headers: admin,
-    body: { url, handle: "unusual_whales", text: "JUST IN: Netanyahu's odds climb to 37%" },
+    body: { url, handle: "unusual_whales", text: "JUST IN: Netanyahu's odds climb to 37%", image: "https://pbs.twimg.com/media/source.jpg" },
   });
   assert.strictEqual(res.status, 201);
   assert.strictEqual(res.body.status, "received", JSON.stringify(res.body));
@@ -86,6 +86,9 @@ test("a tap sends the X link to the FarmClaw agent and answers ✓ with the run 
   const run = gateway.runs[before];
   assert.strictEqual(gateway.runs.length, before + 1);
   assert.strictEqual(run.body.agentId, "farmclaw");
+  assert.strictEqual(res.body.record.image, "https://pbs.twimg.com/media/source.jpg");
+  assert.match(run.body.message, /https:\/\/pbs.twimg.com\/media\/source.jpg/);
+  assert.match(run.body.message, /include it as imageUrl with imageSubjectEvidence/);
   assert.strictEqual(run.key, `farmclaw-${res.body.id}`);
   assert.match(run.body.message, new RegExp(url.replace(/[.?]/g, "\\$&")));
   assert.match(run.body.message, /@unusual_whales: JUST IN: Netanyahu's odds climb to 37%/);

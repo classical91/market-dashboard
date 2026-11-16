@@ -231,3 +231,16 @@ test("the waiting tooltip says whether FarmClaw has ever checked in", () => {
     /picked this up.*last checked in 3 min ago/,
   );
 });
+
+
+test("both FarmClaw intake routes reject invalid photo URLs before storing", async () => {
+  for (const route of ["/api/x/farmclaw", "/api/farmclaw/handoffs"]) {
+    for (const image of ["javascript:alert(1)", "http://pbs.twimg.com/photo.jpg", "https://user:secret@example.com/photo.jpg"]) {
+      const url = nextPostUrl();
+      const result = await call(route, { headers: admin, body: { url, image } });
+      assert.strictEqual(result.status, 400);
+      const lookup = await call(`/api/farmclaw/handoffs/lookup?url=${encodeURIComponent(url)}`, { method: "GET", headers: admin });
+      assert.strictEqual(lookup.status, 404);
+    }
+  }
+});
