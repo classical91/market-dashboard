@@ -20,13 +20,7 @@
   var accountState = null;
 
   var workspace = [
-    {
-      href: "/terminal-suite.html",
-      label: "Terminal Suite",
-      children: [
-        { href: "/reporter.html", label: "Reporter Room" },
-      ],
-    },
+    { href: "/terminal-suite.html", label: "Terminal Suite" },
     {
       href: "/overview-v2",
       label: "Overview v2",
@@ -34,6 +28,7 @@
         { href: "/", label: "Overview" },
       ],
     },
+    { href: "/reporter.html", label: "Reporter Room" },
     {
       // The trade workflow in one place: the trades you are running, the
       // engine that plans them, and the lab that backtests the setups.
