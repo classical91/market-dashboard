@@ -30,7 +30,13 @@
             </span>
             <div><div class="bot-panel-title" id="botLibraryTitle">Command library</div><div class="bot-panel-subtitle">Search and reuse</div></div>
           </div>
-          <span class="bot-count-pill" id="botCount" aria-label="Saved commands">0</span>
+          <div class="bot-library-head-actions">
+            <span class="bot-count-pill" id="botCount" aria-label="Saved commands">0</span>
+            <button class="bot-btn" type="button" id="newCommandBtn" aria-expanded="false" aria-controls="botCommandForm">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+              <span>New command</span>
+            </button>
+          </div>
         </div>
         <div class="bot-panel-body">
           <div class="bot-search-box">
@@ -44,7 +50,7 @@
         </div>
       </section>
 
-      <section class="bot-panel bot-editor-panel is-collapsed" id="botEditorPanel" aria-labelledby="botFormTitle">
+      <section class="bot-panel bot-editor-panel is-collapsed" id="botEditorPanel" aria-labelledby="botFormTitle" hidden>
         <div class="bot-panel-head">
           <div class="bot-panel-heading">
             <span class="bot-panel-icon" aria-hidden="true">
@@ -54,10 +60,7 @@
           </div>
           <div class="bot-editor-head-actions">
             <span class="bot-editing-badge" id="botEditingBadge">Editing saved command</span>
-            <button class="bot-btn" type="button" id="newCommandBtn" aria-expanded="false" aria-controls="botCommandForm">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-              <span>New command</span>
-            </button>
+            <button class="bot-btn bot-btn-ghost bot-btn-icon bot-btn-small" type="button" id="botEditorClose" title="Close editor" aria-label="Close editor">&times;</button>
           </div>
         </div>
         <form class="bot-panel-body bot-form" id="botCommandForm" hidden>
