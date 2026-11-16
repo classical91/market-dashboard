@@ -9,7 +9,10 @@ const { chromium } = require("playwright");
 const { createMacroCalendarRouter } = require("../src/routes/macro-calendar");
 const { normalizeCalendar } = require("../src/services/calendar-normalize");
 
-test("Reporter calendar: real DOM filters, timezones, precision, states and responsive layout", { timeout: 60000 }, async t => {
+test("Reporter calendar: real DOM filters, timezones, precision, states and responsive layout", {
+  timeout: 60000,
+  skip: !fs.existsSync(chromium.executablePath()) && "Install Chromium with npx playwright install chromium",
+}, async t => {
   const root = path.join(__dirname, "..", "public");
   const reporter = fs.readFileSync(path.join(root, "reporter.html"), "utf8");
   const start = reporter.lastIndexOf("<article", reporter.indexOf('id="macro-calendar"'));
