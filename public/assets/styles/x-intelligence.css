@@ -567,11 +567,19 @@ body[data-x-motion="off"] .x-search-popover::before { animation: none; }
   font-weight: 700;
   line-height: 1;
   text-decoration: none;
+  /* Rows fill edge to edge when the buttons wrap, instead of leaving one
+     button stranded on a half-empty line; labels never break mid-word. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 auto;
+  min-width: 0;
+  box-sizing: border-box;
+  white-space: nowrap;
+  text-align: center;
 }
 
 .x-post-open {
-  display: inline-flex;
-  align-items: center;
   padding: 8px 10px;
 }
 
