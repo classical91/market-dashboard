@@ -353,6 +353,48 @@
 .yt-watch-actions a { background: #e60032; color: #fff; }
 .yt-watch-actions a:hover { background: #c50029; }
 
+/* Focus mode: while a video plays the page goes dark and the chrome recedes
+   so the player carries the screen. The feeds below keep their normal look. */
+.yt-page .app,
+.yt-page .cmd-sidebar,
+.yt-header, .yt-toolbar, .yt-feed-status,
+.yt-player-frame { transition: background-color .35s ease, opacity .25s ease, box-shadow .35s ease; }
+
+.yt-page.yt-focus .app { background: #050506; }
+.yt-page.yt-focus .cmd-sidebar { background: #08080a; opacity: .5; }
+.yt-focus :is(.yt-header, .yt-toolbar, .yt-feed-status) { opacity: .5; }
+.yt-page.yt-focus .cmd-sidebar:is(:hover, :focus-within),
+.yt-focus :is(.yt-header, .yt-toolbar, .yt-feed-status):is(:hover, :focus-within) { opacity: 1; }
+
+.yt-focus .yt-watch {
+  position: relative;
+  isolation: isolate;
+  /* Fill the viewport height without letting the title drop below the fold. */
+  width: min(100%, 1320px, calc((100svh - 200px) * 16 / 9));
+  min-width: min(100%, 640px);
+  margin-bottom: 44px;
+}
+
+.yt-focus .yt-watch::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -60px -14%;
+  background: radial-gradient(ellipse at 50% 42%, rgba(0, 0, 0, .9) 0%, rgba(0, 0, 0, .55) 45%, transparent 72%);
+  pointer-events: none;
+}
+
+.yt-focus .yt-player-frame {
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, .07),
+    0 28px 80px -18px rgba(0, 0, 0, .95),
+    0 0 140px -40px rgba(230, 0, 50, .35);
+}
+
+[data-theme]:not([data-theme="dark"]) .yt-page.yt-focus .app { background: color-mix(in srgb, var(--bg) 88%, #000); }
+[data-theme]:not([data-theme="dark"]) .yt-page.yt-focus .cmd-sidebar { background: color-mix(in srgb, var(--panel) 86%, transparent); }
+[data-theme]:not([data-theme="dark"]) .yt-focus .yt-watch::before { opacity: .25; }
+
 @media (min-width: 1180px) {
   .yt-streams { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
   .yt-streams .yt-section + .yt-section { margin: 0; padding: 0; border: 0; }
@@ -370,6 +412,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .yt-feed-thumb img, .yt-thumb-play { transition: none; }
+  .yt-page .app, .yt-page .cmd-sidebar, .yt-header, .yt-toolbar, .yt-feed-status, .yt-player-frame { transition: none; }
 }
 
 /* YouTube source manager: one quiet workspace, two distinct jobs. */

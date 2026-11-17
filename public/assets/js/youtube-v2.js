@@ -428,6 +428,7 @@
       player.title = "YouTube video: " + video.title;
       playerLink.href = card.href;
       watch.hidden = false;
+      document.body.classList.add("yt-focus");
       if (playingId !== video.id) player.src = embedUrl(video.id);
       playingId = video.id;
       watch.scrollIntoView({ block: "start" });
@@ -440,6 +441,7 @@
       card?.removeAttribute("aria-current");
       player.removeAttribute("src");
       watch.hidden = true;
+      document.body.classList.remove("yt-focus");
       playingId = null;
       if (restoreFocus) (card || search).focus();
     }
@@ -513,6 +515,12 @@
     search.addEventListener("input", renderFeed);
     refresh.addEventListener("click", loadFeeds);
     document.getElementById("ytCloseWatch").addEventListener("click", function () { closeWatch(true); });
+    document.addEventListener("keydown", function (event) {
+      // Escape leaves focus mode unless a dialog (e.g. Manage channels) owns the key.
+      if (event.key !== "Escape" || event.defaultPrevented || !playingId) return;
+      if (document.querySelector('.manage-overlay, [role="dialog"][aria-modal="true"]')) return;
+      closeWatch(true);
+    });
     loadFeeds();
 
     var manage = document.getElementById("ytManageChannels");
