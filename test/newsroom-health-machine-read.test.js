@@ -154,10 +154,15 @@ test("the health key does not open unrelated protected APIs", async () => {
   // The broadcast ledger is absent on purpose: its own routes have accepted a
   // valid x-admin-key since long before this change, and that is its contract,
   // not a side effect of the health exemption.
+  // Main Hub also deliberately reads /api/x/accounts and
+  // /api/youtube/channels with this admin key. Their neighboring management
+  // routes remain protected; tracked-media-machine-read.test.js pins that
+  // independent read-only exemption.
   const elsewhere = [
     "/api/reporter",
     "/api/trading-lab/metrics",
-    "/api/x/accounts",
+    "/api/x/accounts/config",
+    "/api/youtube/channels/config",
     "/api/decision/journal",
     "/api/watchlist",
   ];
