@@ -317,6 +317,16 @@ function isNewsroomHealthMachineReadRequest(req, adminKey) {
   return isAdminRequest(req, adminKey);
 }
 
+// Main Hub reuses the existing tracked feeds with the same server credential
+// as its newsroom status reader. Header-only, read-only and exact paths:
+// channel/account configuration, diagnostics and mutations stay session-gated.
+function isTrackedMediaMachineReadRequest(req, adminKey) {
+  if (req.method !== "GET" && req.method !== "HEAD") return false;
+  const path = req.path.endsWith("/") ? req.path.slice(0, -1) : req.path;
+  if (path !== "/api/youtube/channels" && path !== "/api/x/accounts") return false;
+  return isAdminRequest(req, adminKey);
+}
+
 function canAccess(req, session) {
   if (!session) return false;
   if (session.role === "owner") return true;
@@ -413,6 +423,10 @@ function createSiteAuth(config) {
         return;
       }
       if (isNewsroomHealthMachineReadRequest(req, config.adminKey)) {
+        next();
+        return;
+      }
+      if (isTrackedMediaMachineReadRequest(req, config.adminKey)) {
         next();
         return;
       }

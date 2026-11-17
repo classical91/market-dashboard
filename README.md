@@ -103,6 +103,8 @@ Guarded requests must carry an `x-admin-key` header matching `ADMIN_API_KEY`. Th
 
 When `MARKET_DASHBOARD_LOGIN_PASSWORD` is set, site auth runs ahead of every route, so anything not listed here answers `401` (or a `/login` redirect for pages) before its own router is reached. The full list of exceptions:
 
+- `GET`/`HEAD /api/youtube/channels` and `/api/x/accounts` — Main Hub's tracked-feed tabs may read the existing feeds with a valid `x-admin-key` header matching `ADMIN_API_KEY`. Main Hub uses its existing `MARKET_DASHBOARD_ADMIN_KEY` and `MARKET_DASHBOARD_BASE_URL`; provider keys remain here. These routes reuse the same tracked channels, default X template, ingestion and caches as the Intelligence pages. This is not a regional trends API. No neighbouring configuration/diagnostic routes or mutations are opened, and query-string keys are not accepted. Deploy this auth change before the Main Hub tabs. Without it, a locked Market Dashboard correctly returns `401` and Main Hub shows the feed as unavailable.
+
 - `/login`, `POST /auth/login`, `POST /auth/logout` — the login flow itself.
 - `POST /api/alpha-team/access` — the Alpha Team code exchange.
 - `GET /api/health` — the minimal deploy probe.
