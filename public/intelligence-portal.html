@@ -17,44 +17,36 @@
     <div class="cmd-page-header">
       <div>
         <div class="cmd-page-title">Intelligence Portal</div>
-        <div class="cmd-page-subtitle">Two portals, each with its own category list synced from its page. Pick a category and open it there.</div>
+        <div class="cmd-page-subtitle">Two portals, each with its own category list synced from its page. Click a category to open it there.</div>
       </div>
     </div>
 
-    <!-- Nothing loads here but the category lists: Open goes to the real
-         page, already on the chosen category. -->
+    <!-- Nothing loads here but the category lists: each category is a link
+         straight to the real page, already on that category. -->
     <div class="ip-portals">
-      <form class="ip-portal ip-portal--x" id="x" data-portal="x" novalidate>
+      <section class="ip-portal ip-portal--x" id="x" data-portal="x" aria-labelledby="ipXTitle">
         <div class="ip-portal-head">
           <span class="ip-chip ip-chip--x" aria-hidden="true">X</span>
-          <h2 class="ip-portal-title">X Portal</h2>
+          <h2 class="ip-portal-title" id="ipXTitle">X Portal</h2>
         </div>
         <p class="ip-portal-sub">Opens X Intelligence on one of its templates.</p>
-        <label class="ip-label" for="ipXCategory">X category</label>
-        <div class="ip-row">
-          <select id="ipXCategory" disabled>
-            <option>Loading X categories&hellip;</option>
-          </select>
-          <button type="submit" class="ip-go" disabled>Open &#8594;</button>
-        </div>
+        <ul class="ip-cats" id="ipXCategories" aria-label="X categories" aria-busy="true">
+          <li class="ip-cats-note">Loading X categories&hellip;</li>
+        </ul>
         <p class="ip-hint" aria-live="polite"></p>
-      </form>
+      </section>
 
-      <form class="ip-portal ip-portal--youtube" id="youtube" data-portal="youtube" novalidate>
+      <section class="ip-portal ip-portal--youtube" id="youtube" data-portal="youtube" aria-labelledby="ipYoutubeTitle">
         <div class="ip-portal-head">
           <span class="ip-chip ip-chip--yt" aria-hidden="true">YT</span>
-          <h2 class="ip-portal-title">YouTube Portal</h2>
+          <h2 class="ip-portal-title" id="ipYoutubeTitle">YouTube Portal</h2>
         </div>
         <p class="ip-portal-sub">Opens YouTube Intelligence on one of its categories.</p>
-        <label class="ip-label" for="ipYoutubeCategory">YouTube category</label>
-        <div class="ip-row">
-          <select id="ipYoutubeCategory" disabled>
-            <option>Loading YouTube categories&hellip;</option>
-          </select>
-          <button type="submit" class="ip-go" disabled>Open &#8594;</button>
-        </div>
+        <ul class="ip-cats" id="ipYoutubeCategories" aria-label="YouTube categories" aria-busy="true">
+          <li class="ip-cats-note">Loading YouTube categories&hellip;</li>
+        </ul>
         <p class="ip-hint" aria-live="polite"></p>
-      </form>
+      </section>
     </div>
 
     <footer>Intelligence Portal &mdash; <a href="/x-intelligence.html">X Intelligence</a> &middot; <a href="/youtube-v2.html">YouTube Intelligence</a></footer>

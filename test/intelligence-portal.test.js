@@ -1,7 +1,7 @@
 "use strict";
 
 // The Intelligence Portal's category sync: X templates and YouTube categories
-// paired into one dropdown, and the page wired to both live registries.
+// paired up, and the page wired to both live registries.
 
 const test = require("node:test");
 const assert = require("node:assert");
@@ -102,14 +102,16 @@ test("each destination opens its page on the paired category, or not at all", ()
   assert.equal(destinationHref(war, "elsewhere"), null);
 });
 
-test("the portal holds two launchers, each with its own dropdown and no feeds", () => {
+test("the portal holds two launchers, each with its own category links and no feeds", () => {
   const html = read("public/intelligence-portal.html");
   const js = read("public/assets/js/intelligence-portal.js");
-  assert.match(html, /<form class="ip-portal ip-portal--x" id="x" data-portal="x"/);
-  assert.match(html, /<form class="ip-portal ip-portal--youtube" id="youtube" data-portal="youtube"/);
-  assert.match(html, /<select id="ipXCategory"/);
-  assert.match(html, /<select id="ipYoutubeCategory"/);
-  assert.equal(html.match(/class="ip-go"/g).length, 2);
+  assert.match(html, /<section class="ip-portal ip-portal--x" id="x" data-portal="x"/);
+  assert.match(html, /<section class="ip-portal ip-portal--youtube" id="youtube" data-portal="youtube"/);
+  assert.match(html, /<ul class="ip-cats" id="ipXCategories"/);
+  assert.match(html, /<ul class="ip-cats" id="ipYoutubeCategories"/);
+  // No dropdowns: each category is a link straight to its page.
+  assert.doesNotMatch(html, /<select/);
+  assert.doesNotMatch(js, /createElement\("select"\)|createElement\("option"\)/);
   assert.ok(html.indexOf("intelligence-portal-sync.js") < html.indexOf("intelligence-portal.js\""));
   // Each portal reads only its own registry; neither loads posts or videos.
   assert.match(js, /url: "\/api\/x\/templates"/);
@@ -117,7 +119,7 @@ test("the portal holds two launchers, each with its own dropdown and no feeds", 
   assert.doesNotMatch(js, /\/api\/x\/accounts/);
   assert.doesNotMatch(js, /\/api\/youtube\/channels\?/);
   assert.doesNotMatch(html, /x-posts\.js|iframe/);
-  assert.match(js, /window\.location\.assign\(hrefFor\(kind/);
+  assert.match(js, /link\.href = hrefFor\(kind, id\)/);
   assert.match(js, /addEventListener\("hashchange"/);
 });
 

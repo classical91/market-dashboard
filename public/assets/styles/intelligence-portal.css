@@ -1,6 +1,6 @@
 /* ─────────────────────────────────────────────────────────
    Intelligence Portal — two launchers, X and YouTube, each
-   with its own synced category dropdown and an Open button.
+   with its own synced list of one-click category links.
    Layered on top of command.css.
 ───────────────────────────────────────────────────────── */
 
@@ -38,47 +38,60 @@
 .ip-chip--x { background: var(--purple-bg); color: var(--purple); }
 .ip-chip--yt { background: var(--coral-bg); color: var(--coral); }
 
-.ip-label {
-  font-size: 10px; font-weight: 700; letter-spacing: .06em;
-  text-transform: uppercase; color: var(--muted);
+/* Categories: one link each, wrapping. A paired category carries a small
+   attached link to the same subject on the other page. */
+.ip-cats {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  margin: 2px 0 0; padding: 0; list-style: none;
 }
+.ip-cats-note { font-size: 12px; color: var(--muted); padding: 6px 0; }
 
-.ip-row { display: flex; gap: 10px; min-width: 0; }
-
-.ip-portal select {
-  flex: 1 1 auto; min-width: 0; min-height: 38px;
-  padding: 8px 34px 8px 11px;
+.ip-cat {
+  display: inline-flex; align-items: stretch; min-width: 0;
   border: 1px solid var(--border-hover); border-radius: 9px;
-  background: var(--surface2); color: var(--text);
-  font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+  background: var(--surface2);
+  transition: border-color .15s ease, background .15s ease;
 }
-.ip-portal--x select { border-color: rgba(155,123,255,0.38); }
-.ip-portal--youtube select { border-color: rgba(255,77,109,0.34); }
-.ip-portal select:disabled { cursor: not-allowed; opacity: .65; }
+.ip-portal--x .ip-cat { border-color: rgba(155,123,255,0.32); }
+.ip-portal--youtube .ip-cat { border-color: rgba(255,77,109,0.3); }
+.ip-portal--x .ip-cat:hover { border-color: var(--purple); background: var(--purple-bg); }
+.ip-portal--youtube .ip-cat:hover { border-color: var(--coral); background: var(--coral-bg); }
+.ip-portal--x .ip-cat.is-last { border-color: var(--purple); }
+.ip-portal--youtube .ip-cat.is-last { border-color: var(--coral); }
 
-.ip-go {
-  flex: 0 0 auto; min-height: 38px; padding: 8px 16px;
-  border: 1px solid rgba(77,163,255,0.5); border-radius: 9px;
-  background: var(--blue-bg); color: var(--text);
-  font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
-  transition: background .15s ease, border-color .15s ease;
+.ip-cat-link {
+  display: inline-flex; align-items: center; gap: 7px; min-width: 0;
+  min-height: 34px; padding: 6px 11px;
+  border-radius: 8px;
+  color: var(--text); text-decoration: none;
+  font-size: 13px; font-weight: 600; white-space: nowrap;
 }
-.ip-go:hover:not(:disabled) { background: rgba(77,163,255,0.22); border-color: var(--blue); }
-.ip-go:disabled { cursor: not-allowed; opacity: .5; }
+.ip-cat-count {
+  min-width: 20px; padding: 1px 6px; border-radius: 999px;
+  background: rgba(255,255,255,0.07); color: var(--muted);
+  font-size: 11px; font-weight: 700; text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.ip-cat-pair {
+  display: inline-flex; align-items: center; padding: 0 8px;
+  border-left: 1px solid var(--border);
+  border-radius: 0 8px 8px 0;
+  color: var(--muted); text-decoration: none;
+  font-size: 10px; font-weight: 800; letter-spacing: .04em;
+}
+.ip-portal--x .ip-cat-pair:hover { color: var(--coral); }
+.ip-portal--youtube .ip-cat-pair:hover { color: var(--purple); }
 
-.ip-portal select:focus-visible,
-.ip-go:focus-visible,
+.ip-cat-link:focus-visible,
+.ip-cat-pair:focus-visible,
 .ip-hint a:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 
 .ip-hint { margin: 0; min-height: 1.3em; font-size: 12px; color: var(--muted); }
 .ip-hint a { color: var(--blue); text-decoration: none; font-weight: 600; }
 .ip-hint a:hover { text-decoration: underline; }
 .ip-hint--error { color: var(--coral); }
+.ip-hint:empty { display: none; }
 
 @media (max-width: 760px) {
   .ip-portals { grid-template-columns: minmax(0, 1fr); }
-}
-@media (max-width: 420px) {
-  .ip-row { flex-direction: column; }
-  .ip-go { width: 100%; }
 }
