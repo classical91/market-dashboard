@@ -28,6 +28,43 @@ const SYSTEM_PROMPT =
   "Follow the exact format requested: numbered items, hyphen bullets, sentiment labels. " +
   "Be factual, precise, and keep each story within the specified line limit.";
 
+/**
+ * The model's own training data ends before the date it is asked about, and
+ * left alone it can decide a current date is "the future" and refuse rather
+ * than search. This pins the date as real and the search tool as the source.
+ */
+function groundingInstructions(dateStr) {
+  return (
+    `Today is ${dateStr}. That is the real current date, later than your training data, ` +
+    "so use the web_search tool for everything recent and trust dated search results over your own memory. " +
+    "If a search comes back thin, search again with broader or different queries (by country, institution, or " +
+    "indicator) and widen the window to the last 72 hours. If you still cannot verify every requested item, " +
+    "publish the items you can verify in the requested format and add one closing line saying how many are missing. " +
+    "Never reply with only an apology, a refusal, or a list of options."
+  );
+}
+
+const REFUSAL_RETRY_NOTE =
+  "Your previous attempt returned no briefing. Run several web searches now (for example: central bank decisions " +
+  "this week, latest CPI / GDP / PMI releases, major market moves today) and write the briefing from what you find. " +
+  "Partial coverage is acceptable; an apology or a menu of options is not.";
+
+/**
+ * Whether a generation is a refusal rather than a briefing: nothing at all,
+ * or an uncited answer that opens by apologising or saying it can't. A real
+ * briefing cites its searches and never opens like that, and custom prompts
+ * in any format pass, since only the opening is read.
+ */
+function looksLikeRefusal(content, sources) {
+  const text = typeof content === "string" ? content.trim() : "";
+  if (!text) return true;
+  if (Array.isArray(sources) && sources.length) return false;
+  const opening = text.slice(0, 300);
+  return /\b(?:I['’]m sorry|I am sorry|I apologi[sz]e|I can(?:not|['’]t)|I(?:['’]m| am) (?:unable|not able)|unable to (?:reliably )?(?:produce|provide|generate|verify|access|find|compile))\b/i.test(
+    opening
+  );
+}
+
 function formatDate() {
   return new Date()
     .toLocaleDateString("en-US", {
@@ -354,6 +391,9 @@ class ReporterService {
     this._logFile = path.join(dataDir || resolveDataDir(), "reporter-generation-log.json");
     this._lockState = { depth: 0 };
     this._rateLimitedUntil = new Map();
+    // Make every generation call web_search at least once. Cleared for the
+    // process if the model refuses a forced tool call.
+    this._forceSearch = true;
   }
 
   /**
@@ -523,14 +563,50 @@ class ReporterService {
     return report;
   }
 
-  async _generate(prompt) {
-    const res = await this._client.responses.create({
+  async _requestGeneration(input) {
+    const request = {
       model: this._model,
-      instructions: SYSTEM_PROMPT,
+      instructions: `${SYSTEM_PROMPT} ${groundingInstructions(formatDate())}`,
       tools: [{ type: "web_search" }],
-      input: prompt,
-    });
-    return { content: res.output_text, sources: extractSources(res) };
+      input,
+    };
+    if (this._forceSearch) request.tool_choice = "required";
+    let res;
+    try {
+      res = await this._client.responses.create(request);
+    } catch (err) {
+      // Only a model that rejects a forced tool call is worth retrying
+      // without one; every other failure is the caller's to handle.
+      const status = err?.status || err?.statusCode;
+      if (!request.tool_choice || status !== 400 || !/tool_choice/i.test(err?.message || "")) throw err;
+      this._forceSearch = false;
+      delete request.tool_choice;
+      res = await this._client.responses.create(request);
+    }
+    return { content: res.output_text || "", sources: extractSources(res) };
+  }
+
+  /**
+   * One generation, made to search, and never a stored refusal.
+   *
+   * A desk that answered with an apology instead of a briefing used to be
+   * saved as that day's report, which also held the desk's daily slot, so the
+   * refusal stayed on screen until tomorrow. A refusal is asked again once
+   * with a firmer instruction; if it refuses again the call fails, nothing is
+   * cached or logged, and the desk can be run again straight away.
+   */
+  async _generate(prompt) {
+    const first = await this._requestGeneration(prompt);
+    if (!looksLikeRefusal(first.content, first.sources)) return first;
+    const second = await this._requestGeneration(`${prompt}\n\n${REFUSAL_RETRY_NOTE}`);
+    if (!looksLikeRefusal(second.content, second.sources)) return second;
+    throw Object.assign(
+      new Error(
+        "The model answered without a briefing (it reported no usable live search results). " +
+          "Nothing was saved; run the desk again in a few minutes."
+      ),
+      { status: 502, expose: true, code: "unusable_generation" }
+    );
   }
 
   /** Whether an API key is present. Used by the newsroom preflight. */
@@ -768,6 +844,7 @@ module.exports = {
   isWithinCooldown,
   SECTION_LABELS,
   extractSources,
+  looksLikeRefusal,
   GENERATION_REFERENCE_MISSING,
   GENERATION_REFERENCE_AMBIGUOUS,
   GENERATION_REFERENCE_INVALID,

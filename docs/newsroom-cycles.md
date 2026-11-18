@@ -241,6 +241,17 @@ stronger provenance is needed, it has to come from the provider — for example
 by requiring citations in the section prompts and rejecting a response without
 them, which is a product decision, not a storage one.
 
+**Refusals are never stored.** Every generation is sent with
+`tool_choice: "required"`, so the model has to run `web_search` at least once,
+and its instructions state the current date as real (the model's training data
+ends earlier, and left alone it could treat today as "the future" and refuse).
+An uncited answer that opens with an apology or "I can't…" is asked again once
+with a firmer instruction. If the retry refuses too, the generation fails with
+HTTP 502 `unusable_generation`: nothing is cached or logged, the desk's daily
+slot stays free, and a newsroom cycle records it as a retryable generation
+failure. If the configured model rejects a forced tool call, the reporter drops
+`tool_choice` for the rest of the process and keeps working.
+
 ## API
 
 Mounted at `/api/newsroom`. Reads sit behind the normal website access control;
