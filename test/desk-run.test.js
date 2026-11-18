@@ -32,6 +32,10 @@ test("a desk's Reporter Room runs are listed newest first, without prompt bodies
     assert.deepEqual(body.generations, [{ generatedAt: "2026-11-15T01:00:00.000Z", model: "m", content: "1. A\n2. B", customPrompt: true, noBriefing: false }]);
     assert.doesNotMatch(JSON.stringify(body), /secret prompt/);
     assert.equal((await fetch(`${base}/api/daily-report/generations?section=weather`)).status, 400);
+    // Main Hub asks for times only: no report text, only its length.
+    const meta = await (await fetch(`${base}/api/daily-report/generations?section=geopolitics&fields=meta`)).json();
+    assert.deepEqual(meta.generations, [{ generatedAt: "2026-11-15T01:00:00.000Z", model: "m", chars: 9, customPrompt: true, noBriefing: false }]);
+    assert.doesNotMatch(JSON.stringify(meta), /1\. A/);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
