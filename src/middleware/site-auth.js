@@ -327,6 +327,21 @@ function isTrackedMediaMachineReadRequest(req, adminKey) {
   return isAdminRequest(req, adminKey);
 }
 
+// Main Hub's News Reporter card ticks a desk off when that desk was written
+// today. The desk pages show two kinds of run: what the phone Shortcut pushed
+// (already readable with the ledger/admin key under /api/phone-briefings) and
+// the Reporter Room's own runs (⚡ Run and newsroom cycles), listed here. Main
+// Hub reads this from its server with the same header key as the reads above,
+// asking for `fields=meta` so no report text travels. One exact path, GET/HEAD,
+// header only; generating, sending and every other Reporter route stay behind
+// the owner session.
+function isReporterGenerationsMachineReadRequest(req, adminKey) {
+  if (req.method !== "GET" && req.method !== "HEAD") return false;
+  const path = req.path.length > 1 && req.path.endsWith("/") ? req.path.slice(0, -1) : req.path;
+  if (path !== "/api/daily-report/generations") return false;
+  return isAdminRequest(req, adminKey);
+}
+
 function canAccess(req, session) {
   if (!session) return false;
   if (session.role === "owner") return true;
@@ -430,6 +445,10 @@ function createSiteAuth(config) {
         next();
         return;
       }
+      if (isReporterGenerationsMachineReadRequest(req, config.adminKey)) {
+        next();
+        return;
+      }
       const session = sessionFromRequest(req, config);
       if (canAccess(req, session)) {
         req.siteSession = session;
@@ -481,4 +500,5 @@ module.exports = {
   decodeSession,
   encodeSession,
   isNewsroomHealthMachineReadRequest,
+  isReporterGenerationsMachineReadRequest,
 };
