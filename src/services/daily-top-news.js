@@ -153,8 +153,11 @@ function toRun({ id, source, at, title, text, model = null }) {
  * @param {string} [options.date]          "YYYY-MM-DD"; defaults to today
  * @param {string} [options.timeZone]      IANA zone the day is counted in
  * @param {Date}   [options.now]
+ * @param {object} [options.runStore]      Top10RunStore. With it, the Top 10
+ *   is built only from the day's recorded Run (see top10-runs.js) and is
+ *   empty until Run was hit; without it, from the newest runs as before.
  */
-function buildDailyTopNews({ briefingStore, reporterService, date, timeZone, now = new Date() } = {}) {
+function buildDailyTopNews({ briefingStore, reporterService, date, timeZone, runStore = null, now = new Date() } = {}) {
   const zone = isValidTimeZone(timeZone) ? timeZone : DEFAULT_TIME_ZONE;
   const today = localDateKey(now, zone);
   const day = isDateKey(date) ? date : today;
@@ -195,7 +198,10 @@ function buildDailyTopNews({ briefingStore, reporterService, date, timeZone, now
     return { ...publicDesk, runs: [...phoneRuns, ...reporterRuns] };
   });
 
-  return { date: day, today, timeZone: zone, desks, top10: select(desks) };
+  if (!runStore) return { date: day, today, timeZone: zone, desks, top10: select(desks) };
+  const run = runStore.latest(day);
+  const top10Run = run ? { id: run.id, createdAt: run.createdAt, runIds: run.runIds, runs: run.runs } : null;
+  return { date: day, today, timeZone: zone, desks, top10Run, top10: top10Run ? select(desks, top10Run.runIds) : [] };
 }
 
 module.exports = {

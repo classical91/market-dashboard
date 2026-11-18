@@ -1,8 +1,8 @@
 /* Today's Top 10 — reads /api/daily-top-news and shows the day's Economics,
-   Stocks and Crypto stories, one card per story. The phone's run comes
-   first; a Reporter Room run is the backup. Run News writes the three desks
-   through the Reporter Room API (admin key, OpenAI credits); nothing here
-   broadcasts. */
+   Stocks and Crypto stories, one card per story. The Top 10 exists only after
+   Run News: it writes any desk still missing today through the Reporter Room
+   API (admin key, OpenAI credits), then records the Run, which needs all three
+   desks to have a report from today. Nothing here broadcasts. */
 (function () {
   "use strict";
 
@@ -114,14 +114,22 @@
       }).join("") + '</select></label>' + copyButton;
   }
 
+  /* The Top 10 is pinned to the desk runs the day's Run recorded. */
   function selectedStories() {
-    return window.TopNewsSelection.select(state.data.desks, state.picked);
+    var run = state.data && state.data.top10Run;
+    return run ? window.TopNewsSelection.select(state.data.desks, run.runIds) : [];
   }
 
   function renderTop10(stories) {
-    if (!stories.length) return '<p class="briefing-empty">No numbered stories for this day yet. Run News for today, or open a desk to read its full briefing.</p>';
+    var data = state.data;
+    if (!data.top10Run) {
+      return '<p class="briefing-empty">' + (data.date === data.today
+        ? "No Top 10 yet. Hit ⚡ Run News: the Top 10 is made only when Economics, Stocks and Crypto all have a report from today."
+        : "No Top 10 was made this day. A Top 10 exists only for a day Run News completed all three desks.") + '</p>';
+    }
+    if (!stories.length) return '<p class="briefing-empty">The recorded Run has no numbered stories. Open a desk to read its full briefing.</p>';
     return '<section class="briefing-card"><div class="briefing-toolbar"><h2 class="topnews-desk-title">Combined Top 10</h2></div>' +
-      '<p class="topnews-note">Selected from the desks’ existing rankings, alternating desks at each rank. Repeated headlines and article links appear once.</p>' +
+      '<p class="topnews-note">Made by Run News at ' + esc(time(state.data.top10Run.createdAt)) + ' from that day’s three desk reports, alternating desks at each rank. Repeated headlines and article links appear once.</p>' +
       '<ol class="topnews-stories">' + stories.map(function (story) {
         return '<li class="topnews-story"><span class="briefing-rank">' + story.number + '</span><div class="topnews-story-main">' +
           '<h3 class="topnews-story-title">' + inline(story.title) + '</h3>' +
@@ -140,7 +148,7 @@
     els.next.disabled = data.date >= data.today;
     els.today.hidden = data.date === data.today;
     els.status.className = "briefing-age" + (made ? " fresh" : "");
-    els.status.textContent = longDate(data.date) + " · " + selectedStories().length + " of 10 stories · " + made + " of " + desks.length + " desks have news" +
+    els.status.textContent = longDate(data.date) + " · " + (data.top10Run ? selectedStories().length + " of 10 stories" : "no Top 10 yet") + " · " + made + " of " + desks.length + " desks have news" +
       (data.timeZone ? " · day counted in " + data.timeZone : "");
     var stories = selectedStories();
     els.copyAll.disabled = !stories.length;
@@ -148,7 +156,8 @@
     els.run.hidden = data.date !== data.today;
     els.run.disabled = state.running || state.sending;
     els.farmbot.hidden = data.date !== data.today;
-    els.farmbot.disabled = state.running || state.sending || !made;
+    els.farmbot.disabled = state.running || state.sending || !data.top10Run;
+    els.log.disabled = state.running || state.sending || !data.top10Run;
     renderDeskChips(desks);
     els.sections.innerHTML = renderTop10(stories) +
       '<details class="briefing-help"><summary>Source runs</summary><div class="briefing-toolbar">' +
@@ -168,7 +177,7 @@
       return res.json();
     }).then(function (data) {
       state.data = data;
-      state.picked = {};
+      state.picked = Object.assign({}, data.top10Run ? data.top10Run.runIds : {});
       var url = new URL(window.location.href);
       if (data.date === data.today) url.searchParams.delete("date");
       else url.searchParams.set("date", data.date);
@@ -212,6 +221,21 @@
     });
   }
 
+  /* Desks that already have a report from today count as done. */
+  function deskDone(key) {
+    var desk = state.data && state.data.date === state.data.today &&
+      state.data.desks.filter(function (d) { return d.key === key; })[0];
+    return Boolean(desk && desk.runs.length && desk.runs[0].stories.length);
+  }
+
+  /* Record today's Run; the server refuses unless all three desks are done. */
+  function recordRun() {
+    return window.AdminKey.fetch("/api/daily-top-news/run", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tz: timeZone }),
+    }).then(readApiJson);
+  }
+
   function runNews() {
     if (state.running || !window.AdminKey) return;
     state.running = true;
@@ -220,9 +244,13 @@
     var results = [];
     var failed = false;
     var chain = Promise.resolve();
-    RUN_DESKS.forEach(function (desk, index) {
+    var todo = RUN_DESKS.filter(function (desk) { return !deskDone(desk.key); });
+    RUN_DESKS.forEach(function (desk) {
+      if (todo.indexOf(desk) < 0) results.push(desk.label + ": already done today");
+    });
+    todo.forEach(function (desk, index) {
       chain = chain.then(function () {
-        setRunMessage("Writing " + desk.label + " (" + (index + 1) + " of " + RUN_DESKS.length +
+        setRunMessage("Writing " + desk.label + " (" + (index + 1) + " of " + todo.length +
           "). Each desk can take a minute; nothing is broadcast.", "");
         return runDesk(desk).then(function (line) {
           results.push(line);
@@ -233,8 +261,13 @@
       });
     });
     chain.then(function () {
-      setRunMessage(results.join(" · "), failed ? "error" : "ok");
-      return load("").then(function () { return logTop10({ quiet: true }); });
+      return recordRun().then(function () {
+        setRunMessage(results.join(" · ") + " · Top 10 made.", failed ? "error" : "ok");
+        return load("").then(function () { return logTop10({ quiet: true }); });
+      }, function (err) {
+        setRunMessage(results.join(" · ") + " · " + (err.message || "No Top 10 was made."), "error");
+        return load("");
+      });
     }).finally(function () {
       state.running = false;
       els.run.disabled = false;
@@ -258,7 +291,7 @@
       setRunMessage(data.logged + " stories recorded in the Reporter News Log. FarmBot checks and approval are separate.", "ok");
     }).catch(function (err) {
       setRunMessage("Could not log Top 10: " + err.message, "error");
-    }).finally(function () { els.log.disabled = false; });
+    }).finally(function () { els.log.disabled = !(state.data && state.data.top10Run); });
   }
 
   els.log.addEventListener("click", function () { logTop10(); });
@@ -286,6 +319,7 @@
         '<span class="briefing-age">' + esc(when(slip.recordedAt)) + "</span>";
       if (slip.approvalUrl) {
         html += '<a class="briefing-btn topnews-approve" href="' + esc(slip.approvalUrl) + '" target="_blank" rel="noopener">Open in FarmBot to approve →</a>';
+        html += '<a class="briefing-btn" href="/reporter.html#x-drafts">Review X drafts in News Reporter</a>';
       }
       html += "</div>";
       if (slip.error) html += '<p class="topnews-slip-error">' + esc(slip.error) + "</p>";
@@ -347,7 +381,10 @@
     }).then(readApiJson).then(function (data) {
       var slip = data.slip || {};
       setRunMessage(slip.outcome === "sent"
-        ? "Sent " + (slip.stories || []).length + " stories to FarmBot. Open the receipt link below to approve them."
+        ? "Sent " + (slip.stories || []).length + " stories to FarmBot. " + (slip.xDrafts && slip.xDrafts.status === "review"
+          ? "FarmBot wrote " + slip.xDrafts.drafted + " of " + slip.xDrafts.total + " X drafts; review them in News Reporter, then approve the batch in FarmBot."
+          : slip.xDrafts && slip.xDrafts.status === "failed" ? "X drafts were not written (" + slip.xDrafts.error + "); retry from News Reporter."
+          : "Open the receipt link below to approve them.")
         : slip.outcome === "already-sent" ? "Today's Top 10 was already in FarmBot; nothing new was sent."
         : "Not sent: " + (slip.error || "see the receipt below"), slip.outcome === "failed" ? "error" : "ok");
     }).catch(function (err) {

@@ -10,6 +10,7 @@ const { PhoneBriefingStore } = require("../src/services/phone-briefings");
 const { FarmbotTop10Service, fitPost } = require("../src/services/farmbot-top10");
 const { FarmbotTop10Store } = require("../src/services/farmbot-top10-store");
 const { ReporterNewsLogStore } = require("../src/services/reporter-news-log");
+const { Top10XDraftStore } = require("../src/services/top10-x-drafts");
 const { readArticle, verifyArticle, isBlockedAddress, checkUrl } = require("../src/services/article-verifier");
 
 const PREPARER = "p".repeat(40);
@@ -96,7 +97,7 @@ test("post copy is cut to 270 characters at a word and loses links", () => {
 
 // ── The send flow ───────────────────────────────────────────────────────
 
-function setup({ farmbotReply, existing = {}, verify } = {}) {
+function setup({ farmbotReply, existing = {}, verify, xDrafts = null } = {}) {
   const dir = tmp("md-farmbot-top10-");
   const briefingStore = new PhoneBriefingStore({ dataDir: dir, logger: { error() {} } });
   const now = new Date();
@@ -140,6 +141,12 @@ function setup({ farmbotReply, existing = {}, verify } = {}) {
       calls.lookups.push(id);
       return existing[id] ? reply(200, existing[id]) : reply(404, { error: "Batch not found" });
     }
+    if (xDrafts && u.pathname.startsWith("/news/v1/batches/fnb_") && opts.method === "GET") {
+      const payload = calls.posts[calls.posts.length - 1];
+      return reply(200, { batchId: "fnb_00000000-0000-4000-8000-000000000001", clientBatchId: payload.batchId, revision: 1,
+        payloadHash: `sha256:${"a".repeat(64)}`, status: "validated", payload });
+    }
+    if (xDrafts && u.pathname === "/news/v1/x-drafts" && opts.method === "POST") return xDrafts(JSON.parse(opts.body), reply);
     if (u.pathname === "/news/v1/batches" && opts.method === "POST") {
       const { payload } = JSON.parse(opts.body);
       calls.posts.push(payload);
@@ -153,6 +160,7 @@ function setup({ farmbotReply, existing = {}, verify } = {}) {
   const service = new FarmbotTop10Service({
     briefingStore, reporterService: null, slipStore: new FarmbotTop10Store({ dataDir: dir, logger: { error() {} } }),
     newsLogStore, openai, env: ENV, fetcher, verify: verify || defaultVerify, logger: { warn() {} },
+    xDraftStore: xDrafts ? new Top10XDraftStore({ dataDir: dir, logger: { error() {} } }) : null,
   });
   return { service, calls, newsLogStore };
 }
@@ -358,4 +366,31 @@ test("a duplicate article failure stays on its candidate and cannot overwrite an
   assert.equal(first.farmbot.status, "awaiting-approval");
   assert.equal(second.farmbot.status, "blocked");
   assert.equal(second.error, "Same article as a higher-ranked story");
+});
+
+test("after the batch is saved, FarmBot writes X drafts for review; a drafting failure never fails the send", async () => {
+  const requests = [];
+  const verify = async (url) => ({ canonicalUrl: url, title: `Article ${url.split("/").pop()}`, publishedAt: new Date(Date.now() - 3600000).toISOString(),
+    imageUrl: `https://img.example/${url.split("/").pop()}.jpg`, siteName: "Example", description: "Lead.", excerpt: "Body text.",
+    bodyText: "Long article body. ".repeat(20), ageMs: 3600000 });
+  const { service } = setup({
+    verify,
+    xDrafts: (body, reply) => {
+      requests.push(body);
+      return reply(200, { provider: "xai", model: "grok-4", drafts: body.items.map((item) => ({ itemId: item.itemId, ok: true, text: `Draft ${item.itemId}`, length: 10, attempts: 1 })) });
+    },
+  });
+  const slip = await service.send({});
+  assert.equal(slip.outcome, "sent");
+  assert.deepEqual(slip.xDrafts, { status: "review", drafted: 10, total: 10 });
+  assert.equal(requests[0].items.length, 10);
+  assert.match(requests[0].items[0].evidence, /^Lead\.\n\nLong article body/);
+  const set = service.xDrafts.current(slip.date);
+  assert.equal(set.items[0].draft, "Draft story-1");
+
+  const failing = setup({ verify, xDrafts: (_body, reply) => reply(503, { error: "FarmBot Settings has no API key" }) });
+  const failed = await failing.service.send({});
+  assert.equal(failed.outcome, "sent");
+  assert.equal(failed.xDrafts.status, "failed");
+  assert.match(failed.xDrafts.error, /no API key/);
 });

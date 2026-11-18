@@ -145,7 +145,7 @@
 }
 .topnews-day { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .topnews-step { margin-left: 0; min-width: 34px; font-size: 16px; line-height: 1; padding: 5px 10px; }
-.topnews-step:disabled, .topnews-copy-all:disabled { opacity: 0.4; cursor: default; }
+.topnews-step:disabled, .topnews-copy-all:disabled, #topNewsLog:disabled { opacity: 0.4; cursor: default; }
 .topnews-today, .topnews-copy-all, .topnews-run { margin-left: 0; }
 .topnews-actions { display: inline-flex; gap: 8px; flex-wrap: wrap; }
 .topnews-run {

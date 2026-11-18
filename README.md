@@ -664,8 +664,14 @@ second copy and accepts no preview approval/queue writes. Keep
 ## Today's Top 10 → FarmBot
 
 `/briefings/top-10` gathers the day's Economics, Stocks and Crypto desks (phone
-first, Reporter Room as backup). **Send to FarmBot** (admin key) merges them
-into one batch for approval:
+first, Reporter Room as backup). The Top 10 exists only after **⚡ Run News**
+(admin key): it writes any desk that has no report yet today, then records the
+Run in `DATA_DIR/top10-runs.json`, pinning the three desk reports it used. The
+Run is refused (409, naming the desk) unless Economics, Stocks and Crypto all
+have a numbered report from that same day. Without a recorded Run the page shows
+no Top 10, and Log Top 10 and Send to FarmBot are refused.
+
+**Send to FarmBot** (admin key) merges the Run's desks into one batch for approval:
 
 1. One `OPENAI_API_KEY` call with web search ranks all stories, removes
    duplicates, writes post copy (≤270 characters, no links: FarmBot strips them)
@@ -680,6 +686,21 @@ into one batch for approval:
    receipt, approve on FarmBot's News Preview page, then start the timers there.
 4. The receipt is kept in `DATA_DIR/farmbot-top10-slips.json` and each story is
    logged in the Reporter News Log as `verified` (logging is not approval).
+5. FarmBot then writes one engagement X post per story (`POST /news/v1/x-drafts`)
+   with its own **Settings → AI & Generation**: the Grok provider, model and key,
+   the post-writing prompt, post style and niche. Each draft is checked against
+   its article (no invented numbers, tickers or quotes, no links, 280
+   characters). The drafts are kept in `DATA_DIR/top10-x-drafts.json`; a drafting
+   failure never fails the send.
+
+Review the drafts in **News Reporter → ✍️ Top 10 X Drafts** (`/reporter.html#x-drafts`):
+edit, approve or reject each one, then **Apply approved to FarmBot**. Approved
+drafts replace those stories' text in a new revision of the same batch
+(`supersedes`); the rest keep the batch text. The batch must still be the
+revision the drafts were written from, and a batch already approved and queued
+in FarmBot is never changed. You still approve the new revision in FarmBot
+before anything is queued or posted. No new settings are needed; FarmBot must
+include the X drafts update.
 
 ### Which desks go to Telegram
 

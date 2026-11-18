@@ -63,6 +63,7 @@ test("the page renders and copies only the combined ten, including historical da
     URL, URLSearchParams, Intl, setTimeout() {},
     fetch: async (url) => ({ ok: true, json: async () => url.includes("/farmbot") ? { configured: true } : {
       date: "2026-11-13", today: "2026-11-15", timeZone: "UTC", desks: sources,
+      top10Run: { id: "top10-1", createdAt: "2026-11-13T18:00:00Z", runIds: { economics: "economics-run", stocks: "stocks-run", crypto: "crypto-run" } },
     } }),
   };
   for (const name of ["briefing-markdown", "briefing-freshness", "top-news-selection", "top-news"]) {
@@ -83,4 +84,77 @@ test("the page renders and copies only the combined ten, including historical da
   assert.equal(writes[0].body.date, "2026-11-13");
   assert.deepEqual(writes[0].body.runs, { economics: "economics-run", stocks: "stocks-run", crypto: "crypto-run" });
   assert.match(nodes.topNewsRunMessage.textContent, /10 stories recorded/);
+});
+
+test("a day without a recorded Run shows no Top 10 and offers nothing to copy, log or send", async () => {
+  const nodes = {};
+  const context = {
+    window: {
+      location: { search: "", href: "http://x/briefings/top-10" },
+      history: { replaceState() {} },
+      AdminKey: { async fetch() { throw new Error("must not write"); } },
+    },
+    document: { getElementById(id) { return nodes[id] ||= {
+      innerHTML: "", textContent: "", hidden: false, disabled: false, events: {},
+      addEventListener(event, fn) { this.events[event] = fn; },
+    }; } },
+    navigator: {},
+    URL, URLSearchParams, Intl, setTimeout() {},
+    fetch: async (url) => ({ ok: true, json: async () => url.includes("/farmbot") ? { configured: true } : {
+      date: "2026-11-15", today: "2026-11-15", timeZone: "UTC", desks: desks().slice(0, 3), top10Run: null,
+    } }),
+  };
+  for (const name of ["briefing-markdown", "briefing-freshness", "top-news-selection", "top-news"]) {
+    vm.runInNewContext(fs.readFileSync(path.join(__dirname, "..", "public/assets/js", name + ".js"), "utf8"), context);
+  }
+  await new Promise(setImmediate);
+  assert.equal((nodes.topNewsSections.innerHTML.match(/class="topnews-story"/g) || []).length, 0);
+  assert.match(nodes.topNewsSections.innerHTML, /No Top 10 yet\. Hit ⚡ Run News/);
+  assert.equal(nodes.topNewsCopyAll.disabled, true);
+  assert.equal(nodes.topNewsLog.disabled, true);
+  assert.equal(nodes.topNewsFarmbot.disabled, true);
+  assert.equal(nodes.topNewsRun.hidden, false);
+});
+
+test("Run News writes only the desks missing today, then records the Run", async () => {
+  const nodes = {};
+  const writes = [];
+  let recorded = false;
+  const sources = desks().slice(0, 3);
+  sources[1].runs = [];
+  sources[2].runs = [];
+  const context = {
+    window: {
+      location: { search: "", href: "http://x/briefings/top-10" },
+      history: { replaceState() {} },
+      AdminKey: { async fetch(url) {
+        writes.push(url);
+        if (url === "/api/daily-top-news/run") recorded = true;
+        return { ok: true, json: async () => (url.includes("/run") ? { run: { id: "top10-1" } } : { logged: 10 }) };
+      } },
+    },
+    document: { getElementById(id) { return nodes[id] ||= {
+      innerHTML: "", textContent: "", hidden: false, disabled: false, events: {},
+      addEventListener(event, fn) { this.events[event] = fn; },
+    }; } },
+    navigator: {},
+    URL, URLSearchParams, Intl, setTimeout() {},
+    fetch: async (url) => ({ ok: true, json: async () => url.includes("/farmbot") ? { configured: true } : {
+      date: "2026-11-15", today: "2026-11-15", timeZone: "UTC", desks: sources,
+      top10Run: recorded ? { id: "top10-1", createdAt: "2026-11-15T18:00:00Z", runIds: {} } : null,
+    } }),
+  };
+  for (const name of ["briefing-markdown", "briefing-freshness", "top-news-selection", "top-news"]) {
+    vm.runInNewContext(fs.readFileSync(path.join(__dirname, "..", "public/assets/js", name + ".js"), "utf8"), context);
+  }
+  await new Promise(setImmediate);
+  nodes.topNewsRun.events.click();
+  for (let i = 0; i < 20; i += 1) await new Promise(setImmediate);
+  assert.deepEqual(writes, [
+    "/api/daily-report/generate?section=markets",
+    "/api/daily-report/generate?section=crypto",
+    "/api/daily-top-news/run",
+    "/api/daily-top-news/intake",
+  ]);
+  assert.match(nodes.topNewsRunMessage.textContent, /Economics: already done today · Stocks: done · Crypto: done · Top 10 made\./);
 });

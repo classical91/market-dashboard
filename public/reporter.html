@@ -331,6 +331,31 @@
         </div>
       </section>
 
+      <!-- Top 10 X Drafts: engagement X posts FarmBot wrote (with its Grok
+           settings) for the Top 10 batch sent from Today's Top 10. Review
+           here; approved drafts become a new revision of the FarmBot batch,
+           which still needs approval in FarmBot before anything posts. -->
+      <section class="intel-section intel-section--static" id="x-drafts" aria-label="Top 10 X drafts" data-intel-accent="blue">
+        <div class="intel-section-header intel-section-header--static">
+          <span>
+            <span class="intel-section-title">✍️ Top 10 X Drafts</span>
+            <span class="intel-section-sub">Engagement posts FarmBot wrote for the Top 10 · review, then apply to the FarmBot batch</span>
+          </span>
+          <span class="intel-section-note" id="xDraftsMeta"></span>
+        </div>
+        <div class="intel-section-body">
+          <div class="x-drafts" id="xDrafts">
+            <div class="x-drafts-toolbar">
+              <button type="button" class="news-log-refresh" id="xDraftsRefresh">Refresh</button>
+              <button type="button" class="news-log-refresh" id="xDraftsRewrite" hidden>Write drafts again</button>
+              <button type="button" class="news-log-refresh x-drafts-apply" id="xDraftsApply" hidden>Apply approved to FarmBot</button>
+            </div>
+            <p class="x-drafts-status" id="xDraftsStatus" role="status">Loading drafts…</p>
+            <div class="x-drafts-list" id="xDraftsList" aria-live="polite"></div>
+          </div>
+        </div>
+      </section>
+
       <section class="intel-section" aria-label="Global context" data-intel-section="global-context"
                data-intel-accent="blue" data-intel-collapsed="true">
         <button class="intel-section-header" type="button" aria-expanded="false">
@@ -400,6 +425,7 @@
 <script src="/assets/js/reporter-market.js"></script>
 <script src="/assets/js/reporter-calendar.js"></script>
 <script src="/assets/js/reporter-news-log.js"></script>
+<script src="/assets/js/reporter-x-drafts.js"></script>
 <script>
   /* ── Reporter ───────────────────────────────────────────── */
   (function () {
