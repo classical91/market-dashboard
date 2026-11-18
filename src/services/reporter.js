@@ -24,9 +24,11 @@ const SECTION_LABELS = {
 };
 
 const SYSTEM_PROMPT =
-  "You are a professional financial journalist producing concise, structured daily market briefings. " +
-  "Follow the exact format requested: numbered items, hyphen bullets, sentiment labels. " +
-  "Be factual, precise, and keep each story within the specified line limit.";
+  "You are the lead editor of a fast, trusted markets newsroom, writing the daily briefing traders read first. " +
+  "You find the news with web search, then write it with energy and precision: concrete numbers, named actors, " +
+  "active verbs, and a clear answer to \"so what?\" in every story. " +
+  "Follow the requested format exactly, since pages and Telegram parse it: the bold numbered headings, hyphen bullets and labels. " +
+  "Accuracy beats color: never invent a figure, quote or source.";
 
 /**
  * The model's own training data ends before the date it is asked about, and
@@ -253,106 +255,101 @@ function normalizeImportedLogEntry(entry) {
   };
 }
 
+/**
+ * The house style every generation is written in, sent with the instructions
+ * so the four desks and any custom prompt (the website's crypto-news prompt,
+ * the prompt library) sound like one newsroom. The desk prompts below only
+ * say what to cover. Their `**#N … — …**` heading is load-bearing: Today's
+ * Top 10 and the desk pages split stories on it (splitStories in
+ * daily-top-news.js).
+ */
+const HOUSE_STYLE = `House style (where a request sets its own format or tone, the request wins):
+- Write like a sharp wire-desk editor briefing traders before the open: fast, specific, alive.
+- Rank by impact: #1 is the story a reader most needs today.
+- Headlines carry the news itself, with the number, name or move in them.
+  Good: "Fed holds at 4.25%, Powell keeps December cut on the table". Bad: "Fed decision announced".
+- Lead each first bullet with the hardest fact: a figure, a name, a change versus before.
+- Active verbs. No filler ("amid", "in a move that", "it remains to be seen", "investors will be watching").
+- One idea per bullet, one line per bullet.
+- Facts are what sources reported; label anything else as analysis. Never invent a figure; drop it instead.
+- Plain hyphen bullets only, no tables.
+- Keep the whole brief under 3,500 characters: it is posted to Telegram.`;
+
 function cryptoPrompt(dateStr) {
-  return `${dateStr}
-TOP 10 EMERGING / TRENDING CRYPTO TOKENS
+  return `🗓️ ${dateStr}
+🚀 TOP 10 EMERGING / TRENDING CRYPTO TOKENS
 
-Find 10 crypto tokens that are trending or starting to emerge right now. Keep this lightweight: use recent web results and market/news mentions, but do not perform a deep risk audit.
+Find the 10 crypto tokens with the most real momentum right now: fresh listings, volume spikes, a live narrative, or a catalyst people are talking about. Skip the mega-caps unless something new is moving them.
 
-Rules:
-- Output exactly 10 tokens.
-- Prefer tokens with recent momentum, fresh listings, rising volume, social buzz, or a clear narrative.
-- Avoid obvious mega-caps unless there is a fresh reason they are trending.
-- Use simple hyphen bullets only.
-- Keep each item short: heading plus 2-3 bullets.
-- Do not give financial advice or buy/sell instructions.
+Open with one line before #1: **The tape:** what is driving the rotation today, in one sentence.
 
-Format each item:
-**#[N] [TOKEN NAME] ([TICKER]) - [CHAIN / CATEGORY]**
-- Why it is trending
-- Main catalyst or signal
-- Quick caution if relevant`;
+Then exactly 10 items:
+**#[N] [EMOJI] [TOKEN] ([TICKER]) — [CHAIN / SECTOR]: [what is happening, with the number]**
+- 🔥 Why now: the catalyst, with a figure (volume, % move, listing, TVL)
+- 👀 Signal: the on-chain, social or market data behind it
+- ⚠️ Risk: the honest catch (thin liquidity, unlocks, hype only), or "none flagged"
 
+Pick an [EMOJI] that fits the sector (🤖 AI, 🎮 gaming, 🐸 meme, 🏦 DeFi, ⛓️ L1/L2, 💵 stablecoin, 🖼️ NFT).
+This is a radar, not advice: no buy/sell calls, no price targets.`;
 }
 
 function economicsPrompt(dateStr) {
   return `🗓️🌍 ${dateStr}
-💹 TOP 10 GLOBAL ECONOMIC DEVELOPMENTS BRIEF (LAST 24-48 HOURS) 💹
+💹 TOP 10 GLOBAL ECONOMIC DEVELOPMENTS (LAST 24-48 HOURS)
 
-Search for current and verified economic events, indicators, policy moves, market data, or macro developments from the last 24-48 hours and produce a TOP 10 report.
+Search for the economic news that moved or will move markets in the last 24-48 hours: central bank decisions and speeches, official data releases, big moves in bonds, FX and commodities, trade and tariff shifts, and forecast revisions from the IMF, World Bank, OECD and similar.
 
-GEOGRAPHIC SCOPE (REQUIRED):
-Cover a globally balanced mix across major economies. Prioritize:
-- United States
-- Eurozone / EU
-- China
-- United Kingdom
-- Japan
-- India, Brazil, Korea, or other emerging / major economies (at least 1-2 items)
+Make it global: cover the US, Eurozone, China, UK and Japan, plus at least one from India, Brazil, Korea or another emerging economy. No more than 3 items on any one country. When more than 10 compete, central banks beat data, data beats market moves, and market moves beat forecasts.
 
-Do not cluster more than 3 items on any single country.
+Open with one line before #1: **The big picture:** the single thread running through today's economy, in one sentence.
 
-PRIORITY ORDER (when more than 10 items compete):
-1. Central bank decisions or policy shifts
-2. Official government data releases
-3. Major market moves (equities, FX, commodities, bonds)
-4. Trade, tariff, or geopolitical macro developments
-5. Forecasts or revisions from credible institutions (IMF, World Bank, OECD, etc.)
+Then exactly 10 items:
+**#[N] [EMOJI] [COUNTRY/REGION] — [headline with the number in it]**
+- The fact: for data, actual vs. expected (and prior); for policy, the decision and the vote or wording that changed
+- Why it matters: who feels it (borrowers, exporters, the currency, the next rate decision)
+- Next: the date or event that settles it, if one is known
+- Tone: 🟢 supportive / 🔴 restrictive / ⚪ neutral for growth, with a 3-word reason
 
-FORMAT RULES (STRICT):
-- Output EXACTLY 10 items (no more, no less)
-- Each item must begin with a bold numbered heading on its own line, structured as:
-  **#[N] [COUNTRY/REGION] — [HEADLINE TITLE]**
-- Use only simple hyphen bullets (-) for sub-details beneath each heading
-- Keep each item short and structured (max 6 lines total including heading)
-- For data releases, include: DATA + actual vs. expected where relevant
-- If uncertain of a specific data point, omit it rather than approximate
-
-GOAL: concise, globally balanced daily economics snapshot.`;
+Pick an [EMOJI] for the kind of story (🏦 central bank, 📊 data release, 💱 FX, 🛢️ energy/commodities, 🚢 trade, 📉 markets, 🧾 fiscal).`;
 }
 
 function geopoliticsPrompt(dateStr) {
   return `🗓️🌍 ${dateStr}
-TOP 10 GEOPOLITICAL DEVELOPMENTS BRIEF (LAST 24-48 HOURS)
+🛰️ TOP 10 GEOPOLITICAL DEVELOPMENTS (LAST 24-48 HOURS)
 
-Search for current, verified geopolitical developments from the last 24-48 hours and produce a globally balanced TOP 10 report.
+Search for verified geopolitical developments from the last 24-48 hours and rank the 10 that matter most: active conflicts and ceasefires, sanctions and export controls, diplomacy and summits, alliance and defense moves, energy-security and shipping disruptions, and elections or government decisions with consequences beyond their borders.
 
-PRIORITIZE:
-- Active conflicts, ceasefires, sanctions, and diplomatic negotiations
-- Material changes in alliances, defense posture, or security policy
-- Trade restrictions, energy-security events, and shipping disruptions
-- Elections or government decisions with international consequences
+Keep it globally balanced: no region gets more than 3 items, and one event appears once however many outlets covered it.
 
-RULES:
-- Output exactly 10 stories.
-- Use a bold numbered heading: **#[N] [REGION] — [HEADLINE]**
-- Add 2-3 short hyphen bullets: what happened, why it matters, and what to watch.
-- Separate confirmed facts from analysis; do not speculate or make market calls.
-- Avoid duplicating the same event from multiple sources.`;
+Open with one line before #1: **The world today:** the development that changes the most, in one sentence.
+
+Then exactly 10 items:
+**#[N] [EMOJI] [REGION] — [headline that says what changed]**
+- What happened: who did what, where, with numbers (casualties, troops, tariffs, barrels, votes) where reported
+- Why it matters: the consequence beyond the headline (supply chains, energy, alliances, the next escalation step)
+- Watch: the next deadline, meeting, vote or red line
+
+Pick an [EMOJI] for the kind of story (⚔️ conflict, 🕊️ ceasefire/talks, 🚫 sanctions, 🛡️ defense, ⚡ energy, 🚢 shipping, 🗳️ election, 🤝 diplomacy).
+Report, don't predict: no market calls, and mark analysis as analysis.`;
 }
 
 function marketsPrompt(dateStr) {
   return `🗓️ ${dateStr}
+📈 TOP 10 GLOBAL MARKETS BRIEF (LAST 24-48 HOURS)
 
-Create a TOP 10 global markets news brief from the past 24-48 hours.
+Search for the market stories of the last 24-48 hours that a trader needs before the open. Mix asset classes: stocks and indices, single-name movers on earnings or news, FX, commodities, bonds and rates, and the central-bank or macro news that moved them. At least 4 stories must be about stocks or indices.
 
-Coverage should include a mix of:
-- Stocks / indices
-- Forex
-- Commodities
-- Bonds / rates
-- Macro / central banks
+Open with one line before #1: **The tape:** risk-on or risk-off today and the one reason why, in one sentence.
 
-Rules:
-- Output exactly 10 stories.
-- For each story include:
-  1. Title (short)
-  2. Why it matters (1-2 bullets)
-  3. Assets affected (tickers / pairs / indices / contracts)
-  4. Sentiment: Bullish / Bearish / Neutral
-- Keep each story to max 4 lines total.
-- No long paragraphs.
-- Use hyphen bullets only.`;
+Then exactly 10 items:
+**#[N] [EMOJI] [ASSET/TICKER] — [headline with the move in it, e.g. "NVDA +6% on record data-center sales"]**
+- The move: price or % change and the reason, as reported
+- Why it matters: what it says about the market, a sector, or the next trade
+- Assets: the tickers, pairs, indices or contracts affected
+- Sentiment: 🟢 Bullish / 🔴 Bearish / ⚪ Neutral
+
+Pick an [EMOJI] for the asset class (📈 equities, 💱 FX, 🛢️ energy, 🥇 metals, 🏛️ bonds/rates, 🏦 central banks, 💻 tech).
+No buy/sell advice or price targets.`;
 }
 
 function promptForSection(section, dateStr) {
@@ -566,7 +563,7 @@ class ReporterService {
   async _requestGeneration(input) {
     const request = {
       model: this._model,
-      instructions: `${SYSTEM_PROMPT} ${groundingInstructions(formatDate())}`,
+      instructions: `${SYSTEM_PROMPT}\n\n${HOUSE_STYLE}\n\n${groundingInstructions(formatDate())}`,
       tools: [{ type: "web_search" }],
       input,
     };
