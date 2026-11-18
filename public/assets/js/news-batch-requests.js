@@ -14,6 +14,10 @@
   var rows = [];
   try { pending = JSON.parse(sessionStorage.getItem("newsBatchPending") || "null"); } catch (e) { /* optional storage */ }
 
+  function setMessage(text, tone) {
+    message.textContent = text;
+    message.className = "news-request-status" + (tone ? " is-" + tone : "");
+  }
   function savePending(value) {
     pending = value;
     try { if (value) sessionStorage.setItem("newsBatchPending", JSON.stringify(value)); else sessionStorage.removeItem("newsBatchPending"); } catch (e) { /* optional storage */ }
@@ -45,8 +49,9 @@
     return window.AdminKey.fetchSilent("/api/news-batch-requests", { credentials: "same-origin" }).then(json).then(function (data) {
       rows = data.requests;
       render();
-      message.textContent = data.configured ? (rows.length ? "Requests are saved. You can leave this page and return later." : "No requests yet.") : "The server integration needs setup. Requests will be saved as blocked until it is ready.";
-    }).catch(function (error) { message.textContent = error.message; });
+      if (data.configured) setMessage(rows.length ? "Requests are saved. You can leave this page and return later." : "No requests yet.");
+      else setMessage("Server integration needs setup. Requests will be saved as Blocked until it is ready.", "warning");
+    }).catch(function (error) { setMessage(error.message, "error"); });
   }
   function check(id, interactive) {
     var request = interactive ? window.AdminKey.fetchOrSession : window.AdminKey.fetchSilent;
@@ -61,7 +66,7 @@
     if (busy) return;
     var value = { windowHours: Number(windowInput.value), instructions: instructions.value.trim() };
     if (pending && JSON.stringify(pending.options) !== JSON.stringify(value)) {
-      message.textContent = "A submission has an unknown result. Restore its options and retry to recover the original ticket.";
+      setMessage("A submission has an unknown result. Restore its options and retry to recover the original ticket.", "warning");
       windowInput.value = String(pending.options.windowHours);
       instructions.value = pending.options.instructions;
       return;
@@ -69,18 +74,18 @@
     if (!pending) savePending({ key: crypto.randomUUID(), options: value });
     busy = true;
     submit.disabled = true;
-    message.textContent = "Saving your request and checking Penny’s handoff…";
+    setMessage("Saving your request and checking Penny’s handoff…");
     window.AdminKey.fetchOrSession("/api/news-batch-requests", { method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": pending.key }, body: JSON.stringify(pending.options) })
       .then(json).then(function (data) {
         savePending(null);
         rows = [data.request].concat(rows.filter(function (row) { return row.id !== data.request.id; })).slice(0, 30);
         render();
-        message.textContent = data.deduplicated ? "Your existing request is shown below." : "Request saved. Nothing will be published without your approval.";
+        setMessage(data.deduplicated ? "Your existing request is shown below." : "Request saved. Nothing will be published without your approval.");
       }).catch(function (error) {
         // A rejected request has a known outcome; allow corrected options.
         // Network and server errors may hide a saved ticket, so retain its key.
         if ([400, 409, 413, 422].includes(error.status)) savePending(null);
-        message.textContent = error.message + (pending ? " Retry with the same options to recover your ticket." : "");
+        setMessage(error.message + (pending ? " Retry with the same options to recover your ticket." : ""), "error");
       })
       .finally(function () { busy = false; submit.disabled = false; });
   });
@@ -88,7 +93,7 @@
     var button = event.target.closest("[data-request-check]");
     if (!button) return;
     button.disabled = true;
-    check(button.getAttribute("data-request-check"), true).catch(function (error) { message.textContent = error.message; })
+    check(button.getAttribute("data-request-check"), true).catch(function (error) { setMessage(error.message, "error"); })
       .finally(function () { button.disabled = false; });
   });
   if (pending) { windowInput.value = String(pending.options.windowHours); instructions.value = pending.options.instructions; }
@@ -96,11 +101,11 @@
     return rows.filter(function (row) { return !["failed", "preview_ready"].includes(row.status); }).reduce(function (chain, row) {
       return chain.then(function () { return check(row.id, false); });
     }, Promise.resolve());
-  }).catch(function (error) { message.textContent = error.message; });
+  }).catch(function (error) { setMessage(error.message, "error"); });
   // No overlapping polls; no key prompts from background work.
   function poll() {
     var active = rows.find(function (row) { return ["requested", "assigned", "running", "blocked"].includes(row.status); });
-    var work = !document.hidden && !busy && active ? check(active.id, false).catch(function (error) { message.textContent = error.message; }) : Promise.resolve();
+    var work = !document.hidden && !busy && active ? check(active.id, false).catch(function (error) { setMessage(error.message, "error"); }) : Promise.resolve();
     work.finally(function () { setTimeout(poll, 15000); });
   }
   setTimeout(poll, 15000);
