@@ -88,6 +88,11 @@
         { href: "/ai-analysis.html", label: "Presets" },
         { href: "/layout-analysis.html", label: "My Layouts" },
         { href: "/signal-diagnostics.html", label: "Signal Diagnostics" },
+        // ChatGPT project for discretionary trade analysis (opens in a new tab).
+        {
+          href: "https://chatgpt.com/g/g-p-6afdc0cad2a081919b23725443780c43-trading-analyst/project",
+          label: "Trader Analyst",
+        },
       ],
     },
     {
