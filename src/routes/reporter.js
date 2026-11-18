@@ -18,6 +18,12 @@ function createReporterRouter({ reporterService, telegramService, broadcastLedge
     return typeof req.body?.prompt === "string" ? req.body.prompt : "";
   }
 
+  // The desk pages send their built-in crypto-news prompt as a fallback: a
+  // prompt saved for the desk in Settings → Briefing AI replaces it.
+  function promptIsFallback(req) {
+    return req.body?.promptIsFallback === true;
+  }
+
   // Read-only: returns the cached report if present, never generates.
   router.get("/", (req, res, next) => {
     try {
@@ -66,7 +72,9 @@ function createReporterRouter({ reporterService, telegramService, broadcastLedge
   // because it spends OpenAI credits.
   router.post("/generate", requireAdmin, async (req, res, next) => {
     try {
-      const report = await reporterService.generateReport(resolveTtlMs(req), resolveSection(req), resolvePrompt(req));
+      const report = await reporterService.generateReport(resolveTtlMs(req), resolveSection(req), resolvePrompt(req), {
+        promptIsFallback: promptIsFallback(req),
+      });
       res.json(report);
     } catch (err) {
       next(err);

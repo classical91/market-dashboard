@@ -2,6 +2,7 @@
 const path = require("path");
 const crypto = require("crypto");
 const OpenAI = require("openai");
+const { createAiProviders, PROVIDERS } = require("./ai-providers");
 const { resolveDataDir } = require("../utils/data-dir");
 const { withExclusiveLock, writeJsonAtomic } = require("./json-file-lock");
 
@@ -244,6 +245,7 @@ function normalizeImportedLogEntry(entry) {
     generatedAt: generatedDate.toISOString(),
     generatedDateKey: entry.generatedDateKey || formatDateKey(generatedDate),
     dateStr: typeof entry.dateStr === "string" ? entry.dateStr.slice(0, 120) : formatDate(),
+    provider: typeof entry.provider === "string" ? entry.provider.slice(0, 20) : null,
     model: typeof entry.model === "string" ? entry.model.slice(0, 80) : null,
     content,
     prompt: typeof entry.prompt === "string" ? entry.prompt.slice(0, 12000) : null,
@@ -371,6 +373,23 @@ function customPromptForDate(prompt, dateStr) {
   return `${dateStr}\n${normalized}`;
 }
 
+/**
+ * Which AI and prompt made a generation. Two runs of a desk in its refresh
+ * window are the same run only when this matches: switching a desk to
+ * Claude, or saving a new prompt for it, is a new briefing, not a repeat.
+ */
+function engineKey({ provider, model, prompt }) {
+  return `${provider || "openai"}:${model || ""}:${promptCacheKey(prompt)}`;
+}
+
+function entryEngineKey(entry) {
+  return engineKey({ provider: entry.provider || "openai", model: entry.model || "", prompt: entry.prompt || "" });
+}
+
+function providerMeta(id) {
+  return PROVIDERS.find((p) => p.id === id) || PROVIDERS[0];
+}
+
 function promptCacheKey(prompt) {
   const normalized = normalizeCustomPrompt(prompt);
   if (!normalized) return "default";
@@ -378,11 +397,19 @@ function promptCacheKey(prompt) {
 }
 
 class ReporterService {
-  constructor({ cache, apiKey, model, dataDir }) {
+  /**
+   * `providers` (ai-providers.js) adds Claude and Grok next to ChatGPT;
+   * `aiSettings` (briefing-ai-settings.js) says which one each desk writes
+   * with, and with what prompt. Without them every desk is written by OpenAI
+   * with `model`, as before.
+   */
+  constructor({ cache, apiKey, model, dataDir, providers = null, aiSettings = null }) {
     this._cache = cache;
     this._apiKey = apiKey;
     this._client = apiKey ? new OpenAI({ apiKey }) : null;
     this._model = model || "gpt-5.4-mini";
+    this._providers = providers || createAiProviders({ env: { OPENAI_API_KEY: apiKey || "", REPORTER_MODEL: this._model } });
+    this._aiSettings = aiSettings;
     this._logFile = path.join(dataDir || resolveDataDir(), "reporter-generation-log.json");
     this._lockState = { depth: 0 };
     this._rateLimitedUntil = new Map();
@@ -518,9 +545,34 @@ class ReporterService {
       rateLimited: true,
       rateLimitedSection: section,
       rateLimitedUntil: new Date(untilMs).toISOString(),
-      reporterModel: this._model,
-      error: "OpenAI is rate-limited. Showing any saved report instead of retrying immediately.",
+      reporterModel: this.model,
+      error: `${providerMeta(this.engineFor(section).provider).label} is rate-limited. Showing any saved report instead of retrying immediately.`,
     };
+  }
+
+  /** The OpenAI model when nothing else is chosen; each other provider's default otherwise. */
+  _defaultModelFor(provider) {
+    return provider === "openai" ? this._model : this._providers.defaultModel(provider);
+  }
+
+  /** { provider, model, prompt } a desk is written with ("" prompt = built-in). */
+  engineFor(section) {
+    if (!this._aiSettings) return { provider: "openai", model: this._model, prompt: "" };
+    return this._aiSettings.resolve(section, { defaultModel: (provider) => this._defaultModelFor(provider) });
+  }
+
+  _defaultEngine() {
+    if (!this._aiSettings) return { provider: "openai", model: this._model };
+    const settings = this._aiSettings.get();
+    return { provider: settings.default.provider, model: settings.default.model || this._defaultModelFor(settings.default.provider) };
+  }
+
+  _providerConfigured(provider) {
+    return provider === "openai" ? Boolean(this._client) : this._providers.isConfigured(provider);
+  }
+
+  _anyConfigured() {
+    return Boolean(this._client) || this._providers.list().some((p) => p.configured);
   }
 
   _buildReport(ttlMs) {
@@ -528,7 +580,7 @@ class ReporterService {
     const report = {
       configured: true,
       generated: false,
-      reporterModel: this._model,
+      reporterModel: this.model,
       sections: REPORT_SECTIONS,
       generationLog: log,
     };
@@ -558,10 +610,16 @@ class ReporterService {
     return report;
   }
 
-  async _requestGeneration(input) {
+  async _requestGeneration(input, engine = { provider: "openai", model: this._model }) {
+    const instructions = `${SYSTEM_PROMPT}\n\n${HOUSE_STYLE}\n\n${groundingInstructions(formatDate())}`;
+    // Claude and Grok go through ai-providers.js (each with its own web
+    // search); ChatGPT keeps the forced-search path below.
+    if (engine.provider && engine.provider !== "openai") {
+      return this._providers.generate({ provider: engine.provider, model: engine.model, instructions, input });
+    }
     const request = {
-      model: this._model,
-      instructions: `${SYSTEM_PROMPT}\n\n${HOUSE_STYLE}\n\n${groundingInstructions(formatDate())}`,
+      model: engine.model || this._model,
+      instructions,
       tools: [{ type: "web_search" }],
       input,
     };
@@ -590,10 +648,10 @@ class ReporterService {
    * with a firmer instruction; if it refuses again the call fails, nothing is
    * cached or logged, and the desk can be run again straight away.
    */
-  async _generate(prompt) {
-    const first = await this._requestGeneration(prompt);
+  async _generate(prompt, engine) {
+    const first = await this._requestGeneration(prompt, engine);
     if (!looksLikeRefusal(first.content, first.sources)) return first;
-    const second = await this._requestGeneration(`${prompt}\n\n${REFUSAL_RETRY_NOTE}`);
+    const second = await this._requestGeneration(`${prompt}\n\n${REFUSAL_RETRY_NOTE}`, engine);
     if (!looksLikeRefusal(second.content, second.sources)) return second;
     throw Object.assign(
       new Error(
@@ -604,13 +662,18 @@ class ReporterService {
     );
   }
 
-  /** Whether an API key is present. Used by the newsroom preflight. */
+  /** Whether the default AI's key is present. Used by the newsroom preflight. */
   get configured() {
-    return Boolean(this._client);
+    return this._providerConfigured(this._defaultEngine().provider);
   }
 
+  /** The default model id: the one desks without their own choice write with. */
   get model() {
-    return this._model;
+    return this._defaultEngine().model;
+  }
+
+  get provider() {
+    return this._defaultEngine().provider;
   }
 
   get sections() {
@@ -714,7 +777,7 @@ class ReporterService {
    * generation, so simply viewing the page can't spend API calls.
    */
   peekReport(ttlMs) {
-    if (!this._client) {
+    if (!this._anyConfigured()) {
       return { configured: false };
     }
     return this._buildReport(ttlMs || DEFAULT_TTL_MS);
@@ -724,15 +787,30 @@ class ReporterService {
    * Generate only the requested reporter section, then return the current
    * aggregate cached report so the UI can keep already-generated tabs visible.
    */
-  async generateReport(ttlMs, requestedSection, customPrompt, { cycleId = null } = {}) {
-    if (!this._client) {
-      return { configured: false };
-    }
-
+  /**
+   * `promptIsFallback`: the request's prompt is a page's built-in default (the
+   * desk pages' crypto-news prompt), so a prompt saved for the desk in
+   * Settings → Reporter → Briefing AI takes its place. Otherwise the request's
+   * prompt (the Reporter Room's browser prompt library) wins over the saved one.
+   */
+  async generateReport(ttlMs, requestedSection, customPrompt, { cycleId = null, promptIsFallback = false } = {}) {
     const resolvedTtl = ttlMs || DEFAULT_TTL_MS;
     const section = normalizeSection(requestedSection);
-    const promptOverride = normalizeCustomPrompt(customPrompt);
-    const key = this._cacheKey(resolvedTtl, section, promptCacheKey(promptOverride));
+    const engine = this.engineFor(section);
+    if (!this._providerConfigured(engine.provider)) {
+      const meta = providerMeta(engine.provider);
+      return {
+        configured: false,
+        provider: engine.provider,
+        missingKey: meta.keyEnv,
+        error: `${meta.label} needs ${meta.keyEnv} on the server (Settings → Reporter → Briefing AI picks the AI per desk).`,
+      };
+    }
+    const requested = normalizeCustomPrompt(customPrompt);
+    const saved = normalizeCustomPrompt(engine.prompt);
+    const promptOverride = promptIsFallback ? saved || requested : requested || saved;
+    const currentEngine = engineKey({ provider: engine.provider, model: engine.model, prompt: promptOverride });
+    const key = this._cacheKey(resolvedTtl, section, crypto.createHash("sha256").update(currentEngine).digest("hex").slice(0, 16));
     // How far apart two generations of this desk have to be. It comes from the
     // caller's ttlHours, which is the dashboard's Refresh Frequency setting.
     const cooldown = cooldownDays(resolvedTtl);
@@ -740,14 +818,17 @@ class ReporterService {
     const existingGeneratedAt = existingReport.generatedAtBySection && existingReport.generatedAtBySection[section];
     // A stored refusal never holds the desk's slot: the desk page flags it and
     // offers a rerun, and that rerun has to actually run.
-    const loggedRecently = this._readLog().find(
+    const recent = this._readLog().filter(
       (entry) =>
         entry &&
         entry.section === section &&
         isWithinCooldown(entry, cooldown) &&
         !looksLikeRefusal(entry.content, entry.sources)
     );
+    // Only a run with the same AI, model and prompt counts as a repeat.
+    const loggedRecently = recent.find((entry) => entryEngineKey(entry) === currentEngine);
     const existingHolds =
+      !recent.length &&
       existingReport[section] &&
       !looksLikeRefusal(existingReport[section], []) &&
       isWithinCooldown({ generatedAt: existingGeneratedAt }, cooldown);
@@ -796,7 +877,7 @@ class ReporterService {
         const dateStr = formatDate();
         const generatedAt = new Date().toISOString();
         const prompt = customPromptForDate(promptOverride, dateStr) || promptForSection(section, dateStr);
-        const { content, sources } = await this._generate(prompt);
+        const { content, sources } = await this._generate(prompt, engine);
         generatedEntry = {
           section,
           label: SECTION_LABELS[section],
@@ -832,7 +913,8 @@ class ReporterService {
         generatedAt: report.generatedAtBySection && report.generatedAtBySection[section],
         generatedDateKey: formatDateKey(),
         dateStr: report.dateStr,
-        model: this._model,
+        provider: engine.provider,
+        model: engine.model,
         content: generatedEntry ? generatedEntry.content : report[section],
         prompt: generatedEntry ? generatedEntry.prompt : null,
         // Null for every entry written outside a newsroom cycle — a manual
@@ -850,6 +932,7 @@ class ReporterService {
 
 module.exports = {
   ReporterService,
+  promptForSection,
   REPORT_SECTIONS,
   cooldownDays,
   isWithinCooldown,

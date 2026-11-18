@@ -344,6 +344,15 @@ Most keys are optional. The app is designed to degrade to fallback data where po
 - `BROADCAST_LEDGER_INGEST_INTERVAL_MS` - channel poll interval, defaults to `60000` (floor `15000`).
 - `BROADCAST_LEDGER_NOTIFICATION_CHAT_IDS` - private Telegram `chatId` or `chatId:threadId` targets for enabled ledger alerts. No alerts are delivered when blank.
 - `OPENAI_API_KEY` - enables report generation.
+- `ANTHROPIC_API_KEY` / `XAI_API_KEY` - optional; let desks be written by
+  Claude or Grok. Settings → Reporter → **Briefing AI** picks the AI, model and
+  prompt per desk (saved in `DATA_DIR/briefing-ai-settings.json`) for the desk
+  pages, Today's Top 10 Run News, the Reporter Room and the scheduled newsroom.
+  Each AI searches the web itself (OpenAI and xAI Responses `web_search`,
+  Anthropic's server-side web search). **Load models** lists the models each
+  key can use. Changing a desk's AI, model or prompt allows a fresh run that
+  day; the same choice twice inside the refresh window reuses the first run.
+  The FarmBot Top 10 merge still ranks with OpenAI.
 - `REPORTER_MODEL` - OpenAI model for reporter generation, defaults to `gpt-5.4-mini`.
 - `NEWSROOM_SECTIONS` - sections one scheduled newsroom cycle is expected to produce. Blank means the reporter's default set (`geopolitics`, `economics`, `markets` (Stocks), `crypto`). See [docs/newsroom-cycles.md](docs/newsroom-cycles.md).
 - `NEWSROOM_EXPECTED_RUN_TIMES_UTC` - optional `HH:MM,HH:MM` in UTC, used only to report the next expected run in `/api/newsroom/health`. The schedule itself lives in the external cron; this app starts no timer for it.

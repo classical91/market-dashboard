@@ -54,6 +54,9 @@ const { NewsBatchRequestStore, NewsBatchRequestService } = require("./services/n
 const { createNewsBatchRequestsRouter } = require("./routes/news-batch-requests");
 const { createDailyTopNewsRouter } = require("./routes/daily-top-news");
 const { createDeskTelegramRouter } = require("./routes/desk-telegram");
+const { createBriefingAiRouter } = require("./routes/briefing-ai");
+const { createAiProviders } = require("./services/ai-providers");
+const { BriefingAiSettingsStore } = require("./services/briefing-ai-settings");
 const { FarmbotTop10Service } = require("./services/farmbot-top10");
 const { FarmbotTop10Store } = require("./services/farmbot-top10-store");
 const { Top10RunStore } = require("./services/top10-runs");
@@ -226,11 +229,18 @@ function createApp() {
     intervalMs: config.broadcastLedger.ingestIntervalMs,
     watchTargets: config.broadcastLedger.watchTargets,
   });
+  // ChatGPT, Claude or Grok per desk: Settings → Reporter → Briefing AI.
+  const aiProviders = createAiProviders({
+    env: { ...process.env, OPENAI_API_KEY: config.reporter.apiKey, REPORTER_MODEL: config.reporter.model },
+  });
+  const briefingAiSettings = new BriefingAiSettingsStore({ dataDir });
   const reporterService = new ReporterService({
     cache: reporterCache,
     apiKey: config.reporter.apiKey,
     model: config.reporter.model,
     dataDir,
+    providers: aiProviders,
+    aiSettings: briefingAiSettings,
   });
   // Today's Top 10 exists only for a day someone hit Run on (all three desks done).
   const top10RunStore = new Top10RunStore({ dataDir });
@@ -775,6 +785,12 @@ function createApp() {
     }),
   );
   app.use("/api/phone-briefings", phoneBriefingsRouter);
+  app.use("/api/briefing-ai", createBriefingAiRouter({
+    aiSettings: briefingAiSettings,
+    providers: aiProviders,
+    reporterService,
+    requireAdmin,
+  }));
   app.use("/api/desk-telegram", createDeskTelegramRouter({
     briefingStore: phoneBriefingStore,
     reporterService,
