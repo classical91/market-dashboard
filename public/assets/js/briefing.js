@@ -26,6 +26,9 @@
     run: document.getElementById("briefingRun"),
     runMessage: document.getElementById("briefingRunMessage"),
     telegram: document.getElementById("briefingTelegram"),
+    rerunWarning: document.getElementById("briefingRerunWarning"),
+    rerunText: document.getElementById("briefingRerunText"),
+    rerun: document.getElementById("briefingRerun"),
   };
   var telegramInfo = null;
   var sending = false;
@@ -87,8 +90,24 @@
       '<span class="briefing-desk-meta">Economics · Stocks · Crypto</span></a>';
   }
 
+  /* A Reporter Room run where the model apologised instead of writing the
+     briefing. The server doesn't count such a run as the day's, so ⚡ Run
+     writes a fresh one rather than answering "already written today". */
+  function renderRerunWarning(entry) {
+    var show = Boolean(entry && entry.source === "reporter" && entry.noBriefing);
+    els.rerunWarning.hidden = !show;
+    if (!show) return;
+    var latest = runs.length && runs[0].id === entry.id;
+    els.rerunText.textContent = "⚠ This run has no briefing: the model answered without live search results. " +
+      (latest
+        ? "It doesn't count as today's " + LABELS[desk] + " run, so you can run the desk again now."
+        : "A newer run may have replaced it; pick the latest run above.");
+    els.rerun.hidden = !latest || !window.AdminKey;
+  }
+
   function showEmpty(message) {
     current = null;
+    renderRerunWarning(null);
     els.age.className = "briefing-age";
     els.age.textContent = message;
     els.heading.hidden = true;
@@ -112,6 +131,7 @@
     els.body.innerHTML = renderMarkdown(entry.text);
     els.copy.hidden = false;
     current = entry;
+    renderRerunWarning(entry);
   }
 
   function loadRun(id) {
@@ -142,7 +162,10 @@
         runs = (results[1].runs || []).map(function (run) {
           return { source: "phone", id: run.id, at: run.receivedAt };
         }).concat(generationsByDesk[desk].map(function (gen) {
-          return { source: "reporter", id: "reporter-" + gen.generatedAt, at: gen.generatedAt, text: gen.content, title: null };
+          return {
+            source: "reporter", id: "reporter-" + gen.generatedAt, at: gen.generatedAt,
+            text: gen.content, title: null, noBriefing: Boolean(gen.noBriefing),
+          };
         })).filter(function (run) { return isFinite(new Date(run.at).getTime()); })
           .sort(function (a, b) { return new Date(b.at).getTime() - new Date(a.at).getTime(); });
         var mine = categories.filter(function (cat) { return cat.key === desk; })[0];
@@ -179,6 +202,7 @@
     if (running || !window.AdminKey) return;
     running = true;
     els.run.disabled = true;
+    els.rerun.disabled = true;
     els.run.textContent = "⚡ Running…";
     setRunMessage("Writing " + LABELS[desk] + " with web search. This can take a minute; nothing is broadcast.", "");
     var prompt = desk === "crypto" && window.DeskPrompts ? window.DeskPrompts.crypto : "";
@@ -203,12 +227,14 @@
     }).finally(function () {
       running = false;
       els.run.disabled = false;
+      els.rerun.disabled = false;
       els.run.textContent = "⚡ Run " + LABELS[desk];
     });
   }
 
   els.run.textContent = "⚡ Run " + LABELS[desk];
   els.run.addEventListener("click", runDesk);
+  els.rerun.addEventListener("click", runDesk);
 
   /* 📣 Send to Telegram: only on desks switched on in Settings → Telegram →
      News Category Routing. The server looks the run up itself and sends it

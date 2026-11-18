@@ -1,5 +1,6 @@
 const { Router } = require("express");
 const { broadcastReportSections } = require("../services/report-broadcast");
+const { looksLikeRefusal } = require("../services/reporter");
 
 function createReporterRouter({ reporterService, telegramService, broadcastLedgerStore, requireAdmin }) {
   const router = Router();
@@ -44,6 +45,9 @@ function createReporterRouter({ reporterService, telegramService, broadcastLedge
           model: entry.model || null,
           content: entry.content,
           customPrompt: Boolean(entry.prompt),
+          // The model answered without a briefing; the desk page warns and
+          // offers a rerun, which the daily limit does not block.
+          noBriefing: looksLikeRefusal(entry.content, entry.sources),
         })),
       });
     } catch (err) {

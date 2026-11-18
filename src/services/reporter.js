@@ -743,10 +743,20 @@ class ReporterService {
     const cooldown = cooldownDays(resolvedTtl);
     const existingReport = this._buildReport(resolvedTtl);
     const existingGeneratedAt = existingReport.generatedAtBySection && existingReport.generatedAtBySection[section];
+    // A stored refusal never holds the desk's slot: the desk page flags it and
+    // offers a rerun, and that rerun has to actually run.
     const loggedRecently = this._readLog().find(
-      (entry) => entry && entry.section === section && isWithinCooldown(entry, cooldown)
+      (entry) =>
+        entry &&
+        entry.section === section &&
+        isWithinCooldown(entry, cooldown) &&
+        !looksLikeRefusal(entry.content, entry.sources)
     );
-    if ((existingReport[section] && isWithinCooldown({ generatedAt: existingGeneratedAt }, cooldown)) || loggedRecently) {
+    const existingHolds =
+      existingReport[section] &&
+      !looksLikeRefusal(existingReport[section], []) &&
+      isWithinCooldown({ generatedAt: existingGeneratedAt }, cooldown);
+    if (existingHolds || loggedRecently) {
       const fallback = loggedRecently
         ? { ...existingReport, [section]: existingReport[section] || loggedRecently.content }
         : existingReport;
@@ -774,6 +784,12 @@ class ReporterService {
     if (existingCooldown > Date.now()) {
       return this._withRateLimit(this._buildReport(resolvedTtl), section, existingCooldown);
     }
+
+    // Today's slot may still cache a refusal saved before refusals were
+    // rejected; drop it so this run makes a new generation instead of
+    // returning the same apology.
+    const slotted = this._cache.get(key);
+    if (slotted && looksLikeRefusal(slotted.content, slotted.sources)) this._cache.delete(key);
 
     let created = false;
     let generatedEntry = null;

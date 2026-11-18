@@ -111,3 +111,48 @@ test("a model that rejects a forced tool call is asked again without one", async
   await service.generateReport(undefined, "markets");
   assert.strictEqual(requests[2].tool_choice, undefined);
 });
+
+test("a refusal saved before the fix does not count as today's run", async () => {
+  const { service, requests } = reporter([cited(BRIEFING)]);
+  // What a pre-fix run left behind: the apology in the log, today's slot and the latest key.
+  const stored = { section: "economics", generatedAt: new Date().toISOString(), content: REFUSAL, sources: [] };
+  service._logGeneration({ ...stored, model: "test-model" });
+  service._cache.set(service._cacheKey(undefined, "economics"), stored, 60 * 60 * 1000);
+  service._cache.set(service._latestCacheKey("economics"), stored, 60 * 60 * 1000);
+
+  const report = await service.generateReport(undefined, "economics");
+  assert.strictEqual(requests.length, 1);
+  assert.strictEqual(report.generationSkipped, undefined);
+  assert.strictEqual(report.economics, BRIEFING);
+  assert.strictEqual(service.listGenerations({ section: "economics" })[0].content, BRIEFING);
+});
+
+test("a briefing still holds the desk for the day", async () => {
+  const { service, requests } = reporter([cited(BRIEFING), cited(BRIEFING)]);
+  await service.generateReport(undefined, "economics");
+  const again = await service.generateReport(undefined, "economics");
+  assert.strictEqual(requests.length, 1);
+  assert.strictEqual(again.generationSkipped, true);
+});
+
+test("the generations route flags a run with no briefing", async () => {
+  const express = require("express");
+  const { createReporterRouter } = require("../src/routes/reporter");
+  const app = express();
+  const reporterService = {
+    sections: ["economics"],
+    listGenerations: () => [
+      { generatedAt: "2026-11-18T16:06:00.000Z", content: REFUSAL, sources: [] },
+      { generatedAt: "2026-11-17T16:06:00.000Z", content: BRIEFING, sources: [{ url: "https://x" }] },
+    ],
+  };
+  app.use("/api/daily-report", createReporterRouter({ reporterService, telegramService: {}, requireAdmin: (q, s, n) => n() }));
+  const server = app.listen(0);
+  try {
+    const res = await fetch(`http://127.0.0.1:${server.address().port}/api/daily-report/generations?section=economics`);
+    const body = await res.json();
+    assert.deepStrictEqual(body.generations.map((g) => g.noBriefing), [true, false]);
+  } finally {
+    server.close();
+  }
+});

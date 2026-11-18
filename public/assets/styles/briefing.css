@@ -102,6 +102,19 @@
 }
 .briefing-empty { color: var(--muted); }
 
+/* A Reporter Room run that came back as an apology instead of a briefing. */
+.briefing-rerun-warning {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  margin: 0 0 14px; padding: 10px 14px;
+  font-size: 13px; color: var(--amber);
+  border: 1px solid var(--amber); border-radius: 10px;
+  background: var(--amber-bg);
+}
+.briefing-rerun-warning[hidden] { display: none; }
+.briefing-rerun-warning p { margin: 0; flex: 1 1 260px; line-height: 1.5; }
+.briefing-rerun-warning .briefing-btn { margin-left: 0; }
+.briefing-rerun-warning .briefing-btn:disabled { opacity: 0.6; cursor: progress; }
+
 .briefing-help {
   margin-top: 18px;
   padding: 14px 18px;
