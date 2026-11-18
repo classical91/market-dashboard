@@ -23,6 +23,50 @@ function formatForTelegram(raw) {
     .replace(/\*\*(.*?)\*\*/g, "<b>$1</b>");
 }
 
+// A URL, allowing one level of balanced parentheses inside it (Wikipedia-style).
+const URL_PATTERN = String.raw`https?:\/\/(?:[^\s()<>\]]|\([^\s()<>]*\))+`;
+const MD_LINK_PATTERN = String.raw`\[[^\]\n]*\]\(\s*${URL_PATTERN}\s*\)`;
+// "([coingecko.com](https://…))" and "([a](…), [b](…))": the web-search
+// tool's inline citations.
+const PAREN_CITATIONS = new RegExp(
+  String.raw`[ \t]*\(\s*${MD_LINK_PATTERN}(?:\s*[,;]\s*${MD_LINK_PATTERN})*\s*\)`,
+  "g",
+);
+const MD_LINK = new RegExp(String.raw`\[([^\]\n]*)\]\(\s*${URL_PATTERN}\s*\)`, "g");
+const PAREN_URL = new RegExp(String.raw`[ \t]*\(\s*${URL_PATTERN}\s*\)`, "g");
+const BARE_URL = new RegExp(String.raw`[ \t]*${URL_PATTERN}`, "g");
+const DOMAIN_ONLY = /^\s*(?:www\.)?[\w-]+(?:\.[\w-]+)+\s*$/i;
+const SOURCES_LINE = /^[-•]?\s*(?:sources?|citations?|references?)\s*(?::|$)/i;
+const EMPTY_ITEM = /^\s*(?:[-*•]|\d+[.)])?\s*$/;
+
+/**
+ * Report text as a Telegram reader should see it: the stories without their
+ * source links. The web-search model cites inline ("([coingecko.com](url))"),
+ * and in a chat those turn every bullet into a wall of URLs. The sources are
+ * not lost — the generation log keeps them, and the ledger receipt keeps the
+ * text as generated. This only shapes what is posted.
+ */
+function stripCitations(raw) {
+  const lines = String(raw || "").split("\n");
+  const kept = [];
+  for (const line of lines) {
+    if (SOURCES_LINE.test(line.replace(/[*_#]/g, "").trim())) continue;
+    const stripped = line
+      .replace(PAREN_CITATIONS, "")
+      .replace(MD_LINK, (match, label) => (DOMAIN_ONLY.test(label) ? "" : label))
+      .replace(PAREN_URL, "")
+      .replace(BARE_URL, "")
+      .replace(/[ \t]*\(\s*\)/g, "")
+      .replace(/(\S)[ \t]{2,}/g, "$1 ")
+      .replace(/[ \t]+([.,;:!?])/g, "$1")
+      .replace(/[ \t]+$/, "");
+    // A line that held nothing but links ("- [reuters.com](…)") goes with them.
+    if (line.trim() && EMPTY_ITEM.test(stripped)) continue;
+    kept.push(stripped);
+  }
+  return kept.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
 // Safety net for the rare case the model ignores its length instruction —
 // cuts at the last word boundary within budget instead of mid-word, so an
 // overflow reads as an intentionally shortened message rather than a broken
@@ -528,7 +572,9 @@ class TelegramService {
     };
     const heading = headings[newsType];
     if (!heading) throw createServiceError("Reporter newsType must be Geopolitics, Economics, Stock, or Crypto", 400);
-    const body = String(text || "").trim();
+    // Sources stay in the generation log and the ledger receipt; in the chat
+    // they bury the stories, so the posted copy leaves them out.
+    const body = stripCitations(text);
     if (!body) throw createServiceError("Nothing to send: text is empty", 400);
 
     // The heading is markup we wrote; only the model's section body is escaped.
@@ -685,4 +731,4 @@ class TelegramService {
   }
 }
 
-module.exports = { TelegramService, AI_ANALYSIS_TELEGRAM_WORD_LIMIT, countWords, formatXPost };
+module.exports = { TelegramService, AI_ANALYSIS_TELEGRAM_WORD_LIMIT, countWords, formatXPost, stripCitations };
