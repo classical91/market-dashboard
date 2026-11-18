@@ -203,11 +203,15 @@
   .topnews-story { padding: 10px 12px; gap: 10px; }
 }
 .news-request-panel { margin-bottom: 18px; }
+.news-request-panel > .topnews-note { margin: 6px 0 0; line-height: 1.5; }
 .news-request-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
 .news-request-form label { display: grid; gap: 6px; font-size: 13px; }
 .news-request-form select, .news-request-form textarea { width: 100%; box-sizing: border-box; color: inherit; background: #101722; border: 1px solid #3a4759; border-radius: 6px; padding: 9px; font: inherit; }
 .news-request-form :focus-visible { outline: 2px solid #5aa7ff; outline-offset: 2px; }
 .news-request-instructions { grid-column: 1 / -1; }
 .news-request-form button { justify-self: start; }
+.news-request-status { margin: 12px 0 0; padding: 8px 12px; font-size: 12px; line-height: 1.5; color: var(--soft); border: 1px solid var(--border); border-radius: 8px; background: rgba(255,255,255,0.03); }
+.news-request-status.is-warning { color: var(--amber); border-color: rgba(245,197,66,0.35); background: var(--amber-bg); }
+.news-request-status.is-error { color: var(--red); border-color: rgba(255,77,109,0.35); background: var(--red-bg); }
 .news-request-receipt { border-top: 1px solid #303c4c; padding-top: 12px; margin-top: 12px; overflow-wrap: anywhere; }
 @media (max-width: 640px) { .news-request-form { grid-template-columns: 1fr; } }
