@@ -209,15 +209,16 @@
     window.AdminKey.fetch("/api/daily-report/generate?section=" + SECTIONS[desk], {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(prompt ? { prompt: prompt } : {}),
+      // A Crypto prompt saved in Settings → Briefing AI replaces this one.
+      body: JSON.stringify(prompt ? { prompt: prompt, promptIsFallback: true } : {}),
     }).then(function (res) {
       return res.json().catch(function () { return {}; }).then(function (data) {
         if (!res.ok) throw new Error(data.error || "HTTP " + res.status);
         return data;
       });
     }).then(function (data) {
-      if (data.configured === false) throw new Error("the Reporter has no OPENAI_API_KEY on the server");
-      if (data.rateLimited) throw new Error("OpenAI is rate-limited; try again later");
+      if (data.configured === false) throw new Error(data.error || "the Reporter has no AI key on the server");
+      if (data.rateLimited) throw new Error(data.error || "the AI is rate-limited; try again later");
       setRunMessage(data.generationSkippedReason
         ? LABELS[desk] + " was already written today; showing that run."
         : LABELS[desk] + " written. Showing the new run.", "ok");

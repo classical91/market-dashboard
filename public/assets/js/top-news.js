@@ -202,10 +202,10 @@
     return window.AdminKey.fetch("/api/daily-report/generate?section=" + desk.section, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(desk.prompt ? { prompt: desk.prompt } : {}),
+      body: JSON.stringify(desk.prompt ? { prompt: desk.prompt, promptIsFallback: true } : {}),
     }).then(readApiJson).then(function (data) {
-      if (data.configured === false) throw new Error("the Reporter has no OPENAI_API_KEY on the server");
-      if (data.rateLimited) return desk.label + ": OpenAI is rate-limited, try again later";
+      if (data.configured === false) throw new Error(data.error || "the Reporter has no AI key on the server");
+      if (data.rateLimited) return desk.label + ": the AI is rate-limited, try again later";
       if (data.generationSkippedReason) return desk.label + ": already written today";
       if (data.error) throw new Error(data.error);
       return desk.label + ": done";

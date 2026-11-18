@@ -54,6 +54,9 @@ const { NewsBatchRequestStore, NewsBatchRequestService } = require("./services/n
 const { createNewsBatchRequestsRouter } = require("./routes/news-batch-requests");
 const { createDailyTopNewsRouter } = require("./routes/daily-top-news");
 const { createDeskTelegramRouter } = require("./routes/desk-telegram");
+const { createBriefingAiRouter } = require("./routes/briefing-ai");
+const { createAiProviders } = require("./services/ai-providers");
+const { BriefingAiSettingsStore } = require("./services/briefing-ai-settings");
 const { FarmbotTop10Service } = require("./services/farmbot-top10");
 const { FarmbotTop10Store } = require("./services/farmbot-top10-store");
 const OpenAI = require("openai");
@@ -224,11 +227,18 @@ function createApp() {
     intervalMs: config.broadcastLedger.ingestIntervalMs,
     watchTargets: config.broadcastLedger.watchTargets,
   });
+  // ChatGPT, Claude or Grok per desk: Settings → Reporter → Briefing AI.
+  const aiProviders = createAiProviders({
+    env: { ...process.env, OPENAI_API_KEY: config.reporter.apiKey, REPORTER_MODEL: config.reporter.model },
+  });
+  const briefingAiSettings = new BriefingAiSettingsStore({ dataDir });
   const reporterService = new ReporterService({
     cache: reporterCache,
     apiKey: config.reporter.apiKey,
     model: config.reporter.model,
     dataDir,
+    providers: aiProviders,
+    aiSettings: briefingAiSettings,
   });
   // Merges Today's Top 10 into one FarmBot news batch for human approval.
   const farmbotTop10 = new FarmbotTop10Service({
@@ -768,6 +778,12 @@ function createApp() {
     }),
   );
   app.use("/api/phone-briefings", phoneBriefingsRouter);
+  app.use("/api/briefing-ai", createBriefingAiRouter({
+    aiSettings: briefingAiSettings,
+    providers: aiProviders,
+    reporterService,
+    requireAdmin,
+  }));
   app.use("/api/desk-telegram", createDeskTelegramRouter({
     briefingStore: phoneBriefingStore,
     reporterService,

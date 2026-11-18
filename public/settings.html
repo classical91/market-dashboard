@@ -123,6 +123,19 @@
       font: inherit;
     }
     .prompt-field { display: grid; gap: 6px; }
+    .bai-row { display: grid; grid-template-columns: 120px minmax(0, 1fr) minmax(0, 1.4fr); gap: 10px; align-items: end; }
+    .bai-desk { font-size: 13px; font-weight: 700; color: var(--text); padding-bottom: 9px; }
+    .bai-desk small { display: block; font-weight: 500; color: var(--muted); font-size: 11px; margin-top: 2px; }
+    .bai-deskbox { border-top: 1px solid var(--border); padding-top: 12px; display: grid; gap: 10px; }
+    .bai-prompt summary { cursor: pointer; font-size: 12px; color: var(--soft); }
+    .bai-prompt[open] summary { margin-bottom: 8px; }
+    .bai-prompt textarea { min-height: 160px; }
+    .bai-prompt .prompt-actions { margin-top: 8px; }
+    .bai-editor input:disabled { opacity: 0.55; }
+    @media (max-width: 720px) {
+      .bai-row { grid-template-columns: 1fr; }
+      .bai-desk { padding-bottom: 0; }
+    }
     .prompt-field-label {
       font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
       text-transform: uppercase; color: var(--muted);
@@ -521,6 +534,41 @@
         <span class="section-chevron">&#9660;</span>
       </div>
       <div class="settings-panel" id="cards-reporter">
+        <div class="settings-card" id="briefing-ai-settings">
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-label">Briefing AI</div>
+              <div class="settings-row-sub">
+                Which AI writes each desk (ChatGPT, Claude or Grok) and with what prompt. Saved on the server, so it
+                applies to the desk pages&rsquo; &#9889; Run, Today&rsquo;s Top 10 Run News, the Reporter Room and the
+                scheduled newsroom. Each AI searches the web itself. A provider needs its key on Railway:
+                <code>OPENAI_API_KEY</code>, <code>ANTHROPIC_API_KEY</code> or <code>XAI_API_KEY</code>.
+              </div>
+            </div>
+          </div>
+          <div class="tg-status-row">
+            <span class="status-pill off" id="baiPill">&#9203; Loading&hellip;</span>
+          </div>
+          <div class="prompt-editor bai-editor" id="baiEditor" hidden>
+            <div class="bai-row bai-default">
+              <div class="bai-desk">Default</div>
+              <div class="prompt-field">
+                <label class="prompt-field-label" for="baiDefaultProvider">AI</label>
+                <select id="baiDefaultProvider"></select>
+              </div>
+              <div class="prompt-field">
+                <label class="prompt-field-label" for="baiDefaultModel">Model</label>
+                <input id="baiDefaultModel" type="text" autocomplete="off" spellcheck="false" />
+              </div>
+            </div>
+            <div id="baiDesks"></div>
+            <div class="prompt-actions">
+              <button class="settings-action-btn primary" id="baiSave" type="button">Save Briefing AI</button>
+              <button class="settings-action-btn" id="baiLoadModels" type="button">Load models</button>
+            </div>
+            <div class="screener-note" id="baiStatus"></div>
+          </div>
+        </div>
         <div class="settings-card">
           <div class="settings-row">
             <div>
@@ -540,6 +588,8 @@
             <div>
               <div class="settings-row-label">Report Prompts</div>
               <div class="settings-row-sub">
+                Saved in this browser and used only by the Reporter Room on this device, where it wins over the
+                Briefing AI prompt above. For a prompt that applies everywhere, use Briefing AI.
                 Add, rename and delete the requests the reporter sends. Each prompt belongs to one desk,
                 and the desk generates with whichever of its prompts is in use. Use <code>{date}</code>
                 where today&apos;s date should appear. Every desk ships with a default prompt that can be
@@ -820,6 +870,212 @@
     document.querySelectorAll('.freq-btn').forEach(function (b) {
       if (parseInt(b.dataset.hours, 10) === current) b.classList.add('active');
     });
+  })();
+
+  /* ── Briefing AI ─────────────────────────────────────────
+     Which AI writes each desk, and its prompt, saved on the server
+     (/api/briefing-ai). Reading needs only the site login; saving and
+     loading model lists need the admin key. */
+  (function () {
+    var API = '/api/briefing-ai';
+    var pill = document.getElementById('baiPill');
+    var editor = document.getElementById('baiEditor');
+    var defaultProvider = document.getElementById('baiDefaultProvider');
+    var defaultModel = document.getElementById('baiDefaultModel');
+    var desksEl = document.getElementById('baiDesks');
+    var saveBtn = document.getElementById('baiSave');
+    var loadBtn = document.getElementById('baiLoadModels');
+    var statusEl = document.getElementById('baiStatus');
+    if (!editor) return;
+    var DESKS = [
+      { key: 'geopolitics', label: 'Geopolitics' },
+      { key: 'economics', label: 'Economics' },
+      { key: 'markets', label: 'Stocks' },
+      { key: 'crypto', label: 'Crypto' }
+    ];
+    var data = null;
+    var rows = {};
+    var models = {};
+
+    function setStatus(message, isError) {
+      statusEl.textContent = message || '';
+      statusEl.classList.toggle('error', Boolean(isError));
+    }
+
+    function providerById(id) {
+      return (data.providers || []).filter(function (p) { return p.id === id; })[0];
+    }
+
+    function providerOptions(select, includeDefault) {
+      select.innerHTML = '';
+      if (includeDefault) {
+        var inherit = document.createElement('option');
+        inherit.value = '';
+        inherit.textContent = 'Use default';
+        select.appendChild(inherit);
+      }
+      data.providers.forEach(function (p) {
+        var option = document.createElement('option');
+        option.value = p.id;
+        option.textContent = p.label + (p.configured ? '' : ' (needs ' + p.keyEnv + ')');
+        select.appendChild(option);
+      });
+    }
+
+    // One datalist per provider, filled by Load models.
+    function datalistFor(provider) {
+      var id = 'baiModels-' + provider;
+      var list = document.getElementById(id);
+      if (!list) {
+        list = document.createElement('datalist');
+        list.id = id;
+        editor.appendChild(list);
+      }
+      list.innerHTML = (models[provider] || []).map(function (m) {
+        return '<option value="' + m.replace(/"/g, '&quot;') + '"></option>';
+      }).join('');
+      return id;
+    }
+
+    function syncModelInput(select, input, inheritFrom) {
+      var provider = select.value || (inheritFrom ? inheritFrom.value : '');
+      var meta = providerById(provider);
+      input.setAttribute('list', datalistFor(provider));
+      input.placeholder = meta ? meta.defaultModel + ' (default)' : '';
+      input.disabled = inheritFrom ? !select.value : false;
+      if (input.disabled) input.value = '';
+    }
+
+    function describeEffective(key) {
+      var eff = data.effective && data.effective[key];
+      if (!eff) return '';
+      var meta = providerById(eff.provider);
+      return (meta ? meta.label.split(' (')[0] : eff.provider) + ' · ' + eff.model + (eff.customPrompt ? ' · custom prompt' : '');
+    }
+
+    function render() {
+      providerOptions(defaultProvider, false);
+      defaultProvider.value = data.settings.default.provider;
+      defaultModel.value = data.settings.default.model || '';
+      syncModelInput(defaultProvider, defaultModel, null);
+      desksEl.innerHTML = '';
+      rows = {};
+      DESKS.forEach(function (desk) {
+        var saved = data.settings.desks[desk.key] || {};
+        var box = document.createElement('div');
+        box.className = 'bai-deskbox';
+        box.innerHTML =
+          '<div class="bai-row">' +
+          '<div class="bai-desk">' + desk.label + '<small data-effective></small></div>' +
+          '<div class="prompt-field"><label class="prompt-field-label">AI</label><select aria-label="' + desk.label + ' AI"></select></div>' +
+          '<div class="prompt-field"><label class="prompt-field-label">Model</label>' +
+          '<input type="text" autocomplete="off" spellcheck="false" aria-label="' + desk.label + ' model" /></div>' +
+          '</div>' +
+          '<details class="bai-prompt"><summary></summary>' +
+          '<textarea spellcheck="true" aria-label="' + desk.label + ' prompt"></textarea>' +
+          '<div class="prompt-actions"><button class="settings-action-btn" type="button" data-builtin>Use built-in prompt</button></div>' +
+          '</details>';
+        var select = box.querySelector('select');
+        var input = box.querySelector('input');
+        var textarea = box.querySelector('textarea');
+        var summary = box.querySelector('summary');
+        providerOptions(select, true);
+        select.value = saved.provider || '';
+        input.value = saved.model || '';
+        textarea.value = saved.prompt || '';
+        textarea.placeholder = data.builtInPrompts[desk.key] || '';
+        var websiteNote = data.websiteDefaults && data.websiteDefaults[desk.key];
+        function label() {
+          summary.textContent = 'Prompt: ' + (textarea.value.trim()
+            ? 'custom (saved here)'
+            : 'built-in' + (websiteNote ? ' (desk pages & Top 10 use ' + websiteNote.split(' (')[0] + ')' : ''));
+        }
+        label();
+        box.querySelector('[data-effective]').textContent = 'Now: ' + describeEffective(desk.key);
+        select.addEventListener('change', function () { syncModelInput(select, input, defaultProvider); setStatus('Unsaved changes.'); });
+        input.addEventListener('input', function () { setStatus('Unsaved changes.'); });
+        textarea.addEventListener('input', function () { label(); setStatus('Unsaved changes.'); });
+        box.querySelector('[data-builtin]').addEventListener('click', function () {
+          textarea.value = '';
+          label();
+          setStatus('Unsaved changes.');
+        });
+        syncModelInput(select, input, defaultProvider);
+        rows[desk.key] = { select: select, input: input, textarea: textarea };
+        desksEl.appendChild(box);
+      });
+      var missing = data.providers.filter(function (p) { return !p.configured; }).map(function (p) { return p.label.split(' (')[0]; });
+      pill.className = 'status-pill ok';
+      pill.textContent = '✅ ' + data.providers.filter(function (p) { return p.configured; }).length + ' of ' + data.providers.length + ' AIs ready' +
+        (missing.length ? ' · no key for ' + missing.join(', ') : '');
+      editor.hidden = false;
+    }
+
+    defaultProvider.addEventListener('change', function () {
+      syncModelInput(defaultProvider, defaultModel, null);
+      DESKS.forEach(function (desk) {
+        if (rows[desk.key]) syncModelInput(rows[desk.key].select, rows[desk.key].input, defaultProvider);
+      });
+      setStatus('Unsaved changes.');
+    });
+    defaultModel.addEventListener('input', function () { setStatus('Unsaved changes.'); });
+
+    function failure(res) {
+      return res.json().catch(function () { return {}; }).then(function (body) {
+        throw new Error(body.error || ('Request failed (HTTP ' + res.status + ')'));
+      });
+    }
+
+    function load() {
+      return fetch(API, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+        .then(function (res) { return res.ok ? res.json() : failure(res); })
+        .then(function (body) { data = body; render(); })
+        .catch(function (err) {
+          pill.className = 'status-pill off';
+          pill.textContent = '⚠ Unavailable';
+          setStatus('⚠ ' + err.message, true);
+        });
+    }
+
+    saveBtn.addEventListener('click', function () {
+      var payload = { default: { provider: defaultProvider.value, model: defaultModel.value.trim() }, desks: {} };
+      DESKS.forEach(function (desk) {
+        var row = rows[desk.key];
+        payload.desks[desk.key] = { provider: row.select.value, model: row.input.value.trim(), prompt: row.textarea.value };
+      });
+      saveBtn.disabled = true;
+      setStatus('Saving…');
+      AdminKey.fetchOrSession(API, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).then(function (res) {
+        return res.ok ? res.json() : failure(res);
+      }).then(function () {
+        return load().then(function () { setStatus('Saved. The next run of each desk uses these settings.'); showToast(); });
+      }).catch(function (err) {
+        setStatus('⚠ ' + err.message, true);
+      }).finally(function () { saveBtn.disabled = false; });
+    });
+
+    loadBtn.addEventListener('click', function () {
+      var ready = data.providers.filter(function (p) { return p.configured; });
+      if (!ready.length) { setStatus('No AI has a key on the server yet.', true); return; }
+      loadBtn.disabled = true;
+      setStatus('Asking ' + ready.map(function (p) { return p.label.split(' (')[0]; }).join(', ') + ' which models your keys can use…');
+      Promise.all(ready.map(function (p) {
+        return AdminKey.fetchOrSession(API + '/models?provider=' + encodeURIComponent(p.id))
+          .then(function (res) { return res.ok ? res.json() : failure(res); })
+          .then(function (body) { models[p.id] = body.models || []; return p.label.split(' (')[0] + ': ' + models[p.id].length; },
+            function (err) { return p.label.split(' (')[0] + ': ' + err.message; });
+      })).then(function (lines) {
+        syncModelInput(defaultProvider, defaultModel, null);
+        DESKS.forEach(function (desk) { syncModelInput(rows[desk.key].select, rows[desk.key].input, defaultProvider); });
+        setStatus('Models loaded (' + lines.join(' · ') + '). Pick one from the Model box.');
+      }).finally(function () { loadBtn.disabled = false; });
+    });
+
+    load();
   })();
 
   /* ── Report prompts ─────────────────────────────────────
