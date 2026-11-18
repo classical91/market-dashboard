@@ -67,6 +67,37 @@ function stripCitations(raw) {
   return kept.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
+// Where a numbered story starts in a report body: "**#3 …", "#3 …", "3. …".
+const STORY_START = /^\s*(?:#{1,4}\s+)?(?:\*\*|__)?\s*#?\d{1,2}(?:[.):]|\s)/;
+const REPORT_DESKS = { Geopolitics: "geopolitics", Economics: "economics", Stock: "stocks", Crypto: "crypto" };
+
+/**
+ * Fit a report body into one Telegram message without breaking its markup.
+ *
+ * Cutting the formatted HTML at the length limit can split a "<b>…</b>" pair,
+ * and Telegram then refuses the whole message ("can't find end tag"). So the
+ * cut is made on the raw text, before formatting: whole trailing stories are
+ * dropped until the formatted message fits, then a closing line says the rest
+ * is on the dashboard. Only when not even the first story fits does it fall
+ * back to dropping whole lines. Returns the body unchanged when it fits.
+ */
+function fitReportBody(body, { budget, more }) {
+  const fits = (text) => formatForTelegram(text).length <= budget;
+  if (fits(body)) return body;
+  const lines = body.split("\n");
+  const withMore = (count) => `${lines.slice(0, count).join("\n").trimEnd()}\n\n${more}`;
+  const storyStarts = lines
+    .map((line, index) => (STORY_START.test(line) ? index : -1))
+    .filter((index) => index > 0);
+  for (let i = storyStarts.length - 1; i >= 0; i -= 1) {
+    if (fits(withMore(storyStarts[i]))) return withMore(storyStarts[i]);
+  }
+  for (let count = lines.length - 1; count > 0; count -= 1) {
+    if (fits(withMore(count))) return withMore(count);
+  }
+  return more;
+}
+
 // Safety net for the rare case the model ignores its length instruction —
 // cuts at the last word boundary within budget instead of mid-word, so an
 // overflow reads as an intentionally shortened message rather than a broken
@@ -578,7 +609,13 @@ class TelegramService {
     if (!body) throw createServiceError("Nothing to send: text is empty", 400);
 
     // The heading is markup we wrote; only the model's section body is escaped.
-    const message = `<b>${heading[0]} ${heading[1]}</b>\n🗓️ ${escapeHtml(date)}\n\n${formatForTelegram(body)}`;
+    const header = `<b>${heading[0]} ${heading[1]}</b>\n🗓️ ${escapeHtml(date)}\n\n`;
+    const link = this._dashboardUrl ? `: ${this._dashboardUrl}/briefings/${REPORT_DESKS[newsType]}` : ".";
+    const fitted = fitReportBody(body, {
+      budget: MAX_MSG_LEN - header.length,
+      more: `➕ The full brief is on the dashboard${link}`,
+    });
+    const message = `${header}${formatForTelegram(fitted)}`;
     return this._postPreformatted(message, { targets });
   }
 

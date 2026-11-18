@@ -43,7 +43,7 @@ for (const section of REPORT_SECTIONS) {
     assert.match(input, /^\*\*#\[N\] \[EMOJI\] .+ — .+\*\*$/m);
     assert.match(input, /Open with one line before #1/);
     assert.match(instructions, /House style/);
-    assert.match(instructions, /under 3,500 characters/);
+    assert.match(instructions, /under 3,000 characters/);
   });
 }
 

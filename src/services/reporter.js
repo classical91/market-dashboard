@@ -270,10 +270,10 @@ const HOUSE_STYLE = `House style (where a request sets its own format or tone, t
   Good: "Fed holds at 4.25%, Powell keeps December cut on the table". Bad: "Fed decision announced".
 - Lead each first bullet with the hardest fact: a figure, a name, a change versus before.
 - Active verbs. No filler ("amid", "in a move that", "it remains to be seen", "investors will be watching").
-- One idea per bullet, one line per bullet.
+- One idea per bullet, one line per bullet, 20 words at most.
 - Facts are what sources reported; label anything else as analysis. Never invent a figure; drop it instead.
 - Plain hyphen bullets only, no tables.
-- Keep the whole brief under 3,500 characters: it is posted to Telegram.`;
+- Keep the whole brief under 3,000 characters, not counting source links: it is posted to Telegram as one message.`;
 
 function cryptoPrompt(dateStr) {
   return `🗓️ ${dateStr}
@@ -307,8 +307,7 @@ Then exactly 10 items:
 **#[N] [EMOJI] [COUNTRY/REGION] — [headline with the number in it]**
 - The fact: for data, actual vs. expected (and prior); for policy, the decision and the vote or wording that changed
 - Why it matters: who feels it (borrowers, exporters, the currency, the next rate decision)
-- Next: the date or event that settles it, if one is known
-- Tone: 🟢 supportive / 🔴 restrictive / ⚪ neutral for growth, with a 3-word reason
+- Next: the date or event that settles it, if known · Tone: 🟢 supportive / 🔴 restrictive / ⚪ neutral for growth
 
 Pick an [EMOJI] for the kind of story (🏦 central bank, 📊 data release, 💱 FX, 🛢️ energy/commodities, 🚢 trade, 📉 markets, 🧾 fiscal).`;
 }
@@ -345,8 +344,7 @@ Then exactly 10 items:
 **#[N] [EMOJI] [ASSET/TICKER] — [headline with the move in it, e.g. "NVDA +6% on record data-center sales"]**
 - The move: price or % change and the reason, as reported
 - Why it matters: what it says about the market, a sector, or the next trade
-- Assets: the tickers, pairs, indices or contracts affected
-- Sentiment: 🟢 Bullish / 🔴 Bearish / ⚪ Neutral
+- Assets: the tickers, pairs, indices or contracts affected · Sentiment: 🟢 Bullish / 🔴 Bearish / ⚪ Neutral
 
 Pick an [EMOJI] for the asset class (📈 equities, 💱 FX, 🛢️ energy, 🥇 metals, 🏛️ bonds/rates, 🏦 central banks, 💻 tech).
 No buy/sell advice or price targets.`;
