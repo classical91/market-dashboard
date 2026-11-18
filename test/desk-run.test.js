@@ -29,7 +29,7 @@ test("a desk's Reporter Room runs are listed newest first, without prompt bodies
     assert.equal(res.status, 200);
     const body = await res.json();
     assert.deepEqual(seen[0], { section: "geopolitics", limit: 30 }, "limit is capped");
-    assert.deepEqual(body.generations, [{ generatedAt: "2026-11-15T01:00:00.000Z", model: "m", content: "1. A\n2. B", customPrompt: true }]);
+    assert.deepEqual(body.generations, [{ generatedAt: "2026-11-15T01:00:00.000Z", model: "m", content: "1. A\n2. B", customPrompt: true, noBriefing: false }]);
     assert.doesNotMatch(JSON.stringify(body), /secret prompt/);
     assert.equal((await fetch(`${base}/api/daily-report/generations?section=weather`)).status, 400);
   } finally {
