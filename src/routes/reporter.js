@@ -29,6 +29,8 @@ function createReporterRouter({ reporterService, telegramService, broadcastLedge
 
   // Read-only: one section's recent generations, newest first, for the desk
   // pages' run picker. Prompt bodies stay in the log and are not returned.
+  // `fields=meta` leaves out the report text too: Main Hub only needs to know
+  // when each desk was written.
   router.get("/generations", (req, res, next) => {
     try {
       const section = String(req.query.section || "").toLowerCase();
@@ -37,18 +39,23 @@ function createReporterRouter({ reporterService, telegramService, broadcastLedge
         return;
       }
       const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 30);
+      const metaOnly = String(req.query.fields || "").toLowerCase() === "meta";
       res.setHeader("Cache-Control", "no-store");
       res.json({
         section,
-        generations: reporterService.listGenerations({ section, limit }).map((entry) => ({
-          generatedAt: entry.generatedAt,
-          model: entry.model || null,
-          content: entry.content,
-          customPrompt: Boolean(entry.prompt),
-          // The model answered without a briefing; the desk page warns and
-          // offers a rerun, which the daily limit does not block.
-          noBriefing: looksLikeRefusal(entry.content, entry.sources),
-        })),
+        generations: reporterService.listGenerations({ section, limit }).map((entry) => {
+          const run = {
+            generatedAt: entry.generatedAt,
+            model: entry.model || null,
+            customPrompt: Boolean(entry.prompt),
+            // The model answered without a briefing; the desk page warns and
+            // offers a rerun, which the daily limit does not block.
+            noBriefing: looksLikeRefusal(entry.content, entry.sources),
+          };
+          if (metaOnly) run.chars = typeof entry.content === "string" ? entry.content.length : 0;
+          else run.content = entry.content;
+          return run;
+        }),
       });
     } catch (err) {
       next(err);
