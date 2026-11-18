@@ -6,7 +6,8 @@
  * approval. Nothing here queues or posts: FarmBot creates held queue rows only
  * after Jason approves the exact batch on its News Preview page.
  *
- *   1. Gather   — the day's runs shown on Today's Top 10 (phone first).
+ *   1. Gather   — the desk runs pinned by the day's recorded Run (see
+ *                 top10-runs.js); without a Run there is no Top 10 to send.
  *   2. Rank     — one model call with web search ranks all stories, removes
  *                 duplicates, writes post copy and finds each source article.
  *   3. Verify   — each article is fetched and must be readable, dated within
@@ -18,12 +19,16 @@
  *                 server's read-back is the receipt.
  *   6. Slip     — the receipt is saved here and each story is logged in the
  *                 Reporter News Log as verified (logging is not approval).
+ *   7. X drafts — FarmBot writes an engagement X post per story with its own
+ *                 Grok settings, saved for review in News Reporter (see
+ *                 top10-x-drafts.js). A drafting failure never fails the send.
  */
 
 const crypto = require("crypto");
 const { select } = require("../../public/assets/js/top-news-selection");
 const { buildDailyTopNews } = require("./daily-top-news");
 const { verifyArticle } = require("./article-verifier");
+const { Top10XDrafts } = require("./top10-x-drafts");
 
 const TARGET_STORIES = 10;
 const RANKED_STORIES = 16;
@@ -122,6 +127,8 @@ class FarmbotTop10Service {
     briefingStore,
     reporterService,
     slipStore,
+    runStore = null,
+    xDraftStore = null,
     newsLogStore = null,
     openai = null,
     model,
@@ -133,6 +140,8 @@ class FarmbotTop10Service {
     this._briefings = briefingStore;
     this._reporter = reporterService;
     this._slips = slipStore;
+    this._runs = runStore;
+    this.xDrafts = xDraftStore ? new Top10XDrafts({ store: xDraftStore, top10: this }) : null;
     this._newsLog = newsLogStore;
     this._openai = openai;
     this._model = model || "gpt-5.4-mini";
@@ -205,9 +214,12 @@ class FarmbotTop10Service {
   }
 
   _gather(date, timeZone, runIds = {}) {
-    const day = buildDailyTopNews({ briefingStore: this._briefings, reporterService: this._reporter, date, timeZone });
+    const day = buildDailyTopNews({ briefingStore: this._briefings, reporterService: this._reporter, date, timeZone, runStore: this._runs });
+    // With a run store, only the day's recorded Run decides the Top 10.
+    if (this._runs && !day.top10Run) throw farmbotError("No Top 10 for this day yet: hit Run first. All three desks must finish that day.", 409);
+    const picked = day.top10Run ? day.top10Run.runIds : runIds;
     const runs = {};
-    const stories = select(day.desks, runIds).map((story) => {
+    const stories = select(day.desks, picked).map((story) => {
       runs[story.desk] = { id: story.runId, source: story.source, at: story.at };
       return {
         ref: `${story.desk[0].toUpperCase()}${story.sourceRank}`,
@@ -397,6 +409,18 @@ class FarmbotTop10Service {
     });
   }
 
+  /** Ask FarmBot for X drafts of a batch just saved; report, never throw. */
+  async _writeDrafts(slip, date, articles, now) {
+    if (!this.xDrafts) return slip;
+    try {
+      const set = await this.xDrafts.write({ date, articles, now });
+      return { ...slip, xDrafts: { status: "review", drafted: set.items.filter((item) => item.draft).length, total: set.items.length } };
+    } catch (err) {
+      this._logger.warn?.(`[FarmBot Top 10] X drafts not written: ${err.message}`);
+      return { ...slip, xDrafts: { status: "failed", error: err.message } };
+    }
+  }
+
   /**
    * Prepare and send the day's Top 10. Resolves with the saved slip.
    * Throws (with statusCode) only before anything reached FarmBot.
@@ -488,7 +512,7 @@ class FarmbotTop10Service {
 
       const batch = { clientBatchId: created.clientBatchId, batchId: created.batchId };
       this._logStories(accepted, batch);
-      return this._slips.record({
+      const slip = this._slips.record({
         date: day.date,
         outcome: created.duplicate ? "already-sent" : "sent",
         clientBatchId: created.clientBatchId,
@@ -514,6 +538,7 @@ class FarmbotTop10Service {
         runs,
         requestId: crypto.randomUUID(),
       }, now);
+      return await this._writeDrafts(slip, day.date, accepted.map(({ article }) => article), now);
     } catch (err) {
       stories.forEach((story) => {
         try { this._recordStory(story, { readiness: "blocked", error: err.message }); }

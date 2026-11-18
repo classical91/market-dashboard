@@ -56,6 +56,8 @@ const { createDailyTopNewsRouter } = require("./routes/daily-top-news");
 const { createDeskTelegramRouter } = require("./routes/desk-telegram");
 const { FarmbotTop10Service } = require("./services/farmbot-top10");
 const { FarmbotTop10Store } = require("./services/farmbot-top10-store");
+const { Top10RunStore } = require("./services/top10-runs");
+const { Top10XDraftStore } = require("./services/top10-x-drafts");
 const OpenAI = require("openai");
 const { createFarmclawHandoffRouter } = require("./routes/farmclaw-handoffs");
 const { createFarmclawNewsPreviewsRouter } = require("./routes/farmclaw-news-previews");
@@ -230,11 +232,16 @@ function createApp() {
     model: config.reporter.model,
     dataDir,
   });
+  // Today's Top 10 exists only for a day someone hit Run on (all three desks done).
+  const top10RunStore = new Top10RunStore({ dataDir });
   // Merges Today's Top 10 into one FarmBot news batch for human approval.
   const farmbotTop10 = new FarmbotTop10Service({
     briefingStore: phoneBriefingStore,
     reporterService,
     slipStore: new FarmbotTop10Store({ dataDir }),
+    runStore: top10RunStore,
+    // FarmBot writes engagement X drafts with its Grok settings; reviewed in News Reporter.
+    xDraftStore: new Top10XDraftStore({ dataDir }),
     newsLogStore: reporterNewsLogStore,
     openai: config.reporter.apiKey ? new OpenAI({ apiKey: config.reporter.apiKey }) : null,
     model: config.reporter.model,
@@ -783,6 +790,7 @@ function createApp() {
   app.use("/api/daily-top-news", createDailyTopNewsRouter({
     briefingStore: phoneBriefingStore,
     reporterService,
+    runStore: top10RunStore,
     farmbotTop10,
     requireAdmin,
   }));

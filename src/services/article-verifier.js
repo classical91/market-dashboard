@@ -259,6 +259,8 @@ function readArticle(html, finalUrl) {
     siteName: siteName ? stripTags(siteName).slice(0, 80) : null,
     description: stripTags(description).slice(0, 500),
     excerpt: bodyText.slice(0, 600),
+    // Longer article text, kept in memory only, for writing X drafts from.
+    bodyText: bodyText.slice(0, 6000),
     bodyChars: bodyText.length,
   };
 }
