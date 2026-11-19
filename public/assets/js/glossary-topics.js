@@ -404,6 +404,128 @@
       ],
     },
 
+    "Market Math: Returns & Percentages": {
+      summary: "How to measure a move: percent change, basis points, compounding and why losses cost more than gains.",
+      intro: "Every price, return and rate on this dashboard is a percentage of something. This topic covers how those percentages are calculated, the units traders use for small numbers, and why returns multiply instead of adding up.",
+      why: "Most bad intuitions about trading are bad arithmetic: thinking +10% and −10% cancel out, comparing a monthly return with a yearly one, or not realising how deep a hole a 50% loss is.",
+      sections: [
+        {
+          title: "Measuring a move",
+          note: "Start with the basic unit. Divide by the starting value, and be clear whether a change is in percent or percentage points.",
+          ids: ["percent-change", "percent-vs-percentage-points", "basis-points"],
+        },
+        {
+          title: "Why returns multiply",
+          note: "Gains and losses compound. That makes drawdowns expensive and steady returns more valuable than volatile ones with the same average.",
+          ids: ["loss-recovery-math", "compounding", "log-returns"],
+        },
+        {
+          title: "Comparing across time",
+          note: "To compare a funding rate, a yield and a strategy fairly, put them all on the same yearly scale.",
+          ids: ["annualizing-returns"],
+        },
+      ],
+      takeaways: [
+        "+10% then −10% is a loss: returns multiply, they don't add.",
+        "Protect against big drawdowns first — a 50% loss needs a 100% gain to recover.",
+        "Convert rates to the same period (and fees to basis points) before comparing them.",
+      ],
+    },
+
+    "Market Math: Risk & Position Sizing": {
+      summary: "Turning a stop level into a position size, and measuring every trade in units of risk (R).",
+      intro: "Position sizing is the one part of trading that is pure math. Once you know where your stop goes and how much of the account you are willing to lose, the size of the trade follows from a single division. This topic walks through that calculation and the numbers around it: R, effective leverage, liquidation distance and fees.",
+      why: "Sizing decides whether a losing streak is a dent or the end of the account. It is also the part you fully control, unlike where price goes next.",
+      sections: [
+        {
+          title: "Risk as the unit",
+          note: "Measure trades in R (multiples of the amount you risked) and risk a small, fixed fraction of the account each time.",
+          ids: ["r-multiple", "fixed-fractional-risk"],
+        },
+        {
+          title: "From stop to size",
+          note: "The stop comes from the chart; the size comes from dividing your dollar risk by the distance to that stop.",
+          ids: ["position-size-calculation"],
+        },
+        {
+          title: "Leverage and costs",
+          note: "Check what the position really exposes you to, how far price can go before liquidation, and how much of each R the fees take.",
+          ids: ["effective-leverage", "liquidation-distance", "fees-in-r"],
+        },
+      ],
+      takeaways: [
+        "Size = dollar risk ÷ distance to stop. Pick the stop first, then the size.",
+        "Keep risk per trade small (0.5–2%) so a normal losing streak stays survivable.",
+        "Check fees in R: tight stops on big positions can make costs eat the edge.",
+      ],
+    },
+
+    "Market Math: Probability & Expectancy": {
+      summary: "Why a strategy that loses most trades can still make money, and how to tell an edge from luck.",
+      intro: "Trading is a game of probabilities, not predictions. This topic covers how to combine win rate and reward into expectancy, how many trades it takes before results mean anything, how long losing streaks get by chance, and how much to bet when you do have an edge.",
+      why: "Without this math, it's easy to quit a good system during a normal losing streak, or to trust a lucky run of ten trades as proof of skill.",
+      sections: [
+        {
+          title: "Thinking in probabilities",
+          note: "Every setup is a probability, and each trade is independent of the last one.",
+          ids: ["probability-odds"],
+        },
+        {
+          title: "Expectancy: the number that matters",
+          note: "Win rate alone says nothing. Combine it with average win and loss in R to get the result you should expect per trade.",
+          ids: ["expectancy-in-r"],
+        },
+        {
+          title: "Edge versus luck",
+          note: "Small samples lie, and losing streaks happen to good strategies. Know how much noise to expect before judging results.",
+          ids: ["sample-size", "losing-streaks"],
+        },
+        {
+          title: "How much to bet",
+          note: "Even with a real edge, betting too much can still ruin you. These two ideas set the upper limit.",
+          ids: ["risk-of-ruin", "kelly-criterion"],
+        },
+      ],
+      takeaways: [
+        "Judge a strategy by expectancy in R over 100+ trades, not by win rate or recent trades.",
+        "Expect losing streaks of 5–10 trades even in profitable systems, and size for them.",
+        "Bet well below Kelly: your edge is an estimate, and ruin can't be undone.",
+      ],
+    },
+
+    "Market Math: Statistics": {
+      summary: "Averages, z-scores, volatility and correlation: the statistics behind bands, signals and backtests.",
+      intro: "Many indicators on this dashboard are statistics under the hood. Bollinger Bands are standard deviations, an “extreme” funding reading is a z-score or percentile, and cross-market views are correlations. This topic explains those tools and where they mislead.",
+      why: "Knowing the statistics tells you what a signal is really measuring, and when its assumptions (bell curves, stable correlations, untouched backtests) break down.",
+      sections: [
+        {
+          title: "Describing data",
+          note: "Start with the centre of the data, and check whether a few outliers are pulling the average.",
+          ids: ["mean-vs-median"],
+        },
+        {
+          title: "How unusual is this reading?",
+          note: "Z-scores and percentiles measure how stretched a value is against its own history. The bell curve tells you how rare extremes should be, and fat tails remind you that markets don't follow it.",
+          ids: ["z-score", "percentile-rank", "normal-distribution-fat-tails"],
+        },
+        {
+          title: "Volatility and relationships",
+          note: "Scale volatility across timeframes, and measure how assets move together without assuming one causes the other.",
+          ids: ["annualizing-volatility", "beta", "correlation-vs-causation"],
+        },
+        {
+          title: "Testing ideas honestly",
+          note: "The more you search through past data, the more likely you are to find patterns that are just noise.",
+          ids: ["overfitting-multiple-testing"],
+        },
+      ],
+      takeaways: [
+        "Use z-scores or percentiles to say how extreme a reading is, and expect fat tails.",
+        "Volatility scales with the square root of time: daily ≈ annual ÷ 19 in crypto.",
+        "Treat correlations as unstable and backtests as optimistic.",
+      ],
+    },
+
     "Fundamental & Research": {
       summary: "Judging what an asset is worth — project quality, research process and regulatory risk.",
       intro: "Fundamental analysis asks whether an asset deserves its price, regardless of what the chart is doing. For crypto that means the team, product, token design and regulation; for stocks it means earnings and the business itself.",

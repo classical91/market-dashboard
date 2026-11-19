@@ -1923,6 +1923,247 @@
     },
   ];
 
+  // Market Math: the arithmetic, probability and statistics behind returns,
+  // sizing and signals. Related terms that already live in other categories
+  // (Position Sizing, R:R, Win Rate & Expectancy, Standard Deviation,
+  // Correlation, Sharpe) are linked from here rather than repeated.
+  var MARKET_MATH_GLOSSARY = [
+    // ── Market Math: Returns & Percentages ────────────────────────────
+    {
+      id: "percent-change", term: "Percent Change", category: "Market Math: Returns & Percentages",
+      def: "How much a value moved relative to where it started: (new − old) ÷ old × 100. BTC moving from $40,000 to $44,000 is a +10% change.",
+      read: "Always divide by the starting value. That is why the same $4,000 move is +10% from $40,000 but only −9.1% back down from $44,000 — the base changed.",
+    },
+    {
+      id: "percent-vs-percentage-points", term: "Percent vs. Percentage Points", category: "Market Math: Returns & Percentages",
+      def: "Percentage points measure the plain difference between two percentages; percent measures the relative change between them. A funding rate going from 0.01% to 0.03% is up 0.02 percentage points — but up 200%.",
+      read: "Headlines mix these up constantly. A rate “rising 50%” and a rate “rising 50 basis points” are very different claims, so check which one is meant before reacting.",
+    },
+    {
+      id: "basis-points", term: "Basis Points (bps)", category: "Market Math: Returns & Percentages",
+      def: "One basis point is 0.01% (one hundredth of a percent); 100 bps = 1%. A 25 bp rate hike is 0.25%, and a 0.01% funding rate is 1 bp per funding interval.",
+      read: "Used wherever small differences matter: interest rates, spreads, fees and funding. Converting everything to bps makes small costs easy to compare — a 5 bp taker fee paid on entry and exit costs 10 bps per round trip.",
+      pages: [{ label: "Indicators Glossary → Makers vs. Takers", href: "/indicators.html#term-makers-vs-takers" }],
+    },
+    {
+      id: "loss-recovery-math", term: "Loss Recovery Math", category: "Market Math: Returns & Percentages",
+      def: "After a loss, the gain needed to get back to even is bigger than the loss itself: gain needed = loss ÷ (1 − loss). A 50% loss needs a 100% gain to recover.",
+      read: "Small losses are cheap to recover and big ones are not, which is the mathematical case for tight risk control. Losses compound against you faster than gains compound for you.",
+      illustration:
+        '<table class="gi-table"><thead><tr><th>Loss</th><th>Gain needed to break even</th></tr></thead><tbody>' +
+        '<tr><td>−10%</td><td><span class="gi-cell gi-flat">+11.1%</span></td></tr>' +
+        '<tr><td>−20%</td><td><span class="gi-cell gi-flat">+25%</span></td></tr>' +
+        '<tr><td>−33%</td><td><span class="gi-cell gi-down">+50%</span></td></tr>' +
+        '<tr><td>−50%</td><td><span class="gi-cell gi-down">+100%</span></td></tr>' +
+        '<tr><td>−75%</td><td><span class="gi-cell gi-down">+300%</span></td></tr>' +
+        '<tr><td>−90%</td><td><span class="gi-cell gi-down">+900%</span></td></tr>' +
+        "</tbody></table>",
+      pages: [{ label: "Indicators Glossary → Max Drawdown", href: "/indicators.html#term-max-drawdown" }],
+    },
+    {
+      id: "compounding", term: "Compounding & Volatility Drag", category: "Market Math: Returns & Percentages",
+      def: "Returns multiply rather than add: ending value = start × (1 + r₁) × (1 + r₂) × … A steady 1% a day for 30 days is +34.8%, not +30%. The same multiplication works against you when returns swing: +10% then −10% leaves you at −1%, and +50% then −50% at −25%.",
+      read: "The loss from big up-and-down swings is called volatility drag. Two strategies with the same average return finish differently if one is much more volatile — the smoother one compounds to more.",
+    },
+    {
+      id: "log-returns", term: "Log Returns", category: "Market Math: Returns & Percentages",
+      def: "The natural logarithm of new ÷ old price. Unlike percent returns, log returns add up over time: ln(1.10) + ln(0.90) = 0.095 − 0.105 = −0.010, matching the real −1% result of +10% then −10%.",
+      read: "Doubling is +0.693 and halving is −0.693, so ups and downs are symmetric. That is why long-term charts use a log scale: equal vertical distances are equal percentage moves, so a 2017 rally and a 2024 rally can be compared fairly.",
+    },
+    {
+      id: "annualizing-returns", term: "Annualizing & CAGR", category: "Market Math: Returns & Percentages",
+      def: "Annualizing converts a return over any period into a yearly rate. Compound annual growth rate (CAGR) = (end ÷ start)^(1 ÷ years) − 1, so $10,000 growing to $20,000 over 3 years is 26% a year, not 33%.",
+      read: "Short-period rates scale up fast: a 0.01% funding rate paid three times a day is about 11% a year (0.01% × 3 × 365). Annualizing makes yields, funding and basis comparable, but a great month annualized is not a forecast.",
+      pages: [{ label: "Indicators Glossary → BTC Annualized Daily Basis", href: "/indicators.html#term-btc-annualized-daily-basis" }],
+    },
+
+    // ── Market Math: Risk & Position Sizing ───────────────────────────
+    {
+      id: "r-multiple", term: "R-Multiple", category: "Market Math: Risk & Position Sizing",
+      def: "A trade's result expressed in units of its initial risk (R = entry-to-stop loss in dollars). Risking $100 and making $250 is +2.5R; getting stopped out is −1R; a stop that slips is something like −1.2R.",
+      read: "R lets you compare trades of different sizes and markets on one scale, and it is the unit expectancy, win rates and journals should be measured in. A losing trade much worse than −1R means the stop was not respected or slipped badly.",
+      pages: [{ label: "Indicators Glossary → Risk/Reward Ratio (R:R)", href: "/indicators.html#term-risk-reward-ratio" }],
+    },
+    {
+      id: "fixed-fractional-risk", term: "Fixed Fractional Risk", category: "Market Math: Risk & Position Sizing",
+      def: "Risking the same small percentage of current account equity on every trade (commonly 0.5–2%). Because the risk is a fraction of what is left, position sizes shrink after losses and grow after wins.",
+      read: "Ten losses in a row at 1% risk costs about 9.6% of the account; at 10% risk it costs about 65%. Losing streaks are normal, so the risk per trade decides whether a bad run is a setback or the end of the account.",
+      illustration:
+        '<table class="gi-table"><thead><tr><th>Risk per trade</th><th>After 10 losses in a row</th></tr></thead><tbody>' +
+        '<tr><td>0.5%</td><td><span class="gi-cell gi-up">−4.9%</span></td></tr>' +
+        '<tr><td>1%</td><td><span class="gi-cell gi-up">−9.6%</span></td></tr>' +
+        '<tr><td>2%</td><td><span class="gi-cell gi-flat">−18.3%</span></td></tr>' +
+        '<tr><td>5%</td><td><span class="gi-cell gi-down">−40.1%</span></td></tr>' +
+        '<tr><td>10%</td><td><span class="gi-cell gi-down">−65.1%</span></td></tr>' +
+        "</tbody></table>",
+      pages: [{ label: "Indicators Glossary → Risk Management", href: "/indicators.html#term-risk-management" }],
+    },
+    {
+      id: "position-size-calculation", term: "Position Size Calculation (Worked Example)", category: "Market Math: Risk & Position Sizing",
+      def: "Units to buy = dollar risk ÷ (entry − stop). The stop comes from the chart; the size comes from the math. You never pick the size first and the stop second.",
+      read: "Worked through: a $10,000 account risking 1% ($100), long BTC at $60,000 with a stop at $58,800, has $1,200 of risk per coin, so the position is 100 ÷ 1,200 = 0.0833 BTC, worth $5,000. Move the stop to $57,600 and the size halves to 0.0417 BTC — the dollar risk stays $100.",
+      illustration:
+        '<table class="gi-table"><thead><tr><th>Step</th><th>Value</th></tr></thead><tbody>' +
+        '<tr><td>Account × risk %</td><td>$10,000 × 1% = $100</td></tr>' +
+        '<tr><td>Entry − stop</td><td>$60,000 − $58,800 = $1,200</td></tr>' +
+        '<tr><td>Size = risk ÷ distance</td><td>$100 ÷ $1,200 = 0.0833 BTC</td></tr>' +
+        '<tr><td>Notional value</td><td>0.0833 × $60,000 ≈ $5,000</td></tr>' +
+        "</tbody></table>",
+      pages: [{ label: "Indicators Glossary → Position Sizing", href: "/indicators.html#term-position-sizing" }],
+    },
+    {
+      id: "effective-leverage", term: "Notional Exposure & Effective Leverage", category: "Market Math: Risk & Position Sizing",
+      def: "Notional exposure is the full market value of your positions. Effective leverage = total notional ÷ account equity. A $5,000 position in a $10,000 account is 0.5x effective leverage, whatever leverage setting the exchange shows.",
+      read: "The leverage slider only changes how much margin a position ties up; effective leverage is what actually measures your exposure. Add up every open position (and remember correlated ones move together) to see your real risk.",
+      pages: [{ label: "Indicators Glossary → Leverage & Margin", href: "/indicators.html#term-leverage-margin" }],
+    },
+    {
+      id: "liquidation-distance", term: "Liquidation Distance", category: "Market Math: Risk & Position Sizing",
+      def: "Roughly how far price can move against an isolated-margin position before liquidation: about 1 ÷ leverage minus the maintenance-margin rate. At 10x with 0.5% maintenance margin that is about 9.5%; at 100x it is about 0.5%.",
+      read: "This is an approximation — fees, funding and each exchange's tiers move the exact price, so check the liquidation price the exchange shows. Your stop must sit comfortably inside this distance, or the exchange becomes your stop.",
+      illustration:
+        '<table class="gi-table"><thead><tr><th>Leverage</th><th>Approx. move to liquidation</th></tr></thead><tbody>' +
+        '<tr><td>5x</td><td><span class="gi-cell gi-up">~19.5%</span></td></tr>' +
+        '<tr><td>10x</td><td><span class="gi-cell gi-up">~9.5%</span></td></tr>' +
+        '<tr><td>25x</td><td><span class="gi-cell gi-flat">~3.5%</span></td></tr>' +
+        '<tr><td>50x</td><td><span class="gi-cell gi-down">~1.5%</span></td></tr>' +
+        '<tr><td>100x</td><td><span class="gi-cell gi-down">~0.5%</span></td></tr>' +
+        "</tbody></table>",
+      pages: [{ label: "Indicators Glossary → Liquidation Price", href: "/indicators.html#term-liquidation-price" }],
+    },
+    {
+      id: "fees-in-r", term: "Fees in R", category: "Market Math: Risk & Position Sizing",
+      def: "Trading costs expressed as a share of your risk: round-trip fees ÷ dollar risk. With a 0.05% taker fee each way, a $5,000 position costs $5 — 0.05R on $100 of risk.",
+      read: "Tight stops make fees expensive. Risking the same $100 with a 0.25% stop needs a $40,000 position, and the same fees become $40, or 0.4R per trade — enough to turn a small edge negative. Always check costs in R, not in percent of the position.",
+      pages: [{ label: "Indicators Glossary → Slippage", href: "/indicators.html#term-slippage" }],
+    },
+
+    // ── Market Math: Probability & Expectancy ─────────────────────────
+    {
+      id: "probability-odds", term: "Probability & Odds", category: "Market Math: Probability & Expectancy",
+      def: "Probability is the share of outcomes that go your way, from 0 to 1 (or 0–100%). Odds compare wins with losses: a 25% chance is 1:3 odds. The chance of two independent events both happening is the product of their probabilities.",
+      read: "Past trades do not change the next one: after five losses a fair 50% setup is still 50% (believing otherwise is the gambler's fallacy). Treat every signal on this dashboard as shifting probabilities, never as a certainty.",
+    },
+    {
+      id: "expectancy-in-r", term: "Expectancy in R (Worked Example)", category: "Market Math: Probability & Expectancy",
+      def: "The average result per trade measured in R: (win rate × average win in R) − (loss rate × average loss in R). The break-even win rate for a given reward is 1 ÷ (1 + R).",
+      read: "Worked through: winning 40% of trades at +2.5R and losing 60% at −1R gives 0.4 × 2.5 − 0.6 × 1 = +0.4R per trade. Over 100 trades risking $100 each, that is about +$4,000 before costs — even though most trades lose.",
+      illustration:
+        '<table class="gi-table"><thead><tr><th>Reward (R)</th><th>Break-even win rate</th></tr></thead><tbody>' +
+        '<tr><td>1R</td><td>50%</td></tr>' +
+        '<tr><td>1.5R</td><td>40%</td></tr>' +
+        '<tr><td>2R</td><td>33.3%</td></tr>' +
+        '<tr><td>3R</td><td>25%</td></tr>' +
+        '<tr><td>4R</td><td>20%</td></tr>' +
+        "</tbody></table>",
+      pages: [
+        { label: "Indicators Glossary → Win Rate & Expectancy", href: "/indicators.html#term-win-rate-expectancy" },
+        { label: "Pattern Scanner → Stats", href: "/pattern-scanner-stats.html" },
+      ],
+    },
+    {
+      id: "sample-size", term: "Sample Size & the Law of Large Numbers", category: "Market Math: Probability & Expectancy",
+      def: "Results only settle toward a strategy's true edge over many trades. The uncertainty in a measured win rate is roughly ± 2 × √(p × (1 − p) ÷ n) for a win rate p over n trades.",
+      read: "A strategy that truly wins 50% can easily show anything from about 28% to 72% over 20 trades. Judge win rates over 100+ trades, and treat a hot streak in a small sample as noise until proven otherwise.",
+      illustration:
+        '<table class="gi-table"><thead><tr><th>Trades</th><th>A true 50% win rate shows as</th></tr></thead><tbody>' +
+        '<tr><td>20</td><td><span class="gi-cell gi-down">~28%–72%</span></td></tr>' +
+        '<tr><td>100</td><td><span class="gi-cell gi-flat">~40%–60%</span></td></tr>' +
+        '<tr><td>400</td><td><span class="gi-cell gi-up">~45%–55%</span></td></tr>' +
+        "</tbody></table>",
+      pages: [{ label: "Pattern Scanner → Stats", href: "/pattern-scanner-stats.html" }],
+    },
+    {
+      id: "losing-streaks", term: "Losing Streaks", category: "Market Math: Probability & Expectancy",
+      def: "Runs of consecutive losses that happen by chance even in a profitable strategy. Over n trades, the longest losing streak is typically about ln(n) ÷ ln(1 ÷ loss rate).",
+      read: "Over 100 trades, a 40% win-rate strategy should expect a run of about 9 losses in a row; a 60% win-rate one about 5. Plan for that streak in advance — size so you can survive it, and don't abandon a sound system in the middle of one.",
+      illustration:
+        '<table class="gi-table"><thead><tr><th>Win rate</th><th>Typical longest losing run in 100 trades</th></tr></thead><tbody>' +
+        '<tr><td>30%</td><td>~13</td></tr>' +
+        '<tr><td>40%</td><td>~9</td></tr>' +
+        '<tr><td>50%</td><td>~7</td></tr>' +
+        '<tr><td>60%</td><td>~5</td></tr>' +
+        "</tbody></table>",
+    },
+    {
+      id: "risk-of-ruin", term: "Risk of Ruin", category: "Market Math: Probability & Expectancy",
+      def: "The chance of losing so much that you can no longer keep trading. It falls as your edge improves and rises sharply with the share of the account risked per trade. The number of straight losses that halves an account is ln(0.5) ÷ ln(1 − risk per trade).",
+      read: "At 1% risk it takes about 69 losses in a row to halve the account; at 10% it takes about 7. Even a winning strategy can go broke if it bets too big, so keep per-trade risk small enough that ruin needs an implausible run.",
+      illustration:
+        '<table class="gi-table"><thead><tr><th>Risk per trade</th><th>Straight losses to lose 50%</th></tr></thead><tbody>' +
+        '<tr><td>1%</td><td><span class="gi-cell gi-up">~69</span></td></tr>' +
+        '<tr><td>2%</td><td><span class="gi-cell gi-up">~34</span></td></tr>' +
+        '<tr><td>5%</td><td><span class="gi-cell gi-flat">~14</span></td></tr>' +
+        '<tr><td>10%</td><td><span class="gi-cell gi-down">~7</span></td></tr>' +
+        "</tbody></table>",
+    },
+    {
+      id: "kelly-criterion", term: "Kelly Criterion", category: "Market Math: Probability & Expectancy",
+      def: "A formula for the bet size that maximizes long-run growth: f = W − (1 − W) ÷ R, where W is the win rate and R the average win divided by the average loss. Winning 40% at 2.5R gives f = 0.4 − 0.6 ÷ 2.5 = 16% of the account.",
+      read: "Full Kelly assumes you know your edge exactly, and it produces brutal drawdowns. Since real win rates are estimates, traders use a fraction (quarter-Kelly would be 4% here) or simply cap risk at 1–2%. A negative Kelly result means there is no edge to bet on.",
+    },
+
+    // ── Market Math: Statistics ───────────────────────────────────────
+    {
+      id: "mean-vs-median", term: "Mean vs. Median", category: "Market Math: Statistics",
+      def: "The mean is the sum divided by the count; the median is the middle value once sorted. A few large values pull the mean but barely move the median. Trades of −1R, −1R, −1R, −1R and +12R have a mean of +1.6R but a median of −1R.",
+      read: "When mean and median disagree, the data is skewed. A trend-following strategy often has a negative median trade and a positive mean, because rare big winners carry it — which tells you not to cut those winners short.",
+    },
+    {
+      id: "z-score", term: "Z-Score", category: "Market Math: Statistics",
+      def: "How many standard deviations a value sits from its average: (value − mean) ÷ standard deviation. A funding rate of 0.05% against a mean of 0.01% and a standard deviation of 0.01% has a z-score of +4.",
+      read: "Z-scores put different series on one scale, so funding, open interest and price stretch can be compared. Readings beyond ±2 are unusual and beyond ±3 rare — in a normal distribution. Markets have fat tails, so extremes happen more often than that.",
+      pages: [{ label: "Indicators Glossary → Standard Deviation", href: "/indicators.html#term-standard-deviation" }],
+    },
+    {
+      id: "normal-distribution-fat-tails", term: "Normal Distribution & Fat Tails", category: "Market Math: Statistics",
+      def: "In a normal (bell-curve) distribution about 68% of values fall within 1 standard deviation of the mean, 95% within 2 and 99.7% within 3. Market returns have fat tails: moves of 4, 5 or more standard deviations happen far more often than the bell curve predicts.",
+      read: "Models built on the normal curve, from Bollinger Bands to basic risk estimates, understate crash and squeeze risk. Treat a “one in a thousand years” move as something that will happen in your trading life, and never size so that one can wipe you out.",
+      illustration:
+        '<table class="gi-table"><thead><tr><th>Range around the mean</th><th>Share inside (normal curve)</th></tr></thead><tbody>' +
+        '<tr><td>±1 SD</td><td>~68%</td></tr>' +
+        '<tr><td>±2 SD</td><td>~95%</td></tr>' +
+        '<tr><td>±3 SD</td><td>~99.7%</td></tr>' +
+        "</tbody></table>",
+      pages: [{ label: "Indicators Glossary → Bollinger Bands", href: "/indicators.html#term-bollinger" }],
+    },
+    {
+      id: "annualizing-volatility", term: "Annualizing Volatility (Square-Root-of-Time)", category: "Market Math: Statistics",
+      def: "Volatility grows with the square root of time, not linearly. Annual volatility = daily volatility × √(trading days per year): √365 ≈ 19.1 for crypto, √252 ≈ 15.9 for stocks. A 3% daily move standard deviation in BTC is about 57% annualized.",
+      read: "Run it backwards to turn implied volatility into an expected move: 60% annual IV ÷ 19.1 ≈ 3.1% for a typical day, and 60% ÷ √52 ≈ 8.3% for a week. That gives a sensible yardstick for stop distances and targets.",
+      pages: [
+        { label: "Indicators Glossary → Implied Volatility", href: "/indicators.html#term-implied-volatility" },
+        { label: "Indicators Glossary → ATR", href: "/indicators.html#term-atr" },
+      ],
+    },
+    {
+      id: "beta", term: "Beta", category: "Market Math: Statistics",
+      def: "How much an asset tends to move for each 1% move in a benchmark: correlation × (asset volatility ÷ benchmark volatility). An altcoin with a beta of 1.5 to BTC tends to move about 6% when BTC moves 4%.",
+      read: "High-beta assets amplify the benchmark in both directions, so holding them is partly just a leveraged bet on the benchmark. Beta measures typical behaviour and drifts with the market regime, so recheck it.",
+      pages: [{ label: "Indicators Glossary → Correlation (Cross-Asset)", href: "/indicators.html#term-correlation" }],
+    },
+    {
+      id: "correlation-vs-causation", term: "Correlation vs. Causation & R²", category: "Market Math: Statistics",
+      def: "Correlation measures whether two series move together, not whether one drives the other. R² (correlation squared) is the share of one series' variation the other explains: a 0.5 correlation explains only 25%.",
+      read: "Many market relationships are both indirect (a shared driver like liquidity moves both) and unstable (they flip between regimes). Use correlation to spot hidden concentration, not as proof that one chart predicts another.",
+      pages: [{ label: "Cross-Market Open Interest", href: "/cross-market-oi.html" }],
+    },
+    {
+      id: "percentile-rank", term: "Percentile Rank", category: "Market Math: Statistics",
+      def: "Where a current reading sits within its own history: the 90th percentile means it is higher than 90% of past readings.",
+      read: "Percentiles don't assume a bell curve, so they handle skewed data like funding rates, volume and open interest better than z-scores. “Top 5% of the last year” is often the clearest way to say a reading is extreme.",
+    },
+    {
+      id: "overfitting-multiple-testing", term: "Overfitting & Multiple Testing", category: "Market Math: Statistics",
+      def: "Overfitting is tuning a strategy until it fits past noise rather than a real pattern. Multiple testing is the related trap: test 20 random rules and, by chance alone, about one will look significant at the 5% level.",
+      read: "The more rules and parameters you try, the more suspicious a good backtest should look. Keep an out-of-sample period, prefer simple rules with few settings, and expect live results to be worse than the backtest.",
+      pages: [
+        { label: "Indicators Glossary → Backtesting", href: "/indicators.html#term-backtesting" },
+        { label: "Trading Lab", href: "/trading-lab.html" },
+      ],
+    },
+  ];
+
   var ALL_GLOSSARY = GLOSSARY.concat(USER_GLOSSARY)
     .concat(DECISION_ENGINE_GLOSSARY)
     .concat(MARKET_FUNDAMENTALS_GLOSSARY)
@@ -1935,7 +2176,8 @@
     .concat(CHART_PATTERNS_GLOSSARY)
     .concat(CONFLUENCE_GLOSSARY)
     .concat(DEFINITIONS_LIST_GLOSSARY)
-    .concat(ESSENTIALS_GLOSSARY);
+    .concat(ESSENTIALS_GLOSSARY)
+    .concat(MARKET_MATH_GLOSSARY);
 
   var CATEGORY_ORDER = [
     "Market Fundamentals",
@@ -1950,6 +2192,10 @@
     "Futures & Derivatives",
     "Order Types & Execution",
     "Trading Risk & Strategy",
+    "Market Math: Returns & Percentages",
+    "Market Math: Risk & Position Sizing",
+    "Market Math: Probability & Expectancy",
+    "Market Math: Statistics",
     "Fundamental & Research",
     "Market Participants",
     "Professional & Compliance",
