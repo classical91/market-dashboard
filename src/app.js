@@ -601,6 +601,10 @@ function createApp() {
     res.json({ ok: true, configured: true });
   });
   app.use(siteAuth.requireAccess);
+  // Short shortcut link: Crypto Hub with the Bitcoin Research dropdown open.
+  app.get(["/btc-research", "/bitcoin-research"], (req, res) => {
+    res.redirect(302, "/crypto.html#crypto-research");
+  });
   app.get(["/earthwatch", "/earthwatch.html"], (req, res) => {
     res.redirect(302, "https://earth-watch-production-e3c6.up.railway.app/");
   });
