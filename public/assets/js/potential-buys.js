@@ -7,9 +7,16 @@
   var API = "/api/potential-buys";
   var ACCEPTED = ["image/png", "image/jpeg", "image/webp", "image/gif"];
   var UI = window.MarketUI;
+  var Crop = window.CropRect;
   var escapeHtml = UI.escapeHtml;
 
-  var state = { items: [], loading: true, error: "", uploading: 0, filter: "", viewing: null };
+  // A hashtag in a label files the screenshot in that folder (#BTC → BTC).
+  // Mirrors extractTags in src/services/potential-buys.js.
+  var TAG_RE = /(^|[^\w&#])#([A-Za-z][A-Za-z0-9._-]{0,23})/g;
+  var ALL = "__all";
+  var UNTAGGED = "__untagged";
+
+  var state = { items: [], loading: true, error: "", uploading: 0, filter: "", viewing: null, folder: ALL };
 
   var el = {
     grid: document.getElementById("pbGrid"),
@@ -28,6 +35,21 @@
     viewerOpen: document.getElementById("pbViewerOpen"),
     viewerDelete: document.getElementById("pbViewerDelete"),
     viewerClose: document.getElementById("pbViewerClose"),
+    viewerCrop: document.getElementById("pbViewerCrop"),
+    heading: document.getElementById("pbHeading"),
+    folders: document.getElementById("pbFolders"),
+    folderCount: document.getElementById("pbFolderCount"),
+    crop: document.getElementById("pbCrop"),
+    cropStage: document.getElementById("pbCropStage"),
+    cropImg: document.getElementById("pbCropImg"),
+    cropBox: document.getElementById("pbCropBox"),
+    cropAspects: document.getElementById("pbCropAspects"),
+    cropHint: document.getElementById("pbCropHint"),
+    cropSize: document.getElementById("pbCropSize"),
+    cropReset: document.getElementById("pbCropReset"),
+    cropCancel: document.getElementById("pbCropCancel"),
+    cropClose: document.getElementById("pbCropClose"),
+    cropApply: document.getElementById("pbCropApply"),
   };
 
   var toastTimer = null;
@@ -63,15 +85,104 @@
     return bytes >= 1024 * 1024 ? (bytes / 1024 / 1024).toFixed(1) + " MB" : Math.max(1, Math.round(bytes / 1024)) + " KB";
   }
 
+  function tagsOf(item) {
+    var tags = [];
+    var label = (item && item.label) || "";
+    var match;
+    TAG_RE.lastIndex = 0;
+    while ((match = TAG_RE.exec(label))) {
+      var tag = match[2].replace(/[._-]+$/, "").toUpperCase();
+      if (tag && tags.indexOf(tag) === -1) tags.push(tag);
+    }
+    return tags;
+  }
+
+  function touchedAt(item) {
+    return item.updatedAt || item.createdAt || 0;
+  }
+
+  /** One folder per hashtag, with its count and newest change; newest first. */
+  function buildFolders() {
+    var byTag = {};
+    var untagged = { count: 0, updatedAt: 0 };
+    state.items.forEach(function (item) {
+      var tags = tagsOf(item);
+      if (!tags.length) {
+        untagged.count += 1;
+        untagged.updatedAt = Math.max(untagged.updatedAt, touchedAt(item));
+      }
+      tags.forEach(function (tag) {
+        var folder = byTag[tag] || (byTag[tag] = { tag: tag, count: 0, updatedAt: 0 });
+        folder.count += 1;
+        folder.updatedAt = Math.max(folder.updatedAt, touchedAt(item));
+      });
+    });
+    var folders = Object.keys(byTag).map(function (tag) { return byTag[tag]; });
+    folders.sort(function (a, b) { return b.updatedAt - a.updatedAt || a.tag.localeCompare(b.tag); });
+    return { folders: folders, untagged: untagged };
+  }
+
+  function inFolder(item) {
+    if (state.folder === ALL) return true;
+    var tags = tagsOf(item);
+    return state.folder === UNTAGGED ? !tags.length : tags.indexOf(state.folder) !== -1;
+  }
+
   function visibleItems() {
     var q = state.filter.trim().toLowerCase();
-    if (!q) return state.items;
-    return state.items.filter(function (item) { return (item.label || "").toLowerCase().indexOf(q) !== -1; });
+    return state.items.filter(function (item) {
+      return inFolder(item) && (!q || (item.label || "").toLowerCase().indexOf(q) !== -1);
+    });
+  }
+
+  function folderButton(key, name, count, updatedAt, extraClass) {
+    var active = state.folder === key;
+    return (
+      '<button type="button" class="pb-folder' + (extraClass ? " " + extraClass : "") + (active ? " is-active" : "") +
+        '" data-folder="' + escapeHtml(key) + '" aria-pressed="' + active + '">' +
+        '<span class="pb-folder-icon" aria-hidden="true"></span>' +
+        '<span class="pb-folder-main">' +
+          '<span class="pb-folder-name">' + escapeHtml(name) + "</span>" +
+          '<span class="pb-folder-when">' + (updatedAt ? "Updated " + escapeHtml(formatWhen(updatedAt)) : "Empty") + "</span>" +
+        "</span>" +
+        '<span class="pb-folder-count" aria-label="' + count + (count === 1 ? " item" : " items") + '">' + count + "</span>" +
+      "</button>"
+    );
+  }
+
+  function renderFolders() {
+    var built = buildFolders();
+    var folders = built.folders;
+    // A folder whose last tag was removed is gone; fall back to everything.
+    if (state.folder !== ALL && state.folder !== UNTAGGED &&
+        !folders.some(function (f) { return f.tag === state.folder; })) {
+      state.folder = ALL;
+    }
+    if (state.folder === UNTAGGED && !built.untagged.count) state.folder = ALL;
+
+    el.folderCount.textContent = folders.length + (folders.length === 1 ? " folder" : " folders");
+    if (state.loading && !state.items.length) {
+      el.folders.innerHTML = "";
+      el.folderCount.textContent = "";
+      return;
+    }
+    var newest = state.items.reduce(function (max, item) { return Math.max(max, touchedAt(item)); }, 0);
+    var html = folderButton(ALL, "All", state.items.length, newest, "is-all");
+    html += folders.map(function (f) { return folderButton(f.tag, "#" + f.tag, f.count, f.updatedAt); }).join("");
+    if (built.untagged.count && folders.length) {
+      html += folderButton(UNTAGGED, "Untagged", built.untagged.count, built.untagged.updatedAt, "is-untagged");
+    }
+    el.folders.innerHTML = html;
+
+    var title = state.folder === ALL ? "Watching" : state.folder === UNTAGGED ? "Untagged" : "#" + state.folder;
+    el.heading.textContent = title;
   }
 
   function render() {
+    renderFolders();
     var n = state.items.length;
-    el.count.textContent = state.loading && !n ? "Loading…" : n + (n === 1 ? " screenshot" : " screenshots");
+    var shown = state.folder === ALL ? n : state.items.filter(inFolder).length;
+    el.count.textContent = state.loading && !n ? "Loading…" : shown + (shown === 1 ? " screenshot" : " screenshots");
 
     el.dropzone.classList.toggle("is-uploading", state.uploading > 0);
     el.dropzoneTitle.textContent = state.uploading > 0
@@ -95,7 +206,9 @@
     }
     var items = visibleItems();
     if (!items.length) {
-      el.grid.innerHTML = UI.emptyState("Nothing matches “" + state.filter.trim() + "”", "Clear the filter to see every screenshot.");
+      el.grid.innerHTML = state.filter.trim()
+        ? UI.emptyState("Nothing matches “" + state.filter.trim() + "”", "Clear the filter to see every screenshot.")
+        : UI.emptyState("This folder is empty", "Choose All to see everything.");
       return;
     }
 
@@ -113,6 +226,7 @@
               'placeholder="Add ticker or note…" aria-label="Label" data-action="label" />' +
             '<div class="pb-card-foot">' +
               '<span class="pb-when" title="' + escapeHtml(formatSize(item.size)) + '">' + escapeHtml(formatWhen(item.createdAt)) + "</span>" +
+              '<button type="button" class="pb-btn" data-action="crop">Crop</button>' +
               '<button type="button" class="pb-btn pb-btn-danger" data-action="delete">Delete</button>' +
             "</div>" +
           "</div>" +
@@ -182,9 +296,16 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ label: label }),
       });
-      item.label = data.item.label;
+      var hadTags = tagsOf(item).join(",");
+      Object.assign(item, data.item);
       input.value = item.label;
-      toast("Label saved.");
+      var tags = tagsOf(item);
+      if (tags.join(",") !== hadTags && tags.length) {
+        toast("Label saved · filed in " + tags.map(function (t) { return "#" + t; }).join(", ") + ".");
+      } else {
+        toast("Label saved.");
+      }
+      render();
     } catch (err) {
       input.value = item.label || "";
       toast(err.message, true);
@@ -224,6 +345,220 @@
     state.viewing = null;
     if (el.viewer.open) el.viewer.close();
   }
+
+  // ── Crop editor (ported from farm-bot's components/ImageCropper.tsx) ──
+  // A draggable, resizable box over the screenshot with aspect presets. Apply
+  // draws the crop to a canvas and replaces the stored picture with it.
+
+  var ASPECTS = [
+    { id: "free", label: "Free", value: null },
+    { id: "16:9", label: "16:9", value: 16 / 9 },
+    { id: "4:3", label: "4:3", value: 4 / 3 },
+    { id: "1:1", label: "1:1", value: 1 },
+    { id: "4:5", label: "4:5", value: 4 / 5 },
+  ];
+  var MAX_OUTPUT_SIDE = 4096;
+  var CORNERS = ["nw", "ne", "sw", "se"];
+  var EDGES = ["n", "s", "e", "w"];
+
+  var crop = { id: null, rect: Crop.FULL_CROP, aspectId: "free", natural: null, drag: null, applying: false };
+
+  function cropAspect() {
+    var found = ASPECTS.find(function (a) { return a.id === crop.aspectId; });
+    return found ? found.value : null;
+  }
+
+  function cropImageAspect() {
+    return crop.natural ? crop.natural.w / crop.natural.h : 1;
+  }
+
+  function renderCropAspects() {
+    el.cropAspects.innerHTML = ASPECTS.map(function (a) {
+      var active = a.id === crop.aspectId;
+      return '<button type="button" class="pb-chip' + (active ? " is-active" : "") + '" data-aspect="' + a.id +
+        '" aria-pressed="' + active + '">' + a.label + "</button>";
+    }).join("");
+  }
+
+  function renderCropHandles() {
+    var handles = cropAspect() ? CORNERS : CORNERS.concat(EDGES);
+    Array.from(el.cropBox.querySelectorAll(".pb-crop-handle")).forEach(function (h) { h.remove(); });
+    handles.forEach(function (h) {
+      var span = document.createElement("span");
+      span.className = "pb-crop-handle pb-crop-handle-" + h;
+      span.setAttribute("data-handle", h);
+      span.setAttribute("aria-hidden", "true");
+      el.cropBox.appendChild(span);
+    });
+  }
+
+  function renderCrop() {
+    var r = crop.rect;
+    el.cropBox.hidden = !crop.natural;
+    el.cropBox.style.left = r.x * 100 + "%";
+    el.cropBox.style.top = r.y * 100 + "%";
+    el.cropBox.style.width = r.width * 100 + "%";
+    el.cropBox.style.height = r.height * 100 + "%";
+    el.cropReset.disabled = !crop.natural || (Crop.isFullCrop(r) && crop.aspectId === "free");
+    el.cropApply.disabled = !crop.natural || crop.applying || Crop.isFullCrop(r);
+    el.cropApply.textContent = crop.applying ? "Saving…" : "Apply crop";
+    if (!crop.natural) return;
+    var px = Crop.cropToPixels(r, crop.natural.w, crop.natural.h);
+    var out = Crop.outputSize(px.sw, px.sh, MAX_OUTPUT_SIDE);
+    el.cropSize.textContent = out.width + " × " + out.height + " px (from " + crop.natural.w + " × " + crop.natural.h + ")";
+    el.cropBox.setAttribute("aria-label", "Crop area, " + px.sw + " by " + px.sh + " pixels — drag to move, arrow keys to nudge");
+  }
+
+  function openCrop(id) {
+    var item = findItem(id);
+    if (!item) return;
+    if (typeof el.crop.showModal !== "function") {
+      toast("This browser can't open the crop editor.", true);
+      return;
+    }
+    crop.id = id;
+    crop.rect = Crop.FULL_CROP;
+    crop.aspectId = "free";
+    crop.natural = null;
+    crop.drag = null;
+    crop.applying = false;
+    el.cropHint.textContent = "Loading screenshot…";
+    el.cropHint.classList.remove("is-error");
+    el.cropSize.textContent = item.label || "Untitled screenshot";
+    renderCropAspects();
+    renderCropHandles();
+    renderCrop();
+    el.cropImg.removeAttribute("src");
+    el.cropImg.src = item.url;
+    if (el.viewer.open) el.viewer.close();
+    el.crop.showModal();
+  }
+
+  function closeCrop() {
+    crop.id = null;
+    crop.drag = null;
+    if (el.crop.open) el.crop.close();
+  }
+
+  function chooseAspect(id) {
+    crop.aspectId = id;
+    var value = cropAspect();
+    if (value) crop.rect = Crop.fitAspect(value, cropImageAspect(), crop.rect);
+    renderCropAspects();
+    renderCropHandles();
+    renderCrop();
+  }
+
+  function canvasToBlob(canvas, type, quality) {
+    return new Promise(function (resolve, reject) {
+      canvas.toBlob(function (blob) {
+        if (blob) resolve(blob);
+        else reject(new Error("Couldn't render the crop in this browser."));
+      }, type, quality);
+    });
+  }
+
+  async function applyCrop() {
+    var item = findItem(crop.id);
+    if (!item || !crop.natural || crop.applying) return;
+    var px = Crop.cropToPixels(crop.rect, crop.natural.w, crop.natural.h);
+    var out = Crop.outputSize(px.sw, px.sh, MAX_OUTPUT_SIDE);
+    // PNG and GIF screenshots keep crisp text as PNG; photos go out as JPEG.
+    var type = item.mimeType === "image/png" || item.mimeType === "image/gif" ? "image/png" : "image/jpeg";
+    crop.applying = true;
+    renderCrop();
+    try {
+      var canvas = document.createElement("canvas");
+      canvas.width = out.width;
+      canvas.height = out.height;
+      var ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Canvas unavailable in this browser.");
+      if (type === "image/jpeg") {
+        // JPEG has no transparency; give see-through pictures a white backing.
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, out.width, out.height);
+      }
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(el.cropImg, px.sx, px.sy, px.sw, px.sh, 0, 0, out.width, out.height);
+      var blob = await canvasToBlob(canvas, type, 0.92);
+      var data = await request(API + "/" + encodeURIComponent(item.id) + "/image", {
+        method: "PUT",
+        headers: { "Content-Type": type },
+        body: blob,
+      });
+      Object.assign(item, data.item);
+      crop.applying = false;
+      closeCrop();
+      render();
+      toast("Screenshot cropped.");
+    } catch (err) {
+      crop.applying = false;
+      renderCrop();
+      el.cropHint.textContent = err.message;
+      el.cropHint.classList.add("is-error");
+    }
+  }
+
+  el.cropImg.addEventListener("load", function () {
+    if (!crop.id) return;
+    crop.natural = { w: el.cropImg.naturalWidth, h: el.cropImg.naturalHeight };
+    el.cropHint.textContent = "Drag the box or its corners; arrow keys nudge it (Shift for bigger steps).";
+    renderCrop();
+  });
+  el.cropImg.addEventListener("error", function () {
+    if (!crop.id) return;
+    el.cropHint.textContent = "This screenshot couldn't be opened for cropping.";
+    el.cropHint.classList.add("is-error");
+  });
+  el.cropAspects.addEventListener("click", function (e) {
+    var chip = e.target.closest("[data-aspect]");
+    if (chip) chooseAspect(chip.getAttribute("data-aspect"));
+  });
+  el.cropBox.addEventListener("pointerdown", function (e) {
+    if (!crop.natural) return;
+    var handleEl = e.target.closest("[data-handle]");
+    e.preventDefault();
+    if (el.cropBox.setPointerCapture) el.cropBox.setPointerCapture(e.pointerId);
+    crop.drag = {
+      handle: handleEl ? handleEl.getAttribute("data-handle") : "move",
+      startX: e.clientX,
+      startY: e.clientY,
+      start: crop.rect,
+    };
+  });
+  el.cropBox.addEventListener("pointermove", function (e) {
+    var drag = crop.drag;
+    if (!drag) return;
+    var box = el.cropStage.getBoundingClientRect();
+    if (!box.width || !box.height) return;
+    var dx = (e.clientX - drag.startX) / box.width;
+    var dy = (e.clientY - drag.startY) / box.height;
+    crop.rect = Crop.dragCrop(drag.start, drag.handle, dx, dy, cropAspect(), cropImageAspect());
+    renderCrop();
+  });
+  ["pointerup", "pointercancel", "lostpointercapture"].forEach(function (type) {
+    el.cropBox.addEventListener(type, function () { crop.drag = null; });
+  });
+  el.cropBox.addEventListener("keydown", function (e) {
+    var step = e.shiftKey ? 0.02 : 0.005;
+    var moves = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
+    var move = moves[e.key];
+    if (!move || !crop.natural) return;
+    e.preventDefault();
+    crop.rect = Crop.dragCrop(crop.rect, "move", move[0], move[1], cropAspect(), cropImageAspect());
+    renderCrop();
+  });
+  el.cropReset.addEventListener("click", function () {
+    crop.aspectId = "free";
+    crop.rect = Crop.FULL_CROP;
+    renderCropAspects();
+    renderCropHandles();
+    renderCrop();
+  });
+  el.cropApply.addEventListener("click", applyCrop);
+  el.cropCancel.addEventListener("click", closeCrop);
+  el.cropClose.addEventListener("click", closeCrop);
+  el.crop.addEventListener("close", function () { crop.id = null; crop.drag = null; });
 
   // Events
   el.add.addEventListener("click", function () { el.file.click(); });
@@ -265,6 +600,7 @@
     var id = card.getAttribute("data-id");
     var action = target.getAttribute("data-action");
     if (action === "view") openViewer(id);
+    else if (action === "crop") openCrop(id);
     else if (action === "delete") remove(id);
   });
   el.grid.addEventListener("keydown", function (e) {
@@ -281,6 +617,15 @@
   });
 
   el.viewerClose.addEventListener("click", closeViewer);
+  el.viewerCrop.addEventListener("click", function () { if (state.viewing) openCrop(state.viewing); });
+
+  el.folders.addEventListener("click", function (e) {
+    var button = e.target.closest("[data-folder]");
+    if (!button) return;
+    var key = button.getAttribute("data-folder");
+    state.folder = state.folder === key && key !== ALL ? ALL : key;
+    render();
+  });
   el.viewerDelete.addEventListener("click", function () { if (state.viewing) remove(state.viewing); });
   el.viewer.addEventListener("close", function () { state.viewing = null; });
   // A click on the backdrop (outside the dialog box) closes it.

@@ -36,11 +36,20 @@
       <div class="pb-dropzone-hint">PNG, JPEG, WebP or GIF up to 15 MB. Paste works anywhere on this page.</div>
     </section>
 
+    <section class="pb-section pb-folders-section" aria-labelledby="pbFoldersHeading">
+      <div class="pb-section-head">
+        <h2 class="pb-section-title" id="pbFoldersHeading">Folders</h2>
+        <span class="pb-count" id="pbFolderCount"></span>
+        <span class="pb-folders-hint">Put a hashtag like <code>#BTC</code> in a label to file it in a folder.</span>
+      </div>
+      <div class="pb-folders" id="pbFolders" role="group" aria-label="Folders"></div>
+    </section>
+
     <section class="pb-section" aria-labelledby="pbHeading">
       <div class="pb-section-head">
         <h2 class="pb-section-title" id="pbHeading">Watching</h2>
         <span class="pb-count" id="pbCount">Loading…</span>
-        <input class="pb-search" id="pbSearch" type="search" placeholder="Filter by label" aria-label="Filter screenshots by label" />
+        <input class="pb-search" id="pbSearch" type="search" placeholder="Filter by label or #tag" aria-label="Filter screenshots by label" />
       </div>
       <div class="pb-grid" id="pbGrid" aria-live="polite"></div>
     </section>
@@ -78,6 +87,7 @@
       <div class="pb-viewer-label" id="pbViewerLabel"></div>
       <div class="pb-viewer-when" id="pbViewerWhen"></div>
     </div>
+    <button class="pb-btn" type="button" id="pbViewerCrop">Crop</button>
     <a class="pb-btn" id="pbViewerOpen" href="#" target="_blank" rel="noopener">Open original</a>
     <button class="pb-btn pb-btn-danger" type="button" id="pbViewerDelete">Delete</button>
     <button class="pb-btn" type="button" id="pbViewerClose" aria-label="Close">Close</button>
@@ -85,8 +95,37 @@
   <img class="pb-viewer-img" id="pbViewerImg" alt="" />
 </dialog>
 
+<dialog class="pb-crop" id="pbCrop" aria-labelledby="pbCropTitle">
+  <div class="pb-viewer-bar">
+    <div class="pb-viewer-meta">
+      <div class="pb-viewer-label" id="pbCropTitle">Crop screenshot</div>
+      <div class="pb-viewer-when" id="pbCropSize"></div>
+    </div>
+    <button class="pb-btn" type="button" id="pbCropClose" aria-label="Close">Close</button>
+  </div>
+  <div class="pb-crop-body">
+    <div class="pb-chips" id="pbCropAspects" role="group" aria-label="Aspect ratio"></div>
+    <div class="pb-crop-frame">
+      <div class="pb-crop-stage" id="pbCropStage">
+        <img id="pbCropImg" alt="Screenshot to crop" draggable="false" />
+        <div class="pb-crop-box" id="pbCropBox" role="group" aria-roledescription="crop area" tabindex="0" hidden>
+          <span class="pb-crop-grid" aria-hidden="true"></span>
+        </div>
+      </div>
+    </div>
+    <div class="pb-crop-hint" id="pbCropHint" role="status"></div>
+  </div>
+  <div class="pb-crop-foot">
+    <button class="pb-btn" type="button" id="pbCropReset">Reset</button>
+    <span class="pb-crop-spacer"></span>
+    <button class="pb-btn" type="button" id="pbCropCancel">Cancel</button>
+    <button class="pb-btn pb-btn-primary" type="button" id="pbCropApply">Apply crop</button>
+  </div>
+</dialog>
+
 <script src="/assets/js/sidebar.js"></script>
 <script src="/assets/js/ui.js"></script>
+<script src="/assets/js/crop-rect.js"></script>
 <script src="/assets/js/potential-buys.js"></script>
 </body>
 </html>
