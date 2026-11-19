@@ -22,10 +22,10 @@
   var workspace = [
     { href: "/terminal-suite.html", label: "Terminal Suite" },
     {
-      href: "/overview-v2",
+      href: "/",
       label: "Overview v2",
       children: [
-        { href: "/", label: "Overview" },
+        { href: "/overview-v1", label: "Overview" },
       ],
     },
     { href: "/reporter.html", label: "Reporter Room" },
@@ -240,7 +240,9 @@
 
   function currentPath() {
     var path = window.location.pathname || "/";
-    if (path === "/index.html") return "/";
+    // Overview v2 is served at / and its legacy URLs; v1 at /overview-v1 and /index.html.
+    if (path === "/overview-v2" || path === "/overview-v2.html") return "/";
+    if (path === "/index.html" || path === "/overview-v1.html") return "/overview-v1";
     // Single-concept and topic explainer pages belong to the Indicators Glossary.
     if (path === "/concept.html" || path === "/topic.html") return "/indicators.html";
     return path;
