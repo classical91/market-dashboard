@@ -68,6 +68,46 @@ function sniffImage(bytes) {
   return { kind: "unknown" };
 }
 
+/**
+ * Hashtags in a label are its folders: "#BTC breakout #crypto" files the
+ * screenshot under BTC and CRYPTO. A tag starts with a letter (so "#1" is not
+ * one) and is upper-cased, so #btc and #BTC are the same folder.
+ */
+const TAG_RE = /(^|[^\w&#])#([A-Za-z][A-Za-z0-9._-]{0,23})/g;
+
+function extractTags(label) {
+  if (typeof label !== "string" || !label) return [];
+  const tags = [];
+  for (const match of label.matchAll(TAG_RE)) {
+    const tag = match[2].replace(/[._-]+$/, "").toUpperCase();
+    if (tag && !tags.includes(tag)) tags.push(tag);
+  }
+  return tags;
+}
+
+/**
+ * One folder per hashtag: how many screenshots carry it and when the newest
+ * of them was added, relabelled or cropped. Sorted most recently updated
+ * first. Screenshots without a tag are counted as `untagged`.
+ */
+function buildFolders(items) {
+  const byTag = new Map();
+  let untagged = 0;
+  for (const item of items) {
+    const tags = item.tags || extractTags(item.label);
+    if (!tags.length) untagged += 1;
+    const touched = item.updatedAt || item.createdAt || 0;
+    for (const tag of tags) {
+      const folder = byTag.get(tag) || { tag, count: 0, updatedAt: 0 };
+      folder.count += 1;
+      folder.updatedAt = Math.max(folder.updatedAt, touched);
+      byTag.set(tag, folder);
+    }
+  }
+  const folders = [...byTag.values()].sort((a, b) => b.updatedAt - a.updatedAt || a.tag.localeCompare(b.tag));
+  return { folders, untagged };
+}
+
 function normalizeLabel(value) {
   if (value === undefined || value === null) return "";
   if (typeof value !== "string") throw httpError("label must be text", 400);
@@ -102,7 +142,12 @@ class PotentialBuysStore {
   }
 
   _present(item) {
-    return { ...item, url: `${this.urlPrefix}/${item.file}` };
+    return {
+      ...item,
+      updatedAt: item.updatedAt || item.createdAt,
+      tags: extractTags(item.label),
+      url: `${this.urlPrefix}/${item.file}`,
+    };
   }
 
   /** Every stored screenshot, newest first. */
@@ -113,8 +158,76 @@ class PotentialBuysStore {
       .map((item) => this._present(item));
   }
 
+  /** Hashtag folders with their counts and last-updated time. */
+  folders(items = this.list()) {
+    return buildFolders(items);
+  }
+
   /** Store one screenshot from its raw bytes. */
   add(bytes, { label } = {}) {
+    const sniffed = this._checkImage(bytes);
+    const cleanLabel = normalizeLabel(label);
+    return this._withLock(() => {
+      const items = this._read();
+      if (items.length >= MAX_ITEMS) {
+        throw httpError(`Potential Buys holds at most ${MAX_ITEMS} screenshots; delete some first.`, 409);
+      }
+      const createdAt = this.now();
+      const id = `${createdAt}-${crypto.randomBytes(4).toString("hex")}`;
+      const file = `${id}.${EXTENSIONS[sniffed.mimeType]}`;
+      fs.mkdirSync(this.dir, { recursive: true });
+      fs.writeFileSync(path.join(this.dir, file), bytes, { flag: "wx" });
+      const item = {
+        id, file, label: cleanLabel, mimeType: sniffed.mimeType, size: bytes.length, createdAt, updatedAt: createdAt,
+      };
+      try {
+        this._write([item, ...items]);
+      } catch (err) {
+        try { fs.unlinkSync(path.join(this.dir, file)); } catch {}
+        throw err;
+      }
+      return this._present(item);
+    });
+  }
+
+  /**
+   * Swap a screenshot's picture for a cropped version of it. The crop is
+   * saved under a new file name (images are served as immutable), and the
+   * old file is removed once the list points at the new one.
+   */
+  replaceImage(id, bytes) {
+    if (!isPotentialBuyId(id)) throw httpError("Unknown screenshot id.", 400);
+    const sniffed = this._checkImage(bytes);
+    return this._withLock(() => {
+      const items = this._read();
+      const item = items.find((entry) => entry.id === id);
+      if (!item) throw httpError("That screenshot is no longer in Potential Buys.", 404);
+      const updatedAt = Math.max(this.now(), (item.updatedAt || item.createdAt || 0) + 1);
+      const file = `${id}-c${updatedAt}-${crypto.randomBytes(2).toString("hex")}.${EXTENSIONS[sniffed.mimeType]}`;
+      fs.mkdirSync(this.dir, { recursive: true });
+      fs.writeFileSync(path.join(this.dir, file), bytes, { flag: "wx" });
+      const previousFile = item.file;
+      Object.assign(item, { file, mimeType: sniffed.mimeType, size: bytes.length, updatedAt, croppedAt: updatedAt });
+      try {
+        this._write(items);
+      } catch (err) {
+        try { fs.unlinkSync(path.join(this.dir, file)); } catch {}
+        throw err;
+      }
+      this._unlink(previousFile);
+      return this._present(item);
+    });
+  }
+
+  _unlink(file) {
+    try {
+      fs.unlinkSync(path.join(this.dir, file));
+    } catch (err) {
+      if (err.code !== "ENOENT") this.logger.error?.(`[PotentialBuys] Could not delete ${file}:`, err.message);
+    }
+  }
+
+  _checkImage(bytes) {
     if (!Buffer.isBuffer(bytes) || bytes.length === 0) {
       throw httpError("Send the screenshot's bytes as the request body (an image Content-Type).", 400);
     }
@@ -135,26 +248,7 @@ class PotentialBuysStore {
       );
     }
 
-    const cleanLabel = normalizeLabel(label);
-    return this._withLock(() => {
-      const items = this._read();
-      if (items.length >= MAX_ITEMS) {
-        throw httpError(`Potential Buys holds at most ${MAX_ITEMS} screenshots; delete some first.`, 409);
-      }
-      const createdAt = this.now();
-      const id = `${createdAt}-${crypto.randomBytes(4).toString("hex")}`;
-      const file = `${id}.${EXTENSIONS[sniffed.mimeType]}`;
-      fs.mkdirSync(this.dir, { recursive: true });
-      fs.writeFileSync(path.join(this.dir, file), bytes, { flag: "wx" });
-      const item = { id, file, label: cleanLabel, mimeType: sniffed.mimeType, size: bytes.length, createdAt };
-      try {
-        this._write([item, ...items]);
-      } catch (err) {
-        try { fs.unlinkSync(path.join(this.dir, file)); } catch {}
-        throw err;
-      }
-      return this._present(item);
-    });
+    return sniffed;
   }
 
   /** Change a screenshot's label (ticker, note). */
@@ -165,8 +259,11 @@ class PotentialBuysStore {
       const items = this._read();
       const item = items.find((entry) => entry.id === id);
       if (!item) throw httpError("That screenshot is no longer in Potential Buys.", 404);
-      item.label = cleanLabel;
-      this._write(items);
+      if (item.label !== cleanLabel) {
+        item.label = cleanLabel;
+        item.updatedAt = Math.max(this.now(), (item.updatedAt || item.createdAt || 0) + 1);
+        this._write(items);
+      }
       return this._present(item);
     });
   }
@@ -181,11 +278,7 @@ class PotentialBuysStore {
       this._write(items.filter((entry) => entry.id !== id));
       // The list is the source of truth: once the entry is gone the page no
       // longer shows it, so a leftover file is only wasted space, not a ghost.
-      try {
-        fs.unlinkSync(path.join(this.dir, item.file));
-      } catch (err) {
-        if (err.code !== "ENOENT") this.logger.error?.(`[PotentialBuys] Could not delete ${item.file}:`, err.message);
-      }
+      this._unlink(item.file);
       return { id };
     });
   }
@@ -195,6 +288,8 @@ module.exports = {
   PotentialBuysStore,
   isPotentialBuyId,
   sniffImage,
+  extractTags,
+  buildFolders,
   MAX_BYTES,
   MAX_LABEL_CHARS,
 };

@@ -7,10 +7,13 @@ const { MAX_BYTES } = require("../services/potential-buys");
 /**
  * Potential Buys — screenshots of stocks and tokens worth a closer look.
  *
- *   GET    /       every stored screenshot, newest first.
+ *   GET    /       every stored screenshot, newest first, plus `folders`:
+ *                  one per #hashtag in the labels ({ tag, count, updatedAt }).
  *   POST   /       one screenshot: the raw image bytes as the body, with an
  *                  image Content-Type. Optional `?label=` (ticker or note).
  *   PATCH  /:id    { label } — rename it.
+ *   PUT    /:id/image  the cropped picture (raw image bytes) replaces the
+ *                  stored one; id, label and folders stay the same.
  *   DELETE /:id    remove it for good.
  *   POST   /upload the iPhone Shortcut's route (Share Sheet → Potential
  *                  Buys). Ledger key in `x-broadcast-key` (or Authorization:
@@ -57,7 +60,9 @@ function createPotentialBuysRouter({ potentialBuysStore, requireLedgerKey, rateL
   router.get("/", (req, res, next) => {
     try {
       res.setHeader("Cache-Control", "no-store");
-      res.json({ items: potentialBuysStore.list() });
+      const items = potentialBuysStore.list();
+      const { folders, untagged } = potentialBuysStore.folders(items);
+      res.json({ items, folders, untagged });
     } catch (err) {
       next(err);
     }
@@ -77,6 +82,15 @@ function createPotentialBuysRouter({ potentialBuysStore, requireLedgerKey, rateL
     try {
       const item = potentialBuysStore.update(req.params.id, { label: req.body ? req.body.label : undefined });
       res.json({ item });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.put("/:id/image", imageBody, (req, res, next) => {
+    try {
+      const bytes = Buffer.isBuffer(req.body) ? req.body : null;
+      res.json({ item: potentialBuysStore.replaceImage(req.params.id, bytes) });
     } catch (err) {
       next(err);
     }
