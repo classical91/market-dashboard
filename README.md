@@ -35,6 +35,7 @@ The app is intentionally lightweight: no bundler, no frontend framework, and no 
 - `/local-extremes.html` - Local Extremes screener: whether price is stretched toward a possible local top or bottom, with bottom and top scored independently from Bollinger excursion, RSI extreme, divergence, liquidity sweep, volume climax and reversal confirmation. Direction and location are separate questions — a bullish bias and a confirmed local top are both legitimate at once. `/signal-screener.html` redirected here and to Directional Bias when the combined page was split.
 - `/rsi-matrix.html` - Multi-Timeframe RSI Matrix: RSI 14 on 1W / 1D / 4H / 1H for crypto, indices, commodities, FX, dominance and stablecoins, with an AVG row that flags MTF overbought (≥70) / oversold (≤30). See [RSI Matrix](#rsi-matrix).
 - `/tradehunter/market-matrix` (also `/market-matrix.html`) - Market Matrix: four interactive charts in a 2×2 split (TOTAL / DXY / BTC / USDT.D by default) for cross-market confirmation. See [Market Matrix](#market-matrix).
+- `/kucoin-live-trades.html` - KuCoin Live Trades (sidebar: TradeHunter → Live Trades): a real-time, read-only execution terminal for KuCoin spot and USDT perpetuals (BTC, ETH, SOL) — Time & Sales, whale prints, rolling buy/sell volume, delta, buy pressure, CVD and activity charts. One shared server-side KuCoin WebSocket per market, fanned out to browsers over Server-Sent Events. See [KuCoin Live Trades](#kucoin-live-trades) and [docs/kucoin-live-trades.md](docs/kucoin-live-trades.md).
 - `/decision.html` - Decision Engine: multi-asset regime score (BTC, breadth, SPY, QQQ, DXY, VIX, gold, oil, optional US10Y), asset-class rotation board, setup-quality ranking layered over the signal screener, execution levels (trigger / invalidation / target / R:R with explicit "do not trade" reasons), and a trading journal that grades whether the engine's calls were right.
 - `/potential-buys.html` - Potential Buys (under **Trades** in the sidebar): a holding area for screenshots of stocks and crypto tokens worth a closer look. Paste, drag and drop, or pick screenshots (PNG, JPEG, WebP, GIF up to 15 MB); give each an optional ticker/note label; they stay until deleted from the page. Images are saved in `DATA_DIR/potential-buys/` and the list in `DATA_DIR/potential-buys.json`, so they survive restarts on the Railway volume. API: `GET/POST /api/potential-buys` (POST takes the raw image bytes with an image Content-Type), `PATCH/DELETE /api/potential-buys/:id`. Behind the owner login like the other pages. **From the iPhone**: a Share Sheet Shortcut posts to `POST /api/potential-buys/upload` with `x-broadcast-key` (`BROADCAST_LEDGER_API_KEY`, the phone briefings key) and Request Body = File (add a Convert Image → JPEG step first, since camera photos are HEIC); optional `?label=`. That key can only add screenshots — listing, relabelling, deleting and viewing still need the login. Step-by-step setup is on the page under *Send screenshots from your iPhone*.
 - `/trading-lab.html` - Trading Lab: paper execution with real TP1/TP2 scale-outs, ATR risk sizing, kill switches, a historical edge gate that scores every Decision Engine plan against how setups like it have actually performed, and bar-replay backtesting over the same engine. See [docs/trading-lab.md](docs/trading-lab.md).
@@ -470,6 +471,16 @@ The Overview card reads `GET /api/onchain/intelligence`, which wraps DefiLlama's
 - **Workspace** - per-panel symbol and timeframe (5m · 15m · 30m · 1H · 4H · 1D · 1W, default 1H), Sync timeframes, fullscreen and Reset layout. The workspace is stored in the browser (`localStorage`), not on the server. Panels publish crosshair and visible-range events on `window.MarketMatrix.bus` so synchronised crosshairs can be added later.
 - **Caching** - series are cached per source + symbol + timeframe for 20 s – 5 min depending on timeframe (sampled series 60 s, failures 30 s). No new environment variables.
 
+### KuCoin Live Trades
+
+`/kucoin-live-trades.html` (sidebar: TradeHunter → Live Trades, kept outside Screeners because it is an execution tape, not a directional screener) reads `GET /api/kucoin-live-trades/stream?market=spot|futures&asset=BTC|ETH|SOL` (Server-Sent Events), plus `/snapshot`, `/symbols` and `/status`. Code lives in `src/services/kucoin-live-trades/`. Full architecture, formulas and limitations: [docs/kucoin-live-trades.md](docs/kucoin-live-trades.md).
+
+- **Source** - KuCoin's public market-data WebSockets (`wss://x-push-spot.kucoin.com`, `wss://x-push-futures.kucoin.com`, `trade` channel). No API key; nothing can trade or touch an account. The server opens at most one socket per market, only while someone is watching, and `server.js` starts the service (never `createApp()`).
+- **Symbols** - resolved from `GET https://api.kucoin.com/api/ua/v2/market/instrument`: BTC → `BTC-USDT` / `XBTUSDTM`. Futures quantity is contracts; notional uses the exchange's multiplier (0.001 BTC, 0.01 ETH, 0.1 SOL per contract at the time of writing).
+- **Accuracy** - nanosecond times and 17-digit ids are parsed without rounding; notional uses exact decimal products; side is KuCoin's documented taker side (cross-checked against REST by `scripts/kucoin-live-trades-smoke.js`).
+- **Honest windows** - 1m/5m/15m figures are marked partial until the server has been subscribed for the whole window without a reconnect. CVD is labelled with its session, restarts on market/pair change or Reset, and covers KuCoin only.
+- `KUCOIN_LIVE_TRADES_ENABLED` (default `true`), `KUCOIN_SPOT_WS_URL`, `KUCOIN_FUTURES_WS_URL`, `KUCOIN_REST_BASE_URL`, `KUCOIN_LIVE_TRADES_STALE_AFTER_MS` (default 30 s), `KUCOIN_LIVE_TRADES_MAX_CLIENTS` (default 200). Uses Node's built-in `WebSocket` (Node 22+) or the `ws` package on older runtimes; behind an outbound proxy run Node ≥ 22.21 with `NODE_USE_ENV_PROXY=1`.
+
 ### YouTube Intelligence
 
 `/youtube-v2.html` runs on a hybrid of the YouTube Data API v3 and YouTube's public RSS feeds. Per channel the service tries the API first (uploads plus live/upcoming state), falls back to RSS (uploads only, no key, but it needs a known `UC...` channel ID), and finally serves the last known good feed rather than blanking the page. It never scrapes `youtube.com/@handle` HTML — doing that is what used to break the page on Railway, where YouTube answers datacenter IPs with a consent interstitial instead of the channel document.
@@ -562,12 +573,15 @@ market-dashboard/
       screener-settings.js  read the token matrix; admin-gated writes
       rsi-matrix.js       RSI Matrix + its settings; admin-gated writes
       market-matrix.js    TradeHunter Market Matrix chart feeds (read-only)
+      kucoin-live-trades.js  KuCoin Live Trades: status, symbols, snapshot, SSE stream
     services/             provider clients and aggregation
       signal-screener.js  the confluence engine behind both screener pages
       screener-settings.js  which tokens each screener scans (DATA_DIR-backed)
       rsi-matrix-settings.js  RSI Matrix instruments/timeframes (DATA_DIR-backed)
       rsi-matrix/         multi-provider candles + RSI Matrix engine
       market-matrix.js    candles for the four-chart Market Matrix page
+      kucoin-live-trades/ shared KuCoin public WebSockets, trade normalizer,
+                          rolling order-flow aggregator, SSE fan-out
       local-extreme-engine.js  independent local top/bottom scoring
       screener-projections.js  reshapes one cached scan for either page
       trade-context.js    combines bias + extremes + patterns per tracked pair
@@ -595,10 +609,12 @@ market-dashboard/
     trading-lab.md        migration map and remaining work
     broadcast-ledger.md   receipt ledger: data model, endpoints, integrations
     reporter-news-log.md  reporter news log: intake contract, workflow, FarmBot linkage
+    kucoin-live-trades.md KuCoin Live Trades: protocol, formulas, limits, smoke checklist
   scripts/
     lint.js
     build-check.js
     traderclaw-parity.js  JS vs Python engine comparison
+    kucoin-live-trades-smoke.js  live KuCoin feed check (WS vs REST)
   .github/workflows/ci.yml
   AGENTS.md
 ```

@@ -1,0 +1,288 @@
+/* ─────────────────────────────────────────────────────────
+   KuCoin Live Trades Terminal — page chrome.
+   Uses the shared dark tokens from command.css (--green, --red, --blue,
+   --amber, --muted, --border); selects and the "How this page works"
+   footer come from ai-analysis.css.
+───────────────────────────────────────────────────────── */
+
+.klt-main { min-width: 0; }
+/* Component display rules below must not defeat the hidden attribute. */
+.klt-main [hidden] { display: none !important; }
+
+.klt-header { flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.klt-title-block { min-width: 0; }
+
+.klt-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.klt-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted, #8492aa);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.klt-num { width: 110px; }
+
+.klt-segment {
+  display: inline-flex;
+  border: 1px solid var(--border-hover, rgba(255,255,255,0.16));
+  border-radius: 8px;
+  overflow: hidden;
+}
+.klt-seg-btn {
+  background: transparent;
+  color: var(--soft, #aab7cf);
+  border: 0;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  min-height: 32px;
+}
+.klt-seg-btn + .klt-seg-btn { border-left: 1px solid var(--border-hover, rgba(255,255,255,0.16)); }
+.klt-seg-btn.is-active { background: var(--blue-bg, rgba(77,163,255,0.12)); color: #fff; }
+.klt-seg-btn:hover { color: #fff; }
+
+.klt-btn {
+  background: rgba(255,255,255,0.04);
+  color: var(--text, #edf3ff);
+  border: 1px solid var(--border-hover, rgba(255,255,255,0.16));
+  border-radius: 8px;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  min-height: 32px;
+}
+.klt-btn:hover { border-color: var(--blue, #4da3ff); }
+.klt-btn[aria-pressed="true"] { background: var(--purple-bg, rgba(155,123,255,0.12)); border-color: var(--purple, #9b7bff); }
+.klt-btn--sm { padding: 2px 8px; font-size: 11px; min-height: 24px; }
+
+.klt-seg-btn:focus-visible,
+.klt-btn:focus-visible,
+.klt-table-wrap:focus-visible {
+  outline: 2px solid var(--blue, #4da3ff);
+  outline-offset: 2px;
+}
+
+/* ── Status bar ─────────────────────────────────────────── */
+.klt-statusbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--soft, #aab7cf);
+  font-variant-numeric: tabular-nums;
+}
+.klt-stat-label { color: var(--muted, #8492aa); font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; }
+.klt-stat--msg { color: var(--muted, #8492aa); flex: 1 1 220px; }
+
+.klt-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid currentColor;
+}
+.klt-pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.klt-pill--live { color: var(--green, #00e396); background: var(--green-bg, rgba(0,227,150,0.12)); }
+.klt-pill--live::before { animation: klt-pulse 1.6s ease-in-out infinite; }
+.klt-pill--warn { color: var(--amber, #f5c542); background: var(--amber-bg, rgba(245,197,66,0.12)); }
+.klt-pill--error { color: var(--red, #ff4d6d); background: var(--red-bg, rgba(255,77,109,0.12)); }
+.klt-pill--connecting { color: var(--blue, #4da3ff); background: var(--blue-bg, rgba(77,163,255,0.12)); }
+.klt-pill--paused { color: var(--purple, #9b7bff); background: var(--purple-bg, rgba(155,123,255,0.12)); }
+@keyframes klt-pulse { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .klt-pill--live::before { animation: none; } }
+
+.klt-notice {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-hover, rgba(255,255,255,0.16));
+  font-size: 12px;
+}
+.klt-notice--error { border-color: rgba(255,77,109,0.45); color: #ff9bab; background: rgba(255,77,109,0.06); }
+.klt-notice--warn { border-color: rgba(245,197,66,0.4); color: #ffd36b; background: rgba(245,197,66,0.05); }
+
+/* ── KPI row ────────────────────────────────────────────── */
+.klt-kpis {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.klt-kpi,
+.klt-card {
+  background: var(--panel, #0f1524);
+  border: 1px solid var(--border, rgba(255,255,255,0.08));
+  border-radius: 12px;
+  min-width: 0;
+}
+.klt-kpi { padding: 10px 12px; }
+.klt-kpi-label { font-size: 10px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted, #8492aa); }
+.klt-kpi-value { margin-top: 4px; font-size: 19px; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.klt-kpi-sub { margin-top: 3px; font-size: 11px; line-height: 1.45; color: var(--muted, #8492aa); font-variant-numeric: tabular-nums; }
+.klt-kpi[data-tone="buy"] .klt-kpi-value { color: var(--green, #00e396); }
+.klt-kpi[data-tone="sell"] .klt-kpi-value { color: var(--red, #ff4d6d); }
+.klt-partial { display: inline-block; margin-left: 2px; padding: 0 5px; border-radius: 4px; color: var(--amber, #f5c542); border: 1px solid rgba(245,197,66,0.35); font-size: 10px; white-space: nowrap; }
+
+/* ── Main grid: tape | whales ───────────────────────────── */
+.klt-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.klt-card { padding: 12px; display: flex; flex-direction: column; }
+.klt-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.klt-card-title { margin: 0; font-size: 13px; font-weight: 800; color: #fff; }
+.klt-card-tag { font-size: 10px; color: var(--muted, #8492aa); border: 1px solid rgba(137,146,166,0.3); border-radius: 5px; padding: 1px 6px; font-variant-numeric: tabular-nums; }
+
+.klt-tape-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; }
+.klt-export { display: inline-flex; gap: 6px; margin-left: auto; }
+
+.klt-paused-banner {
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  color: #cdbfff;
+  background: var(--purple-bg, rgba(155,123,255,0.12));
+  border: 1px solid rgba(155,123,255,0.35);
+}
+
+.klt-table-wrap {
+  height: 520px;
+  overflow: auto;
+  border: 1px solid var(--border, rgba(255,255,255,0.08));
+  border-radius: 8px;
+  overscroll-behavior: contain;
+}
+.klt-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.klt-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--panel, #0f1524);
+  color: var(--muted, #8492aa);
+  font-family: system-ui, sans-serif;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-align: left;
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--border-hover, rgba(255,255,255,0.16));
+  white-space: nowrap;
+}
+.klt-table td { padding: 3px 8px; border-bottom: 1px solid rgba(255,255,255,0.03); white-space: nowrap; }
+.klt-table .num { text-align: right; }
+.klt-time { color: var(--soft, #aab7cf); }
+.klt-row--buy td:nth-child(2) { color: var(--green, #00e396); }
+.klt-row--sell td:nth-child(2) { color: var(--red, #ff4d6d); }
+.klt-row.is-large { background: rgba(245,197,66,0.07); }
+.klt-row.is-large td { font-weight: 700; }
+.klt-row.is-huge { background: rgba(245,197,66,0.16); box-shadow: inset 3px 0 0 var(--amber, #f5c542); }
+.klt-empty td,
+li.klt-empty { font-size: 12px; padding: 18px 8px; text-align: center; color: var(--muted, #8492aa); font-family: system-ui, sans-serif; list-style: none; }
+
+.klt-side { display: inline-block; min-width: 34px; text-align: center; padding: 0 5px; border-radius: 4px; font-size: 10px; font-weight: 800; text-transform: uppercase; font-family: system-ui, sans-serif; }
+.klt-side--buy { color: var(--green, #00e396); background: var(--green-bg, rgba(0,227,150,0.12)); }
+.klt-side--sell { color: var(--red, #ff4d6d); background: var(--red-bg, rgba(255,77,109,0.12)); }
+
+.klt-note { margin: 6px 0 8px; font-size: 11px; line-height: 1.5; color: var(--muted, #8492aa); }
+
+.klt-whale-list { list-style: none; margin: 0; padding: 0; overflow: auto; max-height: 470px; font-variant-numeric: tabular-nums; }
+.klt-whale {
+  display: grid;
+  grid-template-columns: auto auto auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  font-size: 12px;
+}
+.klt-whale-time { color: var(--soft, #aab7cf); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.klt-whale-sym { color: var(--muted, #8492aa); font-size: 11px; }
+.klt-whale-notional { text-align: right; font-weight: 800; color: #fff; }
+.klt-whale--buy .klt-whale-notional { color: var(--green, #00e396); }
+.klt-whale--sell .klt-whale-notional { color: var(--red, #ff4d6d); }
+.klt-whale-price { color: var(--muted, #8492aa); font-size: 11px; }
+
+/* ── Order flow ─────────────────────────────────────────── */
+.klt-flow { margin-bottom: 14px; }
+.klt-coverage { font-size: 12px; color: var(--soft, #aab7cf); margin-bottom: 10px; }
+.klt-coverage.is-partial { color: var(--amber, #f5c542); }
+.klt-pressure { height: 8px; border-radius: 999px; background: var(--red, #ff4d6d); overflow: hidden; margin-bottom: 10px; }
+.klt-pressure-buy { display: block; height: 100%; background: var(--green, #00e396); transition: width 0.4s ease; }
+.klt-flow-stats { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; margin: 0 0 12px; }
+.klt-flow-item { min-width: 0; }
+.klt-flow-item dt { font-size: 10px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted, #8492aa); }
+.klt-flow-item dd { margin: 2px 0 0; font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums; color: #fff; }
+.klt-flow-item dd[data-tone="buy"] { color: var(--green, #00e396); }
+.klt-flow-item dd[data-tone="sell"] { color: var(--red, #ff4d6d); }
+
+.klt-charts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.klt-chart { margin: 0; min-width: 0; border: 1px solid var(--border, rgba(255,255,255,0.08)); border-radius: 8px; padding: 8px; }
+.klt-chart figcaption { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 11px; font-weight: 800; color: var(--soft, #aab7cf); margin-bottom: 6px; }
+.klt-chart-unit { font-weight: 600; color: var(--muted, #8492aa); }
+.klt-chart-actions { margin-left: auto; display: inline-flex; gap: 6px; }
+.klt-chart canvas { display: block; width: 100%; height: 160px; }
+.klt-chart-note { margin-top: 4px; font-size: 11px; color: var(--muted, #8492aa); }
+
+.klt-sr {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0);
+  white-space: nowrap; border: 0;
+}
+
+/* ── Responsive ─────────────────────────────────────────── */
+@media (max-width: 1280px) {
+  .klt-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .klt-flow-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (max-width: 1024px) {
+  .klt-grid { grid-template-columns: 1fr; }
+  .klt-table-wrap { height: 440px; }
+  .klt-whale-list { max-height: 360px; }
+}
+@media (max-width: 640px) {
+  .klt-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .klt-kpi-value { font-size: 16px; }
+  .klt-charts { grid-template-columns: 1fr; }
+  .klt-flow-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .klt-controls { width: 100%; }
+  .klt-export { margin-left: 0; }
+  .klt-table { font-size: 11px; }
+  .klt-table td, .klt-table thead th { padding-left: 5px; padding-right: 5px; }
+  .klt-table-wrap { height: 380px; }
+  .klt-whale { grid-template-columns: auto auto 1fr; }
+  .klt-whale-sym, .klt-whale-price { display: none; }
+  .klt-btn, .klt-seg-btn, .aia-select { min-height: 36px; }
+}
