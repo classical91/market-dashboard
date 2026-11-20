@@ -30,6 +30,7 @@ const { createDirectionalBiasRouter } = require("./routes/directional-bias");
 const { createLocalExtremesRouter } = require("./routes/local-extremes");
 const { createOpenInterestRouter } = require("./routes/open-interest");
 const { createCrossMarketOiRouter } = require("./routes/cross-market-oi");
+const { createKucoinLiveTradesRouter } = require("./routes/kucoin-live-trades");
 const { createScreenerSettingsRouter } = require("./routes/screener-settings");
 const { createRsiMatrixRouter } = require("./routes/rsi-matrix");
 const { createMarketMatrixRouter } = require("./routes/market-matrix");
@@ -86,6 +87,8 @@ const { SignalScreenerService } = require("./services/signal-screener");
 const { OpenInterestService } = require("./services/open-interest/service");
 const { createProviders: createOpenInterestProviders } = require("./services/open-interest/providers");
 const { CrossMarketOiService } = require("./services/cross-market-oi/service");
+const { KucoinLiveTradesService } = require("./services/kucoin-live-trades/service");
+const { KucoinInstrumentRegistry } = require("./services/kucoin-live-trades/instruments");
 const { CftcCotProvider } = require("./services/cross-market-oi/cftc-provider");
 const { DatabentoDailyOiProvider } = require("./services/cross-market-oi/databento-provider");
 const { ScreenerSettingsService } = require("./services/screener-settings");
@@ -727,6 +730,16 @@ function createApp() {
   app.use("/api/local-extremes", createLocalExtremesRouter({ signalScreenerService, screenerSettingsService }));
   app.use("/api/open-interest", createOpenInterestRouter({ openInterestService }));
   app.use("/api/cross-market-oi", createCrossMarketOiRouter({ crossMarketOiService }));
+  // Constructed here, started by server.js: no socket or timer exists until
+  // start() runs, so tests and the build check stay timer-free.
+  const kucoinLiveTradesService = new KucoinLiveTradesService({
+    enabled: config.kucoinLiveTrades.enabled,
+    instruments: new KucoinInstrumentRegistry({ baseUrl: config.kucoinLiveTrades.restBaseUrl }),
+    urls: { spot: config.kucoinLiveTrades.spotWsUrl, futures: config.kucoinLiveTrades.futuresWsUrl },
+    staleAfterMs: config.kucoinLiveTrades.staleAfterMs,
+    maxClients: config.kucoinLiveTrades.maxClients,
+  });
+  app.use("/api/kucoin-live-trades", createKucoinLiveTradesRouter({ kucoinLiveTradesService }));
   // Settings owns the universes above. Reads are open like the screeners
   // themselves; writes take the browser-management guard (owner session or
   // admin key), the same one the X Intelligence registry uses.
@@ -899,6 +912,7 @@ function createApp() {
   app.locals.liveResearch = liveResearchService;
   app.locals.rsiMatrix = rsiMatrixService;
   app.locals.farmclawPusher = farmclawPusher;
+  app.locals.kucoinLiveTrades = kucoinLiveTradesService;
 
   return app;
 }

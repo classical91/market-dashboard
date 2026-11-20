@@ -83,7 +83,7 @@ test("TradeHunter sits above AI Analysis and owns the scanner workflow", () => {
 
   assert.ok(tradeHunterStart > -1, "TradeHunter is missing");
   assert.ok(aiAnalysisStart > tradeHunterStart, "TradeHunter must sit above AI Analysis");
-  const labels = ["Screeners", "Directional Bias", "Local Extremes", "Pattern Scanner", "Crypto Open Interest", "Cross-Market Open Interest", "Track Record"];
+  const labels = ["Screeners", "Directional Bias", "Local Extremes", "Pattern Scanner", "Crypto Open Interest", "Cross-Market Open Interest", "Market Matrix", "Live Trades", "Track Record"];
   let cursor = -1;
   for (const label of labels) {
     const next = tradeHunter.indexOf(`label: "${label}"`, cursor + 1);
@@ -109,6 +109,9 @@ test("the Screeners group holds one entry per screener and no combined page", ()
   assert.match(menu, /href: "\/cross-market-oi\.html", label: "Cross-Market Open Interest"/);
   assert.doesNotMatch(sidebar, /label: "Signal Screener"/);
   // Future screeners join this group; none of them may ship as a dead link yet.
+  // Live Trades is an execution tape, not a directional screener: it follows
+  // the Screeners group's closing entry (Market Matrix), not inside it.
+  assert.doesNotMatch(menu.slice(0, menu.indexOf('href: "/tradehunter/market-matrix"')), /kucoin-live-trades/);
   for (const unbuilt of ["Derivatives", "Volatility", "Relative Strength"]) {
     assert.doesNotMatch(menu, new RegExp(`label: "${unbuilt}"`), `${unbuilt} is not built yet`);
   }

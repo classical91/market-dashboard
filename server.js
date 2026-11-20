@@ -6,7 +6,7 @@ const { resolveDataDir } = require("./src/utils/data-dir");
 
 const app = createApp();
 
-app.listen(config.port, () => {
+const server = app.listen(config.port, () => {
   console.log(`Market Intel running on port ${config.port}`);
   console.log(`Persistent data directory: ${resolveDataDir()}`);
   app.locals.newsBatchRequests.start();
@@ -40,4 +40,21 @@ app.listen(config.port, () => {
   } else {
     console.log("[FarmclawPusher] Off: FarmClaw taps only queue (set FARMCLAW_OPENCLAW_HOOKS_URL and FARMCLAW_OPENCLAW_HOOK_TOKEN)");
   }
+  // KuCoin Live Trades: the shared upstream sockets and the SSE batching /
+  // watchdog timers start here, never in createApp().
+  if (app.locals.kucoinLiveTrades) app.locals.kucoinLiveTrades.start();
 });
+
+// Close the KuCoin sockets and end open SSE streams on shutdown, so a
+// redeploy does not leave half-open upstream connections behind.
+let shuttingDown = false;
+function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`[Server] ${signal} received, shutting down`);
+  try { if (app.locals.kucoinLiveTrades) app.locals.kucoinLiveTrades.stop(); } catch (err) { console.error(err); }
+  server.close(() => process.exit(0));
+  setTimeout(() => process.exit(0), 5000).unref();
+}
+process.once("SIGTERM", () => shutdown("SIGTERM"));
+process.once("SIGINT", () => shutdown("SIGINT"));

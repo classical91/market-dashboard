@@ -79,6 +79,9 @@
         // Not a screener: four live charts side by side (TOTAL / DXY / BTC /
         // USDT.D by default) for cross-market confirmation.
         { href: "/tradehunter/market-matrix", label: "Market Matrix" },
+        // Not a screener either: a real-time KuCoin execution tape (Time &
+        // Sales, large prints, order flow) for spot and USDT perpetuals.
+        { href: "/kucoin-live-trades.html", label: "Live Trades" },
         { href: "/pattern-scanner-stats.html", label: "Track Record" },
       ],
     },

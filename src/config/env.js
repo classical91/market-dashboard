@@ -338,6 +338,18 @@ const config = {
     requestTimeoutMs: parseNumber(process.env.OPEN_INTEREST_REQUEST_TIMEOUT_MS, 8000),
     venueCooldownMs: parseNumber(process.env.OPEN_INTEREST_VENUE_COOLDOWN_MS, 5 * 60 * 1000),
   },
+  // KuCoin Live Trades Terminal (TradeHunter → Live Trades). Public, keyless
+  // market-data WebSockets only; nothing here can authenticate or trade.
+  // Upstream sockets open on demand when a browser watches a feed, and only
+  // after server.js calls start().
+  kucoinLiveTrades: {
+    enabled: process.env.KUCOIN_LIVE_TRADES_ENABLED !== "false",
+    restBaseUrl: process.env.KUCOIN_REST_BASE_URL || "https://api.kucoin.com",
+    spotWsUrl: process.env.KUCOIN_SPOT_WS_URL || "wss://x-push-spot.kucoin.com",
+    futuresWsUrl: process.env.KUCOIN_FUTURES_WS_URL || "wss://x-push-futures.kucoin.com",
+    staleAfterMs: parseNumber(process.env.KUCOIN_LIVE_TRADES_STALE_AFTER_MS, 30 * 1000),
+    maxClients: parseNumber(process.env.KUCOIN_LIVE_TRADES_MAX_CLIENTS, 200),
+  },
   // Cross-Market Open Interest page. CFTC Public Reporting (Socrata) is free
   // and keyless; CFTC_APP_TOKEN only raises the anonymous rate limit and is
   // sent server-side.

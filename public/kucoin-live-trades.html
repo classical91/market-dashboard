@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KuCoin Live Trades · Market Command</title>
+  <script src="/assets/js/settings.js"></script>
+  <link rel="stylesheet" href="/assets/styles/command.css" />
+  <link rel="stylesheet" href="/assets/styles/ai-analysis.css" />
+  <link rel="stylesheet" href="/assets/styles/kucoin-live-trades.css" />
+</head>
+<body>
+<div class="app">
+  <aside class="cmd-sidebar"></aside>
+  <main class="cmd-main klt-main" id="klt-root">
+
+    <div class="cmd-page-header klt-header">
+      <div class="klt-title-block">
+        <div class="cmd-page-title">&#9889; KuCoin Live Trades</div>
+        <div class="cmd-page-subtitle">Real-time public executions from KuCoin &mdash; Time &amp; Sales, large prints and order flow. Read-only.</div>
+      </div>
+      <div class="klt-controls" role="toolbar" aria-label="Live trades controls">
+        <div class="klt-segment" role="group" aria-label="Market type">
+          <button type="button" class="klt-seg-btn is-active" data-market="spot" aria-pressed="true">Spot</button>
+          <button type="button" class="klt-seg-btn" data-market="futures" aria-pressed="false">Futures</button>
+        </div>
+        <label class="klt-field">Pair
+          <select class="aia-select" id="klt-pair" aria-label="Trading pair">
+            <option value="BTC">BTC</option>
+            <option value="ETH">ETH</option>
+            <option value="SOL">SOL</option>
+          </select>
+        </label>
+        <button type="button" class="klt-btn" id="klt-pause" aria-pressed="false">&#10074;&#10074; Pause display</button>
+      </div>
+    </div>
+
+    <div class="klt-statusbar" aria-label="Feed status">
+      <span class="klt-pill klt-pill--connecting" id="klt-conn" role="status" aria-live="polite">Connecting&hellip;</span>
+      <span class="klt-pill klt-pill--paused" id="klt-paused-pill" hidden>Display paused &middot; feed still live</span>
+      <span class="klt-stat"><span class="klt-stat-label">Symbol</span> <span id="klt-symbol">&mdash;</span></span>
+      <span class="klt-stat"><span class="klt-stat-label">Last trade</span> <span id="klt-last-time">&mdash;</span></span>
+      <span class="klt-stat"><span class="klt-stat-label">Rate</span> <span id="klt-rate">&mdash;</span></span>
+      <span class="klt-stat klt-stat--msg" id="klt-conn-msg"></span>
+    </div>
+
+    <div class="klt-notice" id="klt-notice" role="alert" hidden></div>
+
+    <!-- Market summary: every figure is computed from KuCoin executions this server received. -->
+    <section class="klt-kpis" aria-label="Market summary, rolling 5 minutes">
+      <article class="klt-kpi" id="kpi-price"><div class="klt-kpi-label">Latest price</div><div class="klt-kpi-value">&mdash;</div><div class="klt-kpi-sub">Waiting for the first trade</div></article>
+      <article class="klt-kpi" id="kpi-buy"><div class="klt-kpi-label">Buy volume &middot; 5m</div><div class="klt-kpi-value">&mdash;</div><div class="klt-kpi-sub"></div></article>
+      <article class="klt-kpi" id="kpi-sell"><div class="klt-kpi-label">Sell volume &middot; 5m</div><div class="klt-kpi-value">&mdash;</div><div class="klt-kpi-sub"></div></article>
+      <article class="klt-kpi" id="kpi-ratio"><div class="klt-kpi-label">Buy / sell ratio &middot; 5m</div><div class="klt-kpi-value">&mdash;</div><div class="klt-kpi-sub"></div></article>
+      <article class="klt-kpi" id="kpi-delta"><div class="klt-kpi-label">Net volume delta &middot; 5m</div><div class="klt-kpi-value">&mdash;</div><div class="klt-kpi-sub"></div></article>
+      <article class="klt-kpi" id="kpi-largest"><div class="klt-kpi-label">Largest trade &middot; 5m</div><div class="klt-kpi-value">&mdash;</div><div class="klt-kpi-sub"></div></article>
+    </section>
+
+    <div class="klt-grid">
+      <!-- Time & Sales -->
+      <section class="klt-card klt-tape" aria-labelledby="klt-tape-title">
+        <div class="klt-card-head">
+          <h2 class="klt-card-title" id="klt-tape-title">Live Trades</h2>
+          <span class="klt-card-tag" id="klt-tape-count">0 shown</span>
+        </div>
+        <div class="klt-tape-controls">
+          <label class="klt-field">Min value (USDT)
+            <input class="aia-select klt-num" type="number" id="klt-min-value" min="0" step="100" value="0" inputmode="decimal" aria-describedby="klt-min-help" />
+          </label>
+          <span class="klt-sr" id="klt-min-help">Hide trades whose notional value is below this many USDT</span>
+          <label class="klt-field">Rows
+            <select class="aia-select" id="klt-rows" aria-label="Rows kept in the table">
+              <option value="100">100</option>
+              <option value="200" selected>200</option>
+              <option value="500">500</option>
+            </select>
+          </label>
+          <div class="klt-export">
+            <button type="button" class="klt-btn" id="klt-export-visible">CSV: visible</button>
+            <button type="button" class="klt-btn" id="klt-export-buffer">CSV: buffered</button>
+          </div>
+        </div>
+        <div class="klt-paused-banner" id="klt-paused-banner" hidden role="status"></div>
+        <div class="klt-table-wrap" tabindex="0" aria-label="Live trades table, newest first">
+          <table class="klt-table">
+            <caption class="klt-sr">KuCoin executions, newest first. Side is the taker (aggressor) side.</caption>
+            <thead>
+              <tr><th scope="col">Time</th><th scope="col" class="num">Price</th><th scope="col" class="num" id="klt-qty-head">Quantity</th><th scope="col" class="num">Value (USDT)</th><th scope="col">Side</th></tr>
+            </thead>
+            <tbody id="klt-tape-body">
+              <tr class="klt-empty"><td colspan="5">Connecting to the live feed&hellip;</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Whale trades -->
+      <section class="klt-card klt-whales" aria-labelledby="klt-whale-title">
+        <div class="klt-card-head">
+          <h2 class="klt-card-title" id="klt-whale-title">Whale Trades</h2>
+          <span class="klt-card-tag" id="klt-whale-count">0</span>
+        </div>
+        <div class="klt-tape-controls">
+          <label class="klt-field">Threshold
+            <select class="aia-select" id="klt-whale-threshold" aria-label="Large trade threshold">
+              <option value="10000" selected>$10,000+</option>
+              <option value="50000">$50,000+</option>
+              <option value="100000">$100,000+</option>
+              <option value="500000">$500,000+</option>
+              <option value="custom">Custom</option>
+            </select>
+          </label>
+          <label class="klt-field" id="klt-whale-custom-wrap" hidden>USDT
+            <input class="aia-select klt-num" type="number" id="klt-whale-custom" min="1" step="1000" value="250000" inputmode="decimal" aria-label="Custom large trade threshold in USDT" />
+          </label>
+        </div>
+        <p class="klt-note">Large public executions on KuCoin. They are not proof of an identifiable whale wallet: one order can fill as several prints, and several accounts can share one print size.</p>
+        <ol class="klt-whale-list" id="klt-whale-list" aria-live="off">
+          <li class="klt-empty">No large trades yet this session.</li>
+        </ol>
+      </section>
+    </div>
+
+    <!-- Order flow analytics -->
+    <section class="klt-card klt-flow" aria-labelledby="klt-flow-title">
+      <div class="klt-card-head">
+        <h2 class="klt-card-title" id="klt-flow-title">Order Flow Analytics</h2>
+        <div class="klt-segment" role="group" aria-label="Calculation window">
+          <button type="button" class="klt-seg-btn" data-window="1m" aria-pressed="false">1m</button>
+          <button type="button" class="klt-seg-btn is-active" data-window="5m" aria-pressed="true">5m</button>
+          <button type="button" class="klt-seg-btn" data-window="15m" aria-pressed="false">15m</button>
+        </div>
+      </div>
+      <div class="klt-coverage" id="klt-coverage" role="status">No history yet.</div>
+      <div class="klt-flow-summary" id="klt-flow-summary">
+        <div class="klt-pressure" aria-hidden="true"><span class="klt-pressure-buy" id="klt-pressure-buy" style="width:50%"></span></div>
+        <dl class="klt-flow-stats" id="klt-flow-stats"></dl>
+      </div>
+      <div class="klt-charts">
+        <figure class="klt-chart">
+          <figcaption>Buy vs sell volume per minute <span class="klt-chart-unit">USDT</span></figcaption>
+          <canvas id="klt-chart-volume" height="160" role="img" aria-label="Aggressive buy and sell notional per minute"></canvas>
+        </figure>
+        <figure class="klt-chart">
+          <figcaption>
+            Cumulative volume delta <span class="klt-chart-unit" id="klt-cvd-unit">USDT</span>
+            <span class="klt-chart-actions">
+              <button type="button" class="klt-btn klt-btn--sm" id="klt-cvd-units" aria-pressed="false">Show in base</button>
+              <button type="button" class="klt-btn klt-btn--sm" id="klt-cvd-reset">Reset CVD</button>
+            </span>
+          </figcaption>
+          <canvas id="klt-chart-cvd" height="160" role="img" aria-label="Cumulative volume delta for this session"></canvas>
+          <div class="klt-chart-note" id="klt-cvd-note"></div>
+        </figure>
+        <figure class="klt-chart">
+          <figcaption>Trades per minute</figcaption>
+          <canvas id="klt-chart-tpm" height="160" role="img" aria-label="Trades per minute"></canvas>
+        </figure>
+        <figure class="klt-chart">
+          <figcaption>Large-trade timeline <span class="klt-chart-unit" id="klt-timeline-unit">&ge; $10,000</span></figcaption>
+          <canvas id="klt-chart-large" height="160" role="img" aria-label="Large trades over time, sized by notional"></canvas>
+        </figure>
+      </div>
+      <p class="klt-note">Charts show the minutes this server has observed (up to 60). The current minute is still filling and is drawn lighter; the first minute of a session is usually partial too.</p>
+    </section>
+
+    <details class="aia-how aia-how--footer">
+      <summary>&#8505;&#65039; How this page works</summary>
+      <div class="aia-how-body">
+        <ol class="aia-how-steps">
+          <li><strong>One shared feed.</strong> The server holds one KuCoin public WebSocket per market (<code>wss://x-push-spot.kucoin.com</code>, <code>wss://x-push-futures.kucoin.com</code>) and subscribes to the <code>trade</code> channel for the pairs being watched. Browsers read the server over Server-Sent Events; no browser connects to KuCoin and no API key is used.</li>
+          <li><strong>Symbols are resolved from KuCoin.</strong> BTC, ETH and SOL map to the listed USDT spot pair and USDT-margined perpetual (bitcoin futures are <code>XBTUSDTM</code>) from KuCoin&rsquo;s instrument metadata.</li>
+          <li><strong>Notional.</strong> Spot: price &times; quantity. Futures: price &times; contracts &times; the contract multiplier from KuCoin&rsquo;s metadata. Futures quantity is shown in contracts, never as coins.</li>
+          <li><strong>Side is the taker side.</strong> KuCoin documents a trade&rsquo;s side as the taker order&rsquo;s side, so &ldquo;buy&rdquo; is an aggressive buy. Delta = aggressive buy notional &minus; aggressive sell notional; buy pressure = buy notional &divide; classified notional.</li>
+          <li><strong>CVD</strong> is the running sum of signed notional (USDT, or base units on request) since the session shown under the chart. It restarts when you change market or pair, or press Reset.</li>
+        </ol>
+        <ul class="aia-how-notes">
+          <li><strong>One venue only.</strong> Volume, delta and CVD describe KuCoin&rsquo;s public trades for one instrument, not the whole market or other exchanges.</li>
+          <li><strong>Partial windows are labelled.</strong> A rolling window is complete only after the server has been subscribed for the whole window without a reconnect.</li>
+          <li><strong>Read-only.</strong> Nothing on this page can place orders or access an account. <strong>AI use: No.</strong></li>
+        </ul>
+      </div>
+    </details>
+
+    <footer>KuCoin Live Trades &mdash; <a href="/open-interest.html">Crypto Open Interest</a> &mdash; <a href="/tradehunter/market-matrix">Market Matrix</a> &mdash; <a href="/">Overview</a></footer>
+
+  </main>
+</div>
+<script src="/assets/js/sidebar.js"></script>
+<script src="/assets/js/ui.js"></script>
+<script src="/assets/js/kucoin-live-trades.js"></script>
+</body>
+</html>
