@@ -33,7 +33,7 @@
       <div class="pb-stat">
         <div class="pb-stat-label">Tickers</div>
         <div class="pb-stat-value" id="pbStatTickers">–</div>
-        <div class="pb-stat-sub" id="pbStatTickersSub">Distinct #tags</div>
+        <div class="pb-stat-sub" id="pbStatTickersSub">Distinct tickers</div>
       </div>
       <div class="pb-stat">
         <div class="pb-stat-label">Added this week</div>
@@ -54,21 +54,13 @@
       <div class="pb-dropzone-hint">PNG, JPEG, WebP or GIF up to 15 MB. Paste works anywhere on this page.</div>
     </section>
 
-    <section class="pb-section pb-folders-section" aria-labelledby="pbFoldersHeading">
-      <div class="pb-section-head">
-        <h2 class="pb-section-title" id="pbFoldersHeading">Folders</h2>
-        <span class="pb-count" id="pbFolderCount"></span>
-        <span class="pb-folders-hint">Type a ticker like <code>btc</code> as a label — it saves as <code>$BTC</code> and stacks with the rest of that ticker. In a longer note, use <code>$BTC</code> or <code>#BTC</code>.</span>
-      </div>
-      <div class="pb-folders" id="pbFolders" role="group" aria-label="Folders"></div>
-    </section>
-
     <section class="pb-section" aria-labelledby="pbHeading">
       <div class="pb-section-head">
         <button class="pb-btn pb-back" type="button" id="pbBack" hidden>&larr; All</button>
         <h2 class="pb-section-title" id="pbHeading">Watching</h2>
         <span class="pb-count" id="pbCount">Loading…</span>
         <input class="pb-search" id="pbSearch" type="search" placeholder="Filter by label or $ticker" aria-label="Filter screenshots by label" />
+        <span class="pb-hint">Type a ticker like <code>btc</code> as a label — it saves as <code>$BTC</code> and stacks with the rest of that ticker. Tap a stack to open it.</span>
       </div>
       <div class="pb-grid" id="pbGrid" aria-live="polite"></div>
     </section>
