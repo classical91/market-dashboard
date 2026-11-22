@@ -418,3 +418,11 @@
   .pb-card-foot { flex-wrap: wrap; row-gap: 6px; }
   .pb-when { flex: 1 0 100%; }
 }
+
+/* iOS Safari zooms the page into any focused field under 16px. Touch screens
+   and phone-width screens get 16px label and filter fields so typing a
+   ticker doesn't zoom. */
+@media (pointer: coarse), (max-width: 640px) {
+  .pb-label,
+  .pb-search { font-size: 16px; }
+}
