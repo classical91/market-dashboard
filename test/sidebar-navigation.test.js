@@ -10,7 +10,7 @@ const sidebar = fs.readFileSync(path.join(__dirname, "..", "public/assets/js/sid
 test("primary sidebar order and removed links stay exact", () => {
   const labels = [
     "Terminal Suite",
-    "Overview v2",
+    "Overview",
     "Reporter Room",
     "My Trades",
     "TradeHunter",
@@ -187,7 +187,7 @@ test("shared account UI uses the existing auth endpoints", () => {
 test("Overview remains a direct child link without the Widgets menu", () => {
   const start = sidebar.indexOf('label: "Overview"');
   const menu = sidebar.slice(sidebar.lastIndexOf("{", start), sidebar.indexOf('label: "TradeHunter"'));
-  assert.match(menu, /href: "\/overview-v1",\s*label: "Overview"/);
+  assert.match(menu, /href: "\/",\s*label: "Overview"/);
   const overview = sidebar.slice(sidebar.lastIndexOf("{", start), sidebar.indexOf("}", start) + 1);
   assert.doesNotMatch(overview, /children:/, "Overview has no empty dropdown");
   assert.doesNotMatch(sidebar, /label: "Widgets"|href: "\/#/, "widget jump links left the sidebar");
