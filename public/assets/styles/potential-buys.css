@@ -183,6 +183,14 @@
   border-color: rgba(245,183,64,0.28);
 }
 .pb-stack:hover { border-color: rgba(245,183,64,0.5); }
+/* Older than 3 days: the folder (by its oldest screenshot) and any
+   screenshot's timestamp turn red. */
+.pb-when.is-stale { color: var(--red); font-weight: 700; }
+.pb-stack.is-stale { border-color: rgba(231,76,60,0.55); }
+.pb-stack.is-stale:hover { border-color: rgba(231,76,60,0.8); }
+.pb-stack.is-stale .pb-stack-badge { color: #fff; background: rgba(231,76,60,0.95); }
+.pb-stack.is-stale .pb-folder-icon,
+.pb-stack.is-stale .pb-folder-icon::before { background: rgba(231,76,60,0.9); }
 .pb-stack-thumb { position: relative; cursor: pointer; overflow: hidden; }
 .pb-stack-thumb img { position: absolute; inset: 0; }
 /* Older screenshots fan out behind the newest, each a little smaller. */

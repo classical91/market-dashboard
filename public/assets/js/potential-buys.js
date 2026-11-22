@@ -92,6 +92,13 @@
     return Ticker.extractTags(item && item.label);
   }
 
+  // Screenshots older than this get a red timestamp; a ticker folder whose
+  // oldest screenshot is older than this is marked red as a whole.
+  var STALE_MS = 3 * 24 * 60 * 60 * 1000;
+  function isStale(ms) {
+    return Boolean(ms) && Date.now() - ms > STALE_MS;
+  }
+
   function touchedAt(item) {
     return item.updatedAt || item.createdAt || 0;
   }
@@ -247,14 +254,16 @@
     var byAge = items.slice().sort(function (a, b) { return (a.createdAt || 0) - (b.createdAt || 0); });
     var top = byAge[0];
     var name = "$" + tag;
-    var updated = items.reduce(function (max, item) { return Math.max(max, touchedAt(item)); }, 0);
+    var since = top.createdAt;
+    var stale = isStale(since);
     var peeks = byAge.slice(1, 3).map(function (item, i) {
       return '<img class="pb-stack-peek pb-stack-peek-' + (i + 1) + '" src="' + escapeHtml(item.url) + '" alt="" loading="lazy" />';
     }).join("");
     return (
-      '<article class="pb-card pb-stack" data-folder="' + escapeHtml(tag) + '">' +
+      '<article class="pb-card pb-stack' + (stale ? " is-stale" : "") + '" data-folder="' + escapeHtml(tag) + '">' +
         '<button type="button" class="pb-thumb pb-stack-thumb" data-action="open-folder" ' +
-          'aria-label="Open ' + escapeHtml(name) + " folder, " + items.length + ' screenshots">' +
+          'aria-label="Open ' + escapeHtml(name) + " folder, " + items.length + " screenshots" +
+          (stale ? ", older than 3 days" : "") + '">' +
           peeks +
           '<img class="pb-stack-top" src="' + escapeHtml(top.url) + '" alt="" loading="lazy" />' +
           '<span class="pb-stack-badge" aria-hidden="true">' + items.length + "</span>" +
@@ -262,7 +271,7 @@
         '<div class="pb-card-body">' +
           '<div class="pb-stack-name"><span class="pb-folder-icon" aria-hidden="true"></span>' + escapeHtml(name) + "</div>" +
           '<div class="pb-card-foot">' +
-            '<span class="pb-when">' + items.length + " screenshots · " + escapeHtml(formatWhen(updated)) + "</span>" +
+            '<span class="pb-when' + (stale ? ' is-stale" title="Oldest screenshot is over 3 days old' : "") + '">' + items.length + " screenshots · since " + escapeHtml(formatWhen(since)) + "</span>" +
             '<button type="button" class="pb-btn" data-action="open-folder">Open</button>' +
           "</div>" +
         "</div>" +
@@ -284,7 +293,9 @@
             'placeholder="Ticker (BTC) or note…" aria-label="Label" data-action="label" ' +
             'autocomplete="off" spellcheck="false" />' +
           '<div class="pb-card-foot">' +
-            '<span class="pb-when" title="' + escapeHtml(formatSize(item.size)) + '">' + escapeHtml(formatWhen(item.createdAt)) + "</span>" +
+            '<span class="pb-when' + (isStale(item.createdAt) ? " is-stale" : "") + '" title="' +
+              escapeHtml((isStale(item.createdAt) ? "Older than 3 days · " : "") + formatSize(item.size)) + '">' +
+              escapeHtml(formatWhen(item.createdAt)) + "</span>" +
             '<button type="button" class="pb-btn" data-action="crop">Crop</button>' +
             '<button type="button" class="pb-btn pb-btn-danger" data-action="delete">Delete</button>' +
           "</div>" +
