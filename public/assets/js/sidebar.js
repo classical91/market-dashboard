@@ -26,6 +26,8 @@
       label: "Overview v2",
       children: [
         { href: "/overview-v2#mini-x-portal", label: "Mini X Portal" },
+        // Mirrors Crypto Hub → Bitcoin Research, under the News desks strip.
+        { href: "/overview-v2#btc-research", label: "BTC Research" },
         { href: "/overview-v1", label: "Overview" },
       ],
     },
