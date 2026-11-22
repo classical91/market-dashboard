@@ -25,29 +25,6 @@
           <div class="ticker-track" id="tickerTrack"></div>
         </section>
 
-        <!-- MINI X PORTAL — deep links into X Intelligence and YouTube Intelligence -->
-        <div class="ov-kicker" id="mini-x-portal">Mini X Portal</div>
-        <section class="ov-portal" aria-label="Mini X Portal">
-          <a class="ov-portal-card ov-portal-card--x" href="/x-intelligence.html?template=markets">
-            <span class="ov-portal-icon" aria-hidden="true">X</span>
-            <span class="ov-portal-copy">
-              <span class="ov-portal-tag">X Intelligence &middot; Template</span>
-              <span class="ov-portal-title">Markets</span>
-              <span class="ov-portal-desc">X Intelligence on the Markets template.</span>
-            </span>
-            <span class="ov-portal-go" aria-hidden="true">&#8594;</span>
-          </a>
-          <a class="ov-portal-card ov-portal-card--yt" href="/youtube-v2.html?category=category%3Acrypto">
-            <span class="ov-portal-icon" aria-hidden="true">&#9654;</span>
-            <span class="ov-portal-copy">
-              <span class="ov-portal-tag">YouTube Intelligence &middot; Category</span>
-              <span class="ov-portal-title">Crypto</span>
-              <span class="ov-portal-desc">YouTube Intelligence on the Crypto category.</span>
-            </span>
-            <span class="ov-portal-go" aria-hidden="true">&#8594;</span>
-          </a>
-        </section>
-
         <!-- BTC RESEARCH — rendered from Crypto Hub's Bitcoin Research section
              (/crypto.html#crypto-research), so both pages list the same links. -->
         <details class="ov-btc" id="btc-research">
@@ -137,6 +114,87 @@
         </div>
 
 
+        <!-- TECHNICAL RATINGS — TradingView's oscillator/moving-average ratings,
+             not this app's own analysis. Directional Bias is the in-house
+             direction for crypto. -->
+        <article class="card ov-ta-card" id="technical-analysis" aria-labelledby="ovTaTitle">
+          <div class="card-header">
+            <div>
+              <div class="card-title" id="ovTaTitle">Technical Ratings &middot; TradingView</div>
+              <div class="card-subtitle">Oscillator &amp; moving-average ratings &mdash; TradingView's own, not this dashboard's analysis. For crypto direction, see <a class="card-link" href="/directional-bias.html">Directional Bias</a>.</div>
+            </div>
+            <span class="ov-ta-tag" title="Third-party ratings from TradingView, not computed by this dashboard">Third-party</span>
+          </div>
+          <div class="ov-ta-grid">
+            <div class="ov-ta-item">
+              <div class="ov-ta-symbol">BTCUSDT</div>
+              <div class="ov-ta-body">
+                <div class="tradingview-widget-container">
+                  <div class="tradingview-widget-container__widget"></div>
+                  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js" async>
+                  { "interval": "1h", "width": "100%", "isTransparent": true, "height": "100%", "symbol": "BINANCE:BTCUSDT", "showIntervalTabs": true, "displayMode": "single", "locale": "en", "colorTheme": "dark" }
+                  </script>
+                </div>
+              </div>
+            </div>
+            <div class="ov-ta-item">
+              <div class="ov-ta-symbol">ETHUSDT</div>
+              <div class="ov-ta-body">
+                <div class="tradingview-widget-container">
+                  <div class="tradingview-widget-container__widget"></div>
+                  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js" async>
+                  { "interval": "1h", "width": "100%", "isTransparent": true, "height": "100%", "symbol": "BINANCE:ETHUSDT", "showIntervalTabs": true, "displayMode": "single", "locale": "en", "colorTheme": "dark" }
+                  </script>
+                </div>
+              </div>
+            </div>
+            <div class="ov-ta-item">
+              <div class="ov-ta-symbol">SOLUSDT</div>
+              <div class="ov-ta-body">
+                <div class="tradingview-widget-container">
+                  <div class="tradingview-widget-container__widget"></div>
+                  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js" async>
+                  { "interval": "1h", "width": "100%", "isTransparent": true, "height": "100%", "symbol": "BINANCE:SOLUSDT", "showIntervalTabs": true, "displayMode": "single", "locale": "en", "colorTheme": "dark" }
+                  </script>
+                </div>
+              </div>
+            </div>
+            <div class="ov-ta-item">
+              <div class="ov-ta-symbol">SPY</div>
+              <div class="ov-ta-body">
+                <div class="tradingview-widget-container">
+                  <div class="tradingview-widget-container__widget"></div>
+                  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js" async>
+                  { "interval": "1h", "width": "100%", "isTransparent": true, "height": "100%", "symbol": "AMEX:SPY", "showIntervalTabs": true, "displayMode": "single", "locale": "en", "colorTheme": "dark" }
+                  </script>
+                </div>
+              </div>
+            </div>
+            <div class="ov-ta-item">
+              <div class="ov-ta-symbol">QQQ</div>
+              <div class="ov-ta-body">
+                <div class="tradingview-widget-container">
+                  <div class="tradingview-widget-container__widget"></div>
+                  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js" async>
+                  { "interval": "1h", "width": "100%", "isTransparent": true, "height": "100%", "symbol": "NASDAQ:QQQ", "showIntervalTabs": true, "displayMode": "single", "locale": "en", "colorTheme": "dark" }
+                  </script>
+                </div>
+              </div>
+            </div>
+            <div class="ov-ta-item">
+              <div class="ov-ta-symbol">DXY</div>
+              <div class="ov-ta-body">
+                <div class="tradingview-widget-container">
+                  <div class="tradingview-widget-container__widget"></div>
+                  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js" async>
+                  { "interval": "1h", "width": "100%", "isTransparent": true, "height": "100%", "symbol": "TVC:DXY", "showIntervalTabs": true, "displayMode": "single", "locale": "en", "colorTheme": "dark" }
+                  </script>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+
         <section class="grid overview-grid overview-decision-grid" aria-label="Market pulse, risk, and alerts">
           <div class="stack">
             <article class="card" id="market-pulse">
@@ -216,7 +274,7 @@
           </div>
         </article>
 
-        <p class="footer-note">Market Command — live data via /api/overview + TradingView Market Overview · on-chain data via DefiLlama</p>
+        <p class="footer-note">Market Command — live data via /api/overview + TradingView Market Overview &amp; Technical Ratings · on-chain data via DefiLlama</p>
       </main>
     </div>
 

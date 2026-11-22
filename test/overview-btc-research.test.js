@@ -8,11 +8,11 @@ const btc = require("../public/assets/js/overview-btc-research");
 const PUBLIC = path.join(__dirname, "..", "public");
 const read = (file) => fs.readFileSync(path.join(PUBLIC, file), "utf8");
 
-test("Overview has a BTC Research dropdown under the Mini X Portal that loads Crypto Hub's section", () => {
+test("Overview has a BTC Research dropdown under the ticker that loads Crypto Hub's section", () => {
   const html = read("index.html");
-  const portal = html.indexOf('id="mini-x-portal"');
+  const ticker = html.indexOf('id="ticker"');
   const btcAt = html.indexOf('id="btc-research"');
-  assert.ok(portal !== -1 && btcAt > portal, "BTC Research sits after the Mini X Portal");
+  assert.ok(ticker !== -1 && btcAt > ticker, "BTC Research sits after the ticker");
   assert.ok(btcAt < html.indexOf('id="ovh-market-overview"'), "and before the TradingView widgets");
   assert.match(html, /<details class="ov-btc" id="btc-research">/);
   assert.match(html, /assets\/js\/overview-btc-research\.js/);
