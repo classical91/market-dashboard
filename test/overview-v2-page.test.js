@@ -10,10 +10,16 @@ const css = read("public/assets/styles/overview-v2.css");
 const sidebar = read("public/assets/js/sidebar.js");
 const terminal = read("public/terminal-suite.html");
 
-test("Overview v2 no longer carries the Mini X Portal", () => {
-  assert.doesNotMatch(page, /mini-x-portal|Mini X Portal|ov2-portal/);
-  assert.doesNotMatch(css, /ov2-portal/);
-  assert.doesNotMatch(sidebar, /mini-x-portal|label: "Mini X Portal"/);
+test("Overview v2 restores the mini portal's original shortcuts and full category launcher", () => {
+  assert.match(page, /id="mini-x-portal" aria-labelledby="ov2-portal-heading"/);
+  assert.match(page, /<h2 id="ov2-portal-heading">Mini Intelligent Portal<\/h2>/);
+  assert.match(page, /href="\/x-intelligence\.html\?template=markets"/);
+  assert.match(page, /href="\/youtube-v2\.html\?category=category%3Acrypto"/);
+  assert.match(page, /href="\/intelligence-portal\.html"/);
+  assert.ok(page.indexOf('id="mini-x-portal"') < page.indexOf('id="ov2-news"'));
+  assert.match(css, /@media \(max-width: 640px\) \{ \.ov2-portal \{ grid-template-columns: 1fr/);
+  assert.match(css, /\.ov2-main \.ov2-portal-card:focus-visible/);
+  assert.doesNotMatch(sidebar, /label: "Mini X Portal"/);
 });
 
 test("Overview v2 holds the TradingView technical ratings Terminal links to", () => {
