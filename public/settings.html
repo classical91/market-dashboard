@@ -6,6 +6,7 @@
   <title>Settings · Market Command</title>
   <script src="/assets/js/settings.js"></script>
   <link rel="stylesheet" href="/assets/styles/command.css" />
+  <link rel="stylesheet" href="/assets/styles/watchlist.css" />
   <style>
     /* Each section is a collapsible header over its cards (sections.js), so
        closed sections stack as a compact list. */
@@ -450,6 +451,33 @@
       </div>
     </div>
 
+    <!-- Watchlists -->
+    <div class="settings-section">
+      <div class="section-header" data-section="watchlists" id="watchlists">
+        <span class="section-label">Watchlists</span>
+        <span class="section-chevron">&#9660;</span>
+      </div>
+      <div class="settings-panel" id="cards-watchlists">
+        <div class="settings-card">
+          <div class="settings-row-label">Watchlist folders</div>
+          <div class="settings-row-sub">
+            Ticker folders for the watchlist on <a href="/overview-v2.html#ov2-watchlist">Overview v2</a>.
+            Bookmark a folder with a colour to pin it to the top. Saved in this browser.
+          </div>
+          <div class="wls" id="wlSettings">
+            <div class="wls-folders">
+              <ul class="wls-folder-list" id="wlsFolderList" aria-label="Folders"></ul>
+              <form class="wls-new" id="wlsNewFolder">
+                <input id="wlsNewFolderName" type="text" maxlength="40" placeholder="New folder name" aria-label="New folder name" autocomplete="off" />
+                <button class="settings-action-btn" type="submit">New folder</button>
+              </form>
+            </div>
+            <div class="wls-editor" id="wlsEditor" aria-live="polite"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Screeners -->
     <div class="settings-section">
       <div class="section-header" data-section="screeners" id="screeners">
@@ -786,6 +814,7 @@
 <script src="/assets/js/sidebar.js"></script>
 <script src="/assets/js/admin-key.js"></script>
 <script src="/assets/js/sections.js"></script>
+<script src="/assets/js/watchlists.js"></script>
 <script>
   /* ── Toast ─────────────────────────────────────────────── */
   function showToast() {
@@ -2743,5 +2772,6 @@
     });
   })();
 </script>
+<script src="/assets/js/watchlist-settings.js"></script>
 </body>
 </html>

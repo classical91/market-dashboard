@@ -14,6 +14,7 @@
   <link rel="stylesheet" href="/assets/styles/overview-btc-research.css" />
   <link rel="stylesheet" href="/assets/styles/overview-v2.css" />
   <link rel="stylesheet" href="/assets/styles/overview-news-review.css" />
+  <link rel="stylesheet" href="/assets/styles/watchlist.css" />
 </head>
 <body>
 <div class="app">
@@ -114,14 +115,36 @@
           </div>
         </section>
       </div>
-      <article class="ov2-matrix-card" aria-labelledby="ov2-matrix-title">
-        <header class="ov2-matrix-head">
-          <h2 id="ov2-matrix-title">Market Matrix</h2>
-          <span class="ov2-stamp" id="ov2-matrix-meta">Loading…</span>
-          <a href="/tradehunter/market-matrix">Open 4-chart view ↗</a>
-        </header>
-        <div class="ov2-matrix" id="ov2-matrix"><div class="ov2-skeleton"></div><div class="ov2-skeleton"></div></div>
-      </article>
+      <div class="ov2-right-column">
+        <article class="ov2-matrix-card" aria-labelledby="ov2-matrix-title">
+          <header class="ov2-matrix-head">
+            <h2 id="ov2-matrix-title">Market Matrix</h2>
+            <span class="ov2-stamp" id="ov2-matrix-meta">Loading…</span>
+            <a href="/tradehunter/market-matrix">Open 4-chart view ↗</a>
+          </header>
+          <div class="ov2-matrix" id="ov2-matrix"><div class="ov2-skeleton"></div><div class="ov2-skeleton"></div></div>
+        </article>
+        <!-- Watchlist: saved ticker folders, edited under Settings → Watchlists. -->
+        <section class="wl-card" id="ov2-watchlist" aria-label="Watchlist">
+          <header class="wl-head">
+            <div class="wl-switch">
+              <button class="wl-title-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="ov2-watchlist-menu">
+                <span class="wl-title-flag"></span><span class="wl-title-name">Watchlist</span>
+                <svg class="wl-chevron" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="m3 4.5 3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+              <div class="wl-menu" id="ov2-watchlist-menu" role="menu" aria-label="Watchlist folders" hidden></div>
+            </div>
+            <span class="wl-count"></span>
+            <div class="wl-actions">
+              <a class="wl-icon-btn wl-add" href="/settings.html#watchlists" title="Add symbols" aria-label="Add symbols in Settings">+</a>
+              <a class="wl-icon-btn" href="/settings.html#watchlists" title="Manage watchlists" aria-label="Manage watchlists in Settings">&#8943;</a>
+            </div>
+          </header>
+          <div class="wl-pins" aria-label="Bookmarked folders" hidden></div>
+          <div class="wl-cols" aria-hidden="true"><span>Symbol</span><span>Also in</span></div>
+          <ul class="wl-list" aria-label="Symbols in this folder"><li class="wl-empty">Loading watchlist…</li></ul>
+        </section>
+      </div>
     </section>
 
     <section class="ov2-context" aria-label="Snapshot controls">
@@ -348,5 +371,7 @@
 <script src="/assets/js/oi-wedges.js"></script>
 <script src="/assets/js/cross-market-oi.js"></script>
 <script src="/assets/js/rsi-matrix.js"></script>
+<script src="/assets/js/watchlists.js"></script>
+<script src="/assets/js/watchlist-card.js"></script>
 </body>
 </html>

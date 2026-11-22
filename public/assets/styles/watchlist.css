@@ -1,0 +1,119 @@
+/* Watchlists — TradingView-style ticker folders.
+   .wl-*  the Overview v2 card (watchlist-card.js)
+   .wls-* the Settings editor (watchlist-settings.js) */
+
+.wl-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.wl-flag { flex-shrink: 0; display: block; }
+
+/* ── Overview card ── */
+.wl-card { display: flex; flex-direction: column; min-width: 0; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); overflow: visible; }
+.wl-head { display: flex !important; align-items: center; gap: 6px; padding: 8px 8px 6px 10px; }
+.wl-switch { position: relative; min-width: 0; }
+.wl-title-btn { display: inline-flex; align-items: center; gap: 7px; max-width: 100%; padding: 5px 6px; border: 0; border-radius: 6px; background: transparent; color: var(--text); font: inherit; font-size: 15px; font-weight: 700; letter-spacing: -.01em; cursor: pointer; }
+.wl-title-btn:hover, .wl-title-btn[aria-expanded="true"] { background: var(--surface2); }
+.wl-title-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wl-title-flag:empty { display: none; }
+.wl-chevron { flex-shrink: 0; color: var(--soft); transition: transform .15s; }
+.wl-title-btn[aria-expanded="true"] .wl-chevron { transform: rotate(180deg); }
+.wl-count { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.wl-actions { display: flex; align-items: center; gap: 2px; margin-left: auto; }
+.wl-icon-btn { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 6px; color: var(--soft); text-decoration: none; font-size: 18px; line-height: 1; }
+.wl-icon-btn:hover { background: var(--surface2); color: var(--text); }
+
+.wl-menu { position: absolute; z-index: 30; top: calc(100% + 4px); left: 0; width: 260px; max-height: 340px; overflow-y: auto; padding: 6px 0; border: 1px solid var(--border-hover); border-radius: 8px; background: var(--surface2); box-shadow: 0 12px 32px rgba(0,0,0,.45); }
+.wl-menu[hidden] { display: none; }
+.wl-menu-group { padding: 8px 14px 4px; color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.wl-menu-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 14px; border: 0; background: transparent; color: var(--text); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+.wl-menu-item:hover, .wl-menu-item:focus-visible { background: color-mix(in srgb, var(--text) 8%, transparent); outline: none; }
+.wl-menu-item[aria-checked="true"] { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.wl-menu-noflag { width: 12px; flex-shrink: 0; }
+.wl-menu-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wl-menu-count { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.wl-menu-manage { display: block; margin-top: 6px; padding: 9px 14px 5px; border-top: 1px solid var(--border); color: var(--accent); font-size: 13px; text-decoration: none; }
+.wl-menu-manage:hover, .wl-menu-manage:focus-visible { text-decoration: underline; outline: none; }
+
+.wl-pins { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 0 10px 8px; }
+.wl-pins[hidden] { display: none; }
+.wl-pin { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; max-width: 180px; padding: 4px 10px 4px 8px; border: 1px solid color-mix(in srgb, var(--wl-c) 40%, transparent); border-radius: 999px; background: transparent; color: var(--soft); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.wl-pin span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wl-pin:hover { color: var(--text); border-color: var(--wl-c); }
+.wl-pin.is-active { color: var(--text); border-color: var(--wl-c); background: color-mix(in srgb, var(--wl-c) 18%, transparent); }
+
+.wl-cols { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; padding: 6px 12px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); color: var(--muted); font-size: 12px; }
+.wl-cols span:last-child { text-align: right; }
+
+/* The list takes whatever height the row leaves and scrolls inside it, so a
+   long folder never stretches the Overview's top row. */
+.wl-list { flex: 1 1 0; height: 0; min-height: 150px; margin: 0; padding: 4px 0; list-style: none; overflow-y: auto; scrollbar-width: thin; overscroll-behavior: contain; }
+.wl-row { position: relative; display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; align-items: center; gap: 10px; margin: 0 4px; padding: 6px 8px; border: 1px solid transparent; border-radius: 6px; color: var(--text); text-decoration: none; font-size: 13px; }
+.wl-row::before { content: ""; position: absolute; left: -4px; top: 6px; bottom: 6px; width: 3px; border-radius: 0 2px 2px 0; background: var(--wl-flag, transparent); }
+.wl-row:hover { background: color-mix(in srgb, var(--text) 6%, transparent); }
+.wl-row:focus-visible { outline: none; border-color: var(--soft); background: color-mix(in srgb, var(--text) 6%, transparent); }
+.wl-icon { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--wl-tint); color: #fff; font-size: 11px; font-weight: 800; line-height: 1; flex-shrink: 0; }
+.wl-sym { display: flex; align-items: baseline; gap: 7px; min-width: 0; }
+.wl-sym strong { font-weight: 600; letter-spacing: .01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wl-sym em { color: var(--muted); font-size: 11px; font-style: normal; white-space: nowrap; }
+.wl-folders { display: flex; justify-content: flex-end; gap: 4px; min-width: 0; }
+.wl-chip { --wl-c: var(--soft); display: inline-flex; align-items: center; gap: 4px; max-width: 120px; padding: 2px 7px; border-radius: 4px; background: color-mix(in srgb, var(--wl-c) 14%, transparent); color: color-mix(in srgb, var(--wl-c) 70%, var(--text)); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wl-chip-dot { width: 6px; height: 6px; flex-shrink: 0; border-radius: 50%; background: var(--muted); }
+.wl-chip-more { color: var(--muted); }
+.wl-empty { padding: 18px 14px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.wl-empty a { color: var(--accent); }
+.wl-card :is(button, a):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wl-card .wl-row:focus-visible, .wl-card .wl-menu :is(button, a):focus-visible { outline: none; }
+
+/* Overview v2: matrix + watchlist share the right-hand column. */
+.ov2-right-column { display: flex; flex-direction: column; gap: 10px; min-width: 0; align-self: stretch; }
+@media (max-width: 1050px) {
+  .wl-list { flex: none; height: auto; max-height: 360px; }
+}
+@media (max-width: 520px) {
+  .wl-folders .wl-chip:nth-child(n+2):not(.wl-chip-more) { display: none; }
+  .wl-chip { max-width: 96px; }
+}
+
+/* ── Settings editor ── */
+.wls { display: grid; grid-template-columns: minmax(200px, 260px) minmax(0, 1fr); gap: 18px; margin-top: 16px; }
+.wls-folders { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.wls-folder-list { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 6px; list-style: none; border: 1px solid var(--border); border-radius: 10px; background: var(--surface2); max-height: 360px; overflow-y: auto; }
+.wls-folder { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: 0; border-radius: 6px; background: transparent; color: var(--soft); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+.wls-folder:hover { background: color-mix(in srgb, var(--text) 6%, transparent); color: var(--text); }
+.wls-folder.is-active { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--text); font-weight: 600; }
+.wls-folder-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wls-folder-count { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.wls-new { display: flex; gap: 8px; }
+.wls input[type="text"] { flex: 1; min-width: 0; padding: 9px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface2); color: var(--text); font: inherit; font-size: 13px; }
+.wls input[type="text"]:focus { outline: none; border-color: var(--accent); }
+.wls-editor { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.wls-field { display: flex; flex-direction: column; gap: 8px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.wls-field > label, .wls-field legend, .wls-label { padding: 0; color: var(--soft); font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.wls-field legend span, .wls-label span { margin-left: 6px; color: var(--muted); font-weight: 500; letter-spacing: 0; text-transform: none; }
+.wls-bookmarks legend { margin-bottom: 8px; }
+.wls-swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.wls-swatch { position: relative; display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface2); color: var(--muted); cursor: pointer; }
+.wls-swatch input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+.wls-swatch:hover { border-color: var(--border-hover); }
+.wls-swatch:has(input:checked) { border-color: var(--wl-c, var(--soft)); box-shadow: 0 0 0 1px var(--wl-c, var(--soft)); background: color-mix(in srgb, var(--wl-c, var(--soft)) 14%, var(--surface2)); }
+.wls-swatch:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wls-swatch-none span[aria-hidden] { font-size: 16px; line-height: 1; }
+.wls-tickers { display: flex; flex-direction: column; margin: 0; padding: 4px; list-style: none; border: 1px solid var(--border); border-radius: 10px; background: var(--surface2); max-height: 320px; overflow-y: auto; }
+.wls-ticker { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 5px 6px 5px 8px; border-radius: 6px; font-size: 13px; }
+.wls-ticker:hover { background: color-mix(in srgb, var(--text) 5%, transparent); }
+.wls-ticker .wl-sym { flex-wrap: wrap; }
+.wls-also { color: var(--muted); font-size: 11px; }
+.wls-ticker-actions { display: flex; gap: 2px; }
+.wls-mini { width: 28px; height: 28px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--soft); font: inherit; font-size: 14px; cursor: pointer; }
+.wls-mini:hover:not(:disabled) { border-color: var(--border-hover); color: var(--text); }
+.wls-mini:disabled { opacity: .3; cursor: default; }
+.wls-mini-danger:hover:not(:disabled) { color: var(--coral); border-color: color-mix(in srgb, var(--coral) 40%, transparent); }
+.wls-mini:focus-visible, .wls-folder:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.wls-add { display: flex; gap: 8px; }
+.wls-note { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.wls-note.is-ok { color: var(--green); }
+.wls-note.is-warn { color: var(--amber); }
+.wls-muted { padding: 10px; color: var(--muted); font-size: 13px; }
+.wls-danger-row { padding-top: 12px; border-top: 1px solid var(--border); }
+@media (max-width: 760px) {
+  .wls { grid-template-columns: 1fr; }
+  .wls-folder-list { max-height: 220px; }
+}
