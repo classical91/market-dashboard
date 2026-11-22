@@ -108,6 +108,39 @@ function buildFolders(items) {
   return { folders, untagged };
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Counts only, for Main Hub's System Logs card: never an id, label, file name
+ * or image URL. `tickers` is how many distinct #hashtags are in use; `newestAt`
+ * and `oldestAt` are when the newest and oldest screenshot were added.
+ */
+function summarize(items, now = Date.now()) {
+  const { folders, untagged } = buildFolders(items);
+  let addedLast24h = 0;
+  let addedLast7d = 0;
+  let newestAt = null;
+  let oldestAt = null;
+  for (const item of items) {
+    const created = Number(item.createdAt) || 0;
+    if (!created) continue;
+    if (created >= now - DAY_MS) addedLast24h += 1;
+    if (created >= now - 7 * DAY_MS) addedLast7d += 1;
+    if (newestAt === null || created > newestAt) newestAt = created;
+    if (oldestAt === null || created < oldestAt) oldestAt = created;
+  }
+  return {
+    total: items.length,
+    tickers: folders.length,
+    untagged,
+    addedLast24h,
+    addedLast7d,
+    newestAt,
+    oldestAt,
+    generatedAt: now,
+  };
+}
+
 function normalizeLabel(value) {
   if (value === undefined || value === null) return "";
   if (typeof value !== "string") throw httpError("label must be text", 400);
@@ -161,6 +194,11 @@ class PotentialBuysStore {
   /** Hashtag folders with their counts and last-updated time. */
   folders(items = this.list()) {
     return buildFolders(items);
+  }
+
+  /** Counts only — see summarize(). */
+  summary() {
+    return summarize(this.list(), this.now());
   }
 
   /** Store one screenshot from its raw bytes. */
@@ -290,6 +328,7 @@ module.exports = {
   sniffImage,
   extractTags,
   buildFolders,
+  summarize,
   MAX_BYTES,
   MAX_LABEL_CHARS,
 };
