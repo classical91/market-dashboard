@@ -69,6 +69,7 @@
   text-transform: uppercase;
 }
 .tc-sort { padding: 5px 8px; font-size: 11px; }
+.tc-toolbar { flex-wrap: wrap; }
 
 .tc-filters {
   display: flex;
