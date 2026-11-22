@@ -33,7 +33,7 @@
 
     <div class="aia-notice" id="aia-notice" style="display:none"></div>
 
-    <div class="aia-grid" id="aia-grid"></div>
+    <div class="aia-grid aia-grid--layouts" id="aia-grid"></div>
 
     <div class="aia-log-section">
       <div class="aia-log-head">
@@ -207,7 +207,9 @@
 
       var chartEl = document.getElementById('aia-chart');
       chartEl.innerHTML = data.chartUrl
-        ? '<img src="' + escapeHtml(data.chartUrl) + '" alt="' + escapeHtml(layout.label || '') + ' chart" loading="lazy" />'
+        ? '<a class="aia-chart-preview" href="' + escapeHtml(data.chartUrl) + '" target="_blank" rel="noopener" title="Open full-size chart">' +
+            '<img src="' + escapeHtml(data.chartUrl) + '" alt="' + escapeHtml(layout.label || '') + ' chart — open full size" loading="lazy" />' +
+          '</a>'
         : '<span class="aia-chart-empty">No chart yet &mdash; click Capture &amp; Analyze.</span>';
 
       document.getElementById('aia-analysis').innerHTML = renderAnalysis(data.analysis);

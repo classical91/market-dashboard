@@ -511,6 +511,58 @@
   padding: 0 16px 14px;
 }
 
+/* Saved layouts use one card. Keep the complete capture in view while the
+   written read sits beside it on desktop, rather than below a huge image. */
+.aia-grid--layouts {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.aia-grid--layouts .aia-card-head {
+  flex-wrap: wrap;
+}
+
+.aia-chart-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.aia-chart-preview:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+@media (min-width: 1200px) {
+  .aia-grid--layouts .aia-card-content {
+    display: grid;
+    grid-template-columns: minmax(0, 1.8fr) minmax(280px, 1fr);
+    align-items: start;
+  }
+
+  .aia-grid--layouts .aia-chart--full {
+    height: clamp(300px, 58vh, 560px);
+    background: #000;
+    border-right: 1px solid var(--border);
+  }
+
+  .aia-grid--layouts .aia-chart--full img {
+    height: 100%;
+    object-fit: contain;
+  }
+
+  .aia-grid--layouts .aia-body {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .aia-grid--layouts .aia-meta {
+    grid-column: 1 / -1;
+    padding-top: 12px;
+  }
+}
+
 @media (max-width: 640px) {
   .aia-grid { grid-template-columns: 1fr; }
 }
