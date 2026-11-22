@@ -1039,3 +1039,19 @@ header, .back, .back-group { display: none !important; }
 .info-modal-body li { margin-bottom: 6px; }
 .info-modal-body strong { color: var(--text); }
 .info-modal-body em { color: var(--text); font-style: italic; }
+
+/* Nested dropdown inside a section's card list (Bitcoin Research →
+   Long vs Short). It sits as rows of the parent list, indented. */
+.cards > .section-header--sub {
+  margin: 0; border: 0; border-top: 1px solid var(--border);
+  border-radius: 0; padding: 9px 15px 9px 27px;
+  background: transparent;
+}
+.cards > .section-header--sub .section-label { font-size: 12px; }
+.cards > .cards--sub {
+  margin: 0; border: 0; border-radius: 0;
+  border-top: 1px solid var(--border);
+  background: var(--accent-bg);
+}
+.cards > .cards--sub.collapsed { margin: 0; border-top-color: transparent; }
+.cards > .cards--sub .card { padding-left: 27px; }
