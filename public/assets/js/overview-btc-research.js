@@ -1,5 +1,5 @@
 /**
- * Overview v2 → BTC Research dropdown.
+ * Overview → BTC Research dropdown.
  *
  * Crypto Hub's Bitcoin Research section (/crypto.html#crypto-research) is the
  * single source of truth: this reads that section's links, including its
@@ -11,8 +11,8 @@
 
   var SOURCE_URL = "/crypto.html";
   var SECTION_ID = "crypto-research";
-  var OPEN_KEY = "overviewV2.btcResearchOpen";
-  var SUB_OPEN_KEY = "overviewV2.btcResearchSubOpen";
+  var OPEN_KEY = "overview.btcResearchOpen";
+  var SUB_OPEN_KEY = "overview.btcResearchSubOpen";
 
   function esc(value) {
     return String(value == null ? "" : value).replace(/[&<>"']/g, function (ch) {
@@ -72,11 +72,11 @@
     var href = safeHref(link.href);
     if (!href) return "";
     var external = /^https?:\/\//i.test(href);
-    return '<a class="card" href="' + esc(href) + '"' + (external ? ' target="_blank" rel="noopener noreferrer"' : "") + ">" +
-      '<div class="card-top"><span class="badge" style="' + esc(safeStyle(link.badgeStyle)) + '">' + esc(link.badge) + "</span>" +
-      '<span class="arrow" aria-hidden="true">&#8599;</span></div>' +
-      '<div class="card-title">' + esc(link.title) + "</div>" +
-      '<div class="card-src">' + esc(link.src) + "</div></a>";
+    return '<a class="ov-btc-link" href="' + esc(href) + '"' + (external ? ' target="_blank" rel="noopener noreferrer"' : "") + ">" +
+      '<span class="ov-btc-badge" style="' + esc(safeStyle(link.badgeStyle)) + '">' + esc(link.badge) + "</span>" +
+      '<span class="ov-btc-title">' + esc(link.title) + "</span>" +
+      '<span class="ov-btc-src">' + esc(link.src) + "</span>" +
+      '<span class="ov-btc-arrow" aria-hidden="true">&#8599;</span></a>';
   }
 
   function countLinks(data) {
@@ -87,15 +87,15 @@
   function render(data, openGroups) {
     var open = openGroups || [];
     if (!countLinks(data)) {
-      return '<div class="ov2-empty"><strong>No Bitcoin Research links</strong>' +
+      return '<div class="empty-state"><strong>No Bitcoin Research links</strong>' +
         '<p>Crypto Hub’s Bitcoin Research section is empty. Add cards there and they appear here.</p></div>';
     }
-    return '<div class="cards ov2-btc-cards">' + data.links.map(linkHtml).join("") +
+    return '<div class="ov-btc-list">' + data.links.map(linkHtml).join("") +
       data.groups.map(function (group) {
-        return '<details class="ov2-btc-sub" data-group="' + esc(group.id) + '"' + (open.indexOf(group.id) !== -1 ? " open" : "") + ">" +
-          '<summary><span class="section-label section-label--btc">' + esc(group.label) + "</span>" +
-          '<span class="ov2-btc-sub-count">' + group.links.length + "</span></summary>" +
-          '<div class="ov2-btc-sublist">' + (group.links.length ? group.links.map(linkHtml).join("") : '<p class="ov2-note">No links yet.</p>') + "</div>" +
+        return '<details class="ov-btc-sub" data-group="' + esc(group.id) + '"' + (open.indexOf(group.id) !== -1 ? " open" : "") + ">" +
+          '<summary><span class="ov-btc-sub-label">' + esc(group.label) + "</span>" +
+          '<span class="ov-btc-sub-count">' + group.links.length + "</span></summary>" +
+          '<div class="ov-btc-sublist">' + (group.links.length ? group.links.map(linkHtml).join("") : '<p class="ov-btc-note">No links yet.</p>') + "</div>" +
           "</details>";
       }).join("") + "</div>";
   }
@@ -105,8 +105,8 @@
   if (typeof document === "undefined") return;
 
   var details = document.getElementById("btc-research");
-  var body = document.getElementById("ov2-btc-body");
-  var countEl = document.getElementById("ov2-btc-count");
+  var body = document.getElementById("ov-btc-body");
+  var countEl = document.getElementById("ov-btc-count");
   if (!details || !body) return;
 
   function readStore(key, fallback) {
@@ -127,15 +127,14 @@
   window.addEventListener("hashchange", openFromHash);
   details.addEventListener("toggle", function () { writeStore(OPEN_KEY, details.open); });
 
-  // The sidebar's "BTC Research" link points here; the summary's own link
-  // to Crypto Hub must navigate, not toggle the dropdown.
-  var hubLink = details.querySelector(".ov2-news-link");
+  // The summary's own link to Crypto Hub must navigate, not toggle the dropdown.
+  var hubLink = details.querySelector(".ov-btc-hub");
   if (hubLink) hubLink.addEventListener("click", function (event) { event.stopPropagation(); });
 
   body.addEventListener("toggle", function (event) {
     var sub = event.target;
-    if (!sub.matches || !sub.matches(".ov2-btc-sub")) return;
-    var open = Array.prototype.map.call(body.querySelectorAll(".ov2-btc-sub[open]"), function (el) {
+    if (!sub.matches || !sub.matches(".ov-btc-sub")) return;
+    var open = Array.prototype.map.call(body.querySelectorAll(".ov-btc-sub[open]"), function (el) {
       return el.getAttribute("data-group");
     });
     writeStore(SUB_OPEN_KEY, open);
@@ -143,15 +142,15 @@
 
   function showError(message) {
     countEl.textContent = "Unavailable";
-    body.innerHTML = '<div class="ov2-empty"><strong class="ov2-warn">Bitcoin Research unavailable</strong>' +
+    body.innerHTML = '<div class="empty-state ov-btc-error"><strong>Bitcoin Research unavailable</strong>' +
       "<p>" + esc(message) + "</p>" +
-      '<button class="ov2-button" type="button" data-btc-retry>Retry</button> ' +
-      '<a class="ov2-news-link" href="/crypto.html#crypto-research">Open in Crypto Hub ↗</a></div>';
+      '<button class="ov-btc-retry" type="button" data-btc-retry>Retry</button> ' +
+      '<a class="ov-btc-hub" href="/crypto.html#crypto-research">Open in Crypto Hub ↗</a></div>';
   }
 
   function load() {
     countEl.textContent = "Loading…";
-    body.innerHTML = '<div class="ov2-loading">Loading Bitcoin Research…<div class="ov2-skeleton"></div><div class="ov2-skeleton"></div></div>';
+    body.innerHTML = '<div class="empty-state">Loading Bitcoin Research…</div>';
     return fetch(SOURCE_URL, { credentials: "same-origin" })
       .then(function (response) {
         if (!response.ok) throw new Error("HTTP " + response.status);
@@ -174,6 +173,6 @@
     if (event.target.closest("[data-btc-retry]")) load();
   });
 
-  root.OverviewV2BtcResearch = api;
+  root.OverviewBtcResearch = api;
   load();
 })(typeof window !== "undefined" ? window : globalThis);

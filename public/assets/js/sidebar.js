@@ -21,16 +21,7 @@
 
   var workspace = [
     { href: "/terminal-suite.html", label: "Terminal Suite" },
-    {
-      href: "/",
-      label: "Overview v2",
-      children: [
-        { href: "/overview-v2#mini-x-portal", label: "Mini X Portal" },
-        // Mirrors Crypto Hub → Bitcoin Research, under the News desks strip.
-        { href: "/overview-v2#btc-research", label: "BTC Research" },
-        { href: "/overview-v1", label: "Overview" },
-      ],
-    },
+    { href: "/", label: "Overview" },
     { href: "/reporter.html", label: "Reporter Room" },
     {
       // The trade workflow in one place: the trades you are running, the
@@ -60,10 +51,13 @@
             { href: "/directional-bias.html", label: "Directional Bias" },
             { href: "/local-extremes.html", label: "Local Extremes" },
             { href: "/pattern-scanner.html", label: "Pattern Scanner" },
-            // Cross-Market Open Interest and the RSI Matrix live inside
-            // Overview v2 (/#cross-market-oi, /#rsi-matrix); their standalone
-            // URLs still resolve but are no longer listed here.
+            // The two Open Interest pages sit side by side: crypto perps
+            // (live, per coin) and CFTC futures across asset classes (weekly).
             { href: "/open-interest.html", label: "Crypto Open Interest" },
+            { href: "/cross-market-oi.html", label: "Cross-Market Open Interest" },
+            // Momentum across markets and timeframes at once: RSI 14 on
+            // 1W / 1D / 4H / 1H for crypto, indices, commodities and dominance.
+            { href: "/rsi-matrix.html", label: "RSI Matrix" },
             {
               href: "/heatmaps.html",
               label: "Heatmaps",
@@ -137,7 +131,6 @@
           children: [
             { href: "/market-intel.html#cross-asset-overview", label: "Cross-Asset Overview" },
             { href: "/market-intel.html#macro-indicators", label: "Macro Indicators" },
-            { href: "/market-intel.html#liquidations", label: "Liquidations & Funding" },
           ],
         },
         {
@@ -145,6 +138,7 @@
           children: [
             { href: "/crypto.html#crypto-research", label: "Bitcoin Research" },
             { href: "/crypto.html#technical-analysis", label: "Technical Analysis" },
+            { href: "/crypto.html#btc-liquidations-funding", label: "Liquidations & Funding" },
             { href: "/crypto.html#alt-research", label: "Alt Research" },
             { href: "/crypto.html#interactive-dashboards", label: "Interactive Dashboards" },
             { href: "/crypto.html#tradingview-tickers", label: "TradingView Tickers" },
@@ -245,11 +239,8 @@
 
   function currentPath() {
     var path = window.location.pathname || "/";
-    // Overview v2 is served at / and its legacy URLs; v1 at /overview-v1 and /index.html.
-    if (path === "/overview-v2" || path === "/overview-v2.html") return "/";
-    // Cross-Market OI and the RSI Matrix are sections of Overview v2 now.
-    if (path === "/cross-market-oi.html" || path === "/rsi-matrix.html") return "/";
-    if (path === "/index.html" || path === "/overview-v1.html") return "/overview-v1";
+    // The Overview is served at / and its /index.html and /overview-v1 aliases.
+    if (path === "/index.html" || path === "/overview-v1" || path === "/overview-v1.html") return "/";
     // Single-concept and topic explainer pages belong to the Indicators Glossary.
     if (path === "/concept.html" || path === "/topic.html") return "/indicators.html";
     return path;
