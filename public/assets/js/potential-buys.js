@@ -274,10 +274,13 @@
   }
 
   function stackCard(tag, items) {
-    var top = items[0];
+    // The folder's cover is its oldest screenshot,
+    // with the next-oldest ones peeking out behind it.
+    var byAge = items.slice().sort(function (a, b) { return (a.createdAt || 0) - (b.createdAt || 0); });
+    var top = byAge[0];
     var name = "$" + tag;
     var updated = items.reduce(function (max, item) { return Math.max(max, touchedAt(item)); }, 0);
-    var peeks = items.slice(1, 3).map(function (item, i) {
+    var peeks = byAge.slice(1, 3).map(function (item, i) {
       return '<img class="pb-stack-peek pb-stack-peek-' + (i + 1) + '" src="' + escapeHtml(item.url) + '" alt="" loading="lazy" />';
     }).join("");
     return (
