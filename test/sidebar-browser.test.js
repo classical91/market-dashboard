@@ -15,7 +15,14 @@ test("shared sidebar browser regressions", {
 }, async (t) => {
   const app = express();
   const publicDir = path.join(__dirname, "..", "public");
-  for (const [url, file] of [["/overview-v1", "index.html"], ["/terminal-suite.html", "terminal-suite.html"], ["/", "overview-v2.html"], ["/overview-v2", "overview-v2.html"], ["/reporter.html", "reporter.html"], ["/briefings/crypto", "terminal-suite.html"], ["/heatmaps.html", "heatmaps.html"]]) {
+  const pages = [
+    ["/overview-v1", "index.html"], ["/terminal-suite.html", "terminal-suite.html"],
+    ["/", "overview-v2.html"], ["/overview-v2", "overview-v2.html"],
+    ["/reporter.html", "reporter.html"], ["/briefings/crypto", "terminal-suite.html"],
+    ["/heatmaps.html", "heatmaps.html"], ["/youtube-v2.html", "youtube-v2.html"],
+    ["/x-intelligence.html", "x-intelligence.html"], ["/intelligence-portal.html", "intelligence-portal.html"],
+  ];
+  for (const [url, file] of pages) {
     app.get(url, (_req, res) => {
       const html = fs.readFileSync(path.join(publicDir, file), "utf8");
       res.type("html").send(html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, (tag) =>
@@ -185,6 +192,33 @@ test("shared sidebar browser regressions", {
       assert.equal(await page.evaluate(() => document.body.style.overflow), "");
       await page.setViewportSize({ width: 1440, height: 900 });
       await state(menu(page, "my_trades", sidebar), false);
+    }
+  });
+
+  await t.test("Intelligent Portal has the accent border and platform toggles stay borderless", async (t) => {
+    const page = await open(t);
+    const destinations = [
+      ["/overview-v1", [".sidebar", ".mob-drawer"]],
+      ...["/intelligence-portal.html", "/youtube-v2.html", "/x-intelligence.html"]
+        .map((url) => [url, [".cmd-sidebar", ".cmd-drawer"]]),
+    ];
+    for (const [url, roots] of destinations) {
+      await page.goto(base + url);
+      for (const theme of ["graphite", "terminal"]) {
+        await page.evaluate((theme) => AppSettings.applyTheme(theme), theme);
+        for (const root of roots) {
+          const portal = page.locator(root).getByRole("link", { name: "Intelligent Portal", exact: true, includeHidden: true });
+          assert.equal(await portal.evaluate((node) => getComputedStyle(node).borderTopWidth), "1px");
+          for (const [key, activeUrl] of [["youtube_links", "/youtube-v2.html"], ["x_links", "/x-intelligence.html"]]) {
+            const button = toggle(menu(page, key, root));
+            const appearance = await button.evaluate((node) => {
+              const style = getComputedStyle(node);
+              return [node.classList.contains("active"), style.borderTopWidth, style.borderLeftWidth, style.boxShadow];
+            });
+            assert.deepEqual(appearance, [url === activeUrl, "0px", "0px", "none"], `${theme} ${root} ${key}`);
+          }
+        }
+      }
     }
   });
 

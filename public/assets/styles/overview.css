@@ -139,24 +139,6 @@ body {
   border-color: rgba(155, 123, 255, 0.95);
   background: rgba(155, 123, 255, 0.15);
 }
-.nav-item--youtube {
-  border-color: rgba(255, 0, 0, 0.58);
-  background: rgba(255, 0, 0, 0.08);
-  box-shadow: inset 3px 0 0 rgba(255, 0, 0, 0.82);
-}
-.nav-item--youtube:hover {
-  border-color: rgba(255, 0, 0, 0.9);
-  background: rgba(255, 0, 0, 0.15);
-}
-.nav-item--x {
-  border-color: rgba(255, 255, 255, 0.42);
-  background: rgba(255, 255, 255, 0.07);
-  box-shadow: inset 3px 0 0 rgba(255, 255, 255, 0.75);
-}
-.nav-item--x:hover {
-  border-color: rgba(255, 255, 255, 0.72);
-  background: rgba(255, 255, 255, 0.12);
-}
 .nav-text { flex: 1; }
 .nav-external { color: var(--soft); font-size: 11px; }
 .nav-dot {
@@ -183,22 +165,6 @@ body {
 .nav-dropdown-toggle.nav-item--featured {
   border: 1px solid rgba(245, 197, 66, 0.58);
   background: rgba(245, 197, 66, 0.07);
-}
-.nav-dropdown-toggle.nav-item--youtube {
-  border-color: rgba(255, 0, 0, 0.58);
-  background: rgba(255, 0, 0, 0.08);
-}
-.nav-dropdown-toggle.nav-item--youtube:hover {
-  border-color: rgba(255, 0, 0, 0.9);
-  background: rgba(255, 0, 0, 0.15);
-}
-.nav-dropdown-toggle.nav-item--x {
-  border-color: rgba(255, 255, 255, 0.42);
-  background: rgba(255, 255, 255, 0.07);
-}
-.nav-dropdown-toggle.nav-item--x:hover {
-  border-color: rgba(255, 255, 255, 0.72);
-  background: rgba(255, 255, 255, 0.12);
 }
 .nav-caret {
   font-size: 11px;

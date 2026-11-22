@@ -172,13 +172,8 @@ test("Other section holds the external sites above Trading and tools", () => {
   assert.match(sidebar, /'nav-other" aria-label="Other"/);
 });
 
-test("the intelligence menus are the colour-featured tabs", () => {
-  for (const [label, featured] of [["YouTube Links", "youtube"], ["X Links", "x"]]) {
-    const start = sidebar.indexOf(`label: "${label}"`);
-    assert.ok(start > 0, `${label} is missing`);
-    assert.match(sidebar.slice(start, start + 120), new RegExp(`featured: "${featured}"`));
-  }
-  assert.doesNotMatch(sidebar, /featured: "(worldmonitor|tradingview)"/);
+test("Intelligent Portal is the only featured sidebar item", () => {
+  assert.deepEqual([...sidebar.matchAll(/featured: "([^"]+)"/g)].map((match) => match[1]), ["portal"]);
 });
 
 test("Trading and tools section has one copy of every item in the requested order", () => {
@@ -251,7 +246,7 @@ test("one standalone Intelligent Portal replaces the nested portal links", () =>
   assert.ok(portalStart > -1 && portalStart < ytStart, "the shared portal sits above the platform menus");
   const workspace = sidebar.slice(sidebar.indexOf("var workspace"), sidebar.indexOf("var other"));
   assert.equal((workspace.match(/href: "\/intelligence-portal\.html"/g) || []).length, 1);
-  assert.match(workspace, /^    \{ href: "\/intelligence-portal\.html", label: "Intelligent Portal" \},$/m);
+  assert.match(workspace, /^    \{ href: "\/intelligence-portal\.html", label: "Intelligent Portal", featured: "portal" \},$/m);
   assert.doesNotMatch(workspace, /label: "(?:X|YouTube) Portal"|intelligence-portal\.html#/);
   // The platform pages remain available through their existing menus.
   assert.match(ytMenu, /href: "\/youtube-v2\.html", label: "YouTube Intelligence"/);
