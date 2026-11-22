@@ -136,6 +136,7 @@ const { createAgentRoutePreflight } = require("./services/newsroom-agent-preflig
 const { TelegramService } = require("./services/telegram");
 const { YouTubeIntelligenceService } = require("./services/youtube");
 const { YoutubeChannelRegistry } = require("./services/youtube-channel-registry");
+const { YoutubeSummaryService } = require("./services/youtube-summary");
 const { XFeedService } = require("./services/x-feed");
 const { resolveDataDir } = require("./utils/data-dir");
 const { createRequireAdmin } = require("./middleware/admin-auth");
@@ -305,6 +306,10 @@ function createApp() {
   });
   youtubeChannelRegistry.ensureSeeded();
   const youtubeChannels = youtubeChannelRegistry.list();
+  const youtubeSummaryService = new YoutubeSummaryService({
+    ...config.youtube.summary,
+    cache: new PersistentReporterCache(path.join(dataDir, "youtube-summaries.json")),
+  });
   const youtubeService = new YouTubeIntelligenceService({
     cache,
     idCache: youtubeIdCache,
@@ -870,6 +875,7 @@ function createApp() {
       youtubeService,
       channelRegistry: youtubeChannelRegistry,
       channelIdOverrides: config.youtube.channelIds,
+      summaryService: youtubeSummaryService,
       requireAdmin,
     }),
   );

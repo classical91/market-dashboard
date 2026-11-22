@@ -4,9 +4,15 @@
   var YT_ORIGIN = "https://www.youtube.com";
 
   // enablejsapi lets the page hear when a video ends so the queue can advance.
-  function embedUrl(id) {
+  function embedUrl(id, start) {
     var origin = window.location.origin && window.location.origin !== "null" ? "&origin=" + encodeURIComponent(window.location.origin) : "";
-    return YT_ORIGIN + "/embed/" + encodeURIComponent(id) + "?autoplay=1&enablejsapi=1" + origin;
+    return YT_ORIGIN + "/embed/" + encodeURIComponent(id) + "?autoplay=1&enablejsapi=1" + origin + (start ? "&start=" + start : "");
+  }
+
+  // Gemini can only summarize a finished video: a live stream is still being
+  // recorded and an upcoming one has no content yet.
+  function canSummarize(video) {
+    return Boolean(video && video.id) && video.state !== "live" && video.state !== "upcoming";
   }
   function watchUrl(id) {
     return "https://youtu.be/" + encodeURIComponent(id);
@@ -210,6 +216,17 @@
       wrap.appendChild(queueButton);
     }
 
+    // Gemini summary pill, top-left of the thumbnail (the queue toggle is top-right).
+    if (ctx.onSummarize && canSummarize(video)) {
+      var summary = document.createElement("button");
+      summary.type = "button";
+      summary.className = "yt-summary-chip";
+      summary.textContent = "Summary";
+      summary.setAttribute("aria-label", "Summarize " + (video.title || "video") + " with Gemini");
+      summary.addEventListener("click", function () { ctx.onSummarize(item); });
+      wrap.appendChild(summary);
+    }
+
     return wrap;
   }
 
@@ -404,6 +421,9 @@
     var queueAutoplay = document.getElementById("ytQueueAutoplay");
     var queueAnnounce = document.getElementById("ytQueueAnnounce");
     var playNextButton = document.getElementById("ytPlayNext");
+    var summarizeButton = document.getElementById("ytSummarize");
+    var summarizeItem = null;
+    var playingItem = null;
     var queue = window.YoutubeQueue && queueSection
       ? window.YoutubeQueue.createQueue({ storage: safeStorage() })
       : null;
@@ -419,7 +439,7 @@
 
     function renderFeed() {
       if (!payload) return;
-      var ctx = { onSelect: onSelect, activeId: playingId, queue: queue, onToggleQueue: toggleQueue };
+      var ctx = { onSelect: onSelect, activeId: playingId, queue: queue, onToggleQueue: toggleQueue, onSummarize: summarizeItem };
       var count = render(roots, payload, ctx, search.value);
       status.textContent = (search.value.trim() ? count + (count === 1 ? " matching video. " : " matching videos. ") : "") + feedNote;
     }
@@ -506,6 +526,8 @@
         player.src = embedUrl(video.id);
       }
       playingId = video.id;
+      playingItem = item;
+      if (summarizeButton) summarizeButton.hidden = !summarizeItem || !canSummarize(video);
       renderQueue();
       watch.scrollIntoView({ block: "start" });
       watchTitle.focus({ preventScroll: true });
@@ -524,6 +546,7 @@
       watch.hidden = true;
       document.body.classList.remove("yt-focus");
       playingId = null;
+      playingItem = null;
       renderQueue();
       if (restoreFocus) (card || search).focus();
     }
@@ -903,6 +926,31 @@
         }
       }
     }
+
+    // A [mm:ss] link in a summary plays the video from that point in the
+    // page's own player instead of leaving for youtube.com.
+    function seekTo(item, seconds) {
+      if (playingId !== item.video.id) play(item);
+      endedFor = null;
+      player.src = embedUrl(item.video.id, seconds);
+      window.YoutubeSummary.close();
+      watch.scrollIntoView({ block: "start" });
+      return true;
+    }
+
+    if (window.YoutubeSummary) {
+      summarizeItem = function (item) {
+        window.YoutubeSummary.open({
+          video: item.video,
+          channelLabel: item.channelLabel,
+          onTimestamp: function (seconds) { return seekTo(item, seconds); },
+        });
+      };
+      summarizeButton?.addEventListener("click", function () {
+        if (playingItem) summarizeItem(playingItem);
+      });
+    }
+    if (summarizeButton) summarizeButton.hidden = true;
 
     search.addEventListener("input", renderFeed);
     refresh.addEventListener("click", loadFeeds);

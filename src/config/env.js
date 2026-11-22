@@ -234,6 +234,15 @@ const config = {
     // search.list costs 100 units a call against a 10,000/day default quota,
     // so it stays off unless explicitly switched on with a raised quota.
     liveSearchEnabled: process.env.YOUTUBE_LIVE_SEARCH_ENABLED === "true",
+    // Gemini video summaries (the Summarize button). Gemini is the provider
+    // whose API takes a YouTube URL as video input, so no transcript is
+    // scraped. Blank key: the button says summaries are not configured.
+    summary: {
+      apiKey: process.env.GEMINI_API_KEY || "",
+      model: process.env.GEMINI_MODEL || "gemini-flash-latest",
+      timeoutMs: parseNumber(process.env.GEMINI_SUMMARY_TIMEOUT_MS, 180000),
+      cacheTtlMs: parseNumber(process.env.GEMINI_SUMMARY_CACHE_MS, 30 * 24 * 60 * 60 * 1000),
+    },
   },
   telegram: {
     botToken: process.env.TELEGRAM_BOT_TOKEN || "",

@@ -169,6 +169,47 @@ test("YouTube page browser regressions", { skip: !fs.existsSync(chromium.executa
     }
   });
 
+  await t.test("Gemini summary popup renders, seeks the player and closes", async (t) => {
+    const posts = [];
+    const page = await open(t, (url, request) => {
+      if (!url.pathname.startsWith("/api/youtube/summary/")) return;
+      if (request.method() === "GET") return { body: { provider: "gemini", configured: true, summary: null } };
+      posts.push(url.pathname);
+      return { body: { configured: true, summary: { videoId: "clip1234567", summary: "TL;DR: Rates matter.\n\n## Key points\n- [01:05] Fed holds <b>steady</b>\n\n## Market calls\n- None", model: "gemini-test", generatedAt: "2026-11-15T12:00:00Z", cached: false } } };
+    });
+    await ready(page);
+    // Only finished uploads can be summarized: not the live or upcoming stream.
+    assert.equal(await page.locator(".yt-summary-chip").count(), 1);
+    await page.getByRole("button", { name: "Summarize Weekly market outlook with Gemini" }).click();
+    const dialog = page.getByRole("dialog", { name: "Weekly market outlook" });
+    await dialog.getByRole("heading", { name: "Key points" }).waitFor();
+    assert.deepEqual(posts, ["/api/youtube/summary/clip1234567"]);
+    assert.match(await dialog.locator(".yts-tldr").textContent(), /Rates matter/);
+    // Summary text is never parsed as HTML.
+    assert.equal(await dialog.locator("b").count(), 0);
+    assert.match(await dialog.textContent(), /<b>steady<\/b>/);
+    assert.equal(await page.locator("#ytPlayer").getAttribute("src"), null);
+    await dialog.getByRole("link", { name: "Jump to 01:05" }).click();
+    assert.match(await page.locator("#ytPlayer").getAttribute("src"), /embed\/clip1234567\?autoplay=1&enablejsapi=1.*&start=65$/);
+    assert.equal(await page.locator(".yts-overlay").count(), 0);
+    // The player bar offers the same popup, and Escape closes it without leaving focus mode.
+    await page.getByRole("button", { name: "Summarize", exact: true }).click();
+    await dialog.getByRole("heading", { name: "Key points" }).waitFor();
+    await page.keyboard.press("Escape");
+    assert.equal(await page.locator(".yts-overlay").count(), 0);
+    assert.equal(await page.locator("#ytWatch").isVisible(), true);
+  });
+
+  await t.test("summary popup explains a missing Gemini key", async (t) => {
+    const page = await open(t, (url) => url.pathname.startsWith("/api/youtube/summary/") ? { body: { configured: false, summary: null } } : undefined);
+    await ready(page);
+    await page.locator(".yt-summary-chip").click();
+    await page.getByText("Video summaries aren't set up yet.").waitFor();
+    assert.match(await page.locator(".yts-dialog").textContent(), /GEMINI_API_KEY/);
+    await page.getByRole("button", { name: "Close", exact: true }).click();
+    assert.equal(await page.locator(".yts-overlay").count(), 0);
+  });
+
   await t.test("configuration failure is recoverable without a reload", async (t) => {
     let failing = true;
     const page = await open(t, (url) => url.pathname.endsWith("/channels/config") && failing ? { status: 503, body: {} } : undefined);
