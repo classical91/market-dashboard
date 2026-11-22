@@ -23,7 +23,7 @@ function asyncRoute(handler) {
  * folding it into the seed would have silently retired that setting on the
  * first boot after this change.
  */
-function createYoutubeRouter({ youtubeService, channelRegistry, channelIdOverrides, requireAdmin }) {
+function createYoutubeRouter({ youtubeService, channelRegistry, channelIdOverrides, summaryService, requireAdmin }) {
   const router = express.Router();
 
   function feedChannels(categoryId) {
@@ -170,6 +170,33 @@ function createYoutubeRouter({ youtubeService, channelRegistry, channelIdOverrid
         res.json({ removed, channels: channelRegistry.list(), categories: channelRegistry.listCategories() });
       }),
     );
+  }
+
+  // Gemini video summaries for the Summarize popup.
+  //
+  // Reading a cached summary is free, so GET carries the same access as the
+  // feed itself. Generating one spends Gemini credits, so POST is admin-gated
+  // like the other generate endpoints; the page calls it with the owner
+  // session or the stored admin key.
+  if (summaryService) {
+    router.get(
+      "/summary/:videoId",
+      asyncRoute(async (req, res) => {
+        const cached = summaryService.getCached(req.params.videoId);
+        res.json({ ...summaryService.describe(), summary: cached ? { ...cached, cached: true } : null });
+      }),
+    );
+
+    if (requireAdmin) {
+      router.post(
+        "/summary/:videoId",
+        requireAdmin,
+        asyncRoute(async (req, res) => {
+          const summary = await summaryService.summarize(req.params.videoId, { refresh: req.body?.refresh === true });
+          res.json({ ...summaryService.describe(), summary });
+        }),
+      );
+    }
   }
 
   router.get(

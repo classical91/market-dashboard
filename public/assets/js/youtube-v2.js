@@ -1,9 +1,18 @@
 (function () {
   "use strict";
 
-  function embedUrl(id) {
-    return "https://www.youtube.com/embed/" + encodeURIComponent(id) + "?autoplay=1";
+  function embedUrl(id, start) {
+    return "https://www.youtube.com/embed/" + encodeURIComponent(id) + "?autoplay=1" + (start ? "&start=" + start : "");
   }
+
+  // Gemini can only summarize a finished video: a live stream is still being
+  // recorded and an upcoming one has no content yet.
+  function canSummarize(video) {
+    return Boolean(video && video.id) && video.state !== "live" && video.state !== "upcoming";
+  }
+
+  // Set by init(): opens the Gemini summary popup for a feed item.
+  var summarizeItem = null;
   function watchUrl(id) {
     return "https://youtu.be/" + encodeURIComponent(id);
   }
@@ -173,8 +182,23 @@
       e.preventDefault();
       onSelect(item, card);
     });
+    card.dataset.videoId = video.id || "";
 
-    return card;
+    // The summary button sits beside the link, not inside it: a button nested
+    // in an <a> is invalid and would also trigger playback.
+    var wrap = document.createElement("div");
+    wrap.className = "yt-feed-item";
+    wrap.appendChild(card);
+    if (summarizeItem && canSummarize(video)) {
+      var summary = document.createElement("button");
+      summary.type = "button";
+      summary.className = "yt-summary-chip";
+      summary.textContent = "Summary";
+      summary.setAttribute("aria-label", "Summarize " + (video.title || "video") + " with Gemini");
+      summary.addEventListener("click", function () { summarizeItem(item); });
+      wrap.appendChild(summary);
+    }
+    return wrap;
   }
 
   function setMessage(root, message) {
@@ -351,9 +375,11 @@
       upcoming: document.getElementById("ytUpcomingFeeds"),
       uploads: document.getElementById("ytChannelFeeds"),
     };
+    var summarizeButton = document.getElementById("ytSummarize");
     var payload;
     var request;
     var playingId = null;
+    var playingItem = null;
     var feedNote = "";
 
     function renderFeed() {
@@ -431,6 +457,8 @@
       document.body.classList.add("yt-focus");
       if (playingId !== video.id) player.src = embedUrl(video.id);
       playingId = video.id;
+      playingItem = item;
+      if (summarizeButton) summarizeButton.hidden = !canSummarize(video) || !window.YoutubeSummary;
       watch.scrollIntoView({ block: "start" });
       watchTitle.focus({ preventScroll: true });
     }
@@ -443,6 +471,7 @@
       watch.hidden = true;
       document.body.classList.remove("yt-focus");
       playingId = null;
+      playingItem = null;
       if (restoreFocus) (card || search).focus();
     }
 
@@ -510,6 +539,36 @@
           finishRequest(signal);
         }
       }
+    }
+
+    // A [mm:ss] link in the summary plays the video from that point in the
+    // page's own player instead of leaving for youtube.com.
+    function seekTo(item, seconds) {
+      var id = item.video.id;
+      if (playingId !== id) {
+        var card = document.querySelector('.yt-feed-card[data-video-id="' + CSS.escape(id) + '"]');
+        if (!card) return false;
+        onSelect(item, card);
+      }
+      player.src = embedUrl(id, seconds);
+      window.YoutubeSummary.close();
+      watch.scrollIntoView({ block: "start" });
+      return true;
+    }
+
+    if (window.YoutubeSummary) {
+      summarizeItem = function (item) {
+        window.YoutubeSummary.open({
+          video: item.video,
+          channelLabel: item.channelLabel,
+          onTimestamp: function (seconds) { return seekTo(item, seconds); },
+        });
+      };
+      summarizeButton?.addEventListener("click", function () {
+        if (playingItem) summarizeItem(playingItem);
+      });
+    } else if (summarizeButton) {
+      summarizeButton.hidden = true;
     }
 
     search.addEventListener("input", renderFeed);
