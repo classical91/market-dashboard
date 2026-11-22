@@ -25,6 +25,19 @@
           <div class="ticker-track" id="tickerTrack"></div>
         </section>
 
+        <!-- BTC RESEARCH — rendered from Crypto Hub's Bitcoin Research section
+             (/crypto.html#crypto-research), so both pages list the same links. -->
+        <details class="ov-btc" id="btc-research">
+          <summary>
+            <span class="ov-btc-heading">₿ BTC Research</span>
+            <span class="ov-btc-count" id="ov-btc-count" role="status">Loading…</span>
+            <a class="ov-btc-hub" href="/crypto.html#crypto-research">Open in Crypto Hub ↗</a>
+          </summary>
+          <div class="ov-btc-body" id="ov-btc-body" aria-live="polite">
+            <div class="empty-state">Loading Bitcoin Research…</div>
+          </div>
+        </details>
+
         <!-- ── TradingView widget sections ─────── -->
 
         <!-- MARKET OVERVIEW -->
@@ -271,5 +284,6 @@
     <script src="/assets/js/trading-sessions.js"></script>
     <script src="/assets/js/overview.js"></script>
     <script src="/assets/js/onchain-intelligence.js"></script>
+    <script src="/assets/js/overview-btc-research.js"></script>
   </body>
 </html>

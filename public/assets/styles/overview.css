@@ -1438,3 +1438,59 @@ html {
   max-height: 3000px; opacity: 1;
 }
 .ovh-link-grid.collapsed { max-height: 0; opacity: 0; margin-bottom: 0.5rem; pointer-events: none; }
+
+/* ── BTC Research ── collapsible list mirrored from Crypto Hub's Bitcoin
+   Research section. The badge tokens match crypto.html's inline styles. */
+.ov-btc {
+  --blue-bg: rgba(77, 163, 255, 0.12); --purple-bg: rgba(155, 123, 255, 0.12);
+  --green-bg: rgba(0, 227, 150, 0.12); --teal: #00e396; --teal-bg: rgba(0, 227, 150, 0.12);
+  --amber: #f5c542; --amber-bg: rgba(245, 197, 66, 0.12); --coral: #ff4d6d; --coral-bg: rgba(255, 77, 109, 0.12);
+  margin-bottom: 25px; border: 1px solid var(--border); border-radius: 14px; background: var(--panel);
+  scroll-margin-top: 16px;
+}
+.ov-btc > summary { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; padding: 12px 16px; cursor: pointer; list-style: none; }
+.ov-btc > summary::-webkit-details-marker { display: none; }
+.ov-btc > summary::before { content: "▸"; color: var(--amber); font-size: 11px; transition: transform .15s; }
+.ov-btc[open] > summary::before { transform: rotate(90deg); }
+.ov-btc > summary:focus-visible { outline: 2px solid var(--amber); outline-offset: -2px; border-radius: 14px; }
+.ov-btc-heading { color: var(--amber); font-size: 13px; font-weight: 800; letter-spacing: .04em; }
+.ov-btc-count { color: var(--muted); font-size: 11.5px; }
+.ov-btc[open] .ov-btc-count { display: none; }
+.ov-btc-hub { margin-left: auto; color: var(--blue); font-size: 11.5px; font-weight: 650; text-decoration: none; }
+.ov-btc-hub:hover, .ov-btc-hub:focus-visible { text-decoration: underline; }
+.ov-btc-body { padding: 0 12px 12px; }
+.ov-btc-body .empty-state { padding: 6px 4px; }
+.ov-btc-error strong { color: var(--red); }
+.ov-btc-error p { margin: 4px 0 8px; }
+.ov-btc-retry { padding: 5px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel-2); color: var(--text); font: inherit; font-size: 12px; cursor: pointer; }
+.ov-btc-retry:hover { border-color: var(--amber); }
+.ov-btc-list { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--panel-2); }
+.ov-btc-link { display: flex; align-items: center; gap: 14px; padding: 10px 15px; border-top: 1px solid var(--border); color: inherit; text-decoration: none; transition: background .15s, box-shadow .15s; }
+.ov-btc-list > .ov-btc-link:first-child { border-top: 0; }
+.ov-btc-link:hover { background: rgba(245, 197, 66, 0.06); box-shadow: inset 3px 0 0 var(--amber); }
+.ov-btc-link:focus-visible { outline: 2px solid var(--amber); outline-offset: -2px; }
+.ov-btc-badge { flex: 0 0 auto; min-width: 122px; max-width: 180px; padding: 4px 8px; border-radius: 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; font-size: 10.5px; font-weight: 700; letter-spacing: .05em; color: var(--soft); background: var(--panel-3); }
+.ov-btc-title { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font-size: 13.5px; font-weight: 600; }
+.ov-btc-src { flex: 0 0 auto; color: var(--muted); font-size: 11.5px; }
+.ov-btc-arrow { flex: 0 0 auto; color: var(--soft); font-size: 14px; }
+.ov-btc-sub { border-top: 1px solid var(--border); }
+.ov-btc-sub > summary { display: flex; align-items: center; gap: 8px; padding: 9px 15px 9px 27px; cursor: pointer; list-style: none; }
+.ov-btc-sub > summary::-webkit-details-marker { display: none; }
+.ov-btc-sub > summary::before { content: "▸"; color: var(--amber); font-size: 10px; transition: transform .15s; }
+.ov-btc-sub[open] > summary::before { transform: rotate(90deg); }
+.ov-btc-sub > summary:focus-visible { outline: 2px solid var(--amber); outline-offset: -2px; }
+.ov-btc-sub-label { color: var(--amber); font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.ov-btc-sub-count { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.ov-btc-sublist { border-top: 1px solid var(--border); background: rgba(245, 197, 66, 0.04); }
+.ov-btc-sublist .ov-btc-link { padding-left: 27px; }
+.ov-btc-sublist > .ov-btc-link:first-child { border-top: 0; }
+.ov-btc-note { margin: 0; padding: 9px 27px; color: var(--muted); font-size: 12px; }
+@media (max-width: 640px) {
+  .ov-btc-hub { margin-left: 0; }
+  .ov-btc-link { flex-wrap: wrap; gap: 6px 10px; }
+  .ov-btc-badge { min-width: 0; }
+  .ov-btc-title { order: 3; flex: 1 1 100%; white-space: normal; }
+  .ov-btc-src { order: 4; }
+  .ov-btc-arrow { margin-left: auto; }
+}
+@media (prefers-reduced-motion: reduce) { .ov-btc > summary::before, .ov-btc-sub > summary::before, .ov-btc-link { transition: none; } }
