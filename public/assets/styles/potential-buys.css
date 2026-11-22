@@ -249,6 +249,13 @@
 .pb-viewer-meta { flex: 1 1 200px; min-width: 0; }
 .pb-viewer-label { font-size: 14px; font-weight: 700; overflow-wrap: anywhere; }
 .pb-viewer-when { font-size: 11px; color: var(--muted); }
+/* Phones: the bar wraps, so keep Close beside the title (top right) and
+   move Crop to the end of the second row. */
+@media (max-width: 640px) {
+  .pb-viewer-bar .pb-viewer-meta { order: -2; }
+  #pbViewerClose { order: -1; }
+  #pbViewerCrop { order: 1; }
+}
 .pb-viewer-img {
   display: block;
   max-width: 100%;
