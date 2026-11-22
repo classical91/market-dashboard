@@ -305,16 +305,18 @@
           '<img src="' + escapeHtml(item.url) + '" alt="' + alt + '" loading="lazy" />' +
         "</button>" +
         '<div class="pb-card-body">' +
+          // Read-only until Edit → Rename, so a stray tap doesn't open the keyboard.
           '<input class="pb-label" type="text" maxlength="140" value="' + label + '" ' +
-            'placeholder="Ticker (BTC) or note…" aria-label="Label" data-action="label" ' +
-            'autocomplete="off" spellcheck="false" />' +
+            'placeholder="No ticker" aria-label="Label" data-action="label" ' +
+            'autocomplete="off" spellcheck="false" readonly tabindex="-1" />' +
           '<div class="pb-card-foot">' +
             '<span class="pb-when' + (isStale(item.createdAt) ? " is-stale" : "") + '" title="' +
               escapeHtml((isStale(item.createdAt) ? "Older than 3 days · " : "") + formatSize(item.size)) + '">' +
               escapeHtml(formatWhen(item.createdAt)) + "</span>" +
-            // Crop and Delete sit behind Edit so the card stays uncluttered.
+            // Rename, Crop and Delete sit behind Edit so the card stays uncluttered.
             '<button type="button" class="pb-btn pb-edit" data-action="edit" aria-expanded="' + (state.editing === item.id) + '">Edit</button>' +
             '<span class="pb-edit-actions">' +
+              '<button type="button" class="pb-btn" data-action="rename">Rename</button>' +
               '<button type="button" class="pb-btn" data-action="crop">Crop</button>' +
               '<button type="button" class="pb-btn pb-btn-danger" data-action="delete">Delete</button>' +
               '<button type="button" class="pb-btn" data-action="done">Done</button>' +
@@ -691,7 +693,7 @@
     el.heading.scrollIntoView({ block: "start", behavior: "smooth" });
   }
 
-  /** Show or hide a card's Crop / Delete / Done row; one card at a time. */
+  /** Show or hide a card's Rename / Crop / Delete / Done row; one card at a time. */
   function setEditing(id, focusAction) {
     state.editing = id;
     Array.from(el.grid.querySelectorAll(".pb-card[data-id]")).forEach(function (card) {
@@ -700,10 +702,30 @@
       var edit = card.querySelector('[data-action="edit"]');
       if (edit) edit.setAttribute("aria-expanded", String(on));
       if (on || card.getAttribute("data-id") === focusAction) {
-        var next = card.querySelector('[data-action="' + (on ? "crop" : "edit") + '"]');
+        var next = card.querySelector('[data-action="' + (on ? "rename" : "edit") + '"]');
         if (next) next.focus();
       }
     });
+  }
+
+  /** Make a card's title editable and put the cursor in it. */
+  function startRename(card) {
+    var input = card.querySelector(".pb-label");
+    if (!input) return;
+    input.readOnly = false;
+    input.removeAttribute("tabindex");
+    input.placeholder = "Ticker (BTC) or note…";
+    card.classList.add("is-renaming");
+    input.focus();
+    input.select();
+  }
+
+  function endRename(input) {
+    input.readOnly = true;
+    input.setAttribute("tabindex", "-1");
+    input.placeholder = "No ticker";
+    var card = input.closest(".pb-card");
+    if (card) card.classList.remove("is-renaming");
   }
 
   el.grid.addEventListener("click", function (e) {
@@ -716,6 +738,7 @@
     if (action === "view") openViewer(id);
     else if (action === "edit") setEditing(id);
     else if (action === "done") setEditing(null, id);
+    else if (action === "rename") startRename(card);
     else if (action === "crop") openCrop(id);
     else if (action === "delete") remove(id);
   });
@@ -732,8 +755,13 @@
     }
   });
   el.grid.addEventListener("focusout", function (e) {
-    if (!e.target.matches(".pb-label")) return;
-    saveLabel(e.target.closest(".pb-card").getAttribute("data-id"), e.target);
+    if (!e.target.matches(".pb-label") || e.target.readOnly) return;
+    var id = e.target.closest(".pb-card").getAttribute("data-id");
+    endRename(e.target);
+    // A finished rename closes the Edit row; the card may also have moved
+    // into a ticker stack.
+    if (state.editing === id) setEditing(null);
+    saveLabel(id, e.target);
   });
 
   el.back.addEventListener("click", function () { openFolder(ALL); });
