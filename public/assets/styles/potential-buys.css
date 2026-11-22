@@ -24,6 +24,42 @@
 .pb-btn-danger:hover { background: var(--red-bg); border-color: rgba(255,77,109,0.6); }
 .pb-btn:disabled { opacity: 0.5; cursor: default; }
 
+/* Count tab — totals across every screenshot */
+.pb-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.pb-stat {
+  min-width: 0;
+  padding: 12px 14px;
+  background: rgba(9,14,24,0.72);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.pb-stat-main { border-color: rgba(77,163,255,0.45); background: var(--blue-bg); }
+.pb-stat-label {
+  font-size: 10px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--muted);
+}
+.pb-stat-value {
+  margin-top: 4px;
+  font-size: 26px; font-weight: 800; line-height: 1.1;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.pb-stat-sub {
+  margin-top: 3px;
+  font-size: 11px; color: var(--muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+@media (max-width: 560px) {
+  .pb-stats { gap: 6px; }
+  .pb-stat { padding: 10px; }
+  .pb-stat-value { font-size: 21px; }
+}
+
 /* Drop zone */
 .pb-dropzone {
   display: grid; place-items: center; gap: 6px;
