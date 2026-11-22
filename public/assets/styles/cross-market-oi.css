@@ -144,6 +144,16 @@
 .xoi-plot { position: relative; }
 .xoi-svg { display: block; width: 100%; height: auto; overflow: visible; }
 
+/* Keep the desktop plot near its native size instead of enlarging it across
+   the whole dashboard. The 920:520 viewBox sets the width for a 58vh cap. */
+@media (min-width: 721px) {
+  .xoi-plot-wrap {
+    width: 100%;
+    max-width: min(920px, calc(58vh * 920 / 520));
+    margin-inline: auto;
+  }
+}
+
 .xoi-ring { fill: none; stroke: var(--xoi-cyan-dim); stroke-width: 1; }
 .xoi-ring--outer { stroke: var(--xoi-cyan); stroke-width: 1.5; }
 .xoi-ring--zero { stroke: rgba(34, 211, 238, 0.6); stroke-dasharray: 4 4; }
