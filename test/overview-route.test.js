@@ -5,7 +5,7 @@ const http = require("node:http");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "overview-v2-route-"));
+process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "overview-route-"));
 process.env.MARKET_DASHBOARD_LOGIN_PASSWORD = "test-owner-password";
 const { createApp } = require("../src/app");
 
@@ -27,6 +27,9 @@ test("Overview is the default page and the removed Overview v2 URLs redirect to 
       const html = await response.text();
       assert.match(html, /assets\/js\/overview\.js/, url);
       assert.doesNotMatch(html, /overview-v2/, url);
+      assert.match(html, /id="mini-x-portal"/, url);
+      assert.match(html, /href="\/x-intelligence\.html\?template=markets"/, url);
+      assert.match(html, /href="\/youtube-v2\.html\?category=category%3Acrypto"/, url);
     }
     for (const url of ["/overview-v2", "/overview-v2.html", "/overview-hybrid.html"]) {
       const response = await fetch(base + url, { redirect: "manual", headers: { cookie } });

@@ -413,3 +413,7 @@
   .pb-label,
   .pb-search { font-size: 16px; }
 }
+
+/* Technical Analysis dropdown (shared .section-header/.cards from
+   command.css) — spaced like the other blocks on this page. */
+.pb-ta-header { margin-top: 24px; }

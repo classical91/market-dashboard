@@ -70,6 +70,19 @@
       <div class="pb-grid" id="pbGrid" aria-live="polite"></div>
     </section>
 
+    <!-- TECHNICAL ANALYSIS — the same links as Crypto Hub's Bitcoin Research
+         → Technical Analysis dropdown (public/crypto.html), kept beside the
+         screenshots so a chart idea can be checked before it is saved. -->
+    <div class="section-header pb-ta-header" data-section="technical-analysis">
+      <span class="section-label section-label--btc">Technical Analysis</span>
+      <span class="section-chevron section-chevron--btc">&#9660;</span>
+    </div>
+    <div class="cards" id="technical-analysis">
+      <a class="card" href="https://coinmarketcap.com/community/" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">CMC COMMUNITY</span><span class="arrow">&#8599;</span></div><div class="card-title">CoinMarketCap Community Feed</div><div class="card-src">coinmarketcap.com</div></a>
+      <a class="card" href="https://www.tradingview.com/symbols/BTCUSD/ideas/?exchange=BITSTAMP" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">BTC IDEAS</span><span class="arrow">&#8599;</span></div><div class="card-title">BTCUSD Trade Ideas (Bitstamp)</div><div class="card-src">tradingview.com</div></a>
+      <a class="card" href="https://www.tradingview.com/ideas/" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">TV IDEAS</span><span class="arrow">&#8599;</span></div><div class="card-title">TradingView Ideas</div><div class="card-src">tradingview.com</div></a>
+    </div>
+
     <details class="pb-help" id="pbHelp">
       <summary>Send screenshots from your iPhone (Share Sheet Shortcut)</summary>
       <p>Opening this page on your phone and tapping <strong>+ Add screenshots</strong> works too. The Shortcut lets you send
@@ -144,5 +157,7 @@
 <script src="/assets/js/crop-rect.js"></script>
 <script src="/assets/js/ticker-label.js"></script>
 <script src="/assets/js/potential-buys.js"></script>
+<script src="/assets/js/sections.js"></script>
+<script>initSections('pb_collapsed');</script>
 </body>
 </html>
