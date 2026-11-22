@@ -25,6 +25,7 @@
       href: "/",
       label: "Overview v2",
       children: [
+        { href: "/#mini-x-portal", label: "Mini X Portal" },
         { href: "/overview-v1", label: "Overview" },
       ],
     },
@@ -138,7 +139,6 @@
             { href: "/market-intel.html#cross-asset-overview", label: "Cross-Asset Overview" },
             { href: "/market-intel.html#macro-indicators", label: "Macro Indicators" },
             { href: "/market-intel.html#liquidations", label: "Liquidations & Funding" },
-            { href: "/market-intel.html#mini-x-portal", label: "Mini X Portal" },
           ],
         },
         {
