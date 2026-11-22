@@ -161,11 +161,17 @@
         { href: "/ai-analysis.html", label: "Presets" },
         { href: "/layout-analysis.html", label: "My Layouts" },
         { href: "/signal-diagnostics.html", label: "Signal Diagnostics" },
+      ],
+    },
+    {
+      label: "AI/Bots",
+      children: [
         // ChatGPT project for discretionary trade analysis (opens in a new tab).
         {
           href: "https://chatgpt.com/g/g-p-6afdc0cad2a081919b23725443780c43-trading-analyst/project",
-          label: "Trader Analyst",
+          label: "AI Analyst",
         },
+        { href: "https://t.me/cointrendz", label: "CoinTrendz Telegram" },
       ],
     },
     {
@@ -289,10 +295,6 @@
   ];
 
   var tools = [
-    {
-      href: "https://t.me/cointrendz",
-      label: "CoinTrendz Telegram",
-    },
     {
       // Command references: the dashboard's own bot commands and the
       // OpenClaw CLI docs.
