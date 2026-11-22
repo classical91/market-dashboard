@@ -1,0 +1,222 @@
+/* ─────────────────────────────────────────────────────────
+   Market Intel hub — page-scoped layer on top of command.css.
+   Every colour comes from the command.css / theme tokens, so the
+   Settings themes (light, terminal, accents) carry through.
+───────────────────────────────────────────────────────── */
+
+/* ── Hub routes ───────────────────────────────────────── */
+.mi-kicker {
+  margin: 0 2px 10px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.mi-hubs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 26px;
+}
+
+.mi-hub {
+  --hub: var(--accent);
+  --hub-bg: var(--accent-bg);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, var(--hub-bg), transparent 70%),
+    var(--surface);
+  box-shadow: inset 0 2px 0 var(--hub);
+  transition: border-color 0.15s, transform 0.15s;
+}
+.mi-hub:hover { border-color: var(--border-hover); }
+.mi-hub--crypto      { --hub: var(--amber);  --hub-bg: var(--amber-bg); }
+.mi-hub--traditional { --hub: var(--blue);   --hub-bg: var(--blue-bg); }
+.mi-hub--earthwatch  { --hub: var(--green);  --hub-bg: var(--green-bg); }
+
+.mi-hub-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  color: inherit;
+  text-decoration: none;
+  border-radius: 10px;
+}
+.mi-hub-main:focus-visible { outline: 2px solid var(--hub); outline-offset: 4px; }
+
+.mi-hub-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  border: 1px solid color-mix(in srgb, var(--hub) 40%, transparent);
+  background: var(--hub-bg);
+  color: var(--hub);
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.mi-hub-copy { flex: 1 1 auto; min-width: 0; }
+.mi-hub-title {
+  display: block;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.mi-hub-desc {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.mi-hub-go {
+  flex: 0 0 auto;
+  color: var(--hub);
+  font-size: 16px;
+  transition: transform 0.15s;
+}
+.mi-hub-main:hover .mi-hub-title { color: var(--hub); }
+.mi-hub-main:hover .mi-hub-go { transform: translate(2px, -2px); }
+
+.mi-hub-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: auto;
+}
+.mi-chip {
+  padding: 4px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface2);
+  color: var(--soft);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.mi-chip:hover {
+  border-color: color-mix(in srgb, var(--hub) 55%, transparent);
+  background: var(--hub-bg);
+  color: var(--text);
+}
+.mi-chip:focus-visible { outline: 2px solid var(--hub); outline-offset: 2px; }
+.mi-chip--note { cursor: default; }
+.mi-chip--note:hover {
+  border-color: var(--border);
+  background: var(--surface2);
+  color: var(--soft);
+}
+
+/* ── Link sections as a tile grid ─────────────────────── */
+.cards.mi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 10px;
+  padding: 12px;
+}
+.cards.mi-grid.collapsed { padding: 0; }
+
+.mi-grid .card {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  min-width: 0;
+  padding: 13px 14px 12px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--surface2);
+  transition: border-color 0.15s, background 0.15s, transform 0.15s;
+}
+.mi-grid .card:first-child { border-top: 1px solid var(--border); }
+.mi-grid .card:hover {
+  border-color: var(--border-hover);
+  background: var(--accent-bg);
+  box-shadow: none;
+  transform: translateY(-1px);
+}
+.mi-grid .card:focus-visible { outline-offset: 2px; }
+
+.mi-grid .card-top {
+  order: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.mi-grid .badge {
+  min-width: 0;
+  max-width: 100%;
+  font-size: 10px;
+  padding: 3px 7px;
+  text-align: left;
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.mi-grid .arrow { transition: color 0.15s, transform 0.15s; }
+.mi-grid .card:hover .arrow { color: var(--accent); transform: translate(2px, -2px); }
+.mi-grid .card-title {
+  order: 1;
+  flex: 0 0 auto;
+  white-space: normal;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.mi-card-desc {
+  order: 2;
+  flex: 1 1 auto;
+  color: var(--soft);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.mi-grid .card-src {
+  order: 3;
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+[data-theme="light"] .mi-grid .card,
+[data-theme="light"] .mi-chip { background: var(--panel); }
+
+/* ── Responsive ───────────────────────────────────────── */
+@media (max-width: 1180px) {
+  .mi-hubs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mi-hub--earthwatch { grid-column: 1 / -1; }
+}
+@media (max-width: 640px) {
+  .mi-hubs { grid-template-columns: 1fr; gap: 10px; margin-bottom: 20px; }
+  .mi-hub { padding: 14px; }
+  .cards.mi-grid { grid-template-columns: 1fr; gap: 8px; padding: 10px; }
+  /* command.css re-orders list rows on phones; tiles keep their own order. */
+  .mi-grid .card { flex-wrap: nowrap; gap: 4px; padding: 11px 13px; }
+  .mi-grid .card-top { margin-bottom: 2px; }
+  .mi-grid .card-src { flex: 0 0 auto; }
+  .mi-grid .card-src { margin-top: 0; padding-top: 0; border-top: 0; }
+  .mi-grid .arrow { margin-left: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mi-hub, .mi-hub-go, .mi-grid .card, .mi-grid .arrow { transition: none; }
+  .mi-grid .card:hover,
+  .mi-grid .card:hover .arrow,
+  .mi-hub-main:hover .mi-hub-go { transform: none; }
+}
