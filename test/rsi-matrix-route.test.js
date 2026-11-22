@@ -126,15 +126,15 @@ test("settings reads are open, writes are admin-gated", async () => {
 
 // ── Page, script and navigation ─────────────────────────────────────────
 
-test("RSI Matrix sits under TradeHunter → Screeners and its assets exist", () => {
+test("RSI Matrix lives in Overview v2, keeps its standalone page, and its assets exist", () => {
   const sidebar = read("public/assets/js/sidebar.js");
-  const start = sidebar.indexOf('label: "Screeners"');
-  const menu = sidebar.slice(start, sidebar.indexOf('label: "My Trades"', start));
-  assert.match(menu, /href: "\/rsi-matrix\.html", label: "RSI Matrix"/);
-  const page = read("public/rsi-matrix.html");
-  for (const asset of ["/assets/styles/rsi-matrix.css", "/assets/js/rsi-matrix.js", "/assets/js/sidebar.js"]) {
-    assert.ok(page.includes(asset));
-    assert.ok(fs.existsSync(path.join(ROOT, "public", asset)));
+  assert.doesNotMatch(sidebar, /href: "\/rsi-matrix\.html"/);
+  for (const file of ["public/rsi-matrix.html", "public/overview-v2.html"]) {
+    const page = read(file);
+    for (const asset of ["/assets/styles/rsi-matrix.css", "/assets/js/rsi-matrix.js", "/assets/js/sidebar.js"]) {
+      assert.ok(page.includes(asset), file + " loads " + asset);
+      assert.ok(fs.existsSync(path.join(ROOT, "public", asset)));
+    }
   }
   const settings = read("public/settings.html");
   assert.match(settings, /id="rsi-matrix-settings"/);

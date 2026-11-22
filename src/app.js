@@ -611,13 +611,18 @@ function createApp() {
   app.get(["/earthwatch", "/earthwatch.html"], (req, res) => {
     res.redirect(302, "https://earth-watch-production-e3c6.up.railway.app/");
   });
-  // The Overview (public/index.html) is the default page. Its /overview-v1
-  // alias stays reachable for links made while Overview v2 held "/".
-  app.get(["/", "/overview-v1", "/overview-v1.html"], (req, res) => {
+  // Overview v2 is the default page. Registered before express.static so "/"
+  // doesn't fall through to public/index.html. The v2 URLs stay as aliases:
+  // older releases permanently redirected the .html one to /, which browsers
+  // may still have cached (and / is v2 now, so that cached hop still lands).
+  app.get(["/", "/overview-v2", "/overview-v2.html"], (req, res) => {
+    res.sendFile(path.join(__dirname, "..", "public", "overview-v2.html"));
+  });
+  // The original Overview keeps a clean URL alongside /index.html.
+  app.get(["/overview-v1", "/overview-v1.html"], (req, res) => {
     res.sendFile(path.join(__dirname, "..", "public", "index.html"));
   });
-  // Overview v2 was removed; its old URLs land on the Overview.
-  app.get(["/overview-v2", "/overview-v2.html", "/overview-hybrid.html"], (req, res) => {
+  app.get("/overview-hybrid.html", (req, res) => {
     res.redirect(301, "/");
   });
   // The Signal Screener's two tabs are now two pages. Every old link — the

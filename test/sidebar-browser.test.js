@@ -15,7 +15,7 @@ test("shared sidebar browser regressions", {
 }, async (t) => {
   const app = express();
   const publicDir = path.join(__dirname, "..", "public");
-  for (const [url, file] of [["/", "index.html"], ["/overview-v1", "index.html"], ["/terminal-suite.html", "terminal-suite.html"], ["/reporter.html", "reporter.html"], ["/briefings/crypto", "terminal-suite.html"], ["/heatmaps.html", "heatmaps.html"]]) {
+  for (const [url, file] of [["/overview-v1", "index.html"], ["/terminal-suite.html", "terminal-suite.html"], ["/", "overview-v2.html"], ["/overview-v2", "overview-v2.html"], ["/reporter.html", "reporter.html"], ["/briefings/crypto", "terminal-suite.html"], ["/heatmaps.html", "heatmaps.html"]]) {
     app.get(url, (_req, res) => {
       const html = fs.readFileSync(path.join(publicDir, file), "utf8");
       res.type("html").send(html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, (tag) =>
@@ -49,7 +49,7 @@ test("shared sidebar browser regressions", {
       if (session) await session;
       await route.fulfill({ json: { authenticated: true, role: "owner", identifier: "Owner" } }).catch(() => {});
     });
-    await page.goto(base + "/", { waitUntil: "domcontentloaded" });
+    await page.goto(base + "/overview-v1", { waitUntil: "domcontentloaded" });
     await page.locator(".sidebar [data-dropdown-key]").first().waitFor();
     return page;
   }
@@ -62,30 +62,34 @@ test("shared sidebar browser regressions", {
     assert.equal(await toggle(group).getAttribute("aria-expanded"), String(expected));
   }
 
-  await t.test("Reporter Room sits directly above Trades in both navigation shells, and Overview is a top-level link", async (t) => {
+  await t.test("Reporter Room sits directly above Trades in both navigation shells, and Overview nests under v2", async (t) => {
     const page = await open(t);
-    for (const [url, root, drawer, prefix] of [["/", ".sidebar", ".mob-drawer", ""], ["/terminal-suite.html", ".cmd-sidebar", ".cmd-drawer", "cmd-"]]) {
+    for (const [url, root, drawer, prefix] of [["/overview-v1", ".sidebar", ".mob-drawer", ""], ["/terminal-suite.html", ".cmd-sidebar", ".cmd-drawer", "cmd-"]]) {
       await page.goto(base + url);
       for (const shell of [root, drawer]) {
         const primary = page.locator(`${shell} .${prefix}nav-primary`);
         assert.deepEqual(await primary.evaluate(nav => Array.from(nav.children).slice(0, 4).map(child => child.dataset.dropdownKey || child.getAttribute("data-nav-href"))),
-          ["/terminal-suite.html", "/", "/reporter.html", "sidebar_dropdown_my_trades"]);
+          ["/terminal-suite.html", "sidebar_dropdown_overview_v2", "/reporter.html", "sidebar_dropdown_my_trades"]);
         assert.equal(await menu(page, "terminal_suite", shell).count(), 0);
-        assert.equal(await menu(page, "overview_v2", shell).count(), 0);
         assert.equal(await primary.locator(':scope > a[data-nav-href="/reporter.html"]').count(), 1);
         assert.equal(await menu(page, "reporter", shell).locator('a[data-nav-href="/reporter.html"]').count(), 1);
-        assert.equal(await page.locator(`${shell} a[data-nav-href="/overview-v1"]`).count(), 0);
+        assert.equal(await menu(page, "overview_v2", shell).locator('a[data-nav-href="/overview-v1"]').count(), 1);
+        assert.equal(await primary.locator(':scope > a[data-nav-href="/overview-v1"]').count(), 0);
       }
     }
     await page.locator('.cmd-sidebar .cmd-nav-primary > a[data-nav-href="/reporter.html"]').click();
     await page.waitForURL(base + "/reporter.html");
     await state(menu(page, "reporter"), true);
     if (process.env.SIDEBAR_SCREENSHOT_DIR) await page.locator(".cmd-sidebar").screenshot({ path: path.join(process.env.SIDEBAR_SCREENSHOT_DIR, "sidebar-reporter-above-trades.png") });
-    await page.locator('.cmd-sidebar .cmd-nav-primary > a[data-nav-href="/"]').click();
+    const overview = menu(page, "overview_v2");
+    await toggle(overview).click();
+    assert.equal(page.url(), base + "/reporter.html", "the caret expands without navigating");
+    await overview.locator('a[data-nav-href="/overview-v1"]').click();
+    await page.waitForURL(base + "/overview-v1");
+    assert.equal(await menu(page, "overview_v2").locator('a[data-nav-href="/overview-v1"]').getAttribute("aria-current"), "page");
+    await menu(page, "overview_v2").locator('a[data-nav-href="/"]').click();
     await page.waitForURL(base + "/");
-    assert.equal(await page.locator('.sidebar .nav-primary > a[data-nav-href="/"]').getAttribute("aria-current"), "page");
-    await page.goto(base + "/");
-    assert.equal(await page.locator('.sidebar .nav-primary > a[data-nav-href="/"]').getAttribute("aria-current"), "page", "the /overview-v1 alias highlights Overview");
+    assert.equal(await menu(page, "overview_v2").locator('a[data-nav-href="/"]').getAttribute("aria-current"), "page");
   });
 
   await t.test("open and closed choices survive both page directions and reloads", async (t) => {
@@ -98,8 +102,8 @@ test("shared sidebar browser regressions", {
     for (const key of ["my_trades", "tradehunter", "screeners", "reporter"]) await state(menu(page, key), true);
     await toggle(menu(page, "my_trades")).click();
     await toggle(menu(page, "screeners")).click();
-    await page.locator('.cmd-sidebar a[data-nav-href="/"]').first().click();
-    await page.waitForURL(base + "/");
+    await toggle(menu(page, "overview_v2")).click();
+    await page.locator('.cmd-sidebar a[data-nav-href="/overview-v1"]').click();
     await state(menu(page, "my_trades"), false);
     await state(menu(page, "screeners"), false);
     await state(menu(page, "tradehunter"), true);
@@ -130,7 +134,7 @@ test("shared sidebar browser regressions", {
     assert.equal(await menu(page, "overview").count(), 0);
     assert.equal(await menu(page, "widgets").count(), 0);
     await page.evaluate(() => { location.hash = "technical-analysis"; });
-    await page.waitForFunction(() => document.querySelector('.sidebar .nav-primary > [data-nav-href="/"]').classList.contains("active"));
+    await page.waitForFunction(() => document.querySelector('.sidebar [data-nav-href="/overview-v1"]').classList.contains("active"));
     await page.goto(base + "/heatmaps.html#market-heatmap");
     await state(menu(page, "tradehunter"), true);
     await state(menu(page, "screeners"), true);
@@ -169,7 +173,7 @@ test("shared sidebar browser regressions", {
 
   await t.test("desktop and mobile choices stay synchronized in both shells", async (t) => {
     const page = await open(t);
-    for (const [url, drawer, sidebar] of [["/", ".mob-drawer", ".sidebar"], ["/terminal-suite.html", ".cmd-drawer", ".cmd-sidebar"]]) {
+    for (const [url, drawer, sidebar] of [["/overview-v1", ".mob-drawer", ".sidebar"], ["/terminal-suite.html", ".cmd-drawer", ".cmd-sidebar"]]) {
       await page.setViewportSize({ width: 1440, height: 900 });
       await page.goto(base + url);
       await toggle(menu(page, "my_trades", sidebar)).click();
@@ -199,7 +203,7 @@ test("shared sidebar browser regressions", {
       });
     }
     for (const theme of Object.keys(THEMES)) {
-      await page.goto(base + "/");
+      await page.goto(base + "/overview-v1");
       await page.evaluate((theme) => { AppSettings.applyTheme(theme); AppSettings.applyAccent("purple"); }, theme);
       const overview = await styles(".sidebar");
       const drawer = await styles(".mob-drawer");
@@ -216,8 +220,8 @@ test("shared sidebar browser regressions", {
       assert.equal(await page.evaluate(() => AppSettings.getTheme()), theme);
       assert.equal(await page.evaluate(() => AppSettings.getAccent()), "purple");
       const active = await page.locator('.cmd-sidebar [data-nav-href="/terminal-suite.html"]').evaluate((node) => getComputedStyle(node).color);
-      await page.goto(base + "/");
-      const overviewActive = await page.locator('.sidebar .nav-primary > [data-nav-href="/"]').evaluate((node) => getComputedStyle(node).color);
+      await page.goto(base + "/overview-v1");
+      const overviewActive = await page.locator('.sidebar [data-nav-href="/overview-v1"]').evaluate((node) => getComputedStyle(node).color);
       assert.equal(overviewActive, active, `${theme} selected accent`);
     }
   });
@@ -226,7 +230,7 @@ test("shared sidebar browser regressions", {
     const page = await open(t);
     for (const width of [390, 768, 1024, 1025, 1100, 1440]) {
       await page.setViewportSize({ width, height: 900 });
-      for (const [url, root] of [["/", ".sidebar"], ["/terminal-suite.html", ".cmd-sidebar"]]) {
+      for (const [url, root] of [["/overview-v1", ".sidebar"], ["/terminal-suite.html", ".cmd-sidebar"]]) {
         await page.goto(base + url);
         assert.equal(await page.locator(root).isVisible(), width > 1024, `${url} at ${width}px`);
         assert.equal(await page.getByRole("button", { name: "Open navigation", exact: true }).isVisible(), width <= 1024);
