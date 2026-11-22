@@ -67,7 +67,8 @@ class OverviewService {
       warnings.push(withReason("Macro/FX using fallback (set FINNHUB_API_KEY or MACRO_DATA_URL for live)", macro.error));
     }
     if (news.live) sources.push("news:feed");
-    else warnings.push(withReason("News feed using fallback (set MARKET_NEWS_URL for live)", news.error));
+    else if (news.stale) warnings.push(withReason("News feed delayed — showing last live headlines", news.error));
+    else warnings.push(withReason("News feed using fallback (set MARKET_NEWS_URL or FINNHUB_API_KEY for live)", news.error));
     if (calendar.live) sources.push("calendar:feed");
     // Name the actual cause rather than always pointing at the env var: a
     // configured feed that is erroring or empty is a different problem from an
@@ -87,7 +88,7 @@ class OverviewService {
       crypto: crypto.live ? "live" : crypto.stale ? "delayed" : "fallback",
       equities: equities.live ? "live" : "fallback",
       macro: macro.live ? "live" : macro.stale ? "delayed" : "fallback",
-      news: news.live ? "live" : "fallback",
+      news: news.live ? "live" : news.stale ? "delayed" : "fallback",
       calendar: calendar.live ? "live" : calendar.stale ? "stale" : "unavailable",
       onchain: buildOnchainModuleStatus(onchain),
     };

@@ -1,4 +1,5 @@
 const { createServiceError } = require("../utils/errors");
+const { parseRetryAfter } = require("../utils/retry-after");
 
 function sleep(ms) {
   return new Promise((resolve) => {
@@ -69,6 +70,7 @@ class CovalentService {
             `Covalent API ${response.status}: ${payload?.error_message || payload?.error || response.statusText}`,
             response.status,
           );
+          error.retryAfterMs = parseRetryAfter(response.headers.get("retry-after"));
           lastError = error;
           if (attempt < maxAttempts && response.status >= 500) {
             await sleep(attempt * 250);
@@ -79,9 +81,12 @@ class CovalentService {
 
         if (payload?.error) {
           const detail = payload?.error_message || payload?.error || "Unknown Covalent error";
-          const error = createServiceError(`Covalent API: ${detail}`, 502);
+          const code = Number(payload.error_code);
+          const status = code === 402 || code === 429 ? code : 502;
+          const error = createServiceError(`Covalent API: ${detail}`, status);
+          error.retryAfterMs = parseRetryAfter(response.headers.get("retry-after"));
           lastError = error;
-          if (attempt < maxAttempts && /rate limit/i.test(detail)) {
+          if (status === 502 && attempt < maxAttempts && /rate limit/i.test(detail)) {
             await sleep(attempt * 500);
             continue;
           }

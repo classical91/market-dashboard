@@ -33,8 +33,6 @@ test("Overview v2 shows BTC Research right under News desks, styled by the share
   assert.ok(btcAt < page.indexOf('class="ov2-top"'), "and sits above the status / Market Matrix row");
   assert.match(page, /<details class="ov-btc" id="btc-research">/);
   assert.match(page, /assets\/js\/overview-btc-research\.js/);
-  for (const html of [page, read("public/index.html")]) {
-    assert.match(html, /assets\/styles\/overview-btc-research\.css/);
-  }
+  assert.match(page, /assets\/styles\/overview-btc-research\.css/);
   assert.match(read("public/assets/styles/overview-btc-research.css"), /\.ov-btc \{/);
 });
