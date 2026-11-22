@@ -342,6 +342,18 @@ function isReporterGenerationsMachineReadRequest(req, adminKey) {
   return isAdminRequest(req, adminKey);
 }
 
+// Main Hub's System Logs shows a Potential Buys card: how many potential trades
+// are saved, across how many #tickers. It reads the counts-only summary from
+// its server with the same header key as the reads above. One exact path,
+// GET/HEAD, header only; the screenshot list, the images, uploads and every
+// write stay behind the owner session (uploads behind their own ledger key).
+function isPotentialBuysSummaryMachineReadRequest(req, adminKey) {
+  if (req.method !== "GET" && req.method !== "HEAD") return false;
+  const path = req.path.length > 1 && req.path.endsWith("/") ? req.path.slice(0, -1) : req.path;
+  if (path !== "/api/potential-buys/summary") return false;
+  return isAdminRequest(req, adminKey);
+}
+
 function canAccess(req, session) {
   if (!session) return false;
   if (session.role === "owner") return true;
@@ -446,6 +458,10 @@ function createSiteAuth(config) {
         return;
       }
       if (isReporterGenerationsMachineReadRequest(req, config.adminKey)) {
+        next();
+        return;
+      }
+      if (isPotentialBuysSummaryMachineReadRequest(req, config.adminKey)) {
         next();
         return;
       }

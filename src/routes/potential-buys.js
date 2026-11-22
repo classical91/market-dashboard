@@ -7,6 +7,10 @@ const { MAX_BYTES } = require("../services/potential-buys");
 /**
  * Potential Buys — screenshots of stocks and tokens worth a closer look.
  *
+ *   GET    /summary  counts only (total, #tickers, untagged, added in the
+ *                  last 24 hours and 7 days, newest/oldest times) — never a
+ *                  label or image. Main Hub's System Logs reads it with the
+ *                  admin key in `x-admin-key` (see site-auth.js).
  *   GET    /       every stored screenshot, newest first, plus `folders`:
  *                  one per #hashtag in the labels ({ tag, count, updatedAt }).
  *   POST   /       one screenshot: the raw image bytes as the body, with an
@@ -56,6 +60,15 @@ function createPotentialBuysRouter({ potentialBuysStore, requireLedgerKey, rateL
       }
     });
   }
+
+  router.get("/summary", (req, res, next) => {
+    try {
+      res.setHeader("Cache-Control", "no-store");
+      res.json(potentialBuysStore.summary());
+    } catch (err) {
+      next(err);
+    }
+  });
 
   router.get("/", (req, res, next) => {
     try {
