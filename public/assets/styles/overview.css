@@ -1438,29 +1438,3 @@ html {
   max-height: 3000px; opacity: 1;
 }
 .ovh-link-grid.collapsed { max-height: 0; opacity: 0; margin-bottom: 0.5rem; pointer-events: none; }
-
-/* ── Mini X Portal ── two loud deep-link cards under the ticker. */
-.ov-kicker { margin: 0 2px 10px; color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; scroll-margin-top: 16px; }
-.ov-portal { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 25px; }
-.ov-portal-card {
-  --pc: var(--purple); --pc-bg: rgba(155, 123, 255, 0.12);
-  display: flex; align-items: center; gap: 14px; min-width: 0; padding: 16px 18px;
-  border: 1px solid color-mix(in srgb, var(--pc) 55%, transparent); border-radius: 14px;
-  background: linear-gradient(120deg, color-mix(in srgb, var(--pc) 26%, transparent), var(--pc-bg) 55%, transparent), var(--panel);
-  box-shadow: inset 4px 0 0 var(--pc);
-  color: inherit; text-decoration: none;
-  transition: border-color .15s, box-shadow .15s, transform .15s;
-}
-.ov-portal-card--x  { --pc: var(--purple); --pc-bg: rgba(155, 123, 255, 0.12); }
-.ov-portal-card--yt { --pc: var(--red);    --pc-bg: rgba(255, 77, 109, 0.12); }
-.ov-portal-card:hover { border-color: var(--pc); box-shadow: inset 4px 0 0 var(--pc), 0 6px 24px color-mix(in srgb, var(--pc) 22%, transparent); transform: translateY(-1px); }
-.main .ov-portal-card:focus-visible { outline: 2px solid var(--pc); outline-offset: 3px; }
-.ov-portal-icon { flex: 0 0 auto; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; background: var(--pc); color: var(--bg); font-size: 20px; font-weight: 900; }
-.ov-portal-copy { flex: 1 1 auto; min-width: 0; }
-.ov-portal-tag { display: block; color: var(--pc); font-size: 10.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
-.ov-portal-title { display: block; margin-top: 2px; color: var(--text); font-size: 18px; font-weight: 800; letter-spacing: -.01em; }
-.ov-portal-desc { display: block; margin-top: 2px; color: var(--soft); font-size: 12.5px; line-height: 1.45; }
-.ov-portal-go { flex: 0 0 auto; color: var(--pc); font-size: 18px; font-weight: 800; transition: transform .15s; }
-.ov-portal-card:hover .ov-portal-go { transform: translateX(3px); }
-@media (max-width: 640px) { .ov-portal { grid-template-columns: 1fr; gap: 10px; margin-bottom: 20px; } .ov-portal-card { padding: 14px; } }
-@media (prefers-reduced-motion: reduce) { .ov-portal-card, .ov-portal-go { transition: none; } .ov-portal-card:hover, .ov-portal-card:hover .ov-portal-go { transform: none; } }
