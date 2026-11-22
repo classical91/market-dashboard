@@ -144,6 +144,7 @@
           label: "Crypto",
           children: [
             { href: "/crypto.html#crypto-research", label: "Bitcoin Research" },
+            { href: "/crypto.html#technical-analysis", label: "Technical Analysis" },
             { href: "/crypto.html#alt-research", label: "Alt Research" },
             { href: "/crypto.html#interactive-dashboards", label: "Interactive Dashboards" },
             { href: "/crypto.html#tradingview-tickers", label: "TradingView Tickers" },
