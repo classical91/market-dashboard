@@ -98,11 +98,16 @@ function buildFolders(items) {
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+// The page marks a screenshot red once it is older than this; see STALE_MS in
+// public/assets/js/potential-buys.js.
+const STALE_MS = 3 * DAY_MS;
 
 /**
  * Counts only, for Main Hub's System Logs card: never an id, label, file name
  * or image URL. `tickers` is how many distinct $tickers/#tags are in use; `newestAt`
  * and `oldestAt` are when the newest and oldest screenshot were added.
+ * `olderThan3d` / `olderThan3dTickers` match the page's "Older than 3 days"
+ * card: screenshots past the red line, and how many tickers they cover.
  */
 function summarize(items, now = Date.now()) {
   const { folders, untagged } = buildFolders(items);
@@ -110,11 +115,17 @@ function summarize(items, now = Date.now()) {
   let addedLast7d = 0;
   let newestAt = null;
   let oldestAt = null;
+  let olderThan3d = 0;
+  const staleTickers = new Set();
   for (const item of items) {
     const created = Number(item.createdAt) || 0;
     if (!created) continue;
     if (created >= now - DAY_MS) addedLast24h += 1;
     if (created >= now - 7 * DAY_MS) addedLast7d += 1;
+    if (now - created > STALE_MS) {
+      olderThan3d += 1;
+      for (const tag of item.tags || extractTags(item.label)) staleTickers.add(tag);
+    }
     if (newestAt === null || created > newestAt) newestAt = created;
     if (oldestAt === null || created < oldestAt) oldestAt = created;
   }
@@ -124,6 +135,8 @@ function summarize(items, now = Date.now()) {
     untagged,
     addedLast24h,
     addedLast7d,
+    olderThan3d,
+    olderThan3dTickers: staleTickers.size,
     newestAt,
     oldestAt,
     generatedAt: now,

@@ -8,7 +8,8 @@ const { MAX_BYTES } = require("../services/potential-buys");
  * Potential Buys — screenshots of stocks and tokens worth a closer look.
  *
  *   GET    /summary  counts only (total, #tickers, untagged, added in the
- *                  last 24 hours and 7 days, newest/oldest times) — never a
+ *                  last 24 hours and 7 days, older than 3 days and
+ *                  across how many tickers, newest/oldest times) — never a
  *                  label or image. Main Hub's System Logs reads it with the
  *                  admin key in `x-admin-key` (see site-auth.js).
  *   GET    /       every stored screenshot, newest first, plus `folders`:

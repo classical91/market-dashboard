@@ -35,15 +35,30 @@ test("summarize counts trades, tickers, untagged and recent additions", () => {
     untagged: 1,
     addedLast24h: 1,
     addedLast7d: 2,
+    olderThan3d: 2,
+    olderThan3dTickers: 1,
     newestAt: now - 2 * 60 * 60 * 1000,
     oldestAt: now - 30 * DAY,
     generatedAt: now,
   });
 });
 
+test("older than 3 days matches the page's red line and counts each ticker once", () => {
+  const now = 1_800_000_000_000;
+  const summary = summarize([
+    { label: "$BTC", createdAt: now - 3 * DAY },
+    { label: "$BTC #ETH", createdAt: now - 3 * DAY - 1 },
+    { label: "$BTC", createdAt: now - 10 * DAY },
+    { label: "no ticker", createdAt: now - 5 * DAY },
+    { label: "$SOL", createdAt: now - DAY },
+  ], now);
+  assert.equal(summary.olderThan3d, 3);
+  assert.equal(summary.olderThan3dTickers, 2);
+});
+
 test("an empty list summarizes to zeros with no times", () => {
   assert.deepEqual(summarize([], 5), {
-    total: 0, tickers: 0, untagged: 0, addedLast24h: 0, addedLast7d: 0, newestAt: null, oldestAt: null, generatedAt: 5,
+    total: 0, tickers: 0, untagged: 0, addedLast24h: 0, addedLast7d: 0, olderThan3d: 0, olderThan3dTickers: 0, newestAt: null, oldestAt: null, generatedAt: 5,
   });
 });
 
@@ -74,6 +89,9 @@ test("Main Hub can read the summary with a header key, and it holds counts only"
   assert.equal(body.tickers, 1);
   assert.equal(body.untagged, 1);
   assert.equal(body.addedLast24h, 2);
+  assert.equal(body.addedLast7d, 2);
+  assert.equal(body.olderThan3d, 0);
+  assert.equal(body.olderThan3dTickers, 0);
   const text = JSON.stringify(body);
   for (const leak of ["secret", "BTC", "idea", ".png", "potential-buys-images"]) {
     assert.ok(!text.includes(leak), `summary must not carry ${leak}`);
