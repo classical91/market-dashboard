@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Market Command Dashboard</title>
     <link rel="stylesheet" href="/assets/styles/overview.css" />
+    <link rel="stylesheet" href="/assets/styles/overview-btc-research.css" />
     <link rel="stylesheet" href="/assets/styles/components.css" />
     <link rel="stylesheet" href="/assets/styles/onchain-intelligence.css" />
     <script src="/assets/js/settings.js"></script>
@@ -24,6 +25,19 @@
         <section class="ticker" id="ticker" aria-label="Live ticker">
           <div class="ticker-track" id="tickerTrack"></div>
         </section>
+
+        <!-- BTC RESEARCH — rendered from Crypto Hub's Bitcoin Research section
+             (/crypto.html#crypto-research), so both pages list the same links. -->
+        <details class="ov-btc" id="btc-research">
+          <summary>
+            <span class="ov-btc-heading">₿ BTC Research</span>
+            <span class="ov-btc-count" id="ov-btc-count" role="status">Loading…</span>
+            <a class="ov-btc-hub" href="/crypto.html#crypto-research">Open in Crypto Hub ↗</a>
+          </summary>
+          <div class="ov-btc-body" id="ov-btc-body" aria-live="polite">
+            <div class="empty-state">Loading Bitcoin Research…</div>
+          </div>
+        </details>
 
         <!-- ── TradingView widget sections ─────── -->
 
@@ -100,6 +114,85 @@
           </div>
         </div>
 
+
+        <section class="grid overview-grid overview-decision-grid" aria-label="Market pulse, risk, and alerts">
+          <div class="stack">
+            <article class="card" id="market-pulse">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">Market Pulse</div>
+                  <div class="card-subtitle">
+                    BTC-anchored composite — equities &amp; macro shown when configured
+                  </div>
+                </div>
+                <div class="timeframe" role="group" aria-label="Timeframe">
+                  <button class="tf active" data-range="1D">1D</button>
+                  <button class="tf" data-range="1W">1W</button>
+                  <button class="tf" data-range="1M">1M</button>
+                  <button class="tf" data-range="3M">3M</button>
+                </div>
+              </div>
+              <div class="chart-wrap">
+                <canvas id="marketChart" width="1000" height="360"></canvas>
+              </div>
+              <div class="market-row">
+                <div class="mini-card">
+                  <span>Market Status</span>
+                  <strong id="pulseStatus" class="flat">—</strong>
+                </div>
+                <div class="mini-card">
+                  <span>Volatility</span>
+                  <strong id="pulseVolatility" class="flat">—</strong>
+                </div>
+                <div class="mini-card">
+                  <span>Range Change</span>
+                  <strong id="pulseChange" class="flat">—</strong>
+                </div>
+              </div>
+            </article>
+
+          </div>
+
+          <div class="stack">
+            <article class="card" id="risk-meter">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">Risk Meter</div>
+                  <div class="card-subtitle">Market regime (Decision Engine model) and risk factors</div>
+                </div>
+                <a class="card-link" href="/terminal-suite.html#macro-regime">Open Terminal →</a>
+              </div>
+              <div class="risk-box" id="riskBox"></div>
+            </article>
+
+            <article class="card" id="alerts">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">Alerts</div>
+                  <div class="card-subtitle">Generated from live conditions</div>
+                </div>
+              </div>
+              <div class="feed" id="alertsFeed"></div>
+            </article>
+
+          </div>
+        </section>
+
+        <section class="kpi-grid" id="kpiGrid" aria-label="Key market indicators"></section>
+
+        <!-- ON-CHAIN INTELLIGENCE — chain liquidity & activity context via /api/onchain/intelligence -->
+        <article class="card oci-card" id="onchain-intelligence" aria-labelledby="ociTitle">
+          <div class="card-header">
+            <div>
+              <div class="card-title oci-title" id="ociTitle">On-Chain Intelligence</div>
+              <div class="card-subtitle">Stablecoin liquidity, DeFi TVL and DEX activity — context, not trade signals</div>
+            </div>
+            <span id="ociStatus" class="oci-status" title="Data status">Loading…</span>
+          </div>
+          <div class="oci-body" id="ociBody" aria-live="polite">
+            <div class="empty-state">Loading on-chain data…</div>
+          </div>
+        </article>
 
         <!-- TECHNICAL RATINGS — TradingView's oscillator/moving-average ratings,
              not this app's own analysis. Directional Bias is the in-house
@@ -182,85 +275,6 @@
           </div>
         </article>
 
-        <section class="grid overview-grid overview-decision-grid" aria-label="Market pulse, risk, and alerts">
-          <div class="stack">
-            <article class="card" id="market-pulse">
-              <div class="card-header">
-                <div>
-                  <div class="card-title">Market Pulse</div>
-                  <div class="card-subtitle">
-                    BTC-anchored composite — equities &amp; macro shown when configured
-                  </div>
-                </div>
-                <div class="timeframe" role="group" aria-label="Timeframe">
-                  <button class="tf active" data-range="1D">1D</button>
-                  <button class="tf" data-range="1W">1W</button>
-                  <button class="tf" data-range="1M">1M</button>
-                  <button class="tf" data-range="3M">3M</button>
-                </div>
-              </div>
-              <div class="chart-wrap">
-                <canvas id="marketChart" width="1000" height="360"></canvas>
-              </div>
-              <div class="market-row">
-                <div class="mini-card">
-                  <span>Market Status</span>
-                  <strong id="pulseStatus" class="flat">—</strong>
-                </div>
-                <div class="mini-card">
-                  <span>Volatility</span>
-                  <strong id="pulseVolatility" class="flat">—</strong>
-                </div>
-                <div class="mini-card">
-                  <span>Range Change</span>
-                  <strong id="pulseChange" class="flat">—</strong>
-                </div>
-              </div>
-            </article>
-
-          </div>
-
-          <div class="stack">
-            <article class="card" id="risk-meter">
-              <div class="card-header">
-                <div>
-                  <div class="card-title">Risk Meter</div>
-                  <div class="card-subtitle">Market regime (Decision Engine model) and risk factors</div>
-                </div>
-                <a class="card-link" href="/terminal-suite.html#macro-regime">Open Terminal →</a>
-              </div>
-              <div class="risk-box" id="riskBox"></div>
-            </article>
-
-            <article class="card" id="alerts">
-              <div class="card-header">
-                <div>
-                  <div class="card-title">Alerts</div>
-                  <div class="card-subtitle">Generated from live conditions</div>
-                </div>
-              </div>
-              <div class="feed" id="alertsFeed"></div>
-            </article>
-
-          </div>
-        </section>
-
-        <section class="kpi-grid" id="kpiGrid" aria-label="Key market indicators"></section>
-
-        <!-- ON-CHAIN INTELLIGENCE — chain liquidity & activity context via /api/onchain/intelligence -->
-        <article class="card oci-card" id="onchain-intelligence" aria-labelledby="ociTitle">
-          <div class="card-header">
-            <div>
-              <div class="card-title oci-title" id="ociTitle">On-Chain Intelligence</div>
-              <div class="card-subtitle">Stablecoin liquidity, DeFi TVL and DEX activity — context, not trade signals</div>
-            </div>
-            <span id="ociStatus" class="oci-status" title="Data status">Loading…</span>
-          </div>
-          <div class="oci-body" id="ociBody" aria-live="polite">
-            <div class="empty-state">Loading on-chain data…</div>
-          </div>
-        </article>
-
         <p class="footer-note">Market Command — live data via /api/overview + TradingView Market Overview &amp; Technical Ratings · on-chain data via DefiLlama</p>
       </main>
     </div>
@@ -271,5 +285,6 @@
     <script src="/assets/js/trading-sessions.js"></script>
     <script src="/assets/js/overview.js"></script>
     <script src="/assets/js/onchain-intelligence.js"></script>
+    <script src="/assets/js/overview-btc-research.js"></script>
   </body>
 </html>

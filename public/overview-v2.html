@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="/assets/styles/signal-screener.css" />
   <link rel="stylesheet" href="/assets/styles/cross-market-oi.css" />
   <link rel="stylesheet" href="/assets/styles/rsi-matrix.css" />
+  <link rel="stylesheet" href="/assets/styles/overview-btc-research.css" />
   <link rel="stylesheet" href="/assets/styles/overview-v2.css" />
 </head>
 <body>
@@ -32,6 +33,19 @@
         <a class="ov2-news-link" href="/briefings/top-10">Today’s Top 10 ↗</a>
       </summary>
       <div class="ov2-desks" id="ov2-desks" aria-label="Desk briefings"></div>
+    </details>
+
+    <!-- BTC RESEARCH — rendered from Crypto Hub's Bitcoin Research section
+         (/crypto.html#crypto-research), so both pages list the same links. -->
+    <details class="ov-btc" id="btc-research">
+      <summary>
+        <span class="ov-btc-heading">₿ BTC Research</span>
+        <span class="ov-btc-count" id="ov-btc-count" role="status">Loading…</span>
+        <a class="ov-btc-hub" href="/crypto.html#crypto-research">Open in Crypto Hub ↗</a>
+      </summary>
+      <div class="ov-btc-body" id="ov-btc-body" aria-live="polite">
+        <div class="empty-state">Loading Bitcoin Research…</div>
+      </div>
     </details>
 
     <section class="ov2-top" aria-label="System status and Market Matrix">
@@ -263,6 +277,7 @@
 <script src="/assets/js/overview-v2.js"></script>
 <script src="/assets/js/briefing-freshness.js"></script>
 <script src="/assets/js/overview-v2-status.js"></script>
+<script src="/assets/js/overview-btc-research.js"></script>
 <script src="/assets/js/ui.js"></script>
 <script src="/assets/js/oi-wedges.js"></script>
 <script src="/assets/js/cross-market-oi.js"></script>
