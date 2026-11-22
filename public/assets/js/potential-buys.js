@@ -10,9 +10,9 @@
   var Crop = window.CropRect;
   var escapeHtml = UI.escapeHtml;
 
-  // A hashtag in a label files the screenshot in that folder (#BTC → BTC).
-  // Mirrors extractTags in src/services/potential-buys.js.
-  var TAG_RE = /(^|[^\w&#])#([A-Za-z][A-Za-z0-9._-]{0,23})/g;
+  // A ticker in a label files the screenshot in that folder: typing "btc"
+  // saves "$BTC" and files it under BTC. Shared with the server's store.
+  var Ticker = window.TickerLabel;
   var ALL = "__all";
   var UNTAGGED = "__untagged";
 
@@ -37,6 +37,7 @@
     viewerClose: document.getElementById("pbViewerClose"),
     viewerCrop: document.getElementById("pbViewerCrop"),
     heading: document.getElementById("pbHeading"),
+    back: document.getElementById("pbBack"),
     folders: document.getElementById("pbFolders"),
     folderCount: document.getElementById("pbFolderCount"),
     statTotal: document.getElementById("pbStatTotal"),
@@ -91,15 +92,7 @@
   }
 
   function tagsOf(item) {
-    var tags = [];
-    var label = (item && item.label) || "";
-    var match;
-    TAG_RE.lastIndex = 0;
-    while ((match = TAG_RE.exec(label))) {
-      var tag = match[2].replace(/[._-]+$/, "").toUpperCase();
-      if (tag && tags.indexOf(tag) === -1) tags.push(tag);
-    }
-    return tags;
+    return Ticker.extractTags(item && item.label);
   }
 
   function touchedAt(item) {
@@ -173,14 +166,15 @@
     }
     var newest = state.items.reduce(function (max, item) { return Math.max(max, touchedAt(item)); }, 0);
     var html = folderButton(ALL, "All", state.items.length, newest, "is-all");
-    html += folders.map(function (f) { return folderButton(f.tag, "#" + f.tag, f.count, f.updatedAt); }).join("");
+    html += folders.map(function (f) { return folderButton(f.tag, "$" + f.tag, f.count, f.updatedAt); }).join("");
     if (built.untagged.count && folders.length) {
       html += folderButton(UNTAGGED, "Untagged", built.untagged.count, built.untagged.updatedAt, "is-untagged");
     }
     el.folders.innerHTML = html;
 
-    var title = state.folder === ALL ? "Watching" : state.folder === UNTAGGED ? "Untagged" : "#" + state.folder;
+    var title = state.folder === ALL ? "Watching" : state.folder === UNTAGGED ? "Untagged" : "$" + state.folder;
     el.heading.textContent = title;
+    el.back.hidden = state.folder === ALL;
   }
 
   var BASE_TITLE = document.title;
@@ -205,8 +199,8 @@
       : n ? "All tagged" : "Nothing saved yet";
     el.statTickers.textContent = String(tickers);
     el.statTickersSub.textContent = tickers
-      ? built.folders.slice(0, 3).map(function (f) { return "#" + f.tag; }).join(" ") + (tickers > 3 ? " +" + (tickers - 3) : "")
-      : "Distinct #tags";
+      ? built.folders.slice(0, 3).map(function (f) { return "$" + f.tag; }).join(" ") + (tickers > 3 ? " +" + (tickers - 3) : "")
+      : "Distinct tickers";
     el.statWeek.textContent = String(week);
     document.title = (n ? "(" + n + ") " : "") + BASE_TITLE;
   }
@@ -246,27 +240,89 @@
       return;
     }
 
-    el.grid.innerHTML = items.map(function (item) {
-      var id = escapeHtml(item.id);
-      var label = escapeHtml(item.label || "");
-      var alt = item.label ? "Screenshot: " + label : "Screenshot added " + escapeHtml(formatWhen(item.createdAt));
-      return (
-        '<article class="pb-card" data-id="' + id + '">' +
-          '<button type="button" class="pb-thumb" data-action="view" aria-label="View full size">' +
-            '<img src="' + escapeHtml(item.url) + '" alt="' + alt + '" loading="lazy" />' +
-          "</button>" +
-          '<div class="pb-card-body">' +
-            '<input class="pb-label" type="text" maxlength="140" value="' + label + '" ' +
-              'placeholder="Add ticker or note…" aria-label="Label" data-action="label" />' +
-            '<div class="pb-card-foot">' +
-              '<span class="pb-when" title="' + escapeHtml(formatSize(item.size)) + '">' + escapeHtml(formatWhen(item.createdAt)) + "</span>" +
-              '<button type="button" class="pb-btn" data-action="crop">Crop</button>' +
-              '<button type="button" class="pb-btn pb-btn-danger" data-action="delete">Delete</button>' +
-            "</div>" +
-          "</div>" +
-        "</article>"
-      );
+    el.grid.innerHTML = gridEntries(items).map(function (entry) {
+      return entry.stack ? stackCard(entry.tag, entry.items) : itemCard(entry.item);
     }).join("");
+  }
+
+  /**
+   * On the All view, screenshots of the same ticker stack into one folder
+   * card, placed where its newest screenshot would be. Inside a folder, or
+   * while filtering, every screenshot shows on its own.
+   */
+  function gridEntries(items) {
+    if (state.folder !== ALL || state.filter.trim()) {
+      return items.map(function (item) { return { item: item }; });
+    }
+    var groups = {};
+    items.forEach(function (item) {
+      var tag = tagsOf(item)[0];
+      if (tag) (groups[tag] || (groups[tag] = [])).push(item);
+    });
+    var entries = [];
+    var placed = {};
+    items.forEach(function (item) {
+      var tag = tagsOf(item)[0];
+      if (!tag || groups[tag].length < 2) {
+        entries.push({ item: item });
+      } else if (!placed[tag]) {
+        placed[tag] = true;
+        entries.push({ stack: true, tag: tag, items: groups[tag] });
+      }
+    });
+    return entries;
+  }
+
+  function stackCard(tag, items) {
+    // The folder's cover is its oldest screenshot,
+    // with the next-oldest ones peeking out behind it.
+    var byAge = items.slice().sort(function (a, b) { return (a.createdAt || 0) - (b.createdAt || 0); });
+    var top = byAge[0];
+    var name = "$" + tag;
+    var updated = items.reduce(function (max, item) { return Math.max(max, touchedAt(item)); }, 0);
+    var peeks = byAge.slice(1, 3).map(function (item, i) {
+      return '<img class="pb-stack-peek pb-stack-peek-' + (i + 1) + '" src="' + escapeHtml(item.url) + '" alt="" loading="lazy" />';
+    }).join("");
+    return (
+      '<article class="pb-card pb-stack" data-folder="' + escapeHtml(tag) + '">' +
+        '<button type="button" class="pb-thumb pb-stack-thumb" data-action="open-folder" ' +
+          'aria-label="Open ' + escapeHtml(name) + " folder, " + items.length + ' screenshots">' +
+          peeks +
+          '<img class="pb-stack-top" src="' + escapeHtml(top.url) + '" alt="" loading="lazy" />' +
+          '<span class="pb-stack-badge" aria-hidden="true">' + items.length + "</span>" +
+        "</button>" +
+        '<div class="pb-card-body">' +
+          '<div class="pb-stack-name"><span class="pb-folder-icon" aria-hidden="true"></span>' + escapeHtml(name) + "</div>" +
+          '<div class="pb-card-foot">' +
+            '<span class="pb-when">' + items.length + " screenshots · " + escapeHtml(formatWhen(updated)) + "</span>" +
+            '<button type="button" class="pb-btn" data-action="open-folder">Open</button>' +
+          "</div>" +
+        "</div>" +
+      "</article>"
+    );
+  }
+
+  function itemCard(item) {
+    var id = escapeHtml(item.id);
+    var label = escapeHtml(item.label || "");
+    var alt = item.label ? "Screenshot: " + label : "Screenshot added " + escapeHtml(formatWhen(item.createdAt));
+    return (
+      '<article class="pb-card" data-id="' + id + '">' +
+        '<button type="button" class="pb-thumb" data-action="view" aria-label="View full size">' +
+          '<img src="' + escapeHtml(item.url) + '" alt="' + alt + '" loading="lazy" />' +
+        "</button>" +
+        '<div class="pb-card-body">' +
+          '<input class="pb-label" type="text" maxlength="140" value="' + label + '" ' +
+            'placeholder="Ticker (BTC) or note…" aria-label="Label" data-action="label" ' +
+            'autocomplete="off" spellcheck="false" />' +
+          '<div class="pb-card-foot">' +
+            '<span class="pb-when" title="' + escapeHtml(formatSize(item.size)) + '">' + escapeHtml(formatWhen(item.createdAt)) + "</span>" +
+            '<button type="button" class="pb-btn" data-action="crop">Crop</button>' +
+            '<button type="button" class="pb-btn pb-btn-danger" data-action="delete">Delete</button>' +
+          "</div>" +
+        "</div>" +
+      "</article>"
+    );
   }
 
   function findItem(id) {
@@ -322,8 +378,9 @@
   async function saveLabel(id, input) {
     var item = findItem(id);
     if (!item) return;
-    var label = input.value.replace(/\s+/g, " ").trim();
-    if (label === (item.label || "")) return;
+    var label = Ticker.formatLabel(input.value);
+    input.value = label;
+    if (label === Ticker.formatLabel(item.label)) return;
     try {
       var data = await request(API + "/" + encodeURIComponent(id), {
         method: "PATCH",
@@ -335,7 +392,7 @@
       input.value = item.label;
       var tags = tagsOf(item);
       if (tags.join(",") !== hadTags && tags.length) {
-        toast("Label saved · filed in " + tags.map(function (t) { return "#" + t; }).join(", ") + ".");
+        toast("Label saved · filed in " + tags.map(function (t) { return "$" + t; }).join(", ") + ".");
       } else {
         toast("Label saved.");
       }
@@ -627,12 +684,19 @@
 
   el.search.addEventListener("input", function () { state.filter = el.search.value; render(); });
 
+  function openFolder(key) {
+    state.folder = key;
+    render();
+    el.heading.scrollIntoView({ block: "start", behavior: "smooth" });
+  }
+
   el.grid.addEventListener("click", function (e) {
     var target = e.target.closest("[data-action]");
     var card = e.target.closest(".pb-card");
     if (!target || !card) return;
     var id = card.getAttribute("data-id");
     var action = target.getAttribute("data-action");
+    if (action === "open-folder") { openFolder(card.getAttribute("data-folder")); return; }
     if (action === "view") openViewer(id);
     else if (action === "crop") openCrop(id);
     else if (action === "delete") remove(id);
@@ -650,6 +714,7 @@
     saveLabel(e.target.closest(".pb-card").getAttribute("data-id"), e.target);
   });
 
+  el.back.addEventListener("click", function () { openFolder(ALL); });
   el.viewerClose.addEventListener("click", closeViewer);
   el.viewerCrop.addEventListener("click", function () { if (state.viewing) openCrop(state.viewing); });
 

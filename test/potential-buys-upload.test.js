@@ -56,11 +56,11 @@ test("a Shortcut with the ledger key uploads a File body, labelled from the quer
   assert.equal(res.status, 201);
   const body = await res.json();
   assert.equal(body.ok, true);
-  assert.equal(body.label, "SOL");
+  assert.equal(body.label, "$SOL");
 
   const cookie = await ownerCookie();
   const list = await (await fetch(`${base}/api/potential-buys`, { headers: { cookie } })).json();
-  assert.ok(list.items.some((item) => item.id === body.id && item.label === "SOL"));
+  assert.ok(list.items.some((item) => item.id === body.id && item.label === "$SOL"));
 });
 
 test("octet-stream bodies, Bearer auth and JSON base64 are accepted too", async () => {
@@ -70,7 +70,7 @@ test("octet-stream bodies, Bearer auth and JSON base64 are accepted too", async 
     body: PNG,
   });
   assert.equal(raw.status, 201);
-  assert.equal((await raw.json()).label, "NVDA");
+  assert.equal((await raw.json()).label, "$NVDA");
 
   const json = await fetch(`${base}/api/potential-buys/upload`, {
     method: "POST",
@@ -78,7 +78,7 @@ test("octet-stream bodies, Bearer auth and JSON base64 are accepted too", async 
     body: JSON.stringify({ imageBase64: `data:image/png;base64,${PNG.toString("base64")}`, label: "ETH" }),
   });
   assert.equal(json.status, 201);
-  assert.equal((await json.json()).label, "ETH");
+  assert.equal((await json.json()).label, "$ETH");
 });
 
 test("HEIC and non-images get an error the Shortcut can show", async () => {

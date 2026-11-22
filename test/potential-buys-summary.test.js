@@ -26,7 +26,7 @@ test("summarize counts trades, tickers, untagged and recent additions", () => {
   const summary = summarize([
     { label: "#BTC breakout", createdAt: now - 2 * 60 * 60 * 1000 },
     { label: "#BTC #ETH", createdAt: now - 3 * DAY },
-    { label: "NVDA", createdAt: now - 20 * DAY },
+    { label: "watch the NVDA gap", createdAt: now - 20 * DAY },
     { label: "#sol", createdAt: now - 30 * DAY },
   ], now);
   assert.deepEqual(summary, {

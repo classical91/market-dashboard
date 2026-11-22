@@ -4,6 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const { withExclusiveLock, writeJsonAtomic, readJsonStore } = require("./json-file-lock");
+const { formatLabel, extractTags } = require("../../public/assets/js/ticker-label");
 
 /**
  * Potential Buys — a holding area for screenshots of stocks and crypto tokens
@@ -69,24 +70,12 @@ function sniffImage(bytes) {
 }
 
 /**
- * Hashtags in a label are its folders: "#BTC breakout #crypto" files the
- * screenshot under BTC and CRYPTO. A tag starts with a letter (so "#1" is not
- * one) and is upper-cased, so #btc and #BTC are the same folder.
- */
-const TAG_RE = /(^|[^\w&#])#([A-Za-z][A-Za-z0-9._-]{0,23})/g;
-
-function extractTags(label) {
-  if (typeof label !== "string" || !label) return [];
-  const tags = [];
-  for (const match of label.matchAll(TAG_RE)) {
-    const tag = match[2].replace(/[._-]+$/, "").toUpperCase();
-    if (tag && !tags.includes(tag)) tags.push(tag);
-  }
-  return tags;
-}
-
-/**
- * One folder per hashtag: how many screenshots carry it and when the newest
+ * A label's folders are its tickers: "$BTC breakout #crypto" files the
+ * screenshot under BTC and CRYPTO, and a label that is one ticker-shaped word
+ * ("btc", "Total3") is saved as "$BTC" / "$TOTAL3". Shared with the page —
+ * see public/assets/js/ticker-label.js.
+ *
+ * One folder per ticker: how many screenshots carry it and when the newest
  * of them was added, relabelled or cropped. Sorted most recently updated
  * first. Screenshots without a tag are counted as `untagged`.
  */
@@ -112,7 +101,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Counts only, for Main Hub's System Logs card: never an id, label, file name
- * or image URL. `tickers` is how many distinct #hashtags are in use; `newestAt`
+ * or image URL. `tickers` is how many distinct $tickers/#tags are in use; `newestAt`
  * and `oldestAt` are when the newest and oldest screenshot were added.
  */
 function summarize(items, now = Date.now()) {
@@ -144,7 +133,7 @@ function summarize(items, now = Date.now()) {
 function normalizeLabel(value) {
   if (value === undefined || value === null) return "";
   if (typeof value !== "string") throw httpError("label must be text", 400);
-  return value.replace(/\s+/g, " ").trim().slice(0, MAX_LABEL_CHARS);
+  return formatLabel(value).slice(0, MAX_LABEL_CHARS);
 }
 
 class PotentialBuysStore {
@@ -177,6 +166,8 @@ class PotentialBuysStore {
   _present(item) {
     return {
       ...item,
+      // Older labels ("Btc") read as tickers ("$BTC") without a rewrite.
+      label: formatLabel(item.label),
       updatedAt: item.updatedAt || item.createdAt,
       tags: extractTags(item.label),
       url: `${this.urlPrefix}/${item.file}`,

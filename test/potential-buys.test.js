@@ -52,7 +52,7 @@ test("screenshots persist across store instances on the same data dir", () => {
   const { dataDir, store } = makeStore();
   const added = store.add(PNG, { label: "NVDA" });
   const reopened = new PotentialBuysStore({ dataDir });
-  assert.deepEqual(reopened.list().map((item) => [item.id, item.label]), [[added.id, "NVDA"]]);
+  assert.deepEqual(reopened.list().map((item) => [item.id, item.label]), [[added.id, "$NVDA"]]);
 });
 
 test("update relabels; unknown and malformed ids are refused", () => {
@@ -86,7 +86,7 @@ test("the API uploads raw image bytes, relabels, lists and deletes", async (t) =
   const created = await fetch(`${base}?label=BTC`, { method: "POST", headers: { "Content-Type": "image/png" }, body: PNG });
   assert.equal(created.status, 201);
   const { item } = await created.json();
-  assert.equal(item.label, "BTC");
+  assert.equal(item.label, "$BTC");
 
   const bad = await fetch(base, { method: "POST", headers: { "Content-Type": "image/png" }, body: "nope" });
   assert.equal(bad.status, 415);

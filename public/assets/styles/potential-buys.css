@@ -213,6 +213,40 @@
 .pb-card-foot .pb-btn { padding: 5px 10px; font-size: 11px; }
 .pb-card-foot .pb-btn:first-of-type { margin-left: auto; }
 
+/* A ticker with several screenshots stacks into one folder card. */
+.pb-stack {
+  /* Two cards peeking out underneath, like a pile of prints. */
+  box-shadow:
+    0 6px 0 -3px #0b111d, 0 6px 0 -2px var(--border),
+    0 12px 0 -6px #090e18, 0 12px 0 -5px var(--border);
+  margin-bottom: 12px;
+  border-color: rgba(245,183,64,0.28);
+}
+.pb-stack:hover { border-color: rgba(245,183,64,0.5); }
+.pb-stack-thumb { position: relative; cursor: pointer; overflow: hidden; }
+.pb-stack-thumb img { position: absolute; inset: 0; }
+/* Older screenshots fan out behind the newest, each a little smaller. */
+.pb-stack-thumb img { transform-origin: 50% 100%; border-radius: 6px 6px 0 0; }
+.pb-stack-peek { opacity: 0.45; }
+.pb-stack-peek-1 { transform: translateY(-11%) scale(0.8); }
+.pb-stack-peek-2 { transform: translateY(-22%) scale(0.72); opacity: 0.3; }
+.pb-stack-top { transform: scale(0.86); box-shadow: 0 -4px 14px rgba(0,0,0,0.6); }
+.pb-stack-badge {
+  position: absolute; top: 8px; right: 8px;
+  min-width: 24px; padding: 2px 7px;
+  font-size: 12px; font-weight: 700; text-align: center;
+  color: #1a1204;
+  background: rgba(245,183,64,0.95);
+  border-radius: 999px;
+}
+.pb-stack-name {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; font-weight: 700; color: var(--text);
+}
+.pb-stack-name .pb-folder-icon { margin-top: 2px; width: 18px; height: 13px; }
+.pb-back { padding: 5px 10px; font-size: 12px; }
+.pb-back[hidden] { display: none; }
+
 /* Viewer */
 .pb-viewer {
   width: min(1200px, calc(100vw - 32px));
@@ -380,4 +414,7 @@
   .pb-folders-hint { flex-basis: 100%; }
   .pb-folder { padding: 9px 10px; gap: 8px; }
   .pb-folder-when { white-space: normal; }
+  /* Narrow cards: the date gets its own line instead of wrapping word by word. */
+  .pb-card-foot { flex-wrap: wrap; row-gap: 6px; }
+  .pb-when { flex: 1 0 100%; }
 }
