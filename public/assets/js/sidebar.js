@@ -25,6 +25,7 @@
       href: "/",
       label: "Overview v2",
       children: [
+        { href: "/overview-v2#mini-x-portal", label: "Mini X Portal" },
         { href: "/overview-v1", label: "Overview" },
       ],
     },

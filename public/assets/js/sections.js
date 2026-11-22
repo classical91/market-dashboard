@@ -60,10 +60,23 @@ function initSections(storeKey, options) {
     const cards = cardsFor(header.dataset.section);
     if (!cards) return;
 
-    const wasCollapsed = cards.classList.contains('collapsed');
+    let wasCollapsed = cards.classList.contains('collapsed');
     header.classList.remove('collapsed');
     cards.classList.remove('collapsed');
     header.setAttribute('aria-expanded', 'true');
+    // A nested dropdown (Bitcoin Research → Technical Analysis) is only
+    // visible with every section around it open as well.
+    let outer = header.parentElement && header.parentElement.closest('.cards');
+    while (outer) {
+      const panel = outer;
+      const outerHeader = Array.from(headers).find(h => cardsFor(h.dataset.section) === panel);
+      if (!outerHeader) break;
+      if (panel.classList.contains('collapsed')) wasCollapsed = true;
+      outerHeader.classList.remove('collapsed');
+      panel.classList.remove('collapsed');
+      outerHeader.setAttribute('aria-expanded', 'true');
+      outer = outerHeader.parentElement && outerHeader.parentElement.closest('.cards');
+    }
     saveCollapsed(
       Array.from(headers)
         .filter(sectionHeader => sectionHeader.classList.contains('collapsed'))
@@ -71,6 +84,7 @@ function initSections(storeKey, options) {
     );
     // The browser's own jump happened while the target was still hidden.
     if (inner && wasCollapsed) inner.scrollIntoView();
+    else if (wasCollapsed && header.parentElement.closest('.cards')) header.scrollIntoView();
   }
 
   headers.forEach(header => {
