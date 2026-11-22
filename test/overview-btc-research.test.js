@@ -8,14 +8,9 @@ const btc = require("../public/assets/js/overview-btc-research");
 const PUBLIC = path.join(__dirname, "..", "public");
 const read = (file) => fs.readFileSync(path.join(PUBLIC, file), "utf8");
 
-test("Overview has a BTC Research dropdown under the ticker that loads Crypto Hub's section", () => {
-  const html = read("index.html");
-  const ticker = html.indexOf('id="ticker"');
-  const btcAt = html.indexOf('id="btc-research"');
-  assert.ok(ticker !== -1 && btcAt > ticker, "BTC Research sits after the ticker");
-  assert.ok(btcAt < html.indexOf('id="ovh-market-overview"'), "and before the TradingView widgets");
-  assert.match(html, /<details class="ov-btc" id="btc-research">/);
-  assert.match(html, /assets\/js\/overview-btc-research\.js/);
+test("BTC Research belongs to Overview v2 and loads Crypto Hub's section", () => {
+  assert.doesNotMatch(read("index.html"), /btc-research|overview-btc-research/);
+  assert.match(read("overview-v2.html"), /<details class="ov-btc" id="btc-research">/);
   // The source of truth exists where the dropdown reads it from.
   assert.match(read("crypto.html"), /<div class="cards" id="crypto-research">/);
 });

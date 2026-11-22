@@ -91,6 +91,18 @@ test("macro delayed status when serving stale values", async () => {
   assert.equal(payload.dataQuality.modules.onchain, "unavailable");
 });
 
+test("stale news is reported as delayed, without calling old headlines live", async () => {
+  const service = new OverviewService({
+    marketDataService: makeMarketDataStub({
+      getNews: async () => ({ live: false, stale: true, source: "finnhub-stale", items: [], error: "News feed HTTP 503" }),
+    }),
+    cache: passthroughCache,
+  });
+  const payload = await service.getOverview("1D");
+  assert.equal(payload.dataQuality.modules.news, "delayed");
+  assert.ok(payload.dataQuality.warnings.some(warning => warning.includes("News feed delayed")));
+});
+
 test("VIX proxy risk uses percent change instead of proxy price", async () => {
   const service = new OverviewService({
     marketDataService: makeMarketDataStub({
