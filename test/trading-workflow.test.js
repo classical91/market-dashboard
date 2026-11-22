@@ -45,16 +45,17 @@ test("Overview hands an asset to Terminal, which opens it on first load", () => 
   assert.match(terminalJs, /isn't in the Terminal feed/);
 });
 
-// #408 deliberately leads the sidebar with Terminal Suite; the Overview
-// (served at /) follows it now that Overview v2 is gone.
-test("Terminal Suite is the first entry in the sidebar, with Overview right after it", () => {
+// #408 deliberately leads the sidebar with Terminal Suite and nests the
+// original Overview under the Overview v2 group that follows it.
+test("Terminal Suite is the first entry in the sidebar, with Overview v2 (and Overview) right after it", () => {
   const workspace = sidebar.slice(sidebar.indexOf("var workspace"));
   const terminalEntry = workspace.indexOf('label: "Terminal Suite"');
-  const overview = workspace.indexOf('{ href: "/", label: "Overview" }');
+  const overviewV2 = workspace.indexOf('label: "Overview v2"');
+  const overview = workspace.indexOf('label: "Overview"');
   const trades = workspace.indexOf('label: "My Trades"');
   assert.ok(terminalEntry > -1, "Terminal Suite entry exists");
   assert.equal(workspace.indexOf("label: "), terminalEntry, "Terminal Suite is the first workspace entry");
-  assert.ok(overview > terminalEntry, "Overview follows Terminal Suite");
-  assert.equal(workspace.indexOf("Overview v2"), -1, "Overview v2 is gone from navigation");
-  assert.ok(trades > overview, "My Trades comes after Overview");
+  assert.ok(overviewV2 > terminalEntry, "Overview v2 follows Terminal Suite");
+  assert.ok(overview > overviewV2, "Overview is nested under Overview v2");
+  assert.ok(trades > overview, "My Trades comes after the Overview group");
 });

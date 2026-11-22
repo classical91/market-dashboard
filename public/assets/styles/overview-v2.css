@@ -1,0 +1,134 @@
+.ov2-main { max-width: 1800px; width: 100%; }
+.ov2-eyebrow { color: var(--accent); font-size: 10px; letter-spacing: .15em; font-weight: 700; margin-bottom: 9px; }
+.ov2-main h1 { font-size: 27px; }
+.ov2-version { color: var(--accent); }
+.ov2-button, #ov2-interval { border: 1px solid var(--border-hover); background: var(--surface2); color: var(--text); border-radius: 8px; padding: 9px 13px; font: inherit; font-size: 12px; }
+.ov2-button { cursor: pointer; }
+.ov2-button:hover { border-color: var(--accent); }
+.ov2-button:disabled { cursor: wait; opacity: .6; }
+.ov2-main :is(button, select, a, summary):focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.ov2-context { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 17px 20px; border: 1px solid var(--border); border-left: 3px solid var(--accent); background: var(--surface); border-radius: 10px; margin-bottom: 25px; }
+.ov2-context strong { font-size: 13px; }
+.ov2-context p { color: var(--muted); font-size: 12px; line-height: 1.6; margin-top: 4px; }
+.ov2-context label { color: var(--soft); font-size: 11px; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+/* ── Mini X Portal ── two loud deep-link cards above the screener board. */
+.ov2-kicker { margin: 0 2px 10px; color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+.ov2-portal { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 25px; }
+.ov2-portal-card {
+  --pc: var(--purple); --pc-bg: var(--purple-bg);
+  display: flex; align-items: center; gap: 14px; min-width: 0; padding: 16px 18px;
+  border: 1px solid color-mix(in srgb, var(--pc) 55%, transparent); border-radius: 14px;
+  background: linear-gradient(120deg, color-mix(in srgb, var(--pc) 26%, transparent), var(--pc-bg) 55%, transparent), var(--surface);
+  box-shadow: inset 4px 0 0 var(--pc);
+  color: inherit; text-decoration: none; scroll-margin-top: 16px;
+  transition: border-color .15s, box-shadow .15s, transform .15s;
+}
+.ov2-portal-card--x  { --pc: var(--purple); --pc-bg: var(--purple-bg); }
+.ov2-portal-card--yt { --pc: var(--coral);  --pc-bg: var(--coral-bg); }
+.ov2-portal-card:hover { border-color: var(--pc); box-shadow: inset 4px 0 0 var(--pc), 0 6px 24px color-mix(in srgb, var(--pc) 22%, transparent); transform: translateY(-1px); }
+.ov2-main .ov2-portal-card:focus-visible { outline: 2px solid var(--pc); outline-offset: 3px; }
+.ov2-portal-icon { flex: 0 0 auto; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; background: var(--pc); color: var(--bg); font-size: 20px; font-weight: 900; }
+.ov2-portal-copy { flex: 1 1 auto; min-width: 0; }
+.ov2-portal-tag { display: block; color: var(--pc); font-size: 10.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.ov2-portal-title { display: block; margin-top: 2px; color: var(--text); font-size: 18px; font-weight: 800; letter-spacing: -.01em; }
+.ov2-portal-desc { display: block; margin-top: 2px; color: var(--soft); font-size: 12.5px; line-height: 1.45; }
+.ov2-portal-go { flex: 0 0 auto; color: var(--pc); font-size: 18px; font-weight: 800; transition: transform .15s; }
+.ov2-portal-card:hover .ov2-portal-go { transform: translateX(3px); }
+@media (max-width: 640px) { .ov2-portal { grid-template-columns: 1fr; gap: 10px; margin-bottom: 20px; } .ov2-portal-card { padding: 14px; } }
+@media (prefers-reduced-motion: reduce) { .ov2-portal-card, .ov2-portal-go { transition: none; } .ov2-portal-card:hover, .ov2-portal-card:hover .ov2-portal-go { transform: none; } }
+.ov2-board-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.ov2-board-heading h2 { font-size: 14px; }
+#ov2-status { color: var(--muted); font-size: 11px; }
+.ov2-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.ov2-card { min-width: 0; border: 1px solid var(--border); background: var(--surface); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }
+.ov2-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 18px 19px 14px; }
+.ov2-card-title { display: flex; align-items: center; gap: 10px; }
+.ov2-number { color: var(--accent); background: var(--accent-bg); font-size: 11px; font-variant-numeric: tabular-nums; padding: 7px; border-radius: 6px; }
+.ov2-card h3 { font-size: 14px; font-weight: 700; }
+.ov2-card-head p { font-size: 11px; color: var(--muted); margin-top: 3px; }
+.ov2-period { font-size: 10px; color: var(--soft); border: 1px solid var(--border); border-radius: 5px; padding: 4px 7px; white-space: nowrap; }
+.ov2-body { flex: 1; padding: 0 19px 17px; }
+.ov2-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 11px 12px; background: var(--surface2); border-radius: 7px; font-size: 11px; margin-bottom: 15px; }
+.ov2-lead { font-weight: 750; margin-right: auto; }
+.ov2-bull { color: var(--green); }
+.ov2-bear { color: var(--red); }
+.ov2-warn { color: var(--amber); }
+.ov2-flat { color: var(--soft); }
+.ov2-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+.ov2-metric strong { display: block; font-size: 21px; font-variant-numeric: tabular-nums; letter-spacing: -.03em; overflow-wrap: anywhere; }
+.ov2-metric span { display: block; color: var(--muted); font-size: 10px; margin-top: 4px; }
+.ov2-readings { border-top: 1px solid var(--border); }
+.ov2-reading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 11px; }
+.ov2-reading strong { font-weight: 650; }
+.ov2-reading span:last-child { text-align: right; }
+.ov2-note { color: var(--muted); font-size: 11px; line-height: 1.6; margin-top: 11px; }
+.ov2-health { color: var(--soft); font-size: 10px; display: flex; gap: 9px; flex-wrap: wrap; margin-top: 10px; }
+.ov2-card-foot { display: flex; justify-content: space-between; align-items: center; padding: 11px 19px; border-top: 1px solid var(--border); gap: 12px; }
+.ov2-card-foot a { color: var(--accent); font-size: 11px; font-weight: 650; text-decoration: none; }
+.ov2-card-foot a:hover { text-decoration: underline; }
+.ov2-stamp { color: var(--muted); font-size: 10px; }
+.ov2-loading, .ov2-empty { color: var(--muted); font-size: 12px; line-height: 1.7; padding: 15px 0; min-height: 150px; }
+.ov2-skeleton { height: 11px; background: var(--surface2); margin: 12px 0; border-radius: 4px; width: 85%; }
+.ov2-skeleton:nth-child(2) { width: 55%; }
+.ov2-retry { margin-top: 12px; }
+.ov2-guide { margin-top: 23px; border: 1px solid var(--border); border-radius: 9px; padding: 14px 17px; color: var(--soft); font-size: 12px; }
+.ov2-guide summary { cursor: pointer; font-weight: 650; }
+.ov2-guide p { color: var(--muted); line-height: 1.7; margin-top: 10px; }
+@media (min-width: 1650px) { .ov2-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 1050px) { .ov2-grid { grid-template-columns: 1fr; } .ov2-context { align-items: flex-start; flex-direction: column; gap: 12px; } }
+@media (max-width: 520px) { .ov2-context { padding: 14px; } .ov2-card-head { padding: 15px; } .ov2-body { padding: 0 15px 15px; } .ov2-card h3 { font-size: 13px; } .ov2-number { display: none; } .ov2-board-heading { flex-wrap: wrap; } .ov2-metric strong { font-size: 19px; } .ov2-context label { flex-wrap: wrap; } }
+.ov2-module { margin-top: 28px; padding-top: 22px; border-top: 1px solid var(--border); scroll-margin-top: 16px; }
+.ov2-module-heading { align-items: flex-end; margin-bottom: 14px; }
+.ov2-module-heading p { color: var(--muted); font-size: 11px; margin-top: 4px; }
+.ov2-module-heading a { color: var(--accent); font-size: 11px; font-weight: 650; text-decoration: none; white-space: nowrap; }
+.ov2-module-heading a:hover { text-decoration: underline; }
+/* Top status: news desks tab, system counts, Market Matrix card. */
+.ov2-news { border: 1px solid var(--border); background: var(--surface); border-radius: 10px; margin-bottom: 14px; }
+.ov2-news summary { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; padding: 9px 14px; cursor: pointer; list-style: none; font-size: 12px; }
+.ov2-news summary::-webkit-details-marker { display: none; }
+.ov2-news summary::before { content: "▸"; color: var(--soft); font-size: 10px; transition: transform .15s; }
+.ov2-news[open] summary::before { transform: rotate(90deg); }
+.ov2-news-title { font-weight: 700; }
+.ov2-news-last { color: var(--muted); font-size: 11px; }
+.ov2-news[open] .ov2-news-last { display: none; }
+.ov2-news-link { margin-left: auto; color: var(--accent); font-size: 11px; font-weight: 650; text-decoration: none; }
+.ov2-news-link:hover { text-decoration: underline; }
+.ov2-desks { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; padding: 0 12px 12px; }
+.ov2-desk { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 10px 13px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface2); color: var(--soft); text-decoration: none; }
+.ov2-desk:hover { border-color: var(--border-hover); color: var(--text); }
+.ov2-desk-name { font-size: 13px; font-weight: 700; color: var(--text); }
+.ov2-desk-meta { font-size: 11px; color: var(--green); }
+.ov2-desk.nearing .ov2-desk-meta { color: var(--purple); }
+.ov2-desk.stale .ov2-desk-meta { color: var(--red); }
+.ov2-desk.empty .ov2-desk-meta { color: var(--soft); }
+.ov2-desk-time { font-size: 10px; color: var(--muted); }
+.ov2-top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 14px; margin-bottom: 18px; }
+.ov2-system { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.ov2-sys { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 11px 13px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--soft); text-decoration: none; }
+.ov2-sys:hover { border-color: var(--border-hover); }
+.ov2-sys-label { font-size: 12px; font-weight: 700; color: var(--accent); }
+.ov2-sys-count { font-size: 11px; color: var(--muted); }
+.ov2-sys-count strong { font-size: 18px; color: var(--text); font-variant-numeric: tabular-nums; margin-right: 2px; }
+.ov2-sys-count em { font-style: normal; color: var(--soft); }
+.ov2-sys-when { font-size: 10px; color: var(--soft); overflow-wrap: anywhere; }
+.ov2-sys-stamp, .ov2-news-stamp { color: var(--muted); }
+.ov2-matrix-card { border: 1px solid var(--border); background: var(--surface); border-radius: 10px; padding: 11px 13px; min-width: 0; }
+.ov2-matrix-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+.ov2-matrix-head h2 { font-size: 13px; }
+.ov2-matrix-head a { margin-left: auto; color: var(--accent); font-size: 11px; font-weight: 650; text-decoration: none; }
+.ov2-matrix-head a:hover { text-decoration: underline; }
+.ov2-matrix { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.ov2-mm-panel { min-width: 0; border: 1px solid var(--border); border-radius: 8px; background: var(--surface2); padding: 7px 9px 4px; }
+.ov2-mm-head { display: flex; justify-content: space-between; font-size: 11px; color: var(--soft); }
+.ov2-mm-head strong { color: var(--text); }
+.ov2-mm-value { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 11px; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.ov2-mm-value strong { font-size: 14px; }
+.ov2-mm-empty { font-size: 11px; padding: 14px 0; }
+.ov2-spark { display: block; width: 100%; height: 40px; margin-top: 3px; }
+.ov2-spark-up { color: var(--green); }
+.ov2-spark-down { color: var(--red); }
+@media (max-width: 1050px) { .ov2-top { grid-template-columns: 1fr; } .ov2-desks { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .ov2-desks, .ov2-system { grid-template-columns: 1fr; } .ov2-news-link { margin-left: 0; } }
+/* command.css hides every legacy <header> with !important; Overview v2's
+   page header (title + Refresh all) and card heads are real content. */
+.ov2-main header.cmd-page-header, .ov2-main header.ov2-card-head, .ov2-main header.ov2-matrix-head { display: flex !important; }
