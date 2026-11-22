@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="/assets/styles/rsi-matrix.css" />
   <link rel="stylesheet" href="/assets/styles/overview-btc-research.css" />
   <link rel="stylesheet" href="/assets/styles/overview-v2.css" />
+  <link rel="stylesheet" href="/assets/styles/overview-news-review.css" />
 </head>
 <body>
 <div class="app">
@@ -70,8 +71,22 @@
         <span class="ov2-news-last" id="ov2-news-last" role="status">Loading…</span>
         <a class="ov2-news-link" href="/briefings/top-10">Today’s Top 10 ↗</a>
       </summary>
-      <div class="ov2-desks" id="ov2-desks" aria-label="Desk briefings"></div>
+      <div class="ov2-desks" id="ov2-desks" aria-label="Desk briefings"><span class="ov2-flat" role="status">Loading reports…</span></div>
     </details>
+
+    <dialog class="ov2-review" id="ov2-news-review" aria-labelledby="ov2-review-title" aria-describedby="ov2-review-meta">
+      <div class="ov2-review-head">
+        <div>
+          <h2 id="ov2-review-title">News report</h2>
+          <p id="ov2-review-meta"></p>
+        </div>
+        <button class="ov2-review-close" id="ov2-review-close" type="button" aria-label="Close report review" autofocus>×</button>
+      </div>
+      <div class="ov2-review-body" id="ov2-review-body" tabindex="0"></div>
+      <div class="ov2-review-foot">
+        <a class="ov2-review-run" id="ov2-review-run" href="/briefings/geopolitics#briefingRun">Open desk &amp; run report</a>
+      </div>
+    </dialog>
 
     <!-- BTC RESEARCH — rendered from Crypto Hub's Bitcoin Research section
          (/crypto.html#crypto-research), so both pages list the same links. -->
@@ -325,6 +340,8 @@
 <script src="/assets/js/overview-v2-model.js"></script>
 <script src="/assets/js/overview-v2.js"></script>
 <script src="/assets/js/briefing-freshness.js"></script>
+<script src="/assets/js/briefing-markdown.js"></script>
+<script src="/assets/js/overview-news-review.js"></script>
 <script src="/assets/js/overview-v2-status.js"></script>
 <script src="/assets/js/overview-btc-research.js"></script>
 <script src="/assets/js/ui.js"></script>

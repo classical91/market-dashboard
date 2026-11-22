@@ -23,11 +23,11 @@ function element() {
   return node;
 }
 
-async function run(responses) {
+async function run(responses, review) {
   const nodes = {};
   const context = {
     Date: Clock,
-    window: { ScreenerUI: { escapeHtml: escapeHtml } },
+    window: { ScreenerUI: { escapeHtml: escapeHtml }, OverviewNewsReview: review },
     localStorage: { getItem() { return null; }, setItem() {} },
     document: { hidden: false, getElementById: (id) => (nodes[id] ||= element()) },
     setInterval() {},
@@ -62,6 +62,60 @@ test("news desks use the newer source and the collapsed line names the latest re
   assert.match(desks, /ov2-desk stale" href="\/briefings\/economics"/);
   assert.match(desks, /ov2-desk empty" href="\/briefings\/stocks"/);
   assert.match(nodes["ov2-news-last"].innerHTML, /^Last report 2h ago · Crypto · <time/);
+});
+
+test("desk clicks review the newer report's content and preserve modified link clicks", async () => {
+  const opened = [];
+  const nodes = await run({
+    "/api/phone-briefings": { categories: [
+      { key: "economics", latest: { receivedAt: iso(HOUR), title: "Phone headlines", text: "New phone report" } },
+      { key: "crypto", latest: { receivedAt: iso(4 * HOUR), text: "Old phone report" } },
+    ] },
+    "/api/daily-report/generations?section=economics": { generations: [{ generatedAt: iso(2 * HOUR), content: "Old reporter content" }] },
+    "/api/daily-report/generations?section=crypto": { generations: [{ generatedAt: iso(HOUR), content: "New reporter content", noBriefing: true }] },
+    "/api/daily-report/generations": { generations: [] },
+  }, { open(desk) { opened.push(desk); return true; } });
+  let prevented = 0;
+  function click(key, extra = {}) {
+    nodes["ov2-desks"].listeners.click({
+      button: 0, target: { closest: () => ({ getAttribute: () => key }) },
+      preventDefault() { prevented++; }, ...extra,
+    });
+  }
+  click("economics");
+  click("crypto");
+  assert.equal(opened[0].text, "New phone report");
+  assert.equal(opened[0].title, "Phone headlines");
+  assert.equal(opened[0].reporter, false);
+  assert.equal(opened[1].text, "New reporter content");
+  assert.equal(opened[1].reporter, true);
+  assert.equal(opened[1].noBriefing, true);
+  assert.equal(prevented, 2);
+  for (const modifier of ["ctrlKey", "metaKey", "shiftKey", "altKey"]) click("crypto", { [modifier]: true });
+  click("crypto", { button: 1 });
+  assert.equal(opened.length, 2);
+  assert.equal(prevented, 2);
+});
+
+test("review distinguishes a missing report from failed and partially available sources", async () => {
+  const opened = [];
+  const nodes = await run({
+    "/api/phone-briefings": new Error("down"),
+    "/api/daily-report/generations?section=crypto": { generations: [{ generatedAt: iso(HOUR), content: "Available report" }] },
+    "/api/daily-report/generations?section=economics": { generations: [] },
+    "/api/daily-report/generations": new Error("down"),
+  }, { open(desk) { opened.push(desk); return true; } });
+  for (const key of ["crypto", "economics", "stocks"]) {
+    nodes["ov2-desks"].listeners.click({
+      button: 0, target: { closest: () => ({ getAttribute: () => key }) }, preventDefault() {},
+    });
+  }
+  assert.equal(opened[0].text, "Available report");
+  assert.equal(opened[0].partial, true);
+  assert.equal(opened[0].failed, false);
+  assert.equal(opened[1].at, null);
+  assert.equal(opened[1].failed, false);
+  assert.equal(opened[2].failed, true);
 });
 
 test("system tiles show a count and the last run or update, and a failure stays visible", async () => {
