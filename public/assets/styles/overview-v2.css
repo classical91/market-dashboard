@@ -129,3 +129,43 @@
   .ov-ta-item { border-right: 0 !important; border-bottom: 1px solid var(--border) !important; }
   .ov-ta-item:last-child { border-bottom: 0 !important; }
 }
+
+/* Overview hierarchy: compact workspace header, shortcuts, readable evidence. */
+.ov2-main .market-overview-header { position: relative; align-items: center; gap: 20px; padding: 8px 0 24px; margin-bottom: 0; }
+.market-overview-header .ov2-eyebrow { font-size: 12px; letter-spacing: .13em; margin-bottom: 12px; }
+.market-overview-header .ov2-eyebrow span { padding: 0 9px; color: var(--muted); }
+.ov2-main .market-overview-header h1 { font-size: clamp(26px,2.4vw,34px); font-weight: 700; letter-spacing: -.045em; }
+.market-overview-header .ov2-version { font-size: 12px; font-weight: 600; vertical-align: middle; letter-spacing: 0; border: 1px solid var(--border); border-radius: 6px; padding: 3px 6px; margin-left: 5px; }
+.market-overview-header .cmd-page-subtitle { font-size: 14px; margin-top: 8px; color: var(--soft); }
+.market-header-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.market-motion-toggle,.market-header-actions .ov2-button { font: inherit; font-size: 14px; border-radius: 8px; padding: 10px 13px; cursor: pointer; }
+.market-motion-toggle { border: 1px solid var(--border); color: var(--soft); background: transparent; }
+.market-motion-toggle:hover { border-color: var(--border-hover); color: var(--text); }
+.market-motion-toggle:disabled { cursor: default; opacity: .7; }
+.market-header-actions .ov2-button { border-color: color-mix(in srgb,var(--accent) 30%,transparent); color: var(--accent); background: var(--accent-bg); }
+.market-jump-nav { display: flex; flex-wrap: wrap; gap: 4px 24px; border-bottom: 1px solid var(--border); padding: 0 0 16px; margin: 0 0 24px; }
+.market-jump-nav a { color: var(--soft); font-size: 14px; text-decoration: none; padding: 5px 0; }
+.market-jump-nav a:hover { color: var(--accent); }
+.ov2-main :is(.ov2-card,.ov2-matrix-card,.ov2-news,.ov2-context) { border-color: color-mix(in srgb,var(--soft) 15%,transparent); box-shadow: 0 6px 24px rgba(0,0,0,.1); }
+.ov2-main :is(.ov2-card-head,.ov2-matrix-head) { border-bottom: 1px solid var(--border); margin-bottom: 14px; }
+.ov2-main .ov2-matrix-head { padding-bottom: 10px; flex-wrap: wrap; }
+.ov2-main .ov2-card-title { gap: 0; }
+.ov2-main .ov2-number { display: none; }
+.ov2-main :is(.ov2-card h3,.ov2-board-heading h2,.ov2-matrix-head h2) { font-size: 16px; letter-spacing: -.02em; }
+.ov2-main :is(.ov2-card-head p,.ov2-note,.ov2-reading,.ov2-summary,.ov2-context p,.ov2-sys-count,.ov2-mm-head,.ov2-mm-value) { font-size: 14px; line-height: 1.5; }
+.ov2-main :is(.ov2-health,.ov2-stamp,.ov2-period,.ov2-metric span,.ov2-sys-when,.ov2-desk-time,.ov2-news-last) { font-size: 12px; }
+.ov2-main :is(.ov2-card-foot a,.ov2-module-heading a,.ov2-matrix-head a,.ov2-news-link,.ov2-context label,.ov2-context strong,.ov2-sys-label,.ov2-desk-name,.ov2-desk-meta,.ov2-news summary,#ov2-status) { font-size: 14px; }
+.ov2-main .ov2-metric strong { font-size: 25px; font-weight: 650; }
+.ov2-main .ov2-sys { padding: 15px; }
+.ov2-main .ov2-sys-count strong { font-size: 24px; }
+.ov2-main .ov2-desk { padding: 13px; gap: 7px; }
+.ov2-main .ov2-context { border-left-width: 2px; }
+.ov2-main #ov2-interval { font-size: 14px; appearance: none; padding-right: 30px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='m2 2 4 4 4-4' fill='none' stroke='%2392a2b3' stroke-width='1.5'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; }
+.ov2-main :is(#ov2-grid,#cross-market-oi,#rsi-matrix,#technical-analysis) { scroll-margin-top: 24px; }
+@media (max-width: 700px) {
+  .ov2-main .market-overview-header { align-items: flex-start; flex-direction: column; gap: 18px; }
+  .market-header-actions { width: 100%; justify-content: space-between; }
+  .market-jump-nav { gap: 4px 20px; }
+  .ov2-main .ov2-card-head { flex-wrap: wrap; }
+  .ov2-main .ov2-mm-value { flex-wrap: wrap; }
+}

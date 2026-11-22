@@ -237,4 +237,51 @@ test("shared sidebar browser regressions", {
       }
     }
   });
+
+  await t.test("the logo loads in both shells and mobile navigation", async (t) => {
+    const page = await open(t);
+    for (const url of ["/overview-v1", "/terminal-suite.html", "/"]) {
+      await page.goto(base + url);
+      const marks = page.locator(".market-brand-image");
+      assert.equal(await marks.count(), 3);
+      await page.waitForFunction(() => Array.from(document.querySelectorAll(".market-brand-image")).every((image) => image.complete && image.naturalWidth > 0));
+      for (const mark of await marks.all()) assert.equal(await mark.getAttribute("alt"), "");
+      if (url === "/" && process.env.SIDEBAR_SCREENSHOT_DIR) {
+        await page.screenshot({ path: path.join(process.env.SIDEBAR_SCREENSHOT_DIR, "market-overview-header.png"), clip: { x: 0, y: 0, width: 1440, height: 270 } });
+      }
+      await page.setViewportSize({ width: 390, height: 850 });
+      assert.equal(await page.locator(".aurora-brand--mobile .market-brand-image").isVisible(), true);
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+      if (url === "/" && process.env.SIDEBAR_SCREENSHOT_DIR) {
+        await page.screenshot({ path: path.join(process.env.SIDEBAR_SCREENSHOT_DIR, "market-overview-mobile.png"), clip: { x: 0, y: 0, width: 390, height: 500 } });
+      }
+      await page.setViewportSize({ width: 1440, height: 900 });
+    }
+  });
+
+  await t.test("motion can be paused, survives navigation, and follows reduced-motion changes", async (t) => {
+    const page = await open(t);
+    await page.goto(base + "/");
+    const button = page.locator("#market-motion-toggle");
+    const brand = page.locator(".cmd-sidebar .aurora-brand");
+    await brand.hover({ position: { x: 25, y: 25 } });
+    await page.waitForFunction(() => !!document.querySelector(".cmd-sidebar .aurora-brand").style.getPropertyValue("--brand-x"));
+    await page.mouse.move(1200, 400);
+    assert.equal(await brand.evaluate((node) => node.style.getPropertyValue("--brand-x")), "");
+    await button.click();
+    assert.equal(await button.getAttribute("aria-pressed"), "false");
+    assert.equal(await page.locator(".market-brand-orbit").first().evaluate((node) => getComputedStyle(node).animationPlayState), "paused");
+    await page.reload();
+    assert.equal(await button.textContent(), "Motion off");
+    await brand.hover();
+    assert.equal(await brand.evaluate((node) => node.style.getPropertyValue("--brand-x")), "");
+    await button.click();
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.waitForFunction(() => document.getElementById("market-motion-toggle").disabled);
+    assert.equal(await button.getAttribute("aria-pressed"), "false");
+    assert.equal(await brand.evaluate((node) => getComputedStyle(node.querySelector(".market-brand-orbit")).animationName), "none");
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await page.waitForFunction(() => !document.getElementById("market-motion-toggle").disabled);
+    assert.equal(await button.getAttribute("aria-pressed"), "true");
+  });
 });

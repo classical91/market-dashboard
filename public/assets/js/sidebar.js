@@ -19,6 +19,79 @@
 
   var accountState = null;
 
+  function brandMark() {
+    return '<img class="market-brand-image" src="/assets/images/market-command-mark.png" width="40" height="40" alt="" decoding="async">' +
+      '<span class="market-brand-orbit" aria-hidden="true"></span>';
+  }
+
+  // Pointer motion is event-driven: one pending frame, no perpetual JS loop.
+  function initBrandMotion() {
+    var reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
+    var finePointer = window.matchMedia("(hover: hover) and (pointer: fine)");
+    var paused = false;
+    try { paused = localStorage.getItem("market_motion") === "paused"; } catch (_) {}
+    var frame = 0;
+    var activeBrand = null;
+    var point = null;
+    var button = document.getElementById("market-motion-toggle");
+
+    function reset() {
+      cancelAnimationFrame(frame);
+      frame = 0;
+      if (activeBrand) {
+        ["--brand-x", "--brand-y", "--brand-tilt-x", "--brand-tilt-y"].forEach(function (name) {
+          activeBrand.style.removeProperty(name);
+        });
+      }
+      activeBrand = null;
+    }
+    function sync() {
+      var off = paused || reduced.matches;
+      document.documentElement.classList.toggle("market-motion-paused", off);
+      if (off) reset();
+      if (button) {
+        button.disabled = reduced.matches;
+        button.setAttribute("aria-pressed", String(!off));
+        button.textContent = off ? "Motion off" : "Motion on";
+        button.title = reduced.matches ? "Reduced motion follows your device preference" : "Toggle decorative motion";
+      }
+    }
+    document.querySelectorAll(".aurora-brand").forEach(function (brand) {
+      brand.addEventListener("pointermove", function (event) {
+        if (paused || reduced.matches || !finePointer.matches || document.hidden) return;
+        if (activeBrand !== brand) reset();
+        activeBrand = brand;
+        point = { x: event.clientX, y: event.clientY };
+        if (frame) return;
+        frame = requestAnimationFrame(function () {
+          frame = 0;
+          if (!activeBrand) return;
+          var rect = activeBrand.getBoundingClientRect();
+          var x = Math.max(0, Math.min(1, (point.x - rect.left) / rect.width));
+          var y = Math.max(0, Math.min(1, (point.y - rect.top) / rect.height));
+          activeBrand.style.setProperty("--brand-x", (x * 100) + "%");
+          activeBrand.style.setProperty("--brand-y", (y * 100) + "%");
+          activeBrand.style.setProperty("--brand-tilt-x", ((.5 - y) * 9) + "deg");
+          activeBrand.style.setProperty("--brand-tilt-y", ((x - .5) * 12) + "deg");
+        });
+      });
+      brand.addEventListener("pointerleave", reset);
+      brand.addEventListener("pointercancel", reset);
+      brand.addEventListener("blur", reset);
+    });
+    if (button) button.addEventListener("click", function () {
+      paused = !paused;
+      try { localStorage.setItem("market_motion", paused ? "paused" : "on"); } catch (_) {}
+      sync();
+    });
+    reduced.addEventListener("change", sync);
+    document.addEventListener("visibilitychange", function () {
+      document.documentElement.classList.toggle("market-motion-hidden", document.hidden);
+      if (document.hidden) reset();
+    });
+    sync();
+  }
+
   var workspace = [
     {
       href: "/",
@@ -458,8 +531,8 @@
     }).join("");
     return (
       '<a class="' + prefix + 'brand aurora-brand" href="/">' +
-      '<div class="' + prefix + 'brand-mark">M</div>' +
-      '<div class="' + prefix + 'brand-text"><h1>Market Command</h1><span>Live dashboard system</span></div></a>' +
+      '<div class="' + prefix + 'brand-mark" aria-hidden="true">' + brandMark() + '</div>' +
+      '<div class="' + prefix + 'brand-text"><h1>Market Command</h1><span>Market intelligence</span></div></a>' +
       '<nav class="' + prefix + 'nav-primary" aria-label="Market Command">' + workspaceHtml + '</nav>' +
       '<nav class="' + prefix + 'nav-other" aria-label="Other"><div class="' + prefix + 'nav-label">Other</div>' + otherHtml + '</nav>' +
       '<nav class="' + prefix + 'nav-tools" aria-label="Trading and tools"><div class="' + prefix + 'nav-label">Trading &amp; Tools</div>' + toolsHtml + '</nav>' +
@@ -569,7 +642,7 @@
     bar.className = command ? "cmd-mobile-bar" : "mob-bar";
     bar.id = stem + (command ? "-mobile-bar" : "-bar");
     bar.innerHTML = '<a class="' + (command ? 'cmd-mobile-brand' : 'mob-brand') + ' aurora-brand aurora-brand--mobile" href="/"><div class="' +
-      (command ? 'cmd-mobile-brand-mark' : 'mob-brand-mark') + '">M</div><span class="' +
+      (command ? 'cmd-mobile-brand-mark' : 'mob-brand-mark') + '" aria-hidden="true">' + brandMark() + '</div><span class="' +
       (command ? 'cmd-mobile-brand-name' : 'mob-brand-name') + '">Market Command</span></a>' +
       '<button class="' + (command ? 'cmd-hamburger' : 'mob-ham') + '" type="button" aria-label="Open navigation" aria-controls="' + stem + '-drawer" aria-expanded="false">&#9776;</button>';
     main.insertBefore(bar, main.firstChild);
@@ -615,6 +688,7 @@
     if (overviewSidebar) fill(overviewSidebar, "overview", "desktop");
     if (commandMain && !document.getElementById("cmd-mobile-bar")) buildMobile(commandMain, "command");
     if (overviewMain && !document.getElementById("mob-bar")) buildMobile(overviewMain, "overview");
+    initBrandMotion();
     window.addEventListener("hashchange", updateActiveStates);
     loadAccount();
   }

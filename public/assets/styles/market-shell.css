@@ -1,0 +1,17 @@
+/* Shared shell refinement. Theme variables keep saved appearances intact. */
+:is(.app,body) :is(.sidebar,.cmd-sidebar,.mob-drawer,.cmd-drawer) {
+  background: color-mix(in srgb,var(--panel) 96%,transparent);
+  border-right-color: color-mix(in srgb,var(--soft) 13%,transparent);
+}
+.app :is(.nav-item,.cmd-nav-item),body :is(.mob-drawer,.cmd-drawer) :is(.nav-item,.cmd-nav-item) {
+  border-radius: 9px;
+  transition: background .16s ease,color .16s ease;
+}
+.app :is(.nav-item,.cmd-nav-item).active,body :is(.mob-drawer,.cmd-drawer) :is(.nav-item,.cmd-nav-item).active {
+  box-shadow: inset 2px 0 var(--accent);
+}
+.app :is(.nav-label,.cmd-nav-label),body :is(.mob-drawer,.cmd-drawer) :is(.nav-label,.cmd-nav-label) { font-size: 12px; letter-spacing: .12em; }
+.app :is(.card,.panel,.cmd-card,.kpi-card) { box-shadow: 0 8px 24px rgba(0,0,0,.13); }
+.app :is(.card-title,.cmd-page-title) { letter-spacing: -.025em; }
+.app :is(.main,.cmd-main) { min-width: 0; }
+@media (prefers-reduced-motion: reduce) { .app :is(.nav-item,.cmd-nav-item) { transition: none; } }
