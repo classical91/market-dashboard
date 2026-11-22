@@ -12,13 +12,14 @@
     { id: "extremes", title: "Local Extremes", question: "Where is price stretched?", path: "local-extremes", period: function () { return interval.value; }, query: function () { return "interval=" + interval.value + "&minChecks=4"; } },
     { id: "patterns", title: "Pattern Scanner", question: "What structure is forming?", path: "pattern-scanner", period: function () { return "1h / 4h / 1D"; } },
     { id: "cryptoOi", title: "Crypto Open Interest", question: "Is participation expanding?", path: "open-interest", period: function () { return "24h OI"; }, query: function () { return "confluence=4h"; } },
-    { id: "crossOi", title: "Cross-Market Open Interest", question: "How are futures markets positioned?", path: "cross-market-oi", period: function () { return "Weekly · 1W Δ"; }, query: function () { return "timeframe=W&lookback=1w"; } },
-    { id: "rsi", title: "RSI Matrix", question: "Where is momentum strongest?", path: "rsi-matrix", period: function () { return "All enabled TFs"; } },
+    { id: "crossOi", title: "Cross-Market Open Interest", question: "How are futures markets positioned?", path: "cross-market-oi", href: "#cross-market-oi", period: function () { return "Weekly · 1W Δ"; }, query: function () { return "timeframe=W&lookback=1w"; } },
+    { id: "rsi", title: "RSI Matrix", question: "Where is momentum strongest?", path: "rsi-matrix", href: "#rsi-matrix", period: function () { return "All enabled TFs"; } },
   ];
   function shell(card, i) {
     return '<article class="ov2-card" id="ov2-' + card.id + '" aria-labelledby="ov2-title-' + card.id + '">' +
       '<header class="ov2-card-head"><div class="ov2-card-title"><span class="ov2-number">0' + (i + 1) + '</span><div><h3 id="ov2-title-' + card.id + '">' + esc(card.title) + '</h3><p>' + esc(card.question) + '</p></div></div><span class="ov2-period">' + esc(card.period()) + '</span></header>' +
-      '<div class="ov2-body"></div><div class="ov2-card-foot"><span class="ov2-stamp">Awaiting response</span><a href="/' + card.path + '.html">Open screener ↗</a></div></article>';
+      '<div class="ov2-body"></div><div class="ov2-card-foot"><span class="ov2-stamp">Awaiting response</span>' +
+      (card.href ? '<a href="' + card.href + '">Jump to full view ↓</a>' : '<a href="/' + card.path + '.html">Open screener ↗</a>') + '</div></article>';
   }
   function render(summary) {
     var h = summary.health || {};
@@ -72,7 +73,15 @@
     if (pass === generation) { refresh.disabled = false; interval.disabled = false; }
   }
   grid.innerHTML = cards.map(shell).join("");
-  refresh.addEventListener("click", function () { loadAll(true); });
+  refresh.addEventListener("click", function () {
+    loadAll(true);
+    // The embedded Cross-Market OI and RSI Matrix sections own their loaders;
+    // their Refresh buttons run a forced reload.
+    ["xoi-refresh", "rm-refresh-btn"].forEach(function (id) {
+      var button = document.getElementById(id);
+      if (button && !button.disabled) button.click();
+    });
+  });
   interval.addEventListener("change", function () { loadAll(false); });
   grid.addEventListener("click", async function (event) {
     var button = event.target.closest("[data-retry]");

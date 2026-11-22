@@ -83,7 +83,7 @@ test("TradeHunter sits above AI Analysis and owns the scanner workflow", () => {
 
   assert.ok(tradeHunterStart > -1, "TradeHunter is missing");
   assert.ok(aiAnalysisStart > tradeHunterStart, "TradeHunter must sit above AI Analysis");
-  const labels = ["Screeners", "Directional Bias", "Local Extremes", "Pattern Scanner", "Crypto Open Interest", "Cross-Market Open Interest", "Market Matrix", "Live Trades", "Track Record"];
+  const labels = ["Screeners", "Directional Bias", "Local Extremes", "Pattern Scanner", "Crypto Open Interest", "Market Matrix", "Live Trades", "Track Record"];
   let cursor = -1;
   for (const label of labels) {
     const next = tradeHunter.indexOf(`label: "${label}"`, cursor + 1);
@@ -106,7 +106,9 @@ test("the Screeners group holds one entry per screener and no combined page", ()
   assert.match(menu, /href: "\/local-extremes\.html"/);
   assert.match(menu, /href: "\/pattern-scanner\.html"/);
   assert.match(menu, /href: "\/open-interest\.html", label: "Crypto Open Interest"/);
-  assert.match(menu, /href: "\/cross-market-oi\.html", label: "Cross-Market Open Interest"/);
+  // Cross-Market OI and the RSI Matrix are sections of Overview v2, not menu entries.
+  assert.doesNotMatch(sidebar, /href: "\/cross-market-oi\.html"/);
+  assert.doesNotMatch(sidebar, /href: "\/rsi-matrix\.html"/);
   assert.doesNotMatch(sidebar, /label: "Signal Screener"/);
   // Future screeners join this group; none of them may ship as a dead link yet.
   // Live Trades is an execution tape, not a directional screener: it follows
@@ -210,13 +212,17 @@ test("Screeners nests Heatmaps with all four section links", () => {
   }
 });
 
-test("both Open Interest pages sit side by side under Screeners", () => {
-  const start = sidebar.indexOf('label: "Screeners"');
-  const menu = sidebar.slice(start, sidebar.indexOf('label: "Track Record"', start));
-  const crypto = menu.indexOf('href: "/open-interest.html", label: "Crypto Open Interest"');
-  const cross = menu.indexOf('href: "/cross-market-oi.html", label: "Cross-Market Open Interest"');
-  assert.ok(crypto > -1, "crypto OI is under Screeners");
-  assert.equal(cross > crypto, true, "cross-market OI sits right after crypto OI");
+test("Cross-Market OI and the RSI Matrix are merged into Overview v2", () => {
+  const overview = fs.readFileSync(path.join(__dirname, "..", "public", "overview-v2.html"), "utf8");
+  assert.match(sidebar, /href: "\/open-interest\.html", label: "Crypto Open Interest"/);
+  assert.match(overview, /id="cross-market-oi"/);
+  assert.match(overview, /id="xoi-plot"/);
+  assert.match(overview, /assets\/js\/cross-market-oi\.js/);
+  assert.match(overview, /id="rsi-matrix"/);
+  assert.match(overview, /id="rm-groups"/);
+  assert.match(overview, /assets\/js\/rsi-matrix\.js/);
+  // The standalone pages stay reachable and highlight Overview in the menu.
+  assert.match(sidebar, /path === "\/cross-market-oi\.html" \|\| path === "\/rsi-matrix\.html"\) return "\/"/);
 });
 
 test("the X and YouTube groups are Links menus and each reaches its own portal", () => {
