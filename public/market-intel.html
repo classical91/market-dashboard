@@ -23,7 +23,7 @@
     <nav class="nav-pills" aria-label="Jump to section">
       <a href="#cross-asset-overview" class="nav-pill">Cross-Asset Overview</a>
       <a href="#macro-indicators"     class="nav-pill">Macro Indicators</a>
-      <a href="#liquidations"         class="nav-pill">Liquidations &amp; Funding</a>
+      <a href="/crypto.html#btc-liquidations-funding" class="nav-pill">Liquidations &amp; Funding</a>
       <a href="/crypto.html"          class="nav-pill nav-pill--crypto">Crypto</a>
       <a href="/traditional.html"     class="nav-pill nav-pill--traditional">Traditional</a>
     </nav>
@@ -75,18 +75,6 @@
       <a class="card" href="https://tradingeconomics.com/country-list/unemployment-rate" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">UNEMPLOYMENT</span><span class="arrow">&#8599;</span></div><div class="card-title">Unemployment Rate by Country</div><div class="mi-card-desc">Labour-market slack by country.</div><div class="card-src">tradingeconomics.com</div></a>
     </div>
 
-    <!-- LIQUIDATIONS & FUNDING -->
-    <div class="section-header" id="liquidations" data-section="liquidations">
-      <span class="section-label">Liquidations &amp; Funding</span>
-      <span class="section-chevron">&#9660;</span>
-    </div>
-    <div class="cards mi-grid" id="cards-liquidations">
-      <a class="card" href="https://coinalyze.net/bitcoin/liquidations" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">BTC LIQUIDATIONS</span><span class="arrow">&#8599;</span></div><div class="card-title">Bitcoin Liquidations</div><div class="mi-card-desc">Aggregated long and short liquidations over time.</div><div class="card-src">coinalyze.net</div></a>
-      <a class="card" href="https://coinalyze.net/bitcoin/funding-rate/" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">FUNDING RATE</span><span class="arrow">&#8599;</span></div><div class="card-title">Bitcoin Funding Rate</div><div class="mi-card-desc">Perp funding across exchanges: who is paying to hold the trade.</div><div class="card-src">coinalyze.net</div></a>
-      <a class="card" href="https://www.coinglass.com/pro/futures/LiquidationMap" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">LIQ MAP</span><span class="arrow">&#8599;</span></div><div class="card-title">Liquidation Map</div><div class="mi-card-desc">Estimated liquidation levels stacked by price.</div><div class="card-src">coinglass.com</div></a>
-      <a class="card" href="https://www.coinglass.com/pro/futures/LiquidationHeatMapModel3" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">HEATMAP · MODEL 3</span><span class="arrow">&#8599;</span></div><div class="card-title">Liquidation Heatmap (Model 3)</div><div class="mi-card-desc">Liquidation clusters across price and time.</div><div class="card-src">coinglass.com</div></a>
-    </div>
-
     <footer>Market Intel · Command Hub</footer>
 
   </main>
@@ -95,6 +83,11 @@
 <script src="/assets/js/sections.js"></script>
 <script>
   (function () {
+    // Liquidations & Funding moved to Crypto Hub → Bitcoin Research; keep old links working.
+    if (window.location.hash === '#liquidations') {
+      window.location.replace('/crypto.html#btc-liquidations-funding');
+      return;
+    }
     // Link groups start open here: the hub is short and the tiles are the point.
     initSections('mi_collapsed', { defaultCollapsed: [] });
   })();
