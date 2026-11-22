@@ -1048,6 +1048,8 @@ header, .back, .back-group { display: none !important; }
   background: transparent;
 }
 .cards > .section-header--sub .section-label { font-size: 12px; }
+/* Outrank the 12px gap a collapsed top-level header keeps below it. */
+.cards > .section-header--sub[data-section].collapsed { margin-bottom: 0; }
 .cards > .cards--sub {
   margin: 0; border: 0; border-radius: 0;
   border-top: 1px solid var(--border);
