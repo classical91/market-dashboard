@@ -15,6 +15,7 @@ test("primary sidebar order and removed links stay exact", () => {
     "My Trades",
     "TradeHunter",
     "AI Analysis",
+    "AI/Bots",
     "Reporter",
     "Market Intel Links",
     "Intelligent Portal",
@@ -132,7 +133,7 @@ test("both screener pages are available in Alpha review mode", () => {
 
 test("AI Analysis owns presets, layouts, and Signal Diagnostics", () => {
   const start = sidebar.indexOf('label: "AI Analysis"');
-  const end = sidebar.indexOf('label: "Reporter"', start);
+  const end = sidebar.indexOf('label: "AI/Bots"', start);
   const menu = sidebar.slice(start, end);
 
   assert.match(menu, /label: "Presets"/);
@@ -141,6 +142,20 @@ test("AI Analysis owns presets, layouts, and Signal Diagnostics", () => {
   assert.doesNotMatch(menu, /Trading Lab Backtest/);
   assert.doesNotMatch(menu, /label: "Trading"/);
   assert.doesNotMatch(menu, /Decision Engine/);
+});
+
+test("AI/Bots groups the ChatGPT analyst and CoinTrendz Telegram links", () => {
+  const start = sidebar.indexOf('label: "AI/Bots"');
+  const end = sidebar.indexOf('label: "Reporter"', start);
+  const menu = sidebar.slice(start, end);
+
+  assert.match(menu, /^label: "AI\/Bots",\s*children: \[/);
+  assert.match(menu, /href: "https:\/\/chatgpt\.com\/g\/g-p-6afdc0cad2a081919b23725443780c43-trading-analyst\/project",\s*label: "AI Analyst"/);
+  assert.match(menu, /href: "https:\/\/t\.me\/cointrendz", label: "CoinTrendz Telegram"/);
+  assert.deepEqual([...menu.matchAll(/label: "([^"]+)"/g)].map((match) => match[1]), ["AI/Bots", "AI Analyst", "CoinTrendz Telegram"]);
+  for (const label of ["AI Analyst", "CoinTrendz Telegram"]) {
+    assert.equal(sidebar.match(new RegExp(`label: "${label}"`, "g")).length, 1, `${label} is duplicated`);
+  }
 });
 
 test("Other section holds the external sites above Trading and tools", () => {
@@ -167,7 +182,7 @@ test("the intelligence menus are the colour-featured tabs", () => {
 });
 
 test("Trading and tools section has one copy of every item in the requested order", () => {
-  const labels = ["CoinTrendz Telegram", "Bot Commands", "Indicators Glossary", "Settings"];
+  const labels = ["Bot Commands", "Indicators Glossary", "Settings"];
   let cursor = sidebar.indexOf("var tools");
   for (const label of labels) {
     const next = sidebar.indexOf(`label: "${label}"`, cursor);
