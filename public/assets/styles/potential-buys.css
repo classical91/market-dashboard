@@ -27,7 +27,7 @@
 /* Count tab — totals across every screenshot */
 .pb-stats {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
   margin-bottom: 16px;
 }
@@ -54,8 +54,11 @@
   font-size: 11px; color: var(--muted);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+/* Older than 3 days: red once anything has crossed the line. */
+.pb-stat-stale.is-stale { border-color: rgba(231,76,60,0.45); background: var(--red-bg); }
+.pb-stat-stale.is-stale .pb-stat-value { color: var(--red); }
 @media (max-width: 560px) {
-  .pb-stats { gap: 6px; }
+  .pb-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
   .pb-stat { padding: 10px; }
   .pb-stat-value { font-size: 21px; }
 }

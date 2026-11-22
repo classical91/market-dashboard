@@ -42,6 +42,9 @@
     statTickers: document.getElementById("pbStatTickers"),
     statTickersSub: document.getElementById("pbStatTickersSub"),
     statWeek: document.getElementById("pbStatWeek"),
+    statStaleCard: document.getElementById("pbStatStaleCard"),
+    statStale: document.getElementById("pbStatStale"),
+    statStaleSub: document.getElementById("pbStatStaleSub"),
     crop: document.getElementById("pbCrop"),
     cropStage: document.getElementById("pbCropStage"),
     cropImg: document.getElementById("pbCropImg"),
@@ -159,6 +162,7 @@
       el.statTotalSub.textContent = "Loading…";
       el.statTickers.textContent = "–";
       el.statWeek.textContent = "–";
+      el.statStale.textContent = "–";
       return;
     }
     var since = Date.now() - WEEK_MS;
@@ -173,6 +177,18 @@
       ? built.folders.slice(0, 3).map(function (f) { return "$" + f.tag; }).join(" ") + (tickers > 3 ? " +" + (tickers - 3) : "")
       : "Distinct tickers";
     el.statWeek.textContent = String(week);
+
+    // Same 3-day line as the red timestamps; a ticker counts once any of its
+    // screenshots (so its oldest) is past it.
+    var staleItems = state.items.filter(function (item) { return isStale(item.createdAt); });
+    var staleTickers = {};
+    staleItems.forEach(function (item) { tagsOf(item).forEach(function (tag) { staleTickers[tag] = true; }); });
+    var staleTickerCount = Object.keys(staleTickers).length;
+    el.statStale.textContent = String(staleItems.length);
+    el.statStaleSub.textContent = staleItems.length
+      ? staleTickerCount + (staleTickerCount === 1 ? " ticker" : " tickers")
+      : "All fresh";
+    el.statStaleCard.classList.toggle("is-stale", staleItems.length > 0);
     document.title = (n ? "(" + n + ") " : "") + BASE_TITLE;
   }
 
