@@ -80,31 +80,11 @@
 .pb-dropzone-title { color: var(--text); font-size: 14px; font-weight: 600; }
 .pb-dropzone-hint { color: var(--muted); font-size: 12px; }
 
-/* Folders — one per #hashtag in the labels */
-.pb-folders-section { margin-bottom: 20px; }
-.pb-folders-hint { color: var(--muted); font-size: 11px; }
-.pb-folders-hint code {
+.pb-hint { flex-basis: 100%; color: var(--muted); font-size: 11px; }
+.pb-hint code {
   font-size: 11px; padding: 1px 5px; border-radius: 5px; background: rgba(255,255,255,0.06);
 }
-.pb-folders {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-  gap: 8px;
-}
-.pb-folder {
-  display: flex; align-items: center; gap: 10px;
-  min-width: 0;
-  padding: 10px 12px;
-  font: inherit; text-align: left;
-  color: var(--text);
-  background: rgba(9,14,24,0.72);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  cursor: pointer;
-}
-.pb-folder:hover { border-color: var(--border-hover); }
-.pb-folder:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
-.pb-folder.is-active { border-color: rgba(77,163,255,0.6); background: var(--blue-bg); }
+/* Folder glyph on ticker stack cards. */
 .pb-folder-icon {
   flex: none; position: relative;
   width: 22px; height: 16px; margin-top: 3px;
@@ -116,26 +96,6 @@
   width: 10px; height: 5px;
   border-radius: 2px 2px 0 0;
   background: rgba(245,183,64,0.85);
-}
-.pb-folder.is-all .pb-folder-icon,
-.pb-folder.is-all .pb-folder-icon::before { background: rgba(77,163,255,0.8); }
-.pb-folder.is-untagged .pb-folder-icon,
-.pb-folder.is-untagged .pb-folder-icon::before { background: rgba(160,170,190,0.55); }
-.pb-folder-main { display: grid; gap: 2px; flex: 1; min-width: 0; }
-.pb-folder-name {
-  font-size: 13px; font-weight: 700;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.pb-folder-when { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pb-folder-count {
-  flex: none;
-  min-width: 26px; padding: 2px 8px;
-  font-size: 12px; font-weight: 700; text-align: center;
-  font-variant-numeric: tabular-nums;
-  color: var(--soft);
-  background: rgba(255,255,255,0.06);
-  border: 1px solid var(--border);
-  border-radius: 10px;
 }
 
 /* List */
@@ -410,11 +370,15 @@
 @media (max-width: 640px) {
   .pb-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
   .pb-search { margin-left: 0; width: 100%; }
-  .pb-folders { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
-  .pb-folders-hint { flex-basis: 100%; }
-  .pb-folder { padding: 9px 10px; gap: 8px; }
-  .pb-folder-when { white-space: normal; }
   /* Narrow cards: the date gets its own line instead of wrapping word by word. */
   .pb-card-foot { flex-wrap: wrap; row-gap: 6px; }
   .pb-when { flex: 1 0 100%; }
+}
+
+/* iOS Safari zooms the page into any focused field under 16px. Touch screens
+   and phone-width screens get 16px label and filter fields so typing a
+   ticker doesn't zoom. */
+@media (pointer: coarse), (max-width: 640px) {
+  .pb-label,
+  .pb-search { font-size: 16px; }
 }

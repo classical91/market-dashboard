@@ -14,7 +14,6 @@
   // saves "$BTC" and files it under BTC. Shared with the server's store.
   var Ticker = window.TickerLabel;
   var ALL = "__all";
-  var UNTAGGED = "__untagged";
 
   var state = { items: [], loading: true, error: "", uploading: 0, filter: "", viewing: null, folder: ALL };
 
@@ -38,8 +37,6 @@
     viewerCrop: document.getElementById("pbViewerCrop"),
     heading: document.getElementById("pbHeading"),
     back: document.getElementById("pbBack"),
-    folders: document.getElementById("pbFolders"),
-    folderCount: document.getElementById("pbFolderCount"),
     statTotal: document.getElementById("pbStatTotal"),
     statTotalSub: document.getElementById("pbStatTotalSub"),
     statTickers: document.getElementById("pbStatTickers"),
@@ -123,7 +120,7 @@
   function inFolder(item) {
     if (state.folder === ALL) return true;
     var tags = tagsOf(item);
-    return state.folder === UNTAGGED ? !tags.length : tags.indexOf(state.folder) !== -1;
+    return tags.indexOf(state.folder) !== -1;
   }
 
   function visibleItems() {
@@ -133,47 +130,14 @@
     });
   }
 
-  function folderButton(key, name, count, updatedAt, extraClass) {
-    var active = state.folder === key;
-    return (
-      '<button type="button" class="pb-folder' + (extraClass ? " " + extraClass : "") + (active ? " is-active" : "") +
-        '" data-folder="' + escapeHtml(key) + '" aria-pressed="' + active + '">' +
-        '<span class="pb-folder-icon" aria-hidden="true"></span>' +
-        '<span class="pb-folder-main">' +
-          '<span class="pb-folder-name">' + escapeHtml(name) + "</span>" +
-          '<span class="pb-folder-when">' + (updatedAt ? "Updated " + escapeHtml(formatWhen(updatedAt)) : "Empty") + "</span>" +
-        "</span>" +
-        '<span class="pb-folder-count" aria-label="' + count + (count === 1 ? " item" : " items") + '">' + count + "</span>" +
-      "</button>"
-    );
-  }
-
-  function renderFolders() {
-    var built = buildFolders();
-    var folders = built.folders;
-    // A folder whose last tag was removed is gone; fall back to everything.
-    if (state.folder !== ALL && state.folder !== UNTAGGED &&
-        !folders.some(function (f) { return f.tag === state.folder; })) {
+  /** Which ticker folder is open (from tapping a stack) and the heading for it. */
+  function syncFolder() {
+    // A folder whose last screenshot was relabelled or deleted is gone; fall
+    // back to everything.
+    if (state.folder !== ALL && !buildFolders().folders.some(function (f) { return f.tag === state.folder; })) {
       state.folder = ALL;
     }
-    if (state.folder === UNTAGGED && !built.untagged.count) state.folder = ALL;
-
-    el.folderCount.textContent = folders.length + (folders.length === 1 ? " folder" : " folders");
-    if (state.loading && !state.items.length) {
-      el.folders.innerHTML = "";
-      el.folderCount.textContent = "";
-      return;
-    }
-    var newest = state.items.reduce(function (max, item) { return Math.max(max, touchedAt(item)); }, 0);
-    var html = folderButton(ALL, "All", state.items.length, newest, "is-all");
-    html += folders.map(function (f) { return folderButton(f.tag, "$" + f.tag, f.count, f.updatedAt); }).join("");
-    if (built.untagged.count && folders.length) {
-      html += folderButton(UNTAGGED, "Untagged", built.untagged.count, built.untagged.updatedAt, "is-untagged");
-    }
-    el.folders.innerHTML = html;
-
-    var title = state.folder === ALL ? "Watching" : state.folder === UNTAGGED ? "Untagged" : "$" + state.folder;
-    el.heading.textContent = title;
+    el.heading.textContent = state.folder === ALL ? "Watching" : "$" + state.folder;
     el.back.hidden = state.folder === ALL;
   }
 
@@ -206,7 +170,7 @@
   }
 
   function render() {
-    renderFolders();
+    syncFolder();
     renderStats(buildFolders());
     var n = state.items.length;
     var shown = state.folder === ALL ? n : state.items.filter(inFolder).length;
@@ -247,8 +211,9 @@
 
   /**
    * On the All view, screenshots of the same ticker stack into one folder
-   * card, placed where its newest screenshot would be. Inside a folder, or
-   * while filtering, every screenshot shows on its own.
+   * card, ranked by how many screenshots each holds (single screenshots
+   * last); ties put the one with the newest screenshot first. Inside a folder, or
+   * while filtering, every screenshot shows on its own, newest first.
    */
   function gridEntries(items) {
     if (state.folder !== ALL || state.filter.trim()) {
@@ -270,7 +235,10 @@
         entries.push({ stack: true, tag: tag, items: groups[tag] });
       }
     });
-    return entries;
+    // Array sort is stable, so equal sizes stay in newest-first order.
+    return entries.sort(function (a, b) {
+      return (b.stack ? b.items.length : 1) - (a.stack ? a.items.length : 1);
+    });
   }
 
   function stackCard(tag, items) {
@@ -718,13 +686,6 @@
   el.viewerClose.addEventListener("click", closeViewer);
   el.viewerCrop.addEventListener("click", function () { if (state.viewing) openCrop(state.viewing); });
 
-  el.folders.addEventListener("click", function (e) {
-    var button = e.target.closest("[data-folder]");
-    if (!button) return;
-    var key = button.getAttribute("data-folder");
-    state.folder = state.folder === key && key !== ALL ? ALL : key;
-    render();
-  });
   el.viewerDelete.addEventListener("click", function () { if (state.viewing) remove(state.viewing); });
   el.viewer.addEventListener("close", function () { state.viewing = null; });
   // A click on the backdrop (outside the dialog box) closes it.
