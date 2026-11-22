@@ -57,13 +57,10 @@
             { href: "/directional-bias.html", label: "Directional Bias" },
             { href: "/local-extremes.html", label: "Local Extremes" },
             { href: "/pattern-scanner.html", label: "Pattern Scanner" },
-            // The two Open Interest pages sit side by side: crypto perps
-            // (live, per coin) and CFTC futures across asset classes (weekly).
+            // Cross-Market Open Interest and the RSI Matrix live inside
+            // Overview v2 (/#cross-market-oi, /#rsi-matrix); their standalone
+            // URLs still resolve but are no longer listed here.
             { href: "/open-interest.html", label: "Crypto Open Interest" },
-            { href: "/cross-market-oi.html", label: "Cross-Market Open Interest" },
-            // Momentum across markets and timeframes at once: RSI 14 on
-            // 1W / 1D / 4H / 1H for crypto, indices, commodities and dominance.
-            { href: "/rsi-matrix.html", label: "RSI Matrix" },
             {
               href: "/heatmaps.html",
               label: "Heatmaps",
@@ -247,6 +244,8 @@
     var path = window.location.pathname || "/";
     // Overview v2 is served at / and its legacy URLs; v1 at /overview-v1 and /index.html.
     if (path === "/overview-v2" || path === "/overview-v2.html") return "/";
+    // Cross-Market OI and the RSI Matrix are sections of Overview v2 now.
+    if (path === "/cross-market-oi.html" || path === "/rsi-matrix.html") return "/";
     if (path === "/index.html" || path === "/overview-v1.html") return "/overview-v1";
     // Single-concept and topic explainer pages belong to the Indicators Glossary.
     if (path === "/concept.html" || path === "/topic.html") return "/indicators.html";
