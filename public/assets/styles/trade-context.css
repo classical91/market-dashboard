@@ -5,15 +5,17 @@
 
 .tc-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 350px), 1fr));
+  align-items: start;
+  gap: 18px;
 }
 
 .tc-card {
   min-width: 0;
-  border: 1px solid rgba(74, 74, 170, 0.32);
-  border-radius: var(--radius);
-  background: #0a0a14;
+  border: 1px solid rgba(137, 158, 196, 0.22);
+  border-radius: 14px;
+  background: #0c111d;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
   overflow: hidden;
 }
 
@@ -24,13 +26,14 @@
      the row wraps as a row rather than breaking words inside the chart link. */
   flex-wrap: wrap;
   gap: 8px;
-  padding: 12px 14px;
+  padding: 16px;
+  background: rgba(137, 158, 196, 0.04);
   border-bottom: 1px solid rgba(42, 42, 74, 0.7);
 }
 
 .tc-head > * { white-space: nowrap; }
 
-.tc-symbol { font-size: 15px; font-weight: 800; color: #fff; }
+.tc-symbol { font-size: 16px; font-weight: 800; color: #fff; }
 .tc-interval {
   padding: 2px 7px;
   border: 1px solid rgba(137, 146, 166, 0.35);
@@ -104,7 +107,7 @@
 }
 .tc-filter--on .tc-filter-count { background: rgba(115, 215, 255, 0.22); color: #cdeaff; }
 
-.tc-price { margin-left: auto; color: #c9d4e8; font-size: 13px; font-variant-numeric: tabular-nums; }
+.tc-price { margin-left: auto; color: #edf3ff; font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
 
 /* Freshness sits directly under the head, above every number it qualifies:
    how old the evidence is has to be read before the evidence, not after. */
@@ -205,45 +208,76 @@
 .tc-stale--stale { color: #ffb55f; background: rgba(255, 181, 95, 0.16); border: 1px solid rgba(255, 181, 95, 0.4); }
 .tc-stale--unknown { color: #8892a6; background: rgba(137, 146, 166, 0.14); border: 1px solid rgba(137, 146, 166, 0.3); }
 
-.tc-untrack {
-  border: 1px solid rgba(255, 93, 93, 0.35);
-  border-radius: 6px;
-  padding: 4px 8px;
-  background: rgba(255, 93, 93, 0.1);
-  color: #ff8b7b;
+.tc-identity { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; min-width: 0; }
+.tc-head-tools { flex: 1 1 100%; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; white-space: normal; }
+.tc-head-tools .ss-chart-link { color: #88c7ff; font-size: 12px; text-decoration: none; padding: 6px 0; }
+.tc-head-tools .ss-chart-link:hover { text-decoration: underline; }
+
+.tc-remove {
+  min-height: 32px;
+  border: 1px solid #e05260;
+  border-radius: 7px;
+  padding: 5px 11px;
+  background: #b52c3c;
+  color: #fff;
   font: inherit;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   cursor: pointer;
 }
-.tc-untrack:hover { background: rgba(255, 93, 93, 0.2); }
-.tc-untrack:disabled { opacity: 0.5; cursor: default; }
+.tc-head-tools .tc-remove { margin-left: auto; }
+.tc-remove:hover:not(:disabled) { background: #cf3547; border-color: #ff7885; }
+.tc-remove:disabled { opacity: 0.55; cursor: wait; }
+.tc-remove:focus-visible,
+.tc-dialog-cancel:focus-visible,
+.tc-head-tools .ss-chart-link:focus-visible { outline: 2px solid #88c7ff; outline-offset: 3px; }
 
-.tc-section { padding: 10px 14px; border-bottom: 1px solid rgba(42, 42, 74, 0.45); }
+.tc-remove-dialog {
+  margin: auto;
+  width: min(440px, calc(100% - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 24px;
+  border: 1px solid rgba(137, 158, 196, 0.3);
+  border-radius: 16px;
+  background: #101827;
+  color: #edf3ff;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+}
+.tc-remove-dialog::backdrop { background: rgba(3, 6, 12, 0.78); }
+.tc-dialog-label { color: #a8b6cf; font-size: 12px; font-weight: 700; margin-bottom: 8px; }
+.tc-remove-dialog h2 { font-size: 22px; line-height: 1.3; margin-bottom: 12px; }
+.tc-remove-dialog p { color: #a8b6cf; font-size: 14px; line-height: 1.65; overflow-wrap: anywhere; }
+.tc-remove-dialog strong { color: #edf3ff; }
+.tc-dialog-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+.tc-dialog-actions button { min-height: 40px; padding: 8px 18px; font-size: 14px; }
+.tc-dialog-cancel { border: 1px solid rgba(137, 158, 196, 0.4); border-radius: 7px; background: transparent; color: #edf3ff; font: inherit; cursor: pointer; }
+.tc-dialog-cancel:hover { background: rgba(137, 158, 196, 0.12); }
+
+.tc-section { padding: 12px 16px; border-bottom: 1px solid rgba(42, 42, 74, 0.45); }
 .tc-section:last-child { border-bottom: 0; }
 
 .tc-section-label {
   margin-bottom: 6px;
-  color: #6f7a91;
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.09em;
+  color: #97a6bf;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
 }
 
 .tc-row { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .tc-row + .tc-row { margin-top: 5px; }
-.tc-meta { margin-left: auto; color: #8892a6; font-size: 10px; }
+.tc-meta { margin-left: auto; color: #a8b6cf; font-size: 11px; }
 
-.tc-bias { font-size: 14px; font-weight: 800; letter-spacing: 0.02em; }
+.tc-bias { font-size: 16px; font-weight: 800; letter-spacing: 0.02em; }
 .tc-bias--bullish { color: #00e676; }
-.tc-bias--bearish { color: #ff1744; }
-.tc-bias--neutral { color: #9e9e9e; }
+.tc-bias--bearish { color: #ff6b80; }
+.tc-bias--neutral { color: #b8c2d4; }
 
 /* Bottom and top sit side by side and always both render: seeing 15 next to
    100 is the whole point of keeping the two scores independent. */
 .tc-extremes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.tc-extreme-label { color: #6f7a91; font-size: 9px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.tc-extreme-label { color: #97a6bf; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
 .tc-extreme-value { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .tc-extreme--bottom .tc-extreme-value { color: #45d6b5; }
 .tc-extreme--top .tc-extreme-value { color: #ff8b7b; }
@@ -269,9 +303,9 @@
 .tc-pattern { color: #e8eefb; font-size: 12px; font-weight: 700; }
 .tc-pattern--bullish { color: #00e676; }
 .tc-pattern--bearish { color: #ff1744; }
-.tc-muted { color: #6f7a91; font-size: 11px; font-style: italic; }
+.tc-muted { color: #97a6bf; font-size: 12px; line-height: 1.5; }
 
-.tc-evidence { margin: 0; padding-left: 16px; color: #c9d4e8; font-size: 11px; line-height: 1.7; }
+.tc-evidence { margin: 0; padding-left: 16px; color: #c9d4e8; font-size: 12px; line-height: 1.7; }
 .tc-evidence li::marker { color: #4da3ff; }
 
 /* The context strip is the only synthesis on the card, and it says whether
@@ -293,7 +327,7 @@
   font-weight: 800;
   letter-spacing: 0.05em;
 }
-.tc-context-summary { color: #a8b6cf; font-size: 11px; line-height: 1.5; }
+.tc-context-summary { color: #c0cce0; font-size: 12px; line-height: 1.5; }
 
 .tc-context--aligned { background: rgba(0, 184, 148, 0.08); }
 .tc-context--aligned .tc-context-state { color: #79f2c0; background: rgba(121, 242, 192, 0.16); }
@@ -336,7 +370,7 @@
 
 .tc-gpt-send,
 .tc-superchart {
-  min-height: 28px;
+  min-height: 34px;
   border: 1px solid rgba(16, 163, 127, 0.4);
   border-radius: 6px;
   padding: 4px 10px;
@@ -358,9 +392,9 @@
 
 @media (max-width: 720px) {
   .tc-grid { grid-template-columns: 1fr; gap: 12px; }
-  /* The price and the freshness badge share the wrapped row rather than each
-     claiming one, so the head stays two lines on a phone. */
-  .tc-price { margin-left: 0; flex: 1 1 auto; }
+  .tc-price { margin-left: auto; }
+  .tc-gpt-send,
+  .tc-superchart { flex: 1 1 160px; justify-content: center; margin-left: 0; }
   .tc-data { font-size: 9px; }
   /* The kind column's fixed width buys nothing once the line wraps. */
   .tc-change-kind { min-width: 0; }
@@ -391,8 +425,9 @@
 /* Multi-timeframe RSI: one cell per enabled timeframe. */
 .tc-rsi { display: grid; grid-template-columns: repeat(auto-fit, minmax(56px, 1fr)); gap: 6px; }
 .tc-rsi-cell {
-  padding: 5px 6px;
-  border-radius: 6px;
+  padding: 8px 6px;
+  border: 1px solid rgba(137, 158, 196, 0.1);
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.04);
   text-align: center;
 }
@@ -403,7 +438,7 @@
 .tc-rsi--weak-bearish .tc-rsi-value { color: #ff8b7b; }
 .tc-rsi--strong-bearish .tc-rsi-value,
 .tc-rsi--bearish .tc-rsi-value { color: #ff1744; }
-.tc-rsi--none .tc-rsi-value { color: #6f7a91; }
+.tc-rsi--none .tc-rsi-value { color: #97a6bf; }
 
 /* Manual add bar — search the top-30 catalog or type any pair. */
 .tc-add { flex-wrap: wrap; }
