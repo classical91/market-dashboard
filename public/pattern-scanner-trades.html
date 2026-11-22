@@ -22,7 +22,7 @@
       </div>
     </div>
 
-    <div class="aia-notice" id="tc-notice" style="display:none"></div>
+    <div class="aia-notice" id="tc-notice" role="status" style="display:none"></div>
 
     <div class="ps-toolbar">
       <button class="aia-run-btn" type="button" id="tc-refresh-btn">Refresh</button>
@@ -68,7 +68,7 @@
           <li><strong>Let the order do the triage.</strong> Attention sorting puts a pair that just moved above one that merely disagrees, and disagreement above agreement &mdash; CONFLICT is the reading worth stopping for, ALIGNED the least urgent thing a card can say. The filters narrow a long watchlist to the cards worth opening; neither decides anything about a trade, they only decide what you look at first.</li>
           <li><strong>Scan the CHANGED blocks first.</strong> They report what moved since the previous closed candle &mdash; a context state flipping, a bias check turning over, a divergence appearing. On a long watchlist this is what narrows fifteen pairs down to the few worth opening; the states below tell you where things stand, not what is new.</li>
           <li><strong>Check the DATA line before you trust the card.</strong> It reports how long ago the newest closed candle closed and how long ago each engine last recalculated. A card flagged STALE is showing evidence the feed or the cache has stopped advancing &mdash; the numbers are real, but they are not now.</li>
-          <li><strong>Unstar to remove it.</strong> This is a research watchlist; it does not place, manage, or close trades.</li>
+          <li><strong>Remove a pair when you're done following it.</strong> Press Remove on its card, then confirm the pair and timeframe. Cancel keeps it tracked. This is a research watchlist; removing a card does not place, manage, or close trades.</li>
         </ol>
         <ul class="aia-how-notes">
           <li><strong>Changes are measured per closed candle, not per page load.</strong> A transition stays on the card for the whole of the current bar, so refreshing does not consume it; the baseline rolls forward only when a new candle closes. Continuous readings are left out on purpose &mdash; raw extreme scores, OI percentages and RSI values drift every bar, and reporting that as change would bury the transitions that matter. The directional score is the exception, because it moves in whole confluence checks.</li>
@@ -86,6 +86,15 @@
 
   </main>
 </div>
+<dialog class="tc-remove-dialog" id="tc-remove-dialog" aria-labelledby="tc-remove-title" aria-describedby="tc-remove-copy">
+  <div class="tc-dialog-label">Active Trades</div>
+  <h2 id="tc-remove-title">Remove this pair?</h2>
+  <p id="tc-remove-copy">Remove <strong id="tc-remove-pair"></strong> from Active Trades? You can track it again at any time. This does not close a trade.</p>
+  <div class="tc-dialog-actions">
+    <button class="tc-dialog-cancel" id="tc-remove-cancel" type="button" autofocus>Cancel</button>
+    <button class="tc-remove" id="tc-remove-confirm" type="button">Remove</button>
+  </div>
+</dialog>
 <script src="/assets/js/sidebar.js"></script>
 <script src="/assets/js/admin-key.js"></script>
 <script src="/assets/js/pattern-render.js"></script>
@@ -99,6 +108,13 @@
     var filtersEl = document.getElementById('tc-filters');
     var sortEl = document.getElementById('tc-sort');
     var escapeHtml = PatternRender.escapeHtml;
+    var removeDialog = document.getElementById('tc-remove-dialog');
+    var removePair = document.getElementById('tc-remove-pair');
+    var removeCancel = document.getElementById('tc-remove-cancel');
+    var removeConfirm = document.getElementById('tc-remove-confirm');
+    var pendingRemoval = null;
+    var removalBusy = false;
+    var loadVersion = 0;
 
     var TV_INTERVALS = { '15m': '15', '1h': '60', '4h': '240', '1D': 'D', '1W': 'W' };
 
@@ -325,19 +341,20 @@
       return (
         '<div class="tc-card">' +
           '<div class="tc-head">' +
-            '<span class="tc-symbol">' + escapeHtml(card.symbol) + '</span>' +
+            '<div class="tc-identity"><span class="tc-symbol">' + escapeHtml(card.symbol) + '</span>' +
             '<span class="tc-interval">' + escapeHtml(card.interval) + '</span>' +
             // The context state is the card's single most important output,
             // so it reads beside the symbol rather than below every piece of
             // evidence it summarises. The reasoning stays at the bottom.
             '<span class="tc-head-state tc-head-state--' + escapeHtml(String(context.state).toLowerCase()) + '">' +
-              escapeHtml(context.state) + '</span>' +
-            chartLink(card.symbol, card.interval) +
+              escapeHtml(context.state) + '</span></div>' +
             '<span class="tc-price">' + fmtPrice(card.price) + '</span>' +
-            changedBadge(card.changes) +
-            freshnessBadge(card.freshness) +
-            '<button class="tc-untrack" type="button" data-role="untrack" data-symbol="' + escapeHtml(card.symbol) +
-              '" data-interval="' + escapeHtml(card.interval) + '" title="Remove from Active Trades">&#9733; Untrack</button>' +
+            '<div class="tc-head-tools">' + chartLink(card.symbol, card.interval) +
+              changedBadge(card.changes) + freshnessBadge(card.freshness) +
+              '<button class="tc-remove" type="button" data-role="remove" data-symbol="' + escapeHtml(card.symbol) +
+                '" data-interval="' + escapeHtml(card.interval) + '" aria-label="Remove ' + escapeHtml(card.symbol) + ' ' + escapeHtml(card.interval) +
+                ' from Active Trades"' + (removalBusy ? ' disabled' : '') + '>Remove</button>' +
+            '</div>' +
           '</div>' +
           freshnessLine(card.freshness) +
           changesBlock(card.changes) +
@@ -487,20 +504,69 @@
       renderGrid();
     }
 
-    function untrack(btn) {
-      btn.disabled = true;
+    function askToRemove(btn) {
+      if (removalBusy) return;
+      pendingRemoval = { symbol: btn.getAttribute('data-symbol'), interval: btn.getAttribute('data-interval') };
+      removePair.textContent = pendingRemoval.symbol + ' · ' + pendingRemoval.interval;
+      removeDialog.showModal();
+      removeCancel.focus();
+    }
+
+    removeCancel.addEventListener('click', function () { removeDialog.close(); });
+    removeDialog.addEventListener('close', function () { pendingRemoval = null; });
+    removeConfirm.addEventListener('click', function () {
+      if (!pendingRemoval || removalBusy) return;
+      var pair = pendingRemoval;
+      pendingRemoval = null;
+      removalBusy = true;
+      loadVersion += 1;
+      refreshBtn.disabled = true;
+      refreshBtn.textContent = 'Refresh';
+      // Close the top-layer dialog before AdminKey may ask for credentials.
+      removeDialog.close();
+      grid.querySelectorAll('[data-role="remove"]').forEach(function (btn) {
+        btn.disabled = true;
+        if (btn.getAttribute('data-symbol') === pair.symbol && btn.getAttribute('data-interval') === pair.interval) {
+          btn.textContent = 'Removing…';
+        }
+      });
+      notice.style.display = 'none';
       AdminKey.fetch('/api/watchlist', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ symbol: btn.getAttribute('data-symbol'), interval: btn.getAttribute('data-interval') })
+        body: JSON.stringify(pair)
       })
-        .then(function () { load(); })
-        .catch(function () { btn.disabled = false; });
-    }
+        .then(function (res) {
+          if (!res.ok) {
+            return res.json().catch(function () { return {}; }).then(function (body) {
+              throw new Error(body.error || ('HTTP ' + res.status));
+            });
+          }
+          currentCards = currentCards.filter(function (card) {
+            return card.symbol !== pair.symbol || card.interval !== pair.interval;
+          });
+          currentCounts = {};
+          currentCards.forEach(function (card) {
+            cardTags(card).forEach(function (tag) { currentCounts[tag] = (currentCounts[tag] || 0) + 1; });
+          });
+          notice.textContent = 'Removed ' + pair.symbol + ' ' + pair.interval + ' from Active Trades.';
+        })
+        .catch(function (err) {
+          notice.textContent = 'Could not remove ' + pair.symbol + ' ' + pair.interval + ': ' + err.message;
+        })
+        .finally(function () {
+          removalBusy = false;
+          refreshBtn.disabled = false;
+          notice.style.display = 'block';
+          renderFilters();
+          renderGrid();
+          refreshBtn.focus();
+        });
+    });
 
     grid.addEventListener('click', function (e) {
-      var btn = e.target.closest('[data-role="untrack"]');
-      if (btn) { untrack(btn); return; }
+      var btn = e.target.closest('[data-role="remove"]');
+      if (btn) { askToRemove(btn); return; }
       var gpt = e.target.closest('[data-role="gpt-send"]');
       if (!gpt) return;
       var card = renderedCards[Number(gpt.getAttribute('data-card-index'))];
@@ -524,12 +590,15 @@
     });
 
     function load() {
+      if (removalBusy) return;
+      var version = ++loadVersion;
       refreshBtn.disabled = true;
       refreshBtn.textContent = 'Loading…';
       notice.style.display = 'none';
       fetch('/api/trade-context')
         .then(function (res) { return res.json(); })
         .then(function (data) {
+          if (version !== loadVersion) return;
           var cards = data.cards || [];
           render(cards, data.tagCounts || {});
           // "Page refreshed" rather than "updated": the data's own age lives
@@ -541,10 +610,12 @@
             (stale ? ' · ' + stale + ' card' + (stale === 1 ? '' : 's') + ' on stale data' : '');
         })
         .catch(function (err) {
+          if (version !== loadVersion) return;
           notice.style.display = 'block';
           notice.innerHTML = '&#9888;&#65039; Failed to load: ' + escapeHtml(err.message);
         })
         .finally(function () {
+          if (version !== loadVersion) return;
           refreshBtn.disabled = false;
           refreshBtn.textContent = 'Refresh';
         });
