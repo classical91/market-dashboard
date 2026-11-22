@@ -24,7 +24,9 @@ test("Overview v2 is the default page and v1 stays reachable", async () => {
       const response = await fetch(base + url, { redirect: "manual", headers: { cookie } });
       assert.equal(response.status, 200, url);
       assert.equal(response.headers.get("location"), null);
-      assert.match(await response.text(), /assets\/js\/overview-v2\.js/);
+      const html = await response.text();
+      assert.match(html, /assets\/js\/overview-v2\.js/);
+      assert.match(html, /id="mini-x-portal"/);
     }
     for (const url of ["/overview-v1", "/index.html"]) {
       const response = await fetch(base + url, { redirect: "manual", headers: { cookie } });
