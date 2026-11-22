@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Overview v2 · Market Command</title>
+  <link rel="icon" type="image/png" href="/assets/images/market-command-mark.png" />
   <script src="/assets/js/settings.js"></script>
   <link rel="stylesheet" href="/assets/styles/command.css" />
   <link rel="stylesheet" href="/assets/styles/ai-analysis.css" />
@@ -17,14 +18,24 @@
 <div class="app">
   <aside class="cmd-sidebar"></aside>
   <main class="cmd-main ov2-main">
-    <header class="cmd-page-header">
+    <header class="cmd-page-header market-overview-header">
       <div>
-        <p class="ov2-eyebrow">TRADEHUNTER / MARKET SNAPSHOT</p>
-        <h1 class="cmd-page-title">Overview <span class="ov2-version">v2</span></h1>
+        <p class="ov2-eyebrow">MARKET COMMAND <span>/</span> TRADEHUNTER</p>
+        <h1 class="cmd-page-title">Market overview <span class="ov2-version">v2</span></h1>
         <p class="cmd-page-subtitle">Six screeners. One view of the market.</p>
       </div>
-      <button class="ov2-button" id="ov2-refresh" type="button">↻ Refresh all</button>
+      <div class="market-header-actions">
+        <button class="market-motion-toggle" id="market-motion-toggle" type="button" aria-pressed="true">Motion on</button>
+        <button class="ov2-button" id="ov2-refresh" type="button">↻ Refresh all</button>
+      </div>
     </header>
+
+    <nav class="market-jump-nav" aria-label="Overview sections">
+      <a href="#ov2-grid">Screeners</a>
+      <a href="#cross-market-oi">Open interest</a>
+      <a href="#rsi-matrix">RSI matrix</a>
+      <a href="#technical-analysis">Technical ratings</a>
+    </nav>
 
     <details class="ov2-news" id="ov2-news" open>
       <summary>
