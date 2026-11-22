@@ -39,6 +39,11 @@
     heading: document.getElementById("pbHeading"),
     folders: document.getElementById("pbFolders"),
     folderCount: document.getElementById("pbFolderCount"),
+    statTotal: document.getElementById("pbStatTotal"),
+    statTotalSub: document.getElementById("pbStatTotalSub"),
+    statTickers: document.getElementById("pbStatTickers"),
+    statTickersSub: document.getElementById("pbStatTickersSub"),
+    statWeek: document.getElementById("pbStatWeek"),
     crop: document.getElementById("pbCrop"),
     cropStage: document.getElementById("pbCropStage"),
     cropImg: document.getElementById("pbCropImg"),
@@ -178,8 +183,37 @@
     el.heading.textContent = title;
   }
 
+  var BASE_TITLE = document.title;
+  var WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+  /** Count tab: how many potential trades are on the page right now. */
+  function renderStats(built) {
+    var n = state.items.length;
+    if (state.loading && !n) {
+      el.statTotal.textContent = "–";
+      el.statTotalSub.textContent = "Loading…";
+      el.statTickers.textContent = "–";
+      el.statWeek.textContent = "–";
+      return;
+    }
+    var since = Date.now() - WEEK_MS;
+    var week = state.items.filter(function (item) { return (item.createdAt || 0) >= since; }).length;
+    var tickers = built.folders.length;
+    el.statTotal.textContent = String(n);
+    el.statTotalSub.textContent = built.untagged.count
+      ? built.untagged.count + " untagged"
+      : n ? "All tagged" : "Nothing saved yet";
+    el.statTickers.textContent = String(tickers);
+    el.statTickersSub.textContent = tickers
+      ? built.folders.slice(0, 3).map(function (f) { return "#" + f.tag; }).join(" ") + (tickers > 3 ? " +" + (tickers - 3) : "")
+      : "Distinct #tags";
+    el.statWeek.textContent = String(week);
+    document.title = (n ? "(" + n + ") " : "") + BASE_TITLE;
+  }
+
   function render() {
     renderFolders();
+    renderStats(buildFolders());
     var n = state.items.length;
     var shown = state.folder === ALL ? n : state.items.filter(inFolder).length;
     el.count.textContent = state.loading && !n ? "Loading…" : shown + (shown === 1 ? " screenshot" : " screenshots");
