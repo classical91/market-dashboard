@@ -75,6 +75,25 @@ test("YouTube page browser regressions", { skip: !fs.existsSync(chromium.executa
     assert.match(await page.locator("#ytFeedStatus").textContent(), /0 matching videos/);
   });
 
+  await t.test("played videos are marked watched and stay marked after a reload", async (t) => {
+    const page = await open(t);
+    await ready(page);
+    await page.evaluate(() => localStorage.removeItem("yt:watched"));
+    const card = page.locator('.yt-feed-card[data-video-id="clip1234567"]');
+    assert.equal(await page.locator(".yt-card.is-watched").count(), 0);
+    await card.click();
+    await page.getByRole("button", { name: "Close player" }).click();
+    const marked = page.locator(".yt-card.is-watched");
+    assert.equal(await marked.count(), 1);
+    assert.equal(await marked.locator(".yt-watched-badge").textContent(), "Watched");
+    assert.equal(await marked.locator(".yt-watched-badge").count(), 1, "replaying does not duplicate the label");
+    await page.reload();
+    await ready(page);
+    assert.equal(await page.locator('.yt-card.is-watched .yt-feed-card[data-video-id="clip1234567"]').count(), 1);
+    assert.equal(await page.locator(".yt-card.is-watched").count(), 1);
+    await page.evaluate(() => localStorage.removeItem("yt:watched"));
+  });
+
   await t.test("queue: add, reorder, persist, play and auto-advance", async (t) => {
     const page = await open(t);
     // A stand-in embed that speaks just enough of the iframe API protocol.
