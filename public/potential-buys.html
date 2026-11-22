@@ -58,16 +58,17 @@
       <div class="pb-section-head">
         <h2 class="pb-section-title" id="pbFoldersHeading">Folders</h2>
         <span class="pb-count" id="pbFolderCount"></span>
-        <span class="pb-folders-hint">Put a hashtag like <code>#BTC</code> in a label to file it in a folder.</span>
+        <span class="pb-folders-hint">Type a ticker like <code>btc</code> as a label — it saves as <code>$BTC</code> and stacks with the rest of that ticker. In a longer note, use <code>$BTC</code> or <code>#BTC</code>.</span>
       </div>
       <div class="pb-folders" id="pbFolders" role="group" aria-label="Folders"></div>
     </section>
 
     <section class="pb-section" aria-labelledby="pbHeading">
       <div class="pb-section-head">
+        <button class="pb-btn pb-back" type="button" id="pbBack" hidden>&larr; All</button>
         <h2 class="pb-section-title" id="pbHeading">Watching</h2>
         <span class="pb-count" id="pbCount">Loading…</span>
-        <input class="pb-search" id="pbSearch" type="search" placeholder="Filter by label or #tag" aria-label="Filter screenshots by label" />
+        <input class="pb-search" id="pbSearch" type="search" placeholder="Filter by label or $ticker" aria-label="Filter screenshots by label" />
       </div>
       <div class="pb-grid" id="pbGrid" aria-live="polite"></div>
     </section>
@@ -144,6 +145,7 @@
 <script src="/assets/js/sidebar.js"></script>
 <script src="/assets/js/ui.js"></script>
 <script src="/assets/js/crop-rect.js"></script>
+<script src="/assets/js/ticker-label.js"></script>
 <script src="/assets/js/potential-buys.js"></script>
 </body>
 </html>

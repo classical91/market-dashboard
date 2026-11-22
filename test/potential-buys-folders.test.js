@@ -35,7 +35,7 @@ test("buildFolders counts each tag and keeps its newest change", () => {
     { label: "#BTC", createdAt: 100 },
     { label: "#BTC #ETH", createdAt: 200, updatedAt: 500 },
     { label: "#ETH", createdAt: 300 },
-    { label: "plain", createdAt: 400 },
+    { label: "plain note", createdAt: 400 },
   ]);
   assert.deepEqual(folders, [
     { tag: "BTC", count: 2, updatedAt: 500 },
@@ -73,7 +73,7 @@ test("replaceImage swaps the picture under a new file and removes the old one", 
   const cropped = store.replaceImage(added.id, JPEG);
 
   assert.equal(cropped.id, added.id);
-  assert.equal(cropped.label, "#NVDA");
+  assert.equal(cropped.label, "$NVDA");
   assert.equal(cropped.mimeType, "image/jpeg");
   assert.notEqual(cropped.file, added.file);
   assert.match(cropped.file, /\.jpg$/);
@@ -138,4 +138,54 @@ test("crop geometry keeps the box inside the image and honours aspect", () => {
   assert.ok(Crop.isFullCrop(Crop.FULL_CROP));
   assert.deepEqual(Crop.cropToPixels({ x: 0.5, y: 0.5, width: 0.5, height: 0.5 }, 100, 50), { sx: 50, sy: 25, sw: 50, sh: 25 });
   assert.deepEqual(Crop.outputSize(8000, 4000, 4096), { width: 4096, height: 2048 });
+});
+
+test("formatLabel turns a lone ticker into an upper-case $cashtag", () => {
+  const { formatLabel } = require("../public/assets/js/ticker-label");
+  assert.equal(formatLabel("btc"), "$BTC");
+  assert.equal(formatLabel("  Total3 "), "$TOTAL3");
+  assert.equal(formatLabel("#eth"), "$ETH");
+  assert.equal(formatLabel("$nvda"), "$NVDA");
+  assert.equal(formatLabel("brk.b"), "$BRK.B");
+  assert.equal(formatLabel("sol-usd"), "$SOL-USD");
+  // Notes keep their words; only cashtags in them are upper-cased.
+  assert.equal(formatLabel("$sol  breakout #crypto"), "$SOL breakout #crypto");
+  assert.equal(formatLabel("SOL breakout"), "SOL breakout");
+  assert.equal(formatLabel("paid $100 for it"), "paid $100 for it");
+  assert.equal(formatLabel("100x"), "100x");
+  assert.equal(formatLabel(""), "");
+  assert.equal(formatLabel(undefined), "");
+});
+
+test("$cashtags and lone tickers file into the same folder as #hashtags", () => {
+  assert.deepEqual(extractTags("$BTC breakout, #btc again and $eth."), ["BTC", "ETH"]);
+  assert.deepEqual(extractTags("Btc"), ["BTC"]);
+  assert.deepEqual(extractTags("US$ strength, foo$BAR, $5 entry"), []);
+
+  const { folders, untagged } = buildFolders([
+    { label: "Btc", createdAt: 100 },
+    { label: "$BTC", createdAt: 200 },
+    { label: "#btc weekly", createdAt: 300 },
+    { label: "note to self", createdAt: 400 },
+  ]);
+  assert.deepEqual(folders, [{ tag: "BTC", count: 3, updatedAt: 300 }]);
+  assert.equal(untagged, 1);
+});
+
+test("the store saves lone tickers as $TICKER and shows older labels that way", () => {
+  const { dataDir, store } = makeStore();
+  const typed = store.add(PNG, { label: "eth" });
+  assert.equal(typed.label, "$ETH");
+  assert.deepEqual(typed.tags, ["ETH"]);
+  assert.equal(store.update(typed.id, { label: "$eth reclaim" }).label, "$ETH reclaim");
+
+  // A label saved before this change ("Btc") reads as "$BTC" without a rewrite.
+  const legacy = store.add(PNG);
+  const file = path.join(dataDir, "potential-buys.json");
+  const raw = JSON.parse(fs.readFileSync(file, "utf8"));
+  raw.items.find((item) => item.id === legacy.id).label = "Btc";
+  fs.writeFileSync(file, JSON.stringify(raw));
+  const shown = store.list().find((item) => item.id === legacy.id);
+  assert.equal(shown.label, "$BTC");
+  assert.deepEqual(shown.tags, ["BTC"]);
 });
