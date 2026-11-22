@@ -290,8 +290,8 @@
 
   var tools = [
     {
-      href: "https://t.me/+CG4zdv9ziXZlNDYx",
-      label: "Trader Lab Telegram",
+      href: "https://t.me/cointrendz",
+      label: "CoinTrendz Telegram",
     },
     {
       // Command references: the dashboard's own bot commands and the
