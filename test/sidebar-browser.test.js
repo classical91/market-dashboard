@@ -62,14 +62,14 @@ test("shared sidebar browser regressions", {
     assert.equal(await toggle(group).getAttribute("aria-expanded"), String(expected));
   }
 
-  await t.test("Reporter Room sits directly above Trades in both navigation shells, and Overview nests under v2", async (t) => {
+  await t.test("Overview v2 leads both navigation shells, with Reporter Room directly above Trades", async (t) => {
     const page = await open(t);
     for (const [url, root, drawer, prefix] of [["/overview-v1", ".sidebar", ".mob-drawer", ""], ["/terminal-suite.html", ".cmd-sidebar", ".cmd-drawer", "cmd-"]]) {
       await page.goto(base + url);
       for (const shell of [root, drawer]) {
         const primary = page.locator(`${shell} .${prefix}nav-primary`);
         assert.deepEqual(await primary.evaluate(nav => Array.from(nav.children).slice(0, 4).map(child => child.dataset.dropdownKey || child.getAttribute("data-nav-href"))),
-          ["/terminal-suite.html", "sidebar_dropdown_overview_v2", "/reporter.html", "sidebar_dropdown_my_trades"]);
+          ["sidebar_dropdown_overview_v2", "/terminal-suite.html", "/reporter.html", "sidebar_dropdown_my_trades"]);
         assert.equal(await menu(page, "terminal_suite", shell).count(), 0);
         assert.equal(await primary.locator(':scope > a[data-nav-href="/reporter.html"]').count(), 1);
         assert.equal(await menu(page, "reporter", shell).locator('a[data-nav-href="/reporter.html"]').count(), 1);
