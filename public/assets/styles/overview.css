@@ -1375,6 +1375,58 @@ html {
   .ovh-widgets-row { grid-template-columns: 1fr; }
 }
 
+/* ── Technical Ratings (TradingView, third-party) ──────── */
+.ov-ta-card {
+  margin-bottom: 18px;
+  overflow: hidden;
+}
+.ov-ta-card .card-subtitle .card-link {
+  font-size: inherit;
+  text-decoration: underline;
+}
+.ov-ta-tag {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.ov-ta-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.ov-ta-item {
+  min-width: 0;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.ov-ta-item:nth-child(3n) { border-right: 0; }
+.ov-ta-symbol {
+  padding: 10px 14px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  border-bottom: 1px dotted var(--border);
+}
+.ov-ta-body { height: 420px; }
+@media (max-width: 1320px) {
+  .ov-ta-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ov-ta-item:nth-child(3n) { border-right: 1px solid var(--border); }
+  .ov-ta-item:nth-child(2n) { border-right: 0; }
+}
+@media (max-width: 640px) {
+  .ov-ta-grid { grid-template-columns: 1fr; }
+  .ov-ta-item { border-right: 0 !important; }
+}
+
 /* ── Quick-link grids (reuse .tool-card look, collapsible) ── */
 .ovh-link-grid {
   display: grid;

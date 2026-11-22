@@ -15,8 +15,8 @@ const sidebar = read("public/assets/js/sidebar.js");
 
 const TA_SYMBOLS = ["BINANCE:BTCUSDT", "BINANCE:ETHUSDT", "BINANCE:SOLUSDT", "AMEX:SPY", "NASDAQ:QQQ", "TVC:DXY"];
 
-test("Overview is the 30-second read: no technical ratings or duplicate link cards", () => {
-  for (const marker of ['id="ovh-technical-analysis"', 'id="ovh-derivatives"', 'id="ovh-liquidity"', "embed-widget-technical-analysis.js"]) {
+test("Overview is the 30-second read: no duplicate link cards", () => {
+  for (const marker of ['id="ovh-technical-analysis"', 'id="ovh-derivatives"', 'id="ovh-liquidity"']) {
     assert.ok(!overviewPage.includes(marker), `${marker} should no longer be on Overview`);
   }
   // Both scripts targeted sections Overview no longer has.
@@ -31,14 +31,16 @@ test("Overview is the 30-second read: no technical ratings or duplicate link car
   }
 });
 
-test("the technical ratings moved to Terminal, all six, labelled as TradingView's", () => {
-  assert.match(terminalPage, /id="technical-analysis"/);
-  assert.match(terminalPage, /href="#technical-analysis"/);
+test("the technical ratings live on Overview, all six, labelled as TradingView's", () => {
+  assert.match(overviewPage, /id="technical-analysis"/);
   for (const symbol of TA_SYMBOLS) {
-    assert.ok(terminalPage.includes(`"symbol": "${symbol}"`), `${symbol} rating missing from Terminal`);
+    assert.ok(overviewPage.includes(`"symbol": "${symbol}"`), `${symbol} rating missing from Overview`);
   }
-  assert.match(terminalPage, /Technical Ratings · TradingView/);
-  assert.match(terminalPage, /href="\/directional-bias\.html"/);
+  assert.match(overviewPage, /Technical Ratings &middot; TradingView/);
+  assert.match(overviewPage, /href="\/directional-bias\.html"/);
+  // Terminal no longer embeds them; its tab points at the Overview section.
+  assert.ok(!terminalPage.includes("embed-widget-technical-analysis.js"), "ratings should not be duplicated on Terminal");
+  assert.match(terminalPage, /href="\/#technical-analysis"/);
 });
 
 test("Overview's regime displays read the canonical market state", () => {
