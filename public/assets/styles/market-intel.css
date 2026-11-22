@@ -122,88 +122,6 @@
   color: var(--soft);
 }
 
-/* ── Mini X Portal ────────────────────────────────────── */
-/* Two loud deep-link cards: brighter fill and a coloured border so they
-   stand out from the hub row and the quieter link tiles. */
-.mi-portal {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin-bottom: 26px;
-}
-.mi-portal-card {
-  --pc: var(--purple);
-  --pc-bg: var(--purple-bg);
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  min-width: 0;
-  padding: 16px 18px;
-  border: 1px solid color-mix(in srgb, var(--pc) 55%, transparent);
-  border-radius: 14px;
-  background:
-    linear-gradient(120deg, color-mix(in srgb, var(--pc) 26%, transparent), var(--pc-bg) 55%, transparent),
-    var(--surface);
-  box-shadow: inset 4px 0 0 var(--pc), 0 0 0 0 transparent;
-  color: inherit;
-  text-decoration: none;
-  scroll-margin-top: 16px;
-  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
-}
-.mi-portal-card--x  { --pc: var(--purple); --pc-bg: var(--purple-bg); }
-.mi-portal-card--yt { --pc: var(--coral);  --pc-bg: var(--coral-bg); }
-.mi-portal-card:hover {
-  border-color: var(--pc);
-  box-shadow: inset 4px 0 0 var(--pc), 0 6px 24px color-mix(in srgb, var(--pc) 22%, transparent);
-  transform: translateY(-1px);
-}
-.mi-portal-card:focus-visible { outline: 2px solid var(--pc); outline-offset: 3px; }
-
-.mi-portal-icon {
-  flex: 0 0 auto;
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  background: var(--pc);
-  color: var(--bg);
-  font-size: 20px;
-  font-weight: 900;
-}
-.mi-portal-copy { flex: 1 1 auto; min-width: 0; }
-.mi-portal-tag {
-  display: block;
-  color: var(--pc);
-  font-size: 10.5px;
-  font-weight: 800;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-.mi-portal-title {
-  display: block;
-  margin-top: 2px;
-  color: var(--text);
-  font-size: 18px;
-  font-weight: 800;
-  letter-spacing: -0.01em;
-}
-.mi-portal-desc {
-  display: block;
-  margin-top: 2px;
-  color: var(--soft);
-  font-size: 12.5px;
-  line-height: 1.45;
-}
-.mi-portal-go {
-  flex: 0 0 auto;
-  color: var(--pc);
-  font-size: 18px;
-  font-weight: 800;
-  transition: transform 0.15s;
-}
-.mi-portal-card:hover .mi-portal-go { transform: translateX(3px); }
-
 /* ── Link sections as a tile grid ─────────────────────── */
 .cards.mi-grid {
   display: grid;
@@ -287,8 +205,6 @@
 @media (max-width: 640px) {
   .mi-hubs { grid-template-columns: 1fr; gap: 10px; margin-bottom: 20px; }
   .mi-hub { padding: 14px; }
-  .mi-portal { grid-template-columns: 1fr; gap: 10px; margin-bottom: 20px; }
-  .mi-portal-card { padding: 14px; }
   .cards.mi-grid { grid-template-columns: 1fr; gap: 8px; padding: 10px; }
   /* command.css re-orders list rows on phones; tiles keep their own order. */
   .mi-grid .card { flex-wrap: nowrap; gap: 4px; padding: 11px 13px; }
@@ -299,10 +215,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .mi-hub, .mi-hub-go, .mi-grid .card, .mi-grid .arrow,
-  .mi-portal-card, .mi-portal-go { transition: none; }
-  .mi-portal-card:hover,
-  .mi-portal-card:hover .mi-portal-go { transform: none; }
+  .mi-hub, .mi-hub-go, .mi-grid .card, .mi-grid .arrow { transition: none; }
   .mi-grid .card:hover,
   .mi-grid .card:hover .arrow,
   .mi-hub-main:hover .mi-hub-go { transform: none; }
