@@ -73,7 +73,7 @@
       var iso = at ? new Date(at).toISOString() : null;
       var tone = freshness.state(iso);
       var meta = tone === "empty" ? "No run recorded" : (desk.reporter ? "⚡ " : "📱 ") + ago(at) + " · " + freshness.label(iso);
-      return '<a class="ov2-desk ' + tone + '" href="/briefings/' + desk.key + '">' +
+      return '<a class="ov2-desk ' + tone + '" href="/briefings/' + desk.key + '" data-news-desk="' + desk.key + '" aria-haspopup="dialog" aria-controls="ov2-news-review">' +
         '<span class="ov2-desk-name">' + esc(desk.icon + " " + desk.label) + "</span>" +
         '<span class="ov2-desk-meta">' + esc(meta) + "</span>" +
         (at ? timeTag(at, "ov2-desk-time") : '<span class="ov2-desk-time">' + (desk.failed ? "Source unavailable" : "&nbsp;") + "</span>") +
@@ -103,11 +103,23 @@
           at: useReporter ? runAt : phoneAt,
           reporter: useReporter,
           failed: results[0] === null && run === undefined,
+          partial: results[0] === null || run === undefined,
+          title: useReporter ? null : cat && cat.latest && cat.latest.title,
+          text: useReporter ? run.content : cat && cat.latest && cat.latest.text,
+          noBriefing: Boolean(useReporter && run.noBriefing),
         };
       });
       renderDesks();
     });
   }
+
+  desksEl.addEventListener("click", function (event) {
+    if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    var link = event.target.closest("[data-news-desk]");
+    if (!link || !deskRuns || !window.OverviewNewsReview) return;
+    var desk = deskRuns.filter(function (item) { return item.key === link.getAttribute("data-news-desk"); })[0];
+    if (desk && window.OverviewNewsReview.open(desk)) event.preventDefault();
+  });
 
   try { if (localStorage.getItem(NEWS_OPEN_KEY) === "0") newsEl.open = false; } catch (e) { /* private mode */ }
   newsEl.addEventListener("toggle", function () {

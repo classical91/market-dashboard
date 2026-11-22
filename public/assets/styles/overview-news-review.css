@@ -1,0 +1,44 @@
+/* Compact report reader, using the dashboard's current theme. */
+html.ov2-review-open { overflow: hidden; }
+.ov2-review {
+  box-sizing: border-box;
+  width: min(640px, calc(100vw - 32px));
+  max-height: min(680px, calc(100vh - 32px));
+  max-height: min(680px, calc(100dvh - 32px));
+  padding: 0;
+  margin: auto;
+  border: 1px solid var(--border-hover);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 24px 80px rgba(0,0,0,.5);
+  overflow: hidden;
+}
+.ov2-review[open] { display: flex; flex-direction: column; }
+.ov2-review::backdrop { background: rgba(0,0,0,.65); }
+.ov2-review-head { display: flex; align-items: flex-start; gap: 16px; padding: 18px 20px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.ov2-review-head > div { min-width: 0; flex: 1; }
+.ov2-review-head h2 { font-size: 18px; margin: 0 0 8px; }
+.ov2-review-head p { font-size: 13px; line-height: 1.5; color: var(--muted); margin: 0; }
+.ov2-review-close { flex: none; width: 40px; height: 40px; border: 1px solid var(--border); border-radius: 8px; color: var(--soft); background: var(--surface2); font: inherit; font-size: 24px; cursor: pointer; }
+.ov2-review-close:hover { color: var(--text); border-color: var(--border-hover); }
+.ov2-review-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 20px; color: var(--soft); font-size: 16px; line-height: 1.65; overflow-wrap: anywhere; }
+.ov2-review-body :is(h3,h4,h5,h6) { margin: 20px 0 10px; color: var(--text); font-size: 17px; line-height: 1.4; }
+.ov2-review-body > :first-child { margin-top: 0; }
+.ov2-review-body p { margin-bottom: 12px; }
+.ov2-review-body ul { padding-left: 22px; margin-bottom: 14px; }
+.ov2-review-body strong { color: var(--text); }
+.ov2-review-body a { color: var(--accent); text-decoration: underline; }
+.ov2-review-body hr { border: 0; border-top: 1px solid var(--border); margin: 18px 0; }
+.ov2-review-body .briefing-story { display: flex; gap: 10px; color: var(--text); margin-top: 18px; }
+.ov2-review-body .briefing-rank { flex: none; color: var(--accent); font-weight: 700; }
+.ov2-review-notice { padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface2); }
+.ov2-review-foot { flex-shrink: 0; padding: 14px 20px; border-top: 1px solid var(--border); }
+.ov2-review-run { display: inline-block; padding: 10px 14px; border: 1px solid var(--border-hover); border-radius: 8px; color: var(--accent); background: var(--accent-bg); font-size: 14px; font-weight: 650; text-decoration: none; }
+.ov2-review-run:hover { border-color: var(--accent); }
+.ov2-review :is(button,a,[tabindex]):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+@media (max-width: 520px) {
+  .ov2-review-head, .ov2-review-body { padding: 16px; }
+  .ov2-review-foot { padding: 12px 16px; }
+  .ov2-review-run { display: block; text-align: center; }
+}
