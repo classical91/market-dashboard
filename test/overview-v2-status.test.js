@@ -8,7 +8,10 @@ const path = require("node:path");
 const read = (name) => fs.readFileSync(path.join(__dirname, "..", "public", name), "utf8");
 const NOW = Date.parse("2026-11-22T12:00:00Z");
 const HOUR = 3600000;
-class Clock extends Date { static now() { return NOW; } }
+class Clock extends Date {
+  constructor(...args) { super(...(args.length ? args : [NOW])); }
+  static now() { return NOW; }
+}
 const iso = (msAgo) => new Date(NOW - msAgo).toISOString();
 
 function element() {
@@ -24,7 +27,7 @@ async function run(responses) {
   const nodes = {};
   const context = {
     Date: Clock,
-    window: { ScreenerUI: { escapeHtml: (s) => String(s) } },
+    window: { ScreenerUI: { escapeHtml: escapeHtml } },
     localStorage: { getItem() { return null; }, setItem() {} },
     document: { hidden: false, getElementById: (id) => (nodes[id] ||= element()) },
     setInterval() {},
@@ -36,10 +39,14 @@ async function run(responses) {
   };
   context.window.BriefingFreshness = undefined;
   vm.runInNewContext(read("assets/js/briefing-freshness.js"), context);
-  context.window.ScreenerUI = { escapeHtml: (s) => String(s) };
+  context.window.ScreenerUI = { escapeHtml: escapeHtml };
   vm.runInNewContext(read("assets/js/overview-v2-status.js"), context);
   for (let i = 0; i < 5; i++) await new Promise(setImmediate);
   return nodes;
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
 }
 
 test("news desks use the newer source and the collapsed line names the latest report", async () => {
@@ -70,17 +77,52 @@ test("system tiles show a count and the last run or update, and a failure stays 
   assert.match(tile("presets").querySelector(".ov2-sys-count").innerHTML, /<strong>2<\/strong> runs in 24h/);
   assert.match(tile("presets").querySelector(".ov2-sys-when").innerHTML, /^Last run 1h ago/);
   assert.equal(tile("layouts").querySelector(".ov2-sys-when").innerHTML, "No run recorded");
+  assert.match(nodes["ov2-generation-log"].innerHTML, /No captures yet/);
   assert.match(tile("trades").querySelector(".ov2-sys-count").innerHTML, /<strong>2<\/strong> pairs tracked/);
   assert.match(tile("trades").querySelector(".ov2-sys-when").innerHTML, /^Last updated 5h ago/);
   assert.match(tile("buys").querySelector(".ov2-sys-when").textContent, /^Unavailable/);
   assert.match(tile("buys").querySelector(".ov2-sys-count").innerHTML, /—/);
 });
 
+test("layout widget orders captures newest first, groups local days and escapes layout labels", async () => {
+  const nodes = await run({
+    "/api/layout-analysis/log": { entries: [
+      { label: "BTC 4h", verdict: "HOLD", generatedAt: iso(20 * HOUR) },
+      { label: '<img src=x onerror="alert(1)">', verdict: "BUY", generatedAt: iso(HOUR) },
+      { label: "BTC 1D", verdict: "SELL", generatedAt: iso(2 * HOUR) },
+      { layoutId: "undated", verdict: "unknown", generatedAt: "invalid" },
+    ] },
+  });
+  const html = nodes["ov2-generation-log"].innerHTML;
+  assert.ok(html.indexOf("&lt;img") < html.indexOf("BTC 1D"));
+  assert.ok(html.indexOf("BTC 1D") < html.indexOf("BTC 4h"));
+  assert.match(html, />Today<\/div>/);
+  assert.match(html, />Yesterday<\/div>/);
+  assert.match(html, /aia-verdict--buy/);
+  assert.match(html, /aia-verdict--sell/);
+  assert.match(html, /aia-verdict--hold/);
+  assert.match(html, /datetime="2026-11-22T11:00:00.000Z"/);
+  assert.match(html, /NO CALL/);
+  assert.match(html, /Unknown date/);
+  assert.doesNotMatch(html, /<img/);
+});
+
+test("layout widget limits recent captures and reports a failed source", async () => {
+  const entries = Array.from({ length: 20 }, (_, i) => ({ label: "capture-" + i, verdict: "HOLD", generatedAt: iso(i * HOUR) }));
+  const nodes = await run({ "/api/layout-analysis/log": { entries } });
+  assert.equal((nodes["ov2-generation-log"].innerHTML.match(/class="aia-log-item/g) || []).length, 12);
+  assert.doesNotMatch(nodes["ov2-generation-log"].innerHTML, /capture-12/);
+  const failed = await run({ "/api/layout-analysis/log": new Error("offline") });
+  assert.match(failed["ov2-generation-log"].innerHTML, /Failed to load captures/);
+  assert.match(failed["ov2-generation-log"].innerHTML, /Refresh all/);
+});
+
 test("Overview v2 carries the news tab, status row and Market Matrix card", () => {
   const html = read("overview-v2.html");
-  for (const id of ["ov2-news", "ov2-news-last", "ov2-desks", "ov2-system", "ov2-matrix"]) {
+  for (const id of ["ov2-news", "ov2-news-last", "ov2-desks", "ov2-system", "ov2-matrix", "ov2-generation-log"]) {
     assert.match(html, new RegExp(`id="${id}"`));
   }
   assert.match(html, /href="\/tradehunter\/market-matrix"/);
+  assert.match(html, /href="\/layout-analysis.html#aia-log"/);
   assert.ok(html.indexOf("briefing-freshness.js") < html.indexOf("overview-v2-status.js"));
 });

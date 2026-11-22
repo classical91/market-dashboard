@@ -126,7 +126,13 @@
     {
       id: "layouts", label: "My Layouts", href: "/layout-analysis.html", verb: "Last run",
       load: function () {
-        return getJson("/api/layout-analysis/log").then(function (data) { return logSummary(data.entries); });
+        return getJson("/api/layout-analysis/log").then(function (data) {
+          renderLayoutLog(data.entries);
+          return logSummary(data.entries);
+        }, function (err) {
+          layoutLogEl.innerHTML = '<p class="ov2-note ov2-warn" role="status">Failed to load captures. Use Refresh all to retry.</p>';
+          throw err;
+        });
       },
     },
     {
@@ -196,6 +202,46 @@
   }
 
   systemEl.innerHTML = SYSTEMS.map(systemShell).join("");
+
+  // ── Compact My Layouts generation log ───────────────────────
+  // Share the status tile's read; opening Overview never generates a capture.
+  var layoutLogEl = document.getElementById("ov2-generation-log");
+
+  function renderLayoutLog(entries) {
+    var recent = (entries || []).slice().sort(function (a, b) {
+      return (time(b.generatedAt) || 0) - (time(a.generatedAt) || 0);
+    }).slice(0, 12);
+    if (!recent.length) {
+      layoutLogEl.innerHTML = '<p class="ov2-note" role="status">No captures yet. Open My Layouts to capture a chart.</p>';
+      return;
+    }
+    var today = new Date();
+    var yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+    var previousDay = null;
+    var html = "";
+    recent.forEach(function (entry) {
+      var at = time(entry.generatedAt);
+      var date = at === null ? null : new Date(at);
+      var key = date ? date.toDateString() : "Unknown date";
+      var isToday = key === today.toDateString();
+      var label = isToday ? "Today" : key === yesterday.toDateString() ? "Yesterday"
+        : date ? date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : key;
+      if (key !== previousDay) {
+        if (previousDay !== null) html += "</div>";
+        html += '<div class="aia-log-group"><div class="aia-log-group-title' + (isToday ? ' aia-log-group-title--today' : '') + '">' + esc(label) + '</div>';
+        previousDay = key;
+      }
+      var verdict = ["BUY", "SELL", "HOLD"].indexOf(entry.verdict) !== -1 ? entry.verdict : "NO CALL";
+      var tone = verdict === "NO CALL" ? "" : " aia-verdict--" + verdict.toLowerCase();
+      var clock = date ? date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) : "Unknown time";
+      html += '<div class="aia-log-item' + (isToday ? ' aia-log-item--today' : '') + '">' +
+        '<span class="aia-verdict aia-log-verdict' + tone + '">' + verdict + '</span>' +
+        '<span class="aia-log-symbol" title="' + esc(entry.label || entry.layoutId || "Layout") + '">' + esc(entry.label || entry.layoutId || "Layout") + '</span>' +
+        (date ? '<time class="aia-log-time" datetime="' + date.toISOString() + '" title="' + esc(stamp(at)) + '">' + esc(clock) + '</time>'
+          : '<span class="aia-log-time">Unknown time</span>') + '</div>';
+    });
+    layoutLogEl.innerHTML = html + "</div>";
+  }
 
   // ── Market Matrix ──────────────────────────────────────────
   var matrixEl = document.getElementById("ov2-matrix");
