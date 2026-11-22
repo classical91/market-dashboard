@@ -211,8 +211,9 @@
 
   /**
    * On the All view, screenshots of the same ticker stack into one folder
-   * card, placed where its newest screenshot would be. Inside a folder, or
-   * while filtering, every screenshot shows on its own.
+   * card, ranked by how many screenshots each holds (single screenshots
+   * last); ties put the one with the newest screenshot first. Inside a folder, or
+   * while filtering, every screenshot shows on its own, newest first.
    */
   function gridEntries(items) {
     if (state.folder !== ALL || state.filter.trim()) {
@@ -234,7 +235,10 @@
         entries.push({ stack: true, tag: tag, items: groups[tag] });
       }
     });
-    return entries;
+    // Array sort is stable, so equal sizes stay in newest-first order.
+    return entries.sort(function (a, b) {
+      return (b.stack ? b.items.length : 1) - (a.stack ? a.items.length : 1);
+    });
   }
 
   function stackCard(tag, items) {
