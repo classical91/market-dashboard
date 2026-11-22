@@ -37,6 +37,7 @@
     viewerCrop: document.getElementById("pbViewerCrop"),
     heading: document.getElementById("pbHeading"),
     back: document.getElementById("pbBack"),
+    stats: document.getElementById("pbStats"),
     statTotal: document.getElementById("pbStatTotal"),
     statTotalSub: document.getElementById("pbStatTotalSub"),
     statTickers: document.getElementById("pbStatTickers"),
@@ -149,6 +150,9 @@
     }
     el.heading.textContent = state.folder === ALL ? "Watching" : "$" + state.folder;
     el.back.hidden = state.folder === ALL;
+    // The count cards summarise everything, so they belong on the main (All)
+    // view only; inside a ticker folder they'd read as that folder's numbers.
+    el.stats.hidden = state.folder !== ALL;
   }
 
   var BASE_TITLE = document.title;
