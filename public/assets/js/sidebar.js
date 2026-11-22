@@ -259,6 +259,7 @@
         },
       ],
     },
+    { href: "/intelligence-portal.html", label: "Intelligent Portal" },
     {
       label: "YouTube Links",
       featured: "youtube",
@@ -269,8 +270,6 @@
           href: "https://yt-summarizer-production-4521.up.railway.app/",
           label: "YouTube Summarizer",
         },
-        // Pick a YouTube category, then open YouTube Intelligence on it.
-        { href: "/intelligence-portal.html#youtube", label: "YouTube Portal" },
       ],
     },
     {
@@ -278,8 +277,6 @@
       featured: "x",
       children: [
         { href: "/x-intelligence.html", label: "X Intelligence" },
-        // Pick an X category, then open X Intelligence on it.
-        { href: "/intelligence-portal.html#x", label: "X Portal" },
       ],
     },
   ];

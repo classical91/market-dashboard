@@ -150,8 +150,8 @@
     });
   }
 
-  /* The sidebar's X Portal and YouTube Portal links land on #x and #youtube.
-     Clicking one while already here only changes the hash, so listen for it. */
+  /* Keep existing #x and #youtube bookmarks working, including hash changes
+     while the shared portal is already open. */
   function spotlight() {
     var kind = (window.location.hash || "").replace(/^#/, "");
     Object.keys(PORTALS).forEach(function (key) {

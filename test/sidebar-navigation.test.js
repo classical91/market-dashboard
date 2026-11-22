@@ -17,6 +17,7 @@ test("primary sidebar order and removed links stay exact", () => {
     "AI Analysis",
     "Reporter",
     "Market Intel Links",
+    "Intelligent Portal",
     "YouTube Links",
     "X Links",
   ];
@@ -225,20 +226,19 @@ test("Cross-Market OI and the RSI Matrix are merged into Overview v2", () => {
   assert.match(sidebar, /path === "\/cross-market-oi\.html" \|\| path === "\/rsi-matrix\.html"\) return "\/"/);
 });
 
-test("the X and YouTube groups are Links menus and each reaches its own portal", () => {
+test("one standalone Intelligent Portal replaces the nested portal links", () => {
+  const portalStart = sidebar.indexOf('label: "Intelligent Portal"');
   const ytStart = sidebar.indexOf('label: "YouTube Links"');
   const xStart = sidebar.indexOf('label: "X Links"');
   assert.ok(ytStart > -1 && xStart > ytStart, "YouTube Links must sit above X Links");
   const xMenu = sidebar.slice(xStart, sidebar.indexOf("var other", xStart));
   const ytMenu = sidebar.slice(ytStart, xStart);
-  // The pages keep their names; only the menu groups were renamed.
+  assert.ok(portalStart > -1 && portalStart < ytStart, "the shared portal sits above the platform menus");
+  const workspace = sidebar.slice(sidebar.indexOf("var workspace"), sidebar.indexOf("var other"));
+  assert.equal((workspace.match(/href: "\/intelligence-portal\.html"/g) || []).length, 1);
+  assert.match(workspace, /^    \{ href: "\/intelligence-portal\.html", label: "Intelligent Portal" \},$/m);
+  assert.doesNotMatch(workspace, /label: "(?:X|YouTube) Portal"|intelligence-portal\.html#/);
+  // The platform pages remain available through their existing menus.
   assert.match(ytMenu, /href: "\/youtube-v2\.html", label: "YouTube Intelligence"/);
   assert.match(xMenu, /href: "\/x-intelligence\.html", label: "X Intelligence"/);
-  assert.match(ytMenu, /href: "\/intelligence-portal\.html#youtube", label: "YouTube Portal"/);
-  assert.match(xMenu, /href: "\/intelligence-portal\.html#x", label: "X Portal"/);
-  assert.ok(
-    xMenu.indexOf('label: "X Portal"') > xMenu.indexOf('label: "X Intelligence"'),
-    "the X portal link sits under X Intelligence",
-  );
-  assert.doesNotMatch(sidebar, /label: "Intelligence Portal"/);
 });
