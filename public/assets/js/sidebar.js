@@ -93,7 +93,6 @@
   }
 
   var workspace = [
-    { href: "/terminal-suite.html", label: "Terminal Suite" },
     {
       href: "/",
       label: "Overview v2",
@@ -101,6 +100,7 @@
         { href: "/overview-v1", label: "Overview" },
       ],
     },
+    { href: "/terminal-suite.html", label: "Terminal Suite" },
     { href: "/reporter.html", label: "Reporter Room" },
     {
       // The trade workflow in one place: the trades you are running, the

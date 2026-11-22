@@ -33,7 +33,10 @@ class OnchainService {
     // so the fallback path isn't rebuilt on every refresh.
     const cooldownAtEntry = Date.now() < this.covalentCooldownUntil;
     const cacheTtl = cooldownAtEntry
-      ? Math.max(this.config.overviewCacheMs, this.config.cooldownCacheMs || 0)
+      ? Math.min(
+          Math.max(this.config.overviewCacheMs, this.config.cooldownCacheMs || 0),
+          this.covalentCooldownUntil - Date.now(),
+        )
       : this.config.overviewCacheMs;
     return this.cache.getOrLoad("onchain:overview", cacheTtl, async () => {
       const stablecoinNetflow = await this.defillamaService.getStablecoinNetflow(
@@ -76,7 +79,7 @@ class OnchainService {
         });
       } catch (error) {
         if (this.isCovalentBudgetError(error)) {
-          this.startCovalentCooldown(error);
+          if (Date.now() >= this.covalentCooldownUntil) this.startCovalentCooldown(error);
           // Degrade gracefully: keep the DefiLlama-derived stablecoin netflow
           // and pause Covalent rather than failing the whole on-chain section.
           return this.buildDegradedOverview({
@@ -208,7 +211,7 @@ class OnchainService {
     if (status === 402 || status === 429) {
       return true;
     }
-    return /credit limit|credits? exceeded|rate limit|\b402\b/i.test(error?.message || "");
+    return /credit limit|credits? (?:exceeded|exhausted)|rate limit|\b402\b/i.test(error?.message || "");
   }
 
   startCovalentCooldown(error) {
@@ -217,11 +220,11 @@ class OnchainService {
     const cooldownMs = isCredit
       ? this.config.covalentCreditCooldownMs
       : this.config.covalentRateCooldownMs;
-    this.covalentCooldownUntil = Date.now() + cooldownMs;
+    this.covalentCooldownUntil = Date.now() + Math.max(cooldownMs, error.retryAfterMs || 0);
     const until = new Date(this.covalentCooldownUntil).toISOString();
     const reasonKind = isCredit ? "credits exhausted (402)" : "rate limited (429)";
     this.covalentCooldownReason =
-      `On-chain wallet/token flows paused — Covalent ${reasonKind}. ` +
+      `Covalent wallet/token feed paused — ${reasonKind}. ` +
       `Retrying after ${until}. Stablecoin netflow still live via DefiLlama.`;
   }
 
@@ -372,18 +375,19 @@ class OnchainService {
   }
 
   async getTrackedTokenTransfers({ cutoffTimestamp, pageLimit, pageSize, priceMap, startBlock }) {
-    const tokenTransfers = await Promise.all(
-      this.config.trackedTokens.map((token) =>
-        this.getContractTransfers({
-          token,
-          cutoffTimestamp,
-          pageLimit,
-          pageSize,
-          priceUsd: priceMap.get(token.contractAddress) || 1,
-          startBlock,
-        }),
-      ),
-    );
+    const tokenTransfers = [];
+    // Stop at the first exhausted-budget response, rather than starting one
+    // paid request per token before any can open the cooldown.
+    for (const token of this.config.trackedTokens) {
+      tokenTransfers.push(await this.getContractTransfers({
+        token,
+        cutoffTimestamp,
+        pageLimit,
+        pageSize,
+        priceUsd: priceMap.get(token.contractAddress) || 1,
+        startBlock,
+      }));
+    }
 
     return tokenTransfers.flat();
   }
@@ -392,13 +396,25 @@ class OnchainService {
     const items = [];
 
     for (let pageNumber = 0; pageNumber < pageLimit; pageNumber += 1) {
-      const { items: rows, pagination } = await this.covalentService.getLogEventsByContract({
-        contractAddress: token.contractAddress,
-        startBlock,
-        endBlock: DEFAULT_END_BLOCK,
-        pageSize,
-        pageNumber,
-      });
+      if (Date.now() < this.covalentCooldownUntil) {
+        const error = createServiceError(this.covalentCooldownReason, 429);
+        error.retryAfterMs = this.covalentCooldownUntil - Date.now();
+        throw error;
+      }
+      let result;
+      try {
+        result = await this.covalentService.getLogEventsByContract({
+          contractAddress: token.contractAddress,
+          startBlock,
+          endBlock: DEFAULT_END_BLOCK,
+          pageSize,
+          pageNumber,
+        });
+      } catch (error) {
+        if (this.isCovalentBudgetError(error)) this.startCovalentCooldown(error);
+        throw error;
+      }
+      const { items: rows, pagination } = result;
 
       const mapped = rows
         .map((row) => this.mapCovalentTransferRow(row, token, priceUsd))

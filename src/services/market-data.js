@@ -1,5 +1,8 @@
 const { createServiceError } = require("../utils/errors");
 const { MacroCalendarService } = require("./macro-calendar");
+const { MemoryCache } = require("./cache");
+const { ProviderRequestCache } = require("./provider-request-cache");
+const { parseRetryAfter } = require("../utils/retry-after");
 
 const DEFAULT_CRYPTOS = [
   { symbol: "BTC", id: "bitcoin", name: "Bitcoin" },
@@ -76,7 +79,11 @@ class MarketDataService {
       baseUrl:
         config.baseUrl || process.env.MARKET_DATA_BASE_URL || "https://api.coingecko.com/api/v3",
       requestTimeoutMs: Number(config.requestTimeoutMs || process.env.MARKET_DATA_TIMEOUT_MS || 8000),
-      retryCount: Number(config.retryCount || process.env.MARKET_DATA_RETRIES || 1),
+      retryCount: Number(config.retryCount ?? process.env.MARKET_DATA_RETRIES ?? 1),
+      cacheMs: Number(config.cacheMs ?? process.env.MARKET_DATA_CACHE_MS ?? 60_000),
+      chartCacheMs: Number(config.chartCacheMs ?? process.env.MARKET_CHART_CACHE_MS ?? 300_000),
+      staleMaxAgeMs: Number(config.staleMaxAgeMs ?? process.env.MARKET_DATA_STALE_MAX_MS ?? 86400_000),
+      newsCacheMs: Number(config.newsCacheMs ?? process.env.MARKET_NEWS_CACHE_MS ?? 300_000),
       newsUrl: config.newsUrl || process.env.MARKET_NEWS_URL || "",
       finnhubApiKey: config.finnhubApiKey || process.env.FINNHUB_API_KEY || "",
       finnhubBaseUrl: config.finnhubBaseUrl || process.env.FINNHUB_BASE_URL || "https://finnhub.io/api/v1",
@@ -101,17 +108,26 @@ class MarketDataService {
     // CoinGecko rate-limit (429) serves slightly stale real data instead of
     // overwriting the dashboard with static seed values.
     this.lastGood = new Map();
+    this.snapshotCache = config.snapshotCache;
+    this.newsCache = new MemoryCache();
+    this.providerRequests = new ProviderRequestCache({
+      intervalMs: Number(config.requestIntervalMs ?? process.env.COINGECKO_REQUEST_INTERVAL_MS ?? 2200),
+      cooldownMs: Number(config.rateCooldownMs ?? process.env.COINGECKO_RATE_COOLDOWN_MS ?? 60_000),
+    });
     this.calendar = new MacroCalendarService({ config: this.config,
       fetchJson: url => this.singleFetch(url, { Accept: "application/json" }, "Macro calendar") });
   }
 
   rememberGood(key, value) {
-    this.lastGood.set(key, { value, storedAt: Date.now() });
+    const entry = { value, storedAt: Date.now() };
+    this.lastGood.set(key, entry);
+    this.snapshotCache?.set(key, entry, this.config.staleMaxAgeMs);
   }
 
   recallGood(key) {
-    const entry = this.lastGood.get(key);
-    return entry ? entry.value : null;
+    const entry = this.lastGood.get(key) || this.snapshotCache?.get(key);
+    if (!entry?.value || !Number.isFinite(entry.storedAt) || Date.now() - entry.storedAt >= this.config.staleMaxAgeMs) return null;
+    return { ...entry.value, fetchedAt: new Date(entry.storedAt).toISOString() };
   }
 
   hasLiveCryptoSource() {
@@ -354,24 +370,24 @@ class MarketDataService {
   }
 
   async getNews() {
-    const url = this.config.newsUrl;
+    const url = this.config.newsUrl || (this.config.finnhubApiKey
+      ? `${this.config.finnhubBaseUrl}/news?category=general&token=${encodeURIComponent(this.config.finnhubApiKey)}`
+      : "");
+    const fallback = { live: false, source: "fallback", items: FALLBACK_NEWS.map(item => ({ ...item })) };
     if (!url) {
-      return { live: false, source: "fallback", items: FALLBACK_NEWS.map((item) => ({ ...item })) };
+      return fallback;
     }
     try {
-      const data = await this.singleFetch(url, { Accept: "application/json" }, "News feed");
-      const items = normalizeNews(data);
-      if (!items.length) {
-        return { live: false, source: "fallback", items: FALLBACK_NEWS.map((item) => ({ ...item })) };
-      }
-      return { live: true, source: "market_news_url", items };
+      return await this.newsCache.getOrLoad("news", this.config.newsCacheMs, async () => {
+        const data = await this.singleFetch(url, { Accept: "application/json" }, "News feed");
+        const items = normalizeNews(data);
+        if (!items.length) throw new Error("News feed returned no usable headlines");
+        const result = { live: true, source: this.config.newsUrl ? "market_news_url" : "finnhub", items };
+        this.rememberGood("news", result);
+        return result;
+      });
     } catch (error) {
-      return {
-        live: false,
-        source: "fallback",
-        items: FALLBACK_NEWS.map((item) => ({ ...item })),
-        error: error.message,
-      };
+      return this.staleOr("news", fallback, error);
     }
   }
 
@@ -382,6 +398,11 @@ class MarketDataService {
   }
 
   async fetchJson(url) {
+    const ttl = url.includes("/market_chart?") ? this.config.chartCacheMs : this.config.cacheMs;
+    return this.providerRequests.get(url, ttl, () => this.fetchProviderJson(url));
+  }
+
+  async fetchProviderJson(url) {
     const headers = { Accept: "application/json" };
     if (this.config.coingeckoApiKey && url.startsWith(this.config.baseUrl)) {
       headers[this.config.coingeckoKeyHeader] = this.config.coingeckoApiKey;
@@ -394,10 +415,10 @@ class MarketDataService {
       } catch (error) {
         lastError = error;
         const status = error.statusCode || error.status || 0;
-        const transient = status === 429 || status >= 500 || error.name === "AbortError";
+        // 429 opens a shared cooldown in providerRequests; never retry it here.
+        const transient = status >= 500 || status === 408 || error.name === "AbortError";
         if (!transient || attempt === maxAttempts) break;
-        // Honor the server's Retry-After on 429 when present, but cap it so a
-        // long header value can't stall the request past a sensible budget.
+        // Retry temporary server failures within a bounded request budget.
         const wait = Math.min(error.retryAfterMs ?? 400 * attempt, 2000);
         await sleep(wait);
       }
@@ -448,19 +469,6 @@ class MarketDataService {
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function parseRetryAfter(value) {
-  if (!value) return null;
-  const seconds = Number(value);
-  if (Number.isFinite(seconds)) {
-    return Math.max(0, seconds * 1000);
-  }
-  const dateMs = Date.parse(value);
-  if (Number.isFinite(dateMs)) {
-    return Math.max(0, dateMs - Date.now());
-  }
-  return null;
 }
 
 function macroFallback() {

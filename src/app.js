@@ -280,7 +280,9 @@ function createApp() {
     // starts actually checking it — read-only, before anything is spent.
     externalPreflight: createAgentRoutePreflight(config.newsroom.agentPreflight),
   });
-  const marketDataService = new MarketDataService();
+  const marketDataService = new MarketDataService({
+    snapshotCache: new PersistentReporterCache(path.join(dataDir, "market-data-snapshots.json")),
+  });
   const overviewService = new OverviewService({
     marketDataService,
     onchainService,
