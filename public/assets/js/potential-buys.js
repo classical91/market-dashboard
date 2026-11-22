@@ -15,7 +15,7 @@
   var Ticker = window.TickerLabel;
   var ALL = "__all";
 
-  var state = { items: [], loading: true, error: "", uploading: 0, filter: "", viewing: null, folder: ALL };
+  var state = { items: [], loading: true, error: "", uploading: 0, filter: "", viewing: null, folder: ALL, editing: null };
 
   var el = {
     grid: document.getElementById("pbGrid"),
@@ -284,7 +284,7 @@
     var label = escapeHtml(item.label || "");
     var alt = item.label ? "Screenshot: " + label : "Screenshot added " + escapeHtml(formatWhen(item.createdAt));
     return (
-      '<article class="pb-card" data-id="' + id + '">' +
+      '<article class="pb-card' + (state.editing === item.id ? " is-editing" : "") + '" data-id="' + id + '">' +
         '<button type="button" class="pb-thumb" data-action="view" aria-label="View full size">' +
           '<img src="' + escapeHtml(item.url) + '" alt="' + alt + '" loading="lazy" />' +
         "</button>" +
@@ -296,8 +296,13 @@
             '<span class="pb-when' + (isStale(item.createdAt) ? " is-stale" : "") + '" title="' +
               escapeHtml((isStale(item.createdAt) ? "Older than 3 days · " : "") + formatSize(item.size)) + '">' +
               escapeHtml(formatWhen(item.createdAt)) + "</span>" +
-            '<button type="button" class="pb-btn" data-action="crop">Crop</button>' +
-            '<button type="button" class="pb-btn pb-btn-danger" data-action="delete">Delete</button>' +
+            // Crop and Delete sit behind Edit so the card stays uncluttered.
+            '<button type="button" class="pb-btn pb-edit" data-action="edit" aria-expanded="' + (state.editing === item.id) + '">Edit</button>' +
+            '<span class="pb-edit-actions">' +
+              '<button type="button" class="pb-btn" data-action="crop">Crop</button>' +
+              '<button type="button" class="pb-btn pb-btn-danger" data-action="delete">Delete</button>' +
+              '<button type="button" class="pb-btn" data-action="done">Done</button>' +
+            "</span>" +
           "</div>" +
         "</div>" +
       "</article>"
@@ -390,6 +395,7 @@
     try {
       await request(API + "/" + encodeURIComponent(id), { method: "DELETE" });
       state.items = state.items.filter(function (it) { return it.id !== id; });
+      if (state.editing === id) state.editing = null;
       if (state.viewing === id) closeViewer();
       render();
       toast("Screenshot deleted.");
@@ -669,6 +675,21 @@
     el.heading.scrollIntoView({ block: "start", behavior: "smooth" });
   }
 
+  /** Show or hide a card's Crop / Delete / Done row; one card at a time. */
+  function setEditing(id, focusAction) {
+    state.editing = id;
+    Array.from(el.grid.querySelectorAll(".pb-card[data-id]")).forEach(function (card) {
+      var on = card.getAttribute("data-id") === id;
+      card.classList.toggle("is-editing", on);
+      var edit = card.querySelector('[data-action="edit"]');
+      if (edit) edit.setAttribute("aria-expanded", String(on));
+      if (on || card.getAttribute("data-id") === focusAction) {
+        var next = card.querySelector('[data-action="' + (on ? "crop" : "edit") + '"]');
+        if (next) next.focus();
+      }
+    });
+  }
+
   el.grid.addEventListener("click", function (e) {
     var target = e.target.closest("[data-action]");
     var card = e.target.closest(".pb-card");
@@ -677,10 +698,16 @@
     var action = target.getAttribute("data-action");
     if (action === "open-folder") { openFolder(card.getAttribute("data-folder")); return; }
     if (action === "view") openViewer(id);
+    else if (action === "edit") setEditing(id);
+    else if (action === "done") setEditing(null, id);
     else if (action === "crop") openCrop(id);
     else if (action === "delete") remove(id);
   });
   el.grid.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && state.editing && e.target.closest(".pb-edit-actions")) {
+      setEditing(null, state.editing);
+      return;
+    }
     if (e.target.matches(".pb-label") && e.key === "Enter") { e.preventDefault(); e.target.blur(); }
     if (e.target.matches(".pb-label") && e.key === "Escape") {
       var item = findItem(e.target.closest(".pb-card").getAttribute("data-id"));

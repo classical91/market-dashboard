@@ -172,6 +172,13 @@
 .pb-when { color: var(--muted); font-size: 11px; }
 .pb-card-foot .pb-btn { padding: 5px 10px; font-size: 11px; }
 .pb-card-foot .pb-btn:first-of-type { margin-left: auto; }
+/* Edit reveals Crop / Delete / Done in place of itself. */
+.pb-edit { margin-left: auto; }
+.pb-edit-actions { display: none; margin-left: auto; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.pb-card-foot .pb-edit-actions .pb-btn { margin-left: 0; }
+.pb-card.is-editing .pb-edit { display: none; }
+.pb-card.is-editing .pb-edit-actions { display: flex; }
+.pb-card.is-editing { border-color: rgba(77,163,255,0.45); }
 
 /* A ticker with several screenshots stacks into one folder card. */
 .pb-stack {
