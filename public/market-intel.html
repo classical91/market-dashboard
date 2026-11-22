@@ -6,6 +6,7 @@
   <title>Market Intel · Market Command</title>
   <script src="/assets/js/settings.js"></script>
   <link rel="stylesheet" href="/assets/styles/command.css" />
+  <link rel="stylesheet" href="/assets/styles/market-intel.css" />
 </head>
 <body>
 <div class="app">
@@ -15,55 +16,83 @@
     <div class="cmd-page-header">
       <div>
         <div class="cmd-page-title">📊 Market Intel</div>
-        <div class="cmd-page-subtitle">Cross-asset command hub — route to Crypto, Traditional or Earth Watch</div>
+        <div class="cmd-page-subtitle">Cross-asset command hub — links and routes to Crypto, Traditional and Earth Watch</div>
       </div>
     </div>
 
-    <nav class="nav-pills">
+    <nav class="nav-pills" aria-label="Jump to section">
       <a href="#cross-asset-overview" class="nav-pill">Cross-Asset Overview</a>
       <a href="#macro-indicators"     class="nav-pill">Macro Indicators</a>
+      <a href="#liquidations"         class="nav-pill">Liquidations &amp; Funding</a>
       <a href="/crypto.html"          class="nav-pill nav-pill--crypto">Crypto</a>
       <a href="/traditional.html"     class="nav-pill nav-pill--traditional">Traditional</a>
     </nav>
+
+    <!-- HUB ROUTES -->
+    <div class="mi-kicker" id="hubs">Hubs</div>
+    <section class="mi-hubs" aria-label="Market hubs">
+      <article class="mi-hub mi-hub--crypto" id="crypto">
+        <a class="mi-hub-main" href="/crypto.html">
+          <span class="mi-hub-icon" aria-hidden="true">&#8383;</span>
+          <span class="mi-hub-copy"><span class="mi-hub-title">Crypto Hub</span><span class="mi-hub-desc">BTC &amp; alt research, flows, positioning and on-chain.</span></span>
+          <span class="mi-hub-go" aria-hidden="true">&#8594;</span>
+        </a>
+        <div class="mi-hub-chips"><a class="mi-chip" href="/crypto.html#crypto-research">Bitcoin Research</a><a class="mi-chip" href="/crypto.html#alt-research">Alt Research</a><a class="mi-chip" href="/crypto.html#etf-flows">ETF Flows</a><a class="mi-chip" href="/crypto.html#liquidations">Liquidations</a><a class="mi-chip" href="/crypto.html#open-interest">Open Interest</a><a class="mi-chip" href="/crypto.html#heatmaps">Heatmaps</a></div>
+      </article>
+      <article class="mi-hub mi-hub--traditional" id="traditional">
+        <a class="mi-hub-main" href="/traditional.html">
+          <span class="mi-hub-icon" aria-hidden="true">$</span>
+          <span class="mi-hub-copy"><span class="mi-hub-title">Traditional Markets</span><span class="mi-hub-desc">Equities, screeners, key charts, macro and commodities.</span></span>
+          <span class="mi-hub-go" aria-hidden="true">&#8594;</span>
+        </a>
+        <div class="mi-hub-chips"><a class="mi-chip" href="/traditional.html#cnbc">CNBC</a><a class="mi-chip" href="/traditional.html#news-analysis">News &amp; Analysis</a><a class="mi-chip" href="/traditional.html#market-data">Market Data</a><a class="mi-chip" href="/traditional.html#screeners">Screeners</a><a class="mi-chip" href="/traditional.html#macro">Macro</a><a class="mi-chip" href="/traditional.html#commodities">Commodities</a></div>
+      </article>
+      <article class="mi-hub mi-hub--earthwatch" id="earthwatch">
+        <a class="mi-hub-main" href="/earthwatch" target="_blank" rel="noopener">
+          <span class="mi-hub-icon" aria-hidden="true">&#127757;</span>
+          <span class="mi-hub-copy"><span class="mi-hub-title">Earth Watch</span><span class="mi-hub-desc">Space weather, disasters, seismic activity and live monitoring.</span></span>
+          <span class="mi-hub-go" aria-hidden="true">&#8599;</span>
+        </a>
+        <div class="mi-hub-chips"><span class="mi-chip mi-chip--note">Opens the Earth Watch app in a new tab</span></div>
+      </article>
+    </section>
 
     <!-- CROSS-ASSET OVERVIEW -->
     <div class="section-header" id="cross-asset-overview" data-section="cross-asset-overview">
       <span class="section-label">Cross-Asset Overview</span>
       <span class="section-chevron">&#9660;</span>
     </div>
-    <div class="cards" id="cards-cross-asset-overview">
-      <a class="card" href="https://companiesmarketcap.com/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">MARKET CAP</span><span class="arrow">&#8599;</span></div><div class="card-title">Assets Ranked by Market Cap</div><div class="card-src">companiesmarketcap.com</div></a>
-      <a class="card" href="https://www.tradingview.com/markets/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">TV MARKETS</span><span class="arrow">&#8599;</span></div><div class="card-title">TradingView Markets</div><div class="card-src">tradingview.com</div></a>
-      <a class="card" href="https://tradingeconomics.com/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">MACRO DATA</span><span class="arrow">&#8599;</span></div><div class="card-title">Trading Economics</div><div class="card-src">tradingeconomics.com</div></a>
-      <a class="card" href="https://www.cnbc.com/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--surface2);color:var(--muted)">CNBC</span><span class="arrow">&#8599;</span></div><div class="card-title">CNBC Markets</div><div class="card-src">cnbc.com</div></a>
-      <a class="card" href="https://www.cnn.com/markets#market-movers" target="_blank"><div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">CNN MARKETS</span><span class="arrow">&#8599;</span></div><div class="card-title">Market Movers</div><div class="card-src">cnn.com/markets</div></a>
-      <a class="card" href="https://www.tradingview.com/" target="_blank"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">TRADINGVIEW</span><span class="arrow">&#8599;</span></div><div class="card-title">TradingView</div><div class="card-src">tradingview.com</div></a>
+    <div class="cards mi-grid" id="cards-cross-asset-overview">
+      <a class="card" href="https://companiesmarketcap.com/" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">MARKET CAP</span><span class="arrow">&#8599;</span></div><div class="card-title">Assets Ranked by Market Cap</div><div class="mi-card-desc">Companies, metals and crypto on one leaderboard.</div><div class="card-src">companiesmarketcap.com</div></a>
+      <a class="card" href="https://www.tradingview.com/markets/" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">TV MARKETS</span><span class="arrow">&#8599;</span></div><div class="card-title">TradingView Markets</div><div class="mi-card-desc">Indices, futures, FX and bonds at a glance.</div><div class="card-src">tradingview.com</div></a>
+      <a class="card" href="https://tradingeconomics.com/" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">MACRO DATA</span><span class="arrow">&#8599;</span></div><div class="card-title">Trading Economics</div><div class="mi-card-desc">Calendar, forecasts and indicators by country.</div><div class="card-src">tradingeconomics.com</div></a>
+      <a class="card" href="https://www.cnbc.com/" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--surface2);color:var(--muted)">CNBC</span><span class="arrow">&#8599;</span></div><div class="card-title">CNBC Markets</div><div class="mi-card-desc">Headlines and live pre-market coverage.</div><div class="card-src">cnbc.com</div></a>
+      <a class="card" href="https://www.cnn.com/markets#market-movers" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">CNN MARKETS</span><span class="arrow">&#8599;</span></div><div class="card-title">Market Movers</div><div class="mi-card-desc">Top gainers, losers and most active names.</div><div class="card-src">cnn.com/markets</div></a>
+      <a class="card" href="https://www.tradingview.com/" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">TRADINGVIEW</span><span class="arrow">&#8599;</span></div><div class="card-title">TradingView</div><div class="mi-card-desc">Charting workspace and watchlists.</div><div class="card-src">tradingview.com</div></a>
     </div>
-
-    <!-- HUB LINKS -->
-    <a href="/crypto.html" class="section-link section-link--crypto" id="crypto">
-      <div class="section-header">
-        <span class="section-label">Crypto &#8599;</span>
-        <span class="section-chevron">&#9654;</span>
-      </div>
-    </a>
-    <a href="/traditional.html" class="section-link section-link--traditional" id="traditional">
-      <div class="section-header">
-        <span class="section-label">Traditional &#8599;</span>
-        <span class="section-chevron">&#9654;</span>
-      </div>
-    </a>
 
     <!-- MACRO INDICATORS -->
     <div class="section-header" id="macro-indicators" data-section="macro-indicators">
       <span class="section-label">Macro Indicators</span>
       <span class="section-chevron">&#9660;</span>
     </div>
-    <div class="cards" id="cards-macro-indicators">
-      <a class="card" href="https://tradingeconomics.com/country-list/interest-rate" target="_blank"><div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">INTEREST RATES</span><span class="arrow">&#8599;</span></div><div class="card-title">Interest Rates by Country</div><div class="card-src">tradingeconomics.com</div></a>
-      <a class="card" href="https://tradingeconomics.com/country-list/inflation-rate" target="_blank"><div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">INFLATION</span><span class="arrow">&#8599;</span></div><div class="card-title">Inflation Rate by Country</div><div class="card-src">tradingeconomics.com</div></a>
-      <a class="card" href="https://tradingeconomics.com/country-list/gdp-growth-rate" target="_blank"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">GDP GROWTH</span><span class="arrow">&#8599;</span></div><div class="card-title">GDP Growth Rate by Country</div><div class="card-src">tradingeconomics.com</div></a>
-      <a class="card" href="https://tradingeconomics.com/country-list/unemployment-rate" target="_blank"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">UNEMPLOYMENT</span><span class="arrow">&#8599;</span></div><div class="card-title">Unemployment Rate by Country</div><div class="card-src">tradingeconomics.com</div></a>
+    <div class="cards mi-grid" id="cards-macro-indicators">
+      <a class="card" href="https://tradingeconomics.com/country-list/interest-rate" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">INTEREST RATES</span><span class="arrow">&#8599;</span></div><div class="card-title">Interest Rates by Country</div><div class="mi-card-desc">Policy rates across central banks.</div><div class="card-src">tradingeconomics.com</div></a>
+      <a class="card" href="https://tradingeconomics.com/country-list/inflation-rate" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">INFLATION</span><span class="arrow">&#8599;</span></div><div class="card-title">Inflation Rate by Country</div><div class="mi-card-desc">Latest CPI prints, year over year.</div><div class="card-src">tradingeconomics.com</div></a>
+      <a class="card" href="https://tradingeconomics.com/country-list/gdp-growth-rate" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">GDP GROWTH</span><span class="arrow">&#8599;</span></div><div class="card-title">GDP Growth Rate by Country</div><div class="mi-card-desc">Quarterly growth across economies.</div><div class="card-src">tradingeconomics.com</div></a>
+      <a class="card" href="https://tradingeconomics.com/country-list/unemployment-rate" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--teal-bg);color:var(--teal)">UNEMPLOYMENT</span><span class="arrow">&#8599;</span></div><div class="card-title">Unemployment Rate by Country</div><div class="mi-card-desc">Labour-market slack by country.</div><div class="card-src">tradingeconomics.com</div></a>
+    </div>
+
+    <!-- LIQUIDATIONS & FUNDING -->
+    <div class="section-header" id="liquidations" data-section="liquidations">
+      <span class="section-label">Liquidations &amp; Funding</span>
+      <span class="section-chevron">&#9660;</span>
+    </div>
+    <div class="cards mi-grid" id="cards-liquidations">
+      <a class="card" href="https://coinalyze.net/bitcoin/liquidations" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">BTC LIQUIDATIONS</span><span class="arrow">&#8599;</span></div><div class="card-title">Bitcoin Liquidations</div><div class="mi-card-desc">Aggregated long and short liquidations over time.</div><div class="card-src">coinalyze.net</div></a>
+      <a class="card" href="https://coinalyze.net/bitcoin/funding-rate/" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--amber-bg);color:var(--amber)">FUNDING RATE</span><span class="arrow">&#8599;</span></div><div class="card-title">Bitcoin Funding Rate</div><div class="mi-card-desc">Perp funding across exchanges: who is paying to hold the trade.</div><div class="card-src">coinalyze.net</div></a>
+      <a class="card" href="https://www.coinglass.com/pro/futures/LiquidationMap" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">LIQ MAP</span><span class="arrow">&#8599;</span></div><div class="card-title">Liquidation Map</div><div class="mi-card-desc">Estimated liquidation levels stacked by price.</div><div class="card-src">coinglass.com</div></a>
+      <a class="card" href="https://www.coinglass.com/pro/futures/LiquidationHeatMapModel3" target="_blank" rel="noopener"><div class="card-top"><span class="badge" style="background:var(--coral-bg);color:var(--coral)">HEATMAP · MODEL 3</span><span class="arrow">&#8599;</span></div><div class="card-title">Liquidation Heatmap (Model 3)</div><div class="mi-card-desc">Liquidation clusters across price and time.</div><div class="card-src">coinglass.com</div></a>
     </div>
 
     <footer>Market Intel · Command Hub</footer>
@@ -74,7 +103,8 @@
 <script src="/assets/js/sections.js"></script>
 <script>
   (function () {
-    initSections('mi_collapsed');
+    // Link groups start open here: the hub is short and the tiles are the point.
+    initSections('mi_collapsed', { defaultCollapsed: [] });
   })();
 </script>
 </body>

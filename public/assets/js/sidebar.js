@@ -137,12 +137,14 @@
           children: [
             { href: "/market-intel.html#cross-asset-overview", label: "Cross-Asset Overview" },
             { href: "/market-intel.html#macro-indicators", label: "Macro Indicators" },
+            { href: "/market-intel.html#liquidations", label: "Liquidations & Funding" },
           ],
         },
         {
           label: "Crypto",
           children: [
             { href: "/crypto.html#crypto-research", label: "Bitcoin Research" },
+            { href: "/crypto.html#technical-analysis", label: "Technical Analysis" },
             { href: "/crypto.html#alt-research", label: "Alt Research" },
             { href: "/crypto.html#interactive-dashboards", label: "Interactive Dashboards" },
             { href: "/crypto.html#tradingview-tickers", label: "TradingView Tickers" },
