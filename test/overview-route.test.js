@@ -27,9 +27,8 @@ test("Overview is the default page and the removed Overview v2 URLs redirect to 
       const html = await response.text();
       assert.match(html, /assets\/js\/overview\.js/, url);
       assert.doesNotMatch(html, /overview-v2/, url);
-      assert.match(html, /id="mini-x-portal"/, url);
-      assert.match(html, /href="\/x-intelligence\.html\?template=markets"/, url);
-      assert.match(html, /href="\/youtube-v2\.html\?category=category%3Acrypto"/, url);
+      // The Mini X Portal belonged to Overview v2 only; it is not on the Overview.
+      assert.doesNotMatch(html, /mini-x-portal|ov-portal/, url);
     }
     for (const url of ["/overview-v2", "/overview-v2.html", "/overview-hybrid.html"]) {
       const response = await fetch(base + url, { redirect: "manual", headers: { cookie } });
