@@ -402,6 +402,9 @@
     var watchChannel = document.getElementById("ytWatchChannel");
     var watchDetail = document.getElementById("ytWatchDetail");
     var playerLink = document.getElementById("ytPlayerLink");
+    var copyLinkButton = document.getElementById("ytCopyLink");
+    var copyLinkLabel = copyLinkButton ? copyLinkButton.innerHTML : "";
+    var copyLinkTimer = null;
     var search = document.getElementById("ytSearch");
     var select = document.getElementById("ytCategoryFilter");
     var refresh = document.getElementById("ytRefresh");
@@ -519,6 +522,7 @@
       watchDetail.textContent = videoDetail(video);
       player.title = "YouTube video: " + video.title;
       playerLink.href = video.url || watchUrl(video.id);
+      resetCopyLink();
       watch.hidden = false;
       document.body.classList.add("yt-focus");
       if (playingId !== video.id) {
@@ -549,6 +553,50 @@
       playingItem = null;
       renderQueue();
       if (restoreFocus) (card || search).focus();
+    }
+
+    /* ---- Copy link ---- */
+
+    function resetCopyLink() {
+      if (!copyLinkButton) return;
+      window.clearTimeout(copyLinkTimer);
+      copyLinkButton.innerHTML = copyLinkLabel;
+    }
+
+    function flashCopyLink(label) {
+      copyLinkButton.textContent = label;
+      window.clearTimeout(copyLinkTimer);
+      copyLinkTimer = window.setTimeout(resetCopyLink, 2000);
+    }
+
+    function copyTextFallback(text) {
+      var field = document.createElement("textarea");
+      field.value = text;
+      field.setAttribute("readonly", "");
+      field.style.position = "fixed";
+      field.style.opacity = "0";
+      document.body.appendChild(field);
+      field.select();
+      var ok = false;
+      try { ok = document.execCommand("copy"); } catch (_) { ok = false; }
+      field.remove();
+      return ok;
+    }
+
+    function copyVideoLink() {
+      var url = playerLink.href;
+      if (!url) return;
+      var done = function () { flashCopyLink("Link copied \u2713"); announce("Video link copied."); };
+      var fail = function () {
+        if (copyTextFallback(url)) return done();
+        flashCopyLink("Copy failed");
+        announce("Could not copy the video link.");
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(done, fail);
+      } else {
+        fail();
+      }
     }
 
     /* ---- Up next queue ---- */
@@ -955,6 +1003,7 @@
     search.addEventListener("input", renderFeed);
     refresh.addEventListener("click", loadFeeds);
     document.getElementById("ytCloseWatch").addEventListener("click", function () { closeWatch(true); });
+    copyLinkButton?.addEventListener("click", copyVideoLink);
     document.addEventListener("keydown", function (event) {
       // Shift+N plays the next queued video, as on YouTube.
       if (event.key === "N" && event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && !event.defaultPrevented) {
