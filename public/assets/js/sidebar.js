@@ -137,6 +137,7 @@
           children: [
             { href: "/market-intel.html#cross-asset-overview", label: "Cross-Asset Overview" },
             { href: "/market-intel.html#macro-indicators", label: "Macro Indicators" },
+            { href: "/market-intel.html#liquidations", label: "Liquidations" },
           ],
         },
         {
