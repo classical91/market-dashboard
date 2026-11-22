@@ -118,6 +118,10 @@ test("Active Trades removal and responsive cards", { skip: !executablePath && "C
     const { page } = await open(t);
     const heights = await page.locator(".tc-card").evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().height));
     assert.ok(heights[1] > heights[0], "short cards have no stretched blank footer area");
+    await page.locator("#tc-updated").evaluate(node => {
+      node.textContent = "Page refreshed 11:59:59 PM · 3 cards changed · 1 card on stale data";
+    });
+    await page.evaluate(() => AppSettings.applyTheme("terminal"));
     for (const width of [1520, 1024, 390, 320]) {
       await page.setViewportSize({ width, height: 1100 });
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `no overflow at ${width}px`);
