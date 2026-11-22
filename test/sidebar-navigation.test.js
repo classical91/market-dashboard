@@ -167,7 +167,7 @@ test("the intelligence menus are the colour-featured tabs", () => {
 });
 
 test("Trading and tools section has one copy of every item in the requested order", () => {
-  const labels = ["Trader Lab Telegram", "Bot Commands", "Indicators Glossary", "Settings"];
+  const labels = ["CoinTrendz Telegram", "Bot Commands", "Indicators Glossary", "Settings"];
   let cursor = sidebar.indexOf("var tools");
   for (const label of labels) {
     const next = sidebar.indexOf(`label: "${label}"`, cursor);
