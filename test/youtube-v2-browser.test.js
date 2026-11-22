@@ -75,6 +75,100 @@ test("YouTube page browser regressions", { skip: !fs.existsSync(chromium.executa
     assert.match(await page.locator("#ytFeedStatus").textContent(), /0 matching videos/);
   });
 
+  await t.test("queue: add, reorder, persist, play and auto-advance", async (t) => {
+    const page = await open(t);
+    // A stand-in embed that speaks just enough of the iframe API protocol.
+    await page.route("https://www.youtube.com/embed/**", (route) => route.fulfill({
+      contentType: "text/html",
+      body: "<!doctype html><script>addEventListener('message', function () { parent.postMessage(JSON.stringify({ event: 'infoDelivery', info: { playerState: 1 } }), '*'); });</script>",
+    }));
+    await ready(page);
+    const queueRows = page.locator("#ytQueueList .yt-queue-item");
+    const order = () => queueRows.evaluateAll((rows) => rows.map((row) => row.dataset.rowId));
+    assert.equal(await page.locator("#ytQueue").isVisible(), false);
+
+    await page.getByRole("button", { name: "Add to queue: Weekly market outlook" }).click();
+    await page.getByRole("button", { name: "Add to queue: Tomorrow briefing" }).click();
+    assert.equal(await page.locator("#ytQueue").isVisible(), true);
+    assert.equal(await page.locator("#ytQueueCount").textContent(), "2 videos");
+    assert.deepEqual(await order(), ["clip1234567", "next1234567"]);
+    assert.equal(await page.getByRole("button", { name: "Remove from queue: Tomorrow briefing" }).getAttribute("aria-pressed"), "true");
+    await page.waitForFunction(() => /Added to queue: Tomorrow briefing/.test(document.getElementById("ytQueueAnnounce").textContent));
+
+    await page.getByRole("button", { name: "Move up: Tomorrow briefing" }).click();
+    assert.deepEqual(await order(), ["next1234567", "clip1234567"]);
+    assert.equal(await queueRows.first().evaluate((row) => row.contains(document.activeElement)), true, "focus stays on the moved row");
+
+    await page.reload();
+    await ready(page);
+    assert.deepEqual(await order(), ["next1234567", "clip1234567"], "queue survives a reload");
+
+    await page.getByRole("button", { name: "Play queue" }).click();
+    assert.match(await page.locator("#ytPlayer").getAttribute("src"), /embed\/next1234567\?autoplay=1&enablejsapi=1/);
+    assert.deepEqual(await order(), ["clip1234567"]);
+    assert.equal(await page.getByRole("button", { name: "Play queue" }).isVisible(), false);
+    assert.equal(await page.getByRole("button", { name: "Play next: Weekly market outlook" }).isVisible(), true);
+
+    // The embed reports the video ended; the queue advances on its own.
+    const frame = page.frameLocator("#ytPlayer");
+    await frame.locator("script").waitFor({ state: "attached" });
+    await page.waitForFunction(() => document.getElementById("ytPlayer").contentWindow && true);
+    const embed = page.frames().find((f) => f.url().includes("/embed/next1234567"));
+    await embed.evaluate(() => parent.postMessage(JSON.stringify({ event: "onStateChange", info: 0 }), "*"));
+    await page.waitForFunction(() => /embed\/clip1234567/.test(document.getElementById("ytPlayer").src));
+    assert.equal(await page.locator("#ytWatchTitle").textContent(), "Weekly market outlook");
+    assert.equal(await page.locator("#ytQueue").isVisible(), false);
+    assert.equal(await page.locator("#ytPlayNext").isVisible(), false);
+
+    // Messages from anywhere but the player frame are ignored.
+    await page.getByRole("button", { name: "Add to queue: Markets live" }).click();
+    await page.evaluate(() => window.postMessage(JSON.stringify({ event: "onStateChange", info: 0 }), "*"));
+    await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 100)));
+    assert.match(await page.locator("#ytPlayer").getAttribute("src"), /embed\/clip1234567/);
+
+    // Autoplay off: an ended video stays put; Shift+N still skips ahead.
+    await page.getByRole("checkbox", { name: "Autoplay" }).uncheck();
+    const clip = page.frames().find((f) => f.url().includes("/embed/clip1234567"));
+    await clip.evaluate(() => parent.postMessage(JSON.stringify({ event: "onStateChange", info: 0 }), "*"));
+    await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 100)));
+    assert.match(await page.locator("#ytPlayer").getAttribute("src"), /embed\/clip1234567/);
+    await page.locator("#ytWatchTitle").focus();
+    await page.keyboard.press("Shift+N");
+    assert.match(await page.locator("#ytPlayer").getAttribute("src"), /embed\/live1234567/);
+
+    await page.getByRole("button", { name: "Add to queue: Tomorrow briefing" }).click();
+    await page.getByRole("button", { name: "Remove: Tomorrow briefing" }).click();
+    assert.equal(await page.locator("#ytQueue").isVisible(), false);
+    await page.getByRole("button", { name: "Add to queue: Weekly market outlook" }).click();
+    await page.getByRole("button", { name: "Clear" }).click();
+    assert.equal(await queueRows.count(), 0);
+    assert.equal(await page.evaluate(() => localStorage.getItem("yt:queue:v1")), null);
+  });
+
+  await t.test("queue layout fits and sits beside the player on wide screens", async (t) => {
+    const page = await open(t);
+    await ready(page);
+    await page.getByRole("button", { name: "Add to queue: Weekly market outlook" }).click();
+    await page.getByRole("button", { name: "Add to queue: Tomorrow briefing" }).click();
+    for (const width of [320, 390, 768, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `idle queue fits at ${width}px`);
+    }
+    await page.locator(".yt-feed-card").filter({ hasText: "Markets live" }).click();
+    for (const width of [320, 390, 768, 1025, 1440, 1920]) {
+      await page.setViewportSize({ width, height: 900 });
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `playing queue fits at ${width}px`);
+      const watch = await page.locator("#ytWatch").boundingBox();
+      const queue = await page.locator("#ytQueue").boundingBox();
+      if (width >= 1440) {
+        assert.ok(Math.abs(queue.y - watch.y) < 2 && queue.x > watch.x + watch.width - 1, `queue beside the player at ${width}px`);
+        assert.ok(queue.height <= watch.height + 1, `queue no taller than the player at ${width}px`);
+      } else if (width < 1180) {
+        assert.ok(queue.y >= watch.y + watch.height, `queue under the player at ${width}px`);
+      }
+    }
+  });
+
   await t.test("Gemini summary popup renders, seeks the player and closes", async (t) => {
     const posts = [];
     const page = await open(t, (url, request) => {
@@ -96,7 +190,7 @@ test("YouTube page browser regressions", { skip: !fs.existsSync(chromium.executa
     assert.match(await dialog.textContent(), /<b>steady<\/b>/);
     assert.equal(await page.locator("#ytPlayer").getAttribute("src"), null);
     await dialog.getByRole("link", { name: "Jump to 01:05" }).click();
-    assert.match(await page.locator("#ytPlayer").getAttribute("src"), /embed\/clip1234567\?autoplay=1&start=65/);
+    assert.match(await page.locator("#ytPlayer").getAttribute("src"), /embed\/clip1234567\?autoplay=1&enablejsapi=1.*&start=65$/);
     assert.equal(await page.locator(".yts-overlay").count(), 0);
     // The player bar offers the same popup, and Escape closes it without leaving focus mode.
     await page.getByRole("button", { name: "Summarize", exact: true }).click();

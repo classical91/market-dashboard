@@ -1,8 +1,12 @@
 (function () {
   "use strict";
 
+  var YT_ORIGIN = "https://www.youtube.com";
+
+  // enablejsapi lets the page hear when a video ends so the queue can advance.
   function embedUrl(id, start) {
-    return "https://www.youtube.com/embed/" + encodeURIComponent(id) + "?autoplay=1" + (start ? "&start=" + start : "");
+    var origin = window.location.origin && window.location.origin !== "null" ? "&origin=" + encodeURIComponent(window.location.origin) : "";
+    return YT_ORIGIN + "/embed/" + encodeURIComponent(id) + "?autoplay=1&enablejsapi=1" + origin + (start ? "&start=" + start : "");
   }
 
   // Gemini can only summarize a finished video: a live stream is still being
@@ -10,9 +14,6 @@
   function canSummarize(video) {
     return Boolean(video && video.id) && video.state !== "live" && video.state !== "upcoming";
   }
-
-  // Set by init(): opens the Gemini summary popup for a feed item.
-  var summarizeItem = null;
   function watchUrl(id) {
     return "https://youtu.be/" + encodeURIComponent(id);
   }
@@ -107,14 +108,27 @@
     return formatRelativeDate(video.publishedAt);
   }
 
-  function buildCard(item, onSelect, activeId) {
+  function queueLabel(queued, title) {
+    return (queued ? "Remove from queue: " : "Add to queue: ") + title;
+  }
+
+  function syncQueueButton(button, queued) {
+    button.setAttribute("aria-pressed", queued ? "true" : "false");
+    button.setAttribute("aria-label", queueLabel(queued, button.dataset.title || "video"));
+    button.title = queued ? "Remove from queue" : "Add to queue";
+  }
+
+  function buildCard(item, ctx) {
     var video = item.video;
+    var wrap = document.createElement("div");
+    wrap.className = "yt-card";
     var card = document.createElement("a");
     card.className = "yt-feed-card";
     card.href = video.url || watchUrl(video.id);
     card.target = "_blank";
     card.rel = "noopener";
-    if (video.id === activeId) card.setAttribute("aria-current", "true");
+    if (video.id) card.dataset.videoId = video.id;
+    if (video.id === ctx.activeId) card.setAttribute("aria-current", "true");
 
     var thumb = document.createElement("div");
     thumb.className = "yt-feed-thumb";
@@ -180,24 +194,39 @@
     card.addEventListener("click", function (e) {
       if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0 || !video.id) return;
       e.preventDefault();
-      onSelect(item, card);
+      ctx.onSelect(item, card);
     });
-    card.dataset.videoId = video.id || "";
 
-    // The summary button sits beside the link, not inside it: a button nested
-    // in an <a> is invalid and would also trigger playback.
-    var wrap = document.createElement("div");
-    wrap.className = "yt-feed-item";
     wrap.appendChild(card);
-    if (summarizeItem && canSummarize(video)) {
+
+    // A sibling of the link, not a child: a button inside <a> is invalid and
+    // would also trigger playback.
+    if (video.id && ctx.queue) {
+      var queueButton = document.createElement("button");
+      queueButton.type = "button";
+      queueButton.className = "yt-queue-toggle";
+      queueButton.dataset.queueId = video.id;
+      queueButton.dataset.title = video.title || "video";
+      var icon = document.createElement("span");
+      icon.className = "yt-queue-icon";
+      icon.setAttribute("aria-hidden", "true");
+      queueButton.appendChild(icon);
+      syncQueueButton(queueButton, ctx.queue.has(video.id));
+      queueButton.addEventListener("click", function () { ctx.onToggleQueue(item); });
+      wrap.appendChild(queueButton);
+    }
+
+    // Gemini summary pill, top-left of the thumbnail (the queue toggle is top-right).
+    if (ctx.onSummarize && canSummarize(video)) {
       var summary = document.createElement("button");
       summary.type = "button";
       summary.className = "yt-summary-chip";
       summary.textContent = "Summary";
       summary.setAttribute("aria-label", "Summarize " + (video.title || "video") + " with Gemini");
-      summary.addEventListener("click", function () { summarizeItem(item); });
+      summary.addEventListener("click", function () { ctx.onSummarize(item); });
       wrap.appendChild(summary);
     }
+
     return wrap;
   }
 
@@ -209,7 +238,7 @@
     root.replaceChildren(empty);
   }
 
-  function renderGrid(root, items, emptyText, onSelect, activeId, searchTerms) {
+  function renderGrid(root, items, emptyText, ctx, searchTerms) {
     var matches = items.filter(function (item) {
       var text = [item.video.title, item.channelLabel, item.channelHandle].join(" ").toLowerCase();
       return searchTerms.every(function (term) { return text.includes(term); });
@@ -222,7 +251,7 @@
     var grid = document.createElement("div");
     grid.className = "yt-channel-videos";
     matches.forEach(function (item) {
-      grid.appendChild(buildCard(item, onSelect, activeId));
+      grid.appendChild(buildCard(item, ctx));
     });
     root.replaceChildren(grid);
     return matches.length;
@@ -294,7 +323,7 @@
     }
   }
 
-  function render(roots, data, onSelect, activeId, query) {
+  function render(roots, data, ctx, query) {
     var meta = data.meta || {};
     var failed = data.failedFeeds || [];
     var items = normalizeUploads(data);
@@ -323,9 +352,9 @@
     var searchTerms = query.toLowerCase().split(/\s+/).map(function (term) {
       return term.replace(/^@+/, "");
     }).filter(Boolean);
-    var count = renderGrid(roots.live, live, emptyLiveText(meta, "live"), onSelect, activeId, searchTerms);
-    count += renderGrid(roots.upcoming, upcoming, emptyLiveText(meta, "upcoming"), onSelect, activeId, searchTerms);
-    count += renderGrid(roots.uploads, uploads, "No videos found yet.", onSelect, activeId, searchTerms);
+    var count = renderGrid(roots.live, live, emptyLiveText(meta, "live"), ctx, searchTerms);
+    count += renderGrid(roots.upcoming, upcoming, emptyLiveText(meta, "upcoming"), ctx, searchTerms);
+    count += renderGrid(roots.uploads, uploads, "No videos found yet.", ctx, searchTerms);
     renderFailures(roots.uploads, failed);
     return count;
   }
@@ -352,6 +381,14 @@
   // A category deleted in another tab leaves this page holding an ID the server
   // no longer knows, which it answers with a 400. That is recoverable: fall
   // back to All Categories rather than blanking the page.
+  function safeStorage() {
+    try {
+      return window.localStorage;
+    } catch (e) {
+      return null;
+    }
+  }
+
   function staleCategoryError(status, categoryId) {
     return status === 400 && categoryId && categoryId !== "all";
   }
@@ -375,16 +412,35 @@
       upcoming: document.getElementById("ytUpcomingFeeds"),
       uploads: document.getElementById("ytChannelFeeds"),
     };
+    var stage = document.getElementById("ytStage");
+    var queueSection = document.getElementById("ytQueue");
+    var queueList = document.getElementById("ytQueueList");
+    var queueCount = document.getElementById("ytQueueCount");
+    var queuePlay = document.getElementById("ytQueuePlay");
+    var queueClear = document.getElementById("ytQueueClear");
+    var queueAutoplay = document.getElementById("ytQueueAutoplay");
+    var queueAnnounce = document.getElementById("ytQueueAnnounce");
+    var playNextButton = document.getElementById("ytPlayNext");
     var summarizeButton = document.getElementById("ytSummarize");
+    var summarizeItem = null;
+    var playingItem = null;
+    var queue = window.YoutubeQueue && queueSection
+      ? window.YoutubeQueue.createQueue({ storage: safeStorage() })
+      : null;
     var payload;
     var request;
     var playingId = null;
-    var playingItem = null;
     var feedNote = "";
+    var pendingFocus = null;
+    var dragId = null;
+    var listenTimer = null;
+    var heardPlayer = false;
+    var endedFor = null;
 
     function renderFeed() {
       if (!payload) return;
-      var count = render(roots, payload, onSelect, playingId, search.value);
+      var ctx = { onSelect: onSelect, activeId: playingId, queue: queue, onToggleQueue: toggleQueue, onSummarize: summarizeItem };
+      var count = render(roots, payload, ctx, search.value);
       status.textContent = (search.value.trim() ? count + (count === 1 ? " matching video. " : " matching videos. ") : "") + feedNote;
     }
 
@@ -444,36 +500,366 @@
       return document.querySelector('.yt-feed-card[aria-current="true"]');
     }
 
-    function onSelect(item, card) {
-      selectedCard()?.removeAttribute("aria-current");
-      card.setAttribute("aria-current", "true");
+    function cardsFor(id) {
+      return Array.from(document.querySelectorAll(".yt-feed-card")).filter(function (card) {
+        return card.dataset.videoId === id;
+      });
+    }
+
+    function play(item) {
       var video = item.video;
+      // The video now playing leaves "Up next", as it does on YouTube.
+      if (queue) queue.remove(video.id);
+      document.querySelectorAll('.yt-feed-card[aria-current="true"]').forEach(function (node) {
+        node.removeAttribute("aria-current");
+      });
+      cardsFor(video.id).forEach(function (node) { node.setAttribute("aria-current", "true"); });
       watchTitle.textContent = video.title;
       watchChannel.textContent = item.channelLabel;
       watchDetail.textContent = videoDetail(video);
       player.title = "YouTube video: " + video.title;
-      playerLink.href = card.href;
+      playerLink.href = video.url || watchUrl(video.id);
       watch.hidden = false;
       document.body.classList.add("yt-focus");
-      if (playingId !== video.id) player.src = embedUrl(video.id);
+      if (playingId !== video.id) {
+        endedFor = null;
+        player.src = embedUrl(video.id);
+      }
       playingId = video.id;
       playingItem = item;
-      if (summarizeButton) summarizeButton.hidden = !canSummarize(video) || !window.YoutubeSummary;
+      if (summarizeButton) summarizeButton.hidden = !summarizeItem || !canSummarize(video);
+      renderQueue();
       watch.scrollIntoView({ block: "start" });
       watchTitle.focus({ preventScroll: true });
+    }
+
+    function onSelect(item) {
+      play(item);
     }
 
     function closeWatch(restoreFocus) {
       if (!playingId) return;
       var card = selectedCard();
       card?.removeAttribute("aria-current");
+      stopListening();
       player.removeAttribute("src");
       watch.hidden = true;
       document.body.classList.remove("yt-focus");
       playingId = null;
       playingItem = null;
+      renderQueue();
       if (restoreFocus) (card || search).focus();
     }
+
+    /* ---- Up next queue ---- */
+
+    function announce(message) {
+      if (!queueAnnounce) return;
+      queueAnnounce.textContent = "";
+      // A fresh text node makes repeated messages ("Added to queue") re-announce.
+      window.setTimeout(function () { queueAnnounce.textContent = message; }, 30);
+    }
+
+    function toQueueEntry(item) {
+      var video = item.video;
+      return {
+        id: video.id,
+        title: video.title,
+        channelLabel: item.channelLabel,
+        channelHandle: item.channelHandle,
+        channelCategory: item.channelCategory,
+        thumbnail: video.thumbnail || thumbUrl(video.id),
+        url: video.url || watchUrl(video.id),
+        state: video.state,
+        publishedAt: video.publishedAt,
+        scheduledStartTime: video.scheduledStartTime,
+      };
+    }
+
+    // Prefer the feed's current copy (fresh live/viewer state); fall back to
+    // what the queue stored, e.g. a video queued under another category.
+    function itemForEntry(entry) {
+      if (payload) {
+        var lists = [payload.live || [], payload.upcoming || [], payload.videos || []];
+        (payload.channels || []).forEach(function (channel) { lists.push(channel.videos || []); });
+        for (var i = 0; i < lists.length; i++) {
+          var match = lists[i].filter(function (video) { return video && video.id === entry.id; })[0];
+          if (match) return toItem(Object.assign({ channelLabel: entry.channelLabel, channelHandle: entry.channelHandle }, match));
+        }
+      }
+      return toItem(entry);
+    }
+
+    function toggleQueue(item) {
+      if (!queue) return;
+      var video = item.video;
+      if (queue.has(video.id)) {
+        queue.remove(video.id);
+        announce("Removed from queue: " + video.title);
+      } else if (video.id === playingId) {
+        announce("Already playing: " + video.title);
+      } else if (queue.add(toQueueEntry(item))) {
+        announce("Added to queue: " + video.title + ". " + queue.size() + " in queue.");
+      } else {
+        announce("The queue is full. Remove a video to add another.");
+      }
+    }
+
+    function playNext() {
+      var entry = queue && queue.shift();
+      if (!entry) return false;
+      play(itemForEntry(entry));
+      return true;
+    }
+
+    function autoplayOn() {
+      return !queueAutoplay || queueAutoplay.checked;
+    }
+
+    function queueRow(entry, index, total) {
+      var li = document.createElement("li");
+      li.className = "yt-queue-item";
+      li.dataset.rowId = entry.id;
+      li.draggable = true;
+
+      var pos = document.createElement("span");
+      pos.className = "yt-queue-pos";
+      pos.setAttribute("aria-hidden", "true");
+      pos.textContent = String(index + 1);
+      li.appendChild(pos);
+
+      var main = document.createElement("button");
+      main.type = "button";
+      main.className = "yt-queue-main";
+      main.dataset.action = "play";
+      main.setAttribute("aria-label", "Play now: " + entry.title + (entry.channelLabel ? " — " + entry.channelLabel : ""));
+
+      var thumb = document.createElement("span");
+      thumb.className = "yt-queue-thumb";
+      var image = document.createElement("img");
+      image.alt = "";
+      image.loading = "lazy";
+      image.decoding = "async";
+      image.addEventListener("error", function () { image.remove(); }, { once: true });
+      image.src = entry.thumbnail || thumbUrl(entry.id);
+      thumb.appendChild(image);
+      if (entry.state === "live" || entry.state === "upcoming") {
+        var badge = document.createElement("span");
+        badge.className = "yt-badge yt-badge-" + entry.state;
+        badge.textContent = entry.state === "live" ? "LIVE" : "UPCOMING";
+        thumb.appendChild(badge);
+      }
+      main.appendChild(thumb);
+
+      var copy = document.createElement("span");
+      copy.className = "yt-queue-copy";
+      var title = document.createElement("span");
+      title.className = "yt-queue-title";
+      title.textContent = entry.title;
+      title.title = entry.title;
+      copy.appendChild(title);
+      var meta = document.createElement("span");
+      meta.className = "yt-queue-meta";
+      meta.textContent = entry.channelLabel || "YouTube";
+      copy.appendChild(meta);
+      main.appendChild(copy);
+      li.appendChild(main);
+
+      var actions = document.createElement("span");
+      actions.className = "yt-queue-row-actions";
+      [
+        ["up", "Move up", "\u2191", index === 0],
+        ["down", "Move down", "\u2193", index === total - 1],
+        ["remove", "Remove", "\u2715", false],
+      ].forEach(function (spec) {
+        var button = document.createElement("button");
+        button.type = "button";
+        button.dataset.action = spec[0];
+        button.setAttribute("aria-label", spec[1] + ": " + entry.title);
+        button.title = spec[1];
+        button.textContent = spec[2];
+        button.disabled = spec[3];
+        actions.appendChild(button);
+      });
+      li.appendChild(actions);
+      return li;
+    }
+
+    function restoreQueueFocus() {
+      if (!pendingFocus) return;
+      var want = pendingFocus;
+      pendingFocus = null;
+      var rows = Array.from(queueList.children);
+      var row = rows.filter(function (node) { return node.dataset.rowId === want.id; })[0];
+      if (!row) row = rows[Math.min(want.index, rows.length - 1)];
+      if (!row) { (playingId ? watchTitle : search).focus({ preventScroll: true }); return; }
+      var action = row.dataset.rowId === want.id ? want.action : "remove";
+      var target = row.querySelector('[data-action="' + action + '"]');
+      if (!target || target.disabled) target = row.querySelector('[data-action="up"]:not(:disabled), [data-action="down"]:not(:disabled)') || row.querySelector('[data-action="play"]');
+      target.focus({ preventScroll: true });
+    }
+
+    function renderQueue() {
+      if (!queue) return;
+      var entries = queue.list();
+      var n = entries.length;
+      queueSection.hidden = !n;
+      stage.classList.toggle("has-queue", n > 0);
+      stage.classList.toggle("is-playing", !!playingId);
+      queueCount.textContent = n + (n === 1 ? " video" : " videos");
+      queuePlay.hidden = !n || !!playingId;
+      playNextButton.hidden = !n;
+      if (n) {
+        playNextButton.title = "Play next: " + entries[0].title;
+        playNextButton.setAttribute("aria-label", "Play next: " + entries[0].title);
+      }
+      queueList.replaceChildren.apply(queueList, entries.map(function (entry, index) { return queueRow(entry, index, n); }));
+      document.querySelectorAll(".yt-queue-toggle").forEach(function (button) {
+        syncQueueButton(button, queue.has(button.dataset.queueId));
+      });
+      restoreQueueFocus();
+    }
+
+    function setupQueue() {
+      if (!queue) return;
+      queue.subscribe(renderQueue);
+
+      queueList.addEventListener("click", function (event) {
+        var button = event.target.closest("button[data-action]");
+        var row = button && button.closest(".yt-queue-item");
+        if (!row) return;
+        var id = row.dataset.rowId;
+        var index = Array.from(queueList.children).indexOf(row);
+        var action = button.dataset.action;
+        if (action === "play") {
+          var entry = queue.list().filter(function (item) { return item.id === id; })[0];
+          if (entry) play(itemForEntry(entry));
+          return;
+        }
+        pendingFocus = { id: id, index: index, action: action };
+        if (action === "up") queue.move(id, index - 1);
+        else if (action === "down") queue.move(id, index + 1);
+        else if (action === "remove") {
+          queue.remove(id);
+          announce("Removed from queue.");
+        }
+        // A no-op move leaves no render to consume the focus request.
+        pendingFocus = null;
+      });
+
+      // Drag a row to reorder, as on YouTube. The arrow buttons cover keyboard use.
+      function clearDropMarks() {
+        queueList.querySelectorAll(".is-drop-before, .is-drop-after").forEach(function (node) {
+          node.classList.remove("is-drop-before", "is-drop-after");
+        });
+      }
+      function dropAfter(row, event) {
+        var box = row.getBoundingClientRect();
+        return event.clientY > box.top + box.height / 2;
+      }
+      queueList.addEventListener("dragstart", function (event) {
+        var row = event.target.closest && event.target.closest(".yt-queue-item");
+        if (!row) return;
+        dragId = row.dataset.rowId;
+        row.classList.add("is-dragging");
+        event.dataTransfer.effectAllowed = "move";
+        try { event.dataTransfer.setData("text/plain", dragId); } catch (err) { /* older engines */ }
+      });
+      queueList.addEventListener("dragover", function (event) {
+        var row = event.target.closest && event.target.closest(".yt-queue-item");
+        if (!dragId || !row) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+        clearDropMarks();
+        if (row.dataset.rowId !== dragId) row.classList.add(dropAfter(row, event) ? "is-drop-after" : "is-drop-before");
+      });
+      queueList.addEventListener("drop", function (event) {
+        var row = event.target.closest && event.target.closest(".yt-queue-item");
+        if (!dragId || !row) return;
+        event.preventDefault();
+        var rows = Array.from(queueList.children);
+        var from = rows.findIndex(function (node) { return node.dataset.rowId === dragId; });
+        var to = rows.indexOf(row) + (dropAfter(row, event) ? 1 : 0);
+        if (from !== -1 && from < to) to -= 1;
+        var id = dragId;
+        dragId = null;
+        queue.move(id, to);
+      });
+      queueList.addEventListener("dragend", function () {
+        dragId = null;
+        clearDropMarks();
+        queueList.querySelectorAll(".is-dragging").forEach(function (node) { node.classList.remove("is-dragging"); });
+      });
+
+      queuePlay.addEventListener("click", playNext);
+      playNextButton.addEventListener("click", playNext);
+      queueClear.addEventListener("click", function () {
+        queue.clear();
+        announce("Queue cleared.");
+        (playingId ? watchTitle : search).focus({ preventScroll: true });
+      });
+
+      var AUTOPLAY_KEY = "yt:queue:autoplay";
+      try { queueAutoplay.checked = window.localStorage.getItem(AUTOPLAY_KEY) !== "off"; } catch (err) { /* default on */ }
+      queueAutoplay.addEventListener("change", function () {
+        try { window.localStorage.setItem(AUTOPLAY_KEY, queueAutoplay.checked ? "on" : "off"); } catch (err) { /* best effort */ }
+      });
+
+      // Another tab edited the queue.
+      window.addEventListener("storage", function (event) {
+        if (event.key === queue.key || event.key === null) queue.reload();
+      });
+
+      renderQueue();
+    }
+
+    /* ---- Player end detection (YouTube iframe postMessage protocol) ---- */
+
+    function postToPlayer(message) {
+      try {
+        player.contentWindow?.postMessage(JSON.stringify(Object.assign({ id: "ytPlayer", channel: "widget" }, message)), YT_ORIGIN);
+      } catch (err) { /* player not ready */ }
+    }
+
+    function stopListening() {
+      window.clearInterval(listenTimer);
+      listenTimer = null;
+    }
+
+    function startListening() {
+      stopListening();
+      heardPlayer = false;
+      var tries = 0;
+      function ping() {
+        if (heardPlayer || ++tries > 30) { stopListening(); return; }
+        postToPlayer({ event: "listening" });
+      }
+      ping();
+      listenTimer = window.setInterval(ping, 400);
+    }
+
+    player.addEventListener("load", function () {
+      if (player.getAttribute("src")) startListening();
+    });
+
+    window.addEventListener("message", function (event) {
+      if (event.origin !== YT_ORIGIN || event.source !== player.contentWindow) return;
+      var data;
+      try { data = typeof event.data === "string" ? JSON.parse(event.data) : event.data; } catch (err) { return; }
+      if (!data || typeof data !== "object") return;
+      if (!heardPlayer) {
+        heardPlayer = true;
+        stopListening();
+        postToPlayer({ event: "command", func: "addEventListener", args: ["onStateChange"] });
+      }
+      var state;
+      if (data.event === "onStateChange") state = data.info;
+      else if (data.event === "infoDelivery" && data.info && typeof data.info === "object") state = data.info.playerState;
+      if (state === 1) endedFor = null;
+      if (state !== 0 || !playingId || endedFor === playingId) return;
+      endedFor = playingId;
+      if (autoplayOn() && queue && queue.size()) playNext();
+    });
 
     async function loadCategory(categoryId, fallbackToAll) {
       var signal = beginRequest();
@@ -541,16 +927,12 @@
       }
     }
 
-    // A [mm:ss] link in the summary plays the video from that point in the
+    // A [mm:ss] link in a summary plays the video from that point in the
     // page's own player instead of leaving for youtube.com.
     function seekTo(item, seconds) {
-      var id = item.video.id;
-      if (playingId !== id) {
-        var card = document.querySelector('.yt-feed-card[data-video-id="' + CSS.escape(id) + '"]');
-        if (!card) return false;
-        onSelect(item, card);
-      }
-      player.src = embedUrl(id, seconds);
+      if (playingId !== item.video.id) play(item);
+      endedFor = null;
+      player.src = embedUrl(item.video.id, seconds);
       window.YoutubeSummary.close();
       watch.scrollIntoView({ block: "start" });
       return true;
@@ -567,19 +949,29 @@
       summarizeButton?.addEventListener("click", function () {
         if (playingItem) summarizeItem(playingItem);
       });
-    } else if (summarizeButton) {
-      summarizeButton.hidden = true;
     }
+    if (summarizeButton) summarizeButton.hidden = true;
 
     search.addEventListener("input", renderFeed);
     refresh.addEventListener("click", loadFeeds);
     document.getElementById("ytCloseWatch").addEventListener("click", function () { closeWatch(true); });
     document.addEventListener("keydown", function (event) {
+      // Shift+N plays the next queued video, as on YouTube.
+      if (event.key === "N" && event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && !event.defaultPrevented) {
+        var target = event.target;
+        var typing = target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
+        if (!typing && playingId && queue && queue.size()) {
+          event.preventDefault();
+          playNext();
+        }
+        return;
+      }
       // Escape leaves focus mode unless a dialog (e.g. Manage channels) owns the key.
       if (event.key !== "Escape" || event.defaultPrevented || !playingId) return;
       if (document.querySelector('.manage-overlay, [role="dialog"][aria-modal="true"]')) return;
       closeWatch(true);
     });
+    setupQueue();
     loadFeeds();
 
     var manage = document.getElementById("ytManageChannels");

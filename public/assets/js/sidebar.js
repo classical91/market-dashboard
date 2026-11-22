@@ -265,10 +265,9 @@
         },
       ],
     },
-    { href: "/intelligence-portal.html", label: "Intelligent Portal" },
+    { href: "/intelligence-portal.html", label: "Intelligent Portal", featured: "portal" },
     {
       label: "YouTube Links",
-      featured: "youtube",
       children: [
         { href: "/youtube-v2.html", label: "YouTube Intelligence" },
         { href: "https://www.youtube.com/", label: "YouTube.com" },
@@ -280,7 +279,6 @@
     },
     {
       label: "X Links",
-      featured: "x",
       children: [
         { href: "/x-intelligence.html", label: "X Intelligence" },
       ],

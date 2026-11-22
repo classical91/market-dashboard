@@ -43,33 +43,55 @@
     <div class="yt-feed-status">
       <p id="ytFeedStatus" role="status" aria-live="polite">Loading YouTube sources…</p>
       <a id="ytLoginLink" href="/login?returnTo=%2Fyoutube-v2.html" hidden>Log in again</a>
+      <p class="sr-only" id="ytQueueAnnounce" role="status" aria-live="polite"></p>
     </div>
 
-    <section id="ytWatch" class="yt-watch" aria-labelledby="ytWatchTitle" hidden>
-      <div class="yt-player-frame">
-        <iframe
-          id="ytPlayer"
-          title="YouTube video player"
-          referrerpolicy="strict-origin-when-cross-origin"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          allowfullscreen
-        ></iframe>
-      </div>
-      <div class="yt-watch-info">
-        <div class="yt-watch-copy">
-          <h2 id="ytWatchTitle" tabindex="-1"></h2>
-          <p class="yt-watch-meta">
-            <span id="ytWatchChannel"></span>
-            <span id="ytWatchDetail"></span>
-          </p>
+    <div class="yt-stage" id="ytStage">
+      <section id="ytWatch" class="yt-watch" aria-labelledby="ytWatchTitle" hidden>
+        <div class="yt-player-frame">
+          <iframe
+            id="ytPlayer"
+            title="YouTube video player"
+            referrerpolicy="strict-origin-when-cross-origin"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowfullscreen
+          ></iframe>
         </div>
-        <div class="yt-watch-actions">
-          <button id="ytSummarize" type="button" class="yt-summarize">Summarize</button>
-          <a id="ytPlayerLink" target="_blank" rel="noopener">Watch on YouTube <span aria-hidden="true">&#8599;</span></a>
-          <button id="ytCloseWatch" type="button">Close player</button>
+        <div class="yt-watch-info">
+          <div class="yt-watch-copy">
+            <h2 id="ytWatchTitle" tabindex="-1"></h2>
+            <p class="yt-watch-meta">
+              <span id="ytWatchChannel"></span>
+              <span id="ytWatchDetail"></span>
+            </p>
+          </div>
+          <div class="yt-watch-actions">
+            <button id="ytSummarize" type="button" class="yt-summarize" hidden>Summarize</button>
+            <button id="ytPlayNext" type="button" hidden>Play next <span aria-hidden="true">&#9197;</span></button>
+            <a id="ytPlayerLink" target="_blank" rel="noopener">Watch on YouTube <span aria-hidden="true">&#8599;</span></a>
+            <button id="ytCloseWatch" type="button">Close player</button>
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
+
+      <section id="ytQueue" class="yt-queue" aria-labelledby="ytQueueHeading" hidden>
+        <div class="yt-queue-head">
+          <div>
+            <h2 id="ytQueueHeading">Up next</h2>
+            <p class="yt-queue-count" id="ytQueueCount"></p>
+          </div>
+          <div class="yt-queue-actions">
+            <button type="button" class="yt-queue-play" id="ytQueuePlay" hidden>Play queue</button>
+            <label class="yt-queue-auto">
+              <input type="checkbox" id="ytQueueAutoplay" checked />
+              Autoplay
+            </label>
+            <button type="button" id="ytQueueClear">Clear</button>
+          </div>
+        </div>
+        <ol class="yt-queue-list" id="ytQueueList" aria-label="Queued videos"></ol>
+      </section>
+    </div>
 
     <div class="yt-streams">
       <section class="yt-section" id="yt-live" aria-labelledby="ytLiveHeading">
@@ -100,6 +122,7 @@
 <script src="/assets/js/sidebar.js"></script>
 <script src="/assets/js/ui.js"></script>
 <script src="/assets/js/youtube-channels-admin.js"></script>
+<script src="/assets/js/youtube-queue.js"></script>
 <script src="/assets/js/youtube-summary.js"></script>
 <script src="/assets/js/youtube-v2.js"></script>
 </body>

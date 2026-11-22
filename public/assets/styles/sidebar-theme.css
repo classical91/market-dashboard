@@ -1,5 +1,16 @@
 /* Both page shells render the same navigation. Theme overrides belong here
    so Overview, command pages and their mobile drawers stay in sync. */
+:is(.nav-item.nav-item--portal, .cmd-nav-item.cmd-nav-item--portal) {
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  background: var(--accent-bg);
+  box-shadow: inset 3px 0 var(--accent);
+}
+
+:is(.nav-item.nav-item--portal, .cmd-nav-item.cmd-nav-item--portal):hover {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+
 [data-theme="terminal"] body,
 [data-theme="terminal"] .app {
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Courier New', monospace !important;
@@ -20,6 +31,13 @@
   color: var(--accent);
   border-left: 2px solid var(--accent);
   border-radius: 0 4px 4px 0;
+}
+
+:is(.sidebar, .cmd-sidebar, .mob-drawer, .cmd-drawer)
+  :is([data-dropdown-key="sidebar_dropdown_youtube_links"], [data-dropdown-key="sidebar_dropdown_x_links"])
+  > :is(.nav-dropdown-toggle, .cmd-nav-dropdown-toggle).active {
+  border-left: 0;
+  box-shadow: none;
 }
 
 [data-theme="terminal"] :is(.sidebar, .cmd-sidebar, .mob-drawer, .cmd-drawer) :is(.nav-item, .cmd-nav-item):hover:not(.active) {
