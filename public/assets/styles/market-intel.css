@@ -16,7 +16,7 @@
 
 .mi-hubs {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 26px;
 }
@@ -41,7 +41,6 @@
 .mi-hub:hover { border-color: var(--border-hover); }
 .mi-hub--crypto      { --hub: var(--amber);  --hub-bg: var(--amber-bg); }
 .mi-hub--traditional { --hub: var(--blue);   --hub-bg: var(--blue-bg); }
-.mi-hub--earthwatch  { --hub: var(--green);  --hub-bg: var(--green-bg); }
 
 .mi-hub-main {
   display: flex;
@@ -198,10 +197,6 @@
 [data-theme="light"] .mi-chip { background: var(--panel); }
 
 /* ── Responsive ───────────────────────────────────────── */
-@media (max-width: 1180px) {
-  .mi-hubs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .mi-hub--earthwatch { grid-column: 1 / -1; }
-}
 @media (max-width: 640px) {
   .mi-hubs { grid-template-columns: 1fr; gap: 10px; margin-bottom: 20px; }
   .mi-hub { padding: 14px; }
