@@ -7,38 +7,60 @@
   <script src="/assets/js/settings.js"></script>
   <link rel="stylesheet" href="/assets/styles/command.css" />
   <link rel="stylesheet" href="/assets/styles/ai-analysis.css" />
+  <link rel="stylesheet" href="/assets/styles/ai-analysis-presets.css" />
 </head>
-<body>
+<body class="aia-page">
 <div class="app">
   <aside class="cmd-sidebar"></aside>
   <main class="cmd-main">
 
-    <div class="cmd-page-header">
+    <header class="cmd-page-header aia-page-header">
       <div>
-        <div class="cmd-page-title">&#129504; AI Analysis</div>
-        <div class="cmd-page-subtitle">TradingView chart snapshot + OpenAI vision read &mdash; ends in a BUY / SELL / HOLD call</div>
+        <div class="aia-eyebrow">AI Analyst <span aria-hidden="true">/</span> Chart research</div>
+        <h1 class="cmd-page-title">AI Analysis</h1>
+        <p class="cmd-page-subtitle">A chart snapshot. A technical read. A clearer market view.</p>
       </div>
+      <a class="aia-text-link" href="#aia-log">Generation log</a>
+    </header>
+
+    <div class="aia-workspace-head">
+      <nav class="aia-view-nav" aria-label="Analysis view">
+        <a href="/ai-analysis.html" aria-current="page">Presets</a>
+        <a href="/layout-analysis.html">My Layouts</a>
+      </nav>
+      <p class="aia-mode-help">Standard charts with Volume, MACD &amp; RSI <span aria-hidden="true">&middot;</span> Analyze on demand</p>
     </div>
 
-    <div class="aia-mode-row">
-      <label class="aia-mode-label" for="aia-mode-select">View</label>
-      <select class="aia-select" id="aia-mode-select">
-        <option value="/ai-analysis.html" selected>Presets</option>
-        <option value="/layout-analysis.html">My Layouts</option>
-      </select>
+    <div class="aia-notice" id="aia-notice" role="status" style="display:none"></div>
+
+    <section class="aia-market-tools" aria-label="Market controls">
+      <div class="aia-filter-row">
+        <div class="aia-filters" id="aia-filters" role="group" aria-label="Filter markets by category"></div>
+        <label class="aia-search">
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>
+          <span class="aia-sr-only">Find a market</span>
+          <input type="search" id="aia-search" placeholder="Find a market…" autocomplete="off" disabled />
+        </label>
+      </div>
+      <div class="aia-results-row">
+        <p id="aia-results" role="status" aria-live="polite">Loading markets…</p>
+        <button class="aia-text-button" id="aia-expand" type="button" disabled>Expand all</button>
+      </div>
+    </section>
+
+    <div class="aia-groups" id="aia-grid" aria-busy="true"><div class="aia-loading">Loading saved analysis…</div></div>
+    <div class="aia-empty-state" id="aia-empty" hidden>
+      <h2>No matching markets</h2>
+      <p>Try another symbol or choose a different category.</p>
+      <button class="aia-text-button" id="aia-clear" type="button">Clear filters</button>
     </div>
-    <p class="aia-mode-help"><strong>Presets</strong> builds a standard chart for the selected market and timeframe with Volume, MACD, and RSI.</p>
-
-    <div class="aia-notice" id="aia-notice" style="display:none"></div>
-
-    <div class="aia-groups" id="aia-grid"></div>
 
     <div class="aia-log-section">
       <div class="aia-log-head">
-        <div class="aia-log-title">Generation Log</div>
-        <div class="aia-log-subtitle">When each analysis was generated, grouped by day</div>
+        <h2 class="aia-log-title">Generation log</h2>
+        <p class="aia-log-subtitle">Your recent chart reads, grouped by day.</p>
       </div>
-      <div class="aia-log" id="aia-log"></div>
+      <div class="aia-log" id="aia-log" aria-busy="true"><div class="aia-loading">Loading generation history…</div></div>
     </div>
 
     <details class="aia-how aia-how--footer" id="aia-how">
@@ -68,10 +90,6 @@
 <script src="/assets/js/admin-key.js"></script>
 <script>
   (function () {
-    document.getElementById('aia-mode-select').addEventListener('change', function (e) {
-      window.location.href = e.target.value;
-    });
-
     // The explainer is open on a first visit, then stays however it was last
     // left — shared with My Layouts, since it's the same feature explained
     // twice and nobody wants to dismiss it on both pages.
@@ -93,6 +111,75 @@
     // rather than a stale closure.
     var cardState = {};
     var availableIntervals = [];
+    var activeCategory = '';
+    var searchInput = document.getElementById('aia-search');
+    var filters = document.getElementById('aia-filters');
+    var expandButton = document.getElementById('aia-expand');
+
+    function visibleCards() {
+      return Array.from(grid.querySelectorAll('.aia-card')).filter(function (card) { return !card.hidden; });
+    }
+
+    function updateExpandButton() {
+      var cards = visibleCards();
+      expandButton.disabled = !cards.length;
+      expandButton.textContent = cards.some(function (card) { return card.classList.contains('collapsed'); }) ? 'Expand all' : 'Collapse all';
+    }
+
+    function filterMarkets() {
+      var query = searchInput.value.trim().toLowerCase();
+      var total = 0;
+      var shown = 0;
+      grid.querySelectorAll('.aia-group').forEach(function (group) {
+        var categoryMatches = !activeCategory || group.getAttribute('data-category') === activeCategory;
+        var groupShown = 0;
+        group.querySelectorAll('.aia-card').forEach(function (card) {
+          var state = cardState[card.id];
+          card.hidden = !categoryMatches || (state.label + ' ' + state.symbol).toLowerCase().indexOf(query) === -1;
+          total += 1;
+          if (!card.hidden) groupShown += 1;
+        });
+        group.hidden = !groupShown;
+        shown += groupShown;
+      });
+      document.getElementById('aia-results').textContent = shown === total
+        ? total + ' markets · Saved reads load automatically'
+        : shown + ' of ' + total + ' markets';
+      document.getElementById('aia-empty').hidden = shown > 0;
+      updateExpandButton();
+    }
+
+    function renderFilters(groups) {
+      filters.innerHTML = '<button type="button" class="aia-filter" data-category="" aria-pressed="true">All markets</button>' +
+        groups.map(function (group) {
+          return '<button type="button" class="aia-filter" data-category="' + escapeHtml(group.key) +
+            '" aria-pressed="false">' + escapeHtml(group.label) + '<span>' + group.items.length + '</span></button>';
+        }).join('');
+    }
+
+    function selectCategory(category) {
+      activeCategory = category;
+      filters.querySelectorAll('.aia-filter').forEach(function (button) {
+        button.setAttribute('aria-pressed', String(button.getAttribute('data-category') === category));
+      });
+      filterMarkets();
+    }
+
+    filters.addEventListener('click', function (e) {
+      var button = e.target.closest('.aia-filter');
+      if (button) selectCategory(button.getAttribute('data-category'));
+    });
+    searchInput.addEventListener('input', filterMarkets);
+    document.getElementById('aia-clear').addEventListener('click', function () {
+      searchInput.value = '';
+      selectCategory('');
+      searchInput.focus();
+    });
+    expandButton.addEventListener('click', function () {
+      var cards = visibleCards();
+      var expand = cards.some(function (card) { return card.classList.contains('collapsed'); });
+      cards.forEach(function (card) { setCollapsed(card, card.id, !expand, true); });
+    });
 
     function escapeHtml(str) {
       return String(str || '').replace(/[&<>"']/g, function (ch) {
@@ -182,7 +269,7 @@
 
     function renderIntervalOptions(selected) {
       return availableIntervals.map(function (tf) {
-        return '<button class="aia-tf-option' + (tf === selected ? ' active' : '') + '" type="button" data-role="tf-option" data-value="' +
+        return '<button class="aia-tf-option' + (tf === selected ? ' active' : '') + '" type="button" aria-pressed="' + (tf === selected) + '" data-role="tf-option" data-value="' +
           escapeHtml(tf) + '">' + escapeHtml(tf) + '</button>';
       }).join('');
     }
@@ -199,9 +286,9 @@
     // tappable on mobile, where there's no hover state at all.
     function tickerLink(preset) {
       return (
-        '<span class="aia-ticker-label">' + escapeHtml(preset.label) + '</span>' +
+        '<h3 class="aia-ticker-label">' + escapeHtml(preset.label) + '</h3>' +
         '<a class="aia-chart-link" data-role="ticker-link" href="' + tvChartUrl(preset.symbol, preset.interval) +
-        '" target="_blank" rel="noopener" title="Open on TradingView">&#128200; Chart</a>'
+        '" target="_blank" rel="noopener" aria-label="Open ' + escapeHtml(preset.label) + ' on TradingView">Chart</a>'
       );
     }
 
@@ -210,22 +297,26 @@
         '<div class="aia-card" id="' + cardId(preset.symbol) + '">' +
           '<div class="aia-card-head" data-role="head">' +
             '<div class="aia-card-symbol">' + tickerLink(preset) +
-              '<div class="aia-tf-menu" data-role="tf-menu">' +
-                '<button class="aia-tf-select" type="button" data-role="tf" aria-haspopup="listbox" aria-expanded="false">' +
-                  '<span data-role="tf-label">' + escapeHtml(preset.interval) + '</span><span class="aia-tf-caret" aria-hidden="true">&#9662;</span>' +
-                '</button>' +
-                '<div class="aia-tf-options" data-role="tf-options" role="listbox">' + renderIntervalOptions(preset.interval) + '</div>' +
-              '</div>' +
               '<span class="aia-gen-badge" data-role="gen"></span>' +
             '</div>' +
+            '<button class="aia-toggle" type="button" data-role="toggle" aria-expanded="false" aria-controls="' + cardId(preset.symbol) + '-content">' +
+              '<svg class="aia-chevron" aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m4 6 4 4 4-4"/></svg>' +
+            '</button>' +
+          '</div>' +
+          '<div class="aia-card-toolbar">' +
+            '<span class="aia-verdict" data-role="verdict"></span>' +
             '<div class="aia-card-actions">' +
-              '<span class="aia-verdict" data-role="verdict"></span>' +
+              '<div class="aia-tf-menu" data-role="tf-menu">' +
+                '<button class="aia-tf-select" type="button" data-role="tf" aria-label="Timeframe for ' + escapeHtml(preset.label) + ': ' + escapeHtml(preset.interval) + '" aria-controls="' + cardId(preset.symbol) + '-timeframes" aria-expanded="false">' +
+                  '<span data-role="tf-label">' + escapeHtml(preset.interval) + '</span><span class="aia-tf-caret" aria-hidden="true">&#9662;</span>' +
+                '</button>' +
+                '<div class="aia-tf-options" data-role="tf-options" id="' + cardId(preset.symbol) + '-timeframes" role="group" aria-label="Choose timeframe">' + renderIntervalOptions(preset.interval) + '</div>' +
+              '</div>' +
               '<button class="aia-run-btn" type="button" data-role="run">Analyze</button>' +
-              '<button class="aia-broadcast-btn" type="button" data-role="broadcast" disabled>&#128226; Broadcast</button>' +
-              '<span class="aia-chevron" aria-hidden="true">&#9660;</span>' +
+              '<button class="aia-broadcast-btn" type="button" data-role="broadcast" disabled>Broadcast</button>' +
             '</div>' +
           '</div>' +
-          '<div class="aia-card-content" data-role="content">' +
+          '<div class="aia-card-content" data-role="content" id="' + cardId(preset.symbol) + '-content">' +
             '<div class="aia-chart" data-role="chart"></div>' +
             '<div class="aia-body">' +
               '<div class="aia-analysis" data-role="analysis"></div>' +
@@ -267,7 +358,7 @@
       return (
         '<section class="aia-group" data-category="' + escapeHtml(group.key) + '">' +
           '<div class="aia-group-head">' +
-            '<span class="aia-group-title">' + escapeHtml(group.label) + '</span>' +
+            '<h2 class="aia-group-title">' + escapeHtml(group.label) + '</h2>' +
             '<span class="aia-group-count">' + group.items.length + '</span>' +
             (group.description ? '<span class="aia-group-desc">' + escapeHtml(group.description) + '</span>' : '') +
           '</div>' +
@@ -280,7 +371,7 @@
       var btn = card.querySelector('[data-role="broadcast"]');
       var sent = alreadySent(data);
       btn.disabled = !hasResult(data) || sent;
-      btn.innerHTML = sent ? '&#9989; Sent' : '&#128226; Broadcast';
+      btn.textContent = sent ? '✓ Sent' : 'Broadcast';
     }
 
     function updateCard(id) {
@@ -303,13 +394,13 @@
         genEl.textContent = '✓ ' + (bucket.key === 'today' ? formatTime(data.generatedAt) : bucket.label) + ' · ' + state.interval;
       } else {
         genEl.className = 'aia-gen-badge';
-        genEl.textContent = 'not generated';
+        genEl.textContent = 'Awaiting first analysis';
       }
 
       var chartEl = card.querySelector('[data-role="chart"]');
       chartEl.innerHTML = data.chartUrl
         ? '<img src="' + escapeHtml(data.chartUrl) + '" alt="' + escapeHtml(state.label) + ' chart" loading="lazy" />'
-        : '<span class="aia-chart-empty">No chart yet &mdash; click Analyze to generate one.</span>';
+        : '<div class="aia-chart-empty"><strong>Ready for a closer look</strong><span>Choose a timeframe, then Analyze to generate a chart and read.</span></div>';
 
       card.querySelector('[data-role="analysis"]').innerHTML = renderAnalysis(data.analysis);
 
@@ -336,6 +427,10 @@
 
     function setCollapsed(card, id, collapsed, persist) {
       card.classList.toggle('collapsed', collapsed);
+      var toggle = card.querySelector('[data-role="toggle"]');
+      toggle.setAttribute('aria-expanded', String(!collapsed));
+      toggle.setAttribute('aria-label', (collapsed ? 'Expand ' : 'Collapse ') + cardState[id].label + ' analysis');
+      updateExpandButton();
       if (!persist) return;
       var list = getCollapsed() || [];
       var i = list.indexOf(id);
@@ -352,7 +447,6 @@
       setCollapsed(card, id, defaultCollapsedIds.indexOf(id) > -1, false);
 
       card.querySelector('[data-role="head"]').addEventListener('click', function (e) {
-        if (e.target && e.target.getAttribute('data-role') === 'tf') return;
         if (e.target && e.target.closest('[data-role="ticker-link"]')) return;
         setCollapsed(card, id, !card.classList.contains('collapsed'), true);
       });
@@ -371,9 +465,12 @@
         var state = cardState[id];
         state.interval = value;
         tfLabel.textContent = value;
+        tfSelect.setAttribute('aria-label', 'Timeframe for ' + state.label + ': ' + value);
         if (tickerLinkEl) tickerLinkEl.setAttribute('href', tvChartUrl(state.symbol, value));
         tfOptions.querySelectorAll('[data-role="tf-option"]').forEach(function (option) {
-          option.classList.toggle('active', option.getAttribute('data-value') === value);
+          var selected = option.getAttribute('data-value') === value;
+          option.classList.toggle('active', selected);
+          option.setAttribute('aria-pressed', String(selected));
         });
         state.data = null;
         updateCard(id);
@@ -399,6 +496,12 @@
         tfMenu.classList.toggle('open', willOpen);
         card.classList.toggle('tf-open', willOpen);
         tfSelect.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+      });
+      tfMenu.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+          closeTfMenu();
+          tfSelect.focus();
+        }
       });
       tfOptions.querySelectorAll('[data-role="tf-option"]').forEach(function (option) {
         option.addEventListener('click', function () {
@@ -538,10 +641,12 @@
     }
 
     function loadLog() {
+      logRoot.setAttribute('aria-busy', 'true');
       fetch('/api/ai-analysis/log')
         .then(function (res) { return res.json(); })
         .then(function (data) { renderLog(data.entries || []); })
-        .catch(function () { logRoot.innerHTML = '<div class="aia-chart-empty">Failed to load the generation log.</div>'; });
+        .catch(function () { logRoot.innerHTML = '<div class="aia-chart-empty">Failed to load the generation log.</div>'; })
+        .finally(function () { logRoot.setAttribute('aria-busy', 'false'); });
     }
 
     fetch('/api/ai-analysis')
@@ -553,7 +658,9 @@
         }
         availableIntervals = data.availableIntervals || ['4h'];
         var presets = data.presets || [];
-        grid.innerHTML = groupPresets(presets, data.categories).map(renderGroup).join('');
+        var groups = groupPresets(presets, data.categories);
+        grid.innerHTML = groups.map(renderGroup).join('');
+        renderFilters(groups);
         presets.forEach(function (preset) {
           var id = cardId(preset.symbol);
           cardState[id] = { symbol: preset.symbol, label: preset.label, interval: preset.interval, data: preset };
@@ -570,10 +677,14 @@
           updateCard(cardId(preset.symbol));
           wireCard(preset, defaultCollapsedIds);
         });
+        searchInput.disabled = false;
+        filterMarkets();
       })
       .catch(function (err) {
-        grid.innerHTML = '<div class="aia-notice" style="display:block">Failed to load AI Analysis: ' + err.message + '</div>';
-      });
+        grid.innerHTML = '<div class="aia-notice" role="alert">Failed to load AI Analysis: ' + escapeHtml(err.message) + '</div>';
+        document.getElementById('aia-results').textContent = 'Markets unavailable. Reload the page to try again.';
+      })
+      .finally(function () { grid.setAttribute('aria-busy', 'false'); });
 
     loadLog();
   })();
