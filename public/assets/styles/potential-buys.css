@@ -58,6 +58,9 @@
 /* Older than 3 days: red once anything has crossed the line. */
 .pb-stat-stale.is-stale { border-color: rgba(231,76,60,0.45); background: var(--red-bg); }
 .pb-stat-stale.is-stale .pb-stat-value { color: var(--red); }
+.pb-stat-stale[role="button"] { cursor: pointer; }
+.pb-stat-stale[role="button"]:hover { border-color: rgba(231,76,60,0.75); }
+.pb-stat-stale[role="button"]:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
 @media (max-width: 560px) {
   .pb-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
   .pb-stat { padding: 10px; }

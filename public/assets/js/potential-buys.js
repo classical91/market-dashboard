@@ -14,6 +14,11 @@
   // saves "$BTC" and files it under BTC. Shared with the server's store.
   var Ticker = window.TickerLabel;
   var ALL = "__all";
+  // Every screenshot past the 3-day line, across tickers: opened by tapping
+  // the red "Older than 3 days" card, or from a link with ?view=old (Main
+  // Hub's System Logs links here when anything needs a look).
+  var OLD = "__old";
+  var OLD_PARAM = "old";
 
   var state = { items: [], loading: true, error: "", uploading: 0, filter: "", viewing: null, folder: ALL, editing: null };
 
@@ -130,6 +135,7 @@
 
   function inFolder(item) {
     if (state.folder === ALL) return true;
+    if (state.folder === OLD) return isStale(item.createdAt);
     var tags = tagsOf(item);
     return tags.indexOf(state.folder) !== -1;
   }
@@ -145,10 +151,12 @@
   function syncFolder() {
     // A folder whose last screenshot was relabelled or deleted is gone; fall
     // back to everything.
-    if (state.folder !== ALL && !buildFolders().folders.some(function (f) { return f.tag === state.folder; })) {
+    if (state.folder !== ALL && state.folder !== OLD
+      && !buildFolders().folders.some(function (f) { return f.tag === state.folder; })) {
       state.folder = ALL;
     }
-    el.heading.textContent = state.folder === ALL ? "Watching" : "$" + state.folder;
+    el.heading.textContent = state.folder === ALL ? "Watching"
+      : state.folder === OLD ? "Older than 3 days" : "$" + state.folder;
     el.back.hidden = state.folder === ALL;
     // The count cards summarise everything, so they belong on the main (All)
     // view only; inside a ticker folder they'd read as that folder's numbers.
@@ -193,6 +201,16 @@
       ? staleTickerCount + (staleTickerCount === 1 ? " ticker" : " tickers")
       : "All fresh";
     el.statStaleCard.classList.toggle("is-stale", staleItems.length > 0);
+    // While anything is past the line, the card opens just those screenshots.
+    if (staleItems.length) {
+      el.statStaleCard.setAttribute("role", "button");
+      el.statStaleCard.setAttribute("tabindex", "0");
+      el.statStaleCard.setAttribute("aria-label", "Show the " + staleItems.length + " screenshots older than 3 days");
+    } else {
+      el.statStaleCard.removeAttribute("role");
+      el.statStaleCard.removeAttribute("tabindex");
+      el.statStaleCard.removeAttribute("aria-label");
+    }
     document.title = (n ? "(" + n + ") " : "") + BASE_TITLE;
   }
 
@@ -227,7 +245,9 @@
     if (!items.length) {
       el.grid.innerHTML = state.filter.trim()
         ? UI.emptyState("Nothing matches “" + state.filter.trim() + "”", "Clear the filter to see every screenshot.")
-        : UI.emptyState("This folder is empty", "Choose All to see everything.");
+        : state.folder === OLD
+          ? UI.emptyState("Nothing older than 3 days", "Every screenshot was added in the last 3 days.")
+          : UI.emptyState("This folder is empty", "Choose All to see everything.");
       return;
     }
 
@@ -691,8 +711,20 @@
 
   el.search.addEventListener("input", function () { state.filter = el.search.value; render(); });
 
+  /** Keep ?view=old in the address while that view is open, so it can be reloaded or shared. */
+  function syncViewParam() {
+    try {
+      var url = new URL(window.location.href);
+      var want = state.folder === OLD ? OLD_PARAM : null;
+      if (url.searchParams.get("view") === want) return;
+      if (want) url.searchParams.set("view", want); else url.searchParams.delete("view");
+      window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+    } catch (err) { /* The address is a convenience; the view works without it. */ }
+  }
+
   function openFolder(key) {
     state.folder = key;
+    syncViewParam();
     render();
     el.heading.scrollIntoView({ block: "start", behavior: "smooth" });
   }
@@ -769,6 +801,13 @@
   });
 
   el.back.addEventListener("click", function () { openFolder(ALL); });
+  function openOld() {
+    if (el.statStaleCard.getAttribute("role") === "button") openFolder(OLD);
+  }
+  el.statStaleCard.addEventListener("click", openOld);
+  el.statStaleCard.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openOld(); }
+  });
   el.viewerClose.addEventListener("click", closeViewer);
   el.viewerCrop.addEventListener("click", function () { if (state.viewing) openCrop(state.viewing); });
 
@@ -780,6 +819,7 @@
   var uploadUrl = document.getElementById("pbUploadUrl");
   if (uploadUrl) uploadUrl.textContent = window.location.origin + API + "/upload";
 
+  if (new URLSearchParams(window.location.search).get("view") === OLD_PARAM) state.folder = OLD;
   render();
   load();
 })();
