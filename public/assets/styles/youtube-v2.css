@@ -471,8 +471,41 @@
   padding: 0 4px 10px 0;
 }
 
+.yt-queue-title-group { flex: 1 1 0; min-width: min(100%, 140px); }
 .yt-queue-head h2 { font-size: 18px; letter-spacing: -.03em; }
-.yt-queue-count { margin-top: 2px; color: var(--yt-muted); font-size: 12px; }
+.yt-queue-count { margin-top: 2px; padding-left: 26px; color: var(--yt-muted); font-size: 12px; }
+.yt-queue.is-collapsed .yt-queue-head { padding-bottom: 0; }
+.yt-queue.is-collapsed .yt-queue-count { display: -webkit-box; overflow: hidden; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+
+/* The heading doubles as the collapse toggle. */
+.yt-queue-collapse {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: -4px;
+  padding: 2px 8px 2px 4px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+}
+
+.yt-queue-collapse:hover { background: var(--yt-hover); }
+
+.yt-queue-chevron {
+  width: 8px;
+  height: 8px;
+  margin: 0 5px 3px;
+  border-right: 2px solid var(--yt-muted);
+  border-bottom: 2px solid var(--yt-muted);
+  transform: rotate(45deg);
+  transition: transform .2s ease;
+}
+
+.yt-queue.is-collapsed .yt-queue-chevron { margin-bottom: -2px; transform: rotate(-45deg); }
 .yt-queue-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .yt-queue-actions button { min-height: 32px; padding: 4px 11px; font-size: 12px; }
 .yt-main .yt-queue-actions .yt-queue-play { background: #e60032; color: #fff; }
@@ -606,6 +639,9 @@
   }
 
   .yt-stage.is-playing.has-queue .yt-queue-list { flex: 1 1 auto; min-height: 0; max-height: none; }
+
+  /* Collapsed, the queue shrinks to its header at the top of the column. */
+  .yt-stage.is-playing.has-queue .yt-queue.is-collapsed { align-self: start; min-height: 0; contain: none; }
 }
 
 @media (max-width: 480px) {
@@ -624,6 +660,15 @@
 .yt-player-frame { transition: background-color .35s ease, opacity .25s ease, box-shadow .35s ease; }
 
 .yt-page.yt-focus .app { background: #050506; }
+
+/* Movie mode: the sidebar tucks away while a video plays ("Show menu" brings
+   it back). Below 1024px the shell already swaps it for the mobile bar. */
+.yt-watch-actions .yt-menu-toggle { display: none; }
+@media (min-width: 1025px) {
+  .yt-focus .yt-watch-actions .yt-menu-toggle { display: inline-flex; }
+  .yt-page.yt-menu-tucked .app { grid-template-columns: minmax(0, 1fr); }
+  .yt-page.yt-menu-tucked .cmd-sidebar { display: none; }
+}
 .yt-page.yt-focus .cmd-sidebar { background: #08080a; opacity: .5; }
 .yt-focus :is(.yt-header, .yt-toolbar, .yt-feed-status) { opacity: .5; }
 .yt-page.yt-focus .cmd-sidebar:is(:hover, :focus-within),

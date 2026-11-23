@@ -471,6 +471,8 @@
     var queuePlay = document.getElementById("ytQueuePlay");
     var queueClear = document.getElementById("ytQueueClear");
     var queueAutoplay = document.getElementById("ytQueueAutoplay");
+    var queueCollapse = document.getElementById("ytQueueCollapse");
+    var menuToggle = document.getElementById("ytMenuToggle");
     var queueAnnounce = document.getElementById("ytQueueAnnounce");
     var playNextButton = document.getElementById("ytPlayNext");
     var summarizeButton = document.getElementById("ytSummarize");
@@ -582,6 +584,7 @@
       }
       playingId = video.id;
       playingItem = item;
+      syncMenu();
       if (summarizeButton) summarizeButton.hidden = !summarizeItem || !canSummarize(video);
       renderQueue();
       watch.scrollIntoView({ block: "start" });
@@ -614,9 +617,32 @@
       document.body.classList.remove("yt-focus");
       playingId = null;
       playingItem = null;
+      syncMenu();
       renderQueue();
       if (restoreFocus) (card || search).focus();
     }
+
+    /* ---- Movie mode menu ----
+       While a video plays the sidebar tucks away so the player gets the
+       screen; "Show menu" brings it back and the choice is remembered. */
+
+    var MENU_KEY = "yt:movie:menu";
+    var menuShown = false;
+    try { menuShown = window.localStorage.getItem(MENU_KEY) === "shown"; } catch (err) { /* default hidden */ }
+
+    function syncMenu() {
+      var tucked = !!playingId && !menuShown;
+      document.body.classList.toggle("yt-menu-tucked", tucked);
+      if (!menuToggle) return;
+      menuToggle.textContent = menuShown ? "Hide menu" : "Show menu";
+      menuToggle.setAttribute("aria-pressed", menuShown ? "true" : "false");
+    }
+
+    menuToggle?.addEventListener("click", function () {
+      menuShown = !menuShown;
+      try { window.localStorage.setItem(MENU_KEY, menuShown ? "shown" : "hidden"); } catch (err) { /* best effort */ }
+      syncMenu();
+    });
 
     /* ---- Copy link ---- */
 
@@ -817,7 +843,8 @@
       queueSection.hidden = !n;
       stage.classList.toggle("has-queue", n > 0);
       stage.classList.toggle("is-playing", !!playingId);
-      queueCount.textContent = n + (n === 1 ? " video" : " videos");
+      queueCount.textContent = n + (n === 1 ? " video" : " videos") +
+        (n && queueSection.classList.contains("is-collapsed") ? " · Next: " + entries[0].title : "");
       queuePlay.hidden = !n || !!playingId;
       playNextButton.hidden = !n;
       if (n) {
@@ -909,6 +936,23 @@
         announce("Queue cleared.");
         (playingId ? watchTitle : search).focus({ preventScroll: true });
       });
+
+      var COLLAPSED_KEY = "yt:queue:collapsed";
+      function setCollapsed(collapsed) {
+        queueSection.classList.toggle("is-collapsed", collapsed);
+        queueList.hidden = collapsed;
+        queueCollapse.setAttribute("aria-expanded", collapsed ? "false" : "true");
+        queueCollapse.title = collapsed ? "Expand queue" : "Collapse queue";
+      }
+      if (queueCollapse) {
+        try { setCollapsed(window.localStorage.getItem(COLLAPSED_KEY) === "on"); } catch (err) { /* default open */ }
+        queueCollapse.addEventListener("click", function () {
+          var collapsed = !queueSection.classList.contains("is-collapsed");
+          setCollapsed(collapsed);
+          try { window.localStorage.setItem(COLLAPSED_KEY, collapsed ? "on" : "off"); } catch (err) { /* best effort */ }
+          renderQueue();
+        });
+      }
 
       var AUTOPLAY_KEY = "yt:queue:autoplay";
       try { queueAutoplay.checked = window.localStorage.getItem(AUTOPLAY_KEY) !== "off"; } catch (err) { /* default on */ }
