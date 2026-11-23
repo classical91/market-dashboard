@@ -18,6 +18,9 @@ function element() {
   const node = {
     innerHTML: "", textContent: "", className: "", open: true, listeners: {},
     addEventListener(type, fn) { this.listeners[type] = fn; },
+    attrs: {},
+    setAttribute(name, value) { this.attrs[name] = String(value); },
+    getAttribute(name) { return name in this.attrs ? this.attrs[name] : null; },
     querySelector(sel) { return (this.children ||= {})[sel] ||= element(); },
   };
   return node;
@@ -169,6 +172,48 @@ test("layout widget limits recent captures and reports a failed source", async (
   const failed = await run({ "/api/layout-analysis/log": new Error("offline") });
   assert.match(failed["ov2-generation-log"].innerHTML, /Failed to load captures/);
   assert.match(failed["ov2-generation-log"].innerHTML, /Refresh all/);
+});
+
+test("generation widget shows timeframe tiles, filters the log, and switches to presets", async () => {
+  const nodes = await run({
+    "/api/layout-analysis/log": { entries: [
+      { layoutId: "btc-1w", label: "BTC 1W", verdict: "HOLD", generatedAt: iso(HOUR) },
+      { layoutId: "btc-4h", label: "BTC 4h", verdict: "SELL", generatedAt: iso(2 * HOUR) },
+      { layoutId: "btc-4h", label: "BTC 4h", verdict: "HOLD", generatedAt: iso(30 * HOUR) },
+    ] },
+    "/api/layout-analysis": { layouts: [{ id: "btc-1w", label: "BTC 1W" }, { id: "btc-1d", label: "BTC 1D" }, { id: "btc-4h", label: "BTC 4h" }] },
+    "/api/ai-analysis/log": { entries: [
+      { symbol: "BINANCE:BTCUSDT", interval: "4h", label: "BTCUSDT", verdict: "BUY", generatedAt: iso(HOUR) },
+      { symbol: "BINANCE:ETHUSDT", interval: "1D", label: "ETHUSDT", verdict: "SELL", generatedAt: iso(HOUR) },
+    ] },
+    "/api/ai-analysis": { presets: [{ symbol: "BINANCE:BTCUSDT", label: "BTCUSDT" }, { symbol: "BINANCE:ETHUSDT", label: "ETHUSDT" }], availableIntervals: ["1h", "4h", "1D"] },
+  });
+  const tiles = nodes["ov2-presets"];
+  // Shortest timeframe first; a layout with no capture still gets a tile.
+  assert.ok(tiles.innerHTML.indexOf('data-preset="btc-4h"') < tiles.innerHTML.indexOf('data-preset="btc-1d"'));
+  assert.ok(tiles.innerHTML.indexOf('data-preset="btc-1d"') < tiles.innerHTML.indexOf('data-preset="btc-1w"'));
+  assert.match(tiles.innerHTML, /Not captured yet/);
+
+  const click = (id) => tiles.listeners.click({ target: { closest: () => ({ getAttribute: () => id }) } });
+  click("btc-4h");
+  assert.doesNotMatch(nodes["ov2-generation-log"].innerHTML, /BTC 1W/);
+  assert.equal((nodes["ov2-generation-log"].innerHTML.match(/class="aia-log-item/g) || []).length, 2);
+  assert.equal(nodes["ov2-generation-open"].href, "/layout-analysis.html?layout=btc-4h");
+  click("btc-4h");
+  assert.match(nodes["ov2-generation-log"].innerHTML, /BTC 1W/);
+
+  nodes["ov2-gen-tab-presets"].listeners.click();
+  assert.equal(nodes["ov2-gen-tab-presets"].attrs["aria-selected"], "true");
+  assert.equal(nodes["ov2-generation-symbol-wrap"].hidden, false);
+  assert.match(nodes["ov2-generation-symbol"].innerHTML, /BTCUSDT[\s\S]*ETHUSDT/);
+  assert.match(tiles.innerHTML, /data-preset="1h"[\s\S]*aia-verdict--buy/);
+  assert.match(nodes["ov2-generation-log"].innerHTML, /BTCUSDT 4h/);
+  assert.doesNotMatch(nodes["ov2-generation-log"].innerHTML, /ETHUSDT/);
+
+  nodes["ov2-generation-symbol"].value = "BINANCE:ETHUSDT";
+  nodes["ov2-generation-symbol"].listeners.change();
+  assert.match(nodes["ov2-generation-log"].innerHTML, /ETHUSDT 1D/);
+  assert.doesNotMatch(nodes["ov2-generation-log"].innerHTML, /BTCUSDT/);
 });
 
 test("Overview v2 carries the news tab, status row and Market Matrix card", () => {

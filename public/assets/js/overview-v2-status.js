@@ -227,7 +227,8 @@
   var subtitleEl = document.getElementById("ov2-generation-subtitle");
   var symbolWrapEl = document.getElementById("ov2-generation-symbol-wrap");
   var symbolEl = document.getElementById("ov2-generation-symbol");
-  var tabEls = Array.prototype.slice.call(document.querySelectorAll("[data-gen-tab]"));
+  var GEN_TABS = ["layouts", "presets"];
+  var tabEls = GEN_TABS.map(function (name) { return document.getElementById("ov2-gen-tab-" + name); });
   var GEN_TAB_KEY = "overviewV2.generationTab";
   var GEN_SYMBOL_KEY = "overviewV2.generationSymbol";
   var TF_UNIT_MS = { s: 1e3, m: 6e4, h: 36e5, d: 864e5, w: 6048e5, mo: 2592e6, y: 31536e6 };
@@ -356,8 +357,8 @@
   function renderGeneration() {
     var isPresets = gen.tab === "presets";
     var state = gen[gen.tab];
-    tabEls.forEach(function (tab) {
-      var on = tab.getAttribute("data-gen-tab") === gen.tab;
+    tabEls.forEach(function (tab, i) {
+      var on = GEN_TABS[i] === gen.tab;
       tab.setAttribute("aria-selected", String(on));
       tab.tabIndex = on ? 0 : -1;
     });
@@ -368,7 +369,8 @@
     if (state.entries === null) {
       if (state.error) {
         presetsEl.innerHTML = '<p class="ov2-note ov2-warn" role="status">' + (isPresets ? "Presets" : "Layouts") + " unavailable.</p>";
-        layoutLogEl.innerHTML = '<p class="ov2-note ov2-warn" role="status">Failed to load the log (' + esc(state.error) + "). Use Refresh all to retry.</p>";
+        layoutLogEl.innerHTML = '<p class="ov2-note ov2-warn" role="status">Failed to load ' + (isPresets ? "runs" : "captures") +
+          " (" + esc(state.error) + "). Use Refresh all to retry.</p>";
       } else {
         presetsEl.innerHTML = '<p class="ov2-note" role="status">Loading…</p>';
         layoutLogEl.innerHTML = '<p class="ov2-note" role="status">Loading…</p>';
@@ -389,7 +391,7 @@
     var entries;
     var scope;
     if (isPresets) {
-      var symbolLabel = symbolEl.options[symbolEl.selectedIndex] ? symbolEl.options[symbolEl.selectedIndex].text : "";
+      var symbolLabel = (presetSymbols().filter(function (sym) { return sym.symbol === state.symbol; })[0] || {}).label || "";
       entries = state.entries.filter(function (e) { return e.symbol === state.symbol && (!tile || e.interval === tile.id); })
         .map(function (e) { return { verdict: e.verdict, generatedAt: e.generatedAt, label: (e.label || e.symbol) + " " + e.interval }; });
       scope = tile ? tile.label : symbolLabel + " · all timeframes";
@@ -409,17 +411,16 @@
     gen.tab = tab;
     try { localStorage.setItem(GEN_TAB_KEY, tab); } catch (e) { /* private mode */ }
     renderGeneration();
-    if (focus) document.querySelector('[data-gen-tab="' + tab + '"]').focus();
+    if (focus) document.getElementById("ov2-gen-tab-" + tab).focus();
   }
 
-  tabEls.forEach(function (tab) {
-    tab.addEventListener("click", function () { setGenTab(tab.getAttribute("data-gen-tab"), false); });
+  tabEls.forEach(function (tab, i) {
+    tab.addEventListener("click", function () { setGenTab(GEN_TABS[i], false); });
     tab.addEventListener("keydown", function (event) {
       if (event.key !== "ArrowLeft" && event.key !== "ArrowRight" && event.key !== "Home" && event.key !== "End") return;
       event.preventDefault();
-      var i = tabEls.indexOf(tab);
       var next = event.key === "Home" ? 0 : event.key === "End" ? tabEls.length - 1 : (i + (event.key === "ArrowRight" ? 1 : -1) + tabEls.length) % tabEls.length;
-      setGenTab(tabEls[next].getAttribute("data-gen-tab"), true);
+      setGenTab(GEN_TABS[next], true);
     });
   });
 
@@ -438,7 +439,7 @@
     state.active = state.active === id ? null : id;
     renderGeneration();
     var again = presetsEl.querySelector('[data-preset="' + (window.CSS && CSS.escape ? CSS.escape(id) : id) + '"]');
-    if (again) again.focus();
+    if (again && again.focus) again.focus();
   });
 
   // Called by the status loaders. The list read only adds tiles with no run
