@@ -307,6 +307,10 @@
       ],
     },
     { href: "/indicators.html", label: "Indicators Glossary" },
+    {
+      href: "https://docs.google.com/document/d/1V-47R5Y-gQvwDZ9sDoY84-m6vy7SZ7U9f2pGpoUipoI/edit?usp=sharing",
+      label: "Indicator Drafts",
+    },
     { href: "/settings.html", label: "Settings" },
   ];
 
