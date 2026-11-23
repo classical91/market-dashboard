@@ -106,6 +106,14 @@
     <section class="ov2-top" aria-label="System status and Market Matrix">
       <div class="ov2-status-column">
         <div class="ov2-system" id="ov2-system" aria-label="System status"></div>
+        <section class="ov2-notes" id="ov2-notes" aria-labelledby="ov2-notes-title">
+          <div class="ov2-notes-head">
+            <h2 id="ov2-notes-title">My notes</h2>
+            <span class="ov2-notes-status" id="ov2-notes-status" role="status" aria-live="polite"></span>
+            <button class="ov2-notes-toggle" id="ov2-notes-toggle" type="button" aria-expanded="false" aria-controls="ov2-notes-input">Expand</button>
+          </div>
+          <textarea class="ov2-notes-input" id="ov2-notes-input" rows="3" spellcheck="true" aria-labelledby="ov2-notes-title" placeholder="Write what you want here: ideas, levels to watch, a plan for the session…"></textarea>
+        </section>
         <section class="ov2-generation-card" aria-labelledby="ov2-generation-title">
           <div class="ov2-generation-head">
             <div><h2 id="ov2-generation-title">Generation Log</h2><p id="ov2-generation-subtitle">Saved layouts: latest read per timeframe</p></div>
@@ -385,6 +393,7 @@
 <script src="/assets/js/briefing-markdown.js"></script>
 <script src="/assets/js/overview-news-review.js"></script>
 <script src="/assets/js/overview-v2-status.js"></script>
+<script src="/assets/js/overview-v2-notes.js"></script>
 <script src="/assets/js/overview-btc-research.js"></script>
 <script src="/assets/js/ui.js"></script>
 <script src="/assets/js/oi-wedges.js"></script>
