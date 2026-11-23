@@ -37,6 +37,7 @@ const { createMarketMatrixRouter } = require("./routes/market-matrix");
 const { createStrategyEngineRouter } = require("./routes/strategy-engine");
 const { createTradingLabRouter } = require("./routes/trading-lab");
 const { createWatchlistRouter } = require("./routes/watchlist");
+const { createOverviewNotesRouter } = require("./routes/overview-notes");
 const { createPotentialBuysRouter } = require("./routes/potential-buys");
 const { createTradeContextRouter } = require("./routes/trade-context");
 const { createBotCommandsRouter } = require("./routes/bot-commands");
@@ -106,6 +107,7 @@ const { ResearchQueue } = require("./services/trading/research-queue");
 const { LiveScannerService } = require("./services/trading/live-scanner");
 const { LiveResearchService } = require("./services/trading/live-research-runner");
 const { WatchlistService } = require("./services/watchlist");
+const { OverviewNotesService } = require("./services/overview-notes");
 const { PotentialBuysStore } = require("./services/potential-buys");
 const { TradeContextService } = require("./services/trade-context");
 const { TradeObservationStore } = require("./services/trade-observations");
@@ -436,6 +438,7 @@ function createApp() {
     cache,
   });
   const watchlistService = new WatchlistService({ dataDir });
+  const overviewNotesService = new OverviewNotesService({ dataDir });
   // Screenshots of stocks/tokens worth a closer look, kept until deleted.
   const potentialBuysStore = new PotentialBuysStore({ dataDir, urlPrefix: "/potential-buys-images" });
   // Pure aggregation over the engines above — it owns no indicator maths and
@@ -771,6 +774,8 @@ function createApp() {
   app.use("/api/trading-lab", createTradingLabRouter({ tradingLabService, backtestService, signalActionStore, experimentStore, researchQueue, signalScreenerService, tradeJournalService, requireAdmin }));
   app.use("/api/live-scanner", createLiveScannerRouter({ liveScannerService, requireAdmin }));
   app.use("/api/watchlist", createWatchlistRouter({ watchlistService, requireAdmin }));
+  // Overview v2 "My notes", synced across devices for the signed-in owner.
+  app.use("/api/overview-notes", createOverviewNotesRouter({ overviewNotesService, requireAdmin: requireXAdmin }));
   app.use(
     "/api/potential-buys",
     createPotentialBuysRouter({
