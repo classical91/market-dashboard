@@ -1,8 +1,9 @@
 /* Overview v2 watchlist card — a TradingView-style list of saved tickers.
 
-   Read-only apart from switching folders: tickers, folders and bookmark
-   colours are edited under Settings → Watchlists. No prices are fetched;
-   each row links to the symbol's TradingView chart. */
+   Read-only apart from switching folders and collapsing sections: tickers,
+   sections, folders and bookmark colours are edited under Settings →
+   Watchlists. No prices are fetched; each row links to the symbol's
+   TradingView chart. */
 (function () {
   'use strict';
 
@@ -20,6 +21,26 @@
   var count = card.querySelector('.wl-count');
   var addLink = card.querySelector('.wl-add');
   var state = W.read();
+
+  /* Collapsed sections are a per-browser view preference, kept apart from
+     the watchlists themselves: { folderId: ["###Name", ...] }. */
+  var COLLAPSE_KEY = 'mc_watchlists_collapsed_v1';
+  var collapsed = {};
+  try { collapsed = JSON.parse(localStorage.getItem(COLLAPSE_KEY) || '{}') || {}; } catch (err) { collapsed = {}; }
+
+  function isCollapsed(folder, section) {
+    var list = collapsed[folder.id];
+    return Array.isArray(list) && list.indexOf(section) !== -1;
+  }
+
+  function setCollapsed(folder, section, value) {
+    var list = (Array.isArray(collapsed[folder.id]) ? collapsed[folder.id] : []).filter(function (s) {
+      return s !== section && folder.tickers.indexOf(s) !== -1;
+    });
+    if (value) list.push(section);
+    if (list.length) collapsed[folder.id] = list; else delete collapsed[folder.id];
+    try { localStorage.setItem(COLLAPSE_KEY, JSON.stringify(collapsed)); } catch (err) {}
+  }
 
   function settingsHref(folder) {
     return '/settings.html' + (folder ? '?watchlist=' + encodeURIComponent(folder.id) : '') + '#watchlists';
@@ -41,23 +62,37 @@
       list.innerHTML = '<li class="wl-empty">This folder is empty. <a href="' + settingsHref(folder) + '">Add symbols in Settings</a>.</li>';
       return;
     }
-    list.innerHTML = folder.tickers.map(function (symbol) {
-      var parts = W.tickerParts(symbol);
-      var inFolders = W.foldersFor(state, symbol);
-      var flagged = inFolders.filter(function (f) { return f.bookmark; })[0];
-      var assigned = inFolders.filter(function (f) { return f.id !== folder.id; });
-      var shown = assigned.slice(0, 2).map(folderChip).join('');
-      var more = assigned.length > 2 ? '<span class="wl-chip wl-chip-more">+' + (assigned.length - 2) + '</span>' : '';
-      var names = assigned.map(function (f) { return f.name; }).join(', ');
-      return '<li><a class="wl-row" href="' + esc(W.tradingViewUrl(symbol)) + '" target="_blank" rel="noopener noreferrer"' +
-        ' title="Open ' + esc(symbol) + ' on TradingView"' +
-        (flagged ? ' style="--wl-flag:' + W.colorHex(flagged.bookmark) + '"' : '') + '>' +
-        '<span class="wl-icon" style="--wl-tint:' + W.iconTint(symbol) + '" aria-hidden="true">' + esc(parts.ticker.charAt(0)) + '</span>' +
-        '<span class="wl-sym"><strong>' + esc(parts.ticker) + '</strong>' +
-        (parts.exchange ? '<em>' + esc(parts.exchange) + '</em>' : '') + '</span>' +
-        (assigned.length ? '<span class="wl-folders" aria-label="Also in: ' + esc(names) + '">' + shown + more + '</span>' : '<span class="wl-folders"></span>') +
-        '</a></li>';
+    list.innerHTML = W.groupsOf(folder).map(function (group, gi) {
+      var rows = group.symbols.map(function (symbol) { return rowHtml(folder, symbol); }).join('');
+      if (!group.section) return rows;
+      var shut = isCollapsed(folder, group.section);
+      var bodyId = 'wl-sec-' + gi;
+      return '<li class="wl-group' + (shut ? ' is-collapsed' : '') + '">' +
+        '<button type="button" class="wl-section" data-section="' + esc(group.section) + '" aria-expanded="' + !shut + '" aria-controls="' + bodyId + '">' +
+        '<svg class="wl-section-chev" width="10" height="10" viewBox="0 0 12 12" aria-hidden="true"><path d="m3 4.5 3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+        '<span class="wl-section-name">' + esc(group.name) + '</span>' +
+        '<span class="wl-section-count">' + group.symbols.length + '</span></button>' +
+        '<ul class="wl-group-rows" id="' + bodyId + '"' + (shut ? ' hidden' : '') + '>' +
+        (rows || '<li class="wl-group-empty">No symbols in this section.</li>') + '</ul></li>';
     }).join('');
+  }
+
+  function rowHtml(folder, symbol) {
+    var parts = W.tickerParts(symbol);
+    var inFolders = W.foldersFor(state, symbol);
+    var flagged = inFolders.filter(function (f) { return f.bookmark; })[0];
+    var assigned = inFolders.filter(function (f) { return f.id !== folder.id; });
+    var shown = assigned.slice(0, 2).map(folderChip).join('');
+    var more = assigned.length > 2 ? '<span class="wl-chip wl-chip-more">+' + (assigned.length - 2) + '</span>' : '';
+    var names = assigned.map(function (f) { return f.name; }).join(', ');
+    return '<li><a class="wl-row" href="' + esc(W.tradingViewUrl(symbol)) + '" target="_blank" rel="noopener noreferrer"' +
+      ' title="Open ' + esc(symbol) + ' on TradingView"' +
+      (flagged ? ' style="--wl-flag:' + W.colorHex(flagged.bookmark) + '"' : '') + '>' +
+      '<span class="wl-icon" style="--wl-tint:' + W.iconTint(symbol) + '" aria-hidden="true">' + esc(parts.ticker.charAt(0)) + '</span>' +
+      '<span class="wl-sym"><strong>' + esc(parts.ticker) + '</strong>' +
+      (parts.exchange ? '<em>' + esc(parts.exchange) + '</em>' : '') + '</span>' +
+      (assigned.length ? '<span class="wl-folders" aria-label="Also in: ' + esc(names) + '">' + shown + more + '</span>' : '<span class="wl-folders"></span>') +
+      '</a></li>';
   }
 
   function renderPins(active) {
@@ -80,7 +115,7 @@
       return '<button type="button" role="menuitemradio" class="wl-menu-item" aria-checked="' + on + '" data-folder="' + esc(f.id) + '" tabindex="-1">' +
         (f.bookmark ? W.flagSvg(f.bookmark, 12) : '<span class="wl-menu-noflag" aria-hidden="true"></span>') +
         '<span class="wl-menu-name">' + esc(f.name) + '</span>' +
-        '<span class="wl-menu-count">' + f.tickers.length + '</span></button>';
+        '<span class="wl-menu-count">' + W.symbolsOf(f).length + '</span></button>';
     }
     var html = '';
     if (marked.length) html += '<div class="wl-menu-group" role="presentation">Bookmarked</div>' + marked.map(item).join('');
@@ -94,7 +129,8 @@
     var active = W.activeFolder(state);
     titleName.textContent = active ? active.name : 'Watchlist';
     titleFlag.innerHTML = active && active.bookmark ? W.flagSvg(active.bookmark, 13) : '';
-    count.textContent = active ? active.tickers.length + (active.tickers.length === 1 ? ' symbol' : ' symbols') : '';
+    var n = active ? W.symbolsOf(active).length : 0;
+    count.textContent = active ? n + (n === 1 ? ' symbol' : ' symbols') : '';
     addLink.href = settingsHref(active);
     renderPins(active);
     renderMenu(active);
@@ -152,6 +188,19 @@
     else if (e.key === 'ArrowUp') { e.preventDefault(); items[(i - 1 + items.length) % items.length].focus(); }
     else if (e.key === 'Home') { e.preventDefault(); items[0].focus(); }
     else if (e.key === 'End') { e.preventDefault(); items[items.length - 1].focus(); }
+  });
+
+  list.addEventListener('click', function (e) {
+    var btn = e.target.closest('.wl-section');
+    if (!btn) return;
+    var folder = W.activeFolder(state);
+    if (!folder) return;
+    var open = btn.getAttribute('aria-expanded') === 'true';
+    var group = btn.parentNode;
+    setCollapsed(folder, btn.getAttribute('data-section'), open);
+    btn.setAttribute('aria-expanded', String(!open));
+    group.classList.toggle('is-collapsed', open);
+    group.querySelector('.wl-group-rows').hidden = open;
   });
 
   pins.addEventListener('click', function (e) {

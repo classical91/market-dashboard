@@ -43,7 +43,7 @@
       return '<li><button type="button" class="wls-folder' + (on ? ' is-active' : '') + '" data-folder="' + esc(f.id) + '" aria-current="' + (on ? 'true' : 'false') + '">' +
         (f.bookmark ? W.flagSvg(f.bookmark, 12) : '<span class="wl-menu-noflag" aria-hidden="true"></span>') +
         '<span class="wls-folder-name">' + esc(f.name) + '</span>' +
-        '<span class="wls-folder-count">' + f.tickers.length + '</span></button></li>';
+        '<span class="wls-folder-count">' + W.symbolsOf(f).length + '</span></button></li>';
     }).join('') : '<li class="wls-muted">No folders yet.</li>';
   }
 
@@ -61,17 +61,32 @@
           W.flagSvg(c.id, 14) + '<span class="wl-sr">' + c.label + '</span></label>';
       }).join('');
 
+    function moveButtons(entry, i, last) {
+      return '<button type="button" class="wls-mini" data-act="up" aria-label="Move ' + esc(entry) + ' up"' + (i === 0 ? ' disabled' : '') + '>↑</button>' +
+        '<button type="button" class="wls-mini" data-act="down" aria-label="Move ' + esc(entry) + ' down"' + (last ? ' disabled' : '') + '>↓</button>';
+    }
+
+    var symbolCount = W.symbolsOf(folder).length;
+    var sectionCount = folder.tickers.length - symbolCount;
+
     var rows = folder.tickers.length ? folder.tickers.map(function (symbol, i) {
+      var last = i === folder.tickers.length - 1;
+      if (W.isSection(symbol)) {
+        var name = W.sectionName(symbol);
+        return '<li class="wls-ticker wls-section" data-symbol="' + esc(symbol) + '">' +
+          '<span class="wls-section-mark" aria-hidden="true">§</span>' +
+          '<input class="wls-section-name" type="text" maxlength="' + W.MAX_NAME + '" value="' + esc(name) + '" aria-label="Section name" autocomplete="off" />' +
+          '<span class="wls-ticker-actions">' + moveButtons('section ' + name, i, last) +
+          '<button type="button" class="wls-mini wls-mini-danger" data-act="remove" aria-label="Remove section ' + esc(name) + ' (its symbols stay)">×</button>' +
+          '</span></li>';
+      }
       var parts = W.tickerParts(symbol);
       var others = W.foldersFor(state, symbol).filter(function (f) { return f.id !== folder.id; });
       var also = others.length ? '<span class="wls-also">also in ' + others.map(function (f) { return esc(f.name); }).join(', ') + '</span>' : '';
-      var last = i === folder.tickers.length - 1;
       return '<li class="wls-ticker" data-symbol="' + esc(symbol) + '">' +
         '<span class="wl-icon" style="--wl-tint:' + W.iconTint(symbol) + '" aria-hidden="true">' + esc(parts.ticker.charAt(0)) + '</span>' +
         '<span class="wl-sym"><strong>' + esc(parts.ticker) + '</strong>' + (parts.exchange ? '<em>' + esc(parts.exchange) + '</em>' : '') + also + '</span>' +
-        '<span class="wls-ticker-actions">' +
-        '<button type="button" class="wls-mini" data-act="up" aria-label="Move ' + esc(symbol) + ' up"' + (i === 0 ? ' disabled' : '') + '>↑</button>' +
-        '<button type="button" class="wls-mini" data-act="down" aria-label="Move ' + esc(symbol) + ' down"' + (last ? ' disabled' : '') + '>↓</button>' +
+        '<span class="wls-ticker-actions">' + moveButtons(symbol, i, last) +
         '<button type="button" class="wls-mini wls-mini-danger" data-act="remove" aria-label="Remove ' + esc(symbol) + '">×</button>' +
         '</span></li>';
     }).join('') : '<li class="wls-muted">No symbols in this folder yet.</li>';
@@ -81,13 +96,17 @@
       '<input id="wlsName" type="text" maxlength="' + W.MAX_NAME + '" value="' + esc(folder.name) + '" autocomplete="off" /></div>' +
       '<fieldset class="wls-field wls-bookmarks"><legend>Bookmark <span>Bookmarked folders are pinned to the top</span></legend>' +
       '<div class="wls-swatches">' + swatches + '</div></fieldset>' +
-      '<div class="wls-field"><div class="wls-label">Symbols <span>' + folder.tickers.length + '</span></div>' +
+      '<div class="wls-field"><div class="wls-label">Symbols <span>' + symbolCount +
+      (sectionCount ? ' · ' + sectionCount + (sectionCount === 1 ? ' section' : ' sections') : '') + '</span></div>' +
       '<ul class="wls-tickers">' + rows + '</ul>' +
       '<form class="wls-add" id="wlsAddForm">' +
       '<input id="wlsAddInput" type="text" placeholder="BINANCE:BTCUSDT, NASDAQ:AAPL" aria-label="Add symbols, separated by commas or spaces" autocomplete="off" spellcheck="false" />' +
       '<button class="settings-action-btn primary" type="submit">Add</button></form>' +
+      '<form class="wls-add wls-add-section" id="wlsSectionForm">' +
+      '<input id="wlsSectionInput" type="text" maxlength="' + W.MAX_NAME + '" placeholder="Section name, e.g. Majors" aria-label="New section name" autocomplete="off" />' +
+      '<button class="settings-action-btn" type="submit">Add section</button></form>' +
       '<p class="wls-note' + (note.tone ? ' is-' + note.tone : '') + '" id="wlsNote" role="status">' +
-      esc(note.text || 'Use TradingView symbols — EXCHANGE:TICKER opens the right chart. Several at once is fine.') + '</p></div>' +
+      esc(note.text || 'Use TradingView symbols — EXCHANGE:TICKER opens the right chart. Several at once is fine. Sections divide the list: symbols you add next go under the last section, and ↑ ↓ move rows between sections.') + '</p></div>' +
       '<div class="wls-danger-row">' +
       '<a class="settings-action-btn primary wls-back" href="/overview-v2.html#ov2-watchlist" title="Open Overview v2 with this folder selected">&larr; Back to Overview</a>' +
       '<button class="settings-action-btn danger" type="button" id="wlsDelete">Delete folder</button></div>';
@@ -123,6 +142,13 @@
     if (e.target.id === 'wlsName') {
       save(W.renameFolder(state, folder.id, e.target.value));
       toast();
+    } else if (e.target.classList.contains('wls-section-name')) {
+      var section = e.target.closest('[data-symbol]').getAttribute('data-symbol');
+      var res = W.renameSection(state, folder.id, section, e.target.value);
+      if (res.error) { note = { text: res.error, tone: 'warn' }; render(); return; }
+      note = { text: '', tone: '' };
+      save(res.state);
+      if (res.section !== section) toast();
     } else if (e.target.name === 'wlsBookmark') {
       save(W.setBookmark(state, folder.id, e.target.value || null), 'input[name="wlsBookmark"]:checked');
       toast();
@@ -130,10 +156,30 @@
   });
 
   editor.addEventListener('keydown', function (e) {
-    if (e.target.id === 'wlsName' && e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
+    if ((e.target.id === 'wlsName' || e.target.classList.contains('wls-section-name')) && e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
   });
 
   editor.addEventListener('submit', function (e) {
+    if (e.target.id === 'wlsSectionForm') {
+      e.preventDefault();
+      var current = W.activeFolder(state);
+      var field = document.getElementById('wlsSectionInput');
+      if (!current) return;
+      var made = W.addSection(state, current.id, field.value);
+      if (made.error) {
+        var typed = field.value;
+        note = { text: made.error, tone: 'warn' };
+        render();
+        field = document.getElementById('wlsSectionInput');
+        field.value = typed;
+        field.focus();
+        return;
+      }
+      note = { text: 'Added section ' + W.sectionName(made.section) + '. Symbols you add now go under it.', tone: 'ok' };
+      save(made.state, '#wlsAddInput');
+      toast();
+      return;
+    }
     if (e.target.id !== 'wlsAddForm') return;
     e.preventDefault();
     var folder = W.activeFolder(state);
@@ -154,7 +200,7 @@
     var folder = W.activeFolder(state);
     if (!folder) return;
     if (e.target.id === 'wlsDelete') {
-      if (!window.confirm('Delete the folder "' + folder.name + '" and its ' + folder.tickers.length + ' symbols?')) return;
+      if (!window.confirm('Delete the folder "' + folder.name + '" and its ' + W.symbolsOf(folder).length + ' symbols?')) return;
       note = { text: '', tone: '' };
       save(W.deleteFolder(state, folder.id), '.wls-folder.is-active');
       toast();
