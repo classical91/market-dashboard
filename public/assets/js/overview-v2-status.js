@@ -227,6 +227,7 @@
   var subtitleEl = document.getElementById("ov2-generation-subtitle");
   var symbolWrapEl = document.getElementById("ov2-generation-symbol-wrap");
   var symbolEl = document.getElementById("ov2-generation-symbol");
+  var viewEl = document.getElementById("ov2-generation-view");
   var GEN_TABS = ["layouts", "presets"];
   var tabEls = GEN_TABS.map(function (name) { return document.getElementById("ov2-gen-tab-" + name); });
   var GEN_TAB_KEY = "overviewV2.generationTab";
@@ -363,8 +364,8 @@
       tab.tabIndex = on ? 0 : -1;
     });
     symbolWrapEl.hidden = !isPresets;
-    subtitleEl.textContent = isPresets ? "AI Analysis presets: latest read per timeframe" : "Saved layouts: latest read per timeframe";
-    presetsEl.setAttribute("aria-label", isPresets ? "Timeframes for the selected preset — select one to filter the log" : "Saved layouts by timeframe — select one to filter the log");
+    subtitleEl.textContent = isPresets ? "AI Analysis presets: pick a timeframe to view its chart" : "Saved layouts: pick one to view its chart";
+    presetsEl.setAttribute("aria-label", isPresets ? "Timeframes for the selected preset — select one to view its chart" : "Saved layouts by timeframe — select one to view its chart");
 
     if (state.entries === null) {
       if (state.error) {
@@ -376,6 +377,7 @@
         layoutLogEl.innerHTML = '<p class="ov2-note" role="status">Loading…</p>';
       }
       if (isPresets) renderSymbolSelect();
+      renderView(null);
       filterLabelEl.textContent = "Recent runs";
       return;
     }
@@ -404,8 +406,73 @@
       openLinkEl.textContent = tile ? "Open " + tile.tf + " ↗" : "Full log ↗";
     }
     filterLabelEl.textContent = "Recent " + (isPresets ? "runs" : "captures") + " · " + scope;
+    renderView(tile, viewSource(tile, isPresets));
     renderLayoutLog(entries, tile ? tile.label : null);
   }
+
+  // The selected tile's latest capture: the newest log entry (each one keeps
+  // its chart and read), or the layout's saved result if that is newer.
+  function viewSource(tile, isPresets) {
+    if (!tile) return null;
+    var state = gen[gen.tab];
+    var pool = (state.entries || []).filter(function (e) {
+      return isPresets ? e.symbol === state.symbol && e.interval === tile.id : e.layoutId === tile.id;
+    });
+    if (!isPresets) {
+      var saved = state.configured.filter(function (l) { return l.id === tile.id; })[0];
+      if (saved && saved.generatedAt) pool = pool.concat([saved]);
+    }
+    var best = null;
+    pool.forEach(function (e) {
+      var at = time(e.generatedAt);
+      if (at !== null && (!best || at > best.at)) best = { at: at, entry: e };
+    });
+    return { entry: best ? best.entry : null, at: best ? best.at : null, url: !isPresets && (state.configured.filter(function (l) { return l.id === tile.id; })[0] || {}).url };
+  }
+
+  function renderRead(text) {
+    return esc(String(text || "").trim()).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+      .split(/\n{2,}/).map(function (para) { return "<p>" + para.replace(/\n/g, "<br>") + "</p>"; }).join("");
+  }
+
+  function renderView(tile, source) {
+    if (!tile) {
+      viewEl.hidden = true;
+      viewEl.innerHTML = "";
+      return;
+    }
+    var isPresets = gen.tab === "presets";
+    var entry = source && source.entry;
+    var openHref = isPresets ? "/ai-analysis.html" : tile.href;
+    var links = '<a href="' + esc(openHref) + '">Open in ' + (isPresets ? "Presets" : "My Layouts") + " ↗</a>" +
+      (source && source.url && /^https?:\/\//.test(source.url) ? '<a href="' + esc(source.url) + '" target="_blank" rel="noopener">TradingView ↗</a>' : "");
+    viewEl.hidden = false;
+    if (!entry) {
+      viewEl.innerHTML = '<div class="ov2-view-empty"><p class="ov2-note" role="status">' + esc(tile.label) + " has no " +
+        (isPresets ? "run" : "capture") + " yet. " + (isPresets ? "Generate it on Presets." : "Capture it on My Layouts.") + '</p><div class="ov2-view-links">' + links + "</div></div>";
+      return;
+    }
+    var chartUrl = typeof entry.chartUrl === "string" && /^(https?:\/\/|\/)/.test(entry.chartUrl) ? entry.chartUrl : "";
+    var chart = chartUrl
+      ? '<a class="ov2-view-chart" href="' + esc(chartUrl) + '" target="_blank" rel="noopener" title="Open full-size chart">' +
+        '<img src="' + esc(chartUrl) + '" alt="' + esc(tile.label) + ' chart, open full size" loading="lazy" /></a>'
+      : '<div class="ov2-view-chart ov2-view-nochart">No chart image saved</div>';
+    viewEl.innerHTML = chart +
+      '<div class="ov2-view-body">' +
+        '<div class="ov2-view-head">' + verdictChip(entry.verdict, "") + "<strong>" + esc(tile.label) + "</strong>" +
+          '<time datetime="' + new Date(source.at).toISOString() + '" title="' + esc(stamp(source.at)) + '">' + esc(ago(source.at)) + "</time></div>" +
+        '<div class="ov2-view-read aia-analysis" tabindex="0">' + (entry.analysis ? renderRead(entry.analysis) : '<p class="ov2-flat">No written read saved.</p>') + "</div>" +
+        '<div class="ov2-view-links">' + links + "</div>" +
+      "</div>";
+  }
+
+  // A capture's image can outlive its file (only the newest is kept on disk).
+  viewEl.addEventListener("error", function (event) {
+    var img = event.target;
+    if (!img || img.tagName !== "IMG") return;
+    var box = img.closest(".ov2-view-chart");
+    if (box) box.outerHTML = '<div class="ov2-view-chart ov2-view-nochart">Chart image no longer available</div>';
+  }, true);
 
   function setGenTab(tab, focus) {
     gen.tab = tab;

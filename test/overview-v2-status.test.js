@@ -178,8 +178,8 @@ test("generation widget shows timeframe tiles, filters the log, and switches to 
   const nodes = await run({
     "/api/layout-analysis/log": { entries: [
       { layoutId: "btc-1w", label: "BTC 1W", verdict: "HOLD", generatedAt: iso(HOUR) },
-      { layoutId: "btc-4h", label: "BTC 4h", verdict: "SELL", generatedAt: iso(2 * HOUR) },
-      { layoutId: "btc-4h", label: "BTC 4h", verdict: "HOLD", generatedAt: iso(30 * HOUR) },
+      { layoutId: "btc-4h", label: "BTC 4h", verdict: "SELL", generatedAt: iso(2 * HOUR), chartUrl: "/layout-screenshots/btc-4h-new.png", analysis: "**Trend** down <script>x</script>" },
+      { layoutId: "btc-4h", label: "BTC 4h", verdict: "HOLD", generatedAt: iso(30 * HOUR), chartUrl: "/layout-screenshots/btc-4h-old.png" },
     ] },
     "/api/layout-analysis": { layouts: [{ id: "btc-1w", label: "BTC 1W" }, { id: "btc-1d", label: "BTC 1D" }, { id: "btc-4h", label: "BTC 4h" }] },
     "/api/ai-analysis/log": { entries: [
@@ -199,6 +199,18 @@ test("generation widget shows timeframe tiles, filters the log, and switches to 
   assert.doesNotMatch(nodes["ov2-generation-log"].innerHTML, /BTC 1W/);
   assert.equal((nodes["ov2-generation-log"].innerHTML.match(/class="aia-log-item/g) || []).length, 2);
   assert.equal(nodes["ov2-generation-open"].href, "/layout-analysis.html?layout=btc-4h");
+  // The viewer shows the selected layout's newest capture: chart, verdict and read.
+  const view = nodes["ov2-generation-view"];
+  assert.equal(view.hidden, false);
+  assert.match(view.innerHTML, /<img src="\/layout-screenshots\/btc-4h-new.png"/);
+  assert.match(view.innerHTML, /aia-verdict--sell/);
+  assert.match(view.innerHTML, /<strong>Trend<\/strong> down/);
+  assert.doesNotMatch(view.innerHTML, /<script>/);
+  click("btc-1d");
+  assert.match(view.innerHTML, /has no capture yet/);
+  click("btc-1d");
+  assert.equal(view.hidden, true);
+  click("btc-4h");
   click("btc-4h");
   assert.match(nodes["ov2-generation-log"].innerHTML, /BTC 1W/);
 
@@ -208,6 +220,7 @@ test("generation widget shows timeframe tiles, filters the log, and switches to 
   assert.match(nodes["ov2-generation-symbol"].innerHTML, /BTCUSDT[\s\S]*ETHUSDT/);
   assert.match(tiles.innerHTML, /data-preset="1h"[\s\S]*aia-verdict--buy/);
   assert.match(nodes["ov2-generation-log"].innerHTML, /BTCUSDT 4h/);
+  assert.equal(nodes["ov2-generation-view"].hidden, true);
   assert.doesNotMatch(nodes["ov2-generation-log"].innerHTML, /ETHUSDT/);
 
   nodes["ov2-generation-symbol"].value = "BINANCE:ETHUSDT";
