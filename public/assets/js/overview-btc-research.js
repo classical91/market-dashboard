@@ -83,6 +83,17 @@
     return data.groups.reduce(function (sum, group) { return sum + group.links.length; }, data.links.length);
   }
 
+  /** Every safe link (top level and inside sub-dropdowns), de-duplicated, for "Open All". */
+  function openAllHrefs(data) {
+    var seen = {};
+    var all = data.links.concat.apply(data.links, data.groups.map(function (group) { return group.links; }));
+    return all.map(function (link) { return safeHref(link.href); }).filter(function (href) {
+      if (!href || seen[href]) return false;
+      seen[href] = true;
+      return true;
+    });
+  }
+
   /** HTML for the dropdown body; `openGroups` lists sub-dropdown ids to start open. */
   function render(data, openGroups) {
     var open = openGroups || [];
@@ -100,13 +111,15 @@
       }).join("") + "</div>";
   }
 
-  var api = { extract: extract, render: render, countLinks: countLinks, safeStyle: safeStyle, safeHref: safeHref };
+  var api = { extract: extract, render: render, countLinks: countLinks, openAllHrefs: openAllHrefs, safeStyle: safeStyle, safeHref: safeHref };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (typeof document === "undefined") return;
 
   var details = document.getElementById("btc-research");
   var body = document.getElementById("ov-btc-body");
   var countEl = document.getElementById("ov-btc-count");
+  var openAllBtn = document.getElementById("ov-btc-open-all");
+  var openAllLinks = [];
   if (!details || !body) return;
 
   function readStore(key, fallback) {
@@ -131,6 +144,41 @@
   var hubLink = details.querySelector(".ov-btc-hub");
   if (hubLink) hubLink.addEventListener("click", function (event) { event.stopPropagation(); });
 
+  function setOpenAll(hrefs) {
+    openAllLinks = hrefs;
+    if (!openAllBtn) return;
+    openAllBtn.hidden = !hrefs.length;
+    openAllBtn.textContent = "⧉ Open All (" + hrefs.length + ")";
+    openAllBtn.setAttribute("aria-label", "Open all " + hrefs.length + " Bitcoin Research links in new tabs");
+  }
+
+  function showOpenAllHint(blocked, total) {
+    var note = body.querySelector(".open-all-hint");
+    if (!note) {
+      note = document.createElement("div");
+      note.className = "open-all-hint ov-btc-hint";
+      note.setAttribute("role", "status");
+      body.insertBefore(note, body.firstChild);
+    }
+    note.textContent = "⚠️ Your browser blocked " + blocked + " of " + total +
+      " tabs. Allow pop-ups for this site (pop-up icon in the address bar), then click “Open All” again.";
+    note.style.display = "block";
+    details.open = true;
+  }
+
+  // Same behaviour as Crypto Hub's section "Open All": every link in a new tab,
+  // with a hint when the pop-up blocker stops some of them. Lives in the summary,
+  // so it must not toggle the dropdown.
+  if (openAllBtn) openAllBtn.addEventListener("click", function (event) {
+    event.preventDefault();
+    event.stopPropagation();
+    var blocked = 0;
+    openAllLinks.forEach(function (href) {
+      if (!window.open(href, "_blank", "noopener")) blocked += 1;
+    });
+    if (blocked > 0) showOpenAllHint(blocked, openAllLinks.length);
+  });
+
   body.addEventListener("toggle", function (event) {
     var sub = event.target;
     if (!sub.matches || !sub.matches(".ov-btc-sub")) return;
@@ -141,6 +189,7 @@
   }, true);
 
   function showError(message) {
+    setOpenAll([]);
     countEl.textContent = "Unavailable";
     body.innerHTML = '<div class="empty-state ov-btc-error"><strong>Bitcoin Research unavailable</strong>' +
       "<p>" + esc(message) + "</p>" +
@@ -149,6 +198,7 @@
   }
 
   function load() {
+    setOpenAll([]);
     countEl.textContent = "Loading…";
     body.innerHTML = '<div class="empty-state">Loading Bitcoin Research…</div>';
     return fetch(SOURCE_URL, { credentials: "same-origin" })
@@ -165,6 +215,7 @@
         countEl.textContent = total + " link" + (total === 1 ? "" : "s") +
           (data.groups.length ? " · " + data.groups.map(function (g) { return g.label; }).join(" · ") : "");
         body.innerHTML = render(data, readStore(SUB_OPEN_KEY, []));
+        setOpenAll(openAllHrefs(data));
       })
       .catch(function (err) { showError(err && err.message ? err.message : "Request failed."); });
   }
