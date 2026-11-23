@@ -149,6 +149,17 @@ body[data-x-accent] .x-account-card--all.active { border-color: var(--x-accent);
   outline-offset: 3px;
 }
 .x-account-action-icon { display: none; }
+/* FarmBot leads the shortcut stack in amber; the other links are green. */
+.x-account-actions a.x-shortcut--farmbot {
+  --x-accent: var(--amber);
+  --x-shortcut-bg: color-mix(in srgb, var(--amber) 22%, transparent);
+  --x-shortcut-border: var(--amber);
+  --x-shortcut-text: var(--amber);
+}
+.x-account-actions a.x-shortcut--farmbot:hover {
+  --x-shortcut-bg: color-mix(in srgb, var(--amber) 32%, transparent);
+}
+.x-account-actions a.x-shortcut--link { --x-accent: var(--green); }
 
 .x-timeline-frame {
   min-height: 620px;
