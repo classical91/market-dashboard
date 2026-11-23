@@ -267,6 +267,32 @@
 
 .yt-badge-live { background: #c50029; }
 
+/* Watched: the whole card is outlined in red and the thumbnail is labelled. */
+.yt-card.is-watched {
+  border-radius: 14px;
+  outline: 2px solid var(--yt-red);
+  outline-offset: 4px;
+  background: color-mix(in srgb, var(--yt-red) 8%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--yt-red) 8%, transparent);
+}
+.yt-card.is-watched .yt-feed-thumb img { filter: brightness(.45) saturate(.8); }
+.yt-card.is-watched .yt-feed-card:is(:hover, :focus-visible) .yt-feed-thumb img { filter: brightness(.35) saturate(.8); }
+.yt-watched-badge {
+  position: absolute;
+  z-index: 1;
+  bottom: 8px;
+  left: 8px;
+  padding: 4px 7px;
+  border-radius: 5px;
+  background: #e60032;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
 /* "Add to queue" sits over the thumbnail, revealed on hover or focus like
    YouTube's. It stays visible once queued and on touch screens. */
 .yt-queue-toggle {

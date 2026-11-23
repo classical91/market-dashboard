@@ -129,6 +129,8 @@
     card.rel = "noopener";
     if (video.id) card.dataset.videoId = video.id;
     if (video.id === ctx.activeId) card.setAttribute("aria-current", "true");
+    var watched = Boolean(video.id && ctx.watched && ctx.watched.has(video.id));
+    if (watched) wrap.classList.add("is-watched");
 
     var thumb = document.createElement("div");
     thumb.className = "yt-feed-thumb";
@@ -155,6 +157,8 @@
       badge.textContent = video.state === "live" ? "LIVE" : "UPCOMING";
       thumb.appendChild(badge);
     }
+
+    if (watched) thumb.appendChild(watchedBadge());
 
     var body = document.createElement("div");
     body.className = "yt-feed-body";
@@ -191,8 +195,16 @@
     card.appendChild(thumb);
     card.appendChild(body);
 
+    // Opening the video on youtube.com in a new tab (modifier or middle click)
+    // counts as watching it too.
+    card.addEventListener("auxclick", function (e) {
+      if (e.button === 1 && video.id && ctx.onWatched) ctx.onWatched(video.id);
+    });
     card.addEventListener("click", function (e) {
-      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0 || !video.id) return;
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0 || !video.id) {
+        if (e.button === 0 && video.id && ctx.onWatched) ctx.onWatched(video.id);
+        return;
+      }
       e.preventDefault();
       ctx.onSelect(item, card);
     });
@@ -228,6 +240,43 @@
     }
 
     return wrap;
+  }
+
+  function watchedBadge() {
+    var node = document.createElement("span");
+    node.className = "yt-watched-badge";
+    node.textContent = "Watched";
+    return node;
+  }
+
+  // Videos this browser has played, newest last. Kept in localStorage per
+  // viewer; capped so the list cannot grow without bound.
+  var WATCHED_KEY = "yt:watched";
+  var WATCHED_LIMIT = 1000;
+
+  function createWatchedStore(storage) {
+    var ids = [];
+    function load() {
+      try {
+        var parsed = JSON.parse(storage?.getItem(WATCHED_KEY) || "[]");
+        ids = Array.isArray(parsed) ? parsed.filter(function (id) { return typeof id === "string" && id; }) : [];
+      } catch (e) {
+        ids = [];
+      }
+    }
+    load();
+    return {
+      key: WATCHED_KEY,
+      has: function (id) { return ids.indexOf(id) !== -1; },
+      add: function (id) {
+        if (!id) return false;
+        var fresh = ids.indexOf(id) === -1;
+        ids = ids.filter(function (other) { return other !== id; }).concat(id).slice(-WATCHED_LIMIT);
+        try { storage?.setItem(WATCHED_KEY, JSON.stringify(ids)); } catch (e) { /* best effort */ }
+        return fresh;
+      },
+      reload: load,
+    };
   }
 
   function setMessage(root, message) {
@@ -430,6 +479,7 @@
     var queue = window.YoutubeQueue && queueSection
       ? window.YoutubeQueue.createQueue({ storage: safeStorage() })
       : null;
+    var watchedStore = createWatchedStore(safeStorage());
     var payload;
     var request;
     var playingId = null;
@@ -442,7 +492,7 @@
 
     function renderFeed() {
       if (!payload) return;
-      var ctx = { onSelect: onSelect, activeId: playingId, queue: queue, onToggleQueue: toggleQueue, onSummarize: summarizeItem };
+      var ctx = { onSelect: onSelect, activeId: playingId, queue: queue, onToggleQueue: toggleQueue, onSummarize: summarizeItem, watched: watchedStore, onWatched: markWatched };
       var count = render(roots, payload, ctx, search.value);
       status.textContent = (search.value.trim() ? count + (count === 1 ? " matching video. " : " matching videos. ") : "") + feedNote;
     }
@@ -517,6 +567,7 @@
         node.removeAttribute("aria-current");
       });
       cardsFor(video.id).forEach(function (node) { node.setAttribute("aria-current", "true"); });
+      markWatched(video.id);
       watchTitle.textContent = video.title;
       watchChannel.textContent = item.channelLabel;
       watchDetail.textContent = videoDetail(video);
@@ -539,6 +590,18 @@
 
     function onSelect(item) {
       play(item);
+    }
+
+    // Mark the cards in place rather than re-rendering, which would reset
+    // scroll and focus in the grid.
+    function markWatched(id) {
+      if (!watchedStore.add(id)) return;
+      cardsFor(id).forEach(function (card) {
+        var wrap = card.parentElement;
+        if (!wrap || wrap.classList.contains("is-watched")) return;
+        wrap.classList.add("is-watched");
+        card.querySelector(".yt-feed-thumb")?.appendChild(watchedBadge());
+      });
     }
 
     function closeWatch(restoreFocus) {
@@ -1019,6 +1082,12 @@
       if (event.key !== "Escape" || event.defaultPrevented || !playingId) return;
       if (document.querySelector('.manage-overlay, [role="dialog"][aria-modal="true"]')) return;
       closeWatch(true);
+    });
+    // Another tab watched something.
+    window.addEventListener("storage", function (event) {
+      if (event.key !== watchedStore.key && event.key !== null) return;
+      watchedStore.reload();
+      renderFeed();
     });
     setupQueue();
     loadFeeds();
