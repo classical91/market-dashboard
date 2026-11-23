@@ -107,11 +107,29 @@
         <div class="ov2-system" id="ov2-system" aria-label="System status"></div>
         <section class="ov2-generation-card" aria-labelledby="ov2-generation-title">
           <div class="ov2-generation-head">
-            <div><h2 id="ov2-generation-title">Generation Log</h2><p>Recent layout captures, grouped by day</p></div>
-            <a href="/layout-analysis.html#aia-log">Full log ↗</a>
+            <div><h2 id="ov2-generation-title">Generation Log</h2><p id="ov2-generation-subtitle">Saved layouts: latest read per timeframe</p></div>
+            <a id="ov2-generation-open" href="/layout-analysis.html#aia-log">Full log ↗</a>
+          </div>
+          <div class="ov2-generation-bar">
+            <div class="ov2-gen-tabs" role="tablist" aria-label="Generation source">
+              <button type="button" role="tab" id="ov2-gen-tab-layouts" data-gen-tab="layouts" aria-selected="true" aria-controls="ov2-generation-panel">My Layouts</button>
+              <button type="button" role="tab" id="ov2-gen-tab-presets" data-gen-tab="presets" aria-selected="false" aria-controls="ov2-generation-panel" tabindex="-1">Presets</button>
+            </div>
+            <label class="ov2-gen-symbol" id="ov2-generation-symbol-wrap" hidden>
+              <span>Preset</span>
+              <select id="ov2-generation-symbol" aria-label="Preset symbol"></select>
+            </label>
+          </div>
+          <div id="ov2-generation-panel" role="tabpanel" aria-labelledby="ov2-generation-title">
+          <div class="ov2-presets" id="ov2-presets" role="group" aria-label="Saved layouts by timeframe — select one to filter the log">
+            <p class="ov2-note" role="status">Loading layouts…</p>
+          </div>
+          <div class="ov2-generation-sub">
+            <span id="ov2-generation-filter">Recent captures · all layouts</span>
           </div>
           <div class="aia-log ov2-generation-log" id="ov2-generation-log" role="region" aria-label="Recent layout captures" aria-live="polite" tabindex="0">
             <p class="ov2-note" role="status">Loading captures…</p>
+          </div>
           </div>
         </section>
       </div>

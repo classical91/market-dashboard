@@ -119,6 +119,29 @@
 .ov2-generation-log .aia-log-symbol { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ov2-generation-log .aia-log-verdict, .ov2-generation-log .aia-log-time { flex-shrink: 0; }
 .ov2-generation-head a:focus-visible, .ov2-generation-log:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+/* Preset strip: one tile per saved layout, shortest timeframe first. */
+.ov2-presets { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 8px; margin-bottom: 10px; }
+.ov2-preset { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; min-width: 0; padding: 9px 10px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface2); color: var(--soft); font: inherit; text-align: left; cursor: pointer; }
+.ov2-preset:hover { border-color: var(--border-hover); }
+.ov2-preset[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-bg); }
+.ov2-preset:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ov2-preset-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%; }
+.ov2-preset-tf { font-size: 15px; font-weight: 800; color: var(--text); letter-spacing: 0.01em; }
+.ov2-preset-sym { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--muted); }
+.ov2-preset .aia-verdict { flex-shrink: 0; }
+.ov2-preset-when { font-size: 10px; color: var(--muted); }
+.ov2-preset-when.is-today { color: var(--green); }
+.ov2-generation-sub { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.ov2-generation-sub::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+.ov2-generation-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.ov2-gen-tabs { display: inline-flex; padding: 2px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface2); }
+.ov2-gen-tabs button { padding: 4px 11px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
+.ov2-gen-tabs button:hover { color: var(--text); }
+.ov2-gen-tabs button[aria-selected="true"] { background: var(--accent-bg); color: var(--accent); }
+.ov2-gen-tabs button:focus-visible, .ov2-gen-symbol select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ov2-gen-symbol { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 11px; font-weight: 700; }
+.ov2-gen-symbol[hidden] { display: none; }
+.ov2-gen-symbol select { max-width: 160px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface2); color: var(--text); font: inherit; font-size: 12px; }
 .ov2-sys { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 11px 13px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--soft); text-decoration: none; }
 .ov2-sys:hover { border-color: var(--border-hover); }
 .ov2-sys-label { font-size: 12px; font-weight: 700; color: var(--accent); }
