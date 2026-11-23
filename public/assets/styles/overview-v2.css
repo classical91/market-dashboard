@@ -108,7 +108,7 @@
 .ov2-top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); align-items: start; gap: 14px; margin-bottom: 18px; }
 .ov2-system { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .ov2-status-column { display: grid; gap: 10px; min-width: 0; }
-/* My notes: free-form scratch box between the status tiles and the Generation Log. */
+/* My notes: free-form scratch box under the status tiles. */
 .ov2-notes { min-width: 0; border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 10px; background: var(--surface); padding: 10px 13px 12px; }
 .ov2-notes-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
 .ov2-notes-head h2 { margin: 0; font-size: 14px; }
@@ -133,19 +133,20 @@
 .ov2-notes-folder-action.is-danger:hover { border-color: var(--red); color: var(--red); }
 .ov2-notes-folder-input { width: 140px; border: 1px solid var(--accent); border-radius: 999px; background: var(--surface2); color: var(--text); padding: 3px 10px; font: inherit; font-size: 11px; }
 .ov2-notes-folder:focus-visible, .ov2-notes-folder-add:focus-visible, .ov2-notes-folder-action:focus-visible, .ov2-notes-toggle:focus-visible, .ov2-notes-folder-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.ov2-generation-card { min-width: 0; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); padding: 12px 13px; }
+.ov2-generation-card { grid-column: 1 / -1; min-width: 0; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); padding: 12px 13px; }
 .ov2-generation-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
 .ov2-generation-head h2 { margin: 0; font-size: 14px; }
 .ov2-generation-head p { margin: 3px 0 0; color: var(--muted); font-size: 11px; }
 .ov2-generation-head a { flex-shrink: 0; color: var(--accent); font-size: 12px; text-decoration: none; }
 .ov2-generation-head a:hover { text-decoration: underline; }
-.ov2-generation-log { max-height: 190px; overflow-y: auto; scrollbar-width: thin; padding: 0 10px; overscroll-behavior: contain; }
+.ov2-generation-log { max-height: 240px; overflow-y: auto; scrollbar-width: thin; padding: 0 10px; overscroll-behavior: contain; }
 .ov2-generation-log .aia-log-item { gap: 8px; padding: 4px 0; }
 .ov2-generation-log .aia-log-symbol { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ov2-generation-log .aia-log-verdict, .ov2-generation-log .aia-log-time { flex-shrink: 0; }
 .ov2-generation-head a:focus-visible, .ov2-generation-log:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 /* Preset strip: one tile per saved layout, shortest timeframe first. */
-.ov2-presets { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 8px; margin-bottom: 10px; }
+.ov2-presets { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-bottom: 10px; }
+.ov2-presets > .ov2-note { grid-column: 1 / -1; }
 .ov2-preset { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; min-width: 0; padding: 9px 10px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface2); color: var(--soft); font: inherit; text-align: left; cursor: pointer; }
 .ov2-preset:hover { border-color: var(--border-hover); }
 .ov2-preset[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-bg); }
@@ -168,17 +169,17 @@
 .ov2-gen-symbol[hidden] { display: none; }
 .ov2-gen-symbol select { max-width: 160px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface2); color: var(--text); font: inherit; font-size: 12px; }
 /* Viewer: the selected tile's latest chart and read. */
-.ov2-gen-view { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 10px; margin-bottom: 10px; padding: 10px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface2); }
+.ov2-gen-view { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 10px; margin-bottom: 10px; padding: 10px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface2); }
 .ov2-gen-view[hidden] { display: none; }
 .ov2-view-chart { display: flex; align-self: start; align-items: center; justify-content: center; min-height: 150px; overflow: hidden; border: 1px solid var(--border); border-radius: 7px; background: var(--bg, #000); }
-.ov2-view-chart img { display: block; width: 100%; height: auto; max-height: 260px; object-fit: contain; }
+.ov2-view-chart img { display: block; width: 100%; height: auto; max-height: 420px; object-fit: contain; }
 .ov2-view-chart:focus-visible, .ov2-view-read:focus-visible, .ov2-view-links a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .ov2-view-nochart { color: var(--muted); font-size: 11px; }
 .ov2-view-body { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .ov2-view-head { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 13px; }
 .ov2-view-head strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
 .ov2-view-head time { margin-left: auto; flex-shrink: 0; color: var(--muted); font-size: 11px; }
-.ov2-view-read { flex: 1; max-height: 220px; overflow-y: auto; scrollbar-width: thin; font-size: 12px; line-height: 1.55; }
+.ov2-view-read { flex: 1; max-height: 380px; overflow-y: auto; scrollbar-width: thin; font-size: 12px; line-height: 1.55; }
 .ov2-view-read p { margin: 0 0 6px; }
 .ov2-view-links { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; }
 .ov2-view-links a { color: var(--accent); text-decoration: none; }
