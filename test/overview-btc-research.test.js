@@ -43,3 +43,16 @@ test("render escapes text and drops unsafe hrefs and styles", () => {
   assert.match(html, /A &amp; B/);
   assert.match(html, /style=""/);
 });
+
+test("Open All covers every safe link, nested groups included, once each", () => {
+  const data = {
+    links: [{ href: "https://a.example/" }, { href: "javascript:alert(1)" }],
+    groups: [
+      { id: "g1", label: "G1", links: [{ href: "https://b.example/" }, { href: "https://a.example/" }] },
+      { id: "g2", label: "G2", links: [{ href: "/crypto.html" }] },
+    ],
+  };
+  assert.deepEqual(btc.openAllHrefs(data), ["https://a.example/", "https://b.example/", "/crypto.html"]);
+  assert.deepEqual(btc.openAllHrefs({ links: [], groups: [] }), []);
+  assert.match(read("overview-v2.html"), /<button class="open-all-btn ov-btc-open-all" id="ov-btc-open-all" type="button" hidden>/);
+});
