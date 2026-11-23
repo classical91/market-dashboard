@@ -112,7 +112,9 @@
 .wls-note.is-ok { color: var(--green); }
 .wls-note.is-warn { color: var(--amber); }
 .wls-muted { padding: 10px; color: var(--muted); font-size: 13px; }
-.wls-danger-row { padding-top: 12px; border-top: 1px solid var(--border); }
+.wls-danger-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding-top: 12px; border-top: 1px solid var(--border); }
+.wls-back { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+.wls-back:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (max-width: 760px) {
   .wls { grid-template-columns: 1fr; }
   .wls-folder-list { max-height: 220px; }

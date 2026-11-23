@@ -88,7 +88,9 @@
       '<button class="settings-action-btn primary" type="submit">Add</button></form>' +
       '<p class="wls-note' + (note.tone ? ' is-' + note.tone : '') + '" id="wlsNote" role="status">' +
       esc(note.text || 'Use TradingView symbols — EXCHANGE:TICKER opens the right chart. Several at once is fine.') + '</p></div>' +
-      '<div class="wls-danger-row"><button class="settings-action-btn danger" type="button" id="wlsDelete">Delete folder</button></div>';
+      '<div class="wls-danger-row">' +
+      '<a class="settings-action-btn primary wls-back" href="/overview-v2.html#ov2-watchlist" title="Open Overview v2 with this folder selected">&larr; Back to Overview</a>' +
+      '<button class="settings-action-btn danger" type="button" id="wlsDelete">Delete folder</button></div>';
   }
 
   function render() {
