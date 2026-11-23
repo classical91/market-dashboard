@@ -101,3 +101,48 @@ test("read/write round-trip through the in-memory fallback under Node", () => {
   assert.deepEqual(back, saved);
   assert.equal(W.activeFolder(back).name, "Kucoin trades");
 });
+
+test("sections live in tickers as ###Name and are skipped by symbolsOf", () => {
+  let state = W.normalize({ folders: [{ id: "f", name: "F", tickers: ["BTCUSDT", "###Majors", "ETHUSDT", "###  majors ", "###", "###Alts", "SOLUSDT"] }] });
+  const folder = W.findFolder(state, "f");
+  assert.deepEqual(folder.tickers, ["BTCUSDT", "###Majors", "ETHUSDT", "###Alts", "SOLUSDT"], "blank and duplicate sections are dropped");
+  assert.deepEqual(W.symbolsOf(folder), ["BTCUSDT", "ETHUSDT", "SOLUSDT"]);
+  assert.equal(W.isSection("###Majors"), true);
+  assert.equal(W.sectionName("###Majors"), "Majors");
+  assert.deepEqual(W.groupsOf(folder), [
+    { section: null, name: "", symbols: ["BTCUSDT"] },
+    { section: "###Majors", name: "Majors", symbols: ["ETHUSDT"] },
+    { section: "###Alts", name: "Alts", symbols: ["SOLUSDT"] },
+  ]);
+  assert.equal(W.foldersFor(state, "###Majors").length, 1);
+});
+
+test("addSection appends a divider and later symbols land under it", () => {
+  let state = W.normalize({ folders: [{ id: "f", name: "F", tickers: ["BTCUSDT"] }] });
+  let res = W.addSection(state, "f", "  Dominance   charts ");
+  assert.equal(res.error, null);
+  assert.equal(res.section, "###Dominance charts");
+  state = W.addTickers(res.state, "f", "TOTAL2 TOTAL3").state;
+  assert.deepEqual(W.groupsOf(W.findFolder(state, "f"))[1].symbols, ["TOTAL2", "TOTAL3"]);
+
+  assert.match(W.addSection(state, "f", "dominance CHARTS").error, /already/);
+  assert.match(W.addSection(state, "f", "   ").error, /name/);
+});
+
+test("renameSection keeps position, rejects blanks and clashes", () => {
+  const state = W.normalize({ folders: [{ id: "f", name: "F", tickers: ["###A", "BTCUSDT", "###B"] }] });
+  const ok = W.renameSection(state, "f", "###A", "Majors");
+  assert.equal(ok.error, null);
+  assert.deepEqual(W.findFolder(ok.state, "f").tickers, ["###Majors", "BTCUSDT", "###B"]);
+  assert.match(W.renameSection(state, "f", "###A", "b").error, /already/);
+  assert.match(W.renameSection(state, "f", "###A", " ").error, /empty/);
+  assert.deepEqual(W.findFolder(W.renameSection(state, "f", "###A", "a").state, "f").tickers[0], "###a", "case-only rename is allowed");
+});
+
+test("sections move and delete like symbols, leaving the symbols in place", () => {
+  let state = W.normalize({ folders: [{ id: "f", name: "F", tickers: ["BTCUSDT", "###Alts", "SOLUSDT"] }] });
+  state = W.moveTicker(state, "f", "###Alts", -1);
+  assert.deepEqual(W.findFolder(state, "f").tickers, ["###Alts", "BTCUSDT", "SOLUSDT"]);
+  state = W.removeTicker(state, "f", "###Alts");
+  assert.deepEqual(W.findFolder(state, "f").tickers, ["BTCUSDT", "SOLUSDT"]);
+});

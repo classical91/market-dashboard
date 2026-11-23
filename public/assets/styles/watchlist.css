@@ -57,6 +57,20 @@
 .wl-chip { --wl-c: var(--soft); display: inline-flex; align-items: center; gap: 4px; max-width: 120px; padding: 2px 7px; border-radius: 4px; background: color-mix(in srgb, var(--wl-c) 14%, transparent); color: color-mix(in srgb, var(--wl-c) 70%, var(--text)); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wl-chip-dot { width: 6px; height: 6px; flex-shrink: 0; border-radius: 50%; background: var(--muted); }
 .wl-chip-more { color: var(--muted); }
+/* Sections: a bordered, collapsible sub-group inside the list. */
+.wl-group { margin: 6px 6px 4px; border: 1px solid var(--border); border-radius: 8px; background: color-mix(in srgb, var(--surface2) 55%, transparent); overflow: hidden; }
+.wl-section { display: flex; align-items: center; gap: 7px; width: 100%; padding: 6px 10px; border: 0; border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--accent) 7%, transparent); color: var(--soft); font: inherit; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; text-align: left; cursor: pointer; }
+.wl-section:hover { color: var(--text); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.wl-section-chev { flex-shrink: 0; color: var(--muted); transition: transform .15s; }
+.wl-group.is-collapsed .wl-section { border-bottom-color: transparent; }
+.wl-group.is-collapsed .wl-section-chev { transform: rotate(-90deg); }
+.wl-section-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wl-section-count { color: var(--muted); font-weight: 600; letter-spacing: 0; font-variant-numeric: tabular-nums; }
+.wl-group-rows { margin: 0; padding: 3px 0; list-style: none; }
+.wl-group-rows[hidden] { display: none; }
+.wl-group .wl-row { margin: 0 3px; }
+.wl-group-empty { padding: 7px 12px; color: var(--muted); font-size: 12px; }
+.wl-card .wl-section:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .wl-empty { padding: 18px 14px; color: var(--muted); font-size: 13px; line-height: 1.6; }
 .wl-empty a { color: var(--accent); }
 .wl-card :is(button, a):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -101,6 +115,13 @@
 .wls-ticker:hover { background: color-mix(in srgb, var(--text) 5%, transparent); }
 .wls-ticker .wl-sym { flex-wrap: wrap; }
 .wls-also { color: var(--muted); font-size: 11px; }
+.wls-section { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); border-radius: 0; background: color-mix(in srgb, var(--accent) 7%, transparent); }
+.wls-section:first-child { margin-top: 0; border-top: 0; border-radius: 6px 6px 0 0; }
+.wls-section-mark { display: grid; place-items: center; width: 20px; color: var(--accent); font-weight: 700; }
+.wls-section-name { min-width: 0; width: 100%; padding: 4px 6px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--text); font: inherit; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.wls-section-name:hover { border-color: var(--border); }
+.wls-section-name:focus { outline: none; border-color: var(--accent); background: var(--surface); text-transform: none; letter-spacing: 0; font-size: 13px; }
+.wls-add-section input { flex: 1; }
 .wls-ticker-actions { display: flex; gap: 2px; }
 .wls-mini { width: 28px; height: 28px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--soft); font: inherit; font-size: 14px; cursor: pointer; }
 .wls-mini:hover:not(:disabled) { border-color: var(--border-hover); color: var(--text); }
@@ -112,7 +133,9 @@
 .wls-note.is-ok { color: var(--green); }
 .wls-note.is-warn { color: var(--amber); }
 .wls-muted { padding: 10px; color: var(--muted); font-size: 13px; }
-.wls-danger-row { padding-top: 12px; border-top: 1px solid var(--border); }
+.wls-danger-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding-top: 12px; border-top: 1px solid var(--border); }
+.wls-back { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+.wls-back:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (max-width: 760px) {
   .wls { grid-template-columns: 1fr; }
   .wls-folder-list { max-height: 220px; }

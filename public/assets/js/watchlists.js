@@ -6,7 +6,11 @@
    it without a browser; only read()/write() touch storage.
 
    A folder can be bookmarked with one of TradingView's flag colours.
-   Bookmarked folders always list first, in their own relative order. */
+   Bookmarked folders always list first, in their own relative order.
+
+   Sections divide a folder's list into labelled groups. Like TradingView's
+   own list format they live in `tickers` as "###Name" entries, so they
+   reorder and delete exactly like symbols; symbolsOf() skips them. */
 (function (root) {
   'use strict';
 
@@ -45,6 +49,41 @@
 
   function splitSymbols(text) {
     return String(text == null ? '' : text).split(/[\s,;]+/).filter(Boolean);
+  }
+
+  /* ── Sections ("###Name" entries) ── */
+  var SECTION_PREFIX = '###';
+
+  function isSection(entry) {
+    return typeof entry === 'string' && entry.indexOf(SECTION_PREFIX) === 0;
+  }
+
+  function sectionName(entry) {
+    return isSection(entry) ? entry.slice(SECTION_PREFIX.length) : '';
+  }
+
+  function cleanSectionName(name) {
+    return String(name == null ? '' : name).replace(/\s+/g, ' ').trim().slice(0, MAX_NAME);
+  }
+
+  function hasSection(tickers, name, except) {
+    var key = name.toLowerCase();
+    return tickers.some(function (t) { return t !== except && isSection(t) && sectionName(t).toLowerCase() === key; });
+  }
+
+  function symbolsOf(folder) {
+    return folder ? folder.tickers.filter(function (t) { return !isSection(t); }) : [];
+  }
+
+  /* Splits a folder into the unsectioned symbols at the top, then each
+     section with the symbols under it. */
+  function groupsOf(folder) {
+    var groups = [{ section: null, name: '', symbols: [] }];
+    (folder ? folder.tickers : []).forEach(function (t) {
+      if (isSection(t)) groups.push({ section: t, name: sectionName(t), symbols: [] });
+      else groups[groups.length - 1].symbols.push(t);
+    });
+    return groups;
   }
 
   function tickerParts(symbol) {
@@ -98,6 +137,12 @@
     var tickers = [];
     var have = {};
     (Array.isArray(raw.tickers) ? raw.tickers : []).forEach(function (t) {
+      if (tickers.length >= MAX_TICKERS) return;
+      if (isSection(t)) {
+        var name = cleanSectionName(sectionName(t));
+        if (name && !hasSection(tickers, name)) tickers.push(SECTION_PREFIX + name);
+        return;
+      }
       var s = normalizeSymbol(t);
       if (s && !have[s] && tickers.length < MAX_TICKERS) { have[s] = true; tickers.push(s); }
     });
@@ -223,6 +268,34 @@
     return next;
   }
 
+  /* Appends a section divider; symbols added afterwards land under it. */
+  function addSection(state, id, name) {
+    var next = clone(state);
+    var f = findFolder(next, id);
+    var clean = cleanSectionName(name);
+    var result = { state: next, section: null, error: null };
+    if (!f) return result;
+    if (!clean) result.error = 'Give the section a name.';
+    else if (hasSection(f.tickers, clean)) result.error = 'There is already a section called ' + clean + '.';
+    else if (f.tickers.length >= MAX_TICKERS) result.error = 'Folder is full (' + MAX_TICKERS + ' entries).';
+    else { result.section = SECTION_PREFIX + clean; f.tickers.push(result.section); }
+    return result;
+  }
+
+  function renameSection(state, id, section, name) {
+    var next = clone(state);
+    var f = findFolder(next, id);
+    var clean = cleanSectionName(name);
+    var result = { state: next, section: section, error: null };
+    var i = f ? f.tickers.indexOf(section) : -1;
+    if (i === -1 || !isSection(section)) return result;
+    if (!clean) { result.error = 'Section names cannot be empty.'; return result; }
+    if (hasSection(f.tickers, clean, section)) { result.error = 'There is already a section called ' + clean + '.'; return result; }
+    result.section = SECTION_PREFIX + clean;
+    f.tickers[i] = result.section;
+    return result;
+  }
+
   /* ── Storage (guarded: private browsing, webviews and Node) ── */
   var memory = null;
 
@@ -284,6 +357,12 @@
     normalizeSymbol: normalizeSymbol,
     splitSymbols: splitSymbols,
     tickerParts: tickerParts,
+    isSection: isSection,
+    sectionName: sectionName,
+    symbolsOf: symbolsOf,
+    groupsOf: groupsOf,
+    addSection: addSection,
+    renameSection: renameSection,
     tradingViewUrl: tradingViewUrl,
     iconTint: iconTint,
     defaultState: defaultState,
