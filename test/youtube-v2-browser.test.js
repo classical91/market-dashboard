@@ -75,6 +75,25 @@ test("YouTube page browser regressions", { skip: !fs.existsSync(chromium.executa
     assert.match(await page.locator("#ytFeedStatus").textContent(), /0 matching videos/);
   });
 
+  await t.test("played videos are marked watched and stay marked after a reload", async (t) => {
+    const page = await open(t);
+    await ready(page);
+    await page.evaluate(() => localStorage.removeItem("yt:watched"));
+    const card = page.locator('.yt-feed-card[data-video-id="clip1234567"]');
+    assert.equal(await page.locator(".yt-card.is-watched").count(), 0);
+    await card.click();
+    await page.getByRole("button", { name: "Close player" }).click();
+    const marked = page.locator(".yt-card.is-watched");
+    assert.equal(await marked.count(), 1);
+    assert.equal(await marked.locator(".yt-watched-badge").textContent(), "Watched");
+    assert.equal(await marked.locator(".yt-watched-badge").count(), 1, "replaying does not duplicate the label");
+    await page.reload();
+    await ready(page);
+    assert.equal(await page.locator('.yt-card.is-watched .yt-feed-card[data-video-id="clip1234567"]').count(), 1);
+    assert.equal(await page.locator(".yt-card.is-watched").count(), 1);
+    await page.evaluate(() => localStorage.removeItem("yt:watched"));
+  });
+
   await t.test("queue: add, reorder, persist, play and auto-advance", async (t) => {
     const page = await open(t);
     // A stand-in embed that speaks just enough of the iframe API protocol.
@@ -167,6 +186,45 @@ test("YouTube page browser regressions", { skip: !fs.existsSync(chromium.executa
         assert.ok(queue.y >= watch.y + watch.height, `queue under the player at ${width}px`);
       }
     }
+  });
+
+  await t.test("queue collapses and movie mode tucks the sidebar away", async (t) => {
+    const page = await open(t);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await ready(page);
+    await page.getByRole("button", { name: "Add to queue: Weekly market outlook" }).click();
+    await page.getByRole("button", { name: "Add to queue: Tomorrow briefing" }).click();
+    await page.locator(".yt-feed-card").filter({ hasText: "Markets live" }).click();
+
+    // Movie mode hides the sidebar until the viewer asks for it back.
+    assert.equal(await page.locator(".cmd-sidebar").isVisible(), false);
+    const menu = page.getByRole("button", { name: "Show menu" });
+    await menu.click();
+    assert.equal(await page.locator(".cmd-sidebar").isVisible(), true);
+    assert.equal(await page.locator("#ytMenuToggle").getAttribute("aria-pressed"), "true");
+    await page.getByRole("button", { name: "Hide menu" }).click();
+    assert.equal(await page.locator(".cmd-sidebar").isVisible(), false);
+
+    const toggle = page.locator("#ytQueueCollapse");
+    const expanded = await page.locator("#ytQueue").boundingBox();
+    await toggle.click();
+    assert.equal(await toggle.getAttribute("aria-expanded"), "false");
+    assert.equal(await page.locator("#ytQueueList").isVisible(), false);
+    assert.match(await page.locator("#ytQueueCount").textContent(), /2 videos · Next: Weekly market outlook/);
+    const collapsed = await page.locator("#ytQueue").boundingBox();
+    assert.ok(collapsed.height < expanded.height / 2, "collapsed queue shrinks to its header");
+
+    // Both choices survive a reload; the sidebar returns once the player closes.
+    await page.reload();
+    await ready(page);
+    assert.equal(await page.locator("#ytQueueCollapse").getAttribute("aria-expanded"), "false");
+    assert.equal(await page.locator(".cmd-sidebar").isVisible(), true);
+    await page.locator(".yt-feed-card").filter({ hasText: "Markets live" }).click();
+    assert.equal(await page.locator(".cmd-sidebar").isVisible(), false);
+    await page.getByRole("button", { name: "Close player" }).click();
+    assert.equal(await page.locator(".cmd-sidebar").isVisible(), true);
+    await page.locator("#ytQueueCollapse").click();
+    assert.equal(await page.locator("#ytQueueList").isVisible(), true);
   });
 
   await t.test("Gemini summary popup renders, seeks the player and closes", async (t) => {

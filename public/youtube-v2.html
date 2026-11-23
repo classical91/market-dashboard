@@ -70,6 +70,7 @@
             <button id="ytPlayNext" type="button" hidden>Play next <span aria-hidden="true">&#9197;</span></button>
             <a id="ytPlayerLink" target="_blank" rel="noopener">Watch on YouTube <span aria-hidden="true">&#8599;</span></a>
             <button id="ytCopyLink" type="button">Copy link <span aria-hidden="true">&#128279;</span></button>
+            <button id="ytMenuToggle" type="button" class="yt-menu-toggle" aria-pressed="false">Show menu</button>
             <button id="ytCloseWatch" type="button">Close player</button>
           </div>
         </div>
@@ -77,8 +78,12 @@
 
       <section id="ytQueue" class="yt-queue" aria-labelledby="ytQueueHeading" hidden>
         <div class="yt-queue-head">
-          <div>
-            <h2 id="ytQueueHeading">Up next</h2>
+          <div class="yt-queue-title-group">
+            <h2 id="ytQueueHeading">
+              <button type="button" class="yt-queue-collapse" id="ytQueueCollapse" aria-expanded="true" aria-controls="ytQueueList" title="Collapse queue">
+                <span class="yt-queue-chevron" aria-hidden="true"></span>Up next
+              </button>
+            </h2>
             <p class="yt-queue-count" id="ytQueueCount"></p>
           </div>
           <div class="yt-queue-actions">
