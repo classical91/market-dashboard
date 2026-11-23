@@ -132,19 +132,18 @@
     {
       id: "presets", label: "Presets", href: "/ai-analysis.html", verb: "Last run",
       load: function () {
-        return getJson("/api/ai-analysis/log").then(function (data) { return logSummary(data.entries); });
+        return loadGeneration("presets", "/api/ai-analysis", "/api/ai-analysis/log", function (data) {
+          gen.presets.presets = data.presets || [];
+          gen.presets.intervals = data.availableIntervals || [];
+        }).then(logSummary);
       },
     },
     {
       id: "layouts", label: "My Layouts", href: "/layout-analysis.html", verb: "Last run",
       load: function () {
-        return getJson("/api/layout-analysis/log").then(function (data) {
-          renderLayoutLog(data.entries);
-          return logSummary(data.entries);
-        }, function (err) {
-          layoutLogEl.innerHTML = '<p class="ov2-note ov2-warn" role="status">Failed to load captures. Use Refresh all to retry.</p>';
-          throw err;
-        });
+        return loadGeneration("layouts", "/api/layout-analysis", "/api/layout-analysis/log", function (data) {
+          gen.layouts.configured = data.layouts || [];
+        }).then(logSummary);
       },
     },
     {
@@ -215,16 +214,260 @@
 
   systemEl.innerHTML = SYSTEMS.map(systemShell).join("");
 
-  // ── Compact My Layouts generation log ───────────────────────
-  // Share the status tile's read; opening Overview never generates a capture.
+  // ── Generation widget: My Layouts / Presets ─────────────────
+  // Two tabs over the same layout: timeframe tiles on top (latest verdict
+  // each), the generation log below. My Layouts shows one tile per saved
+  // layout; Presets has a symbol dropdown and one tile per timeframe for
+  // that symbol. Selecting a tile filters the log. Shares the status tiles'
+  // reads; opening Overview never generates anything.
   var layoutLogEl = document.getElementById("ov2-generation-log");
+  var presetsEl = document.getElementById("ov2-presets");
+  var filterLabelEl = document.getElementById("ov2-generation-filter");
+  var openLinkEl = document.getElementById("ov2-generation-open");
+  var subtitleEl = document.getElementById("ov2-generation-subtitle");
+  var symbolWrapEl = document.getElementById("ov2-generation-symbol-wrap");
+  var symbolEl = document.getElementById("ov2-generation-symbol");
+  var tabEls = Array.prototype.slice.call(document.querySelectorAll("[data-gen-tab]"));
+  var GEN_TAB_KEY = "overviewV2.generationTab";
+  var GEN_SYMBOL_KEY = "overviewV2.generationSymbol";
+  var TF_UNIT_MS = { s: 1e3, m: 6e4, h: 36e5, d: 864e5, w: 6048e5, mo: 2592e6, y: 31536e6 };
+  var gen = {
+    tab: "layouts",
+    layouts: { entries: null, configured: [], error: null, active: null },
+    presets: { entries: null, presets: [], intervals: [], error: null, symbol: null, active: null },
+  };
+  try {
+    if (localStorage.getItem(GEN_TAB_KEY) === "presets") gen.tab = "presets";
+    gen.presets.symbol = localStorage.getItem(GEN_SYMBOL_KEY);
+  } catch (e) { /* private mode */ }
 
-  function renderLayoutLog(entries) {
+  // "BTC 4h" → { symbol: "BTC", tf: "4h", ms }. Labels without a trailing
+  // timeframe keep their full text and sort after the ones with one.
+  function parseTimeframe(label) {
+    var text = String(label || "").trim();
+    var match = text.match(/^(.*?)[\s·\-_/]+(\d*)\s*(mo|[smhdwy]|M)$/i) || text.match(/^(.*?)[\s·\-_/]+(\d+)()$/);
+    if (!match) return { symbol: text, tf: "", ms: Infinity };
+    var unit = match[3] === "M" ? "mo" : (match[3] || "m").toLowerCase();
+    var count = match[2] ? parseInt(match[2], 10) : 1;
+    var tf = (match[2] || "1") + (unit === "mo" ? "M" : unit === "h" || unit === "m" || unit === "s" ? unit : unit.toUpperCase());
+    return { symbol: match[1].trim() || text, tf: tf, ms: count * TF_UNIT_MS[unit] };
+  }
+
+  function latestOf(entries) {
+    var best = null;
+    (entries || []).forEach(function (entry) {
+      var at = time(entry.generatedAt);
+      if (at !== null && (!best || at > best.at)) best = { at: at, verdict: entry.verdict };
+    });
+    return best;
+  }
+
+  function verdictOf(value) {
+    return ["BUY", "SELL", "HOLD"].indexOf(value) !== -1 ? value : "NO CALL";
+  }
+
+  function verdictChip(value, extraClass) {
+    var verdict = verdictOf(value);
+    var tone = verdict === "NO CALL" ? "" : " aia-verdict--" + verdict.toLowerCase();
+    return '<span class="aia-verdict ' + extraClass + tone + '">' + verdict + "</span>";
+  }
+
+  // My Layouts tiles: configured layouts plus any layout seen in the log
+  // (so the strip still works if the layout list fails), shortest first.
+  function layoutTiles() {
+    var state = gen.layouts;
+    var byId = {};
+    var order = [];
+    function add(id, label) {
+      if (!id || byId[id]) return;
+      byId[id] = { id: id, label: label || id };
+      order.push(id);
+    }
+    state.configured.forEach(function (layout) { add(layout.id, layout.label); });
+    (state.entries || []).forEach(function (entry) { add(entry.layoutId, entry.label); });
+    return order.map(function (id, i) {
+      var tile = byId[id];
+      var parsed = parseTimeframe(tile.label);
+      return {
+        id: id, label: tile.label, tf: parsed.tf || tile.label, sub: parsed.tf ? parsed.symbol : "", ms: parsed.ms, index: i,
+        latest: latestOf((state.entries || []).filter(function (e) { return e.layoutId === id; })),
+        href: "/layout-analysis.html?layout=" + encodeURIComponent(id),
+      };
+    }).sort(function (a, b) { return a.ms - b.ms || a.index - b.index; });
+  }
+
+  // Presets symbols: the configured presets, then any other symbol in the log.
+  function presetSymbols() {
+    var state = gen.presets;
+    var seen = {};
+    var list = [];
+    function add(symbol, label) {
+      if (!symbol || seen[symbol]) return;
+      seen[symbol] = true;
+      list.push({ symbol: symbol, label: label || symbol });
+    }
+    state.presets.forEach(function (p) { add(p.symbol, p.label); });
+    (state.entries || []).forEach(function (e) { add(e.symbol, e.label); });
+    return list;
+  }
+
+  function presetTiles() {
+    var state = gen.presets;
+    var symbolEntries = (state.entries || []).filter(function (e) { return e.symbol === state.symbol; });
+    var intervals = state.intervals.slice();
+    symbolEntries.forEach(function (e) { if (e.interval && intervals.indexOf(e.interval) === -1) intervals.push(e.interval); });
+    var label = (presetSymbols().filter(function (s) { return s.symbol === state.symbol; })[0] || {}).label || state.symbol;
+    return intervals.map(function (interval, i) {
+      return {
+        id: interval, label: label + " " + interval, tf: interval, sub: "", ms: parseTimeframe("x " + interval).ms, index: i,
+        latest: latestOf(symbolEntries.filter(function (e) { return e.interval === interval; })),
+        href: "/ai-analysis.html",
+      };
+    }).sort(function (a, b) { return a.ms - b.ms || a.index - b.index; });
+  }
+
+  function renderTiles(tiles, active) {
+    var todayKey = new Date().toDateString();
+    presetsEl.innerHTML = tiles.map(function (tile) {
+      var latest = tile.latest;
+      var isToday = latest && new Date(latest.at).toDateString() === todayKey;
+      var when = latest
+        ? '<time class="ov2-preset-when' + (isToday ? " is-today" : "") + '" datetime="' + new Date(latest.at).toISOString() + '">' + esc(ago(latest.at)) + "</time>"
+        : '<span class="ov2-preset-when">' + (gen.tab === "presets" ? "Not generated" : "Not captured yet") + "</span>";
+      return '<button type="button" class="ov2-preset" data-preset="' + esc(tile.id) + '" aria-pressed="' + (tile.id === active) + '"' +
+        ' title="' + esc(tile.label + (latest ? " · " + verdictOf(latest.verdict) + " · " + stamp(latest.at) : "")) + '">' +
+        '<span class="ov2-preset-top"><span class="ov2-preset-tf">' + esc(tile.tf) + "</span>" +
+        (latest ? verdictChip(latest.verdict, "") : "") + "</span>" +
+        (tile.sub ? '<span class="ov2-preset-sym">' + esc(tile.sub) + "</span>" : "") +
+        when + "</button>";
+    }).join("");
+  }
+
+  function renderSymbolSelect() {
+    var symbols = presetSymbols();
+    var state = gen.presets;
+    if (!symbols.some(function (s) { return s.symbol === state.symbol; })) state.symbol = symbols.length ? symbols[0].symbol : null;
+    symbolEl.innerHTML = symbols.map(function (s) {
+      return '<option value="' + esc(s.symbol) + '"' + (s.symbol === state.symbol ? " selected" : "") + ">" + esc(s.label) + "</option>";
+    }).join("");
+    symbolEl.disabled = !symbols.length;
+  }
+
+  function renderGeneration() {
+    var isPresets = gen.tab === "presets";
+    var state = gen[gen.tab];
+    tabEls.forEach(function (tab) {
+      var on = tab.getAttribute("data-gen-tab") === gen.tab;
+      tab.setAttribute("aria-selected", String(on));
+      tab.tabIndex = on ? 0 : -1;
+    });
+    symbolWrapEl.hidden = !isPresets;
+    subtitleEl.textContent = isPresets ? "AI Analysis presets: latest read per timeframe" : "Saved layouts: latest read per timeframe";
+    presetsEl.setAttribute("aria-label", isPresets ? "Timeframes for the selected preset — select one to filter the log" : "Saved layouts by timeframe — select one to filter the log");
+
+    if (state.entries === null) {
+      if (state.error) {
+        presetsEl.innerHTML = '<p class="ov2-note ov2-warn" role="status">' + (isPresets ? "Presets" : "Layouts") + " unavailable.</p>";
+        layoutLogEl.innerHTML = '<p class="ov2-note ov2-warn" role="status">Failed to load the log (' + esc(state.error) + "). Use Refresh all to retry.</p>";
+      } else {
+        presetsEl.innerHTML = '<p class="ov2-note" role="status">Loading…</p>';
+        layoutLogEl.innerHTML = '<p class="ov2-note" role="status">Loading…</p>';
+      }
+      if (isPresets) renderSymbolSelect();
+      filterLabelEl.textContent = "Recent runs";
+      return;
+    }
+
+    if (isPresets) renderSymbolSelect();
+    var tiles = isPresets ? presetTiles() : layoutTiles();
+    if (state.active && !tiles.some(function (t) { return t.id === state.active; })) state.active = null;
+    var tile = tiles.filter(function (t) { return t.id === state.active; })[0];
+
+    if (tiles.length) renderTiles(tiles, state.active);
+    else presetsEl.innerHTML = '<p class="ov2-note" role="status">' + (isPresets ? "No presets configured." : "No saved layouts. Add them to AI_ANALYSIS_LAYOUTS.") + "</p>";
+
+    var entries;
+    var scope;
+    if (isPresets) {
+      var symbolLabel = symbolEl.options[symbolEl.selectedIndex] ? symbolEl.options[symbolEl.selectedIndex].text : "";
+      entries = state.entries.filter(function (e) { return e.symbol === state.symbol && (!tile || e.interval === tile.id); })
+        .map(function (e) { return { verdict: e.verdict, generatedAt: e.generatedAt, label: (e.label || e.symbol) + " " + e.interval }; });
+      scope = tile ? tile.label : symbolLabel + " · all timeframes";
+      openLinkEl.href = "/ai-analysis.html";
+      openLinkEl.textContent = "Open Presets ↗";
+    } else {
+      entries = state.entries.filter(function (e) { return !tile || e.layoutId === tile.id; });
+      scope = tile ? tile.label : "all layouts";
+      openLinkEl.href = tile ? tile.href : "/layout-analysis.html#aia-log";
+      openLinkEl.textContent = tile ? "Open " + tile.tf + " ↗" : "Full log ↗";
+    }
+    filterLabelEl.textContent = "Recent " + (isPresets ? "runs" : "captures") + " · " + scope;
+    renderLayoutLog(entries, tile ? tile.label : null);
+  }
+
+  function setGenTab(tab, focus) {
+    gen.tab = tab;
+    try { localStorage.setItem(GEN_TAB_KEY, tab); } catch (e) { /* private mode */ }
+    renderGeneration();
+    if (focus) document.querySelector('[data-gen-tab="' + tab + '"]').focus();
+  }
+
+  tabEls.forEach(function (tab) {
+    tab.addEventListener("click", function () { setGenTab(tab.getAttribute("data-gen-tab"), false); });
+    tab.addEventListener("keydown", function (event) {
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight" && event.key !== "Home" && event.key !== "End") return;
+      event.preventDefault();
+      var i = tabEls.indexOf(tab);
+      var next = event.key === "Home" ? 0 : event.key === "End" ? tabEls.length - 1 : (i + (event.key === "ArrowRight" ? 1 : -1) + tabEls.length) % tabEls.length;
+      setGenTab(tabEls[next].getAttribute("data-gen-tab"), true);
+    });
+  });
+
+  symbolEl.addEventListener("change", function () {
+    gen.presets.symbol = symbolEl.value;
+    gen.presets.active = null;
+    try { localStorage.setItem(GEN_SYMBOL_KEY, symbolEl.value); } catch (e) { /* private mode */ }
+    renderGeneration();
+  });
+
+  presetsEl.addEventListener("click", function (event) {
+    var tile = event.target.closest("[data-preset]");
+    if (!tile) return;
+    var id = tile.getAttribute("data-preset");
+    var state = gen[gen.tab];
+    state.active = state.active === id ? null : id;
+    renderGeneration();
+    var again = presetsEl.querySelector('[data-preset="' + (window.CSS && CSS.escape ? CSS.escape(id) : id) + '"]');
+    if (again) again.focus();
+  });
+
+  // Called by the status loaders. The list read only adds tiles with no run
+  // yet; if it fails, tiles come from the log alone.
+  function loadGeneration(tab, listUrl, logUrl, applyList) {
+    var state = gen[tab];
+    var list = getJson(listUrl).then(applyList, function () { /* log-only tiles */ });
+    return getJson(logUrl).then(function (data) {
+      state.entries = data.entries || [];
+      state.error = null;
+      list.then(function () { if (gen.tab === tab) renderGeneration(); });
+      if (gen.tab === tab) renderGeneration();
+      return data.entries;
+    }, function (err) {
+      state.entries = null;
+      state.error = err.message;
+      if (gen.tab === tab) renderGeneration();
+      throw err;
+    });
+  }
+
+  function renderLayoutLog(entries, scopeLabel) {
     var recent = (entries || []).slice().sort(function (a, b) {
       return (time(b.generatedAt) || 0) - (time(a.generatedAt) || 0);
     }).slice(0, 12);
     if (!recent.length) {
-      layoutLogEl.innerHTML = '<p class="ov2-note" role="status">No captures yet. Open My Layouts to capture a chart.</p>';
+      var none = gen.tab === "presets" ? "No runs" : "No captures";
+      layoutLogEl.innerHTML = '<p class="ov2-note" role="status">' +
+        (scopeLabel ? none + " of " + esc(scopeLabel) + " yet." : gen.tab === "presets" ? "No runs for this preset yet. Open Presets to generate one." : "No captures yet. Open My Layouts to capture a chart.") + "</p>";
       return;
     }
     var today = new Date();
@@ -243,11 +486,9 @@
         html += '<div class="aia-log-group"><div class="aia-log-group-title' + (isToday ? ' aia-log-group-title--today' : '') + '">' + esc(label) + '</div>';
         previousDay = key;
       }
-      var verdict = ["BUY", "SELL", "HOLD"].indexOf(entry.verdict) !== -1 ? entry.verdict : "NO CALL";
-      var tone = verdict === "NO CALL" ? "" : " aia-verdict--" + verdict.toLowerCase();
       var clock = date ? date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) : "Unknown time";
       html += '<div class="aia-log-item' + (isToday ? ' aia-log-item--today' : '') + '">' +
-        '<span class="aia-verdict aia-log-verdict' + tone + '">' + verdict + '</span>' +
+        verdictChip(entry.verdict, "aia-log-verdict") +
         '<span class="aia-log-symbol" title="' + esc(entry.label || entry.layoutId || "Layout") + '">' + esc(entry.label || entry.layoutId || "Layout") + '</span>' +
         (date ? '<time class="aia-log-time" datetime="' + date.toISOString() + '" title="' + esc(stamp(at)) + '">' + esc(clock) + '</time>'
           : '<span class="aia-log-time">Unknown time</span>') + '</div>';

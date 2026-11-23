@@ -372,7 +372,10 @@
         layoutSelect.innerHTML = layouts.map(function (l) {
           return '<option value="' + escapeHtml(l.id) + '">' + escapeHtml(l.label) + '</option>';
         }).join('');
-        if (layouts.length) setActive(layouts[0].id);
+        // ?layout=<id> (from the Overview widget) opens that layout first.
+        var wanted = new URLSearchParams(window.location.search).get('layout');
+        var initial = layouts.find(function (l) { return l.id === wanted; }) || layouts[0];
+        if (initial) setActive(initial.id);
         else renderPanel();
       })
       .catch(function (err) {
