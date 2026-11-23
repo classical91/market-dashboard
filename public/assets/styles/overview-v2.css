@@ -119,6 +119,20 @@
 .ov2-notes-input::placeholder { color: var(--muted); }
 .ov2-notes-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-color: transparent; }
 .ov2-notes.is-expanded .ov2-notes-input { min-height: 320px; max-height: none; }
+/* Folder row: one chip per folder, wrapping onto more rows as folders are added. */
+.ov2-notes-folders { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 8px; }
+.ov2-notes-folder, .ov2-notes-folder-add, .ov2-notes-folder-action { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; border: 1px solid var(--border); border-radius: 999px; background: var(--surface2); color: var(--soft); padding: 3px 10px; font: inherit; font-size: 11px; font-weight: 650; cursor: pointer; }
+.ov2-notes-folder:hover, .ov2-notes-folder-add:hover, .ov2-notes-folder-action:hover { border-color: var(--border-hover); color: var(--text); }
+.ov2-notes-folder[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-bg); color: var(--accent); }
+.ov2-notes-folder-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ov2-notes-folder.has-notes .ov2-notes-folder-name::after { content: ""; display: inline-block; width: 5px; height: 5px; margin-left: 5px; border-radius: 50%; background: currentColor; opacity: 0.55; vertical-align: middle; }
+.ov2-notes-folder-icon { font-size: 12px; line-height: 1; }
+.ov2-notes-folder-add { border-style: dashed; color: var(--muted); }
+.ov2-notes-folder-actions { display: inline-flex; gap: 4px; margin-left: auto; }
+.ov2-notes-folder-action { border-radius: 6px; padding: 2px 8px; font-weight: 600; color: var(--muted); }
+.ov2-notes-folder-action.is-danger:hover { border-color: var(--red); color: var(--red); }
+.ov2-notes-folder-input { width: 140px; border: 1px solid var(--accent); border-radius: 999px; background: var(--surface2); color: var(--text); padding: 3px 10px; font: inherit; font-size: 11px; }
+.ov2-notes-folder:focus-visible, .ov2-notes-folder-add:focus-visible, .ov2-notes-folder-action:focus-visible, .ov2-notes-toggle:focus-visible, .ov2-notes-folder-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .ov2-generation-card { min-width: 0; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); padding: 12px 13px; }
 .ov2-generation-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
 .ov2-generation-head h2 { margin: 0; font-size: 14px; }
