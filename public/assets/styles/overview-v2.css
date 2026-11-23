@@ -122,6 +122,20 @@
 .ov2-sys { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 11px 13px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--soft); text-decoration: none; }
 .ov2-sys:hover { border-color: var(--border-hover); }
 .ov2-sys-label { font-size: 12px; font-weight: 700; color: var(--accent); }
+/* Each status tile keeps the same shape but carries its own tone. */
+.ov2-system .ov2-sys { --sys-tone: var(--accent); border-left: 3px solid var(--sys-tone); background: linear-gradient(135deg, color-mix(in srgb, var(--sys-tone) 12%, var(--surface)), var(--surface) 70%); }
+.ov2-system .ov2-sys:hover { border-color: color-mix(in srgb, var(--sys-tone) 55%, var(--border)); border-left-color: var(--sys-tone); }
+.ov2-system .ov2-sys:focus-visible { outline-color: var(--sys-tone); }
+.ov2-system .ov2-sys-label { color: var(--sys-tone); }
+.ov2-system .ov2-sys-count em { color: var(--sys-tone); }
+#ov2-sys-presets { --sys-tone: #a78bfa; }
+#ov2-sys-layouts { --sys-tone: #22d3ee; }
+#ov2-sys-trades { --sys-tone: #34d399; }
+#ov2-sys-buys { --sys-tone: #fbbf24; }
+[data-theme="light"] #ov2-sys-presets { --sys-tone: #7c3aed; }
+[data-theme="light"] #ov2-sys-layouts { --sys-tone: #0e7490; }
+[data-theme="light"] #ov2-sys-trades { --sys-tone: #047857; }
+[data-theme="light"] #ov2-sys-buys { --sys-tone: #b45309; }
 .ov2-sys-count { font-size: 11px; color: var(--muted); }
 .ov2-sys-count strong { font-size: 18px; color: var(--text); font-variant-numeric: tabular-nums; margin-right: 2px; }
 .ov2-sys-count em { font-style: normal; color: var(--soft); }
