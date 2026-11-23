@@ -160,6 +160,23 @@ body[data-x-accent] .x-account-card--all.active { border-color: var(--x-accent);
   --x-shortcut-bg: color-mix(in srgb, var(--amber) 32%, transparent);
 }
 .x-account-actions a.x-shortcut--link { --x-accent: var(--green); }
+.x-account-actions a.x-shortcut--ta { --x-accent: var(--purple); }
+.x-shortcut-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.x-shortcut-group + .x-shortcut-group,
+.x-account-actions > a + .x-shortcut-group { margin-top: 6px; }
+.x-shortcut-group-title {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.x-shortcut-group--news .x-shortcut-group-title { color: var(--green); }
+.x-shortcut-group--ta .x-shortcut-group-title { color: var(--purple); }
 
 .x-timeline-frame {
   min-height: 620px;
@@ -1103,6 +1120,7 @@ body[data-x-motion="off"] .x-search-popover::before { animation: none; }
   .x-split.is-rail-collapsed .x-account-actions a { padding: 6px 3px; font-size: 11px; }
   .x-split.is-rail-collapsed .x-account-action-icon { display: inline; }
   .x-split.is-rail-collapsed .x-account-action-label { display: none; }
+  .x-split.is-rail-collapsed .x-shortcut-group-title { display: none; }
   .x-split.is-rail-collapsed .x-account-manage-label,
   .x-split.is-rail-collapsed .x-account-list { display: none; }
 
