@@ -15,7 +15,6 @@ test("primary sidebar order and removed links stay exact", () => {
     "My Trades",
     "TradeHunter",
     "AI Analysis",
-    "AI/Bots",
     "Reporter",
     "Market Intel Links",
     "Intelligent Portal",
@@ -133,7 +132,7 @@ test("both screener pages are available in Alpha review mode", () => {
 
 test("AI Analysis owns presets, layouts, and Signal Diagnostics", () => {
   const start = sidebar.indexOf('label: "AI Analysis"');
-  const end = sidebar.indexOf('label: "AI/Bots"', start);
+  const end = sidebar.indexOf('label: "Reporter"', start);
   const menu = sidebar.slice(start, end);
 
   assert.match(menu, /label: "Presets"/);
@@ -146,7 +145,9 @@ test("AI Analysis owns presets, layouts, and Signal Diagnostics", () => {
 
 test("AI/Bots groups the ChatGPT analyst and CoinTrendz Telegram links", () => {
   const start = sidebar.indexOf('label: "AI/Bots"');
-  const end = sidebar.indexOf('label: "Reporter"', start);
+  const end = sidebar.indexOf('label: "Commands Codes"', start);
+  assert.ok(start > sidebar.indexOf("var tools"), "AI/Bots sits in Trading & Tools");
+  assert.ok(end > start, "AI/Bots sits above Commands Codes");
   const menu = sidebar.slice(start, end);
 
   assert.match(menu, /^label: "AI\/Bots",\s*children: \[/);
