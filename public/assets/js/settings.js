@@ -686,6 +686,53 @@ Rules:
   /* Apply immediately so there's no flash */
   if (typeof document !== 'undefined') applyTheme(getTheme());
 
+  /* ── TradingView links → mobile app ─────────────────────
+     Ticker links across the dashboard point at tradingview.com charts. On
+     Android, tapping one is rerouted through an intent:// URL naming the
+     TradingView app, so the chart opens in the app when it is installed and
+     falls back to the same web chart when it is not. iOS needs no rewrite:
+     a tapped https link opens the app through TradingView's universal links
+     when iOS supports it for that page, and stays in the browser otherwise
+     (a custom-scheme rewrite there would show an error when the app is
+     missing). Desktop browsers are left alone. */
+  var TV_LINK_MODES = ['app', 'web'];
+  var TV_ANDROID_PACKAGE = 'com.tradingview.tradingviewapp';
+  var TV_LINK_RE = /^https:\/\/(?:www\.)?tradingview\.com\/(?:chart|symbols)(?:[/?#]|$)/i;
+
+  function getTradingViewLinks() {
+    var mode = storeGet('tvLinks');
+    return TV_LINK_MODES.indexOf(mode) === -1 ? 'app' : mode;
+  }
+
+  function setTradingViewLinks(mode) {
+    storeSet('tvLinks', TV_LINK_MODES.indexOf(mode) === -1 ? 'app' : mode);
+  }
+
+  /* The intent:// form of a TradingView chart URL for Android, or null when
+     the URL is not a TradingView chart/symbol page or the device is not
+     Android. Pure, so it is tested under Node. */
+  function tradingViewAppHref(href, userAgent) {
+    var url = String(href || '');
+    if (!TV_LINK_RE.test(url) || !/Android/i.test(String(userAgent || ''))) return null;
+    var rest = url.replace(/^https:\/\//i, '');
+    var hash = rest.indexOf('#');
+    if (hash !== -1) rest = rest.slice(0, hash);
+    return 'intent://' + rest + '#Intent;scheme=https;package=' + TV_ANDROID_PACKAGE +
+      ';S.browser_fallback_url=' + encodeURIComponent(url) + ';end';
+  }
+
+  if (typeof document !== 'undefined' && typeof navigator !== 'undefined') {
+    document.addEventListener('click', function (e) {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      var link = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+      if (!link || link.hasAttribute('download') || getTradingViewLinks() !== 'app') return;
+      var appHref = tradingViewAppHref(link.href, navigator.userAgent);
+      if (!appHref) return;
+      e.preventDefault();
+      window.location.href = appHref;
+    });
+  }
+
   var AppSettings = {
     THEMES: THEMES,
     ACCENTS: ACCENTS,
@@ -699,6 +746,9 @@ Rules:
     getTheme: getTheme,
     applyAccent: applyAccent,
     getAccent: getAccent,
+    getTradingViewLinks: getTradingViewLinks,
+    setTradingViewLinks: setTradingViewLinks,
+    tradingViewAppHref: tradingViewAppHref,
     getFrequency: function () {
       var hours = parseInt(storeGet('reporterFreqHours') || '24', 10);
       return REPORTER_FREQUENCIES.indexOf(hours) === -1 ? 24 : hours;

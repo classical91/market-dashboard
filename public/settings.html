@@ -475,6 +475,23 @@
             <div class="wls-editor" id="wlsEditor" aria-live="polite"></div>
           </div>
         </div>
+        <div class="settings-card">
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-label">Open tickers on phones</div>
+              <div class="settings-row-sub">
+                Where a ticker opens when tapped on a phone, from the watchlist and every other TradingView chart link.
+                <strong>TradingView app</strong> opens the chart in the app when it is installed and falls back to the
+                website when it is not: on Android this is always tried; on iPhone it follows TradingView&rsquo;s own
+                app links. Desktop browsers always open the website. Saved in this browser.
+              </div>
+            </div>
+          </div>
+          <div class="freq-options" id="tvLinkOptions" role="group" aria-label="Open tickers on phones">
+            <button class="freq-btn" type="button" data-tv-links="app">TradingView app</button>
+            <button class="freq-btn" type="button" data-tv-links="web">Browser</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -879,6 +896,27 @@
       });
       grid.appendChild(btn);
     });
+  })();
+
+  /* ── TradingView ticker links on phones ─────────────────── */
+  (function () {
+    var s = window.AppSettings;
+    var group = document.getElementById('tvLinkOptions');
+    function paint(mode) {
+      group.querySelectorAll('[data-tv-links]').forEach(function (b) {
+        var on = b.getAttribute('data-tv-links') === mode;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-pressed', String(on));
+      });
+    }
+    group.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-tv-links]');
+      if (!btn) return;
+      s.setTradingViewLinks(btn.getAttribute('data-tv-links'));
+      paint(s.getTradingViewLinks());
+      showToast();
+    });
+    paint(s.getTradingViewLinks());
   })();
 
   /* ── Frequency ──────────────────────────────────────────── */
