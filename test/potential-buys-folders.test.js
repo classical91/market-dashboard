@@ -140,6 +140,24 @@ test("crop geometry keeps the box inside the image and honours aspect", () => {
   assert.deepEqual(Crop.outputSize(8000, 4000, 4096), { width: 4096, height: 2048 });
 });
 
+test("tickerSymbol and withTicker file a separately sent ticker in front of the note", () => {
+  const { tickerSymbol, withTicker } = require("../public/assets/js/ticker-label");
+  assert.equal(tickerSymbol("nvda"), "NVDA");
+  assert.equal(tickerSymbol(" $sol-usd "), "SOL-USD");
+  assert.equal(tickerSymbol("#btc"), "BTC");
+  assert.equal(tickerSymbol("BINANCE:BTCUSDT"), "BTCUSDT");
+  assert.equal(tickerSymbol(""), "");
+  assert.equal(tickerSymbol("buy this"), null);
+  assert.equal(tickerSymbol("100"), null);
+
+  assert.equal(withTicker("nvda", ""), "$NVDA");
+  // A one-word note stays a word, not a second ticker.
+  assert.equal(withTicker("nvda", "breakout"), "$NVDA breakout");
+  assert.equal(withTicker("eth", "breakout #crypto"), "$ETH breakout #crypto");
+  assert.equal(withTicker("btc", "$btc retest"), "$BTC retest");
+  assert.equal(withTicker("", "sol"), "$SOL");
+});
+
 test("formatLabel turns a lone ticker into an upper-case $cashtag", () => {
   const { formatLabel } = require("../public/assets/js/ticker-label");
   assert.equal(formatLabel("btc"), "$BTC");

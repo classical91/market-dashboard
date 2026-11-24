@@ -90,6 +90,8 @@
       <ol>
         <li>In Shortcuts, make a new shortcut named <strong>Potential Buys</strong>. In its details, turn on
           <strong>Show in Share Sheet</strong> and set it to receive <strong>Images</strong>.</li>
+        <li>First add <strong>Ask for Input</strong> (Text) with the prompt <strong>Ticker?</strong>. It goes before the
+          repeat, so one answer covers every screenshot you share at once.</li>
         <li>Add <strong>Repeat with Each</strong> item in <strong>Shortcut Input</strong> (so several screenshots go at once).</li>
         <li>Inside the repeat, add <strong>Convert Image</strong> &rarr; <strong>JPEG</strong> (camera photos are HEIC, which browsers can't show).</li>
         <li>Then <strong>Get Contents of URL</strong>:
@@ -97,12 +99,17 @@
             <li>URL: <code id="pbUploadUrl">/api/potential-buys/upload</code></li>
             <li>Method <strong>POST</strong>. Header <code>x-broadcast-key</code> = your <code>BROADCAST_LEDGER_API_KEY</code>
               (the same key as the phone briefings Shortcut).</li>
+            <li>Header <code>x-ticker</code> = <strong>Provided Input</strong> (the answer to <em>Ticker?</em>).</li>
             <li>Request Body <strong>File</strong> = <strong>Converted Image</strong>.</li>
           </ul>
         </li>
-        <li>Optional: add <strong>Ask for Input</strong> before the URL step and put it at the end of the URL as
-          <code>?label=</code> + the answer, to label it with a ticker.</li>
+        <li>Optional: <strong>Get Dictionary Value</strong> <code>message</code> from <strong>Contents of URL</strong>, then
+          <strong>Show Notification</strong> with it. It reads <em>Saved to $NVDA</em>, or tells you what was wrong.</li>
       </ol>
+      <p>Type the ticker as <code>nvda</code>, <code>$NVDA</code> or <code>NASDAQ:NVDA</code>; each lands in the
+        <strong>$NVDA</strong> stack here, with any earlier NVDA screenshots. Leave it blank to save without one and
+        add it here later. To add a note as well, send it in an <code>x-label</code> header (for example
+        <code>breakout</code> becomes <code>$NVDA breakout</code>).</p>
       <p>The key can only add screenshots here. Viewing, relabelling and deleting them still needs your login.</p>
     </details>
 
