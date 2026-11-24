@@ -18,7 +18,22 @@
     window.open("https://x.com/search?q=" + encodeURIComponent(trimmed) + "&src=typed_query", "_blank", "noopener");
   }
 
+  // Extra search cards (e.g. the green "Search on X" card in the shortcut
+  // rail) opt in with data-x-search-form and reuse the same X search URL.
+  function bindSearchCards() {
+    var cards = document.querySelectorAll("form[data-x-search-form]");
+    Array.prototype.forEach.call(cards, function (card) {
+      var cardInput = card.querySelector("input[type='search']");
+      if (!cardInput) return;
+      card.addEventListener("submit", function (event) {
+        event.preventDefault();
+        openSearch(cardInput.value);
+      });
+    });
+  }
+
   function init() {
+    bindSearchCards();
     var form = document.getElementById("xSearchForm");
     var input = document.getElementById("xSearchInput");
     if (!form || !input) return;

@@ -133,6 +133,24 @@
           </a>
           <div class="x-shortcut-group x-shortcut-group--news" role="group" aria-labelledby="xNewsGrabberTitle">
             <h3 class="x-shortcut-group-title" id="xNewsGrabberTitle">News Grabber</h3>
+            <!-- Green search card: opens X search results in a new tab. The
+                 collapsed rail swaps it for the icon-only link below it. -->
+            <form class="x-shortcut-search" id="xShortcutSearchForm" data-x-search-form
+                  role="search" aria-label="Search on X">
+              <label class="x-shortcut-search-label" for="xShortcutSearchInput">Search on X</label>
+              <div class="x-shortcut-search-row">
+                <input class="x-shortcut-search-input" id="xShortcutSearchInput" type="search"
+                       placeholder="Keyword, $ticker, from:handle&hellip;" autocomplete="off" spellcheck="false" />
+                <button class="x-shortcut-search-submit" type="submit" aria-label="Search on X (opens in a new tab)">
+                  <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" /><path d="m13 13 4 4" /></svg>
+                </button>
+              </div>
+            </form>
+            <a class="x-shortcut--link x-shortcut-search-compact" href="https://x.com/explore" target="_blank" rel="noopener"
+               title="Search on X" aria-label="Search on X">
+              <span class="x-account-action-icon" aria-hidden="true">XS</span><span class="x-account-action-label">Search on X</span>
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12 12 4M4 4h8v8" /></svg>
+            </a>
             <a class="x-shortcut--link x-shortcut--x" id="xTimelineLink" href="https://x.com/" target="_blank" rel="noopener"
                title="Open on X" aria-label="Open on X">
               <span class="x-account-action-icon" aria-hidden="true">X</span><span class="x-account-action-label">Open on X</span>
