@@ -178,6 +178,58 @@ body[data-x-accent] .x-account-card--all.active { border-color: var(--x-accent);
 .x-shortcut-group--news .x-shortcut-group-title { color: var(--green); }
 .x-shortcut-group--ta .x-shortcut-group-title { color: var(--purple); }
 
+/* Green "Search on X" card in the News Grabber group, styled like the links. */
+.x-shortcut-search {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 10px 9px;
+  border: 1px solid color-mix(in srgb, var(--green) 65%, transparent);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(255,255,255,.14), rgba(255,255,255,.035) 48%, transparent 52%),
+              color-mix(in srgb, var(--green) 10%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 3px 12px rgba(0,0,0,.24);
+  transition: border-color .18s ease, box-shadow .18s ease;
+}
+.x-shortcut-search:focus-within {
+  border-color: var(--green);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--green) 65%, transparent), 0 4px 14px rgba(0,0,0,.28);
+}
+.x-shortcut-search-label {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--green);
+}
+.x-shortcut-search-row { display: flex; gap: 6px; }
+.x-shortcut-search-input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--panel, var(--surface));
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+}
+.x-shortcut-search-input:focus { outline: none; border-color: var(--green); }
+.x-shortcut-search-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: 36px;
+  border: 1px solid color-mix(in srgb, var(--green) 55%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--green) 18%, transparent);
+  color: var(--green);
+  cursor: pointer;
+}
+.x-shortcut-search-submit:hover { border-color: var(--green); background: color-mix(in srgb, var(--green) 26%, transparent); }
+.x-shortcut-search-submit:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+/* Only the collapsed desktop rail shows the icon-only search link. */
+.x-account-actions a.x-shortcut-search-compact { display: none; }
+
 .x-timeline-frame {
   min-height: 620px;
   padding: 8px;
@@ -1121,6 +1173,8 @@ body[data-x-motion="off"] .x-search-popover::before { animation: none; }
   .x-split.is-rail-collapsed .x-account-action-icon { display: inline; }
   .x-split.is-rail-collapsed .x-account-action-label { display: none; }
   .x-split.is-rail-collapsed .x-shortcut-group-title { display: none; }
+  .x-split.is-rail-collapsed .x-shortcut-search { display: none; }
+  .x-split.is-rail-collapsed .x-account-actions a.x-shortcut-search-compact { display: flex; }
   .x-split.is-rail-collapsed .x-account-manage-label,
   .x-split.is-rail-collapsed .x-account-list { display: none; }
 
