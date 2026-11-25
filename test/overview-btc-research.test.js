@@ -15,7 +15,22 @@ test("BTC Research belongs to Overview v2 and loads Crypto Hub's section", () =>
   assert.match(read("crypto.html"), /<div class="cards" id="crypto-research">/);
 });
 
-test("render keeps top-level links, nested dropdowns and their open state", () => {
+test("Crypto Hub's Bitcoin Research has a Super Charts dropdown the widget picks up", () => {
+  const page = read("crypto.html");
+  const start = page.indexOf('<div class="cards" id="crypto-research">');
+  const end = page.indexOf("<!-- ALT RESEARCH -->", start);
+  const section = page.slice(start, end);
+  assert.match(section, /<div class="section-header section-header--sub" data-section="btc-super-charts">\s*<span class="section-label section-label--btc">Super Charts<\/span>/);
+  const sub = section.slice(section.indexOf('<div class="cards cards--sub" id="btc-super-charts">'));
+  const list = sub.slice(0, sub.indexOf("</div>\n      <!--"));
+  assert.match(list, /Coinalyze Superchart/);
+  assert.match(list, /Coinglass Superchart/);
+  // Each superchart is listed once, inside the dropdown only.
+  assert.equal(section.split("Coinalyze Superchart").length - 1, 1);
+  assert.equal(section.split("Coinglass Superchart").length - 1, 1);
+});
+
+test("render keeps top-level links and shows every nested dropdown open unless closed", () => {
   const data = {
     links: [{ href: "https://cryptoquant.com/insights/research", badge: "CQ RESEARCH", badgeStyle: "background:var(--purple-bg);color:var(--purple)", title: "CryptoQuant Research", src: "cryptoquant.com" }],
     groups: [
@@ -23,13 +38,14 @@ test("render keeps top-level links, nested dropdowns and their open state", () =
       { id: "technical-analysis", label: "Technical Analysis", links: [] },
     ],
   };
-  const html = btc.render(data, ["btc-long-short"]);
+  const html = btc.render(data, ["technical-analysis"]);
   assert.equal(btc.countLinks(data), 2);
   assert.match(html, /href="https:\/\/cryptoquant\.com\/insights\/research" target="_blank" rel="noopener noreferrer"/);
   assert.match(html, /style="background:var\(--purple-bg\);color:var\(--purple\)"/);
   assert.match(html, /<details class="ov-btc-sub" data-group="btc-long-short" open>/);
   assert.match(html, /<details class="ov-btc-sub" data-group="technical-analysis">/);
   assert.match(html, /No links yet\./);
+  assert.match(btc.render(data), /<details class="ov-btc-sub" data-group="technical-analysis" open>/);
   assert.match(btc.render({ links: [], groups: [] }), /No Bitcoin Research links/);
 });
 
