@@ -3,8 +3,10 @@
  *
  * Crypto Hub's Bitcoin Research section (/crypto.html#crypto-research) is the
  * single source of truth: this reads that section's links, including its
- * nested dropdowns (Long vs Short, Technical Analysis), and renders them
- * here. Adding or editing a card in crypto.html updates both pages.
+ * nested dropdowns (Super Charts, Long vs Short, Technical Analysis…), and
+ * renders them here. Adding or editing a card in crypto.html updates both pages.
+ * Every nested dropdown starts open so each one is visible; only the ones the
+ * visitor closes are remembered.
  */
 (function (root) {
   "use strict";
@@ -12,7 +14,7 @@
   var SOURCE_URL = "/crypto.html";
   var SECTION_ID = "crypto-research";
   var OPEN_KEY = "overview.btcResearchOpen";
-  var SUB_OPEN_KEY = "overview.btcResearchSubOpen";
+  var SUB_CLOSED_KEY = "overview.btcResearchSubClosed";
 
   function esc(value) {
     return String(value == null ? "" : value).replace(/[&<>"']/g, function (ch) {
@@ -94,16 +96,16 @@
     });
   }
 
-  /** HTML for the dropdown body; `openGroups` lists sub-dropdown ids to start open. */
-  function render(data, openGroups) {
-    var open = openGroups || [];
+  /** HTML for the dropdown body; every sub-dropdown is open unless its id is in `closedGroups`. */
+  function render(data, closedGroups) {
+    var closed = closedGroups || [];
     if (!countLinks(data)) {
       return '<div class="empty-state"><strong>No Bitcoin Research links</strong>' +
         '<p>Crypto Hub’s Bitcoin Research section is empty. Add cards there and they appear here.</p></div>';
     }
     return '<div class="ov-btc-list">' + data.links.map(linkHtml).join("") +
       data.groups.map(function (group) {
-        return '<details class="ov-btc-sub" data-group="' + esc(group.id) + '"' + (open.indexOf(group.id) !== -1 ? " open" : "") + ">" +
+        return '<details class="ov-btc-sub" data-group="' + esc(group.id) + '"' + (closed.indexOf(group.id) === -1 ? " open" : "") + ">" +
           '<summary><span class="ov-btc-sub-label">' + esc(group.label) + "</span>" +
           '<span class="ov-btc-sub-count">' + group.links.length + "</span></summary>" +
           '<div class="ov-btc-sublist">' + (group.links.length ? group.links.map(linkHtml).join("") : '<p class="ov-btc-note">No links yet.</p>') + "</div>" +
@@ -182,10 +184,10 @@
   body.addEventListener("toggle", function (event) {
     var sub = event.target;
     if (!sub.matches || !sub.matches(".ov-btc-sub")) return;
-    var open = Array.prototype.map.call(body.querySelectorAll(".ov-btc-sub[open]"), function (el) {
+    var closed = Array.prototype.map.call(body.querySelectorAll(".ov-btc-sub:not([open])"), function (el) {
       return el.getAttribute("data-group");
     });
-    writeStore(SUB_OPEN_KEY, open);
+    writeStore(SUB_CLOSED_KEY, closed);
   }, true);
 
   function showError(message) {
@@ -214,7 +216,7 @@
         var total = countLinks(data);
         countEl.textContent = total + " link" + (total === 1 ? "" : "s") +
           (data.groups.length ? " · " + data.groups.map(function (g) { return g.label; }).join(" · ") : "");
-        body.innerHTML = render(data, readStore(SUB_OPEN_KEY, []));
+        body.innerHTML = render(data, readStore(SUB_CLOSED_KEY, []));
         setOpenAll(openAllHrefs(data));
       })
       .catch(function (err) { showError(err && err.message ? err.message : "Request failed."); });
