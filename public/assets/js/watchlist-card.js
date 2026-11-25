@@ -1,8 +1,9 @@
 /* Overview v2 watchlist card — a TradingView-style list of saved tickers.
 
-   Read-only apart from switching folders and collapsing sections: tickers,
-   sections, folders and bookmark colours are edited under Settings →
-   Watchlists. No prices are fetched; each row links to the symbol's
+   Read-only apart from switching watchlists and collapsing subtitles:
+   tickers, subtitles, watchlists and bookmark colours are edited under
+   Settings → Watchlists. (Internally a watchlist is a "folder" and a
+   subtitle a "section"; the saved format is unchanged.) No prices are fetched; each row links to the symbol's
    TradingView chart. */
 (function () {
   'use strict';
@@ -55,11 +56,11 @@
 
   function renderRows(folder) {
     if (!folder) {
-      list.innerHTML = '<li class="wl-empty">No folders yet. <a href="' + settingsHref() + '">Create one in Settings</a>.</li>';
+      list.innerHTML = '<li class="wl-empty">No watchlists yet. <a href="' + settingsHref() + '">Create one in Settings</a>.</li>';
       return;
     }
     if (!folder.tickers.length) {
-      list.innerHTML = '<li class="wl-empty">This folder is empty. <a href="' + settingsHref(folder) + '">Add symbols in Settings</a>.</li>';
+      list.innerHTML = '<li class="wl-empty">This watchlist is empty. <a href="' + settingsHref(folder) + '">Add symbols in Settings</a>.</li>';
       return;
     }
     list.innerHTML = W.groupsOf(folder).map(function (group, gi) {
@@ -73,7 +74,7 @@
         '<span class="wl-section-name">' + esc(group.name) + '</span>' +
         '<span class="wl-section-count">' + group.symbols.length + '</span></button>' +
         '<ul class="wl-group-rows" id="' + bodyId + '"' + (shut ? ' hidden' : '') + '>' +
-        (rows || '<li class="wl-group-empty">No symbols in this section.</li>') + '</ul></li>';
+        (rows || '<li class="wl-group-empty">No symbols under this subtitle.</li>') + '</ul></li>';
     }).join('');
   }
 
@@ -119,9 +120,9 @@
     }
     var html = '';
     if (marked.length) html += '<div class="wl-menu-group" role="presentation">Bookmarked</div>' + marked.map(item).join('');
-    if (plain.length) html += '<div class="wl-menu-group" role="presentation">' + (marked.length ? 'Folders' : 'All folders') + '</div>' + plain.map(item).join('');
-    if (!folders.length) html += '<div class="wl-menu-group" role="presentation">No folders yet</div>';
-    html += '<a class="wl-menu-manage" role="menuitem" tabindex="-1" href="' + settingsHref(active) + '">Manage folders in Settings</a>';
+    if (plain.length) html += '<div class="wl-menu-group" role="presentation">' + (marked.length ? 'Watchlists' : 'All watchlists') + '</div>' + plain.map(item).join('');
+    if (!folders.length) html += '<div class="wl-menu-group" role="presentation">No watchlists yet</div>';
+    html += '<a class="wl-menu-manage" role="menuitem" tabindex="-1" href="' + settingsHref(active) + '">Manage watchlists in Settings</a>';
     menu.innerHTML = html;
   }
 
@@ -141,7 +142,7 @@
     state = W.write(W.setActive(state, id));
   }
 
-  /* ── Folder menu ── */
+  /* ── Watchlist menu ── */
   function menuItems() { return Array.prototype.slice.call(menu.querySelectorAll('[role^="menuitem"]')); }
 
   function openMenu() {
