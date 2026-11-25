@@ -1,4 +1,8 @@
-/* Watchlists — TradingView-style ticker folders, saved in this browser.
+/* Watchlists — TradingView-style ticker lists, saved in this browser.
+
+   In the UI a "folder" here is called a watchlist and a "section" a
+   subtitle; the code and the saved format keep the original names so
+   existing browsers' lists load unchanged.
 
    Shared by the Overview v2 watchlist card (watchlist-card.js) and the
    Settings editor (watchlist-settings.js). Everything that changes a state
@@ -196,9 +200,9 @@
   }
 
   function createFolder(state, name) {
-    if (state.folders.length >= MAX_FOLDERS) return { state: state, folder: null, error: 'Folder limit reached (' + MAX_FOLDERS + ').' };
+    if (state.folders.length >= MAX_FOLDERS) return { state: state, folder: null, error: 'Watchlist limit reached (' + MAX_FOLDERS + ').' };
     var next = clone(state);
-    var folder = { id: newId(), name: cleanName(name, 'New folder'), bookmark: null, tickers: [] };
+    var folder = { id: newId(), name: cleanName(name, 'New watchlist'), bookmark: null, tickers: [] };
     next.folders.push(folder);
     next.activeId = folder.id;
     return { state: next, folder: folder, error: null };
@@ -275,9 +279,9 @@
     var clean = cleanSectionName(name);
     var result = { state: next, section: null, error: null };
     if (!f) return result;
-    if (!clean) result.error = 'Give the section a name.';
-    else if (hasSection(f.tickers, clean)) result.error = 'There is already a section called ' + clean + '.';
-    else if (f.tickers.length >= MAX_TICKERS) result.error = 'Folder is full (' + MAX_TICKERS + ' entries).';
+    if (!clean) result.error = 'Give the subtitle a name.';
+    else if (hasSection(f.tickers, clean)) result.error = 'There is already a subtitle called ' + clean + '.';
+    else if (f.tickers.length >= MAX_TICKERS) result.error = 'Watchlist is full (' + MAX_TICKERS + ' entries).';
     else { result.section = SECTION_PREFIX + clean; f.tickers.push(result.section); }
     return result;
   }
@@ -289,8 +293,8 @@
     var result = { state: next, section: section, error: null };
     var i = f ? f.tickers.indexOf(section) : -1;
     if (i === -1 || !isSection(section)) return result;
-    if (!clean) { result.error = 'Section names cannot be empty.'; return result; }
-    if (hasSection(f.tickers, clean, section)) { result.error = 'There is already a section called ' + clean + '.'; return result; }
+    if (!clean) { result.error = 'Subtitles cannot be empty.'; return result; }
+    if (hasSection(f.tickers, clean, section)) { result.error = 'There is already a subtitle called ' + clean + '.'; return result; }
     result.section = SECTION_PREFIX + clean;
     f.tickers[i] = result.section;
     return result;

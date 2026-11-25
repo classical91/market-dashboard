@@ -1,5 +1,6 @@
-/* Settings → Watchlists: create folders, add/remove/reorder tickers and
-   bookmark folders with a colour. Saved in this browser (watchlists.js);
+/* Settings → Watchlists: create watchlists, add/remove/reorder tickers,
+   group them under subtitles and bookmark watchlists with a colour.
+   (Internally a watchlist is a "folder" and a subtitle a "section".) Saved in this browser (watchlists.js);
    the Overview v2 watchlist card updates live, even in another tab. */
 (function () {
   'use strict';
@@ -16,7 +17,7 @@
   var state = W.read();
   var note = { text: '', tone: '' };
 
-  /* ?watchlist=<id> (from the Overview card's "+") opens that folder. */
+  /* ?watchlist=<id> (from the Overview card's "+") opens that watchlist. */
   try {
     var wanted = new URLSearchParams(window.location.search).get('watchlist');
     if (wanted && W.findFolder(state, wanted)) state = W.write(W.setActive(state, wanted));
@@ -44,12 +45,12 @@
         (f.bookmark ? W.flagSvg(f.bookmark, 12) : '<span class="wl-menu-noflag" aria-hidden="true"></span>') +
         '<span class="wls-folder-name">' + esc(f.name) + '</span>' +
         '<span class="wls-folder-count">' + W.symbolsOf(f).length + '</span></button></li>';
-    }).join('') : '<li class="wls-muted">No folders yet.</li>';
+    }).join('') : '<li class="wls-muted">No watchlists yet.</li>';
   }
 
   function renderEditor(folder) {
     if (!folder) {
-      editor.innerHTML = '<p class="wls-muted">Create a folder to start saving tickers.</p>';
+      editor.innerHTML = '<p class="wls-muted">Create a watchlist to start saving tickers.</p>';
       return;
     }
     var swatches = '<label class="wls-swatch wls-swatch-none" title="No bookmark">' +
@@ -75,9 +76,9 @@
         var name = W.sectionName(symbol);
         return '<li class="wls-ticker wls-section" data-symbol="' + esc(symbol) + '">' +
           '<span class="wls-section-mark" aria-hidden="true">§</span>' +
-          '<input class="wls-section-name" type="text" maxlength="' + W.MAX_NAME + '" value="' + esc(name) + '" aria-label="Section name" autocomplete="off" />' +
-          '<span class="wls-ticker-actions">' + moveButtons('section ' + name, i, last) +
-          '<button type="button" class="wls-mini wls-mini-danger" data-act="remove" aria-label="Remove section ' + esc(name) + ' (its symbols stay)">×</button>' +
+          '<input class="wls-section-name" type="text" maxlength="' + W.MAX_NAME + '" value="' + esc(name) + '" aria-label="Subtitle" autocomplete="off" />' +
+          '<span class="wls-ticker-actions">' + moveButtons('subtitle ' + name, i, last) +
+          '<button type="button" class="wls-mini wls-mini-danger" data-act="remove" aria-label="Remove subtitle ' + esc(name) + ' (its symbols stay)">×</button>' +
           '</span></li>';
       }
       var parts = W.tickerParts(symbol);
@@ -89,27 +90,27 @@
         '<span class="wls-ticker-actions">' + moveButtons(symbol, i, last) +
         '<button type="button" class="wls-mini wls-mini-danger" data-act="remove" aria-label="Remove ' + esc(symbol) + '">×</button>' +
         '</span></li>';
-    }).join('') : '<li class="wls-muted">No symbols in this folder yet.</li>';
+    }).join('') : '<li class="wls-muted">No symbols in this watchlist yet.</li>';
 
     editor.innerHTML =
-      '<div class="wls-field"><label for="wlsName">Folder name</label>' +
+      '<div class="wls-field"><label for="wlsName">Watchlist name</label>' +
       '<input id="wlsName" type="text" maxlength="' + W.MAX_NAME + '" value="' + esc(folder.name) + '" autocomplete="off" /></div>' +
-      '<fieldset class="wls-field wls-bookmarks"><legend>Bookmark <span>Bookmarked folders are pinned to the top</span></legend>' +
+      '<fieldset class="wls-field wls-bookmarks"><legend>Bookmark <span>Bookmarked watchlists are pinned to the top</span></legend>' +
       '<div class="wls-swatches">' + swatches + '</div></fieldset>' +
       '<div class="wls-field"><div class="wls-label">Symbols <span>' + symbolCount +
-      (sectionCount ? ' · ' + sectionCount + (sectionCount === 1 ? ' section' : ' sections') : '') + '</span></div>' +
+      (sectionCount ? ' · ' + sectionCount + (sectionCount === 1 ? ' subtitle' : ' subtitles') : '') + '</span></div>' +
       '<ul class="wls-tickers">' + rows + '</ul>' +
       '<form class="wls-add" id="wlsAddForm">' +
       '<input id="wlsAddInput" type="text" placeholder="BINANCE:BTCUSDT, NASDAQ:AAPL" aria-label="Add symbols, separated by commas or spaces" autocomplete="off" spellcheck="false" />' +
       '<button class="settings-action-btn primary" type="submit">Add</button></form>' +
       '<form class="wls-add wls-add-section" id="wlsSectionForm">' +
-      '<input id="wlsSectionInput" type="text" maxlength="' + W.MAX_NAME + '" placeholder="Section name, e.g. Majors" aria-label="New section name" autocomplete="off" />' +
-      '<button class="settings-action-btn" type="submit">Add section</button></form>' +
+      '<input id="wlsSectionInput" type="text" maxlength="' + W.MAX_NAME + '" placeholder="Subtitle, e.g. Majors" aria-label="New subtitle" autocomplete="off" />' +
+      '<button class="settings-action-btn" type="submit">Add subtitle</button></form>' +
       '<p class="wls-note' + (note.tone ? ' is-' + note.tone : '') + '" id="wlsNote" role="status">' +
-      esc(note.text || 'Use TradingView symbols — EXCHANGE:TICKER opens the right chart. Several at once is fine. Sections divide the list: symbols you add next go under the last section, and ↑ ↓ move rows between sections.') + '</p></div>' +
+      esc(note.text || 'Use TradingView symbols — EXCHANGE:TICKER opens the right chart. Several at once is fine. Subtitles group the list: symbols you add next go under the last subtitle, and ↑ ↓ move rows between subtitles.') + '</p></div>' +
       '<div class="wls-danger-row">' +
-      '<a class="settings-action-btn primary wls-back" href="/overview-v2.html#ov2-watchlist" title="Open Overview v2 with this folder selected">&larr; Back to Overview</a>' +
-      '<button class="settings-action-btn danger" type="button" id="wlsDelete">Delete folder</button></div>';
+      '<a class="settings-action-btn primary wls-back" href="/overview-v2.html#ov2-watchlist" title="Open Overview v2 with this watchlist selected">&larr; Back to Overview</a>' +
+      '<button class="settings-action-btn danger" type="button" id="wlsDelete">Delete watchlist</button></div>';
   }
 
   function render() {
@@ -175,7 +176,7 @@
         field.focus();
         return;
       }
-      note = { text: 'Added section ' + W.sectionName(made.section) + '. Symbols you add now go under it.', tone: 'ok' };
+      note = { text: 'Added subtitle ' + W.sectionName(made.section) + '. Symbols you add now go under it.', tone: 'ok' };
       save(made.state, '#wlsAddInput');
       toast();
       return;
@@ -190,7 +191,7 @@
     if (res.added.length) parts.push('Added ' + res.added.join(', ') + '.');
     if (res.duplicate.length) parts.push('Already here: ' + res.duplicate.join(', ') + '.');
     if (res.invalid.length) parts.push('Not a valid symbol: ' + res.invalid.join(', ') + '.');
-    if (res.full) parts.push('Folder is full (' + W.MAX_TICKERS + ' symbols).');
+    if (res.full) parts.push('Watchlist is full (' + W.MAX_TICKERS + ' symbols).');
     note = { text: parts.join(' '), tone: res.invalid.length || res.full ? 'warn' : 'ok' };
     save(res.state, '#wlsAddInput');
     if (res.added.length) toast();
@@ -200,7 +201,7 @@
     var folder = W.activeFolder(state);
     if (!folder) return;
     if (e.target.id === 'wlsDelete') {
-      if (!window.confirm('Delete the folder "' + folder.name + '" and its ' + W.symbolsOf(folder).length + ' symbols?')) return;
+      if (!window.confirm('Delete the watchlist "' + folder.name + '" and its ' + W.symbolsOf(folder).length + ' symbols?')) return;
       note = { text: '', tone: '' };
       save(W.deleteFolder(state, folder.id), '.wls-folder.is-active');
       toast();

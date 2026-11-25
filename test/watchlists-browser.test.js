@@ -9,7 +9,7 @@ const { chromium } = require("playwright");
 const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE || chromium.executablePath();
 const KEEP = /src="\/assets\/js\/(settings|watchlists|watchlist-card|watchlist-settings)\.js"/;
 
-test("Watchlist folders: edit in Settings, browse on Overview v2", {
+test("Watchlists: edit in Settings, browse on Overview v2", {
   skip: !fs.existsSync(executablePath) && "Install Chromium or set PLAYWRIGHT_CHROMIUM_EXECUTABLE",
 }, async (t) => {
   const publicDir = path.join(__dirname, "..", "public");
@@ -63,7 +63,7 @@ test("Watchlist folders: edit in Settings, browse on Overview v2", {
 
   // Folder menu: bookmarked group first, keyboard close, switch folders.
   await card.locator(".wl-title-btn").click();
-  assert.deepEqual(await card.locator(".wl-menu-group").allTextContents(), ["Bookmarked", "Folders"]);
+  assert.deepEqual(await card.locator(".wl-menu-group").allTextContents(), ["Bookmarked", "Watchlists"]);
   assert.equal(await page.evaluate(() => document.activeElement.getAttribute("aria-checked")), "true");
   await page.keyboard.press("Escape");
   assert.equal(await card.locator(".wl-menu").isHidden(), true);
@@ -81,6 +81,6 @@ test("Watchlist folders: edit in Settings, browse on Overview v2", {
   await page.click("#wlsDelete");
   await page.click("#wlsDelete");
   await page.goto(base);
-  assert.match(await card.locator(".wl-empty").textContent(), /No folders yet/);
+  assert.match(await card.locator(".wl-empty").textContent(), /No watchlists yet/);
   assert.deepEqual(errors, []);
 });
