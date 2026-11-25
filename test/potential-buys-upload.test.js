@@ -81,6 +81,57 @@ test("octet-stream bodies, Bearer auth and JSON base64 are accepted too", async 
   assert.equal((await json.json()).label, "$ETH");
 });
 
+test("a ticker from the Shortcut files the screenshot in that ticker's stack", async () => {
+  const upload = (headers, query = "") => fetch(`${base}/api/potential-buys/upload${query}`, {
+    method: "POST",
+    headers: { "x-broadcast-key": "ledger-key", "content-type": "image/jpeg", ...headers },
+    body: PNG,
+  });
+
+  const header = await upload({ "x-ticker": "nvda" });
+  assert.equal(header.status, 201);
+  const saved = await header.json();
+  assert.equal(saved.label, "$NVDA");
+  assert.deepEqual(saved.tags, ["NVDA"]);
+  assert.equal(saved.message, "Saved to $NVDA");
+
+  // A TradingView symbol, plus a note: the ticker goes first, the note stays.
+  const withNote = await (await upload({ "x-ticker": "NASDAQ:NVDA", "x-label": "breakout" })).json();
+  assert.equal(withNote.label, "$NVDA breakout");
+  assert.deepEqual(withNote.tags, ["NVDA"]);
+
+  // A note that already names the ticker is not doubled up.
+  const already = await (await upload({ "x-ticker": "btc" }, `?label=${encodeURIComponent("$btc retest")}`)).json();
+  assert.equal(already.label, "$BTC retest");
+
+  const query = await (await upload({}, "?ticker=%24sol")).json();
+  assert.equal(query.label, "$SOL");
+
+  const json = await fetch(`${base}/api/potential-buys/upload`, {
+    method: "POST",
+    headers: { "x-broadcast-key": "ledger-key", "content-type": "application/json" },
+    body: JSON.stringify({ imageBase64: PNG.toString("base64"), ticker: "eth", label: "range low" }),
+  });
+  assert.equal((await json.json()).label, "$ETH range low");
+
+  // Blank: saved untagged, and the message says so.
+  const blank = await (await upload({ "x-ticker": "  " })).json();
+  assert.equal(blank.label, "");
+  assert.deepEqual(blank.tags, []);
+  assert.match(blank.message, /without a ticker/);
+
+  // Not one ticker-shaped word: refused, nothing saved.
+  const cookie = await ownerCookie();
+  const before = (await (await fetch(`${base}/api/potential-buys`, { headers: { cookie } })).json()).items.length;
+  const bad = await upload({ "x-ticker": "buy this one" });
+  assert.equal(bad.status, 400);
+  assert.match((await bad.json()).error, /isn't a ticker/);
+  const after = await (await fetch(`${base}/api/potential-buys`, { headers: { cookie } })).json();
+  assert.equal(after.items.length, before);
+  // Both NVDA uploads above stack together (an earlier test added one more).
+  assert.ok(after.folders.some((folder) => folder.tag === "NVDA" && folder.count >= 2));
+});
+
 test("HEIC and non-images get an error the Shortcut can show", async () => {
   const heic = await fetch(`${base}/api/potential-buys/upload`, {
     method: "POST",
