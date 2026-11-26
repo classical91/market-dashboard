@@ -189,6 +189,16 @@
 .pb-card.is-editing .pb-edit-actions { display: flex; }
 .pb-card.is-editing { border-color: rgba(77,163,255,0.45); }
 
+/* Chart ↗: the ticker's TradingView chart. It leads the right-hand buttons,
+   and steps aside while a card's Edit row is open. */
+.pb-chart { color: var(--blue); }
+.pb-chart:hover { border-color: rgba(77,163,255,0.45); background: var(--blue-bg); }
+.pb-chart[hidden] { display: none; }
+.pb-card-foot .pb-chart { margin-left: auto; }
+.pb-card-foot .pb-chart + .pb-btn,
+.pb-card-foot .pb-chart + .pb-edit { margin-left: 0; }
+.pb-card.is-editing .pb-chart { display: none; }
+
 /* A ticker with several screenshots stacks into one folder card. */
 .pb-stack {
   /* Two cards peeking out underneath, like a pile of prints. */

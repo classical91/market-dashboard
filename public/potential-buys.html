@@ -63,9 +63,10 @@
       <div class="pb-section-head">
         <button class="pb-btn pb-back" type="button" id="pbBack" hidden>&larr; All</button>
         <h2 class="pb-section-title" id="pbHeading">Watching</h2>
+        <a class="pb-btn pb-chart" id="pbHeadingChart" target="_blank" rel="noopener" hidden>Chart <span aria-hidden="true">&#8599;</span></a>
         <span class="pb-count" id="pbCount">Loading…</span>
         <input class="pb-search" id="pbSearch" type="search" placeholder="Filter by label or $ticker" aria-label="Filter screenshots by label" />
-        <span class="pb-hint">Type a ticker like <code>btc</code> as a label — it saves as <code>$BTC</code> and stacks with the rest of that ticker. Tap a stack to open it.</span>
+        <span class="pb-hint">Type a ticker like <code>btc</code> as a label — it saves as <code>$BTC</code> and stacks with the rest of that ticker. Tap a stack to open it, or <strong>Chart ↗</strong> for its free TradingView chart (add <code>#crypto</code> or <code>#stock</code> to a label if it picks the wrong market).</span>
       </div>
       <div class="pb-grid" id="pbGrid" aria-live="polite"></div>
     </section>
@@ -124,6 +125,7 @@
       <div class="pb-viewer-label" id="pbViewerLabel"></div>
       <div class="pb-viewer-when" id="pbViewerWhen"></div>
     </div>
+    <a class="pb-btn pb-chart" id="pbViewerChart" target="_blank" rel="noopener" hidden>Chart <span aria-hidden="true">&#8599;</span></a>
     <button class="pb-btn" type="button" id="pbViewerCrop">Crop</button>
     <a class="pb-btn" id="pbViewerOpen" href="#" target="_blank" rel="noopener">Open original</a>
     <button class="pb-btn pb-btn-danger" type="button" id="pbViewerDelete">Delete</button>
@@ -164,6 +166,7 @@
 <script src="/assets/js/ui.js"></script>
 <script src="/assets/js/crop-rect.js"></script>
 <script src="/assets/js/ticker-label.js"></script>
+<script src="/assets/js/chart-links.js"></script>
 <script src="/assets/js/potential-buys.js"></script>
 <script src="/assets/js/sections.js"></script>
 <script>initSections('pb_collapsed');</script>
