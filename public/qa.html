@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Market Q&amp;A · Market Command</title>
+  <script src="/assets/js/settings.js"></script>
+  <link rel="stylesheet" href="/assets/styles/command.css" />
+  <link rel="stylesheet" href="/assets/styles/components.css" />
+  <link rel="stylesheet" href="/assets/styles/qa.css" />
+</head>
+<body>
+<div class="app">
+  <aside class="cmd-sidebar"></aside>
+  <main class="cmd-main">
+
+    <div class="cmd-page-header">
+      <div>
+        <div class="cmd-page-title">Market Q&amp;A</div>
+        <div class="cmd-page-subtitle">Trading knowledge base: learn, research, trade. Each answer links to the live dashboard page that shows it.</div>
+      </div>
+      <div class="qa-stats" id="qaStats" aria-label="Knowledge base totals"></div>
+    </div>
+
+    <div class="qa-toolbar" role="search">
+      <label class="qa-search-wrap">
+        <span class="sr-only">Search questions</span>
+        <input type="search" class="qa-search" id="qaSearch" placeholder="Search questions and answers… (press /)" autocomplete="off" />
+      </label>
+      <label class="qa-filter">
+        <span>Level</span>
+        <select id="qaLevel">
+          <option value="all">All levels</option>
+          <option value="Beginner">Beginner</option>
+          <option value="Intermediate">Intermediate</option>
+          <option value="Advanced">Advanced</option>
+        </select>
+      </label>
+      <label class="qa-check"><input type="checkbox" id="qaAnswered" /> Answered only</label>
+      <label class="qa-check"><input type="checkbox" id="qaBookmarked" /> Bookmarked</label>
+      <button type="button" class="qa-btn" id="qaRandom">Random question</button>
+    </div>
+
+    <div class="qa-layout">
+      <nav class="qa-categories" id="qaCategories" aria-label="Q&amp;A categories"></nav>
+      <section class="qa-list-panel" aria-labelledby="qaCount">
+        <div class="qa-list-head" id="qaCount" aria-live="polite"></div>
+        <div class="qa-list" id="qaList">
+          <div class="ui-empty-state"><div class="ui-empty-title">Loading questions…</div></div>
+        </div>
+      </section>
+      <section class="qa-detail" id="qaDetail" aria-live="polite" aria-label="Selected question"></section>
+    </div>
+
+    <footer>Market Command &mdash; Market Q&amp;A. Education, not financial advice. Bookmarks and recently viewed stay in this browser.</footer>
+  </main>
+</div>
+
+<script src="/assets/js/sidebar.js"></script>
+<script src="/assets/js/ui.js"></script>
+<script src="/assets/js/qa-data.js"></script>
+<script src="/assets/js/qa.js"></script>
+</body>
+</html>
