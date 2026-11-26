@@ -132,6 +132,45 @@ test("a ticker from the Shortcut files the screenshot in that ticker's stack", a
   assert.ok(after.folders.some((folder) => folder.tag === "NVDA" && folder.count >= 2));
 });
 
+test("a base64 JSON screenshot over the app's 2 MB JSON cap still saves, after the key check", async () => {
+  // What the Shortcut sends: Convert to JPEG → Encode with base64 (a line
+  // break every 76 characters) → JSON. A 3 MB JPEG is ~4.2 MB of JSON.
+  const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(3 * 1024 * 1024)]);
+  const imageBase64 = jpeg.toString("base64").replace(/(.{76})/g, "$1\r\n");
+  const send = (headers, body) => fetch(`${base}/api/potential-buys/upload`, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...headers },
+    body: JSON.stringify(body),
+    redirect: "manual",
+  });
+
+  const ok = await send({ "x-broadcast-key": "ledger-key", "x-ticker": "nvda" }, { imageBase64, mimeType: "image/jpeg" });
+  assert.equal(ok.status, 201);
+  const saved = await ok.json();
+  assert.equal(saved.size, jpeg.length);
+  assert.equal(saved.message, "Saved to $NVDA");
+
+  // Without the key a big body is turned away before it is parsed.
+  const noKey = await send({}, { imageBase64 });
+  assert.equal(noKey.status, 401);
+
+  // Past 15 MB of image: a reason the Shortcut's notification can show.
+  const huge = "A".repeat(23 * 1024 * 1024);
+  const tooBig = await send({ "x-broadcast-key": "ledger-key" }, { imageBase64: huge });
+  assert.equal(tooBig.status, 413);
+  assert.match((await tooBig.json()).error, /larger than 15 MB/);
+});
+
+test("other JSON routes keep the app-wide 2 MB cap", async () => {
+  const cookie = await ownerCookie();
+  const res = await fetch(`${base}/api/potential-buys/0000000000000-00000000`, {
+    method: "PATCH",
+    headers: { cookie, "content-type": "application/json" },
+    body: JSON.stringify({ label: "x".repeat(3 * 1024 * 1024) }),
+  });
+  assert.equal(res.status, 413);
+});
+
 test("HEIC and non-images get an error the Shortcut can show", async () => {
   const heic = await fetch(`${base}/api/potential-buys/upload`, {
     method: "POST",
