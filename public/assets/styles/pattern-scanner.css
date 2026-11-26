@@ -9,6 +9,50 @@
   margin-bottom: 16px;
 }
 
+.ps-toolbar {
+  flex-wrap: wrap;
+}
+
+.ps-tf-filter {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  border-radius: 8px;
+}
+
+.ps-tf-chip {
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dim);
+  cursor: pointer;
+}
+
+.ps-tf-chip:hover {
+  color: var(--text, #e6e6e6);
+}
+
+.ps-tf-chip.is-active {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text, #e6e6e6);
+}
+
+.ps-tf-chip:focus-visible {
+  outline: 2px solid var(--accent, #4f8cff);
+  outline-offset: 1px;
+}
+
+.ps-tf-chip__count {
+  margin-left: 2px;
+  font-size: 10px;
+  opacity: 0.7;
+}
+
 .ps-updated {
   font-size: 11px;
   color: var(--dim);

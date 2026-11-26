@@ -28,6 +28,7 @@
     <div class="ps-toolbar">
       <button class="aia-run-btn" type="button" id="ps-refresh-btn">Rescan</button>
       <button class="aia-run-btn" type="button" id="ps-toggle-all-btn">Collapse All</button>
+      <div class="ps-tf-filter" id="ps-tf-filter" role="group" aria-label="Filter by timeframe"></div>
       <span class="ps-updated" id="ps-updated"></span>
     </div>
 
@@ -103,6 +104,11 @@
     var allExpanded = true;
     var trackedKeys = {}; // "symbol:interval" -> true, refreshed from /api/watchlist
     var lastResults = [];
+    var tfFilterEl = document.getElementById('ps-tf-filter');
+    var TF_ORDER = ['15m', '1h', '4h', '1D', '1W', '1M'];
+    var TF_STORAGE_KEY = 'patternScanner.timeframe';
+    var activeTf = 'all';
+    try { activeTf = localStorage.getItem(TF_STORAGE_KEY) || 'all'; } catch (e) { /* storage unavailable */ }
 
     var escapeHtml = PatternRender.escapeHtml;
     var renderCard = PatternRender.renderCard;
@@ -128,10 +134,35 @@
 
     // 25 tokens x 3 timeframes is 75 combos — show only the hits (pattern or
     // divergence) plus any failed scans, not 70 "nothing here" cards.
+    function isHit(r) { return !!(r.pattern || r.divergence); }
+
+    // Timeframe chips: "All" plus one per interval in the scan, each with its
+    // hit count. The selection survives rescans and page reloads.
+    function renderTfFilter(results) {
+      var seen = {};
+      results.forEach(function (r) { if (r.interval) seen[r.interval] = true; });
+      var tfs = Object.keys(seen).sort(function (a, b) {
+        var ia = TF_ORDER.indexOf(a), ib = TF_ORDER.indexOf(b);
+        return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+      });
+      if (activeTf !== 'all' && !seen[activeTf]) activeTf = 'all';
+      var totalHits = results.filter(isHit).length;
+      var chips = [{ value: 'all', label: 'All', count: totalHits }].concat(tfs.map(function (tf) {
+        return { value: tf, label: tf, count: results.filter(function (r) { return r.interval === tf && isHit(r); }).length };
+      }));
+      tfFilterEl.innerHTML = chips.map(function (c) {
+        var active = c.value === activeTf;
+        return '<button type="button" class="ps-tf-chip' + (active ? ' is-active' : '') + '" data-tf="' + escapeHtml(c.value) + '" aria-pressed="' + active + '">' +
+          escapeHtml(c.label) + ' <span class="ps-tf-chip__count">' + c.count + '</span></button>';
+      }).join('');
+    }
+
     function render(results) {
       lastResults = results;
-      var hits = results.filter(function (r) { return r.pattern || r.divergence; });
-      var errors = results.filter(function (r) { return r.error; });
+      renderTfFilter(results);
+      var visible = activeTf === 'all' ? results : results.filter(function (r) { return r.interval === activeTf; });
+      var hits = visible.filter(isHit);
+      var errors = visible.filter(function (r) { return r.error; });
       // BTC leads the market, so any BTC hit is pinned above the rest of the
       // scan regardless of its pattern score; within each group the usual
       // highest-score-first order still applies.
@@ -144,7 +175,8 @@
         return scoreB - scoreA;
       });
       renderSummary(hits);
-      var scannedNote = '<div class="ps-empty">Scanned ' + results.length + ' token/timeframe combos &mdash; ' + hits.length + ' with a pattern or divergence.</div>';
+      var scope = activeTf === 'all' ? '' : ' on ' + escapeHtml(activeTf);
+      var scannedNote = '<div class="ps-empty">Scanned ' + visible.length + ' token/timeframe combos' + scope + ' &mdash; ' + hits.length + ' with a pattern or divergence.</div>';
       grid.innerHTML = scannedNote +
         hits.map(function (entry, i) {
           return renderCard(entry, i, {
@@ -237,6 +269,14 @@
       grid.querySelectorAll('.ps-card').forEach(function (card) {
         card.classList.toggle('collapsed', !allExpanded);
       });
+    });
+
+    tfFilterEl.addEventListener('click', function (e) {
+      var chip = e.target.closest('[data-tf]');
+      if (!chip) return;
+      activeTf = chip.getAttribute('data-tf');
+      try { localStorage.setItem(TF_STORAGE_KEY, activeTf); } catch (err) { /* storage unavailable */ }
+      render(lastResults);
     });
 
     refreshBtn.addEventListener('click', function () { load(true); });
