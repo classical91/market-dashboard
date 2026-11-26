@@ -5,8 +5,9 @@
  * single source of truth: this reads that section's links, including its
  * nested dropdowns (Super Charts, Long vs Short, Technical Analysis…), and
  * renders them here. Adding or editing a card in crypto.html updates both pages.
- * Every nested dropdown starts open so each one is visible; only the ones the
- * visitor closes are remembered.
+ * The nested dropdowns render outside the collapsible body so they stay visible
+ * when BTC Research is collapsed. Each starts open; only the ones the visitor
+ * closes are remembered.
  */
 (function (root) {
   "use strict";
@@ -96,33 +97,51 @@
     });
   }
 
-  /** HTML for the dropdown body; every sub-dropdown is open unless its id is in `closedGroups`. */
-  function render(data, closedGroups) {
-    var closed = closedGroups || [];
-    if (!countLinks(data)) {
-      return '<div class="empty-state"><strong>No Bitcoin Research links</strong>' +
-        '<p>Crypto Hub’s Bitcoin Research section is empty. Add cards there and they appear here.</p></div>';
-    }
-    return '<div class="ov-btc-list">' + data.links.map(linkHtml).join("") +
-      data.groups.map(function (group) {
-        return '<details class="ov-btc-sub" data-group="' + esc(group.id) + '"' + (closed.indexOf(group.id) === -1 ? " open" : "") + ">" +
-          '<summary><span class="ov-btc-sub-label">' + esc(group.label) + "</span>" +
-          '<span class="ov-btc-sub-count">' + group.links.length + "</span></summary>" +
-          '<div class="ov-btc-sublist">' + (group.links.length ? group.links.map(linkHtml).join("") : '<p class="ov-btc-note">No links yet.</p>') + "</div>" +
-          "</details>";
-      }).join("") + "</div>";
+  function groupsHtml(data, closed) {
+    return data.groups.map(function (group) {
+      return '<details class="ov-btc-sub" data-group="' + esc(group.id) + '"' + (closed.indexOf(group.id) === -1 ? " open" : "") + ">" +
+        '<summary><span class="ov-btc-sub-label">' + esc(group.label) + "</span>" +
+        '<span class="ov-btc-sub-count">' + group.links.length + "</span></summary>" +
+        '<div class="ov-btc-sublist">' + (group.links.length ? group.links.map(linkHtml).join("") : '<p class="ov-btc-note">No links yet.</p>') + "</div>" +
+        "</details>";
+    }).join("");
   }
 
-  var api = { extract: extract, render: render, countLinks: countLinks, openAllHrefs: openAllHrefs, safeStyle: safeStyle, safeHref: safeHref };
+  function emptyHtml() {
+    return '<div class="empty-state"><strong>No Bitcoin Research links</strong>' +
+      '<p>Crypto Hub’s Bitcoin Research section is empty. Add cards there and they appear here.</p></div>';
+  }
+
+  /** HTML for the collapsible body: top-level links only (categories render separately). */
+  function renderLinks(data) {
+    if (!countLinks(data)) return emptyHtml();
+    if (!data.links.length) return '<p class="ov-btc-note">All links are in the categories below.</p>';
+    return '<div class="ov-btc-list">' + data.links.map(linkHtml).join("") + "</div>";
+  }
+
+  /** HTML for the always-visible category dropdowns; each is open unless its id is in `closedGroups`. */
+  function renderGroups(data, closedGroups) {
+    if (!data.groups.length) return "";
+    return '<div class="ov-btc-list">' + groupsHtml(data, closedGroups || []) + "</div>";
+  }
+
+  /** Combined HTML (links then every sub-dropdown); open unless its id is in `closedGroups`. */
+  function render(data, closedGroups) {
+    if (!countLinks(data)) return emptyHtml();
+    return '<div class="ov-btc-list">' + data.links.map(linkHtml).join("") + groupsHtml(data, closedGroups || []) + "</div>";
+  }
+
+  var api = { extract: extract, render: render, renderLinks: renderLinks, renderGroups: renderGroups, countLinks: countLinks, openAllHrefs: openAllHrefs, safeStyle: safeStyle, safeHref: safeHref };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (typeof document === "undefined") return;
 
   var details = document.getElementById("btc-research");
   var body = document.getElementById("ov-btc-body");
   var countEl = document.getElementById("ov-btc-count");
+  var groupsEl = document.getElementById("ov-btc-groups");
   var openAllBtn = document.getElementById("ov-btc-open-all");
   var openAllLinks = [];
-  if (!details || !body) return;
+  if (!details || !body || !groupsEl) return;
 
   function readStore(key, fallback) {
     try { var value = localStorage.getItem(key); return value === null ? fallback : JSON.parse(value); } catch (e) { return fallback; }
@@ -181,10 +200,15 @@
     if (blocked > 0) showOpenAllHint(blocked, openAllLinks.length);
   });
 
-  body.addEventListener("toggle", function (event) {
+  function setGroups(html) {
+    groupsEl.innerHTML = html;
+    groupsEl.hidden = !html;
+  }
+
+  groupsEl.addEventListener("toggle", function (event) {
     var sub = event.target;
     if (!sub.matches || !sub.matches(".ov-btc-sub")) return;
-    var closed = Array.prototype.map.call(body.querySelectorAll(".ov-btc-sub:not([open])"), function (el) {
+    var closed = Array.prototype.map.call(groupsEl.querySelectorAll(".ov-btc-sub:not([open])"), function (el) {
       return el.getAttribute("data-group");
     });
     writeStore(SUB_CLOSED_KEY, closed);
@@ -192,6 +216,7 @@
 
   function showError(message) {
     setOpenAll([]);
+    setGroups("");
     countEl.textContent = "Unavailable";
     body.innerHTML = '<div class="empty-state ov-btc-error"><strong>Bitcoin Research unavailable</strong>' +
       "<p>" + esc(message) + "</p>" +
@@ -201,6 +226,7 @@
 
   function load() {
     setOpenAll([]);
+    setGroups("");
     countEl.textContent = "Loading…";
     body.innerHTML = '<div class="empty-state">Loading Bitcoin Research…</div>';
     return fetch(SOURCE_URL, { credentials: "same-origin" })
@@ -216,7 +242,8 @@
         var total = countLinks(data);
         countEl.textContent = total + " link" + (total === 1 ? "" : "s") +
           (data.groups.length ? " · " + data.groups.map(function (g) { return g.label; }).join(" · ") : "");
-        body.innerHTML = render(data, readStore(SUB_CLOSED_KEY, []));
+        body.innerHTML = renderLinks(data);
+        setGroups(renderGroups(data, readStore(SUB_CLOSED_KEY, [])));
         setOpenAll(openAllHrefs(data));
       })
       .catch(function (err) { showError(err && err.message ? err.message : "Request failed."); });

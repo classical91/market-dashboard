@@ -91,6 +91,7 @@
 
     <!-- BTC RESEARCH — rendered from Crypto Hub's Bitcoin Research section
          (/crypto.html#crypto-research), so both pages list the same links. -->
+    <div class="ov-btc-card">
     <details class="ov-btc" id="btc-research">
       <summary>
         <span class="ov-btc-heading">₿ BTC Research</span>
@@ -102,6 +103,10 @@
         <div class="empty-state">Loading Bitcoin Research…</div>
       </div>
     </details>
+    <!-- Category dropdowns (Super Charts, Long vs Short…) sit outside the
+         collapsible body so they stay visible when BTC Research is collapsed. -->
+    <div class="ov-btc-groups" id="ov-btc-groups" aria-label="BTC Research categories" hidden></div>
+    </div>
 
     <section class="ov2-top" aria-label="System status and Market Matrix">
       <div class="ov2-status-column">

@@ -2,14 +2,20 @@
    Research section, shared by the Overview (index.html) and Overview v2.
    The badge tokens match crypto.html's inline styles; the panel tokens match
    overview.css so the dropdown looks the same on both pages. */
-.ov-btc {
+.ov-btc-card {
   --blue-bg: rgba(77, 163, 255, 0.12); --purple-bg: rgba(155, 123, 255, 0.12);
   --green-bg: rgba(0, 227, 150, 0.12); --teal: #00e396; --teal-bg: rgba(0, 227, 150, 0.12);
   --panel-2: #121b2e; --panel-3: #17223a;
   --amber: #f5c542; --amber-bg: rgba(245, 197, 66, 0.12); --coral: #ff4d6d; --coral-bg: rgba(255, 77, 109, 0.12);
   margin-bottom: 25px; border: 1px solid var(--border); border-radius: 14px; background: var(--panel);
-  scroll-margin-top: 16px;
 }
+/* The card holds the collapsible header/links and, below it, the category
+   dropdowns, which stay visible when BTC Research is collapsed. */
+.ov-btc { scroll-margin-top: 16px; }
+.ov-btc-groups { padding: 0 12px 12px; }
+.ov-btc-groups[hidden] { display: none; }
+.ov-btc-groups .ov-btc-list > .ov-btc-sub:first-child { border-top: 0; }
+.ov-btc-body > .ov-btc-note { padding: 4px 4px 0; }
 .ov-btc > summary { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; padding: 12px 16px; cursor: pointer; list-style: none; }
 .ov-btc > summary::-webkit-details-marker { display: none; }
 .ov-btc > summary::before { content: "▸"; color: var(--amber); font-size: 11px; transition: transform .15s; }
