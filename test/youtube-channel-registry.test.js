@@ -276,3 +276,28 @@ test("a category can still be created by hand once nothing is seeded", () => {
   assert.equal(registry.listCategories()[0].channelCount, 1);
   assert.equal(registry.list()[0].category, "Crypto");
 });
+
+test("mixes follow their channels: a rename carries over and a removal drops out", () => {
+  const { registry } = tempRegistry();
+  registry.ensureSeeded();
+  const mix = registry.addMix({ name: "Picks", handles: ["stockmoe", "cryptosrus"] });
+  assert.equal(mix.channelCount, 2);
+
+  const crypto = registry.listCategories().find((category) => category.name === "Crypto");
+  registry.update("stockmoe", { handle: "StockMoeTV", label: "StockMoe", categoryId: crypto.id });
+  assert.deepEqual(registry.listMixes()[0].handles, ["StockMoeTV", "cryptosrus"]);
+
+  registry.remove("cryptosrus");
+  assert.deepEqual(registry.listMixes()[0].handles, ["StockMoeTV"]);
+  assert.deepEqual(registry.mixChannels(mix.id).map((channel) => channel.handle), ["StockMoeTV"]);
+
+  // Category changes write the whole state; the mix must survive them.
+  const stocks = registry.listCategories().find((category) => category.name === "Stocks");
+  registry.removeCategory(stocks.id, {});
+  assert.equal(registry.listMixes().length, 1);
+
+  assert.throws(() => registry.addMix({ name: "picks", handles: ["StockMoeTV"] }), /already exists/);
+  assert.throws(() => registry.addMix({ name: "Empty", handles: [] }), /at least one channel/);
+  registry.removeMix(mix.id);
+  assert.deepEqual(registry.listMixes(), []);
+});

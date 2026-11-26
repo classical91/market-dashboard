@@ -408,7 +408,9 @@
     return count;
   }
 
-  function setupCategoryFilter(select, categories, activeId, onChange) {
+  // Categories and saved mixes share one picker: a mix is just another view of
+  // the feed, and its "mix:" ID travels through the same parameter.
+  function setupCategoryFilter(select, categories, activeId, onChange, mixes) {
     var all = {
       id: "all",
       name: "All Categories",
@@ -416,13 +418,26 @@
         return sum + Number(category.channelCount || 0);
       }, 0),
     };
+    function option(view) {
+      var node = document.createElement("option");
+      node.value = view.id;
+      node.textContent = view.name + " (" + Number(view.channelCount || 0) + ")";
+      return node;
+    }
     select.replaceChildren();
-    [all].concat(categories).forEach(function (category) {
-      var option = document.createElement("option");
-      option.value = category.id;
-      option.textContent = category.name + " (" + Number(category.channelCount || 0) + ")";
-      select.appendChild(option);
-    });
+    if (!mixes || !mixes.length) {
+      [all].concat(categories).forEach(function (category) { select.appendChild(option(category)); });
+    } else {
+      select.appendChild(option(all));
+      var categoryGroup = document.createElement("optgroup");
+      categoryGroup.label = "Categories";
+      categories.forEach(function (category) { categoryGroup.appendChild(option(category)); });
+      var mixGroup = document.createElement("optgroup");
+      mixGroup.label = "Mixes";
+      mixes.forEach(function (mix) { mixGroup.appendChild(option(mix)); });
+      if (categories.length) select.appendChild(categoryGroup);
+      select.appendChild(mixGroup);
+    }
     select.value = activeId;
     select.onchange = function () { onChange(select.value); };
   }
@@ -1025,7 +1040,9 @@
           var name = data?.selectedCategory?.name;
           var message = categoryId === "all"
             ? "Add your first YouTube channel to start building intelligence feeds."
-            : "No channels in " + (name || "this category") + " yet — add a channel.";
+            : data?.selectedCategory?.mix
+              ? "No channels in the " + (name || "selected") + " mix — edit it in Manage channels."
+              : "No channels in " + (name || "this category") + " yet — add a channel.";
           setFeedMessage(message);
           status.textContent = message;
           return;
@@ -1049,13 +1066,16 @@
         var config = await fetchJson("/api/youtube/channels/config", signal);
         if (signal.aborted) return;
         var categories = config.categories || [];
+        var mixes = config.mixes || [];
 
         function hasCategory(id) {
-          return id === "all" || categories.some(function (category) { return category.id === id; });
+          return id === "all" || categories.concat(mixes).some(function (view) { return view.id === id; });
         }
         function fallbackToAll(staleId) {
-          categories = categories.filter(function (category) { return category.id !== staleId; });
-          setupCategoryFilter(select, categories, "all", choose);
+          function keep(view) { return view.id !== staleId; }
+          categories = categories.filter(keep);
+          mixes = mixes.filter(keep);
+          setupCategoryFilter(select, categories, "all", choose, mixes);
           choose("all");
         }
         function choose(id) {
@@ -1070,7 +1090,7 @@
         var activeId = hasCategory(linked) && !select.onchange ? linked : stored;
         if (!hasCategory(activeId)) activeId = "all";
         storeCategory(activeId);
-        setupCategoryFilter(select, categories, activeId, choose);
+        setupCategoryFilter(select, categories, activeId, choose, mixes);
         select.disabled = false;
         loadCategory(activeId, fallbackToAll);
       } catch (error) {

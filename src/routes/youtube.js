@@ -2,7 +2,7 @@ const express = require("express");
 
 const { resolveYoutubeChannels } = require("../config/youtube-channels");
 const { resolveYoutubeThemes } = require("../config/youtube-themes");
-const { UNCATEGORIZED_ID } = require("../services/youtube-channel-registry");
+const { UNCATEGORIZED_ID, isMixId } = require("../services/youtube-channel-registry");
 const { narrowLiveFeed } = require("../services/youtube-live-feed");
 
 function asyncRoute(handler) {
@@ -26,12 +26,17 @@ function asyncRoute(handler) {
 function createYoutubeRouter({ youtubeService, channelRegistry, channelIdOverrides, summaryService, requireAdmin }) {
   const router = express.Router();
 
+  // `categoryId` names a view of the feed: "all", a category, or a saved mix
+  // (a "mix:" ID). Mixes ride on the same parameter so the page's category
+  // picker, its remembered choice and ?category= links all work for them.
   function feedChannels(categoryId) {
     const channels = channelRegistry.list();
     const selected = String(categoryId || "").trim();
     const filtered = !selected || selected === "all"
       ? channels
-      : channels.filter((channel) => channel.categoryId === selected);
+      : isMixId(selected)
+        ? channelRegistry.mixChannels(selected) || []
+        : channels.filter((channel) => channel.categoryId === selected);
     return resolveYoutubeChannels(channelIdOverrides, filtered);
   }
 
@@ -67,7 +72,9 @@ function createYoutubeRouter({ youtubeService, channelRegistry, channelIdOverrid
     asyncRoute(async (req, res) => {
       const selectedCategoryId = String(req.query.categoryId || "all").trim() || "all";
       const categories = channelRegistry.listCategories();
-      if (selectedCategoryId !== "all" && !categories.some((category) => category.id === selectedCategoryId)) {
+      const mixes = channelRegistry.listMixes();
+      const mix = isMixId(selectedCategoryId) ? mixes.find((item) => item.id === selectedCategoryId) : null;
+      if (selectedCategoryId !== "all" && !mix && !categories.some((category) => category.id === selectedCategoryId)) {
         return res.status(400).json({ error: "Unknown YouTube category" });
       }
       const channels = feedChannels(selectedCategoryId);
@@ -80,10 +87,13 @@ function createYoutubeRouter({ youtubeService, channelRegistry, channelIdOverrid
       res.json({
         ...payload,
         categories,
+        mixes,
         selectedCategoryId,
         selectedCategory: selectedCategoryId === "all"
           ? { id: "all", name: "All Categories", channelCount: channelRegistry.list().length }
-          : categories.find((category) => category.id === selectedCategoryId),
+          : mix
+            ? { id: mix.id, name: mix.name, channelCount: mix.channelCount, mix: true }
+            : categories.find((category) => category.id === selectedCategoryId),
         themes: resolveYoutubeThemes(undefined, channels),
       });
     }),
@@ -98,6 +108,7 @@ function createYoutubeRouter({ youtubeService, channelRegistry, channelIdOverrid
       res.json({
         channels: channelRegistry.list(),
         categories: channelRegistry.listCategories(),
+        mixes: channelRegistry.listMixes(),
         registry: channelRegistry.describe(),
       });
     }),
@@ -113,7 +124,7 @@ function createYoutubeRouter({ youtubeService, channelRegistry, channelIdOverrid
       requireAdmin,
       asyncRoute(async (req, res) => {
         const added = channelRegistry.add(req.body || {});
-        res.status(201).json({ added, channels: channelRegistry.list(), categories: channelRegistry.listCategories() });
+        res.status(201).json({ added, channels: channelRegistry.list(), categories: channelRegistry.listCategories(), mixes: channelRegistry.listMixes() });
       }),
     );
 
@@ -122,7 +133,7 @@ function createYoutubeRouter({ youtubeService, channelRegistry, channelIdOverrid
       requireAdmin,
       asyncRoute(async (req, res) => {
         const updated = channelRegistry.update(req.params.handle, req.body || {});
-        res.json({ updated, channels: channelRegistry.list(), categories: channelRegistry.listCategories() });
+        res.json({ updated, channels: channelRegistry.list(), categories: channelRegistry.listCategories(), mixes: channelRegistry.listMixes() });
       }),
     );
 
@@ -131,7 +142,35 @@ function createYoutubeRouter({ youtubeService, channelRegistry, channelIdOverrid
       requireAdmin,
       asyncRoute(async (req, res) => {
         const removed = channelRegistry.remove(req.params.handle);
-        res.json({ removed, channels: channelRegistry.list(), categories: channelRegistry.listCategories() });
+        res.json({ removed, channels: channelRegistry.list(), categories: channelRegistry.listCategories(), mixes: channelRegistry.listMixes() });
+      }),
+    );
+
+    // Saved mixes: a named set of hand-picked channels viewed as one feed.
+    router.post(
+      "/mixes/config",
+      requireAdmin,
+      asyncRoute(async (req, res) => {
+        const added = channelRegistry.addMix(req.body || {});
+        res.status(201).json({ added, mixes: channelRegistry.listMixes() });
+      }),
+    );
+
+    router.put(
+      "/mixes/config/:mixId",
+      requireAdmin,
+      asyncRoute(async (req, res) => {
+        const updated = channelRegistry.updateMix(req.params.mixId, req.body || {});
+        res.json({ updated, mixes: channelRegistry.listMixes() });
+      }),
+    );
+
+    router.delete(
+      "/mixes/config/:mixId",
+      requireAdmin,
+      asyncRoute(async (req, res) => {
+        const removed = channelRegistry.removeMix(req.params.mixId);
+        res.json({ removed, mixes: channelRegistry.listMixes() });
       }),
     );
 

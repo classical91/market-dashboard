@@ -766,6 +766,17 @@
 .ytm-link-btn { padding: 6px; border: 0; background: transparent; color: var(--soft); font: inherit; font-size: 11px; cursor: pointer; }
 .ytm-section-copy { margin: 0 0 12px; color: var(--muted); font-size: 12px; }
 .ytm-category-form { display: grid; grid-template-columns: 1fr auto auto; align-items: end; gap: 8px; margin-bottom: 12px; }
+.ytm-mix-toolbar { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
+.ytm-mix-editor .ytm-mix-picker { grid-column: 1 / -1; display: grid; gap: 8px; min-width: 0; margin: 0; padding: 0; border: 0; color: var(--soft); font-size: 12px; }
+.ytm-mix-picker legend { padding: 0; margin-bottom: 6px; }
+.ytm-mix-list { display: grid; max-height: 260px; overflow-y: auto; overscroll-behavior: contain; border: 1px solid var(--border); border-radius: 8px; }
+.ytm-mix-list .ytm-empty-copy { padding: 14px; }
+.ytm-mix-option { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px 10px; border-bottom: 1px solid var(--border); cursor: pointer; }
+.ytm-mix-option:last-child { border-bottom: 0; }
+.ytm-mix-option:hover { background: rgba(255,255,255,.03); }
+.ytm-mix-option input { width: 16px; height: 16px; margin: 0; accent-color: var(--green); }
+.ytm-mix-option-text { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; min-width: 0; color: var(--text); font-size: 12px; }
+.ytm-mix-row .manage-row-meta { overflow-wrap: anywhere; }
 .ytm-empty { display: grid; justify-items: center; gap: 10px; padding: 22px 10px; text-align: center; }
 .ytm-empty-copy { margin: 0; color: var(--muted); font-size: 12px; }
 .ytm-confirm-shade { position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; padding: 20px; background: rgba(3,6,12,.78); }

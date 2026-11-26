@@ -297,3 +297,51 @@ test("Uncategorized is selectable end to end once a channel lands in it", async 
     "filtering by the fallback returns only unassigned channels",
   );
 });
+
+test("a saved mix combines channels from different categories into one feed", async () => {
+  const config = await (await api("/api/youtube/channels/config")).json();
+  assert.ok(Array.isArray(config.mixes), "the panel reads mixes with the rest of the config");
+  const [first, second] = config.channels.filter((channel, index, list) =>
+    list.findIndex((other) => other.categoryId === channel.categoryId) === index);
+  assert.ok(first && second && first.categoryId !== second.categoryId, "the seed spans two categories");
+
+  const keyless = await api("/api/youtube/mixes/config", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: "Morning", handles: [first.handle] }),
+  });
+  assert.equal(keyless.status, 401, "saving a mix needs the key, like every other change");
+
+  const created = await adminApi("/api/youtube/mixes/config", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: "Morning", handles: ["@" + first.handle, second.handle, first.handle] }),
+  });
+  assert.equal(created.status, 201);
+  const { added } = await created.json();
+  assert.match(added.id, /^mix:/);
+  assert.deepEqual(added.handles, [first.handle, second.handle], "handles are de-duplicated and stored as tracked");
+
+  const feed = await api(`/api/youtube/channels?categoryId=${encodeURIComponent(added.id)}`);
+  assert.equal(feed.status, 200);
+  const body = await feed.json();
+  assert.equal(body.selectedCategory.name, "Morning");
+  assert.equal(body.selectedCategory.mix, true);
+  assert.deepEqual(body.channels.map((channel) => channel.handle).sort(), [first.handle, second.handle].sort());
+
+  const untracked = await adminApi("/api/youtube/mixes/config", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: "Ghosts", handles: ["nobody-tracks-this"] }),
+  });
+  assert.equal(untracked.status, 400);
+
+  const edited = await adminApi(`/api/youtube/mixes/config/${encodeURIComponent(added.id)}`, {
+    method: "PUT", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: "Morning watch", handles: [second.handle] }),
+  });
+  assert.equal(edited.status, 200);
+  assert.deepEqual((await edited.json()).updated.handles, [second.handle]);
+
+  const removed = await adminApi(`/api/youtube/mixes/config/${encodeURIComponent(added.id)}`, { method: "DELETE" });
+  assert.equal(removed.status, 200);
+  const gone = await api(`/api/youtube/channels?categoryId=${encodeURIComponent(added.id)}`);
+  assert.equal(gone.status, 400, "a deleted mix answers like a stale category, so the page falls back to All");
+});

@@ -61,6 +61,29 @@
     }
     return null;
   }
+  /**
+   * What is wrong with a mix form, or null when it can be saved. `selected` is
+   * the list of chosen handles; `exceptId` is the mix being edited.
+   */
+  function mixFormProblem(input) {
+    var fields = input || {};
+    var name = String(fields.name || "").trim();
+    if (!name) return "Enter a name for the mix.";
+    var clash = (fields.mixes || []).filter(function (mix) {
+      return mix.id !== fields.exceptId && categoryKey(mix.name) === categoryKey(name);
+    })[0];
+    if (clash) return "The mix \"" + clash.name + "\" already exists.";
+    if (!fields.selected || !fields.selected.length) return "Pick at least one channel for the mix.";
+    return null;
+  }
+  /** Channels matching a picker search, by name, handle or category. */
+  function channelsMatching(channels, search) {
+    var query = String(search || "").toLowerCase().trim().replace(/^@+/, "");
+    if (!query) return (channels || []).slice();
+    return (channels || []).filter(function (channel) {
+      return (channel.handle + " " + channel.label + " " + (channel.category || "")).toLowerCase().indexOf(query) >= 0;
+    });
+  }
   /** What an empty channel list says, given the filter and search in force. */
   function emptyChannelsMessage(categories, filterId, search) {
     var query = String(search || "").trim();
@@ -104,7 +127,12 @@
     // The page's category, when it has one, is where the manager opens: the
     // list starts filtered to it and a new channel is preselected into it.
     // render() drops it back to "all" if the category no longer exists.
-    var state = { channels: [], categories: [], tab: "channels", search: "", filter: opts.categoryId || "all", editor: null, busy: false, changed: false };
+    // A mix is not a category, so opening from a mix lands on the Mixes tab.
+    var openedOnMix = /^mix:/.test(String(opts.categoryId || ""));
+    var state = {
+      channels: [], categories: [], mixes: [], tab: openedOnMix ? "mixes" : "channels", search: "",
+      filter: openedOnMix ? "all" : opts.categoryId || "all", editor: null, busy: false, changed: false,
+    };
     var closed = false;
     var confirmation = null;
     var pageRoot = doc.querySelector(".app");
@@ -118,7 +146,7 @@
     var head = el(doc, "div", "manage-head ytm-head");
     var heading = el(doc, "div");
     var title = el(doc, "h2", "manage-title", "Manage YouTube Sources"); title.id = "ytmTitle";
-    heading.appendChild(title); heading.appendChild(el(doc, "p", "ytm-subtitle", "Organize channels once, then filter intelligence by category."));
+    heading.appendChild(title); heading.appendChild(el(doc, "p", "ytm-subtitle", "Organize channels once, then filter intelligence by category or mix."));
     var close = button(doc, "manage-close", "×", cleanup); close.setAttribute("aria-label", "Close source manager");
     head.appendChild(heading); head.appendChild(close); box.appendChild(head);
     var tabs = el(doc, "div", "ytm-tabs"); tabs.setAttribute("role", "tablist");
@@ -158,6 +186,7 @@
     function sync(result, notice) {
       if (result.channels) state.channels = result.channels;
       if (result.categories) state.categories = result.categories;
+      if (result.mixes) state.mixes = result.mixes;
       state.busy = false; state.changed = true; state.editor = null; render(); say(notice, "ok");
       if (!closed) tabs.querySelector('[aria-selected="true"]').focus();
       if (opts.onChange) opts.onChange(state.channels, result);
@@ -165,7 +194,7 @@
     function fail(error) { state.busy = false; say(error.message || "The change could not be saved.", "error"); }
     function setTab(name) { state.tab = name; state.editor = null; say(""); render(); }
 
-    var TABS = ["channels", "categories"];
+    var TABS = ["channels", "categories", "mixes"];
     // Arrow keys move between tabs and only the selected tab is in the tab
     // order, which is what makes a tablist usable from the keyboard: Tab
     // reaches the tab strip once, then Left/Right choose within it.
@@ -420,10 +449,107 @@
       });
       return wrap;
     }
+    function mixForm(mix) {
+      var form = el(doc, "form", "ytm-editor ytm-mix-editor");
+      form.appendChild(el(doc, "h3", "ytm-editor-title", mix ? "Edit mix" : "New mix"));
+      var name = el(doc, "input", "manage-input"); name.value = mix ? mix.name : ""; name.autocomplete = "off";
+      form.appendChild(labeled(doc, "Mix name", name, "e.g. Morning watch, Macro + crypto."));
+      // Chosen handles live here rather than in the checkboxes, so narrowing the
+      // list with a search never forgets a channel picked before it.
+      var chosen = {};
+      (mix ? mix.handles : []).forEach(function (handle) { chosen[handle.toLowerCase()] = handle; });
+      function chosenHandles() { return state.channels.filter(function (channel) { return chosen[channel.handle.toLowerCase()]; }).map(function (channel) { return channel.handle; }); }
+      var search = el(doc, "input", "manage-input ytm-search"); search.placeholder = "Find channels…"; search.setAttribute("aria-label", "Find channels for this mix");
+      var picker = el(doc, "fieldset", "ytm-mix-picker");
+      picker.appendChild(el(doc, "legend", "ytm-label", "Channels"));
+      var count = el(doc, "span", "ytm-hint ytm-mix-count"); count.setAttribute("aria-live", "polite");
+      var list = el(doc, "div", "ytm-mix-list");
+      picker.appendChild(search); picker.appendChild(list); picker.appendChild(count);
+      form.appendChild(picker);
+      function updateCount() {
+        var n = chosenHandles().length;
+        count.textContent = n + (n === 1 ? " channel selected" : " channels selected");
+      }
+      function renderPicker() {
+        list.replaceChildren();
+        var shown = channelsMatching(state.channels, search.value);
+        if (!shown.length) list.appendChild(el(doc, "p", "ytm-empty-copy", state.channels.length ? "No channels match \"" + search.value.trim() + "\"." : "Add channels first, then combine them here."));
+        shown.forEach(function (channel) {
+          var row = el(doc, "label", "ytm-mix-option");
+          var box = el(doc, "input"); box.type = "checkbox"; box.checked = Boolean(chosen[channel.handle.toLowerCase()]);
+          box.addEventListener("change", function () {
+            if (box.checked) chosen[channel.handle.toLowerCase()] = channel.handle;
+            else delete chosen[channel.handle.toLowerCase()];
+            updateCount();
+          });
+          var text = el(doc, "span", "ytm-mix-option-text");
+          text.appendChild(el(doc, "strong", "", channel.label)); text.appendChild(el(doc, "span", "manage-row-handle", "@" + channel.handle));
+          row.appendChild(box); row.appendChild(text); row.appendChild(el(doc, "span", "ytm-badge", channel.category || "Uncategorized"));
+          list.appendChild(row);
+        });
+        updateCount();
+      }
+      search.addEventListener("input", renderPicker);
+      // Enter in the search box filters; it must not submit a half-picked mix.
+      search.addEventListener("keydown", function (event) { if (event.key === "Enter") event.preventDefault(); });
+      renderPicker();
+      var error = el(doc, "div", "ytm-inline-error"); error.setAttribute("role", "alert"); form.appendChild(error);
+      var actions = el(doc, "div", "ytm-actions"); actions.appendChild(button(doc, "ytm-btn", "Cancel", function () { state.editor = null; render(); }));
+      var save = el(doc, "button", "ytm-btn primary", mix ? "Save mix" : "Create mix"); save.type = "submit"; actions.appendChild(save); form.appendChild(actions);
+      form.addEventListener("submit", function (event) {
+        event.preventDefault(); if (save.disabled) return;
+        var handles = chosenHandles();
+        var problem = mixFormProblem({ name: name.value, selected: handles, mixes: state.mixes, exceptId: mix ? mix.id : null });
+        if (problem) { error.textContent = problem; return; }
+        error.textContent = ""; state.busy = true; save.disabled = true; save.textContent = "Saving…";
+        api(mix ? "/api/youtube/mixes/config/" + encodeURIComponent(mix.id) : "/api/youtube/mixes/config", {
+          method: mix ? "PUT" : "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: name.value.trim(), handles: handles }),
+        }).then(function (result) { sync(result, mix ? "Mix saved." : "Mix created. Pick it from the category menu."); }).catch(function (problem) {
+          fail(problem); error.textContent = problem.message || "The mix could not be saved.";
+          save.disabled = false; save.textContent = mix ? "Save mix" : "Create mix";
+        });
+      });
+      setTimeout(function () { name.focus(); }, 0);
+      return form;
+    }
+    function renderMixes() {
+      var wrap = el(doc, "div", "ytm-panel");
+      var toolbar = el(doc, "div", "ytm-mix-toolbar");
+      toolbar.appendChild(el(doc, "p", "ytm-section-copy", "Combine channels from any categories into one feed. A channel can be in as many mixes as you like."));
+      toolbar.appendChild(button(doc, "ytm-btn primary", "+ New Mix", function () { state.editor = { type: "mix", mix: null }; render(); }));
+      wrap.appendChild(toolbar);
+      if (state.editor?.type === "mix" && !state.editor.mix) wrap.appendChild(mixForm(null));
+      if (!state.mixes.length && state.editor?.type !== "mix") wrap.appendChild(el(doc, "div", "manage-empty", "No mixes yet. Create one to watch hand-picked channels together."));
+      state.mixes.forEach(function (mix) {
+        if (state.editor?.type === "mix" && state.editor.mix && state.editor.mix.id === mix.id) { wrap.appendChild(mixForm(mix)); return; }
+        var row = el(doc, "div", "manage-row ytm-category-row ytm-mix-row"); var text = el(doc, "div", "manage-row-text");
+        text.appendChild(el(doc, "strong", "ytm-category-name", mix.name));
+        var labels = mix.handles.map(function (handle) {
+          var channel = state.channels.filter(function (item) { return item.handle.toLowerCase() === handle.toLowerCase(); })[0];
+          return channel ? channel.label : "@" + handle;
+        });
+        var summary = mix.channelCount + (mix.channelCount === 1 ? " channel" : " channels");
+        if (labels.length) summary += " · " + labels.slice(0, 4).join(", ") + (labels.length > 4 ? " +" + (labels.length - 4) + " more" : "");
+        text.appendChild(el(doc, "span", "manage-row-meta", summary));
+        var actions = el(doc, "div", "ytm-row-actions");
+        actions.appendChild(button(doc, "ytm-link-btn", "Edit", function () { state.editor = { type: "mix", mix: mix }; render(); }));
+        actions.appendChild(button(doc, "ytm-link-btn danger", "Delete", function () {
+          confirmDialog("Delete " + mix.name + "?", "This removes the mix only. Its channels stay tracked in their categories.", "Delete mix", function (control) {
+            control.disabled = true; control.textContent = "Deleting…";
+            api("/api/youtube/mixes/config/" + encodeURIComponent(mix.id), { method: "DELETE" })
+              .then(function (result) { closeConfirmation(false); sync(result, "Mix deleted."); }).catch(function (error) { closeConfirmation(true); fail(error); });
+          });
+        }));
+        row.appendChild(text); row.appendChild(actions); wrap.appendChild(row);
+      });
+      return wrap;
+    }
     function render() {
       if (closed) return;
       if (!state.categories.some(function (category) { return category.id === state.filter; })) state.filter = "all";
-      renderTabs(); content.innerHTML = ""; content.appendChild(state.tab === "channels" ? renderChannels() : renderCategories());
+      renderTabs(); content.innerHTML = "";
+      content.appendChild(state.tab === "channels" ? renderChannels() : state.tab === "mixes" ? renderMixes() : renderCategories());
     }
 
     close.addEventListener("click", cleanup); overlay.addEventListener("click", function (event) { if (event.target === overlay) cleanup(); }); doc.addEventListener("keydown", onKey, true);
@@ -431,7 +557,7 @@
     close.focus();
     fetch("/api/youtube/channels/config", { headers: { Accept: "application/json" } }).then(readJson).then(function (body) {
       if (closed) return;
-      state.channels = body.channels || []; state.categories = body.categories || []; render(); say(""); close.focus();
+      state.channels = body.channels || []; state.categories = body.categories || []; state.mixes = body.mixes || []; render(); say(""); close.focus();
       if (body.registry?.loadState === "corrupt") say("The saved source list could not be read; showing defaults.", "error");
     }).catch(function (error) { say(error.message || "Could not load YouTube sources.", "error"); });
   }
@@ -442,6 +568,6 @@
     findDuplicate: findDuplicate, duplicateMessage: duplicateMessage,
     confirmationMessage: confirmationMessage, categoryDuplicate: categoryDuplicate,
     channelFormProblem: channelFormProblem, emptyChannelsMessage: emptyChannelsMessage,
-    defaultCategoryFor: defaultCategoryFor,
+    defaultCategoryFor: defaultCategoryFor, mixFormProblem: mixFormProblem, channelsMatching: channelsMatching,
   };
 });
