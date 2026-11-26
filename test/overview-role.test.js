@@ -13,7 +13,7 @@ const overviewJs = read("public/assets/js/overview.js");
 const terminalPage = read("public/terminal-suite.html");
 const sidebar = read("public/assets/js/sidebar.js");
 
-const TA_SYMBOLS = ["BINANCE:BTCUSDT", "BINANCE:ETHUSDT", "BINANCE:SOLUSDT", "AMEX:SPY", "NASDAQ:QQQ", "TVC:DXY"];
+const TA_INTERVALS = ["15m", "1h", "4h", "1D", "1W", "1M"];
 
 test("Overview is the 30-second read: no duplicate link cards", () => {
   for (const marker of ['id="ovh-technical-analysis"', 'id="ovh-derivatives"', 'id="ovh-liquidity"']) {
@@ -31,10 +31,13 @@ test("Overview is the 30-second read: no duplicate link cards", () => {
   }
 });
 
-test("the technical ratings live on Overview, all six, labelled as TradingView's", () => {
+test("the technical ratings live on Overview: BTC across six timeframes, labelled as TradingView's", () => {
   assert.match(overviewPage, /id="technical-analysis"/);
-  for (const symbol of TA_SYMBOLS) {
-    assert.ok(overviewPage.includes(`"symbol": "${symbol}"`), `${symbol} rating missing from Overview`);
+  const configs = overviewPage.match(/\{ "interval": "[^"]+"[^}]*\}/g) || [];
+  assert.deepStrictEqual(configs.map((c) => c.match(/"interval": "([^"]+)"/)[1]), TA_INTERVALS);
+  for (const config of configs) {
+    assert.match(config, /"symbol": "BINANCE:BTCUSDT"/);
+    assert.match(config, /"showIntervalTabs": false/);
   }
   assert.match(overviewPage, /Technical Ratings &middot; TradingView/);
   assert.match(overviewPage, /href="\/directional-bias\.html"/);
