@@ -307,6 +307,8 @@
       ],
     },
     { href: "/indicators.html", label: "Indicators Glossary" },
+    // Question-led companion to the glossary: each answer links to live pages.
+    { href: "/qa.html", label: "Market Q&A" },
     {
       href: "https://docs.google.com/document/d/1V-47R5Y-gQvwDZ9sDoY84-m6vy7SZ7U9f2pGpoUipoI/edit?usp=sharing",
       label: "Indicator Drafts",
@@ -323,6 +325,7 @@
     if (path === "/index.html" || path === "/overview-v1.html") return "/overview-v1";
     // Single-concept and topic explainer pages belong to the Indicators Glossary.
     if (path === "/concept.html" || path === "/topic.html") return "/indicators.html";
+    if (path === "/qa" || path === "/knowledge-base") return "/qa.html";
     return path;
   }
 

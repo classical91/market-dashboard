@@ -648,6 +648,10 @@ function createApp() {
   app.get(["/tradehunter/market-matrix", "/market-matrix"], (req, res) => {
     res.sendFile(path.join(__dirname, "..", "public", "market-matrix.html"));
   });
+  // Market Q&A knowledge base: short URLs alongside /qa.html.
+  app.get(["/qa", "/knowledge-base"], (req, res) => {
+    res.sendFile(path.join(__dirname, "..", "public", "qa.html"));
+  });
   // A stable link for phone Shortcuts (and bookmarks) to the glossary's
   // "Random topic" button: every hit redirects to a different random concept.
   // Picked server-side and served no-store, so a cached response can't pin it
