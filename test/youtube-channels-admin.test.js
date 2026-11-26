@@ -76,3 +76,9 @@ test("an empty channel list says which view is empty", () => {
   assert.match(admin.emptyChannelsMessage(CATEGORIES, "all", "moe"), /No channels match "moe"/);
   assert.match(admin.emptyChannelsMessage(CATEGORIES, "all", ""), /No channels match/);
 });
+
+test("a new channel starts in the category being viewed", () => {
+  assert.equal(admin.defaultCategoryFor("category:crypto"), "category:crypto");
+  assert.equal(admin.defaultCategoryFor("all"), "", "All categories leaves the form on its usual default");
+  assert.equal(admin.defaultCategoryFor(undefined), "");
+});

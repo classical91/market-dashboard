@@ -1140,6 +1140,9 @@
     if (manage && window.YoutubeChannelsAdmin) {
       manage.addEventListener("click", function () {
         window.YoutubeChannelsAdmin.open({
+          // Open on the category this page is showing, so a channel added from
+          // here lands in it without picking it again.
+          categoryId: select.value,
           // Channel management changes the category counts and the feed.
           onChange: loadFeeds,
         });
