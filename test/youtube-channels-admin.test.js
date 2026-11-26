@@ -82,3 +82,13 @@ test("a new channel starts in the category being viewed", () => {
   assert.equal(admin.defaultCategoryFor("all"), "", "All categories leaves the form on its usual default");
   assert.equal(admin.defaultCategoryFor(undefined), "");
 });
+
+test("the mix form names what is missing", () => {
+  const mixes = [{ id: "mix:morning", name: "Morning" }];
+  assert.match(admin.mixFormProblem({ name: " ", selected: ["stockmoe"], mixes }), /name for the mix/);
+  assert.match(admin.mixFormProblem({ name: "morning", selected: ["stockmoe"], mixes }), /"Morning" already exists/);
+  assert.equal(admin.mixFormProblem({ name: "Morning", selected: ["stockmoe"], mixes, exceptId: "mix:morning" }), null);
+  assert.match(admin.mixFormProblem({ name: "Evening", selected: [], mixes }), /at least one channel/);
+  assert.deepEqual(admin.channelsMatching(TRACKED, "tech").map((channel) => channel.handle), ["iReviewsVideos"], "category names are searchable");
+  assert.deepEqual(admin.channelsMatching(TRACKED, "@stock").map((channel) => channel.handle), ["stockmoe"]);
+});

@@ -41,6 +41,21 @@ contains channels, both lists expose it with the same count and the Categories t
 marks it read-only, keeping the available categories aligned without displaying an
 empty pseudo-category.
 
+### Saved mixes
+
+A mix is a named, hand-picked set of tracked channels from any categories, viewed
+as one feed. Mixes live in the same registry file (`mixes: [{ id: "mix:<slug>",
+name, handles }]`). Unlike a category, a mix does not own its channels: a channel
+sits in one category but in any number of mixes. Renaming a channel's handle
+updates it in every mix, and removing a channel drops it from every mix.
+
+`categoryId` on `GET /api/youtube/channels` also accepts a mix ID, so the page's
+picker (which lists mixes under a "Mixes" group), its remembered choice, and
+`?category=` links work for mixes unchanged. A deleted mix answers `400` like a
+stale category, and the page falls back to `all`. Authenticated
+`/api/youtube/mixes/config` (`POST`, `PUT /:mixId`, `DELETE /:mixId`) manages
+mixes from the panel's Mixes tab.
+
 ## Manage YouTube Sources panel
 
 The panel is one dialog with two tabs, `Channels` and `Categories`, so channel
