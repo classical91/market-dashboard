@@ -41,6 +41,8 @@
     viewerClose: document.getElementById("pbViewerClose"),
     viewerCrop: document.getElementById("pbViewerCrop"),
     heading: document.getElementById("pbHeading"),
+    headingChart: document.getElementById("pbHeadingChart"),
+    viewerChart: document.getElementById("pbViewerChart"),
     back: document.getElementById("pbBack"),
     stats: document.getElementById("pbStats"),
     statTotal: document.getElementById("pbStatTotal"),
@@ -101,6 +103,41 @@
     return Ticker.extractTags(item && item.label);
   }
 
+  // Each ticker links to its free TradingView chart (see chart-links.js);
+  // on phones settings.js opens it in the TradingView app.
+  var Charts = window.ChartLinks;
+
+  /** #crypto / #stock from the labels of every screenshot in a ticker's folder. */
+  function folderHint(tag) {
+    var tags = [];
+    state.items.forEach(function (item) {
+      var own = tagsOf(item);
+      if (own.indexOf(tag) !== -1) tags = tags.concat(own);
+    });
+    return Charts.marketHint(tags);
+  }
+
+  function chartUrlFor(tag, hint) {
+    return Charts && tag ? Charts.chartUrl(tag, hint === undefined ? folderHint(tag) : hint) : "";
+  }
+
+  /** The first of a screenshot's tickers that has a chart, or "". */
+  function chartTagOf(item) {
+    var tags = tagsOf(item);
+    var hint = Charts ? Charts.marketHint(tags) : "";
+    for (var i = 0; i < tags.length; i += 1) if (chartUrlFor(tags[i], hint)) return tags[i];
+    return "";
+  }
+
+  function chartLink(tag, hint) {
+    var url = chartUrlFor(tag, hint);
+    if (!url) return "";
+    var name = "$" + tag;
+    return '<a class="pb-btn pb-chart" href="' + escapeHtml(url) + '" target="_blank" rel="noopener" ' +
+      'title="Open the ' + escapeHtml(name) + ' chart on TradingView" aria-label="' + escapeHtml(name) + ' chart on TradingView">' +
+      'Chart <span aria-hidden="true">&#8599;</span></a>';
+  }
+
   // Screenshots older than this get a red timestamp; a ticker folder whose
   // oldest screenshot is older than this is marked red as a whole.
   var STALE_MS = 3 * 24 * 60 * 60 * 1000;
@@ -147,6 +184,19 @@
     });
   }
 
+  /** Point a fixed Chart link (folder heading, viewer) at a ticker, or hide it. */
+  function setChartLink(link, url, tag) {
+    if (!link) return;
+    link.hidden = !url;
+    if (url) {
+      link.href = url;
+      link.title = "Open the $" + tag + " chart on TradingView";
+      link.setAttribute("aria-label", "$" + tag + " chart on TradingView");
+    } else {
+      link.removeAttribute("href");
+    }
+  }
+
   /** Which ticker folder is open (from tapping a stack) and the heading for it. */
   function syncFolder() {
     // A folder whose last screenshot was relabelled or deleted is gone; fall
@@ -158,6 +208,8 @@
     el.heading.textContent = state.folder === ALL ? "Watching"
       : state.folder === OLD ? "Older than 3 days" : "$" + state.folder;
     el.back.hidden = state.folder === ALL;
+    var folderChart = state.folder === ALL || state.folder === OLD ? "" : chartUrlFor(state.folder);
+    setChartLink(el.headingChart, folderChart, state.folder);
     // The count cards summarise everything, so they belong on the main (All)
     // view only; inside a ticker folder they'd read as that folder's numbers.
     el.stats.hidden = state.folder !== ALL;
@@ -312,6 +364,7 @@
           '<div class="pb-stack-name"><span class="pb-folder-icon" aria-hidden="true"></span>' + escapeHtml(name) + "</div>" +
           '<div class="pb-card-foot">' +
             '<span class="pb-when' + (stale ? ' is-stale" title="Oldest screenshot is over 3 days old' : "") + '">' + items.length + " screenshots · since " + escapeHtml(formatWhen(since)) + "</span>" +
+            chartLink(tag) +
             '<button type="button" class="pb-btn" data-action="open-folder">Open</button>' +
           "</div>" +
         "</div>" +
@@ -337,6 +390,7 @@
             '<span class="pb-when' + (isStale(item.createdAt) ? " is-stale" : "") + '" title="' +
               escapeHtml((isStale(item.createdAt) ? "Older than 3 days · " : "") + formatSize(item.size)) + '">' +
               escapeHtml(formatWhen(item.createdAt)) + "</span>" +
+            chartLink(chartTagOf(item), Charts ? Charts.marketHint(tagsOf(item)) : "") +
             // Rename, Crop and Delete sit behind Edit so the card stays uncluttered.
             '<button type="button" class="pb-btn pb-edit" data-action="edit" aria-expanded="' + (state.editing === item.id) + '">Edit</button>' +
             '<span class="pb-edit-actions">' +
@@ -455,6 +509,8 @@
     el.viewerLabel.textContent = item.label || "Untitled screenshot";
     el.viewerWhen.textContent = "Added " + formatWhen(item.createdAt) + (item.size ? " · " + formatSize(item.size) : "");
     el.viewerOpen.href = item.url;
+    var viewerTag = chartTagOf(item);
+    setChartLink(el.viewerChart, chartUrlFor(viewerTag, Charts ? Charts.marketHint(tagsOf(item)) : ""), viewerTag);
     if (typeof el.viewer.showModal === "function") el.viewer.showModal();
     else window.open(item.url, "_blank", "noopener");
   }
