@@ -275,6 +275,17 @@ const TRADING_LAB_MACHINE_READ_PATHS = new Set([
 // One path segment only, so this can never widen into a deeper sub-resource.
 const STRATEGY_ACCOUNT_DETAIL_PATH = /^\/api\/trading-lab\/strategy-accounts\/[^/]+$/;
 
+// TraderClaw reads Gann observations the same way: an API client with an
+// x-admin-key and no session. One exact path, read methods only — the rest
+// of /api/gann stays behind the owner session.
+const GANN_MACHINE_READ_PATHS = new Set(["/api/gann/observations"]);
+
+function isGannMachineReadRequest(req, adminKey) {
+  if (req.method !== "GET" && req.method !== "HEAD") return false;
+  const path = req.path.length > 1 && req.path.endsWith("/") ? req.path.slice(0, -1) : req.path;
+  return GANN_MACHINE_READ_PATHS.has(path) && isAdminRequest(req, adminKey);
+}
+
 function isTradingLabMachineReadRequest(req, adminKey) {
   if (req.method !== "GET" && req.method !== "HEAD") return false;
   const path = req.path.length > 1 && req.path.endsWith("/") ? req.path.slice(0, -1) : req.path;
@@ -446,6 +457,10 @@ function createSiteAuth(config) {
         }
       }
       if (isTradingLabMachineReadRequest(req, config.adminKey)) {
+        next();
+        return;
+      }
+      if (isGannMachineReadRequest(req, config.adminKey)) {
         next();
         return;
       }

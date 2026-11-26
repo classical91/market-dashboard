@@ -28,6 +28,7 @@ const { createPatternScannerRouter } = require("./routes/pattern-scanner");
 const { createSignalScreenerRouter } = require("./routes/signal-screener");
 const { createDirectionalBiasRouter } = require("./routes/directional-bias");
 const { createLocalExtremesRouter } = require("./routes/local-extremes");
+const { createGannRouter } = require("./routes/gann");
 const { createOpenInterestRouter } = require("./routes/open-interest");
 const { createCrossMarketOiRouter } = require("./routes/cross-market-oi");
 const { createKucoinLiveTradesRouter } = require("./routes/kucoin-live-trades");
@@ -85,6 +86,7 @@ const { LayoutAnalysisService } = require("./services/layout-analysis");
 const { LayoutCaptureService } = require("./services/layout-capture");
 const { PatternScannerService } = require("./services/pattern-scanner");
 const { SignalScreenerService } = require("./services/signal-screener");
+const { GannService } = require("./services/gann/service");
 const { OpenInterestService } = require("./services/open-interest/service");
 const { createProviders: createOpenInterestProviders } = require("./services/open-interest/providers");
 const { CrossMarketOiService } = require("./services/cross-market-oi/service");
@@ -645,6 +647,9 @@ function createApp() {
   });
   // TradeHunter → Market Matrix lives at a TradeHunter path; the .html file
   // stays reachable too, like every other page.
+  app.get(["/tradehunter/gann", "/gann"], (req, res) => {
+    res.sendFile(path.join(__dirname, "..", "public", "gann.html"));
+  });
   app.get(["/tradehunter/market-matrix", "/market-matrix"], (req, res) => {
     res.sendFile(path.join(__dirname, "..", "public", "market-matrix.html"));
   });
@@ -742,6 +747,10 @@ function createApp() {
     createDirectionalBiasRouter({ signalScreenerService, usdtDominanceService, screenerSettingsService }),
   );
   app.use("/api/local-extremes", createLocalExtremesRouter({ signalScreenerService, screenerSettingsService }));
+  // Gann Intelligence: read-only geometry over the same cached candles the
+  // screeners use. No candle fetcher, no trading side effects.
+  const gannService = new GannService({ signalScreenerService, cache });
+  app.use("/api/gann", createGannRouter({ gannService }));
   app.use("/api/open-interest", createOpenInterestRouter({ openInterestService }));
   app.use("/api/cross-market-oi", createCrossMarketOiRouter({ crossMarketOiService }));
   // Constructed here, started by server.js: no socket or timer exists until
