@@ -653,6 +653,9 @@ function createApp() {
   app.get(["/tradehunter/market-matrix", "/market-matrix"], (req, res) => {
     res.sendFile(path.join(__dirname, "..", "public", "market-matrix.html"));
   });
+  app.get("/tradehunter/tradingchart", (req, res) => {
+    res.sendFile(path.join(__dirname, "..", "public", "tradingchart.html"));
+  });
   // Market Q&A knowledge base: short URLs alongside /qa.html.
   app.get(["/qa", "/knowledge-base"], (req, res) => {
     res.sendFile(path.join(__dirname, "..", "public", "qa.html"));
