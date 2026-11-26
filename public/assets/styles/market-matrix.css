@@ -23,6 +23,8 @@
 .mm-tool:focus-visible,
 .mm-icon-btn:focus-visible,
 .mm-select:focus-visible,
+.mm-study:focus-visible,
+.mm-level-input:focus-visible,
 .mm-tv-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .mm-sync[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); background: var(--accent-bg); }
 
@@ -110,6 +112,27 @@
 .mm-icon-btn:hover, .mm-tv-link:hover { color: var(--text); border-color: var(--border-hover); }
 .mm-icon-btn.is-busy { animation: mm-spin 0.9s linear infinite; }
 @keyframes mm-spin { to { transform: rotate(360deg); } }
+
+/* ── Chart tools ────────────────────────────────────────── */
+.mm-chart-tools {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
+  padding: 3px 6px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.mm-chart-tools[hidden] { display: none; }
+.mm-level-form { display: flex; align-items: center; gap: 4px; }
+.mm-study, .mm-level-input {
+  min-height: 26px; padding: 2px 6px;
+  font: inherit; font-size: 11px;
+  color: var(--soft); background: var(--surface2);
+  border: 1px solid var(--border); border-radius: 4px;
+}
+.mm-study { cursor: pointer; }
+.mm-study:hover:not(:disabled) { border-color: var(--border-hover); }
+.mm-study[aria-pressed="true"] { color: var(--study-color); border-color: var(--study-color); }
+.mm-study:disabled { cursor: default; opacity: 0.5; }
+.mm-level-input { width: 90px; color: var(--text); font-variant-numeric: tabular-nums; }
 
 /* ── Chart body ─────────────────────────────────────────── */
 .mm-body { position: relative; flex: 1 1 auto; min-height: 0; }

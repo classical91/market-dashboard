@@ -7,6 +7,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const http = require("node:http");
 const express = require("express");
+const { chromium } = require("playwright");
 
 const { MarketMatrixService, YahooMatrixProvider, summarize, SAMPLED_STALE_MS } = require("../src/services/market-matrix");
 const { createMarketMatrixRouter } = require("../src/routes/market-matrix");
@@ -187,4 +188,68 @@ test("page, navigation and route alias are wired", () => {
   const appSource = read("src/app.js");
   assert.match(appSource, /"\/tradehunter\/market-matrix"/);
   assert.match(appSource, /app\.use\("\/api\/market-matrix"/);
+});
+
+test("Market Matrix chart tools follow candle data and restore saved levels", {
+  skip: !fs.existsSync(chromium.executablePath()) && "Install Chromium with npx playwright install chromium",
+}, async (t) => {
+  const { service } = build({ screener: { getCandles: async (symbol) => hourly(80, { start: symbol === "ETHUSDT" ? 300 : 100 }) } });
+  const app = express();
+  app.use("/api/market-matrix", createMarketMatrixRouter({ marketMatrixService: service }));
+  app.use(express.static(path.join(ROOT, "public")));
+  const server = app.listen(0, "127.0.0.1");
+  await new Promise((resolve) => server.once("listening", resolve));
+  t.after(() => { server.closeAllConnections(); server.close(); });
+
+  const browser = await chromium.launch({ args: ["--no-sandbox"] });
+  t.after(() => browser.close());
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true });
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.addInitScript(() => {
+    if (localStorage.getItem("marketMatrixWorkspace.v1")) return;
+    localStorage.setItem("marketMatrixWorkspace.v1", JSON.stringify({
+      panels: [{ symbol: "TOTAL", tf: "1h" }, { symbol: "BTC", tf: "1D" }, { symbol: "BTC", tf: "1h" }],
+      sync: false,
+      lastTf: "1h",
+    }));
+  });
+  await page.goto(`http://127.0.0.1:${server.address().port}/market-matrix.html`);
+  await page.waitForFunction(() => window.MarketMatrix.panels[2]?.data?.symbol.id === "BTC");
+
+  const panel = page.getByRole("region", { name: "Chart 3" });
+  const level = panel.getByRole("spinbutton", { name: "Price level" });
+  const studies = panel.getByRole("group", { name: "Chart tools" });
+  await panel.getByRole("button", { name: "EMA 20" }).click();
+  await panel.getByRole("button", { name: "EMA 50" }).click();
+  assert.deepEqual(await page.evaluate(() => Array.from(window.MarketMatrix.panels[2].emaSeries.values()).map((line) => {
+    const data = line.data();
+    return [data.length, data[0].value, data.at(-1).value];
+  })), [[61, 109.5, 169.5], [31, 124.5, 154.5]]);
+  await level.fill("145.25");
+  await panel.getByRole("button", { name: "Set price level" }).click();
+  await page.waitForFunction(() => window.MarketMatrix.panels.slice(1, 3).every((p) => p.priceLine?.options().price === 145.25));
+
+  await panel.getByRole("combobox", { name: "Timeframe" }).selectOption("4h");
+  await page.waitForFunction(() => window.MarketMatrix.panels[2].data?.timeframe === "4h" && !!window.MarketMatrix.panels[2].priceLine);
+  await panel.getByRole("combobox", { name: "Symbol" }).selectOption("ETH");
+  await page.waitForFunction(() => window.MarketMatrix.panels[2].data?.symbol.id === "ETH");
+  assert.equal(await level.inputValue(), "");
+  assert.equal(await page.evaluate(() => window.MarketMatrix.panels[2].priceLine), null);
+  assert.equal(await page.evaluate(() => window.MarketMatrix.panels[2].emaSeries.get(20).data()[0].value), 309.5);
+
+  await panel.getByRole("combobox", { name: "Symbol" }).selectOption("TOTAL");
+  await studies.waitFor({ state: "hidden" });
+  assert.equal(await page.evaluate(() => window.MarketMatrix.panels[2].emaSeries.size), 0);
+  await page.getByRole("button", { name: "Reset layout" }).click();
+  await page.waitForFunction(() => window.MarketMatrix.panels[2].data?.symbol.id === "BTC" && !!window.MarketMatrix.panels[2].priceLine);
+  await page.reload();
+  await page.waitForFunction(() => window.MarketMatrix.panels[2]?.emaSeries.size === 2 && !!window.MarketMatrix.panels[2].priceLine);
+  assert.equal(await level.inputValue(), "145.25");
+  assert.equal(await panel.getByRole("button", { name: "EMA 20" }).getAttribute("aria-pressed"), "true");
+  await panel.getByRole("button", { name: "Clear price level" }).click();
+  await panel.getByRole("button", { name: "EMA 50" }).click();
+  assert.equal(await level.inputValue(), "");
+  assert.deepEqual(await page.evaluate(() => [window.MarketMatrix.panels[2].priceLine, window.MarketMatrix.panels[2].emaSeries.size]), [null, 1]);
+  assert.deepEqual(errors, []);
 });

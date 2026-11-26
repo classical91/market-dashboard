@@ -24,6 +24,10 @@
   var ERROR_RETRY_MS = 60e3;
   var TV_INTERVALS = { "5m": "5", "15m": "15", "30m": "30", "1h": "60", "4h": "240", "1D": "D", "1W": "W" };
   var SOURCE_SHORT = { binance: "Binance", yahoo: "Yahoo", sampled: "Sampled" };
+  var EMA_STUDIES = [
+    { period: 20, color: "#39c6e0" },
+    { period: 50, color: "#e4ad52" },
+  ];
 
   var gridEl = document.getElementById("mm-grid");
   var stripEl = document.getElementById("mm-strip");
@@ -140,12 +144,27 @@
     return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
   }
 
+  function emaPoints(candles, period) {
+    if (candles.length < period) return [];
+    var sum = 0;
+    for (var i = 0; i < period; i++) sum += candles[i].close;
+    var value = sum / period;
+    var weight = 2 / (period + 1);
+    var points = [{ time: candles[period - 1].time, value: value }];
+    for (var j = period; j < candles.length; j++) {
+      value += (candles[j].close - value) * weight;
+      points.push({ time: candles[j].time, value: value });
+    }
+    return points;
+  }
+
   // ── Workspace state ────────────────────────────────────────
   function defaultState() {
     return {
-      panels: config.defaults.panels.map(function (id) { return { symbol: id, tf: config.defaults.timeframe }; }),
+      panels: config.defaults.panels.map(function (id) { return { symbol: id, tf: config.defaults.timeframe, emas: [] }; }),
       sync: false,
       lastTf: config.defaults.timeframe,
+      priceLevels: Object.create(null),
     };
   }
 
@@ -154,16 +173,23 @@
     var saved = null;
     try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null"); } catch (e) { saved = null; }
     if (!saved || !Array.isArray(saved.panels)) return fallback;
+    var savedLevels = saved.priceLevels || {};
+    config.symbols.forEach(function (sym) {
+      if (Number.isFinite(savedLevels[sym.id])) fallback.priceLevels[sym.id] = savedLevels[sym.id];
+    });
     return {
       panels: fallback.panels.map(function (def, i) {
         var p = saved.panels[i] || {};
+        var emas = Array.isArray(p.emas) ? p.emas : [];
         return {
           symbol: symbolById(p.symbol) ? p.symbol : def.symbol,
           tf: isTimeframe(p.tf) ? p.tf : def.tf,
+          emas: EMA_STUDIES.map(function (study) { return study.period; }).filter(function (period) { return emas.includes(period); }),
         };
       }),
       sync: saved.sync === true,
       lastTf: isTimeframe(saved.lastTf) ? saved.lastTf : fallback.lastTf,
+      priceLevels: fallback.priceLevels,
     };
   }
 
@@ -177,6 +203,8 @@
     this.chart = null;
     this.series = null;
     this.seriesType = null;
+    this.emaSeries = new Map();
+    this.priceLine = null;
     this.dataKey = null;
     this.lastTime = null;
     this.data = null;
@@ -205,6 +233,17 @@
         '<button class="mm-icon-btn mm-refresh" type="button" aria-label="Refresh chart" title="Refresh">&#8635;</button>' +
         '<button class="mm-icon-btn mm-expand" type="button" aria-label="Expand chart" title="Fullscreen">&#x26F6;</button>' +
       "</div>" +
+      '<div class="mm-chart-tools" role="group" aria-label="Chart tools" hidden>' +
+        EMA_STUDIES.map(function (study) {
+          return '<button class="mm-study" type="button" data-period="' + study.period + '" aria-pressed="false"' +
+            ' style="--study-color:' + study.color + '" title="' + study.period + '-bar exponential moving average">EMA ' + study.period + '</button>';
+        }).join("") +
+        '<form class="mm-level-form">' +
+          '<input class="mm-level-input" type="number" step="any" required aria-label="Price level" placeholder="Price level">' +
+          '<button class="mm-study" type="submit" aria-label="Set price level">Set</button>' +
+          '<button class="mm-study mm-level-clear" type="button" aria-label="Clear price level" disabled>Clear</button>' +
+        '</form>' +
+      '</div>' +
       '<div class="mm-body">' +
         '<div class="mm-chart"></div>' +
         '<div class="mm-legend" aria-hidden="true"></div>' +
@@ -220,6 +259,10 @@
     this.tvLinkEl = el.querySelector(".mm-tv-link");
     this.refreshEl = el.querySelector(".mm-refresh");
     this.expandEl = el.querySelector(".mm-expand");
+    this.toolsEl = el.querySelector(".mm-chart-tools");
+    this.emaButtons = Array.from(el.querySelectorAll("[data-period]"));
+    this.levelInput = el.querySelector(".mm-level-input");
+    this.levelClear = el.querySelector(".mm-level-clear");
     this.chartEl = el.querySelector(".mm-chart");
     this.legendEl = el.querySelector(".mm-legend");
     this.overlayEl = el.querySelector(".mm-overlay");
@@ -228,6 +271,18 @@
     this.tfEl.addEventListener("change", function () { onTimeframeChange(self, self.tfEl.value); });
     this.refreshEl.addEventListener("click", function () { self.load({ force: true }); });
     this.expandEl.addEventListener("click", function () { toggleExpanded(self); });
+    this.emaButtons.forEach(function (button) {
+      button.addEventListener("click", function () { self.toggleEma(Number(button.dataset.period)); });
+    });
+    el.querySelector(".mm-level-form").addEventListener("submit", function (event) {
+      event.preventDefault();
+      var price = self.levelInput.valueAsNumber;
+      if (Number.isFinite(price)) setPriceLevel(self.cfg().symbol, price);
+    });
+    this.levelClear.addEventListener("click", function () {
+      setPriceLevel(self.cfg().symbol, null);
+      self.levelInput.focus();
+    });
 
     this.createChart();
     this.syncControls();
@@ -287,9 +342,72 @@
     this.seriesType = type;
   };
 
+  Panel.prototype.syncStudyControls = function () {
+    var active = this.cfg().emas;
+    this.emaButtons.forEach(function (button) {
+      button.setAttribute("aria-pressed", String(active.includes(Number(button.dataset.period))));
+    });
+  };
+
+  Panel.prototype.syncLevelControls = function () {
+    var price = state.priceLevels[this.cfg().symbol];
+    this.levelInput.value = price == null ? "" : String(price);
+    this.levelClear.disabled = price == null;
+  };
+
+  Panel.prototype.toggleEma = function (period) {
+    var cfg = this.cfg();
+    var active = cfg.emas.indexOf(period);
+    if (active === -1) cfg.emas.push(period);
+    else cfg.emas.splice(active, 1);
+    saveState();
+    this.syncStudyControls();
+    this.renderEmaStudies();
+  };
+
+  Panel.prototype.renderEmaStudies = function () {
+    var self = this;
+    var candles = this.data && this.data.chartType === "candles" ? this.data.candles : [];
+    EMA_STUDIES.forEach(function (study) {
+      var line = self.emaSeries.get(study.period);
+      if (candles.length < study.period || !self.cfg().emas.includes(study.period)) {
+        if (line) {
+          self.chart.removeSeries(line);
+          self.emaSeries.delete(study.period);
+        }
+        return;
+      }
+      if (!line) {
+        line = self.chart.addLineSeries({
+          color: study.color, lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
+        });
+        self.emaSeries.set(study.period, line);
+      }
+      line.setData(emaPoints(candles, study.period));
+    });
+  };
+
+  Panel.prototype.renderPriceLevel = function () {
+    var price = this.data && this.data.chartType === "candles" ? state.priceLevels[this.cfg().symbol] : undefined;
+    if (price == null) {
+      if (this.priceLine) this.series.removePriceLine(this.priceLine);
+      this.priceLine = null;
+    } else if (this.priceLine) {
+      this.priceLine.applyOptions({ price: price });
+    } else {
+      this.priceLine = this.series.createPriceLine({
+        price: price, color: cssVar("--accent", "#7c9cff"), lineWidth: 1,
+        lineStyle: window.LightweightCharts.LineStyle.Dashed, title: "Level",
+      });
+    }
+  };
+
   Panel.prototype.syncControls = function () {
     var cfg = this.cfg();
     var sym = symbolById(cfg.symbol);
+    this.toolsEl.hidden = !sym || config.sources[sym.source].sampled;
+    this.syncStudyControls();
+    this.syncLevelControls();
     this.symbolEl.value = cfg.symbol;
     this.symbolEl.title = sym ? sym.name : "";
     this.tfEl.innerHTML = config.timeframes.map(function (t) {
@@ -331,6 +449,8 @@
   Panel.prototype.clear = function () {
     if (this.series) this.series.setData([]);
     this.data = null;
+    this.renderPriceLevel();
+    this.renderEmaStudies();
     this.dataKey = null;
     this.lastTime = null;
     this.valueEl.textContent = "";
@@ -441,6 +561,8 @@
     this.data = data;
     this.dataKey = key;
     this.lastTime = points.length ? points[points.length - 1].time : null;
+    this.renderEmaStudies();
+    this.renderPriceLevel();
     this.overlayEl.hidden = true;
 
     this.valueEl.textContent = this.format(data.value);
@@ -500,6 +622,17 @@
   }
 
   // ── Page-level behaviour ───────────────────────────────────
+  function setPriceLevel(symbol, price) {
+    if (price == null) delete state.priceLevels[symbol];
+    else state.priceLevels[symbol] = price;
+    saveState();
+    panels.forEach(function (panel) {
+      if (panel.cfg().symbol !== symbol) return;
+      panel.syncLevelControls();
+      panel.renderPriceLevel();
+    });
+  }
+
   function onTimeframeChange(panel, tf) {
     if (!isTimeframe(tf)) return;
     state.lastTf = tf;
@@ -563,9 +696,11 @@
 
   function resetLayout() {
     if (expanded) toggleExpanded(expanded);
-    var sync = state.sync;
-    state = defaultState();
-    state.sync = sync;
+    state.lastTf = config.defaults.timeframe;
+    state.panels.forEach(function (panel, i) {
+      panel.symbol = config.defaults.panels[i];
+      panel.tf = config.defaults.timeframe;
+    });
     saveState();
     panels.forEach(function (p) {
       p.syncControls();
