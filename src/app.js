@@ -39,7 +39,7 @@ const { createStrategyEngineRouter } = require("./routes/strategy-engine");
 const { createTradingLabRouter } = require("./routes/trading-lab");
 const { createWatchlistRouter } = require("./routes/watchlist");
 const { createOverviewNotesRouter } = require("./routes/overview-notes");
-const { createPotentialBuysRouter } = require("./routes/potential-buys");
+const { createPotentialBuysRouter, isPotentialBuysUpload } = require("./routes/potential-buys");
 const { createTradeContextRouter } = require("./routes/trade-context");
 const { createBotCommandsRouter } = require("./routes/bot-commands");
 const { createPatternTrackerRouter } = require("./routes/pattern-tracker");
@@ -580,7 +580,10 @@ function createApp() {
   });
 
   app.disable("x-powered-by");
-  app.use(express.json({ limit: "2mb" }));
+  const jsonBody = express.json({ limit: "2mb" });
+  // The phone's Potential Buys upload parses its own (bigger) JSON body once
+  // its key is checked; see UPLOAD_JSON_LIMIT in routes/potential-buys.js.
+  app.use((req, res, next) => (isPotentialBuysUpload(req) ? next() : jsonBody(req, res, next)));
   app.use(express.urlencoded({ extended: false }));
   app.get("/login", siteAuth.loginPage);
   app.post("/auth/login", siteAuth.login);
