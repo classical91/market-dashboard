@@ -95,7 +95,7 @@
 .ov2-news[open] .ov2-news-last { display: none; }
 .ov2-news-link { margin-left: auto; color: var(--accent); font-size: 11px; font-weight: 650; text-decoration: none; }
 .ov2-news-link:hover { text-decoration: underline; }
-.ov2-main .ov-btc { margin-bottom: 14px; border-radius: 10px; }
+.ov2-main .ov-btc-card { margin-bottom: 14px; border-radius: 10px; }
 .ov2-desks { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; padding: 0 12px 12px; }
 .ov2-desk { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 10px 13px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface2); color: var(--soft); text-decoration: none; }
 .ov2-desk:hover { border-color: var(--border-hover); color: var(--text); }

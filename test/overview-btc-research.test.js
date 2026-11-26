@@ -72,3 +72,19 @@ test("Open All covers every safe link, nested groups included, once each", () =>
   assert.deepEqual(btc.openAllHrefs({ links: [], groups: [] }), []);
   assert.match(read("overview-v2.html"), /<button class="open-all-btn ov-btc-open-all" id="ov-btc-open-all" type="button" hidden>/);
 });
+
+test("category dropdowns render outside the collapsible body so they show when BTC Research is collapsed", () => {
+  const page = read("overview-v2.html");
+  const detailsEnd = page.indexOf("</details>", page.indexOf('id="btc-research"'));
+  const groupsAt = page.indexOf('id="ov-btc-groups"');
+  assert.ok(groupsAt > detailsEnd, "groups container follows the <details>, not inside it");
+  const data = {
+    links: [{ href: "https://a.example/", badge: "A", badgeStyle: "", title: "A", src: "" }],
+    groups: [{ id: "btc-long-short", label: "Long vs Short", links: [{ href: "https://b.example/", badge: "B", badgeStyle: "", title: "B", src: "" }] }],
+  };
+  assert.doesNotMatch(btc.renderLinks(data), /ov-btc-sub/);
+  assert.match(btc.renderLinks(data), /https:\/\/a\.example\//);
+  assert.match(btc.renderGroups(data, ["btc-long-short"]), /<details class="ov-btc-sub" data-group="btc-long-short">/);
+  assert.equal(btc.renderGroups({ links: data.links, groups: [] }), "");
+  assert.match(btc.renderLinks({ links: [], groups: data.groups }), /categories below/);
+});
