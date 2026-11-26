@@ -261,6 +261,18 @@
   font-size: 14px;
 }
 
+/* The open list of a native select is drawn by the browser, which ignores the
+   translucent field background and paints its own white sheet under our light
+   text. Give the list a dark surface so its options stay readable. */
+select.manage-input {
+  color-scheme: dark;
+}
+
+select.manage-input option {
+  background: var(--surface2, #222);
+  color: var(--text, #f0ede8);
+}
+
 .manage-add {
   padding: 10px 14px;
   border: none;

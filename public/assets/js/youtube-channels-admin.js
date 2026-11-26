@@ -69,6 +69,10 @@
     if (category) return "No channels in " + category.name + " yet.";
     return "No channels match this search and category.";
   }
+  /** The category a new channel starts in, given the category filter in force. */
+  function defaultCategoryFor(filterId) {
+    return filterId && filterId !== "all" ? filterId : "";
+  }
   function el(doc, tag, className, text) {
     var node = doc.createElement(tag);
     if (className) node.className = className;
@@ -97,7 +101,10 @@
 
   function open(options) {
     var opts = options || {}; var doc = document; var previousFocus = doc.activeElement;
-    var state = { channels: [], categories: [], tab: "channels", search: "", filter: "all", editor: null, busy: false, changed: false };
+    // The page's category, when it has one, is where the manager opens: the
+    // list starts filtered to it and a new channel is preselected into it.
+    // render() drops it back to "all" if the category no longer exists.
+    var state = { channels: [], categories: [], tab: "channels", search: "", filter: opts.categoryId || "all", editor: null, busy: false, changed: false };
     var closed = false;
     var confirmation = null;
     var pageRoot = doc.querySelector(".app");
@@ -237,7 +244,9 @@
       form.appendChild(el(doc, "h3", "ytm-editor-title", editing ? "Edit channel" : "Add channel"));
       var handle = el(doc, "input", "manage-input"); handle.required = true; handle.value = channel ? "@" + channel.handle : ""; handle.autocomplete = "off";
       var label = el(doc, "input", "manage-input"); label.value = channel?.label || "";
-      var category = categorySelect(channel?.categoryId, true);
+      // Editing keeps the channel's own category; adding uses the category the
+      // list is filtered to, so a channel added while viewing Crypto is Crypto.
+      var category = categorySelect(channel ? channel.categoryId : defaultCategoryFor(state.filter), true);
       var channelId = el(doc, "input", "manage-input"); channelId.value = channel?.channelId || "";
       // Creating a category happens inline rather than by sending the user to
       // the Categories tab: leaving mid-form would throw away the handle they
@@ -433,5 +442,6 @@
     findDuplicate: findDuplicate, duplicateMessage: duplicateMessage,
     confirmationMessage: confirmationMessage, categoryDuplicate: categoryDuplicate,
     channelFormProblem: channelFormProblem, emptyChannelsMessage: emptyChannelsMessage,
+    defaultCategoryFor: defaultCategoryFor,
   };
 });
