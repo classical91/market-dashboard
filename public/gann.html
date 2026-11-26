@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gann Intelligence · Market Command</title>
+  <script src="/assets/js/settings.js"></script>
+  <link rel="stylesheet" href="/assets/styles/command.css" />
+  <link rel="stylesheet" href="/assets/styles/ai-analysis.css" />
+  <link rel="stylesheet" href="/assets/styles/signal-screener.css" />
+  <link rel="stylesheet" href="/assets/styles/gann.css" />
+</head>
+<body>
+<div class="app">
+  <aside class="cmd-sidebar"></aside>
+  <main class="cmd-main">
+
+    <div class="cmd-page-header">
+      <div>
+        <div class="cmd-page-title">&#128208; Gann Intelligence</div>
+        <div class="cmd-page-subtitle">Price geometry, time cycles and technical confluence on closed candles &mdash; geometry, not prediction</div>
+      </div>
+    </div>
+
+    <div class="gn-explainer">
+      <p><strong>Experimental.</strong> Gann levels and cycle windows are arithmetic projections from a chosen swing. They mark where to look, not where price will go, and they have not been validated by paper trading. Check the <a href="#gn-backtest-card">backtest</a> against its baseline before giving any of them weight.</p>
+    </div>
+
+    <div class="aia-notice" id="gn-notice" role="status" style="display:none"></div>
+
+    <div class="ss-toolbar gn-toolbar">
+      <select class="aia-select" id="gn-symbol" aria-label="Asset"></select>
+      <div class="gn-seg" id="gn-timeframes" role="group" aria-label="Timeframe">
+        <button type="button" data-tf="15m" aria-pressed="false">15m</button>
+        <button type="button" data-tf="1h" aria-pressed="false">1H</button>
+        <button type="button" data-tf="4h" aria-pressed="true" class="is-active">4H</button>
+        <button type="button" data-tf="1D" aria-pressed="false">1D</button>
+        <button type="button" data-tf="1W" aria-pressed="false">1W</button>
+      </div>
+      <select class="aia-select" id="gn-anchor-mode" aria-label="Anchor mode">
+        <option value="auto">Anchor: auto swing</option>
+        <option value="manual">Anchor: manual (click chart)</option>
+      </select>
+      <select class="aia-select" id="gn-anchor-side" aria-label="Anchor side">
+        <option value="auto">Swing: most recent</option>
+        <option value="low">Swing: low</option>
+        <option value="high">Swing: high</option>
+      </select>
+      <select class="aia-select" id="gn-scale-mode" aria-label="Price-to-time scale">
+        <option value="atr">Scale: ATR(14) per bar</option>
+        <option value="range">Scale: range / bars</option>
+        <option value="manual">Scale: manual</option>
+      </select>
+      <input class="aia-select gn-num" type="number" id="gn-scale-value" min="0" step="any" placeholder="Price per bar" aria-label="Manual price per bar" hidden />
+      <select class="aia-select" id="gn-sq9-step" aria-label="Square of Nine step">
+        <option value="22.5">SQ9 22.5&deg;</option>
+        <option value="45" selected>SQ9 45&deg;</option>
+        <option value="90">SQ9 90&deg;</option>
+        <option value="180">SQ9 180&deg;</option>
+      </select>
+      <button class="aia-run-btn" type="button" id="gn-refresh">Refresh</button>
+      <span id="gn-freshness"></span>
+      <span class="ss-updated" id="gn-updated"></span>
+    </div>
+
+    <div class="gn-overlays" id="gn-overlays" role="group" aria-label="Chart overlays">
+      <label><input type="checkbox" data-overlay="fan" checked /> Fan</label>
+      <label><input type="checkbox" data-overlay="sq9" checked /> Square of Nine</label>
+      <label><input type="checkbox" data-overlay="box" /> Gann Box</label>
+      <label><input type="checkbox" data-overlay="square" /> Gann Square</label>
+      <label><input type="checkbox" data-overlay="sq144" /> Square of 144</label>
+      <label><input type="checkbox" data-overlay="cycles" checked /> Cycle windows</label>
+      <label><input type="checkbox" data-overlay="fib" /> Fibonacci</label>
+      <label><input type="checkbox" data-overlay="vwap" checked /> Anchored VWAP</label>
+      <label><input type="checkbox" data-overlay="pivots" checked /> Swings</label>
+    </div>
+
+    <div class="gn-grid">
+      <section class="gn-card gn-chart-card" aria-labelledby="gn-chart-title">
+        <div class="gn-card-head">
+          <h2 id="gn-chart-title">Gann Fan chart</h2>
+          <div class="gn-chart-tools">
+            <button type="button" class="gn-icon-btn" id="gn-zoom-in" aria-label="Zoom in">+</button>
+            <button type="button" class="gn-icon-btn" id="gn-zoom-out" aria-label="Zoom out">&minus;</button>
+            <button type="button" class="gn-icon-btn" id="gn-zoom-reset" aria-label="Reset view">&#8634;</button>
+          </div>
+        </div>
+        <div class="gn-chart-wrap" id="gn-chart-wrap">
+          <canvas id="gn-chart" role="img" aria-label="Candlestick chart with Gann overlays"></canvas>
+          <div class="gn-chart-state" id="gn-chart-state">Loading&hellip;</div>
+        </div>
+        <div class="gn-chart-foot">
+          <span id="gn-readout">&nbsp;</span>
+          <span id="gn-anchor-readout"></span>
+        </div>
+      </section>
+
+      <div class="gn-side">
+        <section class="gn-card" aria-labelledby="gn-levels-title">
+          <div class="gn-card-head"><h2 id="gn-levels-title">Support &amp; resistance projections</h2></div>
+          <div id="gn-levels" class="gn-levels"><div class="gn-empty">Loading&hellip;</div></div>
+        </section>
+        <section class="gn-card" aria-labelledby="gn-calendar-title">
+          <div class="gn-card-head"><h2 id="gn-calendar-title">Upcoming cycle calendar</h2></div>
+          <ol id="gn-calendar" class="gn-calendar"><li class="gn-empty">Loading&hellip;</li></ol>
+        </section>
+        <section class="gn-card" aria-labelledby="gn-tech-title">
+          <div class="gn-card-head"><h2 id="gn-tech-title">Technical context</h2></div>
+          <dl id="gn-tech" class="gn-tech"></dl>
+        </section>
+      </div>
+    </div>
+
+    <section class="gn-card" aria-labelledby="gn-matrix-title">
+      <div class="gn-card-head"><h2 id="gn-matrix-title">Price confluence matrix</h2><span class="gn-hint" id="gn-matrix-hint"></span></div>
+      <div class="ss-table-wrap"><table class="ss-table gn-table" id="gn-matrix"><tbody><tr><td class="gn-empty">Loading&hellip;</td></tr></tbody></table></div>
+    </section>
+
+    <div class="gn-grid gn-grid--even">
+      <section class="gn-card" aria-labelledby="gn-mtf-title">
+        <div class="gn-card-head"><h2 id="gn-mtf-title">Multi-timeframe structure</h2></div>
+        <div class="ss-table-wrap"><table class="ss-table gn-table" id="gn-mtf"><tbody><tr><td class="gn-empty">Loading&hellip;</td></tr></tbody></table></div>
+      </section>
+
+      <section class="gn-card" aria-labelledby="gn-sq9-title">
+        <div class="gn-card-head"><h2 id="gn-sq9-title">Square of Nine calculator</h2></div>
+        <form class="gn-calc" id="gn-sq9-form">
+          <label>Price <input class="aia-select gn-num" type="number" id="gn-sq9-price" min="0" step="any" required /></label>
+          <label>Step <select class="aia-select" id="gn-sq9-calc-step"><option>22.5</option><option selected>45</option><option>90</option><option>180</option></select></label>
+          <label>Levels each way <input class="aia-select gn-num" type="number" id="gn-sq9-count" min="1" max="24" value="8" /></label>
+          <label class="gn-check"><input type="checkbox" id="gn-sq9-normalise" checked /> Normalise to 100&ndash;1000</label>
+        </form>
+        <div id="gn-sq9-out" class="gn-sq9-out"></div>
+      </section>
+    </div>
+
+    <section class="gn-card" aria-labelledby="gn-screener-title">
+      <div class="gn-card-head">
+        <h2 id="gn-screener-title">Multi-asset Gann screener</h2>
+        <button class="aia-run-btn" type="button" id="gn-screener-run">Scan universe</button>
+      </div>
+      <div class="ss-table-wrap"><table class="ss-table gn-table" id="gn-screener"><tbody><tr><td class="gn-empty">Not scanned yet. Scans the shared token universe on the selected timeframe using cached candles.</td></tr></tbody></table></div>
+    </section>
+
+    <section class="gn-card" id="gn-backtest-card" aria-labelledby="gn-backtest-title">
+      <div class="gn-card-head">
+        <h2 id="gn-backtest-title">Backtest &amp; validation</h2>
+        <div class="gn-chart-tools">
+          <select class="aia-select" id="gn-cost" aria-label="Cost scenario">
+            <option value="baseline">Costs: baseline</option>
+            <option value="stress">Costs: stress</option>
+            <option value="frictionless">Costs: none</option>
+          </select>
+          <button class="aia-run-btn" type="button" id="gn-backtest-run">Run backtest</button>
+        </div>
+      </div>
+      <div id="gn-backtest"><div class="gn-empty">Not run yet. Walk-forward on the loaded closed candles; in-sample is the first 70%, out-of-sample the last 30%.</div></div>
+    </section>
+
+    <details class="aia-how aia-how--footer" open>
+      <summary>&#8505;&#65039; How this page works</summary>
+      <div class="aia-how-body">
+        <ol class="aia-how-steps">
+          <li><strong>Pick an asset and timeframe.</strong> Candles are the same cached Binance spot klines the screeners use; only closed candles are analysed, so every number changes only when a new candle closes.</li>
+          <li><strong>Choose the anchor.</strong> Auto picks the most extreme confirmed swing in the last 150 bars (a swing is confirmed only after 5 bars on each side). Manual lets you click any candle; its high or low becomes the anchor.</li>
+          <li><strong>Set the price-to-time scale.</strong> The 1x1 angle moves one scale unit per bar: ATR(14) by default, range&nbsp;/&nbsp;bars, or a value you type. All lines are computed in price-and-bar units, so zoom and resize never move them.</li>
+          <li><strong>Read confluence as a count.</strong> The matrix groups levels from different methods within &frac14; ATR. A cluster's number is how many independent methods agree &mdash; not a probability.</li>
+          <li><strong>Check the backtest.</strong> Gann levels are compared with control levels of the same density, cycle hits with the hit rate of random timing, and filtered strategies with the unfiltered one, after costs.</li>
+        </ol>
+        <ul class="aia-how-notes">
+          <li><strong>AI use: No.</strong> Every level comes from fixed, documented formulas (docs/gann-intelligence.md); this page does not call an AI model.</li>
+          <li><strong>Not a signal.</strong> Nothing here means BUY or SELL. TraderClaw receives the same observations as read-only, experimental context.</li>
+          <li><strong>No fabricated data.</strong> When candles are unavailable the page says so rather than drawing anything.</li>
+        </ul>
+      </div>
+    </details>
+
+    <footer>Gann Intelligence &mdash; <a href="/directional-bias.html">Directional Bias</a> &mdash; <a href="/local-extremes.html">Local Extremes</a> &mdash; <a href="/tradehunter/market-matrix">Market Matrix</a> &mdash; <a href="/">Overview</a></footer>
+
+  </main>
+</div>
+<script src="/assets/js/sidebar.js"></script>
+<script src="/assets/js/screener-ui.js"></script>
+<script src="/assets/js/gann-math.js"></script>
+<script src="/assets/js/gann.js"></script>
+</body>
+</html>

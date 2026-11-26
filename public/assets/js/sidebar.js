@@ -149,6 +149,9 @@
         // Not a screener: four live charts side by side (TOTAL / DXY / BTC /
         // USDT.D by default) for cross-market confirmation.
         { href: "/tradehunter/market-matrix", label: "Market Matrix" },
+        // Not a screener: Gann geometry, cycles and confluence for one asset,
+        // with its own multi-asset scan and backtest. Experimental.
+        { href: "/gann.html", label: "Gann Intelligence" },
         // Not a screener either: a real-time KuCoin execution tape (Time &
         // Sales, large prints, order flow) for spot and USDT perpetuals.
         { href: "/kucoin-live-trades.html", label: "Live Trades" },

@@ -1,0 +1,116 @@
+/* Gann Intelligence — dark, dense, operational. Reuses command.css tokens. */
+
+.gn-explainer {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--amber);
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--soft);
+  margin-bottom: 14px;
+}
+.gn-explainer a { color: var(--blue); }
+
+.gn-toolbar { flex-wrap: wrap; gap: 8px; }
+.gn-num { width: 130px; }
+
+.gn-seg { display: inline-flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.gn-seg button {
+  background: transparent; color: var(--soft); border: 0; padding: 7px 11px;
+  font: inherit; font-size: 12px; cursor: pointer;
+}
+.gn-seg button + button { border-left: 1px solid var(--border); }
+.gn-seg button.is-active { background: var(--blue-bg); color: var(--blue); }
+.gn-seg button:focus-visible, .gn-icon-btn:focus-visible, .gn-overlays input:focus-visible {
+  outline: 2px solid var(--blue); outline-offset: 2px;
+}
+
+.gn-overlays { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 4px 0 14px; font-size: 12px; color: var(--soft); }
+.gn-overlays label { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
+
+.gn-grid { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(280px, 1fr); gap: 14px; margin-bottom: 14px; }
+.gn-grid--even { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.gn-chart-card { align-self: start; }
+.gn-side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+
+.gn-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px 14px;
+  min-width: 0;
+  margin-bottom: 14px;
+}
+.gn-grid > .gn-card, .gn-side > .gn-card { margin-bottom: 0; }
+.gn-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+.gn-card-head h2 { font-size: 13px; font-weight: 600; color: var(--text); letter-spacing: 0.02em; }
+.gn-hint { font-size: 11px; color: var(--muted); }
+
+.gn-chart-tools { display: inline-flex; gap: 6px; align-items: center; }
+.gn-icon-btn {
+  width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--surface2); color: var(--soft); cursor: pointer; font-size: 15px; line-height: 1;
+}
+.gn-icon-btn:hover { border-color: var(--border-hover); color: var(--text); }
+
+.gn-chart-wrap { position: relative; height: 460px; touch-action: none; }
+.gn-chart-wrap canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
+.gn-chart-wrap.is-manual canvas { cursor: copy; }
+.gn-chart-state {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  color: var(--muted); font-size: 13px; background: rgba(7,10,18,0.6); text-align: center; padding: 20px;
+}
+.gn-chart-state[hidden] { display: none; }
+.gn-chart-state.is-error { color: var(--red); }
+.gn-chart-foot { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 11px; color: var(--muted); margin-top: 6px; font-variant-numeric: tabular-nums; }
+
+.gn-empty { color: var(--muted); font-size: 12px; padding: 6px 0; }
+.gn-error { color: var(--red); font-size: 12px; padding: 6px 0; }
+
+.gn-levels { display: grid; gap: 4px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.gn-level { display: grid; grid-template-columns: 74px 1fr auto; gap: 8px; align-items: center; padding: 4px 6px; border-radius: 6px; }
+.gn-level--res { background: rgba(255,77,109,0.06); }
+.gn-level--sup { background: rgba(0,227,150,0.06); }
+.gn-level--now { background: var(--blue-bg); color: var(--blue); font-weight: 600; }
+.gn-level small { color: var(--muted); font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gn-count { display: inline-block; min-width: 20px; text-align: center; padding: 1px 5px; border-radius: 5px; background: var(--surface2); color: var(--soft); font-size: 10px; }
+.gn-count--2 { background: var(--purple-bg); color: var(--purple); }
+.gn-count--3 { background: var(--amber-bg); color: var(--amber); }
+
+.gn-calendar { list-style: none; display: grid; gap: 4px; font-size: 12px; max-height: 280px; overflow: auto; }
+.gn-calendar li { display: grid; grid-template-columns: 1fr auto; gap: 6px; padding: 5px 6px; border-radius: 6px; background: var(--surface2); }
+.gn-calendar small { grid-column: 1 / -1; color: var(--muted); font-size: 10px; }
+
+.gn-tech { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.gn-tech dt { color: var(--muted); }
+.gn-tech dd { color: var(--text); text-align: right; }
+
+.gn-table { min-width: 560px; }
+.gn-table td, .gn-table th { font-variant-numeric: tabular-nums; }
+.gn-tick { color: var(--green); }
+.gn-up { color: var(--green); }
+.gn-down { color: var(--red); }
+
+.gn-calc { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; font-size: 12px; color: var(--soft); margin-bottom: 10px; }
+.gn-calc label { display: grid; gap: 4px; }
+.gn-calc .gn-check { display: inline-flex; align-items: center; gap: 6px; }
+.gn-sq9-out { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 4px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.gn-sq9-out div { padding: 4px 6px; border-radius: 6px; background: var(--surface2); display: flex; justify-content: space-between; gap: 6px; }
+.gn-sq9-out .is-cardinal { border: 1px solid rgba(155,123,255,0.4); }
+.gn-sq9-out .is-now { background: var(--blue-bg); color: var(--blue); }
+
+.gn-bt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+.gn-bt-grid h3 { font-size: 12px; color: var(--soft); margin-bottom: 6px; font-weight: 600; }
+.gn-bt-meta { font-size: 11px; color: var(--muted); margin: 8px 0; }
+.gn-caveats { font-size: 11px; color: var(--amber); margin: 8px 0 0 18px; }
+
+@media (max-width: 1100px) {
+  .gn-grid, .gn-grid--even { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 640px) {
+  .gn-chart-wrap { height: 340px; }
+  .gn-card { padding: 10px; }
+  .gn-num { width: 110px; }
+  .gn-table { min-width: 0; }
+}

@@ -20,6 +20,7 @@ const pages = [
   ["public/directional-bias.html", 'id="db-tbody"'],
   ["public/local-extremes.html", 'id="lx-tbody"'],
   ["public/rsi-matrix.html", 'id="rm-groups"'],
+  ["public/gann.html", 'id="gn-backtest"'],
 ];
 
 test("AI Analysis and TradeHunter pages explain themselves at the bottom", () => {
