@@ -149,6 +149,7 @@
         // Not a screener: four live charts side by side (TOTAL / DXY / BTC /
         // USDT.D by default) for cross-market confirmation.
         { href: "/tradehunter/market-matrix", label: "Market Matrix" },
+        { href: "/tradehunter/tradingchart", label: "TradingChart" },
         // Not a screener: Gann geometry, cycles and confluence for one asset,
         // with its own multi-asset scan and backtest. Experimental.
         { href: "/gann.html", label: "Gann Intelligence" },

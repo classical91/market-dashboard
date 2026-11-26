@@ -84,7 +84,7 @@ test("TradeHunter sits above AI Analysis and owns the scanner workflow", () => {
 
   assert.ok(tradeHunterStart > -1, "TradeHunter is missing");
   assert.ok(aiAnalysisStart > tradeHunterStart, "TradeHunter must sit above AI Analysis");
-  const labels = ["Screeners", "Directional Bias", "Local Extremes", "Pattern Scanner", "Crypto Open Interest", "Market Matrix", "Live Trades", "Track Record"];
+  const labels = ["Screeners", "Directional Bias", "Local Extremes", "Pattern Scanner", "Crypto Open Interest", "Market Matrix", "TradingChart", "Live Trades", "Track Record"];
   let cursor = -1;
   for (const label of labels) {
     const next = tradeHunter.indexOf(`label: "${label}"`, cursor + 1);

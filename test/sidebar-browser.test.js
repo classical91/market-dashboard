@@ -21,6 +21,7 @@ test("shared sidebar browser regressions", {
     ["/reporter.html", "reporter.html"], ["/briefings/crypto", "terminal-suite.html"],
     ["/heatmaps.html", "heatmaps.html"], ["/youtube-v2.html", "youtube-v2.html"],
     ["/x-intelligence.html", "x-intelligence.html"], ["/intelligence-portal.html", "intelligence-portal.html"],
+    ["/tradehunter/tradingchart", "tradingchart.html"],
   ];
   for (const [url, file] of pages) {
     app.get(url, (_req, res) => {
@@ -68,6 +69,25 @@ test("shared sidebar browser regressions", {
     assert.equal(await group.evaluate((node) => node.classList.contains("open")), expected);
     assert.equal(await toggle(group).getAttribute("aria-expanded"), String(expected));
   }
+
+  await t.test("TradeHunter opens the hosted TradingChart inside the dashboard", async (t) => {
+    const page = await open(t);
+    const hostedUrl = "https://tradingchart.neatlab.xyz/";
+    await page.route(hostedUrl, (route) => route.fulfill({ contentType: "text/html", body: "<h1>Hosted chart</h1>" }));
+    const tradeHunter = menu(page, "tradehunter");
+    await toggle(tradeHunter).click();
+    await tradeHunter.getByRole("link", { name: "TradingChart", exact: true }).click();
+    await page.waitForURL(base + "/tradehunter/tradingchart");
+    await page.frameLocator('iframe[title="TradingChart"]').getByRole("heading", { name: "Hosted chart" }).waitFor();
+    const launch = page.getByRole("link", { name: /Open in new tab/i });
+    assert.equal(await launch.getAttribute("href"), hostedUrl);
+    assert.equal(await launch.getAttribute("target"), "_blank");
+    assert.equal(await menu(page, "tradehunter").getByRole("link", { name: "TradingChart", exact: true }).getAttribute("aria-current"), "page");
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    const frame = await page.locator('iframe[title="TradingChart"]').boundingBox();
+    assert.ok(frame && frame.width > 350 && frame.x + frame.width <= 390);
+  });
 
   await t.test("Overview v2 leads both navigation shells, with Reporter Room directly above Trades", async (t) => {
     const page = await open(t);
