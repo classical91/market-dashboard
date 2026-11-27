@@ -12,8 +12,10 @@ const { CATEGORIES, normalizeCategory } = require("../services/phone-briefings")
  *                     a form with a `text` field, or the raw text itself as
  *                     text/plain.
  *   POST /            several at once (ledger key). JSON keyed by category:
- *                     { geopolitics, economics, stocks, crypto }.
- *   GET  /            every desk with its newest briefing.
+ *                     { geopolitics, economics, stocks, crypto,
+ *                       "btc-analytics", dominance }.
+ *   GET  /            every desk with its newest briefing (each with its
+ *                     `group`: news, or analytics for the two Overview tabs).
  *   GET  /:category   one desk's runs, newest first (no text).
  *   GET  /:category/:id
  *                     one run with its text.

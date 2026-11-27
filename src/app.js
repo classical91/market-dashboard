@@ -130,7 +130,7 @@ const { BroadcastLedgerStore } = require("./services/broadcast-ledger");
 const { BroadcastLedgerNotificationService } = require("./services/broadcast-ledger-notifications");
 const { ReporterService } = require("./services/reporter");
 const { ReporterNewsLogStore } = require("./services/reporter-news-log");
-const { PhoneBriefingStore, CATEGORIES: PHONE_BRIEFING_CATEGORIES } = require("./services/phone-briefings");
+const { PhoneBriefingStore, NEWS_DESK_KEYS: PHONE_BRIEFING_DESKS } = require("./services/phone-briefings");
 const { FarmclawHandoffStore } = require("./services/farmclaw-handoffs");
 const { FarmclawPusher } = require("./services/farmclaw-pusher");
 const { createOpenclawHookDeliverer } = require("./services/farmclaw-openclaw");
@@ -148,7 +148,9 @@ const { createRequireLedgerKey } = require("./middleware/ledger-auth");
 const { createRequireApproverKey } = require("./middleware/approver-auth");
 const { createSiteAuth } = require("./middleware/site-auth");
 
-const PHONE_BRIEFING_PAGES = new Set(PHONE_BRIEFING_CATEGORIES.map((category) => category.key));
+// Only the four news desks have a /briefings/<desk> page; the analytics
+// reports are read on Overview v2.
+const PHONE_BRIEFING_PAGES = new Set(PHONE_BRIEFING_DESKS);
 
 /**
  * The FarmClaw button's direct push to the FarmClaw OpenClaw agent. Disabled

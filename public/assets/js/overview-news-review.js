@@ -11,10 +11,17 @@
   var runLink = document.getElementById("ov2-review-run");
   var md = window.BriefingMarkdown;
   var activeDesk = null;
+  var opener = null;
 
+  // `deskHref: null` (the BTC Analytics and Market Dominance reports) has no
+  // desk page, so the footer's run link is hidden.
   function open(desk) {
     activeDesk = desk.key;
+    opener = document.activeElement;
     title.textContent = desk.icon + " " + desk.label + " report";
+    var hasDesk = desk.deskHref !== null;
+    runLink.hidden = !hasDesk;
+    runLink.parentNode.hidden = !hasDesk;
     runLink.href = "/briefings/" + desk.key + "#briefingRun";
     runLink.setAttribute("aria-label", "Open " + desk.label + " desk to run a report");
     meta.textContent = desk.at
@@ -24,9 +31,9 @@
       : "Latest report";
 
     if (desk.failed || (!desk.at && desk.partial)) {
-      body.innerHTML = '<p class="ov2-review-notice" role="status">Could not load reports. Open the desk page to try again.</p>';
+      body.innerHTML = '<p class="ov2-review-notice" role="status">Could not load this report.' + (hasDesk ? " Open the desk page to try again." : " Try again in a moment.") + "</p>";
     } else if (!desk.at) {
-      body.innerHTML = '<p class="ov2-review-notice">No report recorded for this desk yet. Open the desk page to run one.</p>';
+      body.innerHTML = '<p class="ov2-review-notice">No report recorded for this desk yet.' + (hasDesk ? " Open the desk page to run one." : "") + "</p>";
     } else {
       var notice = desk.partial ? '<p class="ov2-review-notice" role="status">Some report sources are unavailable. Showing the latest available report.</p>' : "";
       if (desk.noBriefing) notice += '<p class="ov2-review-notice" role="status">This run did not produce a briefing. Open the desk page to run it again.</p>';
@@ -63,7 +70,8 @@
   dialog.addEventListener("close", function () {
     document.documentElement.classList.remove("ov2-review-open");
     // Tiles may have refreshed while the report was open.
-    var trigger = document.querySelector('[data-news-desk="' + activeDesk + '"]');
+    var trigger = document.querySelector('[data-news-desk="' + activeDesk + '"]') ||
+      (opener && opener.isConnected ? opener : null);
     if (trigger) trigger.focus({ preventScroll: true });
   });
 
