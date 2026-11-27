@@ -122,6 +122,18 @@
     if (marked.length) html += '<div class="wl-menu-group" role="presentation">Bookmarked</div>' + marked.map(item).join('');
     if (plain.length) html += '<div class="wl-menu-group" role="presentation">' + (marked.length ? 'Watchlists' : 'All watchlists') + '</div>' + plain.map(item).join('');
     if (!folders.length) html += '<div class="wl-menu-group" role="presentation">No watchlists yet</div>';
+    /* Starter watchlists not added yet: one click adds and opens one. */
+    var have = {};
+    folders.forEach(function (f) { have[f.name.toLowerCase()] = true; });
+    var starters = (W.PRESETS || []).filter(function (p) { return !have[p.name.toLowerCase()]; });
+    if (starters.length) {
+      html += '<div class="wl-menu-group" role="presentation">Add a starter watchlist</div>' + starters.map(function (p) {
+        var n = p.tickers.filter(function (t) { return !W.isSection(t); }).length;
+        return '<button type="button" role="menuitem" class="wl-menu-item wl-menu-preset" data-preset="' + esc(p.id) + '" tabindex="-1">' +
+          W.flagSvg(p.bookmark, 12) + '<span class="wl-menu-name">+ ' + esc(p.name) + '</span>' +
+          '<span class="wl-menu-count">' + n + '</span></button>';
+      }).join('');
+    }
     html += '<a class="wl-menu-manage" role="menuitem" tabindex="-1" href="' + settingsHref(active) + '">Manage watchlists in Settings</a>';
     menu.innerHTML = html;
   }
@@ -174,6 +186,13 @@
   });
 
   menu.addEventListener('click', function (e) {
+    var preset = e.target.closest('[data-preset]');
+    if (preset) {
+      closeMenu(true);
+      var res = W.addPreset(state, preset.getAttribute('data-preset'));
+      if (!res.error) state = W.write(res.state);
+      return;
+    }
     var btn = e.target.closest('[data-folder]');
     if (!btn) return;
     closeMenu(true);

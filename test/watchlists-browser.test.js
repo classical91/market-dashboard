@@ -63,7 +63,7 @@ test("Watchlists: edit in Settings, browse on Overview v2", {
 
   // Folder menu: bookmarked group first, keyboard close, switch folders.
   await card.locator(".wl-title-btn").click();
-  assert.deepEqual(await card.locator(".wl-menu-group").allTextContents(), ["Bookmarked", "Watchlists"]);
+  assert.deepEqual(await card.locator(".wl-menu-group").allTextContents(), ["Bookmarked", "Watchlists", "Add a starter watchlist"]);
   assert.equal(await page.evaluate(() => document.activeElement.getAttribute("aria-checked")), "true");
   await page.keyboard.press("Escape");
   assert.equal(await card.locator(".wl-menu").isHidden(), true);
@@ -83,4 +83,29 @@ test("Watchlists: edit in Settings, browse on Overview v2", {
   await page.goto(base);
   assert.match(await card.locator(".wl-empty").textContent(), /No watchlists yet/);
   assert.deepEqual(errors, []);
+});
+
+test("Overview watchlist menu adds a starter watchlist in one click", {
+  skip: !fs.existsSync(executablePath) && "Install Chromium or set PLAYWRIGHT_CHROMIUM_EXECUTABLE",
+}, async (t) => {
+  const publicDir = path.join(__dirname, "..", "public");
+  const html = fs.readFileSync(path.join(publicDir, "overview-v2.html"), "utf8")
+    .replace(/<script\b[^>]*src="[^"]*"[^>]*><\/script>/g, (tag) => (KEEP.test(tag) ? tag : ""));
+  const app = express();
+  app.get(["/", "/overview-v2.html"], (req, res) => res.type("html").send(html));
+  app.use(express.static(publicDir));
+  const server = await new Promise((resolve) => { const s = app.listen(0, () => resolve(s)); });
+  const browser = await chromium.launch({ executablePath });
+  t.after(async () => { await browser.close(); server.close(); });
+  const page = await browser.newPage();
+  await page.route(/^https?:\/\/(?!127\.0\.0\.1)/, (route) => route.abort());
+  await page.goto(`http://127.0.0.1:${server.address().port}/overview-v2.html`);
+
+  await page.click("#ov2-watchlist .wl-title-btn");
+  await page.click('#ov2-watchlist [data-preset="altcoins"]');
+  assert.equal(await page.textContent("#ov2-watchlist .wl-title-name"), "Alt coins");
+  assert.ok((await page.locator("#ov2-watchlist .wl-row").count()) > 0);
+  await page.click("#ov2-watchlist .wl-title-btn");
+  assert.equal(await page.locator('#ov2-watchlist [data-preset="altcoins"]').count(), 0, "an added starter leaves the menu");
+  assert.equal(await page.locator("#ov2-watchlist [data-preset]").count(), 2);
 });
