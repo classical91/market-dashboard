@@ -143,8 +143,8 @@
     presetsEl.insertAdjacentHTML('beforeend', W.PRESETS.map(function (p) {
       var n = p.tickers.filter(function (t) { return !W.isSection(t); }).length;
       return '<button type="button" class="wls-preset" data-preset="' + esc(p.id) + '">' +
-        W.flagSvg(p.bookmark, 12) + '<span class="wls-folder-name">+ ' + esc(p.name) + '</span>' +
-        '<span class="wls-folder-count">' + n + '</span></button>';
+        W.flagSvg(p.bookmark, 12) + '<span class="wls-preset-name">+ ' + esc(p.name) + '</span>' +
+        '<span class="wls-preset-count">' + n + '</span></button>';
     }).join(''));
     presetsEl.addEventListener('click', function (e) {
       var btn = e.target.closest('[data-preset]');
