@@ -30,9 +30,11 @@
 //   the bar its breakout crosses the trendline, and a divergence the first
 //   time its second pivot is newer than the last one seen for that type.
 // - Scoring copies pattern-tracker.js: entry at the detection close, exit at
-//   the close nearest to detection + horizon (24h / 4d / 10d), +/-2% hit /
+//   the close exactly one horizon after it (24h / 4d / 10d), +/-2% hit /
 //   miss / flat, hit rate = hits / (hits + misses). MFE/MAE use candle
-//   highs/lows over the horizon.
+//   highs/lows over the horizon, clamped to >= 0 / <= 0. An event whose
+//   horizon candle is missing from the data stays unscored, as the tracker
+//   would leave it pending.
 
 const fs = require("fs");
 const path = require("path");
@@ -191,8 +193,10 @@ function walkForward(candles, { opts = DEFAULTS, variants = [{ id: "default", pa
   return { events, checks };
 }
 
-// Index of the bar whose close the tracker would read at resolve time, or
-// -1 while the series doesn't reach that far yet.
+// Index of the bar whose close the tracker reads at resolve time: the bar
+// that closes exactly at detection close + horizon. -1 while the series
+// doesn't reach that far, or when that candle is missing from the data (the
+// tracker leaves such an entry pending rather than score a different close).
 function resolveIndex(candles, index, interval) {
   const horizonMs = RESOLVE_HORIZON_MS[interval];
   if (!horizonMs) throw new Error(`No tracker horizon for interval "${interval}"`);
@@ -200,7 +204,7 @@ function resolveIndex(candles, index, interval) {
   if (candles[candles.length - 1].closeTime < resolveAt) return -1;
   let j = index;
   while (j + 1 < candles.length && candles[j + 1].closeTime <= resolveAt) j++;
-  return j > index ? j : -1;
+  return j > index && candles[j].closeTime === resolveAt ? j : -1;
 }
 
 function scoreEvent(candles, event, interval) {
@@ -217,8 +221,9 @@ function scoreEvent(candles, event, interval) {
   const returnPct = (exit - entry) / entry;
   const bullish = event.bias === "bullish";
   const dirReturn = bullish ? returnPct : -returnPct;
-  const mfe = bullish ? (maxHigh - entry) / entry : (entry - minLow) / entry;
-  const mae = bullish ? (minLow - entry) / entry : (entry - maxHigh) / entry;
+  // Clamped like the tracker: MFE >= 0, MAE <= 0, in the call's direction.
+  const mfe = Math.max(bullish ? (maxHigh - entry) / entry : (entry - minLow) / entry, 0);
+  const mae = Math.min(bullish ? (minLow - entry) / entry : (entry - maxHigh) / entry, 0);
   const outcome = dirReturn >= MOVE_THRESHOLD_PCT ? "hit" : dirReturn <= -MOVE_THRESHOLD_PCT ? "miss" : "flat";
   return { ...event, exitIndex, entry, exit, returnPct, dirReturn, mfe, mae, outcome };
 }
@@ -499,7 +504,7 @@ function buildReport(study, { generatedAt = new Date() } = {}) {
   push(`- **Walk-forward:** at every bar the detectors get the same ${liveLookback(opts)} closed candles the live scanner would have had at that close, and nothing later. Pattern window ${opts.window}, impulse window ${opts.impulseWindow}, pivot order ${opts.pivotOrder}, minR2 ${opts.minR2}.`);
   push(`- **Look-ahead checks:** ${checks.viewsChecked.toLocaleString("en-US")} bar views were checked to end on the current bar with ${liveLookback(opts)} ordered bars, and ${checks.pivotsChecked.toLocaleString("en-US")} divergence detections were checked to have a second pivot at least ${opts.pivotOrder} bars old (fully confirmed). None failed. The unit tests also check that changing future bars never changes past events.`);
   push("- **Events:** what `signal-bot.js` logs into the pattern tracker: a flag/wedge on the bar its close first crosses the trendline (`breakoutCrossed`), scored in the breakout direction; an RSI divergence the first time its second pivot is newer than the last one seen for that type.");
-  push(`- **Scoring:** same as \`pattern-tracker.js\`. Entry at the detection close; exit at the close ${Object.entries(RESOLVE_HORIZON_MS).map(([k, v]) => `${v / 3_600_000}h after (${k})`).join(", ")}; hit ≥ +${MOVE_THRESHOLD_PCT * 100}%, miss ≤ −${MOVE_THRESHOLD_PCT * 100}% in the bias direction, otherwise flat. **Hit rate = hits / (hits + misses)**, as on the tracker page. MFE/MAE come from candle highs and lows over the horizon, signed in the bias direction.`);
+  push(`- **Scoring:** same as \`pattern-tracker.js\`. Entry at the detection close; exit at the candle closing exactly ${Object.entries(RESOLVE_HORIZON_MS).map(([k, v]) => `${v / 3_600_000}h after (${k})`).join(", ")}; hit ≥ +${MOVE_THRESHOLD_PCT * 100}%, miss ≤ −${MOVE_THRESHOLD_PCT * 100}% in the bias direction, otherwise flat. **Hit rate = hits / (hits + misses)**, as on the tracker page. MFE/MAE come from candle highs and lows over the horizon, signed in the bias direction and clamped at 0. An event whose horizon candle is missing from the data is left unscored, as the tracker leaves it pending.`);
   push(`- **Variants:** \`default\` is the live set (impulseMin ${opts.impulseMin}, breakoutBuffer ${opts.breakoutBuffer}). ATR variants set impulseMin = k × ATR${ATR_LENGTH}% and/or breakoutBuffer = k × ATR${ATR_LENGTH}% at each bar; \`fixed\` keeps that one parameter at its live value. Divergence ignores both parameters, so it has no variants.`);
   push(`- **Out-of-sample:** each series is split by bar at ${Math.round(split * 100)}%. The ATR variant is picked per timeframe (all symbols pooled) by the best in-sample average directional return with at least ${minSamples} in-sample events. In-sample events must also resolve before the split. All tables report the last ${Math.round((1 - split) * 100)}% unless they say otherwise.`);
   push(`- **Caveats:** cells marked ⚠ have fewer than ${minSamples} samples and are **inconclusive**. Events close together share forward bars, so samples are not independent and the effective sample size is lower than \`n\`. No fees or slippage.`);

@@ -29,8 +29,16 @@
     <div class="ts-section-title">By pattern / divergence type</div>
     <div class="ss-table-wrap">
       <table class="ss-table">
-        <thead><tr><th>Name</th><th>Hits</th><th>Misses</th><th>Flat</th><th>Hit rate</th><th>Total</th></tr></thead>
+        <thead><tr><th>Name</th><th>Hits</th><th>Misses</th><th>Flat</th><th>Hit rate</th><th title="Average return in the direction of the call">Avg return</th><th title="Average maximum favourable / adverse excursion inside the window">MFE / MAE</th><th>Total</th></tr></thead>
         <tbody id="ts-by-pattern"></tbody>
+      </table>
+    </div>
+
+    <div class="ts-section-title">By timeframe</div>
+    <div class="ss-table-wrap">
+      <table class="ss-table">
+        <thead><tr><th>Timeframe</th><th>Hits</th><th>Misses</th><th>Flat</th><th>Hit rate</th><th title="Average return in the direction of the call">Avg return</th><th title="Average maximum favourable / adverse excursion inside the window">MFE / MAE</th><th>Total</th></tr></thead>
+        <tbody id="ts-by-interval"></tbody>
       </table>
     </div>
 
@@ -47,7 +55,7 @@
       <div class="aia-how-body">
         <ol class="aia-how-steps">
           <li><strong>Scanner detections are logged.</strong> New breakouts and divergences enter the tracker with their direction, price, and detection time.</li>
-          <li><strong>Price resolves each result.</strong> After the evaluation window, the tracker marks the call as a hit, miss, or flat outcome.</li>
+          <li><strong>Price resolves each result.</strong> The window starts at the close of the detecting candle (24h for 1h, 4 days for 4h, 10 days for 1D). The outcome uses the 1h candle close at the end of that window, not the price when the tracker next runs, and the same candles give the best (MFE) and worst (MAE) move along the way. A move of 2% or more in the called direction is a hit; 2% or more against it is a miss; anything smaller is flat.</li>
           <li><strong>Judge the sample, not one call.</strong> Use the overall and per-pattern totals to see where the scanner has evidence and where the sample is still thin.</li>
         </ol>
         <ul class="aia-how-notes">
@@ -79,6 +87,7 @@
     var notice = document.getElementById('ts-notice');
     var overallEl = document.getElementById('ts-overall');
     var byPatternBody = document.getElementById('ts-by-pattern');
+    var byIntervalBody = document.getElementById('ts-by-interval');
     var recentBody = document.getElementById('ts-recent');
 
     function renderOverall(overall, pending) {
@@ -91,21 +100,43 @@
       );
     }
 
-    function renderByPattern(byPattern) {
-      var names = Object.keys(byPattern).sort(function (a, b) { return byPattern[b].total - byPattern[a].total; });
+    function pct(v) { return v == null ? '—' : (v > 0 ? '+' : '') + v + '%'; }
+
+    function renderGroups(body, groups) {
+      groups = groups || {};
+      var names = Object.keys(groups).sort(function (a, b) { return groups[b].total - groups[a].total; });
       if (!names.length) {
-        byPatternBody.innerHTML = '<tr><td colspan="6" class="ss-empty-row">No resolved entries yet &mdash; check back after a few breakouts/divergences have had time to play out.</td></tr>';
+        body.innerHTML = '<tr><td colspan="8" class="ss-empty-row">No resolved entries yet &mdash; check back after a few breakouts/divergences have had time to play out.</td></tr>';
         return;
       }
-      byPatternBody.innerHTML = names.map(function (name) {
-        var s = byPattern[name];
+      body.innerHTML = names.map(function (name) {
+        var s = groups[name];
         var rateText = s.hitRate == null ? '—' : s.hitRate + '%';
         return (
           '<tr><td>' + escapeHtml(name) + '</td><td>' + s.hits + '</td><td>' + s.misses + '</td><td>' + s.flats + '</td>' +
           '<td><span class="ss-badge ' + (s.hitRate >= 55 ? 'ss-score--high' : s.hitRate >= 45 ? 'ss-score--neutral' : 'ss-score--low') + '">' + rateText + '</span></td>' +
+          '<td>' + pct(s.avgFavorableReturnPct) + '</td>' +
+          '<td>' + pct(s.avgMfePct) + ' / ' + pct(s.avgMaePct) + '</td>' +
           '<td>' + s.total + '</td></tr>'
         );
       }).join('');
+    }
+
+    function renderNotices(stats) {
+      var lines = [];
+      if (stats.integrity) {
+        lines.push('&#9888;&#65039; The track log could not be read (' + escapeHtml(stats.integrity.error) + '). It was set aside as ' +
+          escapeHtml(stats.integrity.quarantined) + (stats.integrity.recoveredFromBackup
+            ? ' and ' + stats.integrity.recoveredEntries + ' entries were restored from the last backup.'
+            : '; no backup could be restored, so history shown here is incomplete.'));
+      }
+      if (stats.priceSources && stats.priceSources.live) {
+        lines.push('&#8505;&#65039; ' + stats.priceSources.live + ' older result(s) were scored on the live price when the tracker ran, not at the exact end of their window.');
+      }
+      if (lines.length) {
+        notice.style.display = 'block';
+        notice.innerHTML = lines.join('<br>');
+      }
     }
 
     function outcomeBadge(entry) {
@@ -140,7 +171,9 @@
         var stats = results[0];
         var log = results[1];
         renderOverall(stats.overall, stats.pending);
-        renderByPattern(stats.byPattern);
+        renderGroups(byPatternBody, stats.byPattern);
+        renderGroups(byIntervalBody, stats.byInterval);
+        renderNotices(stats);
         renderRecent(log.entries || []);
       })
       .catch(function (err) {

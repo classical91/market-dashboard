@@ -253,10 +253,10 @@ class SignalBotService {
       this._saveState(state);
       if (this._tracker) {
         const detectedAt = new Date(queuedAt).toISOString();
-        for (const { symbol, interval, kind, name, bias, entryPrice } of patternEvents) {
+        for (const { symbol, interval, kind, name, bias, entryPrice, candleCloseTime } of patternEvents) {
           if (entryPrice != null) {
             this._tracker.log({
-              symbol, interval, kind: kind === "breakout" ? "pattern" : kind, name, bias, entryPrice, detectedAt,
+              symbol, interval, kind: kind === "breakout" ? "pattern" : kind, name, bias, entryPrice, detectedAt, candleCloseTime,
             });
           }
         }

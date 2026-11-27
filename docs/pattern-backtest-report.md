@@ -1,6 +1,6 @@
 # Pattern Scanner backtest
 
-Generated 2026-11-27T15:02:07.307Z by `node scripts/pattern-backtest.js`. Evidence only: the live `DEFAULTS` in `src/services/pattern-scanner.js` are unchanged.
+Generated 2026-11-27T15:04:46.583Z by `node scripts/pattern-backtest.js`. Evidence only: the live `DEFAULTS` in `src/services/pattern-scanner.js` are unchanged.
 
 ## Method
 
@@ -8,7 +8,7 @@ Generated 2026-11-27T15:02:07.307Z by `node scripts/pattern-backtest.js`. Eviden
 - **Walk-forward:** at every bar the detectors get the same 80 closed candles the live scanner would have had at that close, and nothing later. Pattern window 36, impulse window 20, pivot order 3, minR2 0.35.
 - **Look-ahead checks:** 280,120 bar views were checked to end on the current bar with 80 ordered bars, and 65,924 divergence detections were checked to have a second pivot at least 3 bars old (fully confirmed). None failed. The unit tests also check that changing future bars never changes past events.
 - **Events:** what `signal-bot.js` logs into the pattern tracker: a flag/wedge on the bar its close first crosses the trendline (`breakoutCrossed`), scored in the breakout direction; an RSI divergence the first time its second pivot is newer than the last one seen for that type.
-- **Scoring:** same as `pattern-tracker.js`. Entry at the detection close; exit at the close 24h after (1h), 96h after (4h), 240h after (1D); hit ≥ +2%, miss ≤ −2% in the bias direction, otherwise flat. **Hit rate = hits / (hits + misses)**, as on the tracker page. MFE/MAE come from candle highs and lows over the horizon, signed in the bias direction.
+- **Scoring:** same as `pattern-tracker.js`. Entry at the detection close; exit at the candle closing exactly 24h after (1h), 96h after (4h), 240h after (1D); hit ≥ +2%, miss ≤ −2% in the bias direction, otherwise flat. **Hit rate = hits / (hits + misses)**, as on the tracker page. MFE/MAE come from candle highs and lows over the horizon, signed in the bias direction and clamped at 0. An event whose horizon candle is missing from the data is left unscored, as the tracker leaves it pending.
 - **Variants:** `default` is the live set (impulseMin 0.04, breakoutBuffer 0.002). ATR variants set impulseMin = k × ATR14% and/or breakoutBuffer = k × ATR14% at each bar; `fixed` keeps that one parameter at its live value. Divergence ignores both parameters, so it has no variants.
 - **Out-of-sample:** each series is split by bar at 70%. The ATR variant is picked per timeframe (all symbols pooled) by the best in-sample average directional return with at least 30 in-sample events. In-sample events must also resolve before the split. All tables report the last 30% unless they say otherwise.
 - **Caveats:** cells marked ⚠ have fewer than 30 samples and are **inconclusive**. Events close together share forward bars, so samples are not independent and the effective sample size is lower than `n`. No fees or slippage.
@@ -62,7 +62,7 @@ A fixed threshold means a different thing on every row: the last two columns sho
 | 4h | tuned: atr imp=6x buf=fixed | 286 | 40.5% | 30% | -1.20% | 5.75% | -6.22% |
 | 4h | baseline: long every bar | 24923 | 41.0% | 29% | -0.69% | 5.78% | -6.38% |
 | 4h | divergence (all types) | 894 | 50.0% | 30% | 0.12% | 6.08% | -5.91% |
-| 1D | default | 144 | 52.0% | 15% | 0.34% | 11.03% | -9.65% |
+| 1D | default | 144 | 52.0% | 15% | 0.34% | 11.03% | -9.66% |
 | 1D | tuned: atr imp=fixed buf=0.25x | 139 | 52.5% | 14% | 0.52% | 10.93% | -8.91% |
 | 1D | baseline: long every bar | 6932 | 44.9% | 15% | 0.08% | 10.69% | -10.15% |
 | 1D | divergence (all types) | 233 | 49.5% | 15% | -0.62% | 10.68% | -10.36% |
@@ -137,7 +137,7 @@ Breakout rows pool every pattern and symbol. The baseline is the forward return 
 
 | Variant | IS n | IS hit | IS avg | OOS n | OOS hit | OOS avg | OOS MFE | OOS MAE |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| default | 250 | 55.0% | 3.10% | 144 | 52.0% | 0.34% | 11.03% | -9.65% |
+| default | 250 | 55.0% | 3.10% | 144 | 52.0% | 0.34% | 11.03% | -9.66% |
 | atr imp=fixed buf=0.1x | 253 | 54.0% | 2.25% | 139 | 52.5% | 0.55% | 11.22% | -9.37% |
 | atr imp=fixed buf=0.25x **← selected** | 256 | 54.3% | 2.27% | 139 | 52.5% | 0.52% | 10.93% | -8.91% |
 | atr imp=fixed buf=0.5x | 226 | 53.0% | 1.60% | 116 | 51.0% | -0.93% | 9.86% | -9.68% |
@@ -235,7 +235,7 @@ A pattern can break either way (a Bull Flag can break down), and the event is sc
 | ETHUSDT | 4h | tuned | 24 ⚠ | 38.5% | 46% | -1.69% | 4.00% | -5.69% |
 | ETHUSDT | 1D | default | 14 ⚠ | 38.5% | 7% | -6.41% | 8.08% | -14.86% |
 | ETHUSDT | 1D | tuned | 12 ⚠ | 63.6% | 8% | 0.46% | 10.32% | -7.95% |
-| SOLUSDT | 1h | default | 73 | 50.0% | 62% | -0.28% | 1.85% | -2.16% |
+| SOLUSDT | 1h | default | 73 | 50.0% | 62% | -0.28% | 1.86% | -2.16% |
 | SOLUSDT | 1h | tuned | 77 | 51.7% | 62% | -0.03% | 1.93% | -1.94% |
 | SOLUSDT | 4h | default | 38 | 35.7% | 26% | -1.76% | 5.25% | -6.77% |
 | SOLUSDT | 4h | tuned | 27 ⚠ | 23.8% | 22% | -2.99% | 4.93% | -7.91% |
@@ -359,7 +359,7 @@ Covers all bars (in-sample + out-of-sample), so nothing here was tuned. Use it f
 | 1h | Bear Flag | DOGEUSDT | 12 ⚠ | 66.7% | 50% | 0.55% | 3.50% | -4.13% |
 | 1h | Bear Flag | AVAXUSDT | 12 ⚠ | 42.9% | 42% | -0.31% | 2.95% | -3.21% |
 | 1h | Bear Flag | LINKUSDT | 20 ⚠ | 60.0% | 50% | 0.33% | 3.40% | -3.03% |
-| 1h | Bear Flag | INJUSDT | 15 ⚠ | 44.4% | 40% | -1.76% | 2.89% | -4.76% |
+| 1h | Bear Flag | INJUSDT | 15 ⚠ | 44.4% | 40% | -1.76% | 2.89% | -4.77% |
 | 1h | Bear Flag | WIFUSDT | 27 ⚠ | 40.0% | 44% | 1.78% | 6.39% | -4.28% |
 | 1h | Bear Flag | PEPEUSDT | 15 ⚠ | 55.6% | 40% | 0.82% | 5.11% | -3.87% |
 | 1h | Rising Wedge | BTCUSDT | 95 | 63.0% | 72% | 0.20% | 1.71% | -1.46% |
@@ -400,7 +400,7 @@ Covers all bars (in-sample + out-of-sample), so nothing here was tuned. Use it f
 | 4h | Bear Flag | AVAXUSDT | 12 ⚠ | 22.2% | 25% | -3.61% | 5.30% | -8.36% |
 | 4h | Bear Flag | LINKUSDT | 6 ⚠ | 75.0% | 33% | 0.58% | 5.99% | -4.50% |
 | 4h | Bear Flag | INJUSDT | 14 ⚠ | 50.0% | 29% | -2.19% | 7.05% | -10.24% |
-| 4h | Bear Flag | WIFUSDT | 11 ⚠ | 36.4% | 0% | -11.52% | 11.85% | -22.58% |
+| 4h | Bear Flag | WIFUSDT | 11 ⚠ | 36.4% | 0% | -11.52% | 11.85% | -22.60% |
 | 4h | Bear Flag | PEPEUSDT | 21 ⚠ | 50.0% | 24% | -0.57% | 10.17% | -7.80% |
 | 4h | Rising Wedge | BTCUSDT | 44 | 40.7% | 39% | -0.52% | 3.63% | -3.60% |
 | 4h | Rising Wedge | ETHUSDT | 50 | 48.7% | 22% | -0.71% | 4.48% | -4.48% |

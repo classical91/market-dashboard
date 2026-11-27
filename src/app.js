@@ -15,6 +15,18 @@ async function fetchBinancePrice(symbol) {
   return Number(data.price);
 }
 
+// Timestamped klines for the tracker: it resolves each call at its exact
+// horizon (and measures excursion inside the window) instead of trusting
+// whatever the price is when the resolver happens to run.
+async function fetchBinanceCandles({ symbol, interval, startTime, endTime, limit }) {
+  const params = new URLSearchParams({ symbol, interval, startTime: String(startTime), endTime: String(endTime), limit: String(limit || 500) });
+  const res = await fetch(`https://data-api.binance.vision/api/v3/klines?${params}`, {
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!res.ok) throw new Error(`Binance klines HTTP ${res.status} for ${symbol}`);
+  return res.json();
+}
+
 function matchesSecret(provided, expected) {
   const providedBuffer = Buffer.from(String(provided || ""));
   const expectedBuffer = Buffer.from(String(expected || ""));
@@ -471,7 +483,7 @@ function createApp() {
     observationStore: new TradeObservationStore({ dataDir }),
   });
   const botCommandsService = new BotCommandsService({ dataDir });
-  const patternTrackerService = new PatternTrackerService({ dataDir, fetchPrice: fetchBinancePrice });
+  const patternTrackerService = new PatternTrackerService({ dataDir, fetchCandles: fetchBinanceCandles, fetchPrice: fetchBinancePrice });
   const signalActionStore = new SignalActionStore({ dataDir });
   // Research history. Deliberately its own store under <dataDir>/research, so
   // resetting a paper book can never disturb the record of what was tested.

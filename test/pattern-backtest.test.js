@@ -194,31 +194,51 @@ test("scoring uses the tracker horizon, ±2% threshold and candle extremes", () 
   assert.strictEqual(resolveIndex(flatCandles(40, 100, 24 * HOUR), 5, "1D"), 15);
 });
 
-test("a gap in the data exits on the last close before the horizon", () => {
-  const candles = flatCandles(60).filter((_, i) => i < 30 || i > 36);
-  // Entry at bar 10 resolves at bar 34's close, which is missing; bar 29 is
-  // the last close at or before that time.
-  const j = resolveIndex(candles, 10, "1h");
-  assert.strictEqual(candles[j].openTime, 29 * HOUR);
+test("a missing horizon candle leaves the event unscored, like the tracker", () => {
+  const candles = flatCandles(60).filter((_, i) => i !== 34);
+  // Entry at bar 10 resolves on bar 34's close, which is missing.
+  assert.strictEqual(resolveIndex(candles, 10, "1h"), -1);
+  assert.strictEqual(scoreEvent(candles, { index: 10, bias: "bullish" }, "1h"), null);
+  // A gap inside the window doesn't matter while the horizon candle exists.
+  const holed = flatCandles(60).filter((_, i) => i !== 20);
+  assert.strictEqual(holed[resolveIndex(holed, 10, "1h")].openTime, 34 * HOUR);
 });
 
-test("outcomes agree with PatternTrackerService for the same entry and exit", async () => {
+test("MFE and MAE are clamped at zero like the tracker", () => {
+  const candles = flatCandles(60);
+  for (let i = 11; i <= 34; i++) candles[i] = { ...candles[i], high: 110, low: 105, close: 108 };
+  const bull = scoreEvent(candles, { index: 10, bias: "bullish" }, "1h");
+  assert.strictEqual(bull.mae, 0);
+  const bear = scoreEvent(candles, { index: 10, bias: "bearish" }, "1h");
+  assert.strictEqual(bear.mfe, 0);
+});
+
+test("outcomes, returns and excursions agree with PatternTrackerService", async () => {
   const candles = makeCandles(600);
   const events = walkForward(candles).events.slice(0, 40);
   const scored = events.map((e) => scoreEvent(candles, e, "1h")).filter(Boolean);
   assert.ok(scored.length > 5);
+  const rows = candles.map((c) => [c.openTime, c.open, c.high, c.low, c.close, c.volume, c.closeTime]);
+  const fetchCandles = async ({ startTime, endTime }) => rows.filter((r) => r[0] >= startTime && r[0] <= endTime);
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "pattern-bt-"));
+  const logFile = path.join(dataDir, "pattern-track-log.json");
   try {
     for (const s of scored) {
-      const tracker = new PatternTrackerService({ dataDir, fetchPrice: async () => s.exit });
-      fs.rmSync(path.join(dataDir, "pattern-track-log.json"), { force: true });
+      fs.rmSync(logFile, { force: true });
+      fs.rmSync(`${logFile}.bak`, { force: true });
+      const tracker = new PatternTrackerService({ dataDir, fetchCandles, now: () => candles[candles.length - 1].closeTime + 1 });
       tracker.log({
         symbol: "TEST", interval: "1h", kind: s.kind, name: s.name, bias: s.bias, entryPrice: s.entry,
-        detectedAt: new Date(candles[s.index].closeTime).toISOString(),
+        detectedAt: new Date(candles[s.index].closeTime + 1).toISOString(), candleCloseTime: candles[s.index].closeTime,
       });
       const [resolved] = await tracker.resolveDue();
+      assert.ok(resolved, `tracker left event at ${s.index} unresolved`);
+      assert.strictEqual(resolved.priceSource, "historical");
+      assert.strictEqual(resolved.resolvedPrice, s.exit);
       assert.strictEqual(resolved.outcome, s.outcome);
       assert.strictEqual(resolved.returnPct, Number((s.returnPct * 100).toFixed(2)));
+      assert.strictEqual(resolved.mfePct, Number((s.mfe * 100).toFixed(2)));
+      assert.strictEqual(resolved.maePct, Number((s.mae * 100).toFixed(2)));
     }
   } finally {
     fs.rmSync(dataDir, { recursive: true, force: true });
