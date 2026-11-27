@@ -528,4 +528,4 @@ class PatternScannerService {
   }
 }
 
-module.exports = { PatternScannerService, createLimiter, parseRetryAfter, classifyWindow, detectDivergence, findPivots, linearRegression, SCAN_INTERVALS };
+module.exports = { PatternScannerService, createLimiter, parseRetryAfter, classifyWindow, detectDivergence, findPivots, linearRegression, SCAN_INTERVALS, DEFAULTS };

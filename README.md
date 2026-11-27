@@ -88,6 +88,12 @@ npm run parity -- --traderclaw ../traderclaw
 
 `npm run parity` runs identical inputs through the ported JavaScript engines and the original TraderClaw Python ones and fails on any disagreeing field — covering summary and grouped metrics, edge-gate verdicts, checklist verdicts, sizing/levels, and full paper-trade lifecycles down to each individual exit. It needs a TraderClaw checkout and a `python3` (with `python-dotenv` and `requests` for the modules that import `config.py`); without them it reports that it skipped and exits 0. This is the check that gates archiving TraderClaw — see [docs/trading-lab.md](docs/trading-lab.md).
 
+```bash
+npm run backtest:patterns -- --symbols BTCUSDT,ETHUSDT,PEPEUSDT
+```
+
+`npm run backtest:patterns` walks the Pattern Scanner forward bar by bar over historical Binance klines (closed candles only, cached under `data/pattern-backtest/`). It scores each new breakout and divergence the way the pattern tracker does and compares the live `DEFAULTS` with ATR-scaled `impulseMin`/`breakoutBuffer` variants on a 70/30 in-/out-of-sample split. It writes [docs/pattern-backtest-report.md](docs/pattern-backtest-report.md). It needs no API key; `--offline` reruns from the cache. Behind an HTTPS proxy, Node's built-in `fetch` needs `NODE_USE_ENV_PROXY=1` (Node ≥ 22.21). The flags (symbols, intervals, days of history, split, minimum samples, output path) are listed at the top of `scripts/pattern-backtest.js`.
+
 ## Access Control
 
 Website access is optional but recommended for deploys. Set `MARKET_DASHBOARD_LOGIN_PASSWORD` to put the dashboard behind `/login`. That owner password unlocks the full website. Set `ALPHA_TEAM_ACCESS_CODE` to give the Alpha Team a separate read-only password for shared `?view=alpha` pages; that role can open the shared Directional Bias, Local Extremes and Pattern Scanner review pages plus their read-only data APIs (`GET /api/directional-bias`, `GET /api/local-extremes`, `GET /api/signal-screener`, `GET /api/pattern-scanner`, `GET /api/watchlist`), but it cannot reach the rest of the dashboard, the Trading Lab, admin actions, broadcast endpoints or any journal/watchlist mutation. When both website passwords are blank, local/dev behavior stays open.
