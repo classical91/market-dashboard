@@ -18,6 +18,7 @@
   flex-direction: column;
   gap: 10px;
   max-height: calc(100vh - 32px);
+  overflow-y: auto; /* a tall composer scrolls the panel rather than squashing the list */
   padding: 14px;
   border: 1px solid rgba(137, 158, 196, 0.22);
   border-radius: 14px;
@@ -78,6 +79,26 @@
 .ts-drop:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(77, 163, 255, 0.35); }
 .ts-drop.is-over { background: #343f52; border-color: var(--blue, #4da3ff); color: #fff; }
 .ts-panel.is-uploading .ts-drop { cursor: progress; opacity: 0.75; }
+
+/* Composer: the screenshots for the next note, gridded, above the note box. */
+.ts-staged {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.ts-staged[hidden] { display: none; }
+.ts-staged, .ts-panel > .ts-input--note, .ts-compose-actions { flex-shrink: 0; }
+.ts-staged--many { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ts-staged .ts-thumb img { border-color: rgba(77, 163, 255, 0.45); }
+.ts-staged:not(.ts-staged--many) .ts-thumb img { aspect-ratio: auto; max-height: 200px; object-fit: contain; }
+.ts-staged .ts-thumb-x { opacity: 0.85; }
+.ts-compose-actions { display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
+.ts-compose-actions .ts-btn { white-space: nowrap; }
+.ts-compose-actions .ts-btn[hidden] { display: none; }
+.ts-compose-actions .ts-btn:disabled { cursor: not-allowed; opacity: 0.5; }
+.ts-compose-hint { margin-right: auto; color: #5f6a80; font-size: 11px; }
 .ts-drop-icon { font-size: 20px; line-height: 1; color: #9aa3b5; }
 .ts-drop-title { font-size: 13px; font-weight: 700; }
 .ts-drop-hint { font-size: 11px; color: #9aa3b5; line-height: 1.4; }
@@ -90,7 +111,7 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  min-height: 0;
+  min-height: 180px;
   margin: 0 -4px;
   padding: 0 4px 2px;
   overflow-y: auto;
@@ -309,6 +330,7 @@ html.ts-reader-lock { overflow: hidden; }
 .ts-thumb-x:focus-visible { outline: 2px solid var(--blue, #4da3ff); outline-offset: 1px; }
 
 .ts-edit { display: grid; gap: 6px; margin-top: 6px; }
+.ts-edit .ts-input--ticker { max-width: 150px; }
 .ts-edit-actions { display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
 .ts-edit-actions .ts-btn { white-space: nowrap; }
 .ts-edit-actions [data-role="edit-add"] { margin-right: auto; }

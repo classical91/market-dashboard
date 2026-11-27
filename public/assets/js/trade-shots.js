@@ -26,6 +26,10 @@
     file: document.getElementById("ts-file"),
     ticker: document.getElementById("ts-ticker"),
     note: document.getElementById("ts-note"),
+    staged: document.getElementById("ts-staged"),
+    post: document.getElementById("ts-post"),
+    clear: document.getElementById("ts-clear"),
+    composeHint: document.getElementById("ts-compose-hint"),
     tickers: document.getElementById("ts-tickers"),
     status: document.getElementById("ts-status"),
     grid: document.getElementById("tc-grid"),
@@ -42,6 +46,8 @@
     open: {},        // folder tag → true when expanded
     editing: null,   // entry key being relabelled
     draft: null,     // unsaved note text while editing, kept across re-renders
+    staged: [],      // composer screenshots not posted yet: { id, file, url }
+    composeBatch: "",// batch of a part-posted composer, so a retry joins it
     active: [],      // base tickers of the tracked pairs, e.g. ["BTC", "XRP"]
   };
 
@@ -192,11 +198,15 @@
           '<button class="ts-icon ts-icon--danger" type="button" data-role="remove-entry" aria-label="Delete this entry" title="Delete entry">&#128465;</button>' +
         "</span>" +
       "</div>" +
+      thumbs(entry) +
       (editing
         ? '<form class="ts-edit" data-role="edit-form">' +
-            '<textarea class="ts-input ts-input--note" name="label" rows="8" maxlength="20000" ' +
-              'aria-label="Ticker and note" placeholder="$BTC entry, stop under range low">' +
-              escapeHtml(state.draft != null ? state.draft : entry.label) + "</textarea>" +
+            '<input class="ts-input ts-input--ticker" name="ticker" list="ts-tickers" maxlength="24" autocomplete="off" ' +
+              'placeholder="Ticker (none)" aria-label="Ticker for this entry" value="' +
+              escapeHtml(state.draft ? state.draft.ticker : entry.tag) + '" />' +
+            '<textarea class="ts-input ts-input--note" name="note" rows="8" maxlength="20000" ' +
+              'aria-label="Note for this entry" placeholder="Entry, stop under range low…">' +
+              escapeHtml(state.draft ? state.draft.note : note) + "</textarea>" +
             '<span class="ts-edit-hint">Enter for a new line &middot; Ctrl+Enter to save</span>' +
             '<div class="ts-edit-actions">' +
               (entry.batch
@@ -208,7 +218,6 @@
             "</div>" +
           "</form>"
         : note ? noteBlock(note) : "") +
-      thumbs(entry) +
     "</article>";
   }
 
@@ -308,26 +317,27 @@
    * Upload files as one entry. `target` adds them to an existing entry
    * (same batch and label); otherwise the ticker and note fields label it.
    */
-  async function upload(files, target) {
+  async function upload(files, target, batchId) {
+    var result = { saved: 0, failedFiles: [] };
     files = imageFiles(files);
     if (!files.length) {
       setStatus("Only PNG, JPEG, WebP or GIF images can be added.", true);
-      return;
+      return result;
     }
     var tooBig = files.filter(function (f) { return f.size > MAX_BYTES; });
     files = files.filter(function (f) { return f.size <= MAX_BYTES; });
     if (!files.length) {
       setStatus("Images must be 15 MB or smaller.", true);
-      return;
+      return result;
     }
 
     var label = target ? target.label : Ticker.withTicker(el.ticker.value, el.note.value);
     if (!target && el.ticker.value.trim() && Ticker.tickerSymbol(el.ticker.value) === null) {
       setStatus('"' + el.ticker.value.trim() + '" isn\'t a ticker. Use one symbol like BTC or SOL.', true);
       el.ticker.focus();
-      return;
+      return result;
     }
-    var batch = target ? (target.batch || "") : newBatchId();
+    var batch = target ? (target.batch || "") : (batchId || newBatchId());
 
     state.uploading += files.length;
     panel.classList.add("is-uploading");
@@ -357,12 +367,14 @@
         }
       } catch (err) {
         failed.push(err.message);
+        result.failedFiles.push(files[i]);
       }
     }
     if (longLabel && savedIds.length) {
       try {
         await patchLabels(savedIds, label);
       } catch (err) {
+        result.noteFailed = true;
         failed.push("Images saved, but the note wasn't: " + err.message + " Use \u270E to add it again.");
       }
     }
@@ -370,7 +382,6 @@
     panel.classList.toggle("is-uploading", state.uploading > 0);
     el.dropTitle.textContent = DROP_TITLE;
 
-    if (!target && saved && !(longLabel && failed.length)) el.note.value = "";
     var tag = Ticker.extractTags(label)[0];
     if (tooBig.length) failed.push(tooBig.length + " image(s) over 15 MB skipped");
     if (failed.length) {
@@ -380,6 +391,84 @@
     }
     if (tag) state.open[tag] = true;
     render();
+    result.saved = saved;
+    return result;
+  }
+
+  // ---- composer ----------------------------------------------------------------
+  // Screenshots dropped, pasted or chosen collect here as a grid; the note is
+  // written under them, and Post saves them all as one entry.
+
+  var stagedSeq = 0;
+
+  function stage(list) {
+    var files = imageFiles(list);
+    if (!files.length) {
+      setStatus("Only PNG, JPEG, WebP or GIF images can be added.", true);
+      return;
+    }
+    var tooBig = files.filter(function (f) { return f.size > MAX_BYTES; }).length;
+    files.filter(function (f) { return f.size <= MAX_BYTES; }).forEach(function (file) {
+      stagedSeq += 1;
+      state.staged.push({ id: "s" + stagedSeq, file: file, url: URL.createObjectURL(file) });
+    });
+    setStatus(tooBig ? tooBig + " image(s) over 15 MB skipped." : "", Boolean(tooBig));
+    renderComposer();
+  }
+
+  function unstage(id) {
+    state.staged = state.staged.filter(function (shot) {
+      if (shot.id === id) URL.revokeObjectURL(shot.url);
+      return shot.id !== id;
+    });
+    renderComposer();
+  }
+
+  function clearComposer() {
+    state.staged.forEach(function (shot) { URL.revokeObjectURL(shot.url); });
+    state.staged = [];
+    state.composeBatch = "";
+    el.note.value = "";
+    renderComposer();
+  }
+
+  function renderComposer() {
+    var n = state.staged.length;
+    el.staged.hidden = !n;
+    el.staged.classList.toggle("ts-staged--many", n > 1);
+    el.staged.innerHTML = state.staged.map(function (shot, i) {
+      return '<figure class="ts-thumb">' +
+        '<img src="' + escapeHtml(shot.url) + '" alt="' + escapeHtml("Screenshot " + (i + 1) + " for this note") + '" data-zoomable />' +
+        '<button class="ts-thumb-x" type="button" data-unstage="' + escapeHtml(shot.id) + '" aria-label="Remove screenshot ' + (i + 1) +
+          ' from this note" title="Remove">&times;</button>' +
+      "</figure>";
+    }).join("");
+    var busy = state.uploading > 0;
+    el.post.disabled = !n || busy;
+    el.post.textContent = n > 1 ? "Post note (" + n + " images)" : "Post note";
+    el.clear.hidden = !n && !el.note.value.trim();
+    el.composeHint.textContent = n ? "Ctrl+Enter posts" : "Add a screenshot to post.";
+    el.dropTitle.textContent = busy ? el.dropTitle.textContent : n ? "Add more screenshots" : DROP_TITLE;
+  }
+
+  async function post() {
+    if (!state.staged.length || state.uploading) return;
+    var shots = state.staged.slice();
+    state.composeBatch = state.composeBatch || newBatchId();
+    el.post.disabled = true;
+    var result = await upload(shots.map(function (shot) { return shot.file; }), null, state.composeBatch);
+    if (!result.saved && !result.failedFiles.length) { renderComposer(); return; } // refused before upload (bad ticker)
+    // Keep only what didn't upload, so Post again finishes the same entry.
+    state.staged = shots.filter(function (shot) {
+      var keep = result.failedFiles.indexOf(shot.file) !== -1;
+      if (!keep) URL.revokeObjectURL(shot.url);
+      return keep;
+    });
+    if (!state.staged.length && !result.noteFailed) {
+      state.composeBatch = "";
+      el.note.value = "";
+    }
+    renderComposer();
   }
 
   // Every entry made here carries a batch id; one without (none exist today)
@@ -473,7 +562,7 @@
     if (!hasFiles(e)) return;
     e.preventDefault();
     e.stopPropagation();
-    upload(e.dataTransfer.files);
+    stage(e.dataTransfer.files);
   });
   el.drop.addEventListener("click", function () { el.file.click(); });
   el.drop.addEventListener("keydown", function (e) {
@@ -485,7 +574,30 @@
   el.file.addEventListener("change", function () {
     var files = Array.prototype.slice.call(el.file.files || []);
     el.file.value = "";
-    if (files.length) upload(files);
+    if (files.length) stage(files);
+  });
+
+  el.staged.addEventListener("click", function (e) {
+    var btn = e.target.closest("[data-unstage]");
+    if (btn) unstage(btn.getAttribute("data-unstage"));
+  });
+  el.post.addEventListener("click", post);
+  el.clear.addEventListener("click", function () {
+    if (state.staged.length && !window.confirm("Clear these screenshots and the note without posting?")) return;
+    clearComposer();
+  });
+  el.note.addEventListener("input", function () { el.clear.hidden = !state.staged.length && !el.note.value.trim(); });
+  el.note.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      post();
+    }
+  });
+  // Unposted screenshots live only in this tab.
+  window.addEventListener("beforeunload", function (e) {
+    if (!state.staged.length) return;
+    e.preventDefault();
+    e.returnValue = "";
   });
 
   // Drop onto an existing entry: the images join it, side by side.
@@ -526,7 +638,8 @@
       e.preventDefault();
       cardEl.classList.remove("ts-card-over");
       el.ticker.value = baseOf(cardEl.getAttribute("data-symbol"));
-      upload(e.dataTransfer.files);
+      stage(e.dataTransfer.files);
+      el.note.focus();
     });
   }
 
@@ -541,7 +654,7 @@
     // While an entry is open for editing, a pasted screenshot joins it.
     var editingEntry = state.editing && entryByKey(state.editing);
     if (editingEntry) addToEntry(editingEntry, files);
-    else upload(files);
+    else stage(files);
   });
 
   el.list.addEventListener("click", function (e) {
@@ -586,12 +699,21 @@
     e.preventDefault();
     var entryEl = form.closest(".ts-entry");
     var entry = entryEl && entryByKey(entryEl.getAttribute("data-entry"));
-    if (entry) relabel(entry, Ticker.formatLabel(form.elements.label.value));
+    if (!entry) return;
+    var ticker = form.elements.ticker.value;
+    if (ticker.trim() && Ticker.tickerSymbol(ticker) === null) {
+      setStatus('"' + ticker.trim() + '" isn\'t a ticker. Use one symbol like BTC or SOL, or leave it empty.', true);
+      form.elements.ticker.focus();
+      return;
+    }
+    // The ticker field files the entry; any other $tags in the note stay as written.
+    relabel(entry, Ticker.withTicker(ticker, form.elements.note.value));
   });
 
   // Keep the half-typed note when an upload re-renders the list.
   el.list.addEventListener("input", function (e) {
-    if (e.target.name === "label" && e.target.closest('[data-role="edit-form"]')) state.draft = e.target.value;
+    var form = e.target.closest('[data-role="edit-form"]');
+    if (form) state.draft = { ticker: form.elements.ticker.value, note: form.elements.note.value };
   });
 
   // "+ Add photos" in the edit form: the chosen images join this entry.
