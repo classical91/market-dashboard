@@ -65,6 +65,11 @@
         <h2 class="pb-section-title" id="pbHeading">Watching</h2>
         <a class="pb-btn pb-chart" id="pbHeadingChart" target="_blank" rel="noopener" hidden>Chart <span aria-hidden="true">&#8599;</span></a>
         <span class="pb-count" id="pbCount">Loading…</span>
+        <button class="pb-btn pb-btn-danger pb-folder-delete" type="button" id="pbFolderDelete" hidden>Delete folder</button>
+        <div class="pb-view" id="pbView" role="group" aria-label="Layout">
+          <button class="pb-view-btn" type="button" data-view="grid" aria-pressed="true">Folders</button>
+          <button class="pb-view-btn" type="button" data-view="list" aria-pressed="false">List</button>
+        </div>
         <input class="pb-search" id="pbSearch" type="search" placeholder="Filter by label or $ticker" aria-label="Filter screenshots by label" />
         <span class="pb-hint">Type a ticker like <code>btc</code> as a label — it saves as <code>$BTC</code> and stacks with the rest of that ticker. Tap a stack to open it, or <strong>Chart ↗</strong> for its free TradingView chart (add <code>#crypto</code> or <code>#stock</code> to a label if it picks the wrong market).</span>
       </div>

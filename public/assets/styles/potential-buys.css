@@ -238,7 +238,40 @@
   font-size: 13px; font-weight: 700; color: var(--text);
 }
 .pb-stack-name .pb-folder-icon { margin-top: 2px; width: 18px; height: 13px; }
+/* Layout toggle: Folders (stacked cards) or List (compact rows). */
+.pb-view {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.03);
+}
+.pb-view-btn {
+  font: inherit; font-size: 11px; font-weight: 600;
+  color: var(--muted);
+  background: transparent;
+  border: 0; border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.pb-view-btn:hover { color: var(--text); }
+.pb-view-btn[aria-pressed="true"] { color: var(--text); background: rgba(255,255,255,0.09); }
+.pb-view-btn:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+
+/* List layout: one row per folder or screenshot, small thumbnail on the left. */
+.pb-grid.is-list { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.pb-grid.is-list .pb-card { flex-direction: row; align-items: stretch; }
+.pb-grid.is-list .pb-thumb { flex: none; width: 92px; aspect-ratio: 4 / 3; }
+.pb-grid.is-list .pb-card-body { flex: 1; min-width: 0; align-content: center; gap: 6px; padding: 8px 10px; }
+.pb-grid.is-list .pb-stack { box-shadow: none; margin-bottom: 0; }
+.pb-grid.is-list .pb-stack-peek { display: none; }
+.pb-grid.is-list .pb-stack-top { transform: none; box-shadow: none; border-radius: 0; }
+.pb-grid.is-list .pb-stack-badge { top: 4px; right: 4px; min-width: 20px; padding: 1px 5px; font-size: 11px; }
+.pb-grid.is-list .pb-card-foot { flex-wrap: wrap; row-gap: 6px; }
+
 .pb-back { padding: 5px 10px; font-size: 12px; }
+.pb-folder-delete { padding: 5px 10px; font-size: 12px; }
+.pb-folder-delete[hidden] { display: none; }
 .pb-back[hidden] { display: none; }
 
 /* Viewer */
@@ -414,6 +447,12 @@
   /* Narrow cards: the date gets its own line instead of wrapping word by word. */
   .pb-card-foot { flex-wrap: wrap; row-gap: 6px; }
   .pb-when { flex: 1 0 100%; }
+  /* Phones add via the "+ Add screenshots" button, so the big drop zone is
+     hidden. It comes back as a slim strip only while uploads are saving,
+     because its title is the upload progress readout. */
+  .pb-dropzone:not(.is-uploading) { display: none; }
+  .pb-dropzone.is-uploading { min-height: 0; padding: 10px; margin-bottom: 14px; }
+  .pb-dropzone.is-uploading .pb-dropzone-hint { display: none; }
 }
 
 /* iOS Safari zooms the page into any focused field under 16px. Touch screens
