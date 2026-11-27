@@ -270,7 +270,7 @@ function alertBiasLabel(signal) {
   return ALERT_BIAS_LABELS[signal] || String(signal || "NEUTRAL");
 }
 
-function formatSignalAlert(transition, actions, dashboardUrl = "") {
+function formatSignalAlert(transition, actions) {
   const action = actionForTransition(actions, transition);
   const pattern = patternLabel(transition);
   const price = formatPrice(transition.price);
@@ -282,7 +282,6 @@ function formatSignalAlert(transition, actions, dashboardUrl = "") {
     : "WATCH: Trading Lab verdict pending";
   const decision = action && action.decision ? `Checklist: ${action.decision}` : null;
   const confidence = action && action.confidenceScore != null ? `Confidence: ${action.confidenceScore}` : null;
-  const view = dashboardLink(dashboardUrl, "/directional-bias.html");
 
   return [
     `<b>SIGNAL</b> | <b>${escapeHtml(transition.symbol)}</b> ${escapeHtml(transition.interval)} | ${escapeHtml(pattern)}`,
@@ -290,8 +289,54 @@ function formatSignalAlert(transition, actions, dashboardUrl = "") {
     `Regime: ${escapeHtml(trend)}`,
     `Evidence: ${escapeHtml(evidence)}`,
     decision || confidence ? [decision, confidence].filter(Boolean).join(" | ") : null,
-    `Verdict: ${escapeHtml(verdict)}`,
-    view ? `Visit: ${escapeHtml(view)}` : null,
+    `Verdict: ${truncateEscaped(verdict, 600)}`,
+  ].filter(Boolean).join("\n");
+}
+
+function batchAlertRows(title, rows, view) {
+  const header = `${title}\n\n`;
+  const link = view ? escapeHtml(view) : "";
+  const footer = link && link.length <= 1000 ? `\n\nVisit: ${link}` : "";
+  const messages = [];
+  let batch = "";
+  for (const row of rows) {
+    const joined = batch ? `${batch}\n\n${row}` : row;
+    if (batch && header.length + joined.length + footer.length > MAX_MSG_LEN) {
+      messages.push(header + batch + footer);
+      batch = row;
+    } else {
+      batch = joined;
+    }
+  }
+  if (batch) messages.push(header + batch + footer);
+  return messages;
+}
+
+function formatPatternAlert(event) {
+  const bullish = event.bias === "bullish";
+  const direction = bullish ? "bullish" : "bearish";
+  const emoji = bullish ? "🟢" : "🔴";
+  const closeTime = Number.isFinite(event.candleCloseTime)
+    ? `Candle close: ${new Date(event.candleCloseTime).toISOString().slice(0, 16).replace("T", " ")} UTC`
+    : null;
+  const header = `${emoji} <b>WATCH</b> | <b>${escapeHtml(event.symbol)}</b> ${escapeHtml(event.interval)} | ${escapeHtml(event.name)}`;
+  if (event.kind === "breakout") {
+    const boundary = bullish ? "above the upper" : "below the lower";
+    return [
+      `${header} breakout`,
+      `Bias: ${bullish ? "Bullish" : "Bearish"} watch (${escapeHtml(String(event.score ?? "n/a"))})`,
+      `Evidence: candle closed ${boundary} trendline`,
+      closeTime,
+      "Verdict: watch for confirmation",
+    ].filter(Boolean).join("\n");
+  }
+  const context = event.name.startsWith("Hidden") ? "continuation" : "reversal";
+  return [
+    `${header} divergence`,
+    `Bias: ${direction} ${context} watch`,
+    "Evidence: confirmed RSI pivot pair",
+    closeTime,
+    "Verdict: watch for structure confirmation",
   ].filter(Boolean).join("\n");
 }
 
@@ -353,7 +398,7 @@ class TelegramService {
     return !!(this._botToken && this._chatIds.length);
   }
 
-  async _send(target, text, { parseMode = "HTML" } = {}) {
+  async _send(target, text, { parseMode = "HTML", signal } = {}) {
     const url = `${TELEGRAM_API}/bot${this._botToken}/sendMessage`;
     const body = {
       chat_id: target.chatId,
@@ -368,12 +413,26 @@ class TelegramService {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
+      signal,
     });
     if (!res.ok) {
       const responseBody = await res.text();
-      throw createServiceError(`Telegram sendMessage failed (${res.status}): ${responseBody.slice(0, 300)}`, 502);
+      let detail;
+      try { detail = JSON.parse(responseBody); } catch { /* proxy may return HTML */ }
+      throw this._sendError(res.status, responseBody, detail?.parameters?.retry_after);
     }
-    return res.json();
+    const data = await res.json();
+    if (data?.ok === false) {
+      throw this._sendError(data.error_code || res.status, data.description || "", data.parameters?.retry_after);
+    }
+    return data;
+  }
+
+  _sendError(status, detail, retryAfterSeconds) {
+    const error = createServiceError(`Telegram sendMessage failed (${status}): ${detail.slice(0, 300)}`, 502);
+    error.telegramStatus = status;
+    error.retryAfterMs = Number(retryAfterSeconds) * 1000;
+    return error;
   }
 
   async _sendToAll(text) {
@@ -645,50 +704,45 @@ class TelegramService {
     }
   }
 
-  /**
-   * One batched message per scan cycle listing every screener signal flip,
-   * e.g. "🟢 BTCUSDT · 4h: FLAT → LONG (83%)". Batched because a volatile
-   * scan can flip a dozen tokens at once and one message reads far better
-   * than a burst of twelve.
-   */
-  async postSignalAlerts(transitions, tradeActions = []) {
-    if (!this.configured || !transitions.length) return;
-    const rows = transitions.map((t) => formatSignalAlert(t, tradeActions, this._dashboardUrl));
-    const header = "⚡ <b>ALPHA TEAM SIGNALS</b>\n\n";
-    await this._sendToAll(truncate(header + rows.join("\n\n"), MAX_MSG_LEN));
+  alertDeliveries(messages) {
+    if (!this.configured) return [];
+    const targets = new Map(this._chatIds.map((target) => [this._alertTargetKey(target), target]));
+    return Array.from(targets.keys()).flatMap((targetKey) => messages.map((text) => ({ targetKey, text })));
   }
 
-  /**
-   * One batched message per Pattern Scanner cycle listing new breakouts and
-   * fresh divergences, e.g. "⚡ BTCUSDT · 4h: Falling Wedge → Breakout (62)"
-   * or "🔀 ETHUSDT · 1D: Regular Bullish Divergence (RSI)".
-   */
+  _alertTargetKey({ chatId, threadId }) {
+    return threadId ? `${chatId}:${threadId}` : String(chatId);
+  }
+
+  async sendAlertDelivery({ targetKey, text }) {
+    const target = this._chatIds.find((entry) => this._alertTargetKey(entry) === targetKey);
+    if (!this.configured || !target) return false;
+    const response = await this._send(target, text, { signal: AbortSignal.timeout(10_000) });
+    if (response?.ok !== true) throw new Error("Telegram did not confirm alert delivery");
+    return true;
+  }
+
+  signalAlertMessages(transitions, tradeActions = []) {
+    return batchAlertRows("⚡ <b>ALPHA TEAM SIGNALS</b>",
+      transitions.map((transition) => formatSignalAlert(transition, tradeActions)),
+      dashboardLink(this._dashboardUrl, "/directional-bias.html"));
+  }
+
+  patternAlertMessages(events) {
+    return batchAlertRows("📈 <b>PATTERN SCANNER</b>", events.map(formatPatternAlert),
+      dashboardLink(this._dashboardUrl, "/pattern-scanner.html"));
+  }
+
+  async postSignalAlerts(transitions, tradeActions = []) {
+    for (const delivery of this.alertDeliveries(this.signalAlertMessages(transitions, tradeActions))) {
+      await this.sendAlertDelivery(delivery);
+    }
+  }
+
   async postPatternAlerts(events) {
-    if (!this.configured || !events.length) return;
-    const view = dashboardLink(this._dashboardUrl, "/pattern-scanner.html");
-    const rows = events.map((e) => {
-      const biasEmoji = e.bias === "bullish" ? "🟢" : "🔴";
-      if (e.kind === "breakout") {
-        const bias = e.bias === "bullish" ? "Bullish watch" : "Bearish watch";
-        return [
-          `${biasEmoji} <b>WATCH</b> | <b>${escapeHtml(e.symbol)}</b> ${escapeHtml(e.interval)} | ${escapeHtml(e.name)} breakout`,
-          `Bias: ${escapeHtml(bias)} (${escapeHtml(String(e.score ?? "n/a"))})`,
-          "Evidence: pattern moved from forming to breakout",
-          "Verdict: watch for confirmation; act only after checklist/edge gate",
-          view ? `Visit: ${escapeHtml(view)}` : null,
-        ].filter(Boolean).join("\n");
-      }
-      const bias = e.bias === "bullish" ? "bullish reversal watch" : "bearish reversal watch";
-      return [
-        `${biasEmoji} <b>WATCH</b> | <b>${escapeHtml(e.symbol)}</b> ${escapeHtml(e.interval)} | ${escapeHtml(e.name)} divergence`,
-        `Bias: ${escapeHtml(bias)}`,
-        "Evidence: fresh divergence state detected",
-        "Verdict: watch for structure confirmation; no automatic action",
-        view ? `Visit: ${escapeHtml(view)}` : null,
-      ].filter(Boolean).join("\n");
-    });
-    const header = "📈 <b>PATTERN SCANNER</b>\n\n";
-    await this._sendToAll(truncate(header + rows.join("\n\n"), MAX_MSG_LEN));
+    for (const delivery of this.alertDeliveries(this.patternAlertMessages(events))) {
+      await this.sendAlertDelivery(delivery);
+    }
   }
 
   /**

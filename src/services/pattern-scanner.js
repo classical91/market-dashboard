@@ -103,7 +103,8 @@ function priceAt(line, x) {
  * or no pattern. Returns null when there isn't enough pivot data to fit both
  * trendlines with an acceptable R^2.
  */
-function classifyWindow(candles, opts) {
+function classifyWindow(candles, opts, impulseCandles = []) {
+  if (candles.length < opts.window) return null;
   const { highs, lows } = findPivots(candles, opts.pivotOrder);
   if (highs.length < 3 || lows.length < 3) return null;
 
@@ -125,10 +126,12 @@ function classifyWindow(candles, opts) {
   const lowerNow = priceAt(lower, lastX);
   const breakoutUp = lastClose > upperNow * (1 + opts.breakoutBuffer);
   const breakoutDown = lastClose < lowerNow * (1 - opts.breakoutBuffer);
-  const status = breakoutUp || breakoutDown ? "breakout" : "forming";
+  const direction = breakoutUp ? "bullish" : breakoutDown ? "bearish" : null;
+  const previousClose = candles[lastX - 1].close;
+  const crossed = breakoutUp
+    ? previousClose <= priceAt(upper, lastX - 1) * (1 + opts.breakoutBuffer)
+    : breakoutDown && previousClose >= priceAt(lower, lastX - 1) * (1 - opts.breakoutBuffer);
 
-  const preWindowStart = Math.max(0, candles.length - opts.window - opts.impulseWindow);
-  const impulseCandles = candles.slice(preWindowStart, candles.length - opts.window);
   const impulseReturn = impulseCandles.length
     ? (impulseCandles[impulseCandles.length - 1].close - impulseCandles[0].close) / impulseCandles[0].close
     : 0;
@@ -148,20 +151,20 @@ function classifyWindow(candles, opts) {
 
   // Wedges: both trendlines slope the same direction and converge.
   if (upper.slope > 0 && lower.slope > 0 && lower.slope > upper.slope && isCompressing) {
-    return build("Rising Wedge", "bearish", status, r2, widthRatio, impulseReturn, volumeRatio, lines);
+    return build("Rising Wedge", "bearish", direction, crossed, r2, widthRatio, impulseReturn, volumeRatio, lines);
   }
   if (upper.slope < 0 && lower.slope < 0 && Math.abs(upper.slope) > Math.abs(lower.slope) && isCompressing) {
-    return build("Falling Wedge", "bullish", status, r2, widthRatio, impulseReturn, volumeRatio, lines);
+    return build("Falling Wedge", "bullish", direction, crossed, r2, widthRatio, impulseReturn, volumeRatio, lines);
   }
 
   // Flags: a strong directional pole, then a roughly parallel, opposite (or
   // sideways) consolidation channel.
   const isParallel = Math.abs(upper.slope - lower.slope) < Math.abs(upper.slope + lower.slope || 1) * 0.6 + 1e-9;
   if (impulseReturn >= opts.impulseMin && upper.slope <= 0 && lower.slope <= 0 && isParallel) {
-    return build("Bull Flag", "bullish", status, r2, widthRatio, impulseReturn, volumeRatio, lines);
+    return build("Bull Flag", "bullish", direction, crossed, r2, widthRatio, impulseReturn, volumeRatio, lines);
   }
   if (impulseReturn <= -opts.impulseMin && upper.slope >= 0 && lower.slope >= 0 && isParallel) {
-    return build("Bear Flag", "bearish", status, r2, widthRatio, impulseReturn, volumeRatio, lines);
+    return build("Bear Flag", "bearish", direction, crossed, r2, widthRatio, impulseReturn, volumeRatio, lines);
   }
 
   return null;
@@ -232,7 +235,7 @@ function detectDivergence(candles, opts) {
   return candidates[0];
 }
 
-function build(pattern, bias, status, r2, widthRatio, impulseReturn, volumeRatio, lines) {
+function build(pattern, setupBias, direction, crossed, r2, widthRatio, impulseReturn, volumeRatio, lines) {
   // Simple composite score, 0-100: fit quality, compression, impulse
   // strength, and a declining-volume-into-consolidation bonus all push it up.
   const compressionScore = Math.max(0, 1 - widthRatio) * 100;
@@ -241,8 +244,10 @@ function build(pattern, bias, status, r2, widthRatio, impulseReturn, volumeRatio
   const score = Math.round(r2 * 40 + compressionScore * 0.25 + impulseScore * 0.2 + volumeScore * 0.15);
   return {
     pattern,
-    bias,
-    status,
+    bias: direction || setupBias,
+    setupBias,
+    status: direction ? "breakout" : "forming",
+    breakoutCrossed: crossed,
     score: Math.max(0, Math.min(100, score)),
     widthRatio: Number(widthRatio.toFixed(3)),
     impulseReturnPct: Number((impulseReturn * 100).toFixed(2)),
@@ -264,7 +269,7 @@ class PatternScannerService {
     // of the pattern window still have valid RSI values to compare.
     const limit = this._options.window + this._options.impulseWindow + this._options.pivotOrder * 2 + this._options.rsiLen + 5;
     const url = `${BINANCE_KLINES_URL}?symbol=${encodeURIComponent(pair)}&interval=${encodeURIComponent(binanceInterval)}&limit=${limit}`;
-    const res = await fetch(url);
+    const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
     if (!res.ok) {
       throw new Error(`Binance klines HTTP ${res.status} for ${pair} ${binanceInterval}`);
     }
@@ -297,7 +302,8 @@ class PatternScannerService {
       // way it whipsawed the screener's borderline signals.
       const candles = dropUnclosedCandle(await this._fetchKlines(pair, binanceInterval));
       const windowed = candles.slice(-this._options.window);
-      const detection = classifyWindow(windowed, this._options);
+      const impulse = candles.slice(-this._options.window - this._options.impulseWindow, -this._options.window);
+      const detection = classifyWindow(windowed, this._options, impulse);
       const divergence = detectDivergence(candles, this._options);
 
       // Only hits carry chart data — 75 combos of mostly-empty results would
@@ -338,13 +344,14 @@ class PatternScannerService {
       // result.chart in rebased coordinates; don't also ship it inside the
       // pattern/divergence summaries.
       const { pivots, ...divergencePublic } = result.divergence || {};
+      const pivotTimes = result.chart?.divergence?.pivots.map(({ x }) => result.chart.candles[x][0]);
       const { lines, ...patternPublic } = result.detection || {};
       return {
         symbol: pair,
         label,
         interval,
         pattern: result.detection ? patternPublic : null,
-        divergence: result.divergence ? divergencePublic : null,
+        divergence: result.divergence ? { ...divergencePublic, pivotTimes } : null,
         chart: result.chart || null,
         scannedAt: result.scannedAt,
         candleCloseTime: Number.isFinite(result.candleCloseTime) ? result.candleCloseTime : null,

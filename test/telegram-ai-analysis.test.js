@@ -132,12 +132,13 @@ test("Pattern Scanner alerts link only to the available dashboard page", async (
     });
     await telegram.postPatternAlerts([
       { symbol: "ETHUSDT", interval: "4h", kind: "divergence", name: "Regular Bullish", bias: "bullish" },
-      { symbol: "SOLUSDT", interval: "1D", kind: "breakout", name: "Falling Wedge", bias: "bullish", score: 64 },
+      { symbol: "SOLUSDT", interval: "1D", kind: "breakout", name: "Falling Wedge", bias: "bullish", score: 64, candleCloseTime: Date.UTC(2026, 10, 27, 12) },
     ]);
 
     assert.equal(sentBodies.length, 1);
     const text = sentBodies[0].text;
     assert.match(text, /PATTERN SCANNER/);
+    assert.match(text, /Candle close: 2026-11-27 12:00 UTC/);
     assert.match(text, /WATCH/);
     assert.match(text, /Visit: https:\/\/market-dashboard\.example\/pattern-scanner\.html\?view=alpha/);
     assert.doesNotMatch(text, /Readme:/i);
@@ -146,6 +147,34 @@ test("Pattern Scanner alerts link only to the available dashboard page", async (
   } finally {
     global.fetch = originalFetch;
   }
+});
+
+test("large pattern batches keep every complete alert and describe hidden divergence as continuation", async (t) => {
+  const sent = [];
+  t.mock.method(global, "fetch", async (_url, { body }) => {
+    sent.push(JSON.parse(body).text);
+    return { ok: true, json: async () => ({ ok: true }) };
+  });
+  const telegram = new TelegramService({
+    botToken: "test-token", chatIds: ["-1001"], dashboardUrl: "https://market-dashboard.example",
+  });
+  const events = Array.from({ length: 75 }, (_, i) => ({
+    symbol: `TOKEN${i}USDT`,
+    interval: "4h",
+    kind: "divergence",
+    name: "Hidden Bullish",
+    bias: "bullish",
+  }));
+  await telegram.postPatternAlerts(events);
+  assert.ok(sent.length > 1);
+  for (const text of sent) {
+    assert.ok(text.length <= 4096);
+    assert.equal(text.match(/<b>/g).length, text.match(/<\/b>/g).length);
+    assert.match(text, /bullish continuation watch/);
+    assert.match(text, /Visit: https:\/\/market-dashboard\.example\/pattern-scanner\.html\?view=alpha/);
+  }
+  assert.deepEqual(sent.flatMap((text) => [...text.matchAll(/<b>(TOKEN\d+USDT)<\/b>/g)].map(([, symbol]) => symbol)),
+    events.map(({ symbol }) => symbol));
 });
 
 test("signal alerts report a bias, not an entry instruction", async () => {

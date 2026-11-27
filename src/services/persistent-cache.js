@@ -17,8 +17,9 @@ class PersistentReporterCache {
    * @param {string} filePath  Absolute path to the JSON cache file.
    *                           Defaults to <project-root>/data/reporter-cache.json
    */
-  constructor(filePath) {
+  constructor(filePath, { strictWrites = false } = {}) {
     this._file = filePath || path.join(resolveDataDir(), "reporter-cache.json");
+    this._strictWrites = strictWrites;
     this._map = new Map();
     this._inflight = new Map();
     this._load();
@@ -82,13 +83,16 @@ class PersistentReporterCache {
   }
 
   /* ── private: flush to disk ── */
-  _save() {
+  _save(entries = this._map) {
     try {
       const dir = path.dirname(this._file);
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-      const obj = Object.fromEntries(this._map);
-      fs.writeFileSync(this._file, JSON.stringify(obj, null, 2), "utf8");
+      const obj = Object.fromEntries(entries);
+      const destination = this._strictWrites ? `${this._file}.${process.pid}.tmp` : this._file;
+      fs.writeFileSync(destination, JSON.stringify(obj, null, 2), "utf8");
+      if (this._strictWrites) fs.renameSync(destination, this._file);
     } catch (err) {
+      if (this._strictWrites) throw err;
       console.error("[PersistentCache] Failed to write cache file:", err.message);
     }
   }
@@ -105,16 +109,20 @@ class PersistentReporterCache {
 
   set(key, value, ttlMs) {
     const expiresAt = Date.now() + ttlMs;
-    this._map.set(key, { value, expiresAt });
-    this._save();
+    const entries = this._strictWrites ? new Map(this._map) : this._map;
+    entries.set(key, { value, expiresAt });
+    this._save(entries);
+    this._map = entries;
     return value;
   }
 
   /** Removes an entry and flushes, so the deletion survives a restart too. */
   delete(key) {
     this._inflight.delete(key);
-    const existed = this._map.delete(key);
-    if (existed) this._save();
+    const entries = this._strictWrites ? new Map(this._map) : this._map;
+    const existed = entries.delete(key);
+    if (existed) this._save(entries);
+    this._map = entries;
     return existed;
   }
 
