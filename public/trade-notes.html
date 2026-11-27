@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trade Notes · Market Command</title>
+  <script src="/assets/js/settings.js"></script>
+  <link rel="stylesheet" href="/assets/styles/command.css" />
+  <link rel="stylesheet" href="/assets/styles/components.css" />
+  <link rel="stylesheet" href="/assets/styles/trade-shots.css" />
+</head>
+<body>
+<div class="app">
+  <aside class="cmd-sidebar"></aside>
+  <main class="cmd-main ts-page">
+    <div class="ts-page-content" id="ts-panel" data-full-page>
+      <div class="cmd-page-header">
+        <div>
+          <a class="ts-back" href="/pattern-scanner-trades.html"><span aria-hidden="true">&larr;</span> Back to Active Trades</a>
+          <h1 class="cmd-page-title">Trade notes</h1>
+        </div>
+        <span class="ts-count" id="ts-count">Loading…</span>
+      </div>
+      <details class="ts-page-compose" id="ts-compose-toggle">
+        <summary>Add a trade note</summary>
+        <div class="ts-composer" id="ts-composer"></div>
+      </details>
+      <div class="ts-status" id="ts-status" role="status" aria-live="polite"></div>
+      <div class="ts-list" id="ts-list" aria-live="polite"></div>
+    </div>
+  </main>
+</div>
+<script src="/assets/js/sidebar.js"></script>
+<script src="/assets/js/ticker-label.js"></script>
+<script src="/assets/js/briefing-markdown.js"></script>
+<script src="/assets/js/image-zoom.js"></script>
+<script src="/assets/js/trade-shots.js"></script>
+</body>
+</html>

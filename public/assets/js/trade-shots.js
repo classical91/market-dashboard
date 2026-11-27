@@ -1,8 +1,8 @@
 (function () {
   "use strict";
 
-  // Active Trades → Trade notes: your own marked-up screenshots, kept beside
-  // the cards. Drop (or paste) one or more images on the grey box and they
+  // Active Trades and the full Trade notes page use the same collection.
+  // Drop (or paste) one or more images on the grey box and they
   // become one entry with a timestamp and a ticker; images dropped together
   // sit side by side in that entry. Once a ticker has two or more entries
   // they collapse into a folder for that ticker.
@@ -17,6 +17,36 @@
 
   var panel = document.getElementById("ts-panel");
   if (!panel || !Ticker) return;
+
+  var composer = document.getElementById("ts-composer");
+  var composerToggle = document.getElementById("ts-compose-toggle");
+  var fullPage = panel.hasAttribute("data-full-page");
+
+  composer.innerHTML = `
+    <div class="ts-fields">
+      <input class="ts-input ts-input--ticker" id="ts-ticker" list="ts-tickers" placeholder="Ticker" maxlength="24"
+        autocomplete="off" aria-label="Ticker for the next screenshots" />
+      <datalist id="ts-tickers"></datalist>
+    </div>
+    <!-- Composer: screenshots collect in a grid, the note goes under
+         them, and Post saves them together as one entry. -->
+    <div class="ts-drop" id="ts-drop" tabindex="0" role="button" aria-describedby="ts-drop-hint"
+      aria-label="Add screenshots: drop, paste, or choose files">
+      <input type="file" id="ts-file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden />
+      <div class="ts-drop-icon" aria-hidden="true">&#8681;</div>
+      <div class="ts-drop-title" id="ts-drop-title">Drop screenshots here</div>
+      <div class="ts-drop-hint" id="ts-drop-hint">Add as many as you like &mdash; they post together as one note. Paste works anywhere on the page.</div>
+    </div>
+    <div class="ts-staged" id="ts-staged" aria-label="Screenshots for this note" hidden></div>
+    <textarea class="ts-input ts-input--note" id="ts-note" rows="4" maxlength="20000"
+      placeholder="Write up the trade (optional) &mdash; plan, entry, stop, targets. Markdown works: ## heading, **bold**, - list, | table |. Pasting a ChatGPT answer keeps its formatting."
+      aria-label="Note for these screenshots"></textarea>
+    <div class="ts-compose-actions">
+      <span class="ts-compose-hint" id="ts-compose-hint">Add a screenshot to post.</span>
+      <button class="ts-btn" type="button" id="ts-clear" hidden>Clear</button>
+      <button class="ts-btn ts-btn--primary" type="button" id="ts-post" disabled>Post note</button>
+    </div>
+  `;
 
   var el = {
     list: document.getElementById("ts-list"),
@@ -209,6 +239,7 @@
 
   /** The note on its card: formatted, and cut short with "Read full note" when it's a long post. */
   function noteBlock(note) {
+    if (fullPage) return '<div class="ts-note ts-md ts-md--full">' + noteHtml(note) + "</div>";
     var long = isLongNote(note);
     return '<div class="ts-note ts-md' + (long ? " ts-note--clamped" : "") + '">' + noteHtml(note) + "</div>" +
       (long ? '<button class="ts-more" type="button" data-role="read">Read full note &rarr;</button>' : "");
@@ -257,7 +288,7 @@
   }
 
   function renderFolder(tag, entries) {
-    var open = Boolean(state.open[tag]);
+    var open = folderIsOpen(tag);
     var images = entries.reduce(function (n, e) { return n + e.items.length; }, 0);
     var latest = entries[0].createdAt;
     var outcomes = {};
@@ -281,6 +312,10 @@
     "</section>";
   }
 
+  function folderIsOpen(tag) {
+    return state.open[tag] ?? fullPage;
+  }
+
   function render() {
     var entries = buildEntries();
     var images = state.items.length;
@@ -297,8 +332,10 @@
       return;
     }
     if (!entries.length) {
-      el.list.innerHTML = '<div class="ts-empty">No trade notes yet. Drop a marked-up chart above &mdash; ' +
-        "or drop it straight onto a trade card to file it under that ticker.</div>";
+      el.list.innerHTML = '<div class="ts-empty">No trade notes yet. ' +
+        (fullPage ? 'Open “Add a trade note” above to get started.'
+          : 'Drop a marked-up chart above &mdash; or drop it straight onto a trade card to file it under that ticker.') +
+        "</div>";
       return;
     }
 
@@ -446,6 +483,7 @@
       return;
     }
     var tooBig = files.filter(function (f) { return f.size > MAX_BYTES; }).length;
+    if (composerToggle) composerToggle.open = true;
     files.filter(function (f) { return f.size <= MAX_BYTES; }).forEach(function (file) {
       stagedSeq += 1;
       state.staged.push({ id: "s" + stagedSeq, file: file, url: URL.createObjectURL(file) });
@@ -722,8 +760,9 @@
     if (role === "retry") { load(); return; }
     if (role === "toggle") {
       var tag = btn.closest("[data-folder]").getAttribute("data-folder");
-      state.open[tag] = !state.open[tag];
+      state.open[tag] = !folderIsOpen(tag);
       render();
+      if (fullPage) el.list.querySelector('[data-folder="' + tag + '"] .ts-folder-head').focus();
       return;
     }
     var entryEl = btn.closest(".ts-entry");
@@ -828,7 +867,7 @@
         "</div>" +
         '<div class="ts-reader-scroll">' +
           '<div class="ts-reader-shots"></div>' +
-          '<article class="ts-reader-body ts-md"></article>' +
+          '<article class="ts-reader-body ts-md ts-md--full"></article>' +
         "</div>" +
       "</div>";
     shade.addEventListener("click", function (e) {
@@ -1009,18 +1048,25 @@
   el.note.addEventListener("paste", pasteFormatted);
   el.list.addEventListener("paste", pasteFormatted);
 
-  // The page script announces the tracked pairs after each load, so the
-  // ticker field suggests them and their entries are marked active.
-  document.addEventListener("activetrades:cards", function (e) {
+  function setActiveTickers(symbols) {
     var seen = {};
-    state.active = ((e.detail && e.detail.symbols) || []).map(baseOf).filter(function (tag) {
+    state.active = symbols.map(baseOf).filter(function (tag) {
       if (!tag || seen[tag]) return false;
       seen[tag] = true;
       return true;
     });
     renderTickerOptions();
     render();
-  });
+  }
 
+  if (fullPage) {
+    request("/api/watchlist").then(function (data) {
+      if (Array.isArray(data.items)) setActiveTickers(data.items.map(function (item) { return item.symbol; }));
+    }).catch(function () { /* Notes can still be used without ticker suggestions. */ });
+  } else {
+    document.addEventListener("activetrades:cards", function (e) {
+      setActiveTickers((e.detail && e.detail.symbols) || []);
+    });
+  }
   load();
 })();

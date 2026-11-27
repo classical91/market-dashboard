@@ -1,6 +1,6 @@
 /* ─────────────────────────────────────────────────────────
-   Active Trades → Trade notes: a side panel of your own
-   marked-up screenshots, beside the cards. See
+   Trade notes: marked-up screenshots in Active Trades
+   and on their own page. See
    public/assets/js/trade-shots.js.
 ───────────────────────────────────────────────────────── */
 
@@ -26,7 +26,7 @@
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
 }
 
-.ts-head { display: flex; align-items: baseline; gap: 8px; }
+.ts-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 8px; }
 .ts-title {
   margin: 0;
   color: #fff;
@@ -36,6 +36,7 @@
   text-transform: uppercase;
 }
 .ts-count { margin-left: auto; color: #8892a6; font-size: 11px; }
+.ts-composer { display: contents; }
 
 .ts-fields { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
 .ts-input {
@@ -78,7 +79,7 @@
 .ts-drop:hover { background: #313744; }
 .ts-drop:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(77, 163, 255, 0.35); }
 .ts-drop.is-over { background: #343f52; border-color: var(--blue, #4da3ff); color: #fff; }
-.ts-panel.is-uploading .ts-drop { cursor: progress; opacity: 0.75; }
+.is-uploading .ts-drop { cursor: progress; opacity: 0.75; }
 
 /* Composer: the screenshots for the next note, gridded, above the note box. */
 .ts-staged {
@@ -89,7 +90,7 @@
   overflow-y: auto;
 }
 .ts-staged[hidden] { display: none; }
-.ts-staged, .ts-panel > .ts-input--note, .ts-compose-actions { flex-shrink: 0; }
+.ts-staged, .ts-composer > .ts-input--note, .ts-compose-actions { flex-shrink: 0; }
 .ts-staged--many { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .ts-staged .ts-thumb img { border-color: rgba(77, 163, 255, 0.45); }
 .ts-staged:not(.ts-staged--many) .ts-thumb img { aspect-ratio: auto; max-height: 200px; object-fit: contain; }
@@ -306,18 +307,18 @@ html.ts-reader-lock { overflow: hidden; }
   border-radius: 8px;
   cursor: zoom-in;
 }
-.ts-reader-body { max-width: 68ch; color: #c4cad6; font-size: 14.5px; line-height: 1.65; }
-.ts-reader-body p { margin-bottom: 12px; }
-.ts-reader-body h3 { margin: 22px 0 8px; font-size: 19px; }
-.ts-reader-body h4 { margin: 20px 0 8px; font-size: 16px; }
-.ts-reader-body :is(h5, h6) { margin: 16px 0 6px; font-size: 14.5px; }
-.ts-reader-body ul { margin-bottom: 12px; padding-left: 22px; }
-.ts-reader-body li { margin-bottom: 4px; }
-.ts-reader-body .briefing-table-wrap { margin-bottom: 14px; border-radius: 9px; }
-.ts-reader-body .briefing-table { font-size: 13.5px; }
-.ts-reader-body .briefing-table :is(th, td) { padding: 7px 12px; }
-.ts-reader-body .briefing-table th { font-size: 11.5px; }
-.ts-reader-body hr { margin: 18px 0; }
+.ts-md--full { max-width: 68ch; color: #c4cad6; font-size: 14.5px; line-height: 1.65; }
+.ts-md--full p { margin-bottom: 12px; }
+.ts-md--full h3 { margin: 22px 0 8px; font-size: 19px; }
+.ts-md--full h4 { margin: 20px 0 8px; font-size: 16px; }
+.ts-md--full :is(h5, h6) { margin: 16px 0 6px; font-size: 14.5px; }
+.ts-md--full ul { margin-bottom: 12px; padding-left: 22px; }
+.ts-md--full li { margin-bottom: 4px; }
+.ts-md--full .briefing-table-wrap { margin-bottom: 14px; border-radius: 9px; }
+.ts-md--full .briefing-table { font-size: 13.5px; }
+.ts-md--full .briefing-table :is(th, td) { padding: 7px 12px; }
+.ts-md--full .briefing-table th { font-size: 11.5px; }
+.ts-md--full hr { margin: 18px 0; }
 @media (max-width: 600px) {
   .ts-reader-shade { padding: 0; }
   .ts-reader { width: 100%; max-height: 100vh; height: 100vh; border-radius: 0; }
@@ -395,6 +396,7 @@ html.ts-reader-lock { overflow: hidden; }
 }
 .ts-btn:hover { border-color: rgba(137, 158, 196, 0.45); color: #fff; }
 .ts-btn--primary { border-color: rgba(77, 163, 255, 0.5); background: rgba(77, 163, 255, 0.16); color: #cfe6ff; }
+.ts-expand { flex: none; white-space: nowrap; text-decoration: none; }
 
 /* A ticker with two or more entries. */
 .ts-folder {
@@ -468,4 +470,38 @@ html.ts-reader-lock { overflow: hidden; }
   .tc-layout { grid-template-columns: 1fr; }
   .ts-panel { position: static; order: -1; max-height: none; }
   .ts-list { max-height: 520px; }
+}
+
+.ts-page-content { max-width: 1080px; margin-inline: auto; }
+.ts-page .cmd-page-title { margin: 4px 0 0; font-size: 24px; }
+.ts-page .ts-count { color: var(--muted, #8892a6); font-size: 13px; }
+.ts-back { color: var(--blue, #4da3ff); font-size: 13px; }
+.ts-page-compose {
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #0f1524;
+}
+.ts-page-compose > summary {
+  padding: 12px 14px;
+  color: #edf3ff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.ts-page-compose > summary:focus-visible { outline: 2px solid var(--blue, #4da3ff); outline-offset: 2px; border-radius: 10px; }
+.ts-page-compose > .ts-composer { display: grid; gap: 10px; padding: 0 14px 14px; }
+.ts-page .ts-list { min-height: 0; max-height: none; margin: 0; padding: 0; overflow: visible; }
+.ts-page .ts-status { margin-bottom: 10px; }
+.ts-page .ts-entry { padding: clamp(10px, 2vw, 20px); }
+.ts-page .ts-entry-head { flex-wrap: wrap; }
+.ts-page .ts-thumbs { gap: 10px; margin-top: 12px; }
+.ts-page .ts-thumbs .ts-thumb img { aspect-ratio: auto; max-height: 620px; object-fit: contain; }
+.ts-page .ts-note { margin-top: 14px; font-size: 16px; }
+.ts-page .ts-input--note { font-size: 16px; }
+
+@media (max-width: 600px) {
+  .ts-page .ts-thumbs--many { grid-template-columns: 1fr; }
+  .ts-page .ts-folder-head { flex-wrap: wrap; }
+  .ts-page .ts-folder-meta { flex-basis: 100%; order: 1; }
 }

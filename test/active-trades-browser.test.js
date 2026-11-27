@@ -41,14 +41,16 @@ test("Active Trades removal and responsive cards", { skip: !executablePath && "C
   async function open(t, options = {}) {
     const context = await browser.newContext({ viewport: { width: 1520, height: 1100 } });
     t.after(() => context.close());
-    await context.addInitScript(() => localStorage.setItem("marketDashboardAdminKey", "browser-test-key"));
+    await context.addInitScript(() => {
+      if (location.protocol === "http:") localStorage.setItem("marketDashboardAdminKey", "browser-test-key");
+    });
     const page = await context.newPage();
     const errors = [];
     page.on("pageerror", err => errors.push(err.message));
     t.after(() => assert.deepEqual(errors, [], "no uncaught page errors"));
     const deletes = [];
     const cards = [card("BTCUSDT", "1W", "ALIGNED", 3), card("XRPUSDT", "4h", "ALIGNED", 2), card("BTCUSDT", "4h", "QUIET", 1)];
-    await page.route("**/api/**", async route => {
+    await context.route("**/api/**", async route => {
       const request = route.request();
       const url = new URL(request.url());
       if (request.method() === "DELETE") {
@@ -59,6 +61,10 @@ test("Active Trades removal and responsive cards", { skip: !executablePath && "C
         await route.fulfill({ json: { cards, tagCounts: { ALIGNED: 2, QUIET: 1 } } });
       } else if (url.pathname === "/api/watchlist/tokens") {
         await route.fulfill({ json: { tokens: ["BTCUSDT", "XRPUSDT"] } });
+      } else if (url.pathname === "/api/watchlist") {
+        await route.fulfill({ json: { items: cards.map(({ symbol, interval }) => ({ symbol, interval })) } });
+      } else if (url.pathname === "/api/active-trade-shots") {
+        await route.fulfill({ json: { items: options.notes || [] } });
       } else {
         await route.fulfill({ json: { authenticated: true, role: "owner" } });
       }
@@ -137,5 +143,59 @@ test("Active Trades removal and responsive cards", { skip: !executablePath && "C
     }
     await page.getByRole("button", { name: "Remove BTCUSDT 1W from Active Trades", exact: true }).click();
     assert.equal(await page.getByRole("dialog").evaluate(node => node.scrollWidth <= node.clientWidth), true);
+  });
+
+  await t.test("the Trade Notes page shows the full notes and charts without leaving Active Trades", async t => {
+    const body = "## Trade outlook\n\n" + "Context for the next session. ".repeat(14) + "\n\nEnd of write-up";
+    const chart = "/assets/images/market-command-mark.png";
+    const notes = [
+      { id: "shot-1", batch: "batch-1", label: "$BTC\n" + body, outcome: "tp", createdAt: 1700000003000, url: chart },
+      { id: "shot-2", batch: "batch-1", label: "$BTC\n" + body, outcome: "tp", createdAt: 1700000004000, url: chart },
+      { id: "shot-3", label: "$BTC Prior session", outcome: "sl", createdAt: 1700000000000, url: chart },
+    ];
+    const { page } = await open(t, { notes });
+    await page.getByRole("button", { name: /\$BTC/ }).first().click();
+    await page.getByRole("button", { name: /Read full note/ }).click();
+    const reader = page.getByRole("dialog", { name: "Trade note" });
+    await reader.getByText("End of write-up").waitFor();
+    await reader.getByRole("button", { name: "Close note" }).click();
+    const draft = page.getByRole("textbox", { name: "Note for these screenshots" });
+    await draft.fill("Draft in Active Trades");
+    const [notesPage] = await Promise.all([
+      page.context().waitForEvent("page"),
+      page.getByRole("link", { name: /Open full page for Trade Notes/ }).click(),
+    ]);
+    const errors = [];
+    notesPage.on("pageerror", err => errors.push(err.message));
+    await notesPage.getByRole("heading", { name: "Trade notes", exact: true }).waitFor();
+    assert.equal(new URL(notesPage.url()).pathname, "/trade-notes.html");
+    assert.equal(await draft.inputValue(), "Draft in Active Trades");
+
+    const folder = notesPage.getByRole("button", { name: /\$BTC/ }).first();
+    const firstEntry = notesPage.locator(".ts-entry").first();
+    await firstEntry.getByRole("heading", { name: "Trade outlook" }).waitFor();
+    assert.equal(await notesPage.locator("#ts-count").textContent(), "2 entries · 3 images");
+    assert.equal(await firstEntry.getByText("End of write-up").isVisible(), true);
+    assert.equal(await notesPage.locator(".ts-note--clamped").count(), 0);
+    assert.equal(await folder.getAttribute("aria-expanded"), "true");
+    await folder.click();
+    assert.equal(await firstEntry.count(), 0);
+    await folder.click();
+    assert.equal(await firstEntry.locator("img[data-zoomable]").count(), 2);
+    await firstEntry.locator("img[data-zoomable]").first().click();
+    await notesPage.getByRole("dialog", { name: "Image viewer" }).waitFor();
+    await notesPage.keyboard.press("Escape");
+
+    for (const width of [1520, 390, 320]) {
+      await notesPage.setViewportSize({ width, height: 900 });
+      assert.equal(await notesPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+      assert.equal(await notesPage.locator("#ts-list").evaluate(list => getComputedStyle(list).overflowY), "visible");
+      if (screenshotDir && width !== 320) await notesPage.screenshot({ path: path.join(screenshotDir, `trade-notes-${width}.png`) });
+    }
+    await notesPage.getByText("Add a trade note", { exact: true }).click();
+    assert.equal(await notesPage.getByRole("textbox", { name: "Note for these screenshots" }).isVisible(), true);
+    await notesPage.getByRole("link", { name: "Back to Active Trades", exact: true }).click();
+    await notesPage.waitForURL("**/pattern-scanner-trades.html");
+    assert.deepEqual(errors, []);
   });
 });
