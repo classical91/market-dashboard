@@ -147,14 +147,17 @@ test("Trade Context still combines bias, extremes and patterns into one state", 
 });
 
 test("the signal bot's alert vocabulary and transition semantics are unchanged", () => {
-  const telegram = fs.readFileSync(path.join(__dirname, "..", "src/services/telegram.js"), "utf8");
+  const { TelegramService } = require("../src/services/telegram");
   // The wire values still drive the bot; only the label shown to a reader,
   // and the page the Visit: link opens, are presentation. Asserted through
   // the rendered alert rather than the source, so the labels stay pinned
   // wherever the shared map lives.
   const { BIAS_LABELS } = require("../src/services/screener-projections");
   assert.deepEqual(BIAS_LABELS, { LONG: "BULLISH", SHORT: "BEARISH", FLAT: "NEUTRAL" });
-  assert.match(telegram, /dashboardLink\(dashboardUrl, "\/directional-bias\.html"\)/);
+  const telegram = new TelegramService({ dashboardUrl: "https://market-dashboard.example" });
+  const [alert] = telegram.signalAlertMessages([{ symbol: "BTCUSDT", interval: "4h", from: "FLAT", to: "LONG" }]);
+  assert.match(alert, /Bias: <b>BULLISH<\/b>/);
+  assert.match(alert, /Visit: https:\/\/market-dashboard\.example\/directional-bias\.html\?view=alpha/);
 
   const bot = fs.readFileSync(path.join(__dirname, "..", "src/services/signal-bot.js"), "utf8");
   assert.doesNotMatch(bot, /BULLISH|BEARISH|NEUTRAL/, "the bot's state machine stays on LONG/SHORT/FLAT");
