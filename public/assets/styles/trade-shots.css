@@ -474,6 +474,7 @@ html.ts-reader-lock { overflow: hidden; }
 
 .ts-page-content { max-width: 1080px; margin-inline: auto; }
 .ts-page .cmd-page-title { margin: 4px 0 0; font-size: 24px; }
+.ts-page-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-left: auto; }
 .ts-page .ts-count { color: var(--muted, #8892a6); font-size: 13px; }
 .ts-back { color: var(--blue, #4da3ff); font-size: 13px; }
 .ts-page-compose {
@@ -499,6 +500,11 @@ html.ts-reader-lock { overflow: hidden; }
 .ts-page .ts-thumbs .ts-thumb img { aspect-ratio: auto; max-height: 620px; object-fit: contain; }
 .ts-page .ts-note { margin-top: 14px; font-size: 16px; }
 .ts-page .ts-input--note { font-size: 16px; }
+
+.ts-page-content.is-compact { max-width: 760px; }
+.ts-page-content.is-compact .ts-entry { padding: 10px 12px; }
+.ts-page-content.is-compact .ts-thumbs .ts-thumb img { max-height: 320px; }
+.ts-page-content.is-compact .ts-folder-peek { grid-template-columns: repeat(4, minmax(0, 92px)); }
 
 @media (max-width: 600px) {
   .ts-page .ts-thumbs--many { grid-template-columns: 1fr; }

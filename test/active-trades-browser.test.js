@@ -173,6 +173,10 @@ test("Active Trades removal and responsive cards", { skip: !executablePath && "C
 
     const folder = notesPage.getByRole("button", { name: /\$BTC/ }).first();
     const firstEntry = notesPage.locator(".ts-entry").first();
+    await folder.waitFor();
+    assert.equal(await folder.getAttribute("aria-expanded"), "false");
+    assert.equal(await firstEntry.count(), 0);
+    await folder.click();
     await firstEntry.getByRole("heading", { name: "Trade outlook" }).waitFor();
     assert.equal(await notesPage.locator("#ts-count").textContent(), "2 entries · 3 images");
     assert.equal(await firstEntry.getByText("End of write-up").isVisible(), true);
@@ -181,8 +185,27 @@ test("Active Trades removal and responsive cards", { skip: !executablePath && "C
     await folder.click();
     assert.equal(await firstEntry.count(), 0);
     await folder.click();
-    assert.equal(await firstEntry.locator("img[data-zoomable]").count(), 2);
-    await firstEntry.locator("img[data-zoomable]").first().click();
+
+    const compact = notesPage.getByRole("button", { name: "Compact view" });
+    const charts = firstEntry.locator("img[data-zoomable]");
+    const firstChart = charts.first();
+    assert.equal(await charts.count(), 2);
+    await firstChart.evaluate(image => image.decode());
+    const fullCard = await firstEntry.boundingBox();
+    const fullChart = await firstChart.boundingBox();
+    assert.equal(await compact.getAttribute("aria-pressed"), "false");
+    await compact.click();
+    assert.equal(await compact.getAttribute("aria-pressed"), "true");
+    assert.ok((await firstEntry.boundingBox()).width < fullCard.width);
+    assert.ok((await firstChart.boundingBox()).height < fullChart.height);
+
+    await notesPage.reload();
+    await folder.waitFor();
+    assert.equal(await folder.getAttribute("aria-expanded"), "false");
+    assert.equal(await firstEntry.count(), 0);
+    assert.equal(await compact.getAttribute("aria-pressed"), "true");
+    await folder.click();
+    await firstChart.click();
     await notesPage.getByRole("dialog", { name: "Image viewer" }).waitFor();
     await notesPage.keyboard.press("Escape");
 
@@ -192,6 +215,10 @@ test("Active Trades removal and responsive cards", { skip: !executablePath && "C
       assert.equal(await notesPage.locator("#ts-list").evaluate(list => getComputedStyle(list).overflowY), "visible");
       if (screenshotDir && width !== 320) await notesPage.screenshot({ path: path.join(screenshotDir, `trade-notes-${width}.png`) });
     }
+    await notesPage.setViewportSize({ width: 1520, height: 900 });
+    await compact.click();
+    assert.equal(await compact.getAttribute("aria-pressed"), "false");
+    assert.equal((await firstEntry.boundingBox()).width, fullCard.width);
     await notesPage.getByText("Add a trade note", { exact: true }).click();
     assert.equal(await notesPage.getByRole("textbox", { name: "Note for these screenshots" }).isVisible(), true);
     await notesPage.getByRole("link", { name: "Back to Active Trades", exact: true }).click();
