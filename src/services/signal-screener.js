@@ -205,7 +205,7 @@ class SignalScreenerService {
 
   async _fetchKlines(symbol, binanceInterval) {
     const url = `${BINANCE_KLINES_URL}?symbol=${encodeURIComponent(symbol)}&interval=${encodeURIComponent(binanceInterval)}&limit=500`;
-    const res = await fetch(url);
+    const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
     if (!res.ok) {
       throw new Error(`Binance klines HTTP ${res.status} for ${symbol} ${binanceInterval}`);
     }

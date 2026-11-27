@@ -107,6 +107,49 @@ test("classifyWindow detects a falling wedge (converging, both slopes down)", ()
   assert.equal(result.bias, "bullish");
 });
 
+test("a rising wedge that breaks above its upper trendline has bullish breakout bias", () => {
+  const candles = makeZigzagCandles({
+    count: 36, upperStart: 100, upperSlope: 0.15, lowerStart: 90, lowerSlope: 0.35, volume: () => 100,
+  });
+  const opts = {
+    window: 36, pivotOrder: 3, minR2: 0.35, impulseMin: 0.04, breakoutBuffer: 0.002,
+  };
+  candles.at(-1).close = 110;
+  candles.at(-1).high = 110.03;
+  const breakout = classifyWindow(candles, opts);
+  assert.equal(breakout.pattern, "Rising Wedge");
+  assert.equal(breakout.setupBias, "bearish");
+  assert.equal(breakout.bias, "bullish");
+  assert.equal(breakout.status, "breakout");
+  assert.equal(breakout.breakoutCrossed, true);
+
+  candles.at(-2).close = 110;
+  candles.at(-2).high = 110.03;
+  const alreadyOutside = classifyWindow(candles, opts);
+  assert.equal(alreadyOutside.status, "breakout");
+  assert.equal(alreadyOutside.breakoutCrossed, false);
+});
+
+test("scanToken detects flags using the candles before the consolidation window", async (t) => {
+  for (const { start, step, slope, name } of [
+    { start: 90, step: 1, slope: -0.18, name: "Bull Flag" },
+    { start: 130, step: -1, slope: 0.18, name: "Bear Flag" },
+  ]) {
+    const pole = Array.from({ length: 20 }, (_, i) => ({ ...candle(i, start + step * i), volume: 200 }));
+    const consolidation = makeZigzagCandles({
+      count: 36, upperStart: 112, lowerStart: 106, upperSlope: slope, lowerSlope: slope, volume: () => 100,
+    });
+    const rows = [...pole, ...consolidation].map((c, i) => [i, c.open, c.high, c.low, c.close, c.volume, i + 1]);
+    const fetchMock = t.mock.method(global, "fetch", async () => ({ ok: true, json: async () => rows }));
+    const service = new PatternScannerService({ cache: new MemoryCache() });
+    const result = await service.scanToken("BTCUSDT", "1h");
+    assert.equal(result.pattern?.pattern, name);
+    assert.equal(result.pattern.volumeRatio, 0.5);
+    assert.equal(Math.sign(result.pattern.impulseReturnPct), step);
+    fetchMock.mock.restore();
+  }
+});
+
 test("detectDivergence flags a regular bullish divergence (price LL, RSI HL)", () => {
   const result = detectDivergence(makeDivergenceCandles("bullish"), DIVERGENCE_OPTS);
   assert.ok(result, "expected a divergence to be detected");

@@ -7,7 +7,9 @@ const crypto = require("crypto");
 // current price — cheaper than pulling klines when all the tracker needs is
 // "what's it worth now" to resolve a pending pattern/divergence entry.
 async function fetchBinancePrice(symbol) {
-  const res = await fetch(`https://data-api.binance.vision/api/v3/ticker/price?symbol=${encodeURIComponent(symbol)}`);
+  const res = await fetch(`https://data-api.binance.vision/api/v3/ticker/price?symbol=${encodeURIComponent(symbol)}`, {
+    signal: AbortSignal.timeout(10_000),
+  });
   if (!res.ok) throw new Error(`Binance ticker HTTP ${res.status} for ${symbol}`);
   const data = await res.json();
   return Number(data.price);
@@ -509,7 +511,7 @@ function createApp() {
     screenerSettingsService,
     telegramService,
     tradeBridge: signalTradeBridge,
-    stateCache: new PersistentReporterCache(path.join(dataDir, "signal-bot-state.json")),
+    stateCache: new PersistentReporterCache(path.join(dataDir, "signal-bot-state.json"), { strictWrites: true }),
     intervalMs: config.signalBot.intervalMs,
     timeframes: config.signalBot.timeframes,
     minChecks: config.signalBot.minChecks,

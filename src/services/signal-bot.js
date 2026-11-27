@@ -12,8 +12,12 @@
 // Every newly-detected pattern/divergence instance is also logged to the
 // PatternTrackerService with its entry price, so their real-world hit rate
 // can be measured later instead of trusting the heuristics blind.
+const { candleToleranceMs } = require("./data-freshness");
+
 const STATE_TTL_MS = 100 * 365 * 24 * 60 * 60 * 1000;
 const STATE_KEY = "signal-bot:last-signals";
+const DELIVERY_KEY = "pendingTelegram";
+const DELIVERY_TTL_MS = 24 * 60 * 60 * 1000;
 
 class SignalBotService {
   constructor({
@@ -90,7 +94,10 @@ class SignalBotService {
     const transitions = [];
     const symbols = this._universe("directionalBias");
     for (const interval of this._timeframes) {
-      const results = await this._screener.scanAll(interval, this._minChecks, { symbols });
+      const results = await this._screener.scanAll(interval, this._minChecks, { symbols }).catch((err) => {
+        console.error(`[SignalBot] ${interval} Directional scan failed:`, err.message);
+        return [];
+      });
       for (const result of results) {
         if (result.error || !result.signal) continue;
         const key = `${result.symbol}:${interval}`;
@@ -121,55 +128,42 @@ class SignalBotService {
   async _scanPatterns(known, next) {
     if (!this._patternScanner) return [];
     const events = [];
-    const detectedAt = new Date().toISOString();
     const results = await this._patternScanner.scanAll({ symbols: this._universe("patternScanner") });
+    const now = Date.now();
     for (const result of results) {
-      if (result.error) continue;
-      const seenBefore = Object.prototype.hasOwnProperty.call(known, `pattern:${result.symbol}:${result.interval}`);
-      const lastClose = result.chart && result.chart.candles.length
-        ? result.chart.candles[result.chart.candles.length - 1][4]
-        : null;
+      const { symbol, interval, pattern, divergence, candleCloseTime } = result;
+      const maxAge = candleToleranceMs(interval);
+      if (result.error || !Number.isFinite(candleCloseTime)
+        || candleCloseTime > now || now - candleCloseTime > maxAge) continue;
 
-      // Tracker logging shares the exact same trigger as the breakout alert:
-      // a "forming" wedge isn't a completed call yet, so the meaningful
-      // entry moment (and the only one worth backtesting) is the breakout.
-      const patternKey = `pattern:${result.symbol}:${result.interval}`;
-      const patternName = result.pattern ? result.pattern.pattern : null;
-      const patternSig = result.pattern ? `${result.pattern.pattern}:${result.pattern.status}` : null;
-      const priorPatternSig = known[patternKey];
-      next[patternKey] = patternSig;
+      const patternKey = `pattern:${symbol}:${interval}`;
+      const priorCandle = known[patternKey];
+      const seenBefore = Object.prototype.hasOwnProperty.call(known, patternKey);
+      if (typeof priorCandle === "number" && candleCloseTime <= priorCandle) continue;
+      next[patternKey] = candleCloseTime;
 
-      if (seenBefore && patternSig && patternSig.endsWith(":breakout") && patternSig !== priorPatternSig) {
-        events.push({ symbol: result.symbol, interval: result.interval, kind: "breakout", name: patternName, bias: result.pattern.bias, score: result.pattern.score });
-        if (lastClose != null) {
-          this._tracker?.log({
-            symbol: result.symbol,
-            interval: result.interval,
-            kind: "pattern",
-            name: patternName,
-            bias: result.pattern.bias,
-            entryPrice: lastClose,
-            detectedAt,
-          });
-        }
+      const lastClose = result.chart?.candles.at(-1)?.[4] ?? null;
+      if (seenBefore && pattern?.breakoutCrossed && priorCandle !== `${pattern.pattern}:breakout`) {
+        events.push({
+          symbol, interval, kind: "breakout", name: pattern.pattern, bias: pattern.bias,
+          score: pattern.score, entryPrice: lastClose, candleCloseTime,
+        });
       }
 
-      const divKey = `divergence:${result.symbol}:${result.interval}`;
-      const divName = result.divergence ? result.divergence.type : null;
-      const priorDivName = known[divKey];
-      next[divKey] = divName;
-
-      if (seenBefore && divName && divName !== priorDivName && lastClose != null) {
-        this._tracker?.log({
-          symbol: result.symbol,
-          interval: result.interval,
-          kind: "divergence",
-          name: divName,
-          bias: result.divergence.bias,
-          entryPrice: lastClose,
-          detectedAt,
+      if (!divergence?.pivotTimes?.every(Number.isFinite) || divergence.pivotTimes.length !== 2) continue;
+      const divKey = `divergence:${symbol}:${interval}`;
+      const priorDivergences = known[divKey];
+      const pivotsByType = priorDivergences && typeof priorDivergences === "object" ? priorDivergences : {};
+      const priorPivot = pivotsByType[divergence.type]?.[1];
+      if (priorPivot != null && divergence.pivotTimes[1] <= priorPivot) continue;
+      next[divKey] = { ...pivotsByType, [divergence.type]: divergence.pivotTimes };
+      // The old state stored a type string. Seed its pivot on upgrade without
+      // repeating an alert the old bot may have sent for this same divergence.
+      if (seenBefore && priorDivergences !== divergence.type) {
+        events.push({
+          symbol, interval, kind: "divergence", name: divergence.type, bias: divergence.bias,
+          entryPrice: lastClose, candleCloseTime,
         });
-        events.push({ symbol: result.symbol, interval: result.interval, kind: "divergence", name: divName, bias: result.divergence.bias });
       }
     }
     return events;
@@ -188,11 +182,44 @@ class SignalBotService {
     }
   }
 
-  /**
-   * One scan cycle: screener + pattern scans, diffed against persisted
-   * state, alerted, tracker-logged, then the new state persisted. Exposed
-   * for tests and returns everything it alerted.
-   */
+  _saveState(state) {
+    this._stateCache.set(STATE_KEY, state, STATE_TTL_MS);
+  }
+
+  async _deliverPending(state) {
+    if (!this._telegram?.configured) return;
+    const now = Date.now();
+    const deferredTargets = new Set();
+    for (const delivery of state[DELIVERY_KEY]) {
+      if (now - delivery.queuedAt >= DELIVERY_TTL_MS) {
+        console.warn("[SignalBot] Expired an undelivered Telegram alert");
+      } else if (deferredTargets.has(delivery.targetKey) || delivery.retryAt > now) {
+        deferredTargets.add(delivery.targetKey);
+        continue;
+      } else {
+        try {
+          const sent = await this._telegram.sendAlertDelivery(delivery);
+          if (!sent) console.warn("[SignalBot] Dropped an alert for a removed Telegram destination");
+        } catch (err) {
+          const status = err.telegramStatus;
+          console.error(`[SignalBot] Telegram alert failed (${status || "transport error"})`);
+          if (!status || status === 429 || status >= 500) {
+            deferredTargets.add(delivery.targetKey);
+            const retryAt = Date.now() + Math.max(0, err.retryAfterMs || 0);
+            const pending = state[DELIVERY_KEY].map((entry) => (
+              entry === delivery ? { ...entry, retryAt } : entry
+            ));
+            state = { ...state, [DELIVERY_KEY]: pending };
+            this._saveState(state);
+            continue;
+          }
+        }
+      }
+      state = { ...state, [DELIVERY_KEY]: state[DELIVERY_KEY].filter((entry) => entry !== delivery) };
+      this._saveState(state);
+    }
+  }
+
   async runOnce() {
     if (this._running) return { screenerTransitions: [], patternEvents: [], tradeActions: [] }; // a slow cycle shouldn't stack another on top
     this._running = true;
@@ -200,13 +227,46 @@ class SignalBotService {
       const known = this._stateCache.get(STATE_KEY) || {};
       const next = { ...known };
 
-      const screenerTransitions = await this._scanScreener(next);
-      const patternEvents = await this._scanPatterns(known, next);
+      const screenerTransitions = await this._scanScreener(next).catch((err) => {
+        console.error("[SignalBot] Directional scan failed:", err.message);
+        return [];
+      });
+      const patternEvents = await this._scanPatterns(known, next).catch((err) => {
+        console.error("[SignalBot] Pattern scan failed:", err.message);
+        return [];
+      });
 
-      this._stateCache.set(STATE_KEY, next, STATE_TTL_MS);
+      const queuedAt = Date.now();
+      const queue = (messages) => this._telegram.alertDeliveries(messages).map((entry) => ({ ...entry, queuedAt }));
+      const pending = (known[DELIVERY_KEY] || []).slice();
+      const hasTelegram = this._telegram?.configured;
+      if (hasTelegram && patternEvents.length) {
+        pending.push(...queue(this._telegram.patternAlertMessages(patternEvents)));
+      }
+      const signalDeliveries = (tradeActions) => hasTelegram && screenerTransitions.length
+        ? queue(this._telegram.signalAlertMessages(screenerTransitions, tradeActions))
+        : [];
+
+      // Commit the market state and the new alerts together before sending them
+      // or acting on a Directional Bias transition in the Trading Lab.
+      let state = { ...next, [DELIVERY_KEY]: [...pending, ...signalDeliveries([])] };
+      this._saveState(state);
+      if (this._tracker) {
+        const detectedAt = new Date(queuedAt).toISOString();
+        for (const { symbol, interval, kind, name, bias, entryPrice } of patternEvents) {
+          if (entryPrice != null) {
+            this._tracker.log({
+              symbol, interval, kind: kind === "breakout" ? "pattern" : kind, name, bias, entryPrice, detectedAt,
+            });
+          }
+        }
+      }
       const tradeActions = await this._runBridge(screenerTransitions);
-      if (screenerTransitions.length) await this._telegram.postSignalAlerts(screenerTransitions, tradeActions);
-      if (patternEvents.length) await this._telegram.postPatternAlerts(patternEvents);
+      if (hasTelegram && tradeActions.length && screenerTransitions.length) {
+        state = { ...state, [DELIVERY_KEY]: [...pending, ...signalDeliveries(tradeActions)] };
+        this._saveState(state);
+      }
+      await this._deliverPending(state);
       if (this._tracker) {
         await this._tracker.resolveDue().catch((err) => console.error("[SignalBot] resolveDue failed:", err.message));
       }
