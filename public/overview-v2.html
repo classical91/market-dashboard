@@ -355,7 +355,18 @@
         <div><h2 id="ov2-module-ta">Technical Ratings &middot; TradingView</h2><p>Oscillator &amp; moving-average ratings &mdash; TradingView's own, not this dashboard's analysis. For crypto direction, see <a class="ov-ta-link" href="/directional-bias.html">Directional Bias</a>.</p></div>
         <span class="ov-ta-tag" title="Third-party ratings from TradingView, not computed by this dashboard">Third-party</span>
       </div>
-      <div class="ov-ta-grid">
+      <div class="ov-ta-picker" id="ov-ta-picker" role="group" aria-label="Choose a ticker">
+        <button type="button" data-ta-ticker="all" aria-pressed="true" class="is-active">All &middot; 1H</button>
+        <button type="button" data-ta-ticker="BTC" aria-pressed="false">BTC</button>
+        <button type="button" data-ta-ticker="ETH" aria-pressed="false">ETH</button>
+        <button type="button" data-ta-ticker="SOL" aria-pressed="false">SOL</button>
+        <button type="button" data-ta-ticker="SPY" aria-pressed="false">SPY</button>
+        <button type="button" data-ta-ticker="QQQ" aria-pressed="false">QQQ</button>
+        <button type="button" data-ta-ticker="NDX" aria-pressed="false">Nasdaq 100</button>
+        <button type="button" data-ta-ticker="DXY" aria-pressed="false">DXY</button>
+        <span class="ov-ta-picker-note" id="ov-ta-picker-note" aria-live="polite">Tap a ticker to see it on every timeframe.</span>
+      </div>
+      <div class="ov-ta-grid" id="ov-ta-grid">
         <div class="ov-ta-item">
           <div class="ov-ta-symbol">BTCUSDT</div>
           <div class="ov-ta-body">
@@ -412,6 +423,17 @@
           </div>
         </div>
         <div class="ov-ta-item">
+          <div class="ov-ta-symbol">NASDAQ 100</div>
+          <div class="ov-ta-body">
+            <div class="tradingview-widget-container">
+              <div class="tradingview-widget-container__widget"></div>
+              <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js" async>
+              { "interval": "1h", "width": "100%", "isTransparent": false, "height": "100%", "symbol": "NASDAQ:NDX", "showIntervalTabs": true, "displayMode": "single", "locale": "en", "colorTheme": "dark" }
+              </script>
+            </div>
+          </div>
+        </div>
+        <div class="ov-ta-item">
           <div class="ov-ta-symbol">DXY</div>
           <div class="ov-ta-body">
             <div class="tradingview-widget-container">
@@ -445,6 +467,7 @@
 <script src="/assets/js/overview-v2-reports.js"></script>
 <script src="/assets/js/overview-v2-notes.js"></script>
 <script src="/assets/js/overview-btc-research.js"></script>
+<script src="/assets/js/overview-v2-ta.js"></script>
 <script src="/assets/js/ui.js"></script>
 <script src="/assets/js/oi-wedges.js"></script>
 <script src="/assets/js/cross-market-oi.js"></script>
