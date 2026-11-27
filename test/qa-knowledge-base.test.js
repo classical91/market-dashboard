@@ -18,9 +18,12 @@ test("catalogue holds 20 categories and 286 unique questions", () => {
   assert.strictEqual(new Set(allQuestions.map(slug)).size, allQuestions.length, "two questions share a deep-link id");
 });
 
-test("every answer is for a listed question and follows the entry format", () => {
+test("every listed question has an answer in the expected format", () => {
   const known = new Set(allQuestions);
   const glossaryIds = new Set(glossary.ALL_GLOSSARY.map((e) => e.id));
+  for (const question of known) {
+    assert.ok(Object.hasOwn(ANSWERS, question), `missing answer: ${question}`);
+  }
   for (const [question, a] of Object.entries(ANSWERS)) {
     assert.ok(known.has(question), `answer for unlisted question: ${question}`);
     assert.ok(["Beginner", "Intermediate", "Advanced"].includes(a.level), `${question}: bad level`);
@@ -30,6 +33,9 @@ test("every answer is for a listed question and follows the entry format", () =>
     for (const r of a.related || []) assert.ok(known.has(r), `${question}: related "${r}" is not in the catalogue`);
     for (const id of a.glossary || []) assert.ok(glossaryIds.has(id), `${question}: unknown glossary id ${id}`);
     for (const w of a.widgets || []) assert.ok(w.href.startsWith("/") && w.label, `${question}: widget needs a local href and label`);
+    for (const source of a.sources || []) {
+      assert.ok(new URL(source.href).protocol === "https:" && source.label, `${question}: source needs an HTTPS URL and label`);
+    }
     if (a.table) {
       for (const row of a.table.rows) assert.strictEqual(row.length, a.table.head.length, `${question}: table row width`);
     }

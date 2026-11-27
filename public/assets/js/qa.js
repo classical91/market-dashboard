@@ -186,7 +186,7 @@
       html += relatedSection(sameCategory(entry), "More in " + entry.category.name);
     } else {
       html += section("Definition", "<p>" + esc(a.definition) + "</p>");
-      if (a.table) html += section("Typical relationships", tableHtml(a.table));
+      if (a.table) html += section(a.table.title || "Typical relationships", tableHtml(a.table));
       html += section("Trading application", "<p>" + esc(a.application) + "</p>");
       html += section("Important limitation", "<p>" + esc(a.limitation) + "</p>", "qa-limit");
       html += relatedSection((a.related || []).map(function (t) { return BY_TEXT[t]; }).filter(Boolean), "Related questions");
@@ -198,6 +198,11 @@
       if (a.glossary && a.glossary.length) {
         html += section("Glossary", '<div class="qa-links">' + a.glossary.map(function (id) {
           return '<a class="qa-link" href="/concept.html?id=' + encodeURIComponent(id) + '">' + esc(humanize(id)) + "</a>";
+        }).join("") + "</div>");
+      }
+      if (a.sources && a.sources.length) {
+        html += section("Sources", '<div class="qa-links">' + a.sources.map(function (source) {
+          return '<a class="qa-link" href="' + esc(source.href) + '" target="_blank" rel="noopener noreferrer">' + esc(source.label) + "</a>";
         }).join("") + "</div>");
       }
     }
