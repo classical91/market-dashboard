@@ -32,6 +32,24 @@ const BINANCE_INTERVAL = {
 // display interval is another.
 const SCAN_INTERVALS = ["1h", "4h", "1D"];
 
+// Binance answers 429 when a client exceeds its request weight and 418 once
+// it keeps going after that (an IP ban). Both carry Retry-After in seconds.
+const RATE_LIMIT_STATUSES = new Set([429, 418]);
+
+// Request-pacing knobs, kept apart from DEFAULTS (which tune detection).
+const FETCH_DEFAULTS = {
+  // HTTP requests to Binance in flight at once, across every caller of this
+  // service (scanAll, trade context, the route), not per scanAll call.
+  concurrency: 6,
+  // Retries after a 429/418 before the job reports the error.
+  maxRetries: 2,
+  // Backoff when the response has no usable Retry-After.
+  retryBaseMs: 1000,
+  // A Retry-After longer than this (418 bans run minutes to days) fails the
+  // job at once instead of holding a page request open.
+  maxRetryWaitMs: 30_000,
+};
+
 const DEFAULTS = {
   window: 36,
   impulseWindow: 20,
@@ -256,12 +274,73 @@ function build(pattern, setupBias, direction, crossed, r2, widthRatio, impulseRe
   };
 }
 
+/**
+ * Minimal promise semaphore: run(fn) starts fn once fewer than `max` runs are
+ * active, in FIFO order. No dependency; enough for pacing one HTTP client.
+ */
+function createLimiter(max) {
+  const limit = Math.max(1, Math.floor(Number(max)) || 1);
+  let active = 0;
+  const queue = [];
+  const next = () => {
+    if (active >= limit || !queue.length) return;
+    active += 1;
+    const { fn, resolve, reject } = queue.shift();
+    Promise.resolve()
+      .then(fn)
+      .then(resolve, reject)
+      .finally(() => {
+        active -= 1;
+        next();
+      });
+  };
+  return {
+    run(fn) {
+      return new Promise((resolve, reject) => {
+        queue.push({ fn, resolve, reject });
+        next();
+      });
+    },
+    get active() {
+      return active;
+    },
+  };
+}
+
+// Retry-After is either delta-seconds or an HTTP date. Returns ms, or null
+// when the header is absent or unparseable.
+function parseRetryAfter(value, now = Date.now()) {
+  if (value == null || value === "") return null;
+  const text = String(value).trim();
+  if (/^\d+(\.\d+)?$/.test(text)) return Math.round(Number(text) * 1000);
+  const at = Date.parse(text);
+  return Number.isFinite(at) ? Math.max(0, at - now) : null;
+}
+
+function readHeader(res, name) {
+  const headers = res && res.headers;
+  if (!headers) return null;
+  if (typeof headers.get === "function") return headers.get(name);
+  return headers[name] ?? headers[name.toLowerCase()] ?? null;
+}
+
+const defaultSleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 class PatternScannerService {
-  constructor({ cache, cacheMs, tokens, options } = {}) {
+  constructor({ cache, cacheMs, tokens, options, fetchOptions, sleep } = {}) {
     this._cache = cache;
     this._cacheMs = cacheMs || 5 * 60 * 1000;
     this._tokens = tokens || [];
     this._options = { ...DEFAULTS, ...(options || {}) };
+    this._fetchOptions = { ...FETCH_DEFAULTS, ...(fetchOptions || {}) };
+    this._limiter = createLimiter(this._fetchOptions.concurrency);
+    this._sleep = sleep || defaultSleep;
+    // One shared cooldown: after a 429/418 every queued request waits it
+    // out, rather than each job spending its own request to learn the same.
+    this._rateLimitedUntil = 0;
+    // scanToken loads in flight, by cache key, so an overlapping caller
+    // (forced or not) awaits the same fetch instead of duplicating it.
+    this._inflight = new Map();
   }
 
   async _fetchKlines(pair, binanceInterval) {
@@ -269,11 +348,39 @@ class PatternScannerService {
     // of the pattern window still have valid RSI values to compare.
     const limit = this._options.window + this._options.impulseWindow + this._options.pivotOrder * 2 + this._options.rsiLen + 5;
     const url = `${BINANCE_KLINES_URL}?symbol=${encodeURIComponent(pair)}&interval=${encodeURIComponent(binanceInterval)}&limit=${limit}`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+    const { maxRetries, retryBaseMs, maxRetryWaitMs } = this._fetchOptions;
+    let res;
+    let rows;
+    for (let attempt = 0; ; attempt++) {
+      // The slot covers the body read too: the connection is still open
+      // until the JSON has arrived.
+      ({ res, rows } = await this._limiter.run(async () => {
+        const wait = this._rateLimitedUntil - Date.now();
+        // During a long ban, report it instead of waiting it out or sending
+        // more requests (Binance lengthens bans for clients that keep going).
+        if (wait > maxRetryWaitMs) {
+          throw new Error(`Binance klines rate limited for ${pair} ${binanceInterval} (cooling down ${Math.ceil(wait / 1000)}s)`);
+        }
+        if (wait > 0) await this._sleep(wait);
+        const response = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+        return { res: response, rows: response.ok ? await response.json() : null };
+      }));
+      if (!RATE_LIMIT_STATUSES.has(res.status)) break;
+
+      const retryAfterMs = parseRetryAfter(readHeader(res, "retry-after"));
+      const waitMs = retryAfterMs ?? retryBaseMs * 2 ** attempt;
+      this._rateLimitedUntil = Math.max(this._rateLimitedUntil, Date.now() + waitMs);
+      if (attempt >= maxRetries || waitMs > maxRetryWaitMs) {
+        const hint = retryAfterMs != null ? ` (retry after ${Math.ceil(retryAfterMs / 1000)}s)` : "";
+        throw new Error(`Binance klines rate limited HTTP ${res.status} for ${pair} ${binanceInterval}${hint}`);
+      }
+      // Sleep outside the limiter so a waiting retry doesn't hold a slot;
+      // the cooldown above already holds every other request back.
+      await this._sleep(waitMs);
+    }
     if (!res.ok) {
       throw new Error(`Binance klines HTTP ${res.status} for ${pair} ${binanceInterval}`);
     }
-    const rows = await res.json();
     return rows.map((row) => ({
       openTime: row[0],
       open: Number(row[1]),
@@ -339,7 +446,7 @@ class PatternScannerService {
       };
     };
     try {
-      const result = force ? await this._cache.set(key, await load(), this._cacheMs) : await this._cache.getOrLoad(key, this._cacheMs, load);
+      const result = await this._loadShared(key, force, load);
       // The raw geometry (trendline endpoints, pivot indices) lives on
       // result.chart in rebased coordinates; don't also ship it inside the
       // pattern/divergence summaries.
@@ -359,6 +466,22 @@ class PatternScannerService {
     } catch (err) {
       return { symbol: pair, label, interval, pattern: null, divergence: null, error: err.message };
     }
+  }
+
+  // A forced refresh bypasses the cache but not a load already in flight: if
+  // one is running for this key, every caller awaits it.
+  _loadShared(key, force, load) {
+    const pending = this._inflight.get(key);
+    if (pending) return pending;
+    const promise = Promise.resolve()
+      .then(() => (force
+        ? load().then((value) => this._cache.set(key, value, this._cacheMs))
+        : this._cache.getOrLoad(key, this._cacheMs, load)))
+      .finally(() => {
+        if (this._inflight.get(key) === promise) this._inflight.delete(key);
+      });
+    this._inflight.set(key, promise);
+    return promise;
   }
 
   get scanIntervals() {
@@ -390,6 +513,10 @@ class PatternScannerService {
     return resolved;
   }
 
+  // Every job starts at once, but each one's HTTP goes through the shared
+  // limiter in _fetchKlines, so at most fetchOptions.concurrency requests are
+  // in flight however large the universe (or however many scans overlap).
+  // Results keep job order; a failed job resolves to { symbol, interval, error }.
   async scanAll({ force, symbols } = {}) {
     const jobs = [];
     for (const pair of this._resolveSymbols(symbols)) {
@@ -401,4 +528,4 @@ class PatternScannerService {
   }
 }
 
-module.exports = { PatternScannerService, classifyWindow, detectDivergence, findPivots, linearRegression, SCAN_INTERVALS };
+module.exports = { PatternScannerService, createLimiter, parseRetryAfter, classifyWindow, detectDivergence, findPivots, linearRegression, SCAN_INTERVALS };

@@ -267,3 +267,135 @@ test("a scan reports the closed candle it ran on alongside when it ran", async (
     global.fetch = originalFetch;
   }
 });
+
+// --- Request pacing: concurrency cap, in-flight coalescing, rate limits ---
+
+function flatKlineRows() {
+  const rows = [];
+  for (let i = 0; i < 90; i++) rows.push([i * 3600000, "100", "100.3", "99.7", "100", "100", i * 3600000 + 3599999]);
+  return rows;
+}
+
+function urlKey(url) {
+  const u = new URL(url);
+  return `${u.searchParams.get("symbol")}:${u.searchParams.get("interval")}`;
+}
+
+test("scanAll never has more Binance requests in flight than the concurrency cap", async (t) => {
+  let inFlight = 0;
+  let maxInFlight = 0;
+  let calls = 0;
+  t.mock.method(global, "fetch", async () => {
+    calls += 1;
+    inFlight += 1;
+    maxInFlight = Math.max(maxInFlight, inFlight);
+    await new Promise((resolve) => setTimeout(resolve, 2));
+    inFlight -= 1;
+    return { ok: true, status: 200, json: async () => flatKlineRows() };
+  });
+  const tokens = Array.from({ length: 20 }, (_, i) => `T${i}USDT`);
+  const service = new PatternScannerService({ cache: new MemoryCache(), tokens, fetchOptions: { concurrency: 4 } });
+  // Two overlapping scans with different universes still share one cap.
+  const [all, extra] = await Promise.all([
+    service.scanAll({ force: true }),
+    service.scanAll({ force: true, symbols: ["X1USDT", "X2USDT", "X3USDT"] }),
+  ]);
+  assert.equal(all.length, 20 * SCAN_INTERVALS.length);
+  assert.equal(extra.length, 3 * SCAN_INTERVALS.length);
+  assert.equal(calls, 23 * SCAN_INTERVALS.length);
+  assert.ok(maxInFlight <= 4, `max in flight was ${maxInFlight}`);
+  assert.equal(maxInFlight, 4, "the cap should actually be used");
+  // Job order is preserved: symbol-major, then SCAN_INTERVALS order.
+  assert.deepEqual(
+    all.slice(0, 4).map((r) => `${r.symbol}:${r.interval}`),
+    ["T0USDT:1h", "T0USDT:4h", "T0USDT:1D", "T1USDT:1h"],
+  );
+  assert.ok(all.every((r) => !r.error));
+});
+
+test("overlapping forced scans fetch each symbol/interval once", async (t) => {
+  const perKey = new Map();
+  t.mock.method(global, "fetch", async (url) => {
+    const key = urlKey(url);
+    perKey.set(key, (perKey.get(key) || 0) + 1);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    return { ok: true, status: 200, json: async () => flatKlineRows() };
+  });
+  const service = new PatternScannerService({ cache: new MemoryCache(), tokens: ["BTCUSDT", "ETHUSDT"] });
+  const [a, b, c] = await Promise.all([
+    service.scanAll({ force: true }),
+    service.scanAll({ force: true }),
+    service.scanToken("BTCUSDT", "4h"),
+  ]);
+  assert.equal(perKey.size, 2 * SCAN_INTERVALS.length);
+  for (const [key, count] of perKey) assert.equal(count, 1, `${key} fetched ${count} times`);
+  assert.deepEqual(a.map((r) => r.symbol + r.interval), b.map((r) => r.symbol + r.interval));
+  assert.ok(!c.error);
+
+  // Once the first load settles, a new forced refresh fetches again.
+  await service.scanToken("BTCUSDT", "4h", { force: true });
+  assert.equal(perKey.get("BTCUSDT:4h"), 2);
+});
+
+test("a 429 respects Retry-After, pauses other requests, and is retried", async (t) => {
+  const sleeps = [];
+  let calls = 0;
+  t.mock.method(global, "fetch", async () => {
+    calls += 1;
+    if (calls === 1) return { ok: false, status: 429, headers: new Headers({ "Retry-After": "2" }), json: async () => ({}) };
+    return { ok: true, status: 200, json: async () => flatKlineRows() };
+  });
+  const service = new PatternScannerService({
+    cache: new MemoryCache(),
+    tokens: ["BTCUSDT"],
+    fetchOptions: { concurrency: 1 },
+    sleep: async (ms) => { sleeps.push(ms); },
+  });
+  const results = await service.scanAll();
+  assert.ok(results.every((r) => !r.error), JSON.stringify(results.map((r) => r.error)));
+  assert.equal(calls, 1 + SCAN_INTERVALS.length, "only the rate-limited job is re-requested");
+  assert.ok(sleeps.length >= 1);
+  assert.ok(sleeps.every((ms) => ms > 0 && ms <= 2000), `sleeps: ${sleeps}`);
+  assert.equal(sleeps[0] > 1500, true, "the first wait follows Retry-After");
+});
+
+test("a persistent 429 is reported on that job only", async (t) => {
+  t.mock.method(global, "fetch", async (url) => {
+    if (urlKey(url) === "BTCUSDT:1h") return { ok: false, status: 429, headers: new Headers(), json: async () => ({}) };
+    return { ok: true, status: 200, json: async () => flatKlineRows() };
+  });
+  const sleeps = [];
+  const service = new PatternScannerService({
+    cache: new MemoryCache(),
+    tokens: ["BTCUSDT", "ETHUSDT"],
+    fetchOptions: { maxRetries: 2, retryBaseMs: 10 },
+    sleep: async (ms) => { sleeps.push(ms); },
+  });
+  const results = await service.scanAll();
+  assert.equal(results.length, 2 * SCAN_INTERVALS.length);
+  const failed = results.filter((r) => r.error);
+  assert.deepEqual(failed.map((r) => `${r.symbol}:${r.interval}`), ["BTCUSDT:1h"]);
+  assert.match(failed[0].error, /rate limited HTTP 429/);
+  assert.equal(failed[0].pattern, null);
+  assert.equal(global.fetch.mock.calls.filter((c) => urlKey(c.arguments[0]) === "BTCUSDT:1h").length, 3);
+});
+
+test("a long 418 ban fails fast per job and stops further requests", async (t) => {
+  t.mock.method(global, "fetch", async (url) => {
+    if (urlKey(url) === "BTCUSDT:1h") return { ok: false, status: 418, headers: new Headers({ "Retry-After": "600" }), json: async () => ({}) };
+    return { ok: true, status: 200, json: async () => flatKlineRows() };
+  });
+  const sleeps = [];
+  const service = new PatternScannerService({
+    cache: new MemoryCache(),
+    tokens: ["BTCUSDT", "ETHUSDT"],
+    fetchOptions: { concurrency: 1 },
+    sleep: async (ms) => { sleeps.push(ms); },
+  });
+  const results = await service.scanAll();
+  assert.equal(results.length, 2 * SCAN_INTERVALS.length);
+  assert.match(results[0].error, /rate limited HTTP 418.*retry after 600s/);
+  for (const r of results.slice(1)) assert.match(r.error, /cooling down/, `${r.symbol}:${r.interval}`);
+  assert.equal(global.fetch.mock.calls.length, 1, "no request is sent during the ban");
+  assert.deepEqual(sleeps, [], "a ban longer than maxRetryWaitMs is never waited out");
+});
