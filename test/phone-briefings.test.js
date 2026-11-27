@@ -50,6 +50,13 @@ test("a briefing is stored per desk, newest first, and retries are not duplicate
   assert.equal(summary[1].latest, null);
 });
 
+test("ChatGPT citation markers are stripped from stored text", () => {
+  const store = newStore();
+  const marked = "BTC ~$60,700 \uE200cite\uE202turn683609search10\uE202turn683609search11\uE201\n\nciteturn683609search13";
+  assert.equal(store.receive("btc-analytics", { text: marked }).entry.text, "BTC ~$60,700");
+  assert.equal(store.receive("crypto", { text: "Excited citers recite" }).entry.text, "Excited citers recite");
+});
+
 test("BTC Analytics and Market Dominance reports are kept as their own categories", () => {
   const store = newStore();
   assert.equal(store.receive("btc-analytics", { text: "BTC above the 200D" }).entry.category, "btc-analytics");
