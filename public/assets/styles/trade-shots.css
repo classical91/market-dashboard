@@ -146,6 +146,49 @@
 }
 .ts-ticker--active { background: rgba(121, 242, 192, 0.14); color: #79f2c0; }
 .ts-ticker--none { color: #8892a6; font-weight: 600; }
+/* Outcome sticker beside the ticker: how the trade ended. Slightly tilted so it
+   reads as a sticker slapped on the note, not another ticker chip. */
+.ts-sticker {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transform: rotate(-4deg);
+}
+.ts-sticker--tp { background: rgba(121, 242, 192, 0.14); color: #79f2c0; }
+.ts-sticker--sl { background: rgba(255, 93, 93, 0.14); color: #ff8b7b; }
+.ts-sticker--liquidated { background: rgba(190, 120, 255, 0.16); color: #d4a6ff; }
+.ts-folder-head .ts-sticker { flex: none; }
+
+.ts-outcome-menu { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.ts-outcome-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid rgba(137, 158, 196, 0.25);
+  border-radius: 999px;
+  background: transparent;
+  color: #c4cad6;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.ts-outcome-opt:hover { background: rgba(137, 146, 166, 0.14); color: #fff; }
+.ts-outcome-opt--tp[aria-pressed="true"] { border-color: #79f2c0; background: rgba(121, 242, 192, 0.14); color: #79f2c0; }
+.ts-outcome-opt--sl[aria-pressed="true"] { border-color: #ff8b7b; background: rgba(255, 93, 93, 0.14); color: #ff8b7b; }
+.ts-outcome-opt--liquidated[aria-pressed="true"] { border-color: #d4a6ff; background: rgba(190, 120, 255, 0.16); color: #d4a6ff; }
+.ts-outcome-opt:focus-visible { outline: 2px solid var(--blue, #4da3ff); outline-offset: 1px; }
+.ts-icon.is-on { background: rgba(137, 146, 166, 0.14); color: #fff; }
+
 .ts-live { width: 6px; height: 6px; border-radius: 50%; background: #79f2c0; box-shadow: 0 0 0 2px rgba(121, 242, 192, 0.2); }
 .ts-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 

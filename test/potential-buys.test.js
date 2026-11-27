@@ -168,3 +168,48 @@ test("a ticker goes on its own line above a multi-line note, keeping its heading
   assert.equal(withTicker("btc", "one-line note"), "$BTC one-line note");
   assert.deepEqual(extractTags("$BTC\n## Heading #1 and $61,717"), ["BTC"]);
 });
+
+test("trade notes record how a trade ended; outcome-only changes keep the label", () => {
+  const { store: notes } = makeStore({ name: "active-trade-shots", outcomes: true });
+  const item = notes.add(PNG, { label: "$BTC long from 60k" });
+  assert.equal(item.outcome, undefined);
+
+  const tp = notes.update(item.id, { outcome: "TP" });
+  assert.equal(tp.outcome, "tp");
+  assert.equal(tp.label, "$BTC long from 60k");
+  assert.equal(notes.update(item.id, { outcome: "liquidated" }).outcome, "liquidated");
+  // A relabel alone keeps the outcome.
+  assert.equal(notes.update(item.id, { label: "$BTC long, closed" }).outcome, "liquidated");
+  assert.equal(notes.update(item.id, { outcome: "" }).outcome, undefined);
+  assert.equal(notes.list()[0].label, "$BTC long, closed");
+
+  assert.throws(() => notes.update(item.id, { outcome: "breakeven" }), { statusCode: 400 });
+  // Potential Buys doesn't track trades.
+  const { store: buys } = makeStore();
+  assert.throws(() => buys.update(buys.add(PNG).id, { outcome: "tp" }), { statusCode: 400 });
+});
+
+test("the API sets and clears a trade note's outcome", async (t) => {
+  const { store } = makeStore({ name: "active-trade-shots", outcomes: true });
+  const app = express();
+  app.use(express.json());
+  app.use("/api/active-trade-shots", createPotentialBuysRouter({ potentialBuysStore: store }));
+  app.use((err, req, res, next) => res.status(err.statusCode || err.status || 500).json({ error: err.message }));
+  const server = await new Promise((resolve) => {
+    const s = app.listen(0, "127.0.0.1", () => resolve(s));
+  });
+  t.after(() => server.close());
+  const base = `http://127.0.0.1:${server.address().port}/api/active-trade-shots`;
+  const item = store.add(PNG, { label: "$SOL short" });
+  const patch = (body) => fetch(`${base}/${item.id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  const sl = await (await patch({ outcome: "sl" })).json();
+  assert.equal(sl.item.outcome, "sl");
+  assert.equal(sl.item.label, "$SOL short");
+  assert.equal((await patch({ outcome: "moon" })).status, 400);
+  assert.equal((await (await patch({ outcome: "" })).json()).item.outcome, undefined);
+});

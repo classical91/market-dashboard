@@ -155,6 +155,19 @@ function summarize(items, now = Date.now()) {
   };
 }
 
+/**
+ * How a trade ended, for collections that track trades (Active Trades'
+ * notes): take profit, stop loss, or liquidated. "" clears it.
+ */
+const OUTCOMES = ["tp", "sl", "liquidated"];
+
+function normalizeOutcome(value) {
+  if (value === null || value === "") return "";
+  const clean = typeof value === "string" ? value.trim().toLowerCase() : value;
+  if (!OUTCOMES.includes(clean)) throw httpError(`outcome must be one of ${OUTCOMES.join(", ")}, or empty to clear it`, 400);
+  return clean;
+}
+
 function normalizeLabel(value, maxChars = MAX_LABEL_CHARS) {
   if (value === undefined || value === null) return "";
   if (typeof value !== "string") throw httpError("label must be text", 400);
@@ -166,7 +179,8 @@ class PotentialBuysStore {
    * `name` picks the folder and JSON file under DATA_DIR and `title` the
    * name used in error messages, so another page (Active Trades' screenshot
    * notes) can keep its own separate collection with the same rules.
-   * `maxLabelChars` lets that collection take longer notes.
+   * `maxLabelChars` lets that collection take longer notes, and
+   * `outcomes` lets each screenshot record how its trade ended (TP/SL/liquidated).
    */
   constructor({
     dataDir,
@@ -174,6 +188,7 @@ class PotentialBuysStore {
     title = "Potential Buys",
     urlPrefix = "/potential-buys-images",
     maxLabelChars = MAX_LABEL_CHARS,
+    outcomes = false,
     now = () => Date.now(),
     logger = console,
   }) {
@@ -182,6 +197,7 @@ class PotentialBuysStore {
     this.title = title;
     this.urlPrefix = urlPrefix;
     this.maxLabelChars = maxLabelChars;
+    this.outcomes = outcomes;
     this.now = now;
     this.logger = logger;
     this._lock = { depth: 0 };
@@ -323,16 +339,33 @@ class PotentialBuysStore {
     return sniffed;
   }
 
-  /** Change a screenshot's label (ticker, note). */
-  update(id, { label }) {
+  /**
+   * Change a screenshot's label (ticker, note) and, where the collection
+   * tracks trades, its outcome. An outcome-only change (`label` undefined)
+   * leaves the label as it is.
+   */
+  update(id, { label, outcome } = {}) {
     if (!isPotentialBuyId(id)) throw httpError("Unknown screenshot id.", 400);
-    const cleanLabel = normalizeLabel(label, this.maxLabelChars);
+    const setOutcome = outcome !== undefined;
+    if (setOutcome && !this.outcomes) throw httpError(`${this.title} doesn't track trade outcomes.`, 400);
+    const cleanOutcome = setOutcome ? normalizeOutcome(outcome) : undefined;
+    const setLabel = label !== undefined || !setOutcome;
+    const cleanLabel = setLabel ? normalizeLabel(label, this.maxLabelChars) : undefined;
     return this._withLock(() => {
       const items = this._read();
       const item = items.find((entry) => entry.id === id);
       if (!item) throw httpError(`That screenshot is no longer in ${this.title}.`, 404);
-      if (item.label !== cleanLabel) {
+      let changed = false;
+      if (setLabel && item.label !== cleanLabel) {
         item.label = cleanLabel;
+        changed = true;
+      }
+      if (setOutcome && (item.outcome || "") !== cleanOutcome) {
+        if (cleanOutcome) item.outcome = cleanOutcome;
+        else delete item.outcome;
+        changed = true;
+      }
+      if (changed) {
         item.updatedAt = Math.max(this.now(), (item.updatedAt || item.createdAt || 0) + 1);
         this._write(items);
       }
