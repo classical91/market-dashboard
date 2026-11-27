@@ -45,6 +45,7 @@
     uploading: 0,
     open: {},        // folder tag → true when expanded
     editing: null,   // entry key being relabelled
+    picking: null,   // entry key whose TP / SL / liquidated picker is open
     draft: null,     // unsaved note text while editing, kept across re-renders
     staged: [],      // composer screenshots not posted yet: { id, file, url }
     composeBatch: "",// batch of a part-posted composer, so a retry joins it
@@ -117,6 +118,7 @@
       var first = entry.items[0];
       entry.label = first.label || "";
       entry.tag = Ticker.extractTags(entry.label)[0] || "";
+      entry.outcome = OUTCOMES[first.outcome] ? first.outcome : "";
       entry.createdAt = first.createdAt;
       entry.updatedAt = entry.items.reduce(function (max, item) {
         return Math.max(max, item.updatedAt || item.createdAt || 0);
@@ -137,6 +139,34 @@
   }
 
   // ---- render ---------------------------------------------------------------
+
+  /** How a trade ended: a sticker beside its ticker. Stored per image as `outcome`. */
+  var OUTCOMES = {
+    tp: { icon: "\uD83C\uDFAF", text: "TP hit", title: "Took profit" },
+    sl: { icon: "\uD83D\uDED1", text: "SL hit", title: "Stopped out" },
+    liquidated: { icon: "\uD83D\uDC80", text: "Liquidated", title: "Liquidated" },
+  };
+  var OUTCOME_ORDER = ["tp", "sl", "liquidated"];
+
+  function outcomeSticker(outcome, count) {
+    var o = OUTCOMES[outcome];
+    if (!o) return "";
+    var times = count > 1 ? " \u00d7" + count : "";
+    return '<span class="ts-sticker ts-sticker--' + outcome + '" title="' + escapeHtml(o.title + (count > 1 ? " on " + count + " entries" : "")) + '">' +
+      '<span aria-hidden="true">' + o.icon + "</span>" + escapeHtml(o.text + times) + "</span>";
+  }
+
+  /** The picker under an entry's head: one tap marks the trade TP / SL / liquidated. */
+  function outcomeMenu(entry) {
+    return '<div class="ts-outcome-menu" role="group" aria-label="How did this trade end?">' +
+      OUTCOME_ORDER.map(function (key) {
+        var on = entry.outcome === key;
+        return '<button class="ts-outcome-opt ts-outcome-opt--' + key + '" type="button" data-role="set-outcome" data-outcome="' + key +
+          '" aria-pressed="' + on + '"><span aria-hidden="true">' + OUTCOMES[key].icon + "</span>" + OUTCOMES[key].text + "</button>";
+      }).join("") +
+      (entry.outcome ? '<button class="ts-outcome-opt" type="button" data-role="set-outcome" data-outcome="">Clear</button>' : "") +
+    "</div>";
+  }
 
   function tickerChip(tag) {
     if (!tag) return '<span class="ts-ticker ts-ticker--none">No ticker</span>';
@@ -188,16 +218,21 @@
     var note = noteOf(entry);
     var editing = state.editing === entry.key;
     var count = entry.items.length;
+    var picking = state.picking === entry.key;
     return '<article class="ts-entry" data-entry="' + escapeHtml(entry.key) + '">' +
       '<div class="ts-entry-head">' +
         tickerChip(entry.tag) +
+        outcomeSticker(entry.outcome) +
         '<time class="ts-when" datetime="' + new Date(entry.createdAt).toISOString() + '">' + escapeHtml(formatWhen(entry.createdAt)) + "</time>" +
         (count > 1 ? '<span class="ts-n">' + count + " images</span>" : "") +
         '<span class="ts-entry-tools">' +
+          '<button class="ts-icon' + (picking ? " is-on" : "") + '" type="button" data-role="outcome" aria-expanded="' + picking +
+            '" aria-label="Mark how this trade ended" title="TP / SL / liquidated">&#127937;</button>' +
           '<button class="ts-icon" type="button" data-role="edit" aria-label="Edit ticker and note" title="Edit ticker / note">&#9998;</button>' +
           '<button class="ts-icon ts-icon--danger" type="button" data-role="remove-entry" aria-label="Delete this entry" title="Delete entry">&#128465;</button>' +
         "</span>" +
       "</div>" +
+      (picking ? outcomeMenu(entry) : "") +
       thumbs(entry) +
       (editing
         ? '<form class="ts-edit" data-role="edit-form">' +
@@ -225,10 +260,13 @@
     var open = Boolean(state.open[tag]);
     var images = entries.reduce(function (n, e) { return n + e.items.length; }, 0);
     var latest = entries[0].createdAt;
+    var outcomes = {};
+    entries.forEach(function (e) { if (e.outcome) outcomes[e.outcome] = (outcomes[e.outcome] || 0) + 1; });
     return '<section class="ts-folder' + (open ? " is-open" : "") + '" data-folder="' + escapeHtml(tag) + '">' +
       '<button class="ts-folder-head" type="button" data-role="toggle" aria-expanded="' + open + '">' +
         '<span class="ts-folder-icon" aria-hidden="true">' + (open ? "&#128194;" : "&#128193;") + "</span>" +
         tickerChip(tag) +
+        OUTCOME_ORDER.map(function (key) { return outcomes[key] ? outcomeSticker(key, outcomes[key]) : ""; }).join("") +
         '<span class="ts-folder-meta">' + entries.length + " entries · " + images + " image" + (images === 1 ? "" : "s") +
           " · " + escapeHtml(formatWhen(latest)) + "</span>" +
         '<span class="ts-chevron" aria-hidden="true">&#9662;</span>' +
@@ -517,6 +555,26 @@
     render();
   }
 
+  /** Mark (or clear) how the trade in this entry ended, on every image in it. */
+  async function setOutcome(entry, outcome) {
+    try {
+      var ids = entry.items.map(function (item) { return item.id; });
+      for (var i = 0; i < ids.length; i += 1) {
+        var data = await request(API + "/" + encodeURIComponent(ids[i]), {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ outcome: outcome }),
+        });
+        replaceItem(data.item);
+      }
+      state.picking = null;
+      setStatus(outcome ? "Marked " + (entry.tag ? "$" + entry.tag + " " : "") + OUTCOMES[outcome].text + "." : "Outcome cleared.");
+    } catch (err) {
+      setStatus("Couldn't save the outcome: " + err.message, true);
+    }
+    render();
+  }
+
   function replaceItem(item) {
     if (!item) return;
     state.items = state.items.map(function (existing) { return existing.id === item.id ? item : existing; });
@@ -671,7 +729,14 @@
     var entryEl = btn.closest(".ts-entry");
     var entry = entryEl && entryByKey(entryEl.getAttribute("data-entry"));
     if (!entry) return;
-    if (role === "edit") {
+    if (role === "outcome") {
+      state.picking = state.picking === entry.key ? null : entry.key;
+      render();
+      var first = el.list.querySelector('[data-entry="' + entry.key + '"] [data-role="set-outcome"]');
+      if (state.picking && first) first.focus();
+    } else if (role === "set-outcome") {
+      setOutcome(entry, btn.getAttribute("data-outcome"));
+    } else if (role === "edit") {
       startEdit(entry.key);
     } else if (role === "edit-cancel") {
       state.editing = null;
@@ -788,7 +853,7 @@
     reader = reader || buildReader();
     readerReturn = document.activeElement;
     reader.dataset.entry = entry.key;
-    reader.querySelector(".ts-reader-meta").innerHTML = tickerChip(entry.tag) +
+    reader.querySelector(".ts-reader-meta").innerHTML = tickerChip(entry.tag) + outcomeSticker(entry.outcome) +
       '<time class="ts-when" datetime="' + new Date(entry.createdAt).toISOString() + '">' + escapeHtml(formatWhen(entry.createdAt)) + "</time>";
     reader.querySelector(".ts-reader-shots").innerHTML = entry.items.map(function (item, i) {
       return '<img src="' + escapeHtml(item.url) + '" alt="' + escapeHtml("Chart " + (i + 1) + " of this note") +

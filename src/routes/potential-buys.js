@@ -30,7 +30,9 @@ function firstText(...values) {
  *   POST   /       one screenshot: the raw image bytes as the body, with an
  *                  image Content-Type. Optional `?label=` (ticker or note)
  *                  and `?batch=` (screenshots sent together share one).
- *   PATCH  /:id    { label } — rename it.
+ *   PATCH  /:id    { label } — rename it. Active Trades' notes also take
+ *                  { outcome: "tp" | "sl" | "liquidated" | "" } — how the
+ *                  trade ended; sent alone, it leaves the label as it is.
  *   PUT    /:id/image  the cropped picture (raw image bytes) replaces the
  *                  stored one; id, label and folders stay the same.
  *   DELETE /:id    remove it for good.
@@ -161,7 +163,8 @@ function createPotentialBuysRouter({ potentialBuysStore, requireLedgerKey, rateL
 
   router.patch("/:id", (req, res, next) => {
     try {
-      const item = potentialBuysStore.update(req.params.id, { label: req.body ? req.body.label : undefined });
+      const body = req.body && typeof req.body === "object" ? req.body : {};
+      const item = potentialBuysStore.update(req.params.id, { label: body.label, outcome: body.outcome });
       res.json({ item });
     } catch (err) {
       next(err);

@@ -457,6 +457,8 @@ function createApp() {
     // Trade notes are a personal trading journal: full write-ups (often a
     // pasted ChatGPT analysis), not a Potential Buys caption.
     maxLabelChars: 20000,
+    // Each note can record how its trade ended (TP / SL / liquidated).
+    outcomes: true,
   });
   // Pure aggregation over the engines above — it owns no indicator maths and
   // asks both scanners per tracked symbol rather than for the full universe.
