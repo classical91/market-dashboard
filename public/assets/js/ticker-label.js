@@ -24,8 +24,19 @@
   /** The whole label is one ticker: BTC, brk.b, SOL-USD, Total3, #eth, $nvda. */
   var BARE_TICKER_RE = /^[#$]?([A-Za-z][A-Za-z0-9.-]{0,11})$/;
 
+  /**
+   * Runs of spaces and tabs become one space. Line breaks are kept (at most
+   * one blank line in a row) so a longer note keeps its paragraphs; a
+   * single-line label is unchanged.
+   */
   function collapse(value) {
-    return typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
+    if (typeof value !== "string") return "";
+    return value
+      .replace(/\r\n?/g, "\n")
+      .replace(/[^\S\n]+/g, " ")
+      .replace(/ ?\n ?/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
   }
 
   function cleanSymbol(symbol) {
@@ -88,7 +99,9 @@
     if (!symbol) return label;
     if (extractTags(label).indexOf(symbol) !== -1) return label;
     var rest = collapse(note);
-    return rest ? formatLabel("$" + symbol + " " + rest) : "$" + symbol;
+    // A multi-line note (a written-up post) keeps its first line, often a
+    // heading, intact: the ticker goes on a line of its own above it.
+    return rest ? formatLabel("$" + symbol + (rest.indexOf("\n") !== -1 ? "\n" : " ") + rest) : "$" + symbol;
   }
 
   return {

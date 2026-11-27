@@ -31,6 +31,9 @@
     grid: document.getElementById("tc-grid"),
   };
 
+  /** Longest URL-encoded label sent in the upload's query string. */
+  var MAX_QUERY_LABEL = 1500;
+
   var state = {
     items: [],
     loading: true,
@@ -38,6 +41,7 @@
     uploading: 0,
     open: {},        // folder tag → true when expanded
     editing: null,   // entry key being relabelled
+    draft: null,     // unsaved note text while editing, kept across re-renders
     active: [],      // base tickers of the tracked pairs, e.g. ["BTC", "XRP"]
   };
 
@@ -119,7 +123,7 @@
   function noteOf(entry) {
     if (!entry.tag) return entry.label;
     var re = new RegExp("(^|\\s)[$#]" + entry.tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "(?=\\s|$)", "i");
-    return entry.label.replace(re, " ").replace(/\s+/g, " ").trim();
+    return entry.label.replace(re, " ").replace(/[^\S\n]+/g, " ").replace(/ ?\n ?/g, "\n").trim();
   }
 
   function isActive(tag) {
@@ -153,6 +157,27 @@
     "</div>";
   }
 
+  var Markdown = window.BriefingMarkdown || null;
+  /** A note is longer than the card shows in full past this many characters or lines. */
+  var NOTE_PREVIEW_CHARS = 320;
+  var NOTE_PREVIEW_LINES = 6;
+
+  /** Markdown (headings, bold, lists, tables) as HTML; plain escaped text without the renderer. */
+  function noteHtml(note) {
+    return Markdown ? Markdown.renderMarkdown(note) : '<p class="ts-plain">' + escapeHtml(note) + "</p>";
+  }
+
+  function isLongNote(note) {
+    return note.length > NOTE_PREVIEW_CHARS || note.split("\n").length > NOTE_PREVIEW_LINES;
+  }
+
+  /** The note on its card: formatted, and cut short with "Read full note" when it's a long post. */
+  function noteBlock(note) {
+    var long = isLongNote(note);
+    return '<div class="ts-note ts-md' + (long ? " ts-note--clamped" : "") + '">' + noteHtml(note) + "</div>" +
+      (long ? '<button class="ts-more" type="button" data-role="read">Read full note &rarr;</button>' : "");
+  }
+
   function renderEntry(entry) {
     var note = noteOf(entry);
     var editing = state.editing === entry.key;
@@ -169,12 +194,20 @@
       "</div>" +
       (editing
         ? '<form class="ts-edit" data-role="edit-form">' +
-            '<input class="ts-input" name="label" value="' + escapeHtml(entry.label) + '" maxlength="140" ' +
-              'aria-label="Ticker and note" placeholder="$BTC entry, stop under range low" />' +
-            '<button class="ts-btn ts-btn--primary" type="submit">Save</button>' +
-            '<button class="ts-btn" type="button" data-role="edit-cancel">Cancel</button>' +
+            '<textarea class="ts-input ts-input--note" name="label" rows="8" maxlength="20000" ' +
+              'aria-label="Ticker and note" placeholder="$BTC entry, stop under range low">' +
+              escapeHtml(state.draft != null ? state.draft : entry.label) + "</textarea>" +
+            '<span class="ts-edit-hint">Enter for a new line &middot; Ctrl+Enter to save</span>' +
+            '<div class="ts-edit-actions">' +
+              (entry.batch
+                ? '<input class="ts-edit-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden />' +
+                  '<button class="ts-btn" type="button" data-role="edit-add" title="Add more screenshots to this entry (or paste one)">&#43; Add photos</button>'
+                : "") +
+              '<button class="ts-btn ts-btn--primary" type="submit">Save</button>' +
+              '<button class="ts-btn" type="button" data-role="edit-cancel">Cancel</button>' +
+            "</div>" +
           "</form>"
-        : note ? '<p class="ts-note">' + escapeHtml(note) + "</p>" : "") +
+        : note ? noteBlock(note) : "") +
       thumbs(entry) +
     "</article>";
   }
@@ -301,9 +334,14 @@
     el.dropTitle.textContent = "Uploading " + files.length + " image" + (files.length === 1 ? "" : "s") + "…";
     var saved = 0;
     var failed = [];
+    // A long write-up won't fit in the upload's query string: the images go
+    // up under the ticker alone, then the full note is set on them.
+    var longLabel = encodeURIComponent(label).length > MAX_QUERY_LABEL;
+    var uploadLabel = longLabel ? tagLabel(label) : label;
+    var savedIds = [];
     for (var i = 0; i < files.length; i += 1) {
       var params = new URLSearchParams();
-      if (label) params.set("label", label);
+      if (uploadLabel) params.set("label", uploadLabel);
       if (batch) params.set("batch", batch);
       try {
         var data = await request(API + "?" + params.toString(), {
@@ -313,6 +351,7 @@
         });
         if (data.item) {
           state.items.unshift(data.item);
+          savedIds.push(data.item.id);
           saved += 1;
           render();
         }
@@ -320,11 +359,18 @@
         failed.push(err.message);
       }
     }
+    if (longLabel && savedIds.length) {
+      try {
+        await patchLabels(savedIds, label);
+      } catch (err) {
+        failed.push("Images saved, but the note wasn't: " + err.message + " Use \u270E to add it again.");
+      }
+    }
     state.uploading -= files.length;
     panel.classList.toggle("is-uploading", state.uploading > 0);
     el.dropTitle.textContent = DROP_TITLE;
 
-    if (!target && saved) el.note.value = "";
+    if (!target && saved && !(longLabel && failed.length)) el.note.value = "";
     var tag = Ticker.extractTags(label)[0];
     if (tooBig.length) failed.push(tooBig.length + " image(s) over 15 MB skipped");
     if (failed.length) {
@@ -350,17 +396,29 @@
     return buildEntries().filter(function (e) { return e.key === key; })[0] || null;
   }
 
+  /** Set one label on several images (JSON body, so a long write-up fits). */
+  async function patchLabels(ids, label) {
+    for (var i = 0; i < ids.length; i += 1) {
+      var data = await request(API + "/" + encodeURIComponent(ids[i]), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label: label }),
+      });
+      replaceItem(data.item);
+    }
+  }
+
+  /** Just the ticker of a label ("$BTC"), or "" when it has none. */
+  function tagLabel(label) {
+    var tag = Ticker.extractTags(label)[0];
+    return tag ? "$" + tag : "";
+  }
+
   async function relabel(entry, label) {
     try {
-      for (var i = 0; i < entry.items.length; i += 1) {
-        var data = await request(API + "/" + encodeURIComponent(entry.items[i].id), {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ label: label }),
-        });
-        replaceItem(data.item);
-      }
+      await patchLabels(entry.items.map(function (item) { return item.id; }), label);
       state.editing = null;
+      state.draft = null;
       var tag = Ticker.extractTags(label)[0];
       if (tag) state.open[tag] = true;
       setStatus("Saved.");
@@ -474,10 +532,16 @@
 
   // Paste a screenshot anywhere on the page (Cmd/Ctrl+V after a capture).
   document.addEventListener("paste", function (e) {
+    if (e.defaultPrevented) return;
     var files = imageFiles(e.clipboardData && e.clipboardData.files);
     if (!files.length) return;
+    // Text copied with an image attached still goes into the note being typed.
+    if (isNoteBox(e.target) && hasText(e.clipboardData)) return;
     e.preventDefault();
-    upload(files);
+    // While an entry is open for editing, a pasted screenshot joins it.
+    var editingEntry = state.editing && entryByKey(state.editing);
+    if (editingEntry) addToEntry(editingEntry, files);
+    else upload(files);
   });
 
   el.list.addEventListener("click", function (e) {
@@ -495,13 +559,16 @@
     var entry = entryEl && entryByKey(entryEl.getAttribute("data-entry"));
     if (!entry) return;
     if (role === "edit") {
-      state.editing = entry.key;
-      render();
-      var input = el.list.querySelector('[data-role="edit-form"] input');
-      if (input) { input.focus(); input.select(); }
+      startEdit(entry.key);
     } else if (role === "edit-cancel") {
       state.editing = null;
+      state.draft = null;
       render();
+    } else if (role === "read") {
+      openReader(entry);
+    } else if (role === "edit-add") {
+      var picker = entryEl.querySelector(".ts-edit-file");
+      if (picker) picker.click();
     } else if (role === "remove-entry") {
       var n = entry.items.length;
       if (window.confirm("Delete this " + (entry.tag ? "$" + entry.tag + " " : "") + "entry" +
@@ -522,12 +589,238 @@
     if (entry) relabel(entry, Ticker.formatLabel(form.elements.label.value));
   });
 
+  // Keep the half-typed note when an upload re-renders the list.
+  el.list.addEventListener("input", function (e) {
+    if (e.target.name === "label" && e.target.closest('[data-role="edit-form"]')) state.draft = e.target.value;
+  });
+
+  // "+ Add photos" in the edit form: the chosen images join this entry.
+  el.list.addEventListener("change", function (e) {
+    if (!e.target.classList.contains("ts-edit-file")) return;
+    var files = Array.prototype.slice.call(e.target.files || []);
+    e.target.value = "";
+    var entryEl = e.target.closest(".ts-entry");
+    var entry = entryEl && entryByKey(entryEl.getAttribute("data-entry"));
+    if (entry && files.length) addToEntry(entry, files);
+  });
+
   el.list.addEventListener("keydown", function (e) {
-    if (e.key === "Escape" && e.target.closest('[data-role="edit-form"]')) {
+    var form = e.target.closest('[data-role="edit-form"]');
+    if (!form) return;
+    if (e.key === "Escape") {
       state.editing = null;
+      state.draft = null;
       render();
+    } else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+      // Plain Enter starts a new line in the note; Ctrl/Cmd+Enter saves.
+      e.preventDefault();
+      form.requestSubmit();
     }
   });
+
+  // ---- reader -----------------------------------------------------------------
+  // A long note opens as a post: the charts, then the whole write-up, at a
+  // readable width.
+
+  // A plain overlay rather than a modal <dialog>: the image zoom viewer
+  // (image-zoom.js) has to open on top of it, and nothing stacks above a
+  // modal dialog's top layer.
+  var reader = null;
+  var readerReturn = null;
+
+  function buildReader() {
+    var shade = document.createElement("div");
+    shade.className = "ts-reader-shade";
+    shade.hidden = true;
+    shade.innerHTML =
+      '<div class="ts-reader" role="dialog" aria-modal="true" aria-label="Trade note">' +
+        '<div class="ts-reader-head">' +
+          '<span class="ts-reader-meta"></span>' +
+          '<button class="ts-btn" type="button" data-reader="edit">&#9998; Edit</button>' +
+          '<button class="ts-icon" type="button" data-reader="close" aria-label="Close note" title="Close (Esc)">&times;</button>' +
+        "</div>" +
+        '<div class="ts-reader-scroll">' +
+          '<div class="ts-reader-shots"></div>' +
+          '<article class="ts-reader-body ts-md"></article>' +
+        "</div>" +
+      "</div>";
+    shade.addEventListener("click", function (e) {
+      if (e.target === shade) { closeReader(); return; }
+      var btn = e.target.closest("[data-reader]");
+      if (!btn) return;
+      var action = btn.getAttribute("data-reader");
+      closeReader(action === "edit");
+      if (action === "edit" && shade.dataset.entry) startEdit(shade.dataset.entry);
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key !== "Escape" || shade.hidden) return;
+      var zoom = document.querySelector(".img-zoom-overlay");
+      if (zoom && !zoom.hidden) return; // Esc closes the zoomed image first
+      closeReader();
+    });
+    document.body.appendChild(shade);
+    return shade;
+  }
+
+  function openReader(entry) {
+    reader = reader || buildReader();
+    readerReturn = document.activeElement;
+    reader.dataset.entry = entry.key;
+    reader.querySelector(".ts-reader-meta").innerHTML = tickerChip(entry.tag) +
+      '<time class="ts-when" datetime="' + new Date(entry.createdAt).toISOString() + '">' + escapeHtml(formatWhen(entry.createdAt)) + "</time>";
+    reader.querySelector(".ts-reader-shots").innerHTML = entry.items.map(function (item, i) {
+      return '<img src="' + escapeHtml(item.url) + '" alt="' + escapeHtml("Chart " + (i + 1) + " of this note") +
+        '" loading="lazy" decoding="async" data-zoomable />';
+    }).join("");
+    reader.querySelector(".ts-reader-body").innerHTML = noteHtml(noteOf(entry));
+    reader.hidden = false;
+    document.documentElement.classList.add("ts-reader-lock");
+    reader.querySelector(".ts-reader-scroll").scrollTop = 0;
+    reader.querySelector('[data-reader="close"]').focus();
+  }
+
+  function closeReader(keepFocus) {
+    if (!reader || reader.hidden) return;
+    reader.hidden = true;
+    document.documentElement.classList.remove("ts-reader-lock");
+    if (!keepFocus && readerReturn && document.contains(readerReturn)) readerReturn.focus();
+    readerReturn = null;
+  }
+
+  function startEdit(key) {
+    state.editing = key;
+    state.draft = null;
+    var entry = entryByKey(key);
+    if (entry && entry.tag) state.open[entry.tag] = true;
+    render();
+    var input = el.list.querySelector('[data-role="edit-form"] textarea');
+    if (input) {
+      input.scrollIntoView({ block: "nearest" });
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+    }
+  }
+
+  // ---- pasting a formatted answer --------------------------------------------
+  // Text selected and copied from ChatGPT (or any page) arrives as HTML; it is
+  // turned back into the markdown the note renders, so headings, bold, lists
+  // and tables survive. A paste from ChatGPT's own copy button is already
+  // markdown and goes in untouched.
+
+  function isNoteBox(node) {
+    return Boolean(node && node.tagName === "TEXTAREA" && (node === el.note || node.closest('[data-role="edit-form"]')));
+  }
+
+  function hasText(data) {
+    return Boolean(data && (data.getData("text/plain") || data.getData("text/html")));
+  }
+
+  var SKIP_TAGS = { script: 1, style: 1, svg: 1, button: 1, noscript: 1, canvas: 1, template: 1, head: 1, title: 1, meta: 1 };
+  var BLOCK_SELECTOR = "p,h1,h2,h3,h4,h5,h6,ul,ol,li,table,div,pre,blockquote,hr,section,article,header,footer";
+
+  function squash(text) {
+    return text.replace(/[^\S\n]+/g, " ").replace(/ ?\n ?/g, "\n").trim();
+  }
+
+  function inlineMarkdown(node) {
+    var out = "";
+    Array.prototype.forEach.call(node.childNodes, function (child) {
+      if (child.nodeType === 3) { out += child.nodeValue.replace(/\s+/g, " "); return; }
+      if (child.nodeType !== 1) return;
+      var tag = child.tagName.toLowerCase();
+      if (SKIP_TAGS[tag] || tag === "ul" || tag === "ol") return;
+      if (tag === "br") { out += "\n"; return; }
+      var inner = inlineMarkdown(child);
+      var parts = inner.match(/^(\s*)([\s\S]*?)(\s*)$/);
+      if ((tag === "strong" || tag === "b") && parts[2]) out += parts[1] + "**" + parts[2] + "**" + parts[3];
+      else if (tag === "a" && parts[2] && /^https?:\/\//i.test(child.getAttribute("href") || "")) {
+        out += parts[1] + "[" + parts[2] + "](" + child.getAttribute("href") + ")" + parts[3];
+      } else if (tag === "img") out += child.getAttribute("alt") || "";
+      else out += inner;
+    });
+    return out;
+  }
+
+  /** Blocks as { text, kind }; list items and table rows join without a blank line. */
+  function blockMarkdown(node, out) {
+    Array.prototype.forEach.call(node.childNodes, function (child) {
+      if (child.nodeType === 3) {
+        var text = squash(child.nodeValue);
+        if (text) out.push({ text: text, kind: "p" });
+        return;
+      }
+      if (child.nodeType !== 1) return;
+      var tag = child.tagName.toLowerCase();
+      if (SKIP_TAGS[tag]) return;
+      var heading = /^h([1-6])$/.exec(tag);
+      if (heading) {
+        var title = squash(inlineMarkdown(child)).replace(/\n/g, " ");
+        if (title) out.push({ text: new Array(Math.min(Number(heading[1]), 4) + 1).join("#") + " " + title, kind: "h" });
+      } else if (tag === "ul" || tag === "ol") {
+        var n = 0;
+        Array.prototype.forEach.call(child.children, function (li) {
+          if (li.tagName.toLowerCase() !== "li") return;
+          n += 1;
+          var item = squash(inlineMarkdown(li)).replace(/\n/g, " ");
+          if (item) out.push({ text: (tag === "ol" ? n + ". " : "- ") + item, kind: "li" });
+          Array.prototype.forEach.call(li.querySelectorAll(":scope > ul, :scope > ol"), function (nested) {
+            var wrap = document.createElement("div");
+            wrap.appendChild(nested.cloneNode(true));
+            blockMarkdown(wrap, out);
+          });
+        });
+      } else if (tag === "table") {
+        var first = true;
+        Array.prototype.forEach.call(child.querySelectorAll("tr"), function (tr) {
+          var row = Array.prototype.map.call(tr.querySelectorAll("th, td"), function (cell) {
+            return squash(inlineMarkdown(cell)).replace(/\n/g, " ").replace(/\|/g, "/");
+          });
+          if (!row.length) return;
+          out.push({ text: "| " + row.join(" | ") + " |", kind: "tr" });
+          if (first) out.push({ text: "|" + row.map(function () { return " --- "; }).join("|") + "|", kind: "tr" });
+          first = false;
+        });
+      } else if (tag === "hr") {
+        out.push({ text: "---", kind: "p" });
+      } else if (tag === "pre") {
+        var code = child.textContent.trim();
+        if (code) out.push({ text: code, kind: "p" });
+      } else if (tag === "p" || !child.querySelector(BLOCK_SELECTOR)) {
+        var para = squash(inlineMarkdown(child));
+        if (para) out.push({ text: para, kind: "p" });
+      } else {
+        blockMarkdown(child, out);
+      }
+    });
+    return out;
+  }
+
+  function htmlToMarkdown(html) {
+    var doc = new DOMParser().parseFromString(html, "text/html");
+    var blocks = blockMarkdown(doc.body, []);
+    return blocks.map(function (block, i) {
+      var prev = blocks[i - 1];
+      var tight = prev && prev.kind === block.kind && (block.kind === "li" || block.kind === "tr");
+      return (i === 0 ? "" : tight ? "\n" : "\n\n") + block.text;
+    }).join("");
+  }
+
+  /** Paste into a note box: formatted HTML becomes markdown at the cursor. */
+  function pasteFormatted(e) {
+    var box = e.target;
+    if (!isNoteBox(box) || !e.clipboardData) return;
+    if (imageFiles(e.clipboardData.files).length && !hasText(e.clipboardData)) return; // a screenshot: the page uploads it
+    var html = e.clipboardData.getData("text/html");
+    if (!html || !/<(h[1-6]|table|ul|ol|li|strong|b)\b/i.test(html)) return;
+    var markdown = htmlToMarkdown(html);
+    if (!markdown) return;
+    e.preventDefault();
+    box.setRangeText(markdown, box.selectionStart, box.selectionEnd, "end");
+    box.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+
+  el.note.addEventListener("paste", pasteFormatted);
+  el.list.addEventListener("paste", pasteFormatted);
 
   // The page script announces the tracked pairs after each load, so the
   // ticker field suggests them and their entries are marked active.
