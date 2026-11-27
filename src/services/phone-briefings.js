@@ -66,6 +66,19 @@ function normalizeCategory(value) {
   return CATEGORIES.some((category) => category.key === resolved) ? resolved : null;
 }
 
+// ChatGPT's in-app citation markers ("citeturn12search3turn12search4", in
+// private-use characters a copy may or may not keep) mean nothing off ChatGPT.
+const CITATION_RE = /[\uE200-\uE2FF]*cite(?:[\uE200-\uE2FF]*turn\d+[a-z]+\d+)+[\uE200-\uE2FF]*/g;
+
+function cleanText(text) {
+  return text
+    .replace(/\r\n?/g, "\n")
+    .replace(CITATION_RE, "")
+    .replace(/[\uE200-\uE2FF]/g, "")
+    .replace(/[ \t]+$/gm, "")
+    .trim();
+}
+
 function textHash(text) {
   return crypto.createHash("sha256").update(text).digest("hex").slice(0, 16);
 }
@@ -101,7 +114,7 @@ class PhoneBriefingStore {
   receive(category, { text, title } = {}, now = new Date()) {
     const key = normalizeCategory(category);
     if (!key) throw badRequest(`Unknown category "${category}". Use one of: ${CATEGORIES.map((c) => c.key).join(", ")}.`);
-    const body = typeof text === "string" ? text.replace(/\r\n?/g, "\n").trim() : "";
+    const body = typeof text === "string" ? cleanText(text) : "";
     if (!body) throw badRequest("Briefing text is empty.");
     if (body.length > MAX_TEXT_LEN) throw badRequest(`Briefing text is longer than ${MAX_TEXT_LEN} characters.`);
 
