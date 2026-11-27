@@ -43,7 +43,7 @@ test("Watchlists: edit in Settings, browse on Overview v2", {
   assert.equal(await page.locator(".wls-ticker").count(), 2);
   await page.check('input[name="wlsBookmark"][value="red"]');
   assert.deepEqual(
-    await page.locator(".wls-folder-name").allTextContents(),
+    await page.locator(".wls-folder .wls-folder-name").allTextContents(),
     ["Kucoin trades", "My watchlist"],
     "the bookmarked folder moves to the top",
   );
