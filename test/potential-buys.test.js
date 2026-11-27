@@ -161,3 +161,10 @@ test("labels keep line breaks, and a store can take longer notes", () => {
   const item = notes.add(PNG, { label: "$BTC short" });
   assert.equal(notes.update(item.id, { label: "y".repeat(600) }).label.length, 600);
 });
+
+test("a ticker goes on its own line above a multi-line note, keeping its heading intact", () => {
+  const { withTicker, extractTags } = require("../public/assets/js/ticker-label");
+  assert.equal(withTicker("btc", "## **BTC plan**\n\n- entry 61k"), "$BTC\n## **BTC plan**\n\n- entry 61k");
+  assert.equal(withTicker("btc", "one-line note"), "$BTC one-line note");
+  assert.deepEqual(extractTags("$BTC\n## Heading #1 and $61,717"), ["BTC"]);
+});

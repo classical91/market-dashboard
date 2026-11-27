@@ -99,7 +99,9 @@
     if (!symbol) return label;
     if (extractTags(label).indexOf(symbol) !== -1) return label;
     var rest = collapse(note);
-    return rest ? formatLabel("$" + symbol + " " + rest) : "$" + symbol;
+    // A multi-line note (a written-up post) keeps its first line, often a
+    // heading, intact: the ticker goes on a line of its own above it.
+    return rest ? formatLabel("$" + symbol + (rest.indexOf("\n") !== -1 ? "\n" : " ") + rest) : "$" + symbol;
   }
 
   return {
