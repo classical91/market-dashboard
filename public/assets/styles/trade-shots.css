@@ -36,7 +36,23 @@
   text-transform: uppercase;
 }
 .ts-count { margin-left: auto; color: #8892a6; font-size: 11px; }
-.ts-composer { display: contents; }
+.ts-compose {
+  flex: none;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #0f1524;
+}
+.ts-compose > summary {
+  padding: 12px 14px;
+  color: #edf3ff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.ts-compose > summary:focus-visible { outline: 2px solid var(--blue, #4da3ff); outline-offset: 2px; border-radius: 10px; }
+.ts-composer { display: grid; gap: 10px; padding: 0 14px 14px; }
+.ts-panel .ts-compose > summary { padding: 8px 10px; }
+.ts-panel .ts-composer { padding: 0 10px 10px; }
 
 .ts-fields { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
 .ts-input {
@@ -90,7 +106,6 @@
   overflow-y: auto;
 }
 .ts-staged[hidden] { display: none; }
-.ts-staged, .ts-composer > .ts-input--note, .ts-compose-actions { flex-shrink: 0; }
 .ts-staged--many { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .ts-staged .ts-thumb img { border-color: rgba(77, 163, 255, 0.45); }
 .ts-staged:not(.ts-staged--many) .ts-thumb img { aspect-ratio: auto; max-height: 200px; object-fit: contain; }
@@ -472,26 +487,18 @@ html.ts-reader-lock { overflow: hidden; }
   .ts-list { max-height: 520px; }
 }
 
+@media (max-height: 800px) {
+  .ts-panel .ts-thumbs:not(.ts-thumbs--many) .ts-thumb img {
+    max-height: clamp(96px, 20vh, 160px);
+  }
+}
+
 .ts-page-content { max-width: 1080px; margin-inline: auto; }
 .ts-page .cmd-page-title { margin: 4px 0 0; font-size: 24px; }
 .ts-page-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-left: auto; }
 .ts-page .ts-count { color: var(--muted, #8892a6); font-size: 13px; }
 .ts-back { color: var(--blue, #4da3ff); font-size: 13px; }
-.ts-page-compose {
-  margin-bottom: 14px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: #0f1524;
-}
-.ts-page-compose > summary {
-  padding: 12px 14px;
-  color: #edf3ff;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-}
-.ts-page-compose > summary:focus-visible { outline: 2px solid var(--blue, #4da3ff); outline-offset: 2px; border-radius: 10px; }
-.ts-page-compose > .ts-composer { display: grid; gap: 10px; padding: 0 14px 14px; }
+.ts-page .ts-compose { margin-bottom: 14px; }
 .ts-page .ts-list { min-height: 0; max-height: none; margin: 0; padding: 0; overflow: visible; }
 .ts-page .ts-status { margin-bottom: 10px; }
 .ts-page .ts-entry { padding: clamp(10px, 2vw, 20px); }

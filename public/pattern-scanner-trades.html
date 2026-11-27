@@ -70,7 +70,10 @@
           <a class="ts-btn ts-expand" href="/trade-notes.html" target="_blank" rel="noopener"
             aria-label="Open full page for Trade Notes (new tab)">Open full page <span aria-hidden="true">&#8599;</span></a>
         </div>
-        <div class="ts-composer" id="ts-composer"></div>
+        <details class="ts-compose" id="ts-compose-toggle">
+          <summary>Add a trade note</summary>
+          <div class="ts-composer" id="ts-composer"></div>
+        </details>
         <div class="ts-status" id="ts-status" role="status" aria-live="polite"></div>
         <div class="ts-list" id="ts-list" aria-live="polite"></div>
       </aside>
@@ -87,7 +90,7 @@
           <li><strong>Let the order do the triage.</strong> Attention sorting puts a pair that just moved above one that merely disagrees, and disagreement above agreement &mdash; CONFLICT is the reading worth stopping for, ALIGNED the least urgent thing a card can say. The filters narrow a long watchlist to the cards worth opening; neither decides anything about a trade, they only decide what you look at first.</li>
           <li><strong>Scan the CHANGED blocks first.</strong> They report what moved since the previous closed candle &mdash; a context state flipping, a bias check turning over, a divergence appearing. On a long watchlist this is what narrows fifteen pairs down to the few worth opening; the states below tell you where things stand, not what is new.</li>
           <li><strong>Check the DATA line before you trust the card.</strong> It reports how long ago the newest closed candle closed and how long ago each engine last recalculated. A card flagged STALE is showing evidence the feed or the cache has stopped advancing &mdash; the numbers are real, but they are not now.</li>
-          <li><strong>Keep your own marked-up charts in Trade notes.</strong> Type a ticker, then drop screenshots on the grey box (or paste them anywhere on the page) &mdash; they collect in a grid, the note goes underneath, and <strong>Post note</strong> saves them as one timestamped entry; dropping onto a trade card adds it with that card's ticker, and dropping onto a saved entry adds to it straight away. The note box is your trade journal: write a full post in it, or paste a ChatGPT analysis &mdash; headings, bold, lists and tables render as formatted text, and <strong>Read full note</strong> opens the whole post with its charts. The &#9998; button reopens an entry to rewrite its note or add more photos (<strong>+ Add photos</strong>, or paste while it's open). Once a ticker has two entries they fold into a <strong>$TICKER</strong> folder. Tickers you're tracking here show a green dot.</li>
+          <li><strong>Keep your own marked-up charts in Trade notes.</strong> Open <strong>Add a trade note</strong>, type a ticker, then drop screenshots on the grey box (or paste them anywhere on the page) &mdash; they collect in a grid, the note goes underneath, and <strong>Post note</strong> saves them as one timestamped entry; dropping onto a trade card adds it with that card's ticker, and dropping onto a saved entry adds to it straight away. The note box is your trade journal: write a full post in it, or paste a ChatGPT analysis &mdash; headings, bold, lists and tables render as formatted text, and <strong>Read full note</strong> opens the whole post with its charts. The &#9998; button reopens an entry to rewrite its note or add more photos (<strong>+ Add photos</strong>, or paste while it's open). Once a ticker has two entries they fold into a <strong>$TICKER</strong> folder. Tickers you're tracking here show a green dot.</li>
           <li><strong>Remove a pair when you're done following it.</strong> Press Remove on its card, then confirm the pair and timeframe. Cancel keeps it tracked. This is a research watchlist; removing a card does not place, manage, or close trades.</li>
         </ol>
         <ul class="aia-how-notes">

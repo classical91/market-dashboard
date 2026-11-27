@@ -39,7 +39,7 @@ test("Active Trades removal and responsive cards", { skip: !executablePath && "C
   if (screenshotDir) fs.mkdirSync(screenshotDir, { recursive: true });
 
   async function open(t, options = {}) {
-    const context = await browser.newContext({ viewport: { width: 1520, height: 1100 } });
+    const context = await browser.newContext({ viewport: options.viewport || { width: 1520, height: 1100 } });
     t.after(() => context.close());
     await context.addInitScript(() => {
       if (location.protocol === "http:") localStorage.setItem("marketDashboardAdminKey", "browser-test-key");
@@ -143,6 +143,55 @@ test("Active Trades removal and responsive cards", { skip: !executablePath && "C
     }
     await page.getByRole("button", { name: "Remove BTCUSDT 1W from Active Trades", exact: true }).click();
     assert.equal(await page.getByRole("dialog").evaluate(node => node.scrollWidth <= node.clientWidth), true);
+  });
+
+  await t.test("an opened ticker fits its first note preview on a short laptop screen", async t => {
+    const chart = "/assets/images/market-command-mark.png";
+    const notes = [
+      { id: "shot-1", label: "$BTC\n## Latest outlook\n\n" + "Context for the next session. ".repeat(20), createdAt: 1700000003000, url: chart },
+      { id: "shot-2", label: "$BTC Prior session", createdAt: 1700000000000, url: chart },
+      { id: "shot-3", batch: "eth-shots", label: "$ETH", createdAt: 1699999999000, url: chart },
+      { id: "shot-4", batch: "eth-shots", label: "$ETH", createdAt: 1699999998000, url: chart },
+      { id: "shot-5", label: "$SOL", createdAt: 1699999997000, url: chart },
+      { id: "shot-6", label: "$XRP", createdAt: 1699999996000, url: chart },
+    ];
+    const { page } = await open(t, { notes, viewport: { width: 1366, height: 620 } });
+    const panel = page.locator("#ts-panel");
+    const composer = panel.getByText("Add a trade note", { exact: true });
+    const noteInput = panel.getByRole("textbox", { name: "Note for these screenshots" });
+    assert.equal(await noteInput.isVisible(), false);
+
+    const folder = panel.locator(".ts-folder-head").first();
+    await folder.click();
+    assert.equal(await panel.locator("#ts-count").textContent(), "5 entries · 6 images");
+    const firstEntry = panel.locator(".ts-entry").first();
+    const screenshot = firstEntry.locator("img[data-zoomable]");
+    await screenshot.scrollIntoViewIfNeeded();
+    await screenshot.evaluate(image => image.decode());
+    for (const viewport of [{ width: 1366, height: 620 }, { width: 1280, height: 600 }]) {
+      await page.setViewportSize(viewport);
+      await panel.evaluate(node => node.scrollIntoView({ block: "start" }));
+      assert.equal(await firstEntry.evaluate(node => {
+        const entry = node.getBoundingClientRect();
+        const list = node.closest(".ts-list").getBoundingClientRect();
+        return entry.top >= list.top && entry.bottom <= Math.min(list.bottom, innerHeight);
+      }), true, `the chart, note preview, and reader link fit at ${viewport.width}×${viewport.height}`);
+    }
+    if (screenshotDir) await page.screenshot({ path: path.join(screenshotDir, "trade-notes-laptop.png") });
+
+    await page.evaluate(async url => {
+      const chart = await (await fetch(url)).blob();
+      const data = new DataTransfer();
+      data.items.add(new File([chart], "chart.png", { type: "image/png" }));
+      document.body.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+    }, chart);
+    await panel.getByRole("button", { name: "Post note", exact: true }).waitFor();
+    await noteInput.fill("Laptop draft");
+    await composer.click();
+    assert.equal(await noteInput.isVisible(), false);
+    await composer.click();
+    assert.equal(await noteInput.inputValue(), "Laptop draft");
+    assert.equal(await panel.locator("#ts-staged img").count(), 1);
   });
 
   await t.test("the Trade Notes page shows the full notes and charts without leaving Active Trades", async t => {
