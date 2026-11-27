@@ -27,6 +27,13 @@
         <p class="cmd-page-subtitle">Six screeners. One view of the market.</p>
       </div>
       <div class="market-header-actions">
+        <p class="ov2-session" id="ov2-session" role="status" aria-live="polite" hidden>
+          <span class="ov2-session-dot" aria-hidden="true"></span>
+          <span class="ov2-session-text">
+            <span class="ov2-session-name">Market session</span>
+            <span class="ov2-session-when"></span>
+          </span>
+        </p>
         <button class="market-motion-toggle" id="market-motion-toggle" type="button" aria-pressed="true">Motion on</button>
         <button class="ov2-button" id="ov2-refresh" type="button">↻ Refresh all</button>
       </div>
@@ -473,6 +480,9 @@
 <script src="/assets/js/briefing-markdown.js"></script>
 <script src="/assets/js/overview-news-review.js"></script>
 <script src="/assets/js/overview-v2-status.js"></script>
+<!-- Session hours, shared with /api/market-session and Main Hub. Must load before overview-v2-session.js. -->
+<script src="/assets/js/trading-sessions.js"></script>
+<script src="/assets/js/overview-v2-session.js"></script>
 <script src="/assets/js/overview-v2-reports.js"></script>
 <script src="/assets/js/overview-v2-notes.js"></script>
 <script src="/assets/js/overview-btc-research.js"></script>

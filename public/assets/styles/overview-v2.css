@@ -301,3 +301,16 @@
   .ov2-main .ov2-card-head { flex-wrap: wrap; }
   .ov2-main .ov2-mm-value { flex-wrap: wrap; }
 }
+/* Market session pill: the same open/closed status Main Hub shows on its hero. */
+.ov2-session { display: inline-flex; align-items: center; gap: 9px; margin: 0; padding: 6px 13px 6px 11px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface2); min-width: 0; }
+.ov2-session[hidden] { display: none; }
+.ov2-session-dot { width: 8px; height: 8px; flex: 0 0 auto; border-radius: 50%; background: var(--muted); }
+.ov2-session-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.ov2-session-name { color: var(--text); font-size: 12.5px; font-weight: 600; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ov2-session-when { color: var(--muted); font-size: 11px; font-weight: 600; line-height: 1.25; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ov2-session.is-open { border-color: color-mix(in srgb, var(--green) 35%, transparent); }
+.ov2-session.is-open .ov2-session-dot { background: var(--green); box-shadow: 0 0 0 3px var(--green-bg); animation: ov2-session-pulse 2.4s ease-in-out infinite; }
+.ov2-session.is-open .ov2-session-when { color: var(--green); }
+@keyframes ov2-session-pulse { 0%, 100% { box-shadow: 0 0 0 3px var(--green-bg); } 50% { box-shadow: 0 0 0 6px transparent; } }
+@media (prefers-reduced-motion: reduce) { .ov2-session.is-open .ov2-session-dot { animation: none; } }
+@media (max-width: 720px) { .market-header-actions { flex-wrap: wrap; } .ov2-session { flex: 1 1 100%; } }
