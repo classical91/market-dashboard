@@ -66,13 +66,54 @@
       </div>
     </section>
 
+    <!-- Report widgets: the four news desks, plus the BTC Analytics and
+         Market Dominance reports from their own phone Shortcuts. Tabs switch
+         between them (overview-v2-reports.js); the collapsed line shows the
+         active tab's last report. -->
     <details class="ov2-news" id="ov2-news" open>
       <summary>
-        <span class="ov2-news-title">📰 News desks</span>
-        <span class="ov2-news-last" id="ov2-news-last" role="status">Loading…</span>
-        <a class="ov2-news-link" href="/briefings/top-10">Today’s Top 10 ↗</a>
+        <span class="ov2-news-title" data-news-part="news">📰 News desks</span>
+        <span class="ov2-news-title" data-news-part="btc-analytics" hidden>📊 BTC Analytics</span>
+        <span class="ov2-news-title" data-news-part="dominance" hidden>🥧 Market Dominance</span>
+        <span class="ov2-news-last" id="ov2-news-last" data-news-part="news" role="status">Loading…</span>
+        <span class="ov2-news-last" id="ov2-news-last-btc-analytics" data-news-part="btc-analytics" role="status" hidden>Loading…</span>
+        <span class="ov2-news-last" id="ov2-news-last-dominance" data-news-part="dominance" role="status" hidden>Loading…</span>
+        <a class="ov2-news-link" href="/briefings/top-10" data-news-part="news">Today’s Top 10 ↗</a>
       </summary>
-      <div class="ov2-desks" id="ov2-desks" aria-label="Desk briefings"><span class="ov2-flat" role="status">Loading reports…</span></div>
+      <div class="ov2-gen-tabs ov2-news-tabs" role="tablist" aria-label="Report widgets">
+        <button type="button" role="tab" id="ov2-news-tab-news" data-news-tab="news" aria-selected="true" aria-controls="ov2-news-panel-news">📰 News desks</button>
+        <button type="button" role="tab" id="ov2-news-tab-btc-analytics" data-news-tab="btc-analytics" aria-selected="false" aria-controls="ov2-news-panel-btc-analytics" tabindex="-1">📊 BTC Analytics</button>
+        <button type="button" role="tab" id="ov2-news-tab-dominance" data-news-tab="dominance" aria-selected="false" aria-controls="ov2-news-panel-dominance" tabindex="-1">🥧 Market Dominance</button>
+      </div>
+      <div class="ov2-news-panel" role="tabpanel" id="ov2-news-panel-news" aria-labelledby="ov2-news-tab-news">
+        <div class="ov2-desks" id="ov2-desks" aria-label="Desk briefings"><span class="ov2-flat" role="status">Loading reports…</span></div>
+      </div>
+      <div class="ov2-news-panel" role="tabpanel" id="ov2-news-panel-btc-analytics" aria-labelledby="ov2-news-tab-btc-analytics" hidden>
+        <div class="ov2-desks" id="ov2-reports-btc-analytics" aria-label="BTC Analytics reports"><span class="ov2-flat" role="status">Loading reports…</span></div>
+        <details class="ov2-report-help">
+          <summary>Send BTC Analytics from the iPhone Shortcut</summary>
+          <ol>
+            <li>After the <strong>Ask ChatGPT</strong> step, add <strong>Get Contents of URL</strong>.</li>
+            <li>URL: <code data-report-endpoint="btc-analytics">/api/phone-briefings/btc-analytics</code></li>
+            <li>Method <strong>POST</strong>. Header <code>x-broadcast-key</code> = your <code>BROADCAST_LEDGER_API_KEY</code>.</li>
+            <li>Request Body <strong>JSON</strong>, one field: <code>text</code> = the ChatGPT result (optional <code>title</code>).</li>
+          </ol>
+          <p>Sending the same text twice is stored once. The newest 30 reports are kept.</p>
+        </details>
+      </div>
+      <div class="ov2-news-panel" role="tabpanel" id="ov2-news-panel-dominance" aria-labelledby="ov2-news-tab-dominance" hidden>
+        <div class="ov2-desks" id="ov2-reports-dominance" aria-label="Market Dominance reports"><span class="ov2-flat" role="status">Loading reports…</span></div>
+        <details class="ov2-report-help">
+          <summary>Send Market Dominance from the iPhone Shortcut</summary>
+          <ol>
+            <li>After the <strong>Ask ChatGPT</strong> step, add <strong>Get Contents of URL</strong>.</li>
+            <li>URL: <code data-report-endpoint="dominance">/api/phone-briefings/dominance</code></li>
+            <li>Method <strong>POST</strong>. Header <code>x-broadcast-key</code> = your <code>BROADCAST_LEDGER_API_KEY</code>.</li>
+            <li>Request Body <strong>JSON</strong>, one field: <code>text</code> = the ChatGPT result (optional <code>title</code>).</li>
+          </ol>
+          <p>Sending the same text twice is stored once. The newest 30 reports are kept.</p>
+        </details>
+      </div>
     </details>
 
     <dialog class="ov2-review" id="ov2-news-review" aria-labelledby="ov2-review-title" aria-describedby="ov2-review-meta">
@@ -401,6 +442,7 @@
 <script src="/assets/js/briefing-markdown.js"></script>
 <script src="/assets/js/overview-news-review.js"></script>
 <script src="/assets/js/overview-v2-status.js"></script>
+<script src="/assets/js/overview-v2-reports.js"></script>
 <script src="/assets/js/overview-v2-notes.js"></script>
 <script src="/assets/js/overview-btc-research.js"></script>
 <script src="/assets/js/ui.js"></script>

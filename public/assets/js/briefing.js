@@ -157,7 +157,8 @@
     }));
     return Promise.all([getJson("/api/phone-briefings"), getJson("/api/phone-briefings/" + desk), reporterRuns])
       .then(function (results) {
-        categories = results[0].categories || [];
+        // The analytics reports (BTC Analytics, Market Dominance) live on Overview v2.
+        categories = (results[0].categories || []).filter(function (cat) { return DESKS.indexOf(cat.key) !== -1; });
         results[2].forEach(function (result) { generationsByDesk[result.key] = result.generations; });
         runs = (results[1].runs || []).map(function (run) {
           return { source: "phone", id: run.id, at: run.receivedAt };

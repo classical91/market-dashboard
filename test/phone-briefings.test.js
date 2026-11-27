@@ -43,10 +43,23 @@ test("a briefing is stored per desk, newest first, and retries are not duplicate
   assert.equal(store.history("geopolitics")[0].text, undefined, "history lists runs without their text");
 
   const summary = store.summary();
-  assert.deepEqual(summary.map((desk) => desk.key), ["geopolitics", "economics", "stocks", "crypto"]);
+  assert.deepEqual(summary.map((desk) => desk.key), ["geopolitics", "economics", "stocks", "crypto", "btc-analytics", "dominance"]);
+  assert.deepEqual(summary.map((desk) => desk.group), ["news", "news", "news", "news", "analytics", "analytics"]);
   assert.equal(summary[0].latest.id, second.entry.id);
   assert.equal(summary[0].count, 2);
   assert.equal(summary[1].latest, null);
+});
+
+test("BTC Analytics and Market Dominance reports are kept as their own categories", () => {
+  const store = newStore();
+  assert.equal(store.receive("btc-analytics", { text: "BTC above the 200D" }).entry.category, "btc-analytics");
+  assert.equal(store.receive("BTC_Analytics", { text: "Funding flat" }).entry.category, "btc-analytics");
+  assert.equal(store.receive("Market-Dominance", { text: "BTC.D 58%" }).entry.category, "dominance");
+  assert.equal(store.receive("btc.d", { text: "BTC.D 59%" }).entry.category, "dominance");
+  assert.equal(store.receive("btc", { text: "desk" }).entry.category, "crypto", "bare btc stays the Crypto desk");
+  assert.equal(store.history("btc-analytics").length, 2);
+  assert.equal(store.history("dominance").length, 2);
+  assert.equal(store.history("crypto").length, 1);
 });
 
 test("desk names the Reporter Room or Telegram use resolve to the four desks", () => {
@@ -125,6 +138,7 @@ test("the Shortcut pushes with the ledger key; reads need the site login", async
     assert.equal(page.status, 200);
     assert.match(await page.text(), /assets\/js\/briefing\.js/);
     assert.equal((await read("/briefings/weather")).status, 404);
+    assert.equal((await read("/briefings/btc-analytics")).status, 404, "analytics reports have no desk page");
 
     // The old desk pages land on the briefing that replaced them.
     for (const [old, next] of [

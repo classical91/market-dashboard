@@ -303,6 +303,14 @@ After each **Ask ChatGPT** step, the Shortcut adds **Get Contents of URL**:
 To send all four in one request, `POST /api/phone-briefings` with
 `{ "geopolitics": "…", "economics": "…", "stocks": "…", "crypto": "…" }`.
 
+Two more Shortcuts push reports the same way: `btc-analytics` (BTC Analytics)
+and `dominance` (Market Dominance; `market-dominance` and `btc.d` are accepted).
+They have no `/briefings/<desk>` page; Overview v2's report widget shows them
+on its **📊 BTC Analytics** and **🥧 Market Dominance** tabs next to
+**📰 News desks** — the newest report and the three before it, each opening in
+the review dialog. `GET /api/phone-briefings` lists every category with its
+`group` (`news` or `analytics`). The bare name `btc` still means the Crypto desk.
+
 Re-sending the same text for a desk is stored once. Each desk keeps its last 30
 runs in `<DATA_DIR>/phone-briefings.json`; the page shows the newest, a picker
 for earlier runs, and marks a desk amber once its latest briefing is over 48

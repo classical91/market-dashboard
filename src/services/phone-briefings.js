@@ -24,12 +24,18 @@ const DEFAULT_HISTORY_PER_CATEGORY = 30;
 const MAX_TEXT_LEN = 50000;
 const MAX_TITLE_LEN = 200;
 
+// `news` are the four desks (their pages live at /briefings/<key>);
+// `analytics` are reports from their own Shortcuts, read on Overview v2's
+// BTC Analytics and Market Dominance tabs.
 const CATEGORIES = [
-  { key: "geopolitics", label: "Geopolitics", icon: "🌍" },
-  { key: "economics", label: "Economics", icon: "🏦" },
-  { key: "stocks", label: "Stocks", icon: "📈" },
-  { key: "crypto", label: "Crypto", icon: "₿" },
+  { key: "geopolitics", label: "Geopolitics", icon: "🌍", group: "news" },
+  { key: "economics", label: "Economics", icon: "🏦", group: "news" },
+  { key: "stocks", label: "Stocks", icon: "📈", group: "news" },
+  { key: "crypto", label: "Crypto", icon: "₿", group: "news" },
+  { key: "btc-analytics", label: "BTC Analytics", icon: "📊", group: "analytics" },
+  { key: "dominance", label: "Market Dominance", icon: "🥧", group: "analytics" },
 ];
+const NEWS_DESK_KEYS = CATEGORIES.filter((category) => category.group === "news").map((category) => category.key);
 // The Shortcut may name a desk the way the Reporter Room or Telegram does.
 const CATEGORY_ALIASES = {
   geopolitical: "geopolitics",
@@ -40,6 +46,18 @@ const CATEGORY_ALIASES = {
   market: "stocks",
   btc: "crypto",
   cryptocurrency: "crypto",
+  // `btc` alone stays the Crypto desk; the analytics report says so in full.
+  "btc-analytic": "btc-analytics",
+  btc_analytics: "btc-analytics",
+  btcanalytics: "btc-analytics",
+  "bitcoin-analytics": "btc-analytics",
+  bitcoin_analytics: "btc-analytics",
+  "market-dominance": "dominance",
+  market_dominance: "dominance",
+  marketdominance: "dominance",
+  dominances: "dominance",
+  "btc-dominance": "dominance",
+  "btc.d": "dominance",
 };
 
 function normalizeCategory(value) {
@@ -143,4 +161,4 @@ class PhoneBriefingStore {
   }
 }
 
-module.exports = { PhoneBriefingStore, CATEGORIES, normalizeCategory, MAX_TEXT_LEN };
+module.exports = { PhoneBriefingStore, CATEGORIES, NEWS_DESK_KEYS, normalizeCategory, MAX_TEXT_LEN };
