@@ -2436,7 +2436,10 @@
       }
     });
     var emptyEl = document.getElementById("glossaryEmpty");
-    if (emptyEl) emptyEl.hidden = Object.keys(anyVisible).length > 0;
+    var hasMatches = Object.keys(anyVisible).length > 0;
+    if (emptyEl) emptyEl.hidden = hasMatches;
+    var reader = document.getElementById("glossaryReadRandom");
+    if (reader) reader.disabled = !hasMatches;
   }
 
   function populateJumpMenu() {
@@ -2492,10 +2495,9 @@
     return from[Math.floor(random() * from.length) % from.length];
   }
 
-  // Sends the reader to a random concept page. `pool` defaults to the whole
-  // glossary; the glossary page passes the cards left after a search.
-  function goToRandomConcept(pool, currentId) {
-    var entries = pool && pool.length ? pool : ALL_GLOSSARY;
+  function takeRandomConcept(pool, currentId) {
+    var entries = pool || ALL_GLOSSARY;
+    if (!entries.length) return null;
     var seen = readSeen();
     var poolIds = {};
     entries.forEach(function (e) { poolIds[e.id] = true; });
@@ -2505,30 +2507,29 @@
       seen = seen.filter(function (id) { return !poolIds[id]; });
     }
     var pick = pickRandomEntry(entries, seen, currentId);
-    if (!pick) return;
     seen.push(pick.id);
     writeSeen(seen);
-    window.location.assign(conceptHref(pick));
+    return pick;
+  }
+
+  function goToRandomConcept(pool, currentId) {
+    var pick = takeRandomConcept(pool && pool.length ? pool : null, currentId);
+    if (pick) window.location.assign(conceptHref(pick));
+  }
+
+  function currentSearchPool() {
+    var search = document.getElementById("glossarySearch");
+    var tokens = queryTokens(search ? search.value : "");
+    return tokens.length ? ALL_GLOSSARY.filter(function (entry) {
+      return matchesQuery(searchIndex(entry), tokens);
+    }) : null;
   }
 
   function setupRandomButton() {
     var button = document.getElementById("glossaryRandom");
     if (!button) return;
-    var byId = {};
-    ALL_GLOSSARY.forEach(function (e) { byId[e.id] = e; });
     button.addEventListener("click", function () {
-      var search = document.getElementById("glossarySearch");
-      var pool = null;
-      if (search && search.value.trim()) {
-        // With a search active, stay within the matching concepts.
-        pool = [];
-        document.querySelectorAll(".glossary-card").forEach(function (card) {
-          if (card.style.display === "none") return;
-          var entry = byId[card.id.replace(/^term-/, "")];
-          if (entry) pool.push(entry);
-        });
-      }
-      goToRandomConcept(pool);
+      goToRandomConcept(currentSearchPool());
     });
   }
 
@@ -2598,6 +2599,8 @@
     queryTokens: queryTokens,
     matchesQuery: matchesQuery,
     pickRandomEntry: pickRandomEntry,
+    takeRandomConcept: takeRandomConcept,
+    currentSearchPool: currentSearchPool,
     goToRandomConcept: goToRandomConcept,
   };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
