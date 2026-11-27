@@ -144,7 +144,11 @@
   letter-spacing: 0.02em;
   white-space: nowrap;
 }
-.ts-ticker--active { background: rgba(121, 242, 192, 0.14); color: #79f2c0; }
+.ts-ticker--active {
+  position: relative; /* keep the screen-reader label inside the scrolling list */
+  background: rgba(121, 242, 192, 0.14);
+  color: #79f2c0;
+}
 .ts-ticker--none { color: #8892a6; font-weight: 600; }
 /* Outcome sticker beside the ticker: how the trade ended. Slightly tilted so it
    reads as a sticker slapped on the note, not another ticker chip. */
