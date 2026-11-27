@@ -72,16 +72,24 @@
           <input class="ts-input ts-input--ticker" id="ts-ticker" list="ts-tickers" placeholder="Ticker" maxlength="24"
             autocomplete="off" aria-label="Ticker for the next screenshots" />
           <datalist id="ts-tickers"></datalist>
-          <textarea class="ts-input ts-input--note" id="ts-note" rows="4" maxlength="20000"
-            placeholder="Write up the trade (optional) &mdash; plan, entry, stop, targets. Markdown works: ## heading, **bold**, - list, | table |. Pasting a ChatGPT answer keeps its formatting."
-            aria-label="Note for the next screenshots"></textarea>
         </div>
+        <!-- Composer: screenshots collect in a grid, the note goes under
+             them, and Post saves them together as one entry. -->
         <div class="ts-drop" id="ts-drop" tabindex="0" role="button" aria-describedby="ts-drop-hint"
           aria-label="Add screenshots: drop, paste, or choose files">
           <input type="file" id="ts-file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden />
           <div class="ts-drop-icon" aria-hidden="true">&#8681;</div>
           <div class="ts-drop-title" id="ts-drop-title">Drop screenshots here</div>
-          <div class="ts-drop-hint" id="ts-drop-hint">Several at once stay together in one entry. Paste works anywhere on the page.</div>
+          <div class="ts-drop-hint" id="ts-drop-hint">Add as many as you like &mdash; they post together as one note. Paste works anywhere on the page.</div>
+        </div>
+        <div class="ts-staged" id="ts-staged" aria-label="Screenshots for this note" hidden></div>
+        <textarea class="ts-input ts-input--note" id="ts-note" rows="4" maxlength="20000"
+          placeholder="Write up the trade (optional) &mdash; plan, entry, stop, targets. Markdown works: ## heading, **bold**, - list, | table |. Pasting a ChatGPT answer keeps its formatting."
+          aria-label="Note for these screenshots"></textarea>
+        <div class="ts-compose-actions">
+          <span class="ts-compose-hint" id="ts-compose-hint">Add a screenshot to post.</span>
+          <button class="ts-btn" type="button" id="ts-clear" hidden>Clear</button>
+          <button class="ts-btn ts-btn--primary" type="button" id="ts-post" disabled>Post note</button>
         </div>
         <div class="ts-status" id="ts-status" role="status" aria-live="polite"></div>
         <div class="ts-list" id="ts-list" aria-live="polite"></div>
@@ -99,7 +107,7 @@
           <li><strong>Let the order do the triage.</strong> Attention sorting puts a pair that just moved above one that merely disagrees, and disagreement above agreement &mdash; CONFLICT is the reading worth stopping for, ALIGNED the least urgent thing a card can say. The filters narrow a long watchlist to the cards worth opening; neither decides anything about a trade, they only decide what you look at first.</li>
           <li><strong>Scan the CHANGED blocks first.</strong> They report what moved since the previous closed candle &mdash; a context state flipping, a bias check turning over, a divergence appearing. On a long watchlist this is what narrows fifteen pairs down to the few worth opening; the states below tell you where things stand, not what is new.</li>
           <li><strong>Check the DATA line before you trust the card.</strong> It reports how long ago the newest closed candle closed and how long ago each engine last recalculated. A card flagged STALE is showing evidence the feed or the cache has stopped advancing &mdash; the numbers are real, but they are not now.</li>
-          <li><strong>Keep your own marked-up charts in Trade notes.</strong> Type a ticker, then drop screenshots on the grey box (or paste one anywhere on the page). Each drop becomes one timestamped entry, with several images side by side; dropping onto a trade card files it under that card's ticker, and dropping onto an entry adds to it. The note box is your trade journal: write a full post in it, or paste a ChatGPT analysis &mdash; headings, bold, lists and tables render as formatted text, and <strong>Read full note</strong> opens the whole post with its charts. The &#9998; button reopens an entry to rewrite its note or add more photos (<strong>+ Add photos</strong>, or paste while it's open). Once a ticker has two entries they fold into a <strong>$TICKER</strong> folder. Tickers you're tracking here show a green dot.</li>
+          <li><strong>Keep your own marked-up charts in Trade notes.</strong> Type a ticker, then drop screenshots on the grey box (or paste them anywhere on the page) &mdash; they collect in a grid, the note goes underneath, and <strong>Post note</strong> saves them as one timestamped entry; dropping onto a trade card adds it with that card's ticker, and dropping onto a saved entry adds to it straight away. The note box is your trade journal: write a full post in it, or paste a ChatGPT analysis &mdash; headings, bold, lists and tables render as formatted text, and <strong>Read full note</strong> opens the whole post with its charts. The &#9998; button reopens an entry to rewrite its note or add more photos (<strong>+ Add photos</strong>, or paste while it's open). Once a ticker has two entries they fold into a <strong>$TICKER</strong> folder. Tickers you're tracking here show a green dot.</li>
           <li><strong>Remove a pair when you're done following it.</strong> Press Remove on its card, then confirm the pair and timeframe. Cancel keeps it tracked. This is a research watchlist; removing a card does not place, manage, or close trades.</li>
         </ol>
         <ul class="aia-how-notes">
