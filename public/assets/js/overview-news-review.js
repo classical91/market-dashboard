@@ -31,7 +31,8 @@
       : "Latest report";
 
     if (desk.failed || (!desk.at && desk.partial)) {
-      body.innerHTML = '<p class="ov2-review-notice" role="status">Could not load this report.' + (hasDesk ? " Open the desk page to try again." : " Try again in a moment.") + "</p>";
+      body.innerHTML = '<p class="ov2-review-notice" role="status">' +
+        (hasDesk ? "Could not load reports. Open the desk page to try again." : "Could not load this report. Try again in a moment.") + "</p>";
     } else if (!desk.at) {
       body.innerHTML = '<p class="ov2-review-notice">No report recorded for this desk yet.' + (hasDesk ? " Open the desk page to run one." : "") + "</p>";
     } else {
