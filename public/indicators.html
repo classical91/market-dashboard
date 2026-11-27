@@ -301,6 +301,28 @@
     }
     .glossary-random:hover { border-color: var(--blue); background: rgba(77, 163, 255, 0.22); }
     .glossary-random:focus-visible { outline: none; box-shadow: var(--ui-focus); }
+    .glossary-random[hidden], .glossary-reader [hidden] { display: none; }
+    .glossary-random:disabled, .glossary-reader button:disabled { opacity: 0.55; cursor: default; }
+    .glossary-reader {
+      width: min(580px, calc(100% - 32px));
+      max-height: calc(100% - 32px);
+      margin: auto;
+      padding: clamp(16px, 4vw, 24px);
+      overflow: auto;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      color: var(--text);
+    }
+    .glossary-reader::backdrop { background: rgba(0, 0, 0, 0.65); }
+    .glossary-reader-head, .glossary-reader-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+    .glossary-reader-head { justify-content: space-between; margin-bottom: 12px; }
+    .glossary-reader-title { font-size: 20px; line-height: 1.25; }
+    .glossary-reader p { color: var(--soft); font-size: 14px; line-height: 1.55; margin-bottom: 12px; }
+    .glossary-reader h3 { font-size: 14px; margin-bottom: 4px; }
+    .glossary-reader button { font-family: inherit; cursor: pointer; }
+    .glossary-reader-status:not(:empty) { margin-top: 12px; }
+    .glossary-reader p.glossary-reader-status { margin-bottom: 0; }
     @media (max-width: 640px) {
       /* Full-width tap target right under the title on phones. */
       .glossary-random { width: 100%; }
@@ -377,6 +399,9 @@
         <button class="glossary-random" id="glossaryRandom" type="button" title="Open a random concept (stays within your search results when searching)">
           <span aria-hidden="true">&#127922;</span> Random topic
         </button>
+        <button class="glossary-random" id="glossaryReadRandom" type="button" aria-haspopup="dialog" hidden>
+          Read a random topic
+        </button>
       </div>
     </div>
 
@@ -404,6 +429,22 @@
     </div>
     <div class="glossary-side-backdrop" id="glossarySideBackdrop"></div>
 
+    <dialog class="glossary-reader" id="glossaryReader" aria-labelledby="glossaryReaderTitle">
+      <div class="glossary-reader-head">
+        <h2 class="glossary-reader-title" id="glossaryReaderTitle" aria-live="polite"></h2>
+        <form method="dialog"><button class="glossary-topics-button" autofocus>Close</button></form>
+      </div>
+      <p id="glossaryReaderDefinition"></p>
+      <h3>How to read it</h3>
+      <p id="glossaryReaderInterpretation"></p>
+      <div class="glossary-reader-actions">
+        <button class="glossary-topics-button" id="glossaryReaderPlayback" type="button">Read aloud</button>
+        <button class="glossary-topics-button" id="glossaryReaderNext" type="button">Another topic</button>
+        <a class="glossary-topic-link" id="glossaryReaderLink">Open full topic</a>
+      </div>
+      <p class="glossary-reader-status" id="glossaryReaderStatus" role="status"></p>
+    </dialog>
+
     <footer>Indicators Glossary &mdash; <a href="/">Market Command</a></footer>
 
   </main>
@@ -412,5 +453,6 @@
 <script src="/assets/js/sidebar.js"></script>
 <script src="/assets/js/glossary-topics.js"></script>
 <script src="/assets/js/indicators.js"></script>
+<script src="/assets/js/glossary-reader.js"></script>
 </body>
 </html>
