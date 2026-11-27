@@ -617,8 +617,23 @@
       '<polyline points="' + points + '" fill="none" stroke="currentColor" stroke-width="1.6" vector-effect="non-scaling-stroke" /></svg>';
   }
 
+  // Same TradingView link as the Market Matrix page's ↗: the panel's
+  // concept on TradingView at the panel's timeframe. Link-out only.
+  var TV_INTERVALS = { "5m": "5", "15m": "15", "30m": "30", "1h": "60", "4h": "240", "1D": "D", "1W": "W" };
+
+  function matrixTicker(panel, data) {
+    var label = data && data.symbol ? data.symbol.label : panel.symbol;
+    var tv = data && data.symbol && data.symbol.tvSymbol;
+    if (!tv) return "<strong>" + esc(label) + "</strong>";
+    var href = "https://www.tradingview.com/chart/?symbol=" + encodeURIComponent(tv) +
+      "&interval=" + encodeURIComponent(TV_INTERVALS[panel.tf] || "60");
+    return '<a class="ov2-mm-tv" href="' + esc(href) + '" target="_blank" rel="noopener noreferrer" title="Open ' + esc(tv) +
+      ' on TradingView" aria-label="Open ' + esc(label) + ' on TradingView"><strong>' + esc(label) +
+      '</strong><span aria-hidden="true">&#8599;</span></a>';
+  }
+
   function matrixPanel(panel, data, err) {
-    var head = '<div class="ov2-mm-head"><strong>' + esc(data ? data.symbol.label : panel.symbol) + "</strong><span>" +
+    var head = '<div class="ov2-mm-head">' + matrixTicker(panel, data) + "<span>" +
       esc(data ? data.timeframeLabel : panel.tf) + "</span></div>";
     if (err || !data || !data.available) {
       return '<div class="ov2-mm-panel">' + head + '<p class="ov2-mm-empty ov2-warn">' +

@@ -229,6 +229,28 @@ test("generation widget shows timeframe tiles, filters the log, and switches to 
   assert.doesNotMatch(nodes["ov2-generation-log"].innerHTML, /BTCUSDT/);
 });
 
+test("Market Matrix tickers open the same symbol and timeframe on TradingView", async () => {
+  const nodes = await run({
+    "/api/market-matrix/chart?symbol=NQ": {
+      available: true, value: 21000, changePct: 0.5, timeframeLabel: "1H", candles: [{ close: 1 }, { close: 2 }],
+      symbol: { id: "NQ", label: "NQ1!", name: "Nasdaq-100 E-mini futures", format: "price", tvSymbol: "CME_MINI:NQ1!" },
+      source: { label: "Yahoo Finance" },
+    },
+    "/api/market-matrix/chart?symbol=USDT.D": {
+      available: false, error: "stale", timeframeLabel: "1H",
+      symbol: { id: "USDT.D", label: "USDT.D", tvSymbol: null },
+    },
+  });
+  const html = nodes["ov2-matrix"].innerHTML;
+  assert.match(html, /<a class="ov2-mm-tv" href="https:\/\/www\.tradingview\.com\/chart\/\?symbol=CME_MINI%3ANQ1!&amp;interval=60" target="_blank" rel="noopener noreferrer"[^>]*><strong>NQ1!<\/strong>/);
+  assert.match(html, /aria-label="Open NQ1! on TradingView"/);
+  // No tvSymbol, or no chart response at all: the ticker stays plain text.
+  assert.match(html, /<strong>USDT\.D<\/strong>/);
+  assert.doesNotMatch(html, /Open USDT\.D on TradingView/);
+  assert.match(html, /<strong>DXY<\/strong>/);
+  assert.equal((html.match(/class="ov2-mm-tv"/g) || []).length, 1);
+});
+
 test("Overview v2 carries the news tab, status row and Market Matrix card", () => {
   const html = read("overview-v2.html");
   for (const id of ["ov2-news", "ov2-news-last", "ov2-desks", "ov2-system", "ov2-matrix", "ov2-generation-log"]) {
