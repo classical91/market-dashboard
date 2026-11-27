@@ -146,3 +146,29 @@ test("sections move and delete like symbols, leaving the symbols in place", () =
   state = W.removeTicker(state, "f", "###Alts");
   assert.deepEqual(W.findFolder(state, "f").tickers, ["BTCUSDT", "SOLUSDT"]);
 });
+
+test("addPreset adds starter watchlists once, with valid symbols", () => {
+  for (const preset of W.PRESETS) {
+    for (const t of preset.tickers) {
+      if (!W.isSection(t)) assert.equal(W.normalizeSymbol(t), t, `${preset.id}: ${t}`);
+    }
+  }
+  const start = W.defaultState();
+  const added = W.addPreset(start, "altcoins");
+  assert.equal(added.error, null);
+  assert.equal(added.existed, false);
+  assert.equal(added.state.folders.length, 2);
+  assert.equal(added.state.activeId, added.folder.id);
+  assert.equal(added.folder.bookmark, "purple");
+  assert.ok(added.folder.tickers.includes("BINANCE:SOLUSDT.P"));
+  assert.ok(W.groupsOf(added.folder).some((g) => g.name === "Memes"));
+  // survives a save round-trip unchanged
+  const saved = W.normalize(added.state);
+  assert.deepEqual(W.findFolder(saved, added.folder.id).tickers, added.folder.tickers);
+
+  const again = W.addPreset(added.state, "altcoins");
+  assert.equal(again.existed, true);
+  assert.equal(again.state.folders.length, 2);
+  assert.equal(start.folders.length, 1);
+  assert.ok(W.addPreset(start, "nope").error);
+});

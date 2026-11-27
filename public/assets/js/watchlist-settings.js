@@ -137,6 +137,28 @@
     toast();
   });
 
+  /* ── Starter watchlists: one click adds a ready-made list ── */
+  var presetsEl = document.getElementById('wlsPresets');
+  if (presetsEl && W.PRESETS) {
+    presetsEl.insertAdjacentHTML('beforeend', W.PRESETS.map(function (p) {
+      var n = p.tickers.filter(function (t) { return !W.isSection(t); }).length;
+      return '<button type="button" class="wls-preset" data-preset="' + esc(p.id) + '">' +
+        W.flagSvg(p.bookmark, 12) + '<span class="wls-folder-name">+ ' + esc(p.name) + '</span>' +
+        '<span class="wls-folder-count">' + n + '</span></button>';
+    }).join(''));
+    presetsEl.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-preset]');
+      if (!btn) return;
+      var res = W.addPreset(state, btn.getAttribute('data-preset'));
+      if (res.error) { note = { text: res.error, tone: 'warn' }; render(); return; }
+      note = res.existed
+        ? { text: 'You already have a watchlist called ' + res.folder.name + ' — opened it instead.', tone: 'warn' }
+        : { text: 'Added ' + res.folder.name + '. Edit, reorder or remove anything below.', tone: 'ok' };
+      save(res.state, '.wls-folder.is-active');
+      if (!res.existed) toast();
+    });
+  }
+
   editor.addEventListener('change', function (e) {
     var folder = W.activeFolder(state);
     if (!folder) return;
