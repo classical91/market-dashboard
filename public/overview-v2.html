@@ -37,10 +37,17 @@
 
     <nav class="market-jump-nav" aria-label="Overview sections">
       <a href="#mini-x-portal">Intelligent Portal</a>
+      <a href="#ov2-news">News desks</a>
+      <a href="#btc-research">BTC research</a>
+      <a href="#ov2-notes">My notes</a>
+      <a href="#market-matrix">Market matrix</a>
+      <a href="#ov2-watchlist">Watchlist</a>
+      <a href="#generation-log">Generation log</a>
       <a href="#ov2-grid">Screeners</a>
       <a href="#cross-market-oi">Open interest</a>
       <a href="#rsi-matrix">RSI matrix</a>
       <a href="#technical-analysis">Technical ratings</a>
+      <a href="#overview-guide">Guide</a>
     </nav>
 
     <!-- Restored mini portal: original Markets and Crypto shortcuts. -->
@@ -165,7 +172,7 @@
         </section>
       </div>
       <div class="ov2-right-column">
-        <article class="ov2-matrix-card" aria-labelledby="ov2-matrix-title">
+        <article class="ov2-matrix-card" id="market-matrix" aria-labelledby="ov2-matrix-title">
           <header class="ov2-matrix-head">
             <h2 id="ov2-matrix-title">Market Matrix</h2>
             <span class="ov2-stamp" id="ov2-matrix-meta">Loading…</span>
@@ -195,7 +202,7 @@
         </section>
       </div>
       <!-- Generation Log spans both columns so the chart and read get the full width. -->
-      <section class="ov2-generation-card" aria-labelledby="ov2-generation-title">
+      <section class="ov2-generation-card" id="generation-log" aria-labelledby="ov2-generation-title">
         <div class="ov2-generation-head">
           <div><h2 id="ov2-generation-title">Generation Log</h2><p id="ov2-generation-subtitle">Saved layouts: latest read per timeframe</p></div>
           <a id="ov2-generation-open" href="/layout-analysis.html#aia-log">Full log ↗</a>
@@ -449,7 +456,7 @@
       </div>
     </section>
 
-    <details class="ov2-guide">
+    <details class="ov2-guide" id="overview-guide">
       <summary>How to read this overview</summary>
       <p>These cards summarize the same data as their full screeners. Counts use each screener’s configured universe and can differ between cards. Risk on / risk off describes bullish versus bearish breadth, not a combined market score or a trade entry.</p>
       <p>Bias and extremes use the selected timeframe with four minimum agreeing checks. Patterns sweep 1h / 4h / 1D. Crypto OI shows 24h changes; cross-market positioning uses weekly CFTC reports with a one-week comparison. RSI uses all enabled timeframes and requires every reading for an average.</p>
