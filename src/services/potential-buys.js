@@ -155,10 +155,10 @@ function summarize(items, now = Date.now()) {
   };
 }
 
-function normalizeLabel(value) {
+function normalizeLabel(value, maxChars = MAX_LABEL_CHARS) {
   if (value === undefined || value === null) return "";
   if (typeof value !== "string") throw httpError("label must be text", 400);
-  return formatLabel(value).slice(0, MAX_LABEL_CHARS);
+  return formatLabel(value).slice(0, maxChars).trim();
 }
 
 class PotentialBuysStore {
@@ -166,12 +166,14 @@ class PotentialBuysStore {
    * `name` picks the folder and JSON file under DATA_DIR and `title` the
    * name used in error messages, so another page (Active Trades' screenshot
    * notes) can keep its own separate collection with the same rules.
+   * `maxLabelChars` lets that collection take longer notes.
    */
   constructor({
     dataDir,
     name = "potential-buys",
     title = "Potential Buys",
     urlPrefix = "/potential-buys-images",
+    maxLabelChars = MAX_LABEL_CHARS,
     now = () => Date.now(),
     logger = console,
   }) {
@@ -179,6 +181,7 @@ class PotentialBuysStore {
     this.file = path.join(dataDir, `${name}.json`);
     this.title = title;
     this.urlPrefix = urlPrefix;
+    this.maxLabelChars = maxLabelChars;
     this.now = now;
     this.logger = logger;
     this._lock = { depth: 0 };
@@ -233,7 +236,7 @@ class PotentialBuysStore {
   /** Store one screenshot from its raw bytes. */
   add(bytes, { label, batch } = {}) {
     const sniffed = this._checkImage(bytes);
-    const cleanLabel = normalizeLabel(label);
+    const cleanLabel = normalizeLabel(label, this.maxLabelChars);
     const cleanBatch = normalizeBatch(batch);
     return this._withLock(() => {
       const items = this._read();
@@ -323,7 +326,7 @@ class PotentialBuysStore {
   /** Change a screenshot's label (ticker, note). */
   update(id, { label }) {
     if (!isPotentialBuyId(id)) throw httpError("Unknown screenshot id.", 400);
-    const cleanLabel = normalizeLabel(label);
+    const cleanLabel = normalizeLabel(label, this.maxLabelChars);
     return this._withLock(() => {
       const items = this._read();
       const item = items.find((entry) => entry.id === id);

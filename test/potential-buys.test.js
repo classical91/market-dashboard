@@ -148,3 +148,16 @@ test("POST / passes ?batch= through to the store", async () => {
     server.close();
   }
 });
+
+test("labels keep line breaks, and a store can take longer notes", () => {
+  const { store } = makeStore();
+  const multi = store.add(PNG, { label: "$sol  plan\r\n\r\n\r\n  entry 140,\tstop 132  \n" });
+  assert.equal(multi.label, "$SOL plan\n\nentry 140, stop 132");
+  assert.deepEqual(multi.tags, ["SOL"]);
+  assert.equal(store.add(PNG, { label: "x".repeat(500) }).label.length, 140);
+
+  const { store: notes } = makeStore({ name: "active-trade-shots", maxLabelChars: 1000 });
+  assert.equal(notes.add(PNG, { label: "x".repeat(1500) }).label.length, 1000);
+  const item = notes.add(PNG, { label: "$BTC short" });
+  assert.equal(notes.update(item.id, { label: "y".repeat(600) }).label.length, 600);
+});

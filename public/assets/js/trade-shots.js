@@ -38,6 +38,7 @@
     uploading: 0,
     open: {},        // folder tag → true when expanded
     editing: null,   // entry key being relabelled
+    draft: null,     // unsaved note text while editing, kept across re-renders
     active: [],      // base tickers of the tracked pairs, e.g. ["BTC", "XRP"]
   };
 
@@ -119,7 +120,7 @@
   function noteOf(entry) {
     if (!entry.tag) return entry.label;
     var re = new RegExp("(^|\\s)[$#]" + entry.tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "(?=\\s|$)", "i");
-    return entry.label.replace(re, " ").replace(/\s+/g, " ").trim();
+    return entry.label.replace(re, " ").replace(/[^\S\n]+/g, " ").replace(/ ?\n ?/g, "\n").trim();
   }
 
   function isActive(tag) {
@@ -169,10 +170,18 @@
       "</div>" +
       (editing
         ? '<form class="ts-edit" data-role="edit-form">' +
-            '<input class="ts-input" name="label" value="' + escapeHtml(entry.label) + '" maxlength="140" ' +
-              'aria-label="Ticker and note" placeholder="$BTC entry, stop under range low" />' +
-            '<button class="ts-btn ts-btn--primary" type="submit">Save</button>' +
-            '<button class="ts-btn" type="button" data-role="edit-cancel">Cancel</button>' +
+            '<textarea class="ts-input ts-input--note" name="label" rows="5" maxlength="1000" ' +
+              'aria-label="Ticker and note" placeholder="$BTC entry, stop under range low">' +
+              escapeHtml(state.draft != null ? state.draft : entry.label) + "</textarea>" +
+            '<span class="ts-edit-hint">Enter for a new line &middot; Ctrl+Enter to save</span>' +
+            '<div class="ts-edit-actions">' +
+              (entry.batch
+                ? '<input class="ts-edit-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden />' +
+                  '<button class="ts-btn" type="button" data-role="edit-add" title="Add more screenshots to this entry (or paste one)">&#43; Add photos</button>'
+                : "") +
+              '<button class="ts-btn ts-btn--primary" type="submit">Save</button>' +
+              '<button class="ts-btn" type="button" data-role="edit-cancel">Cancel</button>' +
+            "</div>" +
           "</form>"
         : note ? '<p class="ts-note">' + escapeHtml(note) + "</p>" : "") +
       thumbs(entry) +
@@ -361,6 +370,7 @@
         replaceItem(data.item);
       }
       state.editing = null;
+      state.draft = null;
       var tag = Ticker.extractTags(label)[0];
       if (tag) state.open[tag] = true;
       setStatus("Saved.");
@@ -477,7 +487,10 @@
     var files = imageFiles(e.clipboardData && e.clipboardData.files);
     if (!files.length) return;
     e.preventDefault();
-    upload(files);
+    // While an entry is open for editing, a pasted screenshot joins it.
+    var editingEntry = state.editing && entryByKey(state.editing);
+    if (editingEntry) addToEntry(editingEntry, files);
+    else upload(files);
   });
 
   el.list.addEventListener("click", function (e) {
@@ -496,12 +509,17 @@
     if (!entry) return;
     if (role === "edit") {
       state.editing = entry.key;
+      state.draft = null;
       render();
-      var input = el.list.querySelector('[data-role="edit-form"] input');
-      if (input) { input.focus(); input.select(); }
+      var input = el.list.querySelector('[data-role="edit-form"] textarea');
+      if (input) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
     } else if (role === "edit-cancel") {
       state.editing = null;
+      state.draft = null;
       render();
+    } else if (role === "edit-add") {
+      var picker = entryEl.querySelector(".ts-edit-file");
+      if (picker) picker.click();
     } else if (role === "remove-entry") {
       var n = entry.items.length;
       if (window.confirm("Delete this " + (entry.tag ? "$" + entry.tag + " " : "") + "entry" +
@@ -522,10 +540,32 @@
     if (entry) relabel(entry, Ticker.formatLabel(form.elements.label.value));
   });
 
+  // Keep the half-typed note when an upload re-renders the list.
+  el.list.addEventListener("input", function (e) {
+    if (e.target.name === "label" && e.target.closest('[data-role="edit-form"]')) state.draft = e.target.value;
+  });
+
+  // "+ Add photos" in the edit form: the chosen images join this entry.
+  el.list.addEventListener("change", function (e) {
+    if (!e.target.classList.contains("ts-edit-file")) return;
+    var files = Array.prototype.slice.call(e.target.files || []);
+    e.target.value = "";
+    var entryEl = e.target.closest(".ts-entry");
+    var entry = entryEl && entryByKey(entryEl.getAttribute("data-entry"));
+    if (entry && files.length) addToEntry(entry, files);
+  });
+
   el.list.addEventListener("keydown", function (e) {
-    if (e.key === "Escape" && e.target.closest('[data-role="edit-form"]')) {
+    var form = e.target.closest('[data-role="edit-form"]');
+    if (!form) return;
+    if (e.key === "Escape") {
       state.editing = null;
+      state.draft = null;
       render();
+    } else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+      // Plain Enter starts a new line in the note; Ctrl/Cmd+Enter saves.
+      e.preventDefault();
+      form.requestSubmit();
     }
   });
 

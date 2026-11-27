@@ -24,8 +24,19 @@
   /** The whole label is one ticker: BTC, brk.b, SOL-USD, Total3, #eth, $nvda. */
   var BARE_TICKER_RE = /^[#$]?([A-Za-z][A-Za-z0-9.-]{0,11})$/;
 
+  /**
+   * Runs of spaces and tabs become one space. Line breaks are kept (at most
+   * one blank line in a row) so a longer note keeps its paragraphs; a
+   * single-line label is unchanged.
+   */
   function collapse(value) {
-    return typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
+    if (typeof value !== "string") return "";
+    return value
+      .replace(/\r\n?/g, "\n")
+      .replace(/[^\S\n]+/g, " ")
+      .replace(/ ?\n ?/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
   }
 
   function cleanSymbol(symbol) {

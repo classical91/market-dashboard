@@ -36,7 +36,7 @@
 }
 .ts-count { margin-left: auto; color: #8892a6; font-size: 11px; }
 
-.ts-fields { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 6px; }
+.ts-fields { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
 .ts-input {
   min-width: 0;
   padding: 7px 9px;
@@ -48,6 +48,14 @@
   font-size: 12px;
 }
 .ts-input--ticker { text-transform: uppercase; font-weight: 700; }
+/* The note: a multi-line box under the ticker, full panel width. */
+.ts-input--note {
+  width: 100%;
+  min-height: 84px;
+  max-height: 320px;
+  resize: vertical;
+  line-height: 1.45;
+}
 .ts-input::placeholder { color: #5f6a80; text-transform: none; font-weight: 400; }
 .ts-input:focus-visible { outline: none; border-color: var(--blue, #4da3ff); box-shadow: 0 0 0 3px rgba(77, 163, 255, 0.22); }
 
@@ -120,7 +128,7 @@
 .ts-live { width: 6px; height: 6px; border-radius: 50%; background: #79f2c0; box-shadow: 0 0 0 2px rgba(121, 242, 192, 0.2); }
 .ts-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
-.ts-note { margin: 6px 0 0; color: #c4cad6; font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; }
+.ts-note { margin: 6px 0 0; color: #c4cad6; font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; white-space: pre-line; }
 
 .ts-thumbs { display: grid; grid-template-columns: 1fr; gap: 6px; margin-top: 8px; }
 .ts-thumbs--many { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -173,8 +181,11 @@
 .ts-folder-head:focus-visible,
 .ts-thumb-x:focus-visible { outline: 2px solid var(--blue, #4da3ff); outline-offset: 1px; }
 
-.ts-edit { display: flex; gap: 4px; margin-top: 6px; }
-.ts-edit .ts-input { flex: 1; }
+.ts-edit { display: grid; gap: 6px; margin-top: 6px; }
+.ts-edit-actions { display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
+.ts-edit-actions .ts-btn { white-space: nowrap; }
+.ts-edit-actions [data-role="edit-add"] { margin-right: auto; }
+.ts-edit-hint { margin-top: -2px; color: #5f6a80; font-size: 11px; }
 .ts-btn {
   padding: 6px 9px;
   border: 1px solid rgba(137, 158, 196, 0.25);
