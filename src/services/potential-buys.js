@@ -38,6 +38,18 @@ function isPotentialBuyId(value) {
   return typeof value === "string" && ID_RE.test(value);
 }
 
+/**
+ * Screenshots dropped together share a batch id chosen by the page, so they
+ * read as one entry (several images side by side). Only this shape is kept;
+ * anything else is dropped rather than refused, so a bad id never loses a
+ * screenshot.
+ */
+const BATCH_RE = /^[a-z0-9][a-z0-9-]{5,39}$/;
+
+function normalizeBatch(value) {
+  return typeof value === "string" && BATCH_RE.test(value) ? value : "";
+}
+
 function httpError(message, statusCode) {
   const err = new Error(message);
   err.statusCode = statusCode;
@@ -150,9 +162,22 @@ function normalizeLabel(value) {
 }
 
 class PotentialBuysStore {
-  constructor({ dataDir, urlPrefix = "/potential-buys-images", now = () => Date.now(), logger = console }) {
-    this.dir = path.join(dataDir, "potential-buys");
-    this.file = path.join(dataDir, "potential-buys.json");
+  /**
+   * `name` picks the folder and JSON file under DATA_DIR and `title` the
+   * name used in error messages, so another page (Active Trades' screenshot
+   * notes) can keep its own separate collection with the same rules.
+   */
+  constructor({
+    dataDir,
+    name = "potential-buys",
+    title = "Potential Buys",
+    urlPrefix = "/potential-buys-images",
+    now = () => Date.now(),
+    logger = console,
+  }) {
+    this.dir = path.join(dataDir, name);
+    this.file = path.join(dataDir, `${name}.json`);
+    this.title = title;
     this.urlPrefix = urlPrefix;
     this.now = now;
     this.logger = logger;
@@ -166,13 +191,13 @@ class PotentialBuysStore {
 
   _write(items) {
     if (!writeJsonAtomic(this.file, { version: 1, items }, this.logger, "[PotentialBuys]")) {
-      throw httpError("Couldn't save the Potential Buys list; try again.", 500);
+      throw httpError(`Couldn't save the ${this.title} list; try again.`, 500);
     }
   }
 
   _withLock(operation) {
     return withExclusiveLock(this.file, this._lock, operation, {
-      busyMessage: "Potential Buys is busy; retry in a moment.",
+      busyMessage: `${this.title} is busy; retry in a moment.`,
     });
   }
 
@@ -206,13 +231,14 @@ class PotentialBuysStore {
   }
 
   /** Store one screenshot from its raw bytes. */
-  add(bytes, { label } = {}) {
+  add(bytes, { label, batch } = {}) {
     const sniffed = this._checkImage(bytes);
     const cleanLabel = normalizeLabel(label);
+    const cleanBatch = normalizeBatch(batch);
     return this._withLock(() => {
       const items = this._read();
       if (items.length >= MAX_ITEMS) {
-        throw httpError(`Potential Buys holds at most ${MAX_ITEMS} screenshots; delete some first.`, 409);
+        throw httpError(`${this.title} holds at most ${MAX_ITEMS} screenshots; delete some first.`, 409);
       }
       const createdAt = this.now();
       const id = `${createdAt}-${crypto.randomBytes(4).toString("hex")}`;
@@ -222,6 +248,7 @@ class PotentialBuysStore {
       const item = {
         id, file, label: cleanLabel, mimeType: sniffed.mimeType, size: bytes.length, createdAt, updatedAt: createdAt,
       };
+      if (cleanBatch) item.batch = cleanBatch;
       try {
         this._write([item, ...items]);
       } catch (err) {
@@ -243,7 +270,7 @@ class PotentialBuysStore {
     return this._withLock(() => {
       const items = this._read();
       const item = items.find((entry) => entry.id === id);
-      if (!item) throw httpError("That screenshot is no longer in Potential Buys.", 404);
+      if (!item) throw httpError(`That screenshot is no longer in ${this.title}.`, 404);
       const updatedAt = Math.max(this.now(), (item.updatedAt || item.createdAt || 0) + 1);
       const file = `${id}-c${updatedAt}-${crypto.randomBytes(2).toString("hex")}.${EXTENSIONS[sniffed.mimeType]}`;
       fs.mkdirSync(this.dir, { recursive: true });
@@ -300,7 +327,7 @@ class PotentialBuysStore {
     return this._withLock(() => {
       const items = this._read();
       const item = items.find((entry) => entry.id === id);
-      if (!item) throw httpError("That screenshot is no longer in Potential Buys.", 404);
+      if (!item) throw httpError(`That screenshot is no longer in ${this.title}.`, 404);
       if (item.label !== cleanLabel) {
         item.label = cleanLabel;
         item.updatedAt = Math.max(this.now(), (item.updatedAt || item.createdAt || 0) + 1);
@@ -316,7 +343,7 @@ class PotentialBuysStore {
     return this._withLock(() => {
       const items = this._read();
       const item = items.find((entry) => entry.id === id);
-      if (!item) throw httpError("That screenshot is no longer in Potential Buys.", 404);
+      if (!item) throw httpError(`That screenshot is no longer in ${this.title}.`, 404);
       this._write(items.filter((entry) => entry.id !== id));
       // The list is the source of truth: once the entry is gone the page no
       // longer shows it, so a leftover file is only wasted space, not a ghost.
