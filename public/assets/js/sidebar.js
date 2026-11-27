@@ -327,6 +327,7 @@
     // Cross-Market OI and the RSI Matrix are sections of Overview v2 now.
     if (path === "/cross-market-oi.html" || path === "/rsi-matrix.html") return "/";
     if (path === "/index.html" || path === "/overview-v1.html") return "/overview-v1";
+    if (path === "/trade-notes.html") return "/pattern-scanner-trades.html";
     // Single-concept and topic explainer pages belong to the Indicators Glossary.
     if (path === "/concept.html" || path === "/topic.html") return "/indicators.html";
     if (path === "/qa" || path === "/knowledge-base") return "/qa.html";

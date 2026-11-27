@@ -67,30 +67,10 @@
         <div class="ts-head">
           <h2 class="ts-title" id="ts-title">Trade notes</h2>
           <span class="ts-count" id="ts-count">Loading…</span>
+          <a class="ts-btn ts-expand" href="/trade-notes.html" target="_blank" rel="noopener"
+            aria-label="Open full page for Trade Notes (new tab)">Open full page <span aria-hidden="true">&#8599;</span></a>
         </div>
-        <div class="ts-fields">
-          <input class="ts-input ts-input--ticker" id="ts-ticker" list="ts-tickers" placeholder="Ticker" maxlength="24"
-            autocomplete="off" aria-label="Ticker for the next screenshots" />
-          <datalist id="ts-tickers"></datalist>
-        </div>
-        <!-- Composer: screenshots collect in a grid, the note goes under
-             them, and Post saves them together as one entry. -->
-        <div class="ts-drop" id="ts-drop" tabindex="0" role="button" aria-describedby="ts-drop-hint"
-          aria-label="Add screenshots: drop, paste, or choose files">
-          <input type="file" id="ts-file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden />
-          <div class="ts-drop-icon" aria-hidden="true">&#8681;</div>
-          <div class="ts-drop-title" id="ts-drop-title">Drop screenshots here</div>
-          <div class="ts-drop-hint" id="ts-drop-hint">Add as many as you like &mdash; they post together as one note. Paste works anywhere on the page.</div>
-        </div>
-        <div class="ts-staged" id="ts-staged" aria-label="Screenshots for this note" hidden></div>
-        <textarea class="ts-input ts-input--note" id="ts-note" rows="4" maxlength="20000"
-          placeholder="Write up the trade (optional) &mdash; plan, entry, stop, targets. Markdown works: ## heading, **bold**, - list, | table |. Pasting a ChatGPT answer keeps its formatting."
-          aria-label="Note for these screenshots"></textarea>
-        <div class="ts-compose-actions">
-          <span class="ts-compose-hint" id="ts-compose-hint">Add a screenshot to post.</span>
-          <button class="ts-btn" type="button" id="ts-clear" hidden>Clear</button>
-          <button class="ts-btn ts-btn--primary" type="button" id="ts-post" disabled>Post note</button>
-        </div>
+        <div class="ts-composer" id="ts-composer"></div>
         <div class="ts-status" id="ts-status" role="status" aria-live="polite"></div>
         <div class="ts-list" id="ts-list" aria-live="polite"></div>
       </aside>
