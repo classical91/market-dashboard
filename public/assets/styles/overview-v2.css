@@ -241,23 +241,23 @@
 /* ── Technical Ratings (TradingView, third-party) ── */
 .ov2-module-heading .ov-ta-link { color: var(--accent); font-size: inherit; font-weight: 400; text-decoration: underline; white-space: normal; }
 .ov-ta-tag { flex-shrink: 0; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); white-space: nowrap; }
+.ov-ta-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 10px; }
+.ov-ta-picker button { min-height: 32px; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--muted); font: inherit; font-size: 12px; font-weight: 700; letter-spacing: .04em; cursor: pointer; }
+.ov-ta-picker button:hover { color: var(--text); }
+.ov-ta-picker button.is-active { color: #fff; background: var(--blue-bg, rgba(77,163,255,0.12)); border-color: rgba(77,163,255,0.6); }
+.ov-ta-picker button:focus-visible, .ov-ta-symbol-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ov-ta-picker-note { color: var(--muted); font-size: 12px; margin-left: 4px; }
+/* Each cell draws a 1px ring; the clipped grid hides the outer edge, so the
+   dividers stay right for any item count without empty filler cells. */
 .ov-ta-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid var(--border); border-radius: 10px; background: var(--surface); overflow: hidden; }
-.ov-ta-item { min-width: 0; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); }
-.ov-ta-item:nth-child(3n) { border-right: 0; }
-.ov-ta-item:nth-last-child(-n+3) { border-bottom: 0; }
+.ov-ta-item { min-width: 0; box-shadow: 0 0 0 1px var(--border); }
 .ov-ta-symbol { padding: 10px 14px; color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: .12em; border-bottom: 1px dotted var(--border); }
+.ov-ta-symbol-btn { display: block; width: 100%; text-align: left; background: none; border: 0; border-bottom: 1px dotted var(--border); font-family: inherit; cursor: pointer; }
+.ov-ta-symbol-btn:hover { color: var(--text); }
+.ov-ta-symbol-btn::after { content: " \203A  all timeframes"; font-weight: 600; letter-spacing: .04em; opacity: .7; }
 .ov-ta-body { height: 420px; }
-@media (max-width: 1320px) {
-  .ov-ta-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .ov-ta-item:nth-child(3n) { border-right: 1px solid var(--border); }
-  .ov-ta-item:nth-child(2n) { border-right: 0; }
-  .ov-ta-item:nth-last-child(3) { border-bottom: 1px solid var(--border); }
-}
-@media (max-width: 640px) {
-  .ov-ta-grid { grid-template-columns: 1fr; }
-  .ov-ta-item { border-right: 0 !important; border-bottom: 1px solid var(--border) !important; }
-  .ov-ta-item:last-child { border-bottom: 0 !important; }
-}
+@media (max-width: 1320px) { .ov-ta-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .ov-ta-grid { grid-template-columns: 1fr; } }
 
 /* Overview hierarchy: compact workspace header, shortcuts, readable evidence. */
 .ov2-main .market-overview-header { position: relative; align-items: center; gap: 20px; padding: 8px 0 24px; margin-bottom: 0; }

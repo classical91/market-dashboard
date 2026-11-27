@@ -42,3 +42,16 @@ test("Overview v2 shows BTC Research right under News desks, styled by the share
   assert.match(page, /assets\/styles\/overview-btc-research\.css/);
   assert.match(read("public/assets/styles/overview-btc-research.css"), /\.ov-btc \{/);
 });
+
+test("Overview v2 technical ratings: tap a ticker to see every timeframe, Nasdaq 100 included", () => {
+  const ta = read("public/assets/js/overview-v2-ta.js");
+  assert.ok(page.includes('"symbol": "NASDAQ:NDX"'), "Nasdaq 100 rating missing from the All view");
+  for (const id of ["all", "BTC", "ETH", "SOL", "SPY", "QQQ", "NDX", "DXY"]) {
+    assert.ok(page.includes(`data-ta-ticker="${id}"`), `${id} chip missing`);
+  }
+  assert.ok(page.indexOf("overview-v2-ta.js") > page.indexOf('id="ov-ta-grid"'));
+  for (const interval of ["15m", "30m", "1h", "2h", "4h", "1D", "1W", "1M"]) {
+    assert.ok(ta.includes(`interval: "${interval}"`), `${interval} timeframe missing`);
+  }
+  assert.match(css, /\.ov-ta-picker button:focus-visible/);
+});
