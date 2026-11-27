@@ -105,3 +105,46 @@ test("the API uploads raw image bytes, relabels, lists and deletes", async (t) =
   assert.equal(deleted.status, 200);
   assert.deepEqual((await (await fetch(base)).json()).items, []);
 });
+
+test("a named store keeps its own folder and file, and keeps a batch id", () => {
+  const { dataDir, store } = makeStore({
+    name: "active-trade-shots",
+    title: "Active Trades notes",
+    urlPrefix: "/active-trade-shots-images",
+  });
+  const first = store.add(PNG, { label: "btc", batch: "mwykq-bc3b7b95" });
+  const second = store.add(PNG, { label: "btc", batch: "mwykq-bc3b7b95" });
+  const loose = store.add(PNG, { label: "sol", batch: "../../etc" });
+
+  assert.equal(first.batch, "mwykq-bc3b7b95");
+  assert.equal(second.batch, "mwykq-bc3b7b95");
+  assert.equal(loose.batch, undefined, "a malformed batch id is dropped, not stored");
+  assert.match(first.url, /^\/active-trade-shots-images\//);
+  assert.ok(fs.existsSync(path.join(dataDir, "active-trade-shots", first.file)));
+  assert.ok(fs.existsSync(path.join(dataDir, "active-trade-shots.json")));
+  assert.ok(!fs.existsSync(path.join(dataDir, "potential-buys.json")), "never touches Potential Buys");
+  assert.throws(() => store.remove("1700000000000-deadbeef"), /no longer in Active Trades notes/);
+});
+
+test("POST / passes ?batch= through to the store", async () => {
+  const { store } = makeStore();
+  const app = express();
+  app.use(express.json());
+  app.use("/api/x", createPotentialBuysRouter({ potentialBuysStore: store }));
+  app.use((err, req, res, next) => res.status(err.statusCode || 500).json({ error: err.message }));
+  const server = app.listen(0, "127.0.0.1");
+  await new Promise((resolve) => server.once("listening", resolve));
+  try {
+    const res = await fetch(`http://127.0.0.1:${server.address().port}/api/x?label=eth&batch=abc123-ff`, {
+      method: "POST",
+      headers: { "Content-Type": "image/png" },
+      body: PNG,
+    });
+    assert.equal(res.status, 201);
+    const { item } = await res.json();
+    assert.equal(item.label, "$ETH");
+    assert.equal(item.batch, "abc123-ff");
+  } finally {
+    server.close();
+  }
+});
