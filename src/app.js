@@ -447,6 +447,14 @@ function createApp() {
   const overviewNotesService = new OverviewNotesService({ dataDir });
   // Screenshots of stocks/tokens worth a closer look, kept until deleted.
   const potentialBuysStore = new PotentialBuysStore({ dataDir, urlPrefix: "/potential-buys-images" });
+  // Active Trades' screenshot notes: the same store and ticker folders, kept
+  // in their own folder so they never mix with Potential Buys.
+  const activeTradeShotsStore = new PotentialBuysStore({
+    dataDir,
+    name: "active-trade-shots",
+    title: "Active Trades notes",
+    urlPrefix: "/active-trade-shots-images",
+  });
   // Pure aggregation over the engines above — it owns no indicator maths and
   // asks both scanners per tracked symbol rather than for the full universe.
   const tradeContextService = new TradeContextService({
@@ -693,6 +701,12 @@ function createApp() {
       res.setHeader("Cache-Control", "private, max-age=31536000, immutable");
     },
   }));
+  app.use("/active-trade-shots-images", express.static(activeTradeShotsStore.dir, {
+    setHeaders(res) {
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.setHeader("Cache-Control", "private, max-age=31536000, immutable");
+    },
+  }));
 
   // One page with the day's Economics, Stocks and Crypto top 10, gathered from
   // what the phone and the Reporter Room already made (routes/daily-top-news.js).
@@ -807,6 +821,8 @@ function createApp() {
       rateLimitPerMinute: config.broadcastLedger.rateLimitPerMinute,
     }),
   );
+  // No phone upload route here (no ledger key): owner session only.
+  app.use("/api/active-trade-shots", createPotentialBuysRouter({ potentialBuysStore: activeTradeShotsStore }));
   app.use("/api/trade-context", createTradeContextRouter({ tradeContextService }));
   app.use("/api/bot-commands", createBotCommandsRouter({ botCommandsService }));
   app.use("/api/pattern-tracker", createPatternTrackerRouter({ patternTrackerService }));

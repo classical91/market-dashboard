@@ -226,6 +226,9 @@
 .ov2-mm-panel { min-width: 0; border: 1px solid var(--border); border-radius: 8px; background: var(--surface2); padding: 7px 9px 4px; }
 .ov2-mm-head { display: flex; justify-content: space-between; font-size: 11px; color: var(--soft); }
 .ov2-mm-head strong { color: var(--text); }
+.ov2-mm-tv { display: inline-flex; align-items: baseline; gap: 4px; color: inherit; text-decoration: none; }
+.ov2-mm-tv span { color: var(--soft); font-size: 10px; }
+.ov2-mm-tv:hover strong, .ov2-mm-tv:hover span { color: var(--accent); }
 .ov2-mm-value { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 11px; margin-top: 2px; font-variant-numeric: tabular-nums; }
 .ov2-mm-value strong { font-size: 14px; }
 .ov2-mm-empty { font-size: 11px; padding: 14px 0; }

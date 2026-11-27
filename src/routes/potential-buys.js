@@ -28,7 +28,8 @@ function firstText(...values) {
  *   GET    /       every stored screenshot, newest first, plus `folders`:
  *                  one per #hashtag in the labels ({ tag, count, updatedAt }).
  *   POST   /       one screenshot: the raw image bytes as the body, with an
- *                  image Content-Type. Optional `?label=` (ticker or note).
+ *                  image Content-Type. Optional `?label=` (ticker or note)
+ *                  and `?batch=` (screenshots sent together share one).
  *   PATCH  /:id    { label } — rename it.
  *   PUT    /:id/image  the cropped picture (raw image bytes) replaces the
  *                  stored one; id, label and folders stay the same.
@@ -151,7 +152,7 @@ function createPotentialBuysRouter({ potentialBuysStore, requireLedgerKey, rateL
   router.post("/", imageBody, (req, res, next) => {
     try {
       const bytes = Buffer.isBuffer(req.body) ? req.body : null;
-      const item = potentialBuysStore.add(bytes, { label: req.query.label });
+      const item = potentialBuysStore.add(bytes, { label: req.query.label, batch: req.query.batch });
       res.status(201).json({ item });
     } catch (err) {
       next(err);
