@@ -146,7 +146,7 @@
             },
           ],
         },
-        // Not a screener: four live charts side by side (TOTAL / DXY / BTC /
+        // Not a screener: four live charts side by side (NQ / DXY / BTC /
         // USDT.D by default) for cross-market confirmation.
         { href: "/tradehunter/market-matrix", label: "Market Matrix" },
         { href: "/tradehunter/tradingchart", label: "TradingChart" },

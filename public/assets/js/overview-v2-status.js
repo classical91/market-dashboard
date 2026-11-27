@@ -568,7 +568,7 @@
   var matrixEl = document.getElementById("ov2-matrix");
   var matrixMetaEl = document.getElementById("ov2-matrix-meta");
   var MATRIX_DEFAULTS = [
-    { symbol: "TOTAL", tf: "1h" }, { symbol: "DXY", tf: "1h" }, { symbol: "BTC", tf: "1h" }, { symbol: "USDT.D", tf: "1h" },
+    { symbol: "NQ", tf: "1h" }, { symbol: "DXY", tf: "1h" }, { symbol: "BTC", tf: "1h" }, { symbol: "USDT.D", tf: "1h" },
   ];
 
   // Same panels as the Market Matrix page: its saved workspace when there is

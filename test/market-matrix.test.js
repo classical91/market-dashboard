@@ -47,12 +47,12 @@ function build({ screener, dominance, yahoo } = {}) {
   return { service, calls };
 }
 
-test("defaults are TOTAL / DXY / BTC / USDT.D on 1H, each mapped to a real source", () => {
-  assert.deepEqual(DEFAULT_PANELS, ["TOTAL", "DXY", "BTC", "USDT.D"]);
+test("defaults are NQ / DXY / BTC / USDT.D on 1H, each mapped to a real source", () => {
+  assert.deepEqual(DEFAULT_PANELS, ["NQ", "DXY", "BTC", "USDT.D"]);
   assert.equal(DEFAULT_TIMEFRAME, "1h");
   assert.deepEqual(
     DEFAULT_PANELS.map((id) => [getSymbol(id).source, getSymbol(id).providerSymbol]),
-    [["sampled", "TOTAL"], ["yahoo", "DX-Y.NYB"], ["binance", "BTCUSDT"], ["sampled", "USDT.D"]],
+    [["yahoo", "NQ=F"], ["yahoo", "DX-Y.NYB"], ["binance", "BTCUSDT"], ["sampled", "USDT.D"]],
   );
   for (const sym of SYMBOLS) assert.ok(SOURCES[sym.source], `${sym.id} has an unknown source`);
   assert.ok(!SOURCES.sampled.timeframes.includes("5m"), "15-minute samples cannot make 5m bars");

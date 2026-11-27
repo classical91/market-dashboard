@@ -2,7 +2,7 @@
 
 // TradeHunter → Market Matrix: the symbols a chart panel can show.
 //
-// Panels are keyed by concept ("TOTAL", "DXY", "BTC", "USDT.D"), never by a
+// Panels are keyed by concept ("NQ", "DXY", "BTC", "USDT.D"), never by a
 // provider ticker. Each entry says where its candles really come from, so
 // swapping a feed is a one-line change here and the page — which shows the
 // source in every panel header — never has to be touched.
@@ -32,7 +32,10 @@ const TIMEFRAME_KEYS = TIMEFRAMES.map((tf) => tf.key);
 const DEFAULT_TIMEFRAME = "1h";
 
 // Top-left, top-right, bottom-left, bottom-right.
-const DEFAULT_PANELS = ["TOTAL", "DXY", "BTC", "USDT.D"];
+// NQ (Nasdaq-100 E-mini futures) rather than TOTAL: BTC tracks the Nasdaq
+// more closely than the S&P, and the future trades ~23h a day, so its 1H
+// chart lines up with BTC's instead of going flat outside cash hours.
+const DEFAULT_PANELS = ["NQ", "DXY", "BTC", "USDT.D"];
 
 const SOURCES = {
   binance: {
@@ -64,7 +67,7 @@ function symbol(id, label, name, source, providerSymbol, extra = {}) {
 
 const SYMBOLS = [
   // Defaults
-  symbol("TOTAL", "TOTAL", "Total crypto market cap", "sampled", "TOTAL", { format: "usd-compact", tvSymbol: "CRYPTOCAP:TOTAL" }),
+  symbol("NQ", "NQ1!", "Nasdaq-100 E-mini futures", "yahoo", "NQ=F", { tvSymbol: "CME_MINI:NQ1!", note: "CME E-mini Nasdaq-100 front-month future" }),
   symbol("DXY", "DXY", "U.S. Dollar Index", "yahoo", "DX-Y.NYB", { tvSymbol: "TVC:DXY", note: "ICE US Dollar Index" }),
   symbol("BTC", "BTC/USDT", "Bitcoin", "binance", "BTCUSDT", { tvSymbol: "BINANCE:BTCUSDT" }),
   symbol("USDT.D", "USDT.D", "Tether market-cap dominance", "sampled", "USDT.D", { format: "percent", tvSymbol: "CRYPTOCAP:USDT.D" }),
@@ -77,6 +80,7 @@ const SYMBOLS = [
   symbol("ETHBTC", "ETH/BTC", "Ethereum / Bitcoin", "binance", "ETHBTC", { tvSymbol: "BINANCE:ETHBTC" }),
 
   // Market cap and dominance
+  symbol("TOTAL", "TOTAL", "Total crypto market cap", "sampled", "TOTAL", { format: "usd-compact", tvSymbol: "CRYPTOCAP:TOTAL" }),
   symbol("TOTAL2", "TOTAL2", "Crypto market cap excl. BTC", "sampled", "TOTAL2", { format: "usd-compact", tvSymbol: "CRYPTOCAP:TOTAL2" }),
   symbol("TOTAL3", "TOTAL3", "Crypto market cap excl. BTC & ETH", "sampled", "TOTAL3", { format: "usd-compact", tvSymbol: "CRYPTOCAP:TOTAL3" }),
   symbol("BTC.D", "BTC.D", "Bitcoin dominance", "sampled", "BTC.D", { format: "percent", tvSymbol: "CRYPTOCAP:BTC.D" }),
@@ -86,16 +90,17 @@ const SYMBOLS = [
   // Macro
   symbol("SPX", "SPX", "S&P 500 index", "yahoo", "^GSPC", { tvSymbol: "SP:SPX" }),
   symbol("NDX", "NDX", "Nasdaq 100 index", "yahoo", "^NDX", { tvSymbol: "NASDAQ:NDX" }),
+  symbol("ES", "ES1!", "S&P 500 E-mini futures", "yahoo", "ES=F", { tvSymbol: "CME_MINI:ES1!", note: "CME E-mini S&P 500 front-month future" }),
   symbol("US10Y", "US10Y", "US 10-year yield", "yahoo", "^TNX", { tvSymbol: "TVC:US10Y", note: "CBOE 10-year yield index (^TNX)" }),
   symbol("GOLD", "GOLD", "Gold", "yahoo", "GC=F", { tvSymbol: "COMEX:GC1!", note: "COMEX gold front-month future" }),
   symbol("USOIL", "USOIL", "WTI crude oil", "yahoo", "CL=F", { tvSymbol: "NYMEX:CL1!", note: "NYMEX WTI front-month future" }),
 ];
 
 const SYMBOL_GROUPS = [
-  { label: "Defaults", ids: ["TOTAL", "DXY", "BTC", "USDT.D"] },
+  { label: "Defaults", ids: ["NQ", "DXY", "BTC", "USDT.D"] },
   { label: "Crypto", ids: ["ETH", "SOL", "XRP", "BNB", "ETHBTC"] },
-  { label: "Market cap & dominance", ids: ["TOTAL2", "TOTAL3", "BTC.D", "ETH.D", "USDC.D"] },
-  { label: "Macro", ids: ["SPX", "NDX", "US10Y", "GOLD", "USOIL"] },
+  { label: "Market cap & dominance", ids: ["TOTAL", "TOTAL2", "TOTAL3", "BTC.D", "ETH.D", "USDC.D"] },
+  { label: "Macro", ids: ["SPX", "NDX", "ES", "US10Y", "GOLD", "USOIL"] },
 ];
 
 const SYMBOLS_BY_ID = new Map(SYMBOLS.map((s) => [s.id, s]));
