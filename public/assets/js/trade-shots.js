@@ -22,6 +22,10 @@
   var composerToggle = document.getElementById("ts-compose-toggle");
   var fullPage = panel.hasAttribute("data-full-page");
 
+  if (composerToggle && !fullPage) {
+    composerToggle.open = !window.matchMedia("(max-height: 800px)").matches;
+  }
+
   composer.innerHTML = `
     <div class="ts-fields">
       <input class="ts-input ts-input--ticker" id="ts-ticker" list="ts-tickers" placeholder="Ticker" maxlength="24"
@@ -330,7 +334,7 @@
     if (!entries.length) {
       el.list.innerHTML = '<div class="ts-empty">No trade notes yet. ' +
         (fullPage ? 'Open “Add a trade note” above to get started.'
-          : 'Drop a marked-up chart above &mdash; or drop it straight onto a trade card to file it under that ticker.') +
+          : 'Open “Add a trade note” above or drop a chart onto a trade card to file it under that ticker.') +
         "</div>";
       return;
     }
