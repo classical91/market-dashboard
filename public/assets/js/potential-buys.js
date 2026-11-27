@@ -45,6 +45,7 @@
     viewerChart: document.getElementById("pbViewerChart"),
     back: document.getElementById("pbBack"),
     view: document.getElementById("pbView"),
+    folderDelete: document.getElementById("pbFolderDelete"),
     stats: document.getElementById("pbStats"),
     statTotal: document.getElementById("pbStatTotal"),
     statTotalSub: document.getElementById("pbStatTotalSub"),
@@ -226,6 +227,8 @@
     el.back.hidden = state.folder === ALL;
     var folderChart = state.folder === ALL || state.folder === OLD ? "" : chartUrlFor(state.folder);
     setChartLink(el.headingChart, folderChart, state.folder);
+    // Inside a ticker folder, the heading offers Delete folder too.
+    el.folderDelete.hidden = state.folder === ALL || state.folder === OLD;
     // The count cards summarise everything, so they belong on the main (All)
     // view only; inside a ticker folder they'd read as that folder's numbers.
     el.stats.hidden = state.folder !== ALL;
@@ -382,6 +385,8 @@
             '<span class="pb-when' + (stale ? ' is-stale" title="Oldest screenshot is over 3 days old' : "") + '">' + items.length + " screenshots · since " + escapeHtml(formatWhen(since)) + "</span>" +
             chartLink(tag) +
             '<button type="button" class="pb-btn" data-action="open-folder">Open</button>' +
+            '<button type="button" class="pb-btn pb-btn-danger" data-action="delete-folder" ' +
+              'aria-label="Delete ' + escapeHtml(name) + ' folder and its ' + items.length + ' screenshots">Delete</button>' +
           "</div>" +
         "</div>" +
       "</article>"
@@ -513,6 +518,42 @@
       toast("Screenshot deleted.");
     } catch (err) {
       toast(err.message, true);
+    }
+  }
+
+  /**
+   * Delete a ticker folder: every screenshot tagged with it, after a warning
+   * that says how many go and which of them also sit in other folders.
+   */
+  async function removeFolder(tag) {
+    var items = state.items.filter(function (item) { return tagsOf(item).indexOf(tag) !== -1; });
+    if (!items.length) return;
+    var shared = items.filter(function (item) { return tagsOf(item).length > 1; }).length;
+    var n = items.length;
+    var message = "Delete the $" + tag + " folder?\n\n" +
+      "This permanently deletes " + (n === 1 ? "the 1 screenshot" : "all " + n + " screenshots") + " in it." +
+      (shared ? "\n" + shared + (shared === 1 ? " of them is" : " of them are") +
+        " also tagged with another ticker and will disappear from that folder too." : "") +
+      "\n\nThis can't be undone.";
+    if (!window.confirm(message)) return;
+
+    var results = await Promise.all(items.map(function (item) {
+      return request(API + "/" + encodeURIComponent(item.id), { method: "DELETE" })
+        .then(function () { return { id: item.id, ok: true }; })
+        .catch(function (err) { return { id: item.id, ok: false, error: err.message }; });
+    }));
+    var gone = {};
+    results.forEach(function (r) { if (r.ok) gone[r.id] = true; });
+    state.items = state.items.filter(function (item) { return !gone[item.id]; });
+    if (state.editing && gone[state.editing]) state.editing = null;
+    if (state.viewing && gone[state.viewing]) closeViewer();
+    var failed = results.filter(function (r) { return !r.ok; });
+    // syncFolder() drops back to All once the folder is empty.
+    render();
+    if (failed.length) {
+      toast("Deleted " + (n - failed.length) + " of " + n + " screenshots. " + failed[0].error, true);
+    } else {
+      toast("$" + tag + " folder deleted (" + n + (n === 1 ? " screenshot" : " screenshots") + ").");
     }
   }
 
@@ -848,6 +889,7 @@
     var id = card.getAttribute("data-id");
     var action = target.getAttribute("data-action");
     if (action === "open-folder") { openFolder(card.getAttribute("data-folder")); return; }
+    if (action === "delete-folder") { removeFolder(card.getAttribute("data-folder")); return; }
     if (action === "view") openViewer(id);
     else if (action === "edit") setEditing(id);
     else if (action === "done") setEditing(null, id);
@@ -878,6 +920,9 @@
   });
 
   el.back.addEventListener("click", function () { openFolder(ALL); });
+  el.folderDelete.addEventListener("click", function () {
+    if (state.folder !== ALL && state.folder !== OLD) removeFolder(state.folder);
+  });
   function openOld() {
     if (el.statStaleCard.getAttribute("role") === "button") openFolder(OLD);
   }
