@@ -140,3 +140,10 @@
   .wls { grid-template-columns: 1fr; }
   .wls-folder-list { max-height: 220px; }
 }
+
+/* Starter watchlists (Settings) */
+.wls-presets { display: flex; flex-direction: column; gap: 4px; }
+.wls-presets .wls-label { margin-bottom: 2px; }
+.wls-preset { display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 10px; border: 1px dashed var(--border); border-radius: 8px; background: transparent; color: var(--soft); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+.wls-preset:hover { border-color: var(--border-hover); color: var(--text); background: color-mix(in srgb, var(--text) 5%, transparent); }
+.wls-preset:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }

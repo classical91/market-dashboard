@@ -300,6 +300,83 @@
     return result;
   }
 
+  /* ── Starter watchlists ──
+     Ready-made lists added from Settings with one click. Perps use
+     TradingView's ".P" suffix; Binance lists low-priced memes as 1000x
+     contracts (1000PEPEUSDT.P). Adding one never touches existing lists. */
+  var PRESETS = [
+    {
+      id: 'altcoins',
+      name: 'Alt coins',
+      bookmark: 'purple',
+      tickers: [
+        '###Alt season gauges',
+        'CRYPTOCAP:TOTAL3', 'CRYPTOCAP:OTHERS.D', 'CRYPTOCAP:OTHERS', 'BINANCE:ETHBTC',
+        '###Large caps',
+        'BINANCE:SOLUSDT.P', 'BINANCE:XRPUSDT.P', 'BINANCE:BNBUSDT.P', 'BINANCE:DOGEUSDT.P',
+        'BINANCE:ADAUSDT.P', 'BINANCE:TRXUSDT.P', 'BINANCE:AVAXUSDT.P', 'BINANCE:LINKUSDT.P',
+        'BINANCE:TONUSDT.P', 'BINANCE:DOTUSDT.P', 'BINANCE:LTCUSDT.P', 'BINANCE:BCHUSDT.P',
+        '###L1 / L2',
+        'BINANCE:SUIUSDT.P', 'BINANCE:APTUSDT.P', 'BINANCE:NEARUSDT.P', 'BINANCE:SEIUSDT.P',
+        'BINANCE:INJUSDT.P', 'BINANCE:TIAUSDT.P', 'BINANCE:ARBUSDT.P', 'BINANCE:OPUSDT.P',
+        'BINANCE:POLUSDT.P',
+        '###DeFi',
+        'BINANCE:UNIUSDT.P', 'BINANCE:AAVEUSDT.P', 'BINANCE:LDOUSDT.P', 'BINANCE:PENDLEUSDT.P',
+        'BINANCE:ENAUSDT.P', 'BINANCE:JUPUSDT.P',
+        '###AI',
+        'BINANCE:TAOUSDT.P', 'BINANCE:FETUSDT.P', 'BINANCE:RENDERUSDT.P', 'BINANCE:WLDUSDT.P',
+        '###Memes',
+        'BINANCE:1000PEPEUSDT.P', 'BINANCE:WIFUSDT.P', 'BINANCE:1000BONKUSDT.P',
+        'BINANCE:1000SHIBUSDT.P', 'BINANCE:1000FLOKIUSDT.P',
+      ],
+    },
+    {
+      id: 'crypto-dominance',
+      name: 'Crypto & dominance',
+      bookmark: 'orange',
+      tickers: [
+        '###Other pairs',
+        'BINANCE:BTCUSDT.P', 'BINANCE:ETHUSDT.P', 'BINANCE:XRPUSDT.P',
+        '###Dominant charts',
+        'CRYPTOCAP:TOTAL', 'CRYPTOCAP:USDT.D', 'CRYPTOCAP:BTC.D', 'CRYPTOCAP:TOTAL2',
+        'CRYPTOCAP:TOTAL3', 'CRYPTOCAP:ETH.D', 'CRYPTOCAP:OTHERS.D',
+      ],
+    },
+    {
+      id: 'bonds',
+      name: 'Bonds',
+      bookmark: 'blue',
+      tickers: [
+        '###US yields',
+        'TVC:US03MY', 'TVC:US01Y', 'TVC:US02Y', 'TVC:US05Y', 'TVC:US10Y', 'TVC:US20Y', 'TVC:US30Y',
+        '###Global 10Y',
+        'TVC:DE10Y', 'TVC:GB10Y', 'TVC:JP10Y', 'TVC:CA10Y',
+      ],
+    },
+  ];
+
+  function findPreset(id) {
+    for (var i = 0; i < PRESETS.length; i++) if (PRESETS[i].id === id) return PRESETS[i];
+    return null;
+  }
+
+  /* Adds a starter watchlist as a new folder and selects it. A watchlist
+     with the same name already there is selected instead of duplicated. */
+  function addPreset(state, presetId) {
+    var preset = findPreset(presetId);
+    if (!preset) return { state: state, folder: null, error: 'Unknown starter watchlist.' };
+    var key = preset.name.toLowerCase();
+    var existing = state.folders.filter(function (f) { return f.name.toLowerCase() === key; })[0];
+    if (existing) return { state: setActive(state, existing.id), folder: existing, existed: true, error: null };
+    var made = createFolder(state, preset.name);
+    if (made.error) return made;
+    var next = made.state;
+    var f = findFolder(next, made.folder.id);
+    f.bookmark = preset.bookmark || null;
+    f.tickers = preset.tickers.slice(0, MAX_TICKERS);
+    return { state: next, folder: f, existed: false, error: null };
+  }
+
   /* ── Storage (guarded: private browsing, webviews and Node) ── */
   var memory = null;
 
@@ -383,6 +460,8 @@
     addTickers: addTickers,
     removeTicker: removeTicker,
     moveTicker: moveTicker,
+    PRESETS: PRESETS,
+    addPreset: addPreset,
     read: read,
     write: write,
     subscribe: subscribe,
