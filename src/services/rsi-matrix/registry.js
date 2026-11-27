@@ -30,9 +30,11 @@ function entry(id, label, group, provider, providerSymbol, note) {
 const DEFAULT_INSTRUMENTS = [
   // Cross-Market
   entry("spx", "SPX", "cross-market", "yahoo", "^GSPC"),
+  entry("nq", "NQ1!", "cross-market", "yahoo", "NQ=F", "CME E-mini Nasdaq-100 front-month future"),
   entry("btc-usd", "BTCUSD", "cross-market", "binance", "BTCUSDT", "Binance BTCUSDT spot"),
   entry("eth-usd", "ETHUSD", "cross-market", "binance", "ETHUSDT", "Binance ETHUSDT spot"),
   entry("xrp-usdt", "XRPUSDT", "cross-market", "binance", "XRPUSDT"),
+  entry("xrp-btc", "XRPBTC", "cross-market", "binance", "XRPBTC", "Binance XRPBTC spot"),
   entry("us10y", "US10Y", "cross-market", "yahoo", "^TNX", "CBOE 10-year yield index"),
   entry("gold", "GOLD", "cross-market", "yahoo", "GC=F", "COMEX gold front-month future"),
   entry("silver", "SILVER", "cross-market", "yahoo", "SI=F", "COMEX silver front-month future"),
@@ -44,6 +46,9 @@ const DEFAULT_INSTRUMENTS = [
   entry("usdt-d", "USDT.D", "crypto-stables", "dominance", "USDT.D"),
   entry("btc-usd-crypto", "BTCUSD", "crypto-stables", "binance", "BTCUSDT", "Binance BTCUSDT spot"),
   entry("btc-d", "BTC.D", "crypto-stables", "dominance", "BTC.D"),
+  entry("eth-d", "ETH.D", "crypto-stables", "dominance", "ETH.D"),
+  entry("total", "TOTAL", "crypto-stables", "dominance", "TOTAL", "Total crypto market cap"),
+  entry("total2", "TOTAL2", "crypto-stables", "dominance", "TOTAL2", "Crypto market cap excl. BTC"),
   entry("total3", "TOTAL3", "crypto-stables", "dominance", "TOTAL3"),
   entry("usdc-d", "USDC.D", "crypto-stables", "dominance", "USDC.D"),
   entry("ustc", "USTCUSDT", "crypto-stables", "binance", "USTCUSDT"),

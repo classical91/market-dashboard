@@ -255,7 +255,20 @@ class RsiMatrixSettingsService {
       const present = new Set(state.instruments.map((row) => row.id));
       const pending = this._defaults.filter((row) => !seeded.has(row.id) && !present.has(row.id));
       if (!pending.length) return state.migrated ? this._write(state) : false;
-      for (const { note, ...row } of pending) state.instruments.push({ ...row });
+      // Each new default lands beside the shipped neighbour it follows (NQ1!
+      // after SPX), not at the end of the table; the operator's own order is
+      // otherwise left as it is.
+      for (const { note, ...row } of pending) {
+        const shippedIndex = this._defaults.findIndex((d) => d.id === row.id);
+        let at = -1;
+        for (let i = shippedIndex - 1; i >= 0 && at < 0; i -= 1) {
+          const prev = this._defaults[i];
+          if (prev.group !== row.group) continue;
+          at = state.instruments.findIndex((r) => r.id === prev.id && r.group === row.group);
+        }
+        if (at >= 0) state.instruments.splice(at + 1, 0, { ...row });
+        else state.instruments.push({ ...row });
+      }
       state.seededDefaults.push(...pending.map((row) => row.id));
       return this._write(state);
     });
