@@ -310,7 +310,7 @@
         { href: "https://docs.openclaw.ai/cli", label: "OpenClaw CLI" },
       ],
     },
-    { href: "/indicators.html", label: "Indicators Glossary" },
+    { href: "/indicators.html", label: "Market Glossary" },
     // Question-led companion to the glossary: each answer links to live pages.
     { href: "/qa.html", label: "Market Q&A" },
     {
@@ -328,7 +328,7 @@
     if (path === "/cross-market-oi.html" || path === "/rsi-matrix.html") return "/";
     if (path === "/index.html" || path === "/overview-v1.html") return "/overview-v1";
     if (path === "/trade-notes.html") return "/pattern-scanner-trades.html";
-    // Single-concept and topic explainer pages belong to the Indicators Glossary.
+    // Single-concept and topic explainer pages belong to the Market Glossary.
     if (path === "/concept.html" || path === "/topic.html") return "/indicators.html";
     if (path === "/qa" || path === "/knowledge-base") return "/qa.html";
     return path;

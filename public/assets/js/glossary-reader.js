@@ -8,6 +8,7 @@
   var button = document.getElementById("glossaryReadRandom");
   var title = document.getElementById("glossaryReaderTitle");
   var definition = document.getElementById("glossaryReaderDefinition");
+  var readLabel = document.getElementById("glossaryReaderReadLabel") || dialog.querySelector("h3");
   var interpretation = document.getElementById("glossaryReaderInterpretation");
   var playback = document.getElementById("glossaryReaderPlayback");
   var next = document.getElementById("glossaryReaderNext");
@@ -36,7 +37,7 @@
     }
 
     // Short utterances keep voices that cut off long passages reading.
-    var text = entry.term + ". " + entry.def + " How to read it. " + entry.read;
+    var text = entry.term + ". " + entry.def + " " + readLabel.textContent + ". " + entry.read;
     var chunks = text.match(/\S.{0,159}(?=\s|$)|\S+/g);
     status.textContent = "";
     playback.textContent = "Stop reading";
@@ -70,6 +71,7 @@
     entry = pick;
     title.textContent = entry.term;
     definition.textContent = entry.def;
+    readLabel.textContent = entry.readLabel || "How to read it";
     interpretation.textContent = entry.read;
     link.href = glossary.conceptHref(entry);
     next.disabled = pool && pool.length === 1;

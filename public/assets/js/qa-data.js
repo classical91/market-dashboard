@@ -15,7 +15,7 @@
  *   limitation   where it breaks down
  *   related      other questions in this catalogue, by exact text
  *   widgets      dashboard pages that show it live: { href, label }
- *   glossary     Indicators Glossary concept ids (/concept.html?id=<id>)
+ *   glossary     Market Glossary concept ids (/concept.html?id=<id>)
  *   sources      optional primary references: { href, label }
  *
  * A question without an answer is still listed, searchable and linkable; the

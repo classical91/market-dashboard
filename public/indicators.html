@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Indicators Glossary · Market Command</title>
+  <title>Market Glossary · Market Command</title>
   <script src="/assets/js/settings.js"></script>
   <link rel="stylesheet" href="/assets/styles/command.css" />
   <link rel="stylesheet" href="/assets/styles/components.css" />
@@ -389,8 +389,8 @@
 
     <div class="cmd-page-header">
       <div>
-        <div class="cmd-page-title">&#128218; Indicators Glossary</div>
-        <div class="cmd-page-subtitle">What each metric means, how to read it, and where it shows up in this dashboard</div>
+        <div class="cmd-page-title">&#128218; Market Glossary</div>
+        <div class="cmd-page-subtitle">Market concepts, indicators, and the companies and institutions behind them</div>
       </div>
       <div class="glossary-header-actions">
         <a class="glossary-topics-button" href="/topic.html" title="Each category explained as one guided read">
@@ -408,7 +408,7 @@
     <div class="glossary-layout">
       <div class="glossary-main">
         <div class="glossary-toolbar">
-          <input class="glossary-search" id="glossarySearch" type="search" placeholder="Search indicators — e.g. MACD, funding rate, MVRV..." />
+          <input class="glossary-search" id="glossarySearch" type="search" aria-label="Search the market glossary" placeholder="Search terms, tickers, and organizations…" />
           <select class="glossary-jump" id="glossaryJump">
             <option value="">Jump to a concept (A–Z)&hellip;</option>
           </select>
@@ -416,7 +416,7 @@
         </div>
 
         <div id="glossaryContent"></div>
-        <div class="glossary-empty" id="glossaryEmpty" hidden>No indicators match your search.</div>
+        <div class="glossary-empty" id="glossaryEmpty" hidden>No glossary entries match your search.</div>
       </div>
 
       <aside class="glossary-side" id="glossarySide" aria-label="Glossary categories">
@@ -435,7 +435,7 @@
         <form method="dialog"><button class="glossary-topics-button" autofocus>Close</button></form>
       </div>
       <p id="glossaryReaderDefinition"></p>
-      <h3>How to read it</h3>
+      <h3 id="glossaryReaderReadLabel">How to read it</h3>
       <p id="glossaryReaderInterpretation"></p>
       <div class="glossary-reader-actions">
         <button class="glossary-topics-button" id="glossaryReaderPlayback" type="button">Read aloud</button>
@@ -445,13 +445,14 @@
       <p class="glossary-reader-status" id="glossaryReaderStatus" role="status"></p>
     </dialog>
 
-    <footer>Indicators Glossary &mdash; <a href="/">Market Command</a></footer>
+    <footer>Market Glossary &mdash; <a href="/">Market Command</a></footer>
 
   </main>
 </div>
 
 <script src="/assets/js/sidebar.js"></script>
 <script src="/assets/js/glossary-topics.js"></script>
+<script src="/assets/js/glossary-entities.js"></script>
 <script src="/assets/js/indicators.js"></script>
 <script src="/assets/js/glossary-reader.js"></script>
 </body>

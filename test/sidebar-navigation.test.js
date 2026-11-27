@@ -178,7 +178,7 @@ test("Intelligent Portal is the only featured sidebar item", () => {
 });
 
 test("Trading and tools section has one copy of every item in the requested order", () => {
-  const labels = ["Bot Commands", "Indicators Glossary", "Settings"];
+  const labels = ["Bot Commands", "Market Glossary", "Settings"];
   let cursor = sidebar.indexOf("var tools");
   for (const label of labels) {
     const next = sidebar.indexOf(`label: "${label}"`, cursor);
