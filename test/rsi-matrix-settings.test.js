@@ -40,8 +40,8 @@ test("the reference instruments are seeded into three tables, one column per log
   const snap = create(tmpDir()).snapshot();
   assert.deepEqual(snap.groups.map((g) => g.id), ["cross-market", "crypto-stables", "exchange-tokens"]);
   const labels = (group) => snap.instruments.filter((r) => r.group === group).map((r) => r.label);
-  assert.deepEqual(labels("cross-market"), ["SPX", "BTCUSD", "ETHUSD", "XRPUSDT", "US10Y", "GOLD", "SILVER", "USOIL", "EUR1!", "DXY"]);
-  for (const label of ["USDT.D", "BTCUSD", "BTC.D", "TOTAL3", "USDC.D", "USTCUSDT", "DAIUSD", "TUSD", "USDDUSDC", "USDPUSDT", "PYUSDEUR", "FRAXUSDT"]) {
+  assert.deepEqual(labels("cross-market"), ["SPX", "NQ1!", "BTCUSD", "ETHUSD", "XRPUSDT", "XRPBTC", "US10Y", "GOLD", "SILVER", "USOIL", "EUR1!", "DXY"]);
+  for (const label of ["USDT.D", "BTCUSD", "BTC.D", "ETH.D", "TOTAL", "TOTAL2", "TOTAL3", "USDC.D", "USTCUSDT", "DAIUSD", "TUSD", "USDDUSDC", "USDPUSDT", "PYUSDEUR", "FRAXUSDT"]) {
     assert.ok(labels("crypto-stables").includes(label), `${label} is seeded with the stablecoins`);
   }
   // Each exchange's own token gets its own table.
@@ -51,6 +51,20 @@ test("the reference instruments are seeded into three tables, one column per log
   assert.equal(snap.rsiLength, 14);
   assert.deepEqual(snap.timeframes.map((t) => [t.key, t.enabled]), [["1W", true], ["1D", true], ["4h", true], ["1h", true]]);
   assert.ok(snap.instruments.every((r) => r.isDefault && r.enabled));
+});
+
+test("a default shipped in a later release is placed beside its shipped neighbour", () => {
+  const dir = tmpDir();
+  const later = ["nq", "xrp-btc", "eth-d", "total", "total2"];
+  const older = DEFAULT_INSTRUMENTS.filter((r) => !later.includes(r.id)).map(({ note, ...row }) => row);
+  fs.writeFileSync(
+    path.join(dir, "rsi-matrix-settings.json"),
+    JSON.stringify({ version: 2, seededDefaults: older.map((r) => r.id), instruments: older }),
+  );
+  const ids = create(dir).snapshot().instruments.map((r) => r.id);
+  assert.deepEqual(ids.slice(0, 6), ["spx", "nq", "btc-usd", "eth-usd", "xrp-usdt", "xrp-btc"]);
+  const at = ids.indexOf("btc-d");
+  assert.deepEqual(ids.slice(at, at + 5), ["btc-d", "eth-d", "total", "total2", "total3"]);
 });
 
 test("reorder, relabel, enable/disable and timeframes survive a restart", async () => {
