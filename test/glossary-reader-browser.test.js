@@ -51,7 +51,7 @@ test("the glossary reader picks matching topics and controls read-aloud", {
   await next.click();
   assert.notEqual(await title.textContent(), first);
   const href = await dialog.getByRole("link", { name: "Open full topic" }).getAttribute("href");
-  assert.match(href, /^\/concept\.html\?id=(mvrv|on-chain-metrics|realized-price)$/);
+  assert.match(href, /^\/concept\.html\?id=(mvrv|on-chain-metrics|realized-price|glassnode)$/);
   const entry = ALL_GLOSSARY.find((candidate) => conceptHref(candidate) === href);
   assert.equal(await title.textContent(), entry.term);
   const spoken = await page.evaluate(() => {
@@ -65,7 +65,7 @@ test("the glossary reader picks matching topics and controls read-aloud", {
     return { lines: speech.lines.join(" "), cancellations: speech.cancellations, startedOnClick: speech.startedOnClick };
   });
   assert.deepEqual(spoken, {
-    lines: `${entry.term}. ${entry.def} How to read it. ${entry.read}`,
+    lines: `${entry.term}. ${entry.def} ${entry.readLabel || "How to read it"}. ${entry.read}`,
     cancellations: 1,
     startedOnClick: true,
   });
@@ -80,6 +80,19 @@ test("the glossary reader picks matching topics and controls read-aloud", {
   await page.waitForFunction(() => window.readerSpeech.cancellations === 3);
   assert.equal(await open.evaluate((element) => element === document.activeElement), true);
 
+  await search.fill("MicroStrategy");
+  await open.click();
+  assert.equal(await title.textContent(), "Strategy (MSTR)");
+  assert.equal(await dialog.getByRole("heading", { name: "Why it matters" }).isVisible(), true);
+  assert.equal(await next.isDisabled(), true);
+  await dialog.getByRole("link", { name: "Open full topic" }).click();
+  await page.getByRole("heading", { name: "Strategy (MSTR)", level: 1 }).waitFor();
+  const official = page.getByRole("link", { name: "Strategy · Company overview" });
+  assert.equal(await official.getAttribute("href"), "https://www.strategy.com/company");
+  await page.locator(".concept-topic-note a").click();
+  await page.getByRole("heading", { name: "Companies & Institutions", level: 1 }).waitFor();
+  assert.equal(await page.getByRole("heading", { name: "Public companies", level: 2 }).isVisible(), true);
+
   const fallback = await browser.newPage();
   await fallback.addInitScript(() => Object.defineProperty(window, "speechSynthesis", { value: undefined }));
   await fallback.goto(url);
@@ -88,5 +101,5 @@ test("the glossary reader picks matching topics and controls read-aloud", {
   assert.match(await fallback.getByRole("status").filter({ hasText: "Read-aloud" }).textContent(), /unavailable/);
   assert.equal(await fallback.getByRole("button", { name: "Another topic" }).isDisabled(), true);
   await fallback.getByRole("link", { name: "Open full topic" }).click();
-  assert.equal(await fallback.getByRole("heading", { name: "Parabolic SAR", level: 1 }).isVisible(), true);
+  await fallback.getByRole("heading", { name: "Parabolic SAR", level: 1 }).waitFor();
 });

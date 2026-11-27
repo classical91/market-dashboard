@@ -1,5 +1,5 @@
 /**
- * Topic explainers for the Indicators Glossary — one guide per glossary
+ * Topic explainers for the Market Glossary — one guide per glossary
  * category, rendered at /topic.html?id=<topic id>.
  *
  * Each topic turns a category's list of terms into an explanation:
@@ -43,6 +43,49 @@
         "Read every move as a shift in supply and demand first, then ask what caused it.",
         "Expect crowds to overshoot in both directions — that's where opportunity and risk both come from.",
         "Match your tools to your horizon: traders watch structure and flows, investors watch value and macro.",
+      ],
+    },
+
+    "Companies & Institutions": {
+      summary: "Who sets policy, publishes market data, runs exchanges, and issues the products you follow.",
+      intro: "Market headlines often use an organization, an index, and a tradable product in the same sentence. Start by identifying each actor and its role. For example, S&P Dow Jones Indices maintains the S&P 500, CME lists futures tied to it, and asset managers offer funds that seek to track it.",
+      why: "Knowing who publishes a figure or sets a rule helps you find its primary source, interpret the data correctly, and recognize which markets a change can affect.",
+      sections: [
+        {
+          title: "Central banks, public data, and regulators",
+          note: "Central banks set monetary policy, public agencies publish economic releases, and regulators oversee markets and require disclosures.",
+          ids: ["federal-reserve", "federal-open-market-committee", "us-treasury", "bls", "bea", "st-louis-fed-fred", "sec", "cftc", "ecb", "bank-of-japan"],
+        },
+        {
+          title: "Benchmarks and traditional exchanges",
+          note: "Index administrators define what a benchmark measures. Exchanges determine how their own listed instruments trade.",
+          ids: ["sp-dow-jones-indices", "nasdaq", "ftse-russell", "cme-group", "cboe", "intercontinental-exchange", "nyse"],
+        },
+        {
+          title: "Crypto venues",
+          note: "Each venue observes its own trades, orders, and derivative positions. Product and venue differences matter when you compare data.",
+          ids: ["coinbase", "binance", "bybit", "okx", "kucoin", "bitget", "deribit"],
+        },
+        {
+          title: "Fund sponsors and stablecoin issuers",
+          note: "For funds, look at the issuer, ticker, and underlying holdings. For stablecoins, identify the issuer, reserve disclosures, and redemption terms.",
+          ids: ["blackrock", "fidelity-investments", "grayscale", "tether", "circle"],
+        },
+        {
+          title: "Data and charting providers",
+          note: "Data providers aggregate and model observations in different ways. Their definitions, coverage, and update frequency affect how you interpret a chart.",
+          ids: ["tradingview", "coinglass", "coingecko", "glassnode", "cryptoquant"],
+        },
+        {
+          title: "Public companies",
+          note: "Company share prices reflect their business and capital structure. Their influence on a benchmark or exposure to Bitcoin depends on the specific company.",
+          ids: ["nvidia", "strategy"],
+        },
+      ],
+      takeaways: [
+        "For a macro release, check the original agency and the publication date.",
+        "For a quote, identify the ticker, venue, instrument type, and whether the quote is delayed.",
+        "For funds and stablecoins, look up the official documents before interpreting flows, reserves, or holdings.",
       ],
     },
 

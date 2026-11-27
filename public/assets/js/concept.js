@@ -28,11 +28,11 @@
   }
 
   if (index === -1) {
-    document.title = "Concept not found · Indicators Glossary · Market Command";
+    document.title = "Concept not found · Market Glossary · Market Command";
     root.innerHTML =
       '<div class="concept-card"><p class="concept-missing">' +
       (id ? "There is no glossary concept called &ldquo;" + esc(id) + "&rdquo;." : "No concept was chosen.") +
-      ' Browse or search the <a href="/indicators.html">Indicators Glossary</a> instead.</p></div>' +
+      ' Browse or search the <a href="/indicators.html">Market Glossary</a> instead.</p></div>' +
       randomButtonHtml("Open a random concept");
     bindRandomButton();
     return;
@@ -47,10 +47,10 @@
     return s.entries.some(function (other) { return other.id === entry.id; });
   })[0];
   var explainerHref = categoryHref + (section ? "#term-" + encodeURIComponent(entry.id) : "");
-  document.title = entry.term + " · Indicators Glossary · Market Command";
+  document.title = entry.term + " · Market Glossary · Market Command";
 
   crumbs.innerHTML =
-    '<a href="/indicators.html">Indicators Glossary</a><span aria-hidden="true">/</span>' +
+    '<a href="/indicators.html">Market Glossary</a><span aria-hidden="true">/</span>' +
     '<a href="' + esc(categoryHref) + '">' + esc(entry.category) + "</a>";
 
   function pagerLink(target, cls, label) {
@@ -77,9 +77,10 @@
     '<div class="concept-kicker">' + esc(entry.category) + "</div>" +
     '<h1 class="concept-title">' + esc(entry.term) + "</h1>" +
     '<p class="concept-def">' + esc(entry.def) + "</p>" +
-    '<section class="concept-read"><h2 class="concept-section-title">How to read it</h2><p>' + esc(entry.read) + "</p></section>" +
+    '<section class="concept-read"><h2 class="concept-section-title">' + esc(entry.readLabel || "How to read it") + '</h2><p>' + esc(entry.read) + "</p></section>" +
     (entry.illustration ? '<div class="concept-illustration">' + entry.illustration + "</div>" : "") +
     (usedIn ? '<section><h2 class="concept-section-title">Where it shows up</h2><div class="concept-used-in">' + usedIn + "</div></section>" : "") +
+    (entry.source ? '<section><h2 class="concept-section-title">Official source</h2><a class="concept-chip" href="' + esc(entry.source.href) + '" target="_blank" rel="noopener noreferrer">' + esc(entry.source.label) + '</a></section>' : "") +
     '<p class="concept-topic-note">Part of the <a href="' + esc(explainerHref) + '">' + esc(entry.category) + " topic explainer</a>" +
     (section ? " &middot; " + esc(section.title) : "") + "</p>" +
     "</article>" +

@@ -70,11 +70,13 @@ test("topic ids round-trip and links point at the topic page", () => {
   assert.strictEqual(glossary.categoryForTopicId("not-a-topic"), null);
 });
 
-test("glossary, concept and topic pages load the topic text before the glossary script", () => {
+test("glossary, concept and topic pages load their content before the glossary script", () => {
   for (const page of ["public/indicators.html", "public/concept.html", "public/topic.html"]) {
     const html = read(page);
-    const topics = html.indexOf("/assets/js/glossary-topics.js");
-    assert.ok(topics !== -1 && topics < html.indexOf("/assets/js/indicators.js"), `${page} must load glossary-topics.js first`);
+    for (const script of ["glossary-topics.js", "glossary-entities.js"]) {
+      const content = html.indexOf(`/assets/js/${script}`);
+      assert.ok(content !== -1 && content < html.indexOf("/assets/js/indicators.js"), `${page} must load ${script} first`);
+    }
   }
   const topicPage = read("public/topic.html");
   assert.ok(topicPage.indexOf("/assets/js/indicators.js") < topicPage.indexOf("/assets/js/topic.js"));

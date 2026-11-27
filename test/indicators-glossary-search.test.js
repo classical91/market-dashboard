@@ -18,6 +18,12 @@ test("glossary search matches natural phrasings of terms written with &", () => 
   assert.ok(search("h&s").includes("Head & Shoulders (H&S)"));
 });
 
+test("organization profiles are searchable by product tickers and former names", () => {
+  assert.ok(search("IBIT").includes("BlackRock (iShares)"));
+  assert.ok(search("MicroStrategy").includes("Strategy (MSTR)"));
+  assert.ok(search("ALFRED").includes("Federal Reserve Bank of St. Louis (FRED)"));
+});
+
 test("glossary search matches words in any order and ignores plurals", () => {
   assert.deepStrictEqual(search("divergence rsi"), search("rsi divergence"));
   assert.ok(search("stoch").includes("Stochastic Oscillator"));

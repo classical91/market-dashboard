@@ -42,10 +42,10 @@
   }
 
   if (!category) {
-    document.title = (id ? "Topic not found" : "Topic Explainers") + " · Indicators Glossary · Market Command";
+    document.title = (id ? "Topic not found" : "Topic Explainers") + " · Market Glossary · Market Command";
     root.innerHTML =
       '<div class="topic-card">' +
-      '<div class="topic-kicker">Indicators Glossary</div>' +
+      '<div class="topic-kicker">Market Glossary</div>' +
       '<h1 class="topic-title">Topic explainers</h1>' +
       (id
         ? '<p class="topic-missing">There is no topic called &ldquo;' + esc(id) + "&rdquo;. Pick one below.</p>"
@@ -64,7 +64,7 @@
   document.title = category + " · Topic Explainer · Market Command";
 
   crumbs.innerHTML =
-    '<a href="/indicators.html">Indicators Glossary</a><span aria-hidden="true">/</span>' +
+    '<a href="/indicators.html">Market Glossary</a><span aria-hidden="true">/</span>' +
     '<a href="/topic.html">Topics</a><span aria-hidden="true">/</span>' +
     "<span>" + esc(category) + "</span>";
 
@@ -81,7 +81,7 @@
       '<article class="topic-concept" id="term-' + esc(entry.id) + '">' +
       '<h3 class="topic-concept-heading"><a class="topic-concept-term" href="' + esc(G.conceptHref(entry)) + '">' + esc(entry.term) + "</a></h3>" +
       "<p>" + esc(entry.def) + "</p>" +
-      '<p class="topic-concept-read"><strong>How to read it:</strong> ' + esc(entry.read) + "</p>" +
+      '<p class="topic-concept-read"><strong>' + esc(entry.readLabel || "How to read it") + ':</strong> ' + esc(entry.read) + "</p>" +
       (entry.illustration ? '<div class="topic-concept-illustration">' + entry.illustration + "</div>" : "") +
       (chips ? '<div class="topic-chips">' + chips + "</div>" : "") +
       "</article>"
