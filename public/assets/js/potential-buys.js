@@ -20,7 +20,7 @@
   var OLD = "__old";
   var OLD_PARAM = "old";
 
-  var state = { items: [], loading: true, error: "", uploading: 0, filter: "", viewing: null, folder: ALL, editing: null };
+  var state = { items: [], loading: true, error: "", uploading: 0, filter: "", viewing: null, folder: ALL, editing: null, view: "grid" };
 
   var el = {
     grid: document.getElementById("pbGrid"),
@@ -44,6 +44,7 @@
     headingChart: document.getElementById("pbHeadingChart"),
     viewerChart: document.getElementById("pbViewerChart"),
     back: document.getElementById("pbBack"),
+    view: document.getElementById("pbView"),
     stats: document.getElementById("pbStats"),
     statTotal: document.getElementById("pbStatTotal"),
     statTotalSub: document.getElementById("pbStatTotalSub"),
@@ -65,6 +66,21 @@
     cropClose: document.getElementById("pbCropClose"),
     cropApply: document.getElementById("pbCropApply"),
   };
+
+  // Layout: "grid" shows folders as stacked cards, "list" as compact rows.
+  // Remembered per browser; storage can be blocked, so it's best-effort.
+  var VIEW_KEY = "pb-view";
+  function readView() {
+    try { return localStorage.getItem(VIEW_KEY) === "list" ? "list" : "grid"; } catch (_) { return "grid"; }
+  }
+  function setView(view) {
+    state.view = view === "list" ? "list" : "grid";
+    try { localStorage.setItem(VIEW_KEY, state.view); } catch (_) { /* not saved */ }
+    el.grid.classList.toggle("is-list", state.view === "list");
+    Array.from(el.view.querySelectorAll("[data-view]")).forEach(function (btn) {
+      btn.setAttribute("aria-pressed", String(btn.getAttribute("data-view") === state.view));
+    });
+  }
 
   var toastTimer = null;
   function toast(message, isError) {
@@ -735,6 +751,11 @@
   el.crop.addEventListener("close", function () { crop.id = null; crop.drag = null; });
 
   // Events
+  setView(readView());
+  el.view.addEventListener("click", function (e) {
+    var btn = e.target.closest("[data-view]");
+    if (btn) setView(btn.getAttribute("data-view"));
+  });
   el.add.addEventListener("click", function () { el.file.click(); });
   el.refresh.addEventListener("click", function () { load(); });
   el.dropzone.addEventListener("click", function () { el.file.click(); });
