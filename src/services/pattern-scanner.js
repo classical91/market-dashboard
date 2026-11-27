@@ -401,4 +401,4 @@ class PatternScannerService {
   }
 }
 
-module.exports = { PatternScannerService, classifyWindow, detectDivergence, findPivots, linearRegression, SCAN_INTERVALS };
+module.exports = { PatternScannerService, classifyWindow, detectDivergence, findPivots, linearRegression, SCAN_INTERVALS, DEFAULTS };

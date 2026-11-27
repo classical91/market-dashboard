@@ -135,4 +135,4 @@ class PatternTrackerService {
   }
 }
 
-module.exports = { PatternTrackerService, MOVE_THRESHOLD_PCT };
+module.exports = { PatternTrackerService, MOVE_THRESHOLD_PCT, RESOLVE_HORIZON_MS };
