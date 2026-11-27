@@ -288,7 +288,7 @@
   }
 
   function renderFolder(tag, entries) {
-    var open = folderIsOpen(tag);
+    var open = Boolean(state.open[tag]);
     var images = entries.reduce(function (n, e) { return n + e.items.length; }, 0);
     var latest = entries[0].createdAt;
     var outcomes = {};
@@ -310,10 +310,6 @@
             }).join("") +
           "</div>") +
     "</section>";
-  }
-
-  function folderIsOpen(tag) {
-    return state.open[tag] ?? fullPage;
   }
 
   function render() {
@@ -760,7 +756,7 @@
     if (role === "retry") { load(); return; }
     if (role === "toggle") {
       var tag = btn.closest("[data-folder]").getAttribute("data-folder");
-      state.open[tag] = !folderIsOpen(tag);
+      state.open[tag] = !state.open[tag];
       render();
       if (fullPage) el.list.querySelector('[data-folder="' + tag + '"] .ts-folder-head').focus();
       return;
@@ -1059,7 +1055,28 @@
     render();
   }
 
+  function initCompactView() {
+    var button = document.getElementById("ts-compact");
+    var key = "trade-notes-compact";
+    var compact = false;
+
+    function apply() {
+      panel.classList.toggle("is-compact", compact);
+      button.classList.toggle("ts-btn--primary", compact);
+      button.setAttribute("aria-pressed", String(compact));
+    }
+
+    try { compact = localStorage.getItem(key) === "true"; } catch (_) {}
+    apply();
+    button.addEventListener("click", function () {
+      compact = !compact;
+      apply();
+      try { localStorage.setItem(key, String(compact)); } catch (_) {}
+    });
+  }
+
   if (fullPage) {
+    initCompactView();
     request("/api/watchlist").then(function (data) {
       if (Array.isArray(data.items)) setActiveTickers(data.items.map(function (item) { return item.symbol; }));
     }).catch(function () { /* Notes can still be used without ticker suggestions. */ });
