@@ -3,8 +3,9 @@
  *   News desks     the four desk briefings (phone upload or Reporter run,
  *                  whichever is newer), in a tab that collapses to one line
  *                  showing when the last report ran.
- *   System status  a count and the last run / update time for AI Presets,
- *                  My Layouts, Active Trades and Potential Buys.
+ *   System status  how many Active Trades, Potential Trades, My Layouts and
+ *                  My Presets there are, with the last 24 hours in small
+ *                  print and the last run / update time.
  *   Market Matrix  the four Market Matrix panels as sparklines, in the same
  *                  symbols and timeframes as the full page's saved workspace.
  *
@@ -128,14 +129,32 @@
 
   // ── System status ──────────────────────────────────────────
   var systemEl = document.getElementById("ov2-system");
+  // Order: Active Trades, Potential Trades, My Layouts, My Presets. The big
+  // number is how many there are; the small print is the last 24 hours.
   var SYSTEMS = [
     {
-      id: "presets", label: "Presets", href: "/ai-analysis.html", verb: "Last run",
+      id: "trades", label: "Active Trades", href: "/pattern-scanner-trades.html", verb: "Last updated",
       load: function () {
-        return loadGeneration("presets", "/api/ai-analysis", "/api/ai-analysis/log", function (data) {
-          gen.presets.presets = data.presets || [];
-          gen.presets.intervals = data.availableIntervals || [];
-        }).then(logSummary);
+        return getJson("/api/watchlist").then(function (data) {
+          var items = data.items || [];
+          var added = countSince(items, "addedAt");
+          return {
+            count: items.length, unit: items.length === 1 ? "pair tracked" : "pairs tracked",
+            note: "+" + added + " added in 24h", at: newestOf(items, "addedAt"),
+          };
+        });
+      },
+    },
+    {
+      id: "buys", label: "Potential Trades", href: "/potential-buys.html", verb: "Last updated",
+      load: function () {
+        return getJson("/api/potential-buys/summary").then(function (data) {
+          return {
+            count: data.total, unit: "saved",
+            note: typeof data.addedLast24h === "number" ? "+" + data.addedLast24h + " added in 24h" : "",
+            at: time(data.newestAt),
+          };
+        });
       },
     },
     {
@@ -143,28 +162,18 @@
       load: function () {
         return loadGeneration("layouts", "/api/layout-analysis", "/api/layout-analysis/log", function (data) {
           gen.layouts.configured = data.layouts || [];
-        }).then(logSummary);
+          return gen.layouts.configured.length;
+        }).then(generationSummary);
       },
     },
     {
-      id: "trades", label: "Active Trades", href: "/pattern-scanner-trades.html", verb: "Last updated",
+      id: "presets", label: "My Presets", href: "/ai-analysis.html", verb: "Last run",
       load: function () {
-        return getJson("/api/watchlist").then(function (data) {
-          var items = data.items || [];
-          return { count: items.length, unit: items.length === 1 ? "pair tracked" : "pairs tracked", at: newestOf(items, "addedAt") };
-        });
-      },
-    },
-    {
-      id: "buys", label: "Potential Buys", href: "/potential-buys.html", verb: "Last updated",
-      load: function () {
-        return getJson("/api/potential-buys/summary").then(function (data) {
-          return {
-            count: data.total, unit: "saved",
-            extra: typeof data.addedLast24h === "number" ? "+" + data.addedLast24h + " in 24h" : "",
-            at: time(data.newestAt),
-          };
-        });
+        return loadGeneration("presets", "/api/ai-analysis", "/api/ai-analysis/log", function (data) {
+          gen.presets.presets = data.presets || [];
+          gen.presets.intervals = data.availableIntervals || [];
+          return gen.presets.presets.length;
+        }).then(generationSummary);
       },
     },
   ];
@@ -178,12 +187,20 @@
     return best;
   }
 
-  // The generation logs keep the latest 200 runs; the count is runs in the
-  // last 24 hours, the time is the newest run.
-  function logSummary(entries) {
+  function countSince(items, field) {
     var since = Date.now() - DAY_MS;
-    var count = (entries || []).filter(function (e) { var at = time(e && e.generatedAt); return at !== null && at >= since; }).length;
-    return { count: count, unit: count === 1 ? "run in 24h" : "runs in 24h", at: newestOf(entries, "generatedAt") };
+    return (items || []).filter(function (item) { var at = time(item && item[field]); return at !== null && at >= since; }).length;
+  }
+
+  // Count = saved layouts / presets; small print = runs in the last 24 hours
+  // (the generation logs keep the latest 200 runs), time = the newest run.
+  function generationSummary(result) {
+    var runs = countSince(result.entries, "generatedAt");
+    return {
+      count: result.listed, unit: "saved",
+      note: result.entries ? runs + (runs === 1 ? " run" : " runs") + " in 24h" : "Runs unavailable",
+      at: newestOf(result.entries, "generatedAt"),
+    };
   }
 
   function systemShell(sys) {
@@ -199,12 +216,13 @@
     return sys.load().then(function (result) {
       var known = typeof result.count === "number" && isFinite(result.count);
       countEl.innerHTML = known
-        ? "<strong>" + esc(result.count) + "</strong> " + esc(result.unit) + (result.extra ? ' <em>' + esc(result.extra) + "</em>" : "")
+        ? "<strong>" + esc(result.count) + "</strong> " + esc(result.unit)
         : "<strong>—</strong>";
+      var note = result.note ? "<em>" + esc(result.note) + "</em> · " : "";
       whenEl.className = "ov2-sys-when" + (result.at ? "" : " ov2-flat");
-      whenEl.innerHTML = result.at
+      whenEl.innerHTML = note + (result.at
         ? esc(sys.verb + " " + ago(result.at)) + " · " + timeTag(result.at, "ov2-sys-stamp")
-        : esc(sys.verb === "Last run" ? "No run recorded" : "Nothing saved yet");
+        : esc(sys.verb === "Last run" ? "No run recorded" : "Nothing saved yet"));
     }, function (err) {
       countEl.innerHTML = "<strong>—</strong>";
       whenEl.className = "ov2-sys-when ov2-warn";
@@ -510,21 +528,28 @@
   });
 
   // Called by the status loaders. The list read only adds tiles with no run
-  // yet; if it fails, tiles come from the log alone.
+  // yet; if it fails, tiles come from the log alone. Resolves with the list
+  // count (null if the list failed) and the log entries (null if the log
+  // failed); rejects only when both fail.
   function loadGeneration(tab, listUrl, logUrl, applyList) {
     var state = gen[tab];
-    var list = getJson(listUrl).then(applyList, function () { /* log-only tiles */ });
-    return getJson(logUrl).then(function (data) {
+    var list = getJson(listUrl).then(applyList, function () { return null; /* log-only tiles */ });
+    var log = getJson(logUrl).then(function (data) {
       state.entries = data.entries || [];
       state.error = null;
       list.then(function () { if (gen.tab === tab) renderGeneration(); });
       if (gen.tab === tab) renderGeneration();
-      return data.entries;
+      return { entries: state.entries };
     }, function (err) {
       state.entries = null;
       state.error = err.message;
       if (gen.tab === tab) renderGeneration();
-      throw err;
+      return { entries: null, error: err };
+    });
+    return Promise.all([list, log]).then(function (results) {
+      var listed = typeof results[0] === "number" ? results[0] : null;
+      if (listed === null && results[1].error) throw results[1].error;
+      return { listed: listed, entries: results[1].entries };
     });
   }
 
