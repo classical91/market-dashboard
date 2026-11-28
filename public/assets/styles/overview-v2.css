@@ -216,6 +216,7 @@
 .ov2-sys-count strong { font-size: 18px; color: var(--text); font-variant-numeric: tabular-nums; margin-right: 2px; }
 .ov2-sys-count em { font-style: normal; color: var(--soft); }
 .ov2-sys-when { font-size: 10px; color: var(--soft); overflow-wrap: anywhere; }
+.ov2-sys-when em { font-style: normal; color: var(--sys-tone, var(--soft)); }
 .ov2-sys-stamp, .ov2-news-stamp { color: var(--muted); }
 .ov2-matrix-card { border: 1px solid var(--border); background: var(--surface); border-radius: 10px; padding: 11px 13px; min-width: 0; }
 .ov2-matrix-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }

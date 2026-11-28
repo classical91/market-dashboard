@@ -121,24 +121,46 @@ test("review distinguishes a missing report from failed and partially available 
   assert.equal(opened[2].failed, true);
 });
 
-test("system tiles show a count and the last run or update, and a failure stays visible", async () => {
+test("system tiles lead with how many there are, in trade-first order, with the last 24h in small print", async () => {
   const nodes = await run({
+    // Log before list: the fake fetch matches the first prefix.
     "/api/ai-analysis/log": { entries: [{ generatedAt: iso(HOUR) }, { generatedAt: iso(3 * HOUR) }, { generatedAt: iso(30 * HOUR) }] },
+    "/api/ai-analysis": { presets: [{ symbol: "A" }, { symbol: "B" }, { symbol: "C" }], availableIntervals: ["4h"] },
     "/api/layout-analysis/log": { entries: [] },
     "/api/watchlist": { items: [{ addedAt: iso(5 * HOUR) }, { addedAt: iso(26 * HOUR) }] },
     "/api/potential-buys/summary": new Error("down"),
     "/api/phone-briefings": { categories: [] },
     "/api/daily-report/generations": { generations: [] },
   });
+  const order = ["trades", "buys", "layouts", "presets"].map((id) => nodes["ov2-system"].innerHTML.indexOf('id="ov2-sys-' + id + '"'));
+  assert.deepEqual(order.slice().sort((x, y) => x - y), order);
+  assert.ok(order[0] >= 0);
+  assert.match(nodes["ov2-system"].innerHTML, /Potential Trades/);
+  assert.match(nodes["ov2-system"].innerHTML, /My Presets/);
   const tile = (id) => nodes["ov2-system"] && nodes["ov2-sys-" + id];
-  assert.match(tile("presets").querySelector(".ov2-sys-count").innerHTML, /<strong>2<\/strong> runs in 24h/);
-  assert.match(tile("presets").querySelector(".ov2-sys-when").innerHTML, /^Last run 1h ago/);
-  assert.equal(tile("layouts").querySelector(".ov2-sys-when").innerHTML, "No run recorded");
+  // Presets: count is saved presets; runs in the last 24 hours are small print.
+  assert.match(tile("presets").querySelector(".ov2-sys-count").innerHTML, /<strong>3<\/strong> saved/);
+  assert.match(tile("presets").querySelector(".ov2-sys-when").innerHTML, /^<em>2 runs in 24h<\/em> · Last run 1h ago/);
+  // Layouts: the list failed but the log loaded, so the count is unknown, not 0.
+  assert.match(tile("layouts").querySelector(".ov2-sys-count").innerHTML, /<strong>—<\/strong>/);
+  assert.equal(tile("layouts").querySelector(".ov2-sys-when").innerHTML, "<em>0 runs in 24h</em> · No run recorded");
   assert.match(nodes["ov2-generation-log"].innerHTML, /No captures yet/);
   assert.match(tile("trades").querySelector(".ov2-sys-count").innerHTML, /<strong>2<\/strong> pairs tracked/);
-  assert.match(tile("trades").querySelector(".ov2-sys-when").innerHTML, /^Last updated 5h ago/);
+  assert.match(tile("trades").querySelector(".ov2-sys-when").innerHTML, /^<em>\+1 added in 24h<\/em> · Last updated 5h ago/);
   assert.match(tile("buys").querySelector(".ov2-sys-when").textContent, /^Unavailable/);
   assert.match(tile("buys").querySelector(".ov2-sys-count").innerHTML, /—/);
+});
+
+test("a generation tile is unavailable only when both its list and its log fail", async () => {
+  const nodes = await run({
+    "/api/layout-analysis/log": new Error("down"),
+    "/api/layout-analysis": { layouts: [{ id: "a" }, { id: "b" }] },
+    "/api/ai-analysis/log": new Error("down"),
+  });
+  const tile = (id) => nodes["ov2-sys-" + id];
+  assert.match(tile("layouts").querySelector(".ov2-sys-count").innerHTML, /<strong>2<\/strong> saved/);
+  assert.match(tile("layouts").querySelector(".ov2-sys-when").innerHTML, /^<em>Runs unavailable<\/em>/);
+  assert.match(tile("presets").querySelector(".ov2-sys-when").textContent, /^Unavailable/);
 });
 
 test("layout widget orders captures newest first, groups local days and escapes layout labels", async () => {
